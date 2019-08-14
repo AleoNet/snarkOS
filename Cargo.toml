@@ -12,7 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = []
+members = ["utilities"]
+
+[[bin]]
+name = "snarkos"
+path = "node/main.rs"
 
 [profile.release]
 opt-level = 3
