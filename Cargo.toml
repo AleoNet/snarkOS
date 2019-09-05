@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["errors", "utilities"]
+members = ["errors", "models", "utilities"]
 
 [[bin]]
 name = "snarkos"
