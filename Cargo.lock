@@ -219,6 +219,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "1.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8815e2ab78f3a59928fc32e141fbeece88320a240e43f47b2fd64ea3a88a5b3d"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1041,6 +1052,13 @@ dependencies = [
  "smallvec",
  "snarkos-errors",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-profiler"
+version = "0.8.0"
+dependencies = [
+ "colored",
 ]
 
 [[package]]
