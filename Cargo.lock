@@ -1028,6 +1028,18 @@ name = "snarkos"
 version = "0.8.0"
 
 [[package]]
+name = "snarkos-curves"
+version = "0.8.0"
+dependencies = [
+ "derivative",
+ "rand 0.7.3",
+ "rand_xorshift 0.2.0",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-errors"
 version = "0.8.0"
 dependencies = [
