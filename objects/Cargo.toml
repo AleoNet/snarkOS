@@ -1,0 +1,25 @@
+[package]
+name = "snarkos-objects"
+version = "0.8.0"
+authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+description = "Objects for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
+snarkos-algorithms = { path = "../algorithms" }
+snarkos-errors = { path = "../errors" }
+
+base58 = { version = "0.1" }
+chrono = { version = "0.4", features = ["serde"] }
+hex = { version = "0.4.0" }
+secp256k1 = { version = "0.15.5" }
+serde = { version = "1.0", features = ["derive"] }
+sha2 = { version = "0.8" }
+wagyu-bitcoin = { version = "0.6.1" }
+wagyu-model = { version = "0.6.1" }
