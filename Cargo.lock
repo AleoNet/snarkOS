@@ -762,6 +762,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lock_api"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79b2de95ecb4691949fea4716ca53cdbcfccb2c612e19644a8bad05edcf9f47b"
+dependencies = [
+ "scopeguard",
+]
+
+[[package]]
 name = "log"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -841,6 +850,30 @@ name = "opaque-debug"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
+
+[[package]]
+name = "parking_lot"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92e98c49ab0b7ce5b222f2cc9193fc4efe11c6d0bd4f648e374684a6857b1cfc"
+dependencies = [
+ "lock_api",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7582838484df45743c8434fbff785e8edf260c28748353d44bc0da32e0ceabf1"
+dependencies = [
+ "cfg-if",
+ "cloudabi",
+ "libc",
+ "redox_syscall",
+ "smallvec 1.2.0",
+ "winapi",
+]
 
 [[package]]
 name = "pbkdf2"
@@ -1301,6 +1334,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "smallvec"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
+
+[[package]]
 name = "snarkos"
 version = "0.8.0"
 
@@ -1317,7 +1356,7 @@ dependencies = [
  "rand_xorshift 0.2.0",
  "rayon",
  "sha2",
- "smallvec",
+ "smallvec 0.6.13",
  "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
@@ -1359,7 +1398,7 @@ dependencies = [
  "failure",
  "rand 0.7.3",
  "rand_xorshift 0.2.0",
- "smallvec",
+ "smallvec 0.6.13",
  "snarkos-errors",
  "snarkos-utilities",
 ]
@@ -1385,6 +1424,21 @@ name = "snarkos-profiler"
 version = "0.8.0"
 dependencies = [
  "colored",
+]
+
+[[package]]
+name = "snarkos-storage"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "hex 0.4.1",
+ "parking_lot",
+ "rocksdb",
+ "serde",
+ "snarkos-errors",
+ "snarkos-objects",
+ "wagyu-bitcoin",
+ "wagyu-model",
 ]
 
 [[package]]
