@@ -1503,6 +1503,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_test"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fef5f7c7434b2f2c598adc6f9494648a1e41274a75c0ba4056f680ae0c117fd6"
+dependencies = [
+ "lazy_static",
+ "parking_lot",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d08338d8024b227c62bd68a12c7c9883f5c66780abaef15c550dc56f46ee6515"
+dependencies = [
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
+]
+
+[[package]]
 name = "sha2"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1632,6 +1654,27 @@ dependencies = [
  "smallvec 0.6.13",
  "snarkos-errors",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-network"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "futures-await-test",
+ "hex 0.4.1",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "serial_test",
+ "snarkos-consensus",
+ "snarkos-errors",
+ "snarkos-objects",
+ "snarkos-storage",
+ "tokio",
+ "tokio-test",
+ "wagyu-bitcoin",
 ]
 
 [[package]]
@@ -1834,6 +1877,17 @@ dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
  "syn 1.0.14",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09cf9705471976fa5fc6817d3fbc9c4ff9696a6647af0e5c1870c81ca7445b05"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "tokio",
 ]
 
 [[package]]
