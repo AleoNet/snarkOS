@@ -1,0 +1,41 @@
+[package]
+name = "snarkos-rpc"
+version = "0.8.0"
+authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+description = "RPC for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+#[lib]
+#path = "src/lib.rs"
+#
+#[[bin]]
+#name = "rpc"
+#path = "src/rpc_server.rs"
+
+[dependencies]
+snarkos-consensus = { path = "../consensus" }
+snarkos-errors = { path = "../errors" }
+snarkos-network = { path = "../network" }
+snarkos-objects = { path = "../objects" }
+snarkos-storage = { path = "../storage" }
+
+chrono = { version = "0.4", features = ["serde"] }
+hex = { version = "0.4.0" }
+jsonrpc-core = { version = "14.0.5" }
+jsonrpc-core-client = { version = "14.0.5" }
+jsonrpc-derive = { version = "14.0.5" }
+jsonrpc-http-server = { version = "14.0.5" }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "0.2", features = ["full"] }
+wagyu-bitcoin = { version = "0.6.1" }
+wagyu-model = { version = "0.6.1" }
+
+[dev-dependencies]
+jsonrpc-test = { version = "14.0.5" }
+serde_json = { version = "1.0.47" }
