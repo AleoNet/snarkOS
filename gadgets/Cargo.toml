@@ -1,0 +1,26 @@
+[package]
+name = "snarkos-gadgets"
+version = "0.8.0"
+authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+description = "Gadgets for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
+snarkos-algorithms = { path = "../algorithms" }
+snarkos-curves = { path = "../curves" }
+snarkos-models = { path = "../models" }
+snarkos-utilities = { path = "../utilities" }
+
+derivative = { version = "1" }
+digest = { version = "0.7" }
+
+[dev-dependencies]
+blake2 = { version = "0.7" }
+rand = { version = "0.7" }
+rand_xorshift = { version = "0.2" }
