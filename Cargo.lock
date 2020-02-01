@@ -1916,6 +1916,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-gadgets"
+version = "0.8.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.7.6",
+ "rand 0.7.3",
+ "rand_xorshift 0.2.0",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-models",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
