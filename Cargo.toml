@@ -12,7 +12,21 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["algorithms", "consensus", "curves", "errors", "gadgets", "models", "network", "objects", "profiler", "rpc", "storage", "utilities"]
+members = [
+    "algorithms",
+    "consensus",
+    "console",
+    "curves",
+    "errors",
+    "gadgets",
+    "models",
+    "network",
+    "objects",
+    "profiler",
+    "rpc",
+    "storage",
+    "utilities"
+]
 
 [[bin]]
 name = "snarkos"
