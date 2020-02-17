@@ -1,0 +1,80 @@
+sudo: false
+language: rust
+cache: cargo
+env:
+  global:
+    - CRATE_NAME=snarkOS
+matrix:
+  fast_finish: true
+  include:
+    - rust: stable
+      env: TEST_COVERAGE=1
+      addons:
+        apt:
+          packages:
+            - libcurl4-openssl-dev
+            - libelf-dev
+            - libdw-dev
+            - cmake
+            - gcc
+            - binutils-dev
+            - libiberty-dev
+      after_success: |
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+        tar xzf master.tar.gz &&
+        cd kcov-master &&
+        mkdir build &&
+        cd build &&
+        cmake .. &&
+        make &&
+        sudo make install &&
+        cd ../.. &&
+        rm -rf kcov-master &&
+        for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+        bash <(curl -s https://codecov.io/bash) &&
+        echo "Uploaded code coverage"
+    - rust: beta
+    - rust: nightly
+    # Deployments
+    - rust: stable
+      env: DEPLOY=1 TARGET=x86_64-apple-darwin
+      script:
+        - cargo build --release --target $TARGET
+        - RUST_BACKTRACE=1 cargo test --all --verbose
+      os: osx
+#    - rust: stable
+#      env: DEPLOY=1 TARGET=x86_64-unknown-linux-musl
+#      script:
+#        - rustup target add x86_64-unknown-linux-musl
+#        - rustup component add rustfmt --toolchain stable-x86_64-unknown-linux-gnu
+#        - cargo build --release --target $TARGET
+#        - RUST_BACKTRACE=1 cargo test --all --verbose
+#      addons:
+#        apt:
+#          packages:
+#            - musl-tools
+
+script:
+  - cargo build --verbose
+  - RUST_MIN_STACK=8388608 RUST_BACKTRACE=1 cargo test --all --verbose
+
+#before_deploy:
+#  - |
+#    name="snarkOS-$TRAVIS_TAG-$TARGET"
+#    mv target/$TARGET/release/snarkOS $name
+#    tar czvf $name.tar.gz $name
+#    echo -n $(shasum -ba 256 "$name.tar.gz" | cut -d " " -f 1) > $name.tar.gz.sha256
+#deploy:
+#  api_key:
+#    secure: "Wc4CI2DQ8EyfhHKc+nBzewCu2fAK1Fz2XlKBs02haxAnqoxi3uDjCCzlGOJmwMcg0DCvpKlyqtmMFV1i1/3zPTd+SKTMiuJQfuWhSAtDuKXyBKdiHe9mLzZqle5VSliiLLxCWuqgDeMdiU3+0zWIwjM3wwzyzzCnNg3N0H9KyuJE+0HFvgCmpSt1XilRbIl/D8ihXpZZqIz832/1EXtbHcWIpa7+dcjPuGA6GRXWccLgehBC6tR4e2CviFLsXZ1/B1cLcNZmCEj2yxkvbF913sBjXGK1Y5I9pihZ3w58ZBzbjqj5B23+WN6zUNsxE9TqsafJU/XRlcXvRI2NNxKMRHyVb8ZswJo+W21Kzi0AezHfHY+HI0ntcyutWXEFYTVxVwamYPisYkq6hZK6uS/58HXLh59FcHbn3xomRwKRAtuJ5rhosvGXBBfuvgo5azRkSkCdGwXwsdOM6kgP1wGoRm0bKUe1JlAkC51bWIWHhkKFjOmyjbCo05pqhP9UxV/6lNVt2aemY7I/c7EAKHk5VlRdA7AGsmFWivMr1KPc6HjZzl3/pcMWQlaklZNEevzgDdqIeTl5iFDSJfg02+gWoDV90pyk8NhdKK9jxlhIJMihZWrbcaqwOdNaw4DJSH4+tQ2qANp7GChySPYEdZdaA87dzvQMWbhnYkJqD/qKxpQ="
+#  draft: true
+#  file_glob: true
+#  file:
+#    - snarkOS-$TRAVIS_TAG-$TARGET.tar.gz
+#    - snarkOS-$TRAVIS_TAG-$TARGET.tar.gz.sha256
+#  on:
+#    condition: $DEPLOY = 1
+#    tags: true
+#    repo: AleoHQ/snarkOS
+#  provider: releases
+#  skip_cleanup: true
