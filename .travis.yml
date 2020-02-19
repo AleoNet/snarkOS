@@ -1,0 +1,42 @@
+language: rust
+services: docker
+sudo: required
+
+before_install:
+  - set -e
+  - export SCCACHE_CACHE_SIZE=200M
+  - export SCCACHE_DIR="$TRAVIS_HOME/.cache/sccache"
+
+install:
+  - (cargo install sccache || true)
+  - export PATH="$PATH:$TRAVIS_HOME/.cargo/bin"
+  - export RUSTC_WRAPPER="sccache"
+  - rustup component add rustfmt
+
+cache:
+  directories:
+    - $TRAVIS_HOME/.cache/sccache
+    - $TRAVIS_HOME/.cargo
+
+# See https://levans.fr/rust_travis_cache.html
+before_cache:
+  - rm -rf "$TRAVIS_HOME/.cargo/registry"
+
+after_script:
+  - sccache -s
+  - set +e
+
+matrix:
+  fast_finish: true
+  include:
+    - rust: stable
+      script:
+        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip integration_test
+
+    - rust: nightly
+      script:
+        - cargo fmt -- --check
+        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip integration_test
+
+script:
+  - echo "snarkOS"
