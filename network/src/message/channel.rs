@@ -1,6 +1,8 @@
 use crate::message::{
     read::{read_header, read_message},
-    Message, MessageHeader, MessageName,
+    Message,
+    MessageHeader,
+    MessageName,
 };
 
 use snarkos_errors::network::ConnectError;

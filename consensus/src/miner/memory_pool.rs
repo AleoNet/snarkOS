@@ -261,13 +261,10 @@ mod tests {
 
         let mut mem_pool = MemoryPool::new();
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: TRANSACTION_BYTES.len(),
-                    transaction: Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_BYTES.len(),
+                transaction: Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap(),
+            })
             .unwrap();
 
         assert_eq!(434, mem_pool.total_size);
@@ -283,13 +280,10 @@ mod tests {
         let mut mem_pool = MemoryPool::new();
         let transaction = Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap();
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: TRANSACTION_BYTES.len(),
-                    transaction: transaction.clone(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_BYTES.len(),
+                transaction: transaction.clone(),
+            })
             .unwrap();
 
         assert_eq!(1, mem_pool.transactions.len());
@@ -315,13 +309,10 @@ mod tests {
         let mut mem_pool = MemoryPool::new();
         let transaction = Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap();
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: TRANSACTION_BYTES.len(),
-                    transaction: transaction.clone(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_BYTES.len(),
+                transaction: transaction.clone(),
+            })
             .unwrap();
 
         assert_eq!(1, mem_pool.transactions.len());
@@ -347,13 +338,10 @@ mod tests {
         let transaction = Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap();
         let expected_transaction = transaction.clone();
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: TRANSACTION_BYTES.len(),
-                    transaction,
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_BYTES.len(),
+                transaction,
+            })
             .unwrap();
 
         let max_block_size = TRANSACTION_BYTES.len() + BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE;
@@ -375,33 +363,24 @@ mod tests {
             Transaction::deserialize(&hex::decode(DOUBLE_SPEND_TRANSACTION_BYTES).unwrap()).unwrap();
 
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: TRANSACTION_BYTES.len(),
-                    transaction: transaction.clone(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_BYTES.len(),
+                transaction: transaction.clone(),
+            })
             .unwrap();
 
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: TRANSACTION_BYTES.len(),
-                    transaction: transaction.clone(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_BYTES.len(),
+                transaction: transaction.clone(),
+            })
             .unwrap();
 
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size: DOUBLE_SPEND_TRANSACTION_BYTES.len(),
-                    transaction: double_spend_transaction,
-                },
-            )
+            .insert(&blockchain, Entry {
+                size: DOUBLE_SPEND_TRANSACTION_BYTES.len(),
+                transaction: double_spend_transaction,
+            })
             .unwrap();
 
         assert_eq!(1, mem_pool.transactions.len());

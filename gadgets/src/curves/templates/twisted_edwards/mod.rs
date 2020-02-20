@@ -10,7 +10,8 @@ use snarkos_models::{
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::CondSelectGadget,
             uint8::UInt8,
-            ToBitsGadget, ToBytesGadget,
+            ToBitsGadget,
+            ToBytesGadget,
         },
     },
 };

@@ -2,7 +2,9 @@ use crate::{
     curves::{
         batch_inversion,
         fp6_3over2::{Fp6, Fp6Parameters},
-        Field, Fp2Parameters, PrimeField,
+        Field,
+        Fp2Parameters,
+        PrimeField,
     },
     gadgets::{
         curves::FieldGadget,
@@ -13,7 +15,8 @@ use crate::{
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
             uint8::UInt8,
-            ToBitsGadget, ToBytesGadget,
+            ToBitsGadget,
+            ToBytesGadget,
         },
     },
 };

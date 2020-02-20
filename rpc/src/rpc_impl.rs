@@ -1,6 +1,10 @@
 use crate::{rpc_types::*, RpcFunctions};
 use snarkos_consensus::{
-    block_reward, check_for_double_spend, check_for_double_spends, miner::MemoryPool, ConsensusParameters,
+    block_reward,
+    check_for_double_spend,
+    check_for_double_spends,
+    miner::MemoryPool,
+    ConsensusParameters,
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_network::base::{process_transaction_internal, Context};

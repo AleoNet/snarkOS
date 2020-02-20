@@ -1,6 +1,11 @@
 use snarkos_models::curves::{
-    AffineCurve, Field, MontgomeryModelParameters as MontgomeryParameters, PrimeField, ProjectiveCurve,
-    SquareRootField, TEModelParameters as Parameters,
+    AffineCurve,
+    Field,
+    MontgomeryModelParameters as MontgomeryParameters,
+    PrimeField,
+    ProjectiveCurve,
+    SquareRootField,
+    TEModelParameters as Parameters,
 };
 use snarkos_utilities::{
     bititerator::BitIterator,

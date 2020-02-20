@@ -180,7 +180,6 @@ pub struct ConfigCli;
 impl CLI for ConfigCli {
     type Config = Config;
 
-    const NAME: NameType = "skeleton-node";
     const ABOUT: AboutType = "Start a skeleton blockchain miner (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[
         flag::NETWORK,
@@ -189,6 +188,7 @@ impl CLI for ConfigCli {
         flag::MINER,
         flag::QUIET,
     ];
+    const NAME: NameType = "skeleton-node";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
         option::PORT,
@@ -205,49 +205,43 @@ impl CLI for ConfigCli {
     /// Handle all CLI arguments and flags for skeleton node
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CliError> {
         let mut config = Config::default();
-        config.parse(
-            arguments,
-            &[
-                "network",
-                "no_jsonrpc",
-                "is_bootnode",
-                "miner",
-                "quiet",
-                "ip",
-                "port",
-                "path",
-                "rpc_port",
-                "connect",
-                "coinbase_address",
-                "mempool_interval",
-                "min_peers",
-                "max_peers",
-            ],
-        );
+        config.parse(arguments, &[
+            "network",
+            "no_jsonrpc",
+            "is_bootnode",
+            "miner",
+            "quiet",
+            "ip",
+            "port",
+            "path",
+            "rpc_port",
+            "connect",
+            "coinbase_address",
+            "mempool_interval",
+            "min_peers",
+            "max_peers",
+        ]);
 
         // TODO: remove this for release
         match arguments.subcommand() {
             ("test", Some(arguments)) => {
                 config.subcommand = Some("test".into());
-                config.parse(
-                    arguments,
-                    &[
-                        "network",
-                        "no_jsonrpc",
-                        "is_bootnode",
-                        "miner",
-                        "quiet",
-                        "ip",
-                        "port",
-                        "path",
-                        "rpc_port",
-                        "connect",
-                        "coinbase_address",
-                        "mempool+interval",
-                        "min_peers",
-                        "max_peers",
-                    ],
-                );
+                config.parse(arguments, &[
+                    "network",
+                    "no_jsonrpc",
+                    "is_bootnode",
+                    "miner",
+                    "quiet",
+                    "ip",
+                    "port",
+                    "path",
+                    "rpc_port",
+                    "connect",
+                    "coinbase_address",
+                    "mempool+interval",
+                    "min_peers",
+                    "max_peers",
+                ]);
             }
             _ => {}
         }

@@ -294,11 +294,7 @@ impl<P: Fp384Parameters> Field for Fp384<P> {
                 }
             }
 
-            if u == one {
-                Some(b)
-            } else {
-                Some(c)
-            }
+            if u == one { Some(b) } else { Some(c) }
         }
     }
 
@@ -355,11 +351,7 @@ impl<P: Fp384Parameters> PrimeField for Fp384<P> {
     #[inline]
     fn from_repr_raw(r: BigInteger) -> Self {
         let r = Fp384(r, PhantomData);
-        if r.is_valid() {
-            r
-        } else {
-            Self::zero()
-        }
+        if r.is_valid() { r } else { Self::zero() }
     }
 
     #[inline]
@@ -376,11 +368,7 @@ impl<P: Fp384Parameters> PrimeField for Fp384<P> {
         BigInteger::read(result_bytes.as_slice()).ok().and_then(|mut res| {
             res.as_mut()[5] &= 0xffffffffffffffff >> P::REPR_SHAVE_BITS;
             let result = Self::new(res);
-            if result.is_valid() {
-                Some(result)
-            } else {
-                None
-            }
+            if result.is_valid() { Some(result) } else { None }
         })
     }
 
@@ -501,11 +489,7 @@ impl<P: Fp384Parameters> FromStr for Fp384<P> {
                 }
             }
         }
-        if !res.is_valid() {
-            Err(())
-        } else {
-            Ok(res)
-        }
+        if !res.is_valid() { Err(()) } else { Ok(res) }
     }
 }
 

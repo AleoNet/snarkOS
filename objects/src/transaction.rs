@@ -7,7 +7,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{fmt, io::Read, str::FromStr};
 use wagyu_bitcoin::{
-    network::Mainnet, private_key::BitcoinPrivateKey, BitcoinAddress, BitcoinFormat, BitcoinPublicKey,
+    network::Mainnet,
+    private_key::BitcoinPrivateKey,
+    BitcoinAddress,
+    BitcoinFormat,
+    BitcoinPublicKey,
 };
 use wagyu_model::{crypto::hash160, PrivateKey};
 

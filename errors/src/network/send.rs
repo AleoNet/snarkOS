@@ -1,6 +1,7 @@
-use crate::network::message::MessageError;
-use crate::network::ConnectError;
-use crate::objects::BlockError;
+use crate::{
+    network::{message::MessageError, ConnectError},
+    objects::BlockError,
+};
 
 #[derive(Debug, Fail)]
 pub enum SendError {

@@ -209,51 +209,45 @@ impl CLI for ConsoleCli {
     /// Handle all CLI arguments and flags for skeleton node
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CLIError> {
         let mut config = ConsoleConfig::default();
-        config.parse(
-            arguments,
-            &[
-                "ip",
-                "port",
-                "getbalance",
-                "getblock",
-                "getblockcount",
-                "getbestblockhash",
-                "listunspent",
-                "getrawtransaction",
-                "createrawtransaction",
-                "decoderawtransaction",
-                "signrawtransaction",
-                "sendrawtransaction",
-                "getconnectioncount",
-                "getpeerinfo",
-                "getblocktemplate",
-            ],
-        );
+        config.parse(arguments, &[
+            "ip",
+            "port",
+            "getbalance",
+            "getblock",
+            "getblockcount",
+            "getbestblockhash",
+            "listunspent",
+            "getrawtransaction",
+            "createrawtransaction",
+            "decoderawtransaction",
+            "signrawtransaction",
+            "sendrawtransaction",
+            "getconnectioncount",
+            "getpeerinfo",
+            "getblocktemplate",
+        ]);
 
         // TODO: remove this for release
         match arguments.subcommand() {
             ("test", Some(arguments)) => {
                 config.subcommand = Some("test".into());
-                config.parse(
-                    arguments,
-                    &[
-                        "ip",
-                        "port",
-                        "getbalance",
-                        "getblock",
-                        "getblockcount",
-                        "getbestblockhash",
-                        "listunspent",
-                        "getrawtransaction",
-                        "createrawtransaction",
-                        "decoderawtransaction",
-                        "signrawtransaction",
-                        "sendrawtransaction",
-                        "getconnectioncount",
-                        "getpeerinfo",
-                        "getblocktemplate",
-                    ],
-                );
+                config.parse(arguments, &[
+                    "ip",
+                    "port",
+                    "getbalance",
+                    "getblock",
+                    "getblockcount",
+                    "getbestblockhash",
+                    "listunspent",
+                    "getrawtransaction",
+                    "createrawtransaction",
+                    "decoderawtransaction",
+                    "signrawtransaction",
+                    "sendrawtransaction",
+                    "getconnectioncount",
+                    "getpeerinfo",
+                    "getblocktemplate",
+                ]);
             }
             _ => {}
         }

@@ -222,11 +222,7 @@ fn is_left_child(index: usize) -> bool {
 /// Returns the index of the parent, given an index.
 #[inline]
 fn parent(index: usize) -> Option<usize> {
-    if index > 0 {
-        Some((index - 1) >> 1)
-    } else {
-        None
-    }
+    if index > 0 { Some((index - 1) >> 1) } else { None }
 }
 
 #[inline]

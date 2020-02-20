@@ -3,7 +3,10 @@ use snarkos_models::curves::{
     tests_curve::curve_tests,
     tests_field::{field_test, frobenius_test, primefield_test, sqrt_field_test},
     tests_group::group_test,
-    AffineCurve, Field, PairingEngine, PrimeField,
+    AffineCurve,
+    Field,
+    PairingEngine,
+    PrimeField,
 };
 
 use rand;

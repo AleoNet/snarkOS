@@ -256,11 +256,7 @@ impl<F: Field> AllocGadget<bool, F> for AllocatedBit {
             || "boolean",
             || {
                 value = Some(*value_gen()?.borrow());
-                if value.get()? {
-                    Ok(F::one())
-                } else {
-                    Ok(F::zero())
-                }
+                if value.get()? { Ok(F::one()) } else { Ok(F::zero()) }
             },
         )?;
 
@@ -286,11 +282,7 @@ impl<F: Field> AllocGadget<bool, F> for AllocatedBit {
             || "boolean",
             || {
                 value = Some(*value_gen()?.borrow());
-                if value.get()? {
-                    Ok(F::one())
-                } else {
-                    Ok(F::zero())
-                }
+                if value.get()? { Ok(F::one()) } else { Ok(F::zero()) }
             },
         )?;
 

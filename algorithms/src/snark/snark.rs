@@ -1,6 +1,12 @@
 use crate::snark::{
-    create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, Parameters,
-    PreparedVerifyingKey, Proof, VerifyingKey,
+    create_random_proof,
+    generate_random_parameters,
+    prepare_verifying_key,
+    verify_proof,
+    Parameters,
+    PreparedVerifyingKey,
+    Proof,
+    VerifyingKey,
 };
 use snarkos_errors::algorithms::Error;
 use snarkos_models::{

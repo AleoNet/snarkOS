@@ -391,11 +391,7 @@ impl<P: Fp6Parameters> Ord for Fp6<P> {
         let c1_cmp = self.c1.cmp(&other.c1);
         let c0_cmp = self.c0.cmp(&other.c0);
         if c2_cmp == Ordering::Equal {
-            if c1_cmp == Ordering::Equal {
-                c0_cmp
-            } else {
-                c1_cmp
-            }
+            if c1_cmp == Ordering::Equal { c0_cmp } else { c1_cmp }
         } else {
             c2_cmp
         }

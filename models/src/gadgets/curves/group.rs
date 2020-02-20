@@ -7,7 +7,8 @@ use crate::{
             boolean::Boolean,
             eq::{EqGadget, NEqGadget},
             select::CondSelectGadget,
-            ToBitsGadget, ToBytesGadget,
+            ToBitsGadget,
+            ToBytesGadget,
         },
     },
 };

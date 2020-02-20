@@ -1,9 +1,11 @@
 use hex::{FromHex, FromHexError, ToHex};
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp, fmt,
+    cmp,
+    fmt,
     hash::{Hash, Hasher},
-    ops, str,
+    ops,
+    str,
 };
 
 macro_rules! fixed_hash {

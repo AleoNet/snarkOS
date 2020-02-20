@@ -1,6 +1,9 @@
 use crate::curves::templates::bls12::{
-    Bls12PairingGadget, G1Gadget as Bls12G1Gadget, G1PreparedGadget as Bls12G1PreparedGadget,
-    G2Gadget as Bls12G2Gadget, G2PreparedGadget as Bls12G2PreparedGadget,
+    Bls12PairingGadget,
+    G1Gadget as Bls12G1Gadget,
+    G1PreparedGadget as Bls12G1PreparedGadget,
+    G2Gadget as Bls12G2Gadget,
+    G2PreparedGadget as Bls12G2PreparedGadget,
 };
 use snarkos_curves::bls12_377::{Bls12_377Parameters, Fq, Fq12Parameters, Fq2Parameters, Fq6Parameters};
 use snarkos_models::gadgets::curves::{Fp12Gadget, Fp2Gadget, Fp6Gadget, FpGadget};

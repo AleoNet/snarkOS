@@ -1,7 +1,5 @@
-use crate::network::message::MessageError;
-use crate::network::ConnectError;
 use crate::{
-    network::SendError,
+    network::{message::MessageError, ConnectError, SendError},
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };

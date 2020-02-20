@@ -265,11 +265,7 @@ impl<P: Fp320Parameters> Field for Fp320<P> {
                 }
             }
 
-            if u == one {
-                Some(b)
-            } else {
-                Some(c)
-            }
+            if u == one { Some(b) } else { Some(c) }
         }
     }
 
@@ -324,11 +320,7 @@ impl<P: Fp320Parameters> PrimeField for Fp320<P> {
     #[inline]
     fn from_repr_raw(r: BigInteger) -> Self {
         let r = Fp320(r, PhantomData);
-        if r.is_valid() {
-            r
-        } else {
-            Self::zero()
-        }
+        if r.is_valid() { r } else { Self::zero() }
     }
 
     #[inline]
@@ -342,11 +334,7 @@ impl<P: Fp320Parameters> PrimeField for Fp320<P> {
         let mut result = Self::zero();
         if result.0.read_le((&bytes[..]).by_ref()).is_ok() {
             result.0.as_mut()[4] &= 0xffffffffffffffff >> P::REPR_SHAVE_BITS;
-            if result.is_valid() {
-                Some(result)
-            } else {
-                None
-            }
+            if result.is_valid() { Some(result) } else { None }
         } else {
             None
         }
@@ -472,11 +460,7 @@ impl<P: Fp320Parameters> FromStr for Fp320<P> {
                 }
             }
         }
-        if !res.is_valid() {
-            Err(())
-        } else {
-            Ok(res)
-        }
+        if !res.is_valid() { Err(()) } else { Ok(res) }
     }
 }
 

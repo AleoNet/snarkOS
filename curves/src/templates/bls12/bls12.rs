@@ -6,7 +6,14 @@ use snarkos_models::curves::{
     fp12_2over3over2::{Fp12, Fp12Parameters},
     fp2::Fp2Parameters,
     fp6_3over2::Fp6Parameters,
-    Field, Fp2, ModelParameters, PairingCurve, PairingEngine, PrimeField, SWModelParameters, SquareRootField,
+    Field,
+    Fp2,
+    ModelParameters,
+    PairingCurve,
+    PairingEngine,
+    PrimeField,
+    SWModelParameters,
+    SquareRootField,
 };
 use snarkos_utilities::bititerator::BitIterator;
 

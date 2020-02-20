@@ -64,10 +64,9 @@ mod tests {
             len: 4u32,
         };
 
-        assert_eq!(
-            header.serialize().unwrap(),
-            vec![112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]
-        );
+        assert_eq!(header.serialize().unwrap(), vec![
+            112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4
+        ]);
     }
 
     #[test]

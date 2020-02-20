@@ -3,9 +3,11 @@ use crate::{
     gadgets::{
         curves::FieldGadget,
         r1cs::{
-            Assignment, ConstraintSystem,
+            Assignment,
+            ConstraintSystem,
             ConstraintVar::{self, *},
-            LinearCombination, SynthesisError,
+            LinearCombination,
+            SynthesisError,
         },
         utilities::{
             alloc::AllocGadget,
@@ -13,7 +15,8 @@ use crate::{
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
             uint8::UInt8,
-            ToBitsGadget, ToBytesGadget,
+            ToBitsGadget,
+            ToBytesGadget,
         },
     },
 };
@@ -411,11 +414,7 @@ impl<F: PrimeField> CondSelectGadget<F> for FpGadget<F> {
         second: &Self,
     ) -> Result<Self, SynthesisError> {
         if let Boolean::Constant(cond) = *cond {
-            if cond {
-                Ok(first.clone())
-            } else {
-                Ok(second.clone())
-            }
+            if cond { Ok(first.clone()) } else { Ok(second.clone()) }
         } else {
             let result = Self::alloc(cs.ns(|| ""), || {
                 cond.get_value()
@@ -499,11 +498,7 @@ impl<F: PrimeField> ThreeBitCondNegLookupGadget<F> for FpGadget<F> {
                 (true, false) => c[1],
                 (true, true) => c[3],
             };
-            if b[2].get_value().get()? {
-                Ok(-y)
-            } else {
-                Ok(y)
-            }
+            if b[2].get_value().get()? { Ok(-y) } else { Ok(y) }
         })?;
 
         let one = CS::one();

@@ -4,7 +4,11 @@ use node::{
 };
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::node::NodeError;
-use snarkos_network::{base::Context, base::SyncHandler, MinerInstance, Server};
+use snarkos_network::{
+    base::{Context, SyncHandler},
+    MinerInstance,
+    Server,
+};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::BlockStorage;
 

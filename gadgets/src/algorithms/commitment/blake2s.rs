@@ -69,13 +69,10 @@ impl<F: PrimeField> AllocGadget<[u8; 32], F> for Blake2sRandomnessGadget {
         cs: CS,
         value_gen: Fn,
     ) -> Result<Self, SynthesisError> {
-        Ok(Blake2sRandomnessGadget(<UInt8>::alloc_vec(
-            cs,
-            &match value_gen() {
-                Ok(val) => *(val.borrow()),
-                Err(_) => [0u8; 32],
-            },
-        )?))
+        Ok(Blake2sRandomnessGadget(<UInt8>::alloc_vec(cs, &match value_gen() {
+            Ok(val) => *(val.borrow()),
+            Err(_) => [0u8; 32],
+        })?))
     }
 
     #[inline]
