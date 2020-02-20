@@ -1,6 +1,5 @@
 use snarkos_curves::templates::short_weierstrass::short_weierstrass_jacobian::{
-    GroupAffine as SWAffine,
-    GroupProjective as SWProjective,
+    GroupAffine as SWAffine, GroupProjective as SWProjective,
 };
 use snarkos_models::{
     curves::{AffineCurve, Field, PrimeField, ProjectiveCurve, SWModelParameters},
@@ -13,8 +12,7 @@ use snarkos_models::{
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::CondSelectGadget,
             uint8::UInt8,
-            ToBitsGadget,
-            ToBytesGadget,
+            ToBitsGadget, ToBytesGadget,
         },
     },
 };

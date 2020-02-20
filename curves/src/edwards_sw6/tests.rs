@@ -3,8 +3,7 @@ use snarkos_models::curves::{
     tests_curve::curve_tests,
     tests_field::{field_test, primefield_test},
     tests_group::group_test,
-    AffineCurve,
-    ProjectiveCurve,
+    AffineCurve, ProjectiveCurve,
 };
 
 use rand;

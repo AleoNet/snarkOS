@@ -123,7 +123,7 @@ dependencies = [
  "cfg-if",
  "clang-sys",
  "clap",
- "env_logger",
+ "env_logger 0.6.2",
  "fxhash",
  "lazy_static",
  "log",
@@ -543,6 +543,19 @@ name = "env_logger"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aafcde04e90a5226a6443b7aabdb016ba2f8307c847d524724bd9b346dd1a2d3"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
 dependencies = [
  "atty",
  "humantime",
@@ -2190,6 +2203,21 @@ checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
 [[package]]
 name = "snarkos"
 version = "0.8.0"
+dependencies = [
+ "clap",
+ "env_logger 0.7.1",
+ "hex 0.4.1",
+ "log",
+ "serde",
+ "snarkos-consensus",
+ "snarkos-errors",
+ "snarkos-network",
+ "snarkos-objects",
+ "snarkos-rpc",
+ "snarkos-storage",
+ "tokio 0.2.11",
+ "wagyu-bitcoin",
+]
 
 [[package]]
 name = "snarkos-algorithms"
@@ -2321,10 +2349,12 @@ dependencies = [
 
 [[package]]
 name = "snarkos-network"
-version = "0.8.0"
+version = "0.1.0"
 dependencies = [
  "bincode",
+ "byteorder",
  "chrono",
+ "futures",
  "futures-await-test",
  "hex 0.4.1",
  "log",
@@ -2365,7 +2395,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-rpc"
-version = "0.8.0"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "hex 0.4.1",

@@ -594,7 +594,11 @@ impl<P: Fp768Parameters> Field for Fp768<P> {
                 }
             }
 
-            if u == one { Some(b) } else { Some(c) }
+            if u == one {
+                Some(b)
+            } else {
+                Some(c)
+            }
         }
     }
 
@@ -663,7 +667,11 @@ impl<P: Fp768Parameters> PrimeField for Fp768<P> {
     #[inline]
     fn from_repr_raw(r: BigInteger) -> Self {
         let r = Fp768(r, PhantomData);
-        if r.is_valid() { r } else { Self::zero() }
+        if r.is_valid() {
+            r
+        } else {
+            Self::zero()
+        }
     }
 
     #[inline]
@@ -677,7 +685,11 @@ impl<P: Fp768Parameters> PrimeField for Fp768<P> {
         let mut result = Self::zero();
         if result.0.read_le((&bytes[..]).by_ref()).is_ok() {
             result.0.as_mut()[11] &= 0xffffffffffffffff >> P::REPR_SHAVE_BITS;
-            if result.is_valid() { Some(result) } else { None }
+            if result.is_valid() {
+                Some(result)
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -822,7 +834,11 @@ impl<P: Fp768Parameters> FromStr for Fp768<P> {
                 }
             }
         }
-        if !res.is_valid() { Err(()) } else { Ok(res) }
+        if !res.is_valid() {
+            Err(())
+        } else {
+            Ok(res)
+        }
     }
 }
 

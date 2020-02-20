@@ -1,11 +1,14 @@
 use crate::peer_book::PeerBook;
 
+use crate::Connections;
 use std::net::SocketAddr;
 use tokio::sync::RwLock;
 
 /// Network context.
-//#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Context {
+    /// Tcp stream connections
+    pub connections: RwLock<Connections>,
+
     /// This node is a bootnode
     pub is_bootnode: bool,
 
@@ -37,6 +40,7 @@ impl Context {
         bootnodes: Vec<String>,
     ) -> Self {
         Self {
+            connections: RwLock::new(Connections::new()),
             is_bootnode,
             local_addr,
             peer_book: RwLock::new(PeerBook::new()),

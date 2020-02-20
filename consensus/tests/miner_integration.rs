@@ -4,12 +4,7 @@ mod miner_integration {
         test_data::*,
     };
     use snarkos_objects::{
-        Block,
-        Transaction,
-        TransactionInput,
-        TransactionOutput,
-        TransactionParameters,
-        Transactions,
+        Block, Transaction, TransactionInput, TransactionOutput, TransactionParameters, Transactions,
     };
     use snarkos_storage::BlockStorage;
 
@@ -212,15 +207,13 @@ mod miner_integration {
             .sign(&BitcoinPrivateKey::<N>::from_str(TEST_WALLETS[0].private_key).unwrap())
             .unwrap();
 
-        assert!(
-            miner
-                .establish_block(
-                    &blockchain,
-                    &Transactions::from(&[signed_transaction_1.clone(), signed_transaction_2.clone()])
-                )
-                .await
-                .is_err()
-        );
+        assert!(miner
+            .establish_block(
+                &blockchain,
+                &Transactions::from(&[signed_transaction_1.clone(), signed_transaction_2.clone()])
+            )
+            .await
+            .is_err());
 
         let (parent_header, transactions) = miner
             .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1.clone()]))
@@ -236,28 +229,22 @@ mod miner_integration {
             transactions: Transactions::from(&[signed_transaction_1.clone(), signed_transaction_2.clone()]),
         };
 
-        assert!(
-            miner
-                .consensus
-                .process_block(&mut blockchain, &mut memory_pool, &invalid_block)
-                .is_err()
-        );
+        assert!(miner
+            .consensus
+            .process_block(&mut blockchain, &mut memory_pool, &invalid_block)
+            .is_err());
         miner
             .consensus
             .process_block(&mut blockchain, &mut memory_pool, &new_block_1)
             .unwrap();
-        assert!(
-            miner
-                .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1]))
-                .await
-                .is_err()
-        );
-        assert!(
-            miner
-                .establish_block(&blockchain, &Transactions::from(&[signed_transaction_2]))
-                .await
-                .is_err()
-        );
+        assert!(miner
+            .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1]))
+            .await
+            .is_err());
+        assert!(miner
+            .establish_block(&blockchain, &Transactions::from(&[signed_transaction_2]))
+            .await
+            .is_err());
 
         kill_storage_sync(blockchain, path);
     }

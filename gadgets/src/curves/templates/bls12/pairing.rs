@@ -1,14 +1,6 @@
 use crate::curves::templates::bls12::{G1Gadget, G1PreparedGadget, G2Gadget, G2PreparedGadget};
 use snarkos_curves::templates::bls12::{
-    Bls12,
-    Bls12Parameters,
-    G1Affine,
-    G1Prepared,
-    G1Projective,
-    G2Affine,
-    G2Prepared,
-    G2Projective,
-    TwistType,
+    Bls12, Bls12Parameters, G1Affine, G1Prepared, G1Projective, G2Affine, G2Prepared, G2Projective, TwistType,
 };
 use snarkos_models::{
     curves::{Fp12, ModelParameters, PairingCurve},

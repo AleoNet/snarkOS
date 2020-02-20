@@ -1,26 +1,10 @@
 use crate::{
-    bytes_to_u32,
-    BlockPath,
-    Key,
-    KeyValue,
-    SideChainPath,
-    Storage,
-    TransactionMeta,
-    TransactionValue,
-    Value,
-    KEY_BEST_BLOCK_NUMBER,
-    KEY_MEMORY_POOL,
-    NUM_COLS,
+    bytes_to_u32, BlockPath, Key, KeyValue, SideChainPath, Storage, TransactionMeta, TransactionValue, Value,
+    KEY_BEST_BLOCK_NUMBER, KEY_MEMORY_POOL, NUM_COLS,
 };
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::{
-    create_script_pub_key,
-    Block,
-    BlockHeader,
-    BlockHeaderHash,
-    Outpoint,
-    Transaction,
-    Transactions,
+    create_script_pub_key, Block, BlockHeader, BlockHeaderHash, Outpoint, Transaction, Transactions,
 };
 
 use parking_lot::RwLock;

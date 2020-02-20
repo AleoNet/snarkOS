@@ -1,14 +1,7 @@
 [package]
 name = "snarkos-network"
-version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
-description = "Network for a decentralized record system"
-homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
-categories = ["cryptography"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
-license = "GPL-3.0"
+version = "0.1.0"
+authors = ["raychu86"]
 edition = "2018"
 
 [dependencies]
@@ -18,7 +11,9 @@ snarkos-objects = { path = "../objects" }
 snarkos-storage = { path = "../storage" }
 
 bincode = { version = "1.2.0" }
+byteorder = { version = "1" }
 chrono = { version = "0.4", features = ["serde"] }
+futures = { version = "0.1" }
 hex = { version="0.4.0" }
 log = { version = "0.4.8" }
 rand = { version = "0.7.3" }

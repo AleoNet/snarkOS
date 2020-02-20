@@ -162,11 +162,9 @@ mod consensus_integration {
 
         let test_block = Block { header, transactions };
 
-        assert!(
-            consensus
-                .process_block(&mut blockchain, &mut memory_pool, &test_block)
-                .is_err()
-        );
+        assert!(consensus
+            .process_block(&mut blockchain, &mut memory_pool, &test_block)
+            .is_err());
 
         kill_storage_sync(blockchain, path);
     }

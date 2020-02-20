@@ -4,10 +4,7 @@ use crate::templates::{
 };
 use snarkos_models::curves::{
     to_field_vec::{Error, ToConstraintField},
-    Field,
-    ProjectiveCurve,
-    SWModelParameters,
-    TEModelParameters,
+    Field, ProjectiveCurve, SWModelParameters, TEModelParameters,
 };
 
 impl<M: TEModelParameters, F: Field> ToConstraintField<F> for TEAffine<M>

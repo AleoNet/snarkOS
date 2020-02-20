@@ -2,9 +2,7 @@ use crate::sw6::{
     fq::{Fq, FqParameters},
     g1::{G1Affine, G1Projective},
     g2::{G2Affine, G2Projective, SW6G2Parameters},
-    Fq3,
-    Fq6,
-    Fr,
+    Fq3, Fq6, Fr,
 };
 use snarkos_models::{
     curves::{Field, FpParameters, PairingCurve, PairingEngine, SWModelParameters},

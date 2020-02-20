@@ -1,10 +1,5 @@
 use snarkos_models::curves::{
-    AffineCurve,
-    Field,
-    PrimeField,
-    ProjectiveCurve,
-    SWModelParameters as Parameters,
-    SquareRootField,
+    AffineCurve, Field, PrimeField, ProjectiveCurve, SWModelParameters as Parameters, SquareRootField,
 };
 use snarkos_utilities::{
     bititerator::BitIterator,

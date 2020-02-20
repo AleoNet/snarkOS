@@ -1,11 +1,11 @@
 use crate::{
-    base::{handshake_request, handshake_response, Context, Message},
+    base::{Context, SyncHandler},
     Server,
-    SyncHandler,
 };
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
+use crate::message::Channel;
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -84,17 +84,21 @@ pub fn initialize_test_server(
     )
 }
 
+///// Adds Peer to peerbook and connection handler
+//pub fn initialize_test_context(server_address: SocketAddr, peer_address: SocketAddr) -> Context {
+//    let context = Context::new(server_address, 5, 1, 10, true, vec![])
+//
+//}
+
 /// Starts a server on a new thread. Takes full ownership of server.
 pub fn start_test_server(server: Server) {
     tokio::spawn(async move { server.listen().await.unwrap() });
 }
 
-/// Returns the next message received by the given peer listener
-pub async fn get_next_message(peer_listener: &mut TcpListener) -> Message {
-    let (mut stream, _) = peer_listener.accept().await.unwrap();
-    let mut buf = [0u8; 1024];
-    let n = stream.read(&mut buf).await.unwrap();
-    bincode::deserialize(&buf[0..n]).unwrap()
+/// Returns the next tcp channel connected to the listener
+pub async fn get_next_channel(listener: &mut TcpListener) -> Arc<Channel> {
+    let (stream, peer_address) = listener.accept().await.unwrap();
+    Arc::new(Channel::new(stream, peer_address).await.unwrap())
 }
 
 /// Starts a fake node that accepts all messages at the given socket address
@@ -129,32 +133,32 @@ pub async fn ping(address: SocketAddr, mut listener: TcpListener) {
     assert_eq!(actual_message, "ping");
 }
 
-/// Complete a full handshake between a server and peer
-pub async fn peer_server_handshake(peer_address: SocketAddr, server_address: SocketAddr) {
-    // 1. Start peer server
-
-    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
-    sleep(100).await;
-
-    // 2. Initiate handshake request from peer to server
-
-    handshake_request(1, server_address).await.unwrap();
-    sleep(100).await;
-
-    // 3. Check that server sent a Verack message
-
-    let actual = get_next_message(&mut peer_listener).await;
-    let expected = Message::Verack;
-    assert_eq!(actual, expected);
-
-    // 4. Check that server sent a Version message
-
-    get_next_message(&mut peer_listener).await;
-
-    // 5. Initiate handshake response from peer to server
-
-    handshake_response(1, server_address, false).await.unwrap();
-
-    drop(peer_listener);
-    sleep(100).await;
-}
+///// Complete a full handshake between a server and peer
+//pub async fn peer_server_handshake(peer_address: SocketAddr, server_address: SocketAddr) {
+//    // 1. Start peer server
+//
+//    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+//    sleep(100).await;
+//
+//    // 2. Initiate handshake request from peer to server
+//
+//    handshake_request(1, server_address).await.unwrap();
+//    sleep(100).await;
+//
+//    // 3. Check that server sent a Verack message
+//
+//    let actual = get_next_message(&mut peer_listener).await;
+//    let expected = Message::Verack;
+//    assert_eq!(actual, expected);
+//
+//    // 4. Check that server sent a Version message
+//
+//    get_next_message(&mut peer_listener).await;
+//
+//    // 5. Initiate handshake response from peer to server
+//
+//    handshake_response(1, server_address, false).await.unwrap();
+//
+//    drop(peer_listener);
+//    sleep(100).await;
+//}

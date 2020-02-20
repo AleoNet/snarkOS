@@ -5,18 +5,19 @@ use snarkos_consensus::{
 use snarkos_objects::Block;
 use snarkos_storage::BlockStorage;
 
-use std::{net::SocketAddr, sync::Arc};
+use crate::base::{propagate_block, Context};
+use std::sync::Arc;
 use tokio::{sync::Mutex, task};
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
-use crate::base::send_propagate_block;
+//use crate::base::send_propagate_block;
 
 pub struct MinerInstance {
     pub coinbase_address: BitcoinAddress<Mainnet>,
     pub consensus: ConsensusParameters,
     pub storage: Arc<BlockStorage>,
     pub memory_pool_lock: Arc<Mutex<MemoryPool>>,
-    pub server_addr: SocketAddr,
+    pub server_context: Arc<Context>,
 }
 
 impl MinerInstance {
@@ -26,14 +27,14 @@ impl MinerInstance {
         consensus: ConsensusParameters,
         storage: Arc<BlockStorage>,
         memory_pool_lock: Arc<Mutex<MemoryPool>>,
-        server_addr: SocketAddr,
+        server_context: Arc<Context>,
     ) -> Self {
         Self {
             coinbase_address,
             consensus,
             storage,
             memory_pool_lock,
-            server_addr,
+            server_context,
         }
     }
 
@@ -43,16 +44,21 @@ impl MinerInstance {
     ///   - Modifying miner_lock will start or stop all additional listeners.
     pub fn spawn(self) {
         task::spawn(async move {
+            let context = self.server_context.clone();
+            let local_address = self.server_context.local_addr;
             let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone());
+
             loop {
                 let block_serialized = miner.mine_block(&self.storage, &self.memory_pool_lock).await.unwrap();
 
-                info!(
+                println!(
                     "Block found!           {:?}",
                     Block::deserialize(&block_serialized).unwrap()
                 );
 
-                send_propagate_block(self.server_addr, block_serialized).await.unwrap();
+                propagate_block(context.clone(), block_serialized, local_address)
+                    .await
+                    .unwrap();
             }
         });
     }
