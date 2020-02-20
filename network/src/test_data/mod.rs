@@ -5,17 +5,16 @@ use crate::{
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
-use crate::message::Channel;
+use crate::message::{types::Ping, Channel, MessageName};
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
-    net::{TcpListener, TcpStream},
-    prelude::*,
-    sync::Mutex,
+    net::TcpListener,
+    sync::{oneshot, Mutex},
 };
 
+pub const ALEO_PORT: &'static str = "4130";
 pub const LOCALHOST: &'static str = "127.0.0.1:";
-pub const LOCALHOST_SERVER: &'static str = "127.0.0.1:";
 pub const LOCALHOST_PEER: &'static str = "127.0.0.2:";
 pub const LOCALHOST_BOOTNODE: &'static str = "127.0.0.3:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
@@ -48,6 +47,13 @@ pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
 //    string.parse::<SocketAddr>().unwrap()
 //}
 //
+
+/// Returns a socket address from the aleo server port on localhost
+pub fn aleo_socket_address() -> SocketAddr {
+    let string = format!("{}{}", LOCALHOST, ALEO_PORT);
+    string.parse::<SocketAddr>().unwrap()
+}
+
 /// Returns a random tcp socket address
 pub fn random_socket_address() -> SocketAddr {
     let mut rng = rand::thread_rng();
@@ -117,20 +123,18 @@ pub fn accept_all_messages(mut peer_listener: TcpListener) {
 
 /// Send a dummy message to the peer and make sure no other messages were received
 pub async fn ping(address: SocketAddr, mut listener: TcpListener) {
-    {
-        let mut stream = TcpStream::connect(&address).await.unwrap();
-        let ping = bincode::serialize("ping").unwrap();
-        let _result = stream.write(&ping).await.unwrap();
-    }
+    let (tx, rx) = oneshot::channel();
+    tokio::spawn(async move {
+        let channel = Arc::new(Channel::connect(address).await.unwrap());
+        channel.write(&Ping::new()).await.unwrap();
+        tx.send(()).unwrap();
+    });
 
-    let (mut stream, _) = listener.accept().await.unwrap();
-    let mut buf = [0u8; 1024];
-    let n = stream.read(&mut buf).await.unwrap();
+    rx.await.unwrap();
+    let channel = get_next_channel(&mut listener).await;
+    let (name, _bytes) = channel.read().await.unwrap();
 
-    let actual_message: String = bincode::deserialize(&buf[0..n]).unwrap();
-
-    assert_eq!(n, 12);
-    assert_eq!(actual_message, "ping");
+    assert_eq!(MessageName::from("ping"), name);
 }
 
 ///// Complete a full handshake between a server and peer

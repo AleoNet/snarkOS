@@ -22,8 +22,6 @@ use crate::{
     message::{types::*, Channel, Message, MessageName},
 };
 
-//pub const ALEO_SERVER_PORT: u16 = 4130;
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ServerStatus {
     /// Listening for a client request or a peer message.
