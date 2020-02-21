@@ -28,7 +28,6 @@ impl Message for Version {
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         if vec.len() != 67 {
-            println!("vec.len {:?}", vec.len());
             return Err(MessageError::InvalidLength(vec.len(), 67));
         }
 

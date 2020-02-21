@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use snarkos_errors::network::message::MessageError;
 use std::{collections::HashMap, net::SocketAddr};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Peers {
     pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }

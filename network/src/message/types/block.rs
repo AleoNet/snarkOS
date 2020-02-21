@@ -2,7 +2,7 @@ use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 /// One of our peers has found a new block
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Block {
     /// block data
     pub data: Vec<u8>,

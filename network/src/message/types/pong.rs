@@ -5,7 +5,7 @@ use crate::message::types::Ping;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Pong {
     pub nonce: u64,
 }

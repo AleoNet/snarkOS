@@ -1,7 +1,7 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GetMemoryPool;
 
 impl Message for GetMemoryPool {

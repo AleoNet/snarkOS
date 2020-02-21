@@ -3,7 +3,7 @@ use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
 /// One of our peers has found a new block
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GetBlock {
     /// block data
     pub block_hash: BlockHeaderHash,

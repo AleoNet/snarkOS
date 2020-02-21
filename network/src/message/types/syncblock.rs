@@ -2,7 +2,7 @@ use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 /// A serialized block from a sync node
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SyncBlock {
     /// block data
     pub data: Vec<u8>,

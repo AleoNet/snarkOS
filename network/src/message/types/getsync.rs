@@ -3,7 +3,7 @@ use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
 /// Request blocks from sync node
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GetSync {
     /// hashes of blocks requested
     pub block_locator_hashes: Vec<BlockHeaderHash>,

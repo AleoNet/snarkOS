@@ -5,7 +5,7 @@ use std::{collections::HashMap, net::SocketAddr};
 pub struct AddressBook {
     /// Hashmap of addresses
     pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
-    // TODO Add structures to store addresses like this:
+    // TODO @raychu Add structures to store addresses like this:
     //    by_addr: HashMap<SocketAddr, (DateTime<Utc>, ServicesProvided)>,
     //    by_time: BTreeSet<MetaAddr>,
 }

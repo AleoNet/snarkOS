@@ -8,7 +8,6 @@ mod server_message_handler {
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;
-    use snarkos_network::base::handshake_response;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{net::TcpListener, runtime::Runtime, sync::oneshot};
 

@@ -145,8 +145,7 @@ impl Server {
             } else if name == GetSync::name() {
                 self.receive_get_sync(GetSync::deserialize(bytes)?, channel).await?;
             } else if name == MemoryPool::name() {
-                self.receive_memory_pool(MemoryPool::deserialize(bytes)?, channel)
-                    .await?;
+                self.receive_memory_pool(MemoryPool::deserialize(bytes)?).await?;
             } else if name == Peers::name() {
                 self.receive_peers(Peers::deserialize(bytes)?, channel).await?;
             } else if name == Ping::name() {
@@ -233,7 +232,7 @@ impl Server {
     }
 
     /// A peer has sent us their memory pool transactions
-    async fn receive_memory_pool(&mut self, message: MemoryPool, channel: Arc<Channel>) -> Result<(), ServerError> {
+    async fn receive_memory_pool(&mut self, message: MemoryPool) -> Result<(), ServerError> {
         let mut memory_pool = self.memory_pool_lock.lock().await;
 
         for transaction_bytes in message.transactions {
@@ -294,8 +293,12 @@ impl Server {
     }
 
     async fn receive_pong(&mut self, _message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
-        let peer_book = &mut self.context.peer_book.write().await;
-        peer_book.peers.update(channel.address, Utc::now());
+        self.context
+            .peer_book
+            .write()
+            .await
+            .peers
+            .update(channel.address, Utc::now());
 
         Ok(())
     }
