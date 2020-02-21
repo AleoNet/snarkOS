@@ -1,27 +1,17 @@
 #[macro_use]
 extern crate log;
 
-pub mod address_book;
-pub use self::address_book::*;
-
-pub mod base;
-
-pub mod bootnodes;
-pub use self::bootnodes::*;
-
-pub mod connections;
-pub use self::connections::*;
+pub mod context;
+pub use context::*;
 
 pub mod message;
+pub use message::*;
 
-pub mod miner_instance;
-pub use self::miner_instance::*;
-
-pub mod peer_book;
-pub use self::peer_book::*;
+pub mod protocol;
+pub use protocol::*;
 
 pub mod server;
-pub use self::server::*;
+pub use server::*;
 
 #[allow(dead_code)]
 pub mod test_data;

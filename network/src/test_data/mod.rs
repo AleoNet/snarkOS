@@ -1,7 +1,4 @@
-use crate::{
-    base::{Context, SyncHandler},
-    Server,
-};
+use crate::{context::Context, protocol::SyncHandler, server::Server};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 

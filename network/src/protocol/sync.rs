@@ -1,5 +1,5 @@
 use crate::{
-    base::Context,
+    context::Context,
     message::{
         types::{Block, GetBlock, GetSync, Transaction},
         Channel,
@@ -16,10 +16,14 @@ use tokio::sync::Mutex;
 
 pub enum SyncState {
     Idle,
-    // Store timestamp and block height
+    // (timestamp, block_height)
     Syncing(DateTime<Utc>, u32),
 }
 
+/// Manages syncing chain state with a sync node
+/// 1. The server_node sends a GetSync message to a sync_node
+/// 2. The sync_node responds with a vector of block_headers the server_node is missing
+/// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the vector
 pub struct SyncHandler {
     pub block_headers: Vec<BlockHeaderHash>,
     pub sync_node: SocketAddr,
@@ -41,37 +45,28 @@ impl SyncHandler {
             SyncState::Syncing(date_time, _old_height) => self.sync_state = SyncState::Syncing(date_time, block_height),
         }
     }
-}
 
-pub async fn increment_sync_handler(
-    channel: Arc<Channel>,
-    sync_handler_lock: Arc<Mutex<SyncHandler>>,
-    storage: Arc<BlockStorage>,
-) -> Result<(), SendError> {
-    let mut sync_handler = sync_handler_lock.lock().await;
+    pub async fn increment(&mut self, channel: Arc<Channel>, storage: Arc<BlockStorage>) -> Result<(), SendError> {
+        if let SyncState::Syncing(date_time, height) = self.sync_state {
+            if self.block_headers.is_empty() {
+                info!(
+                    "Synced {} Blocks in {:.2} seconds",
+                    storage.get_latest_block_height() - height,
+                    (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
+                );
 
-    if let SyncState::Syncing(date_time, height) = sync_handler.sync_state {
-        if sync_handler.block_headers.is_empty() {
-            let elapsed_time_seconds = (Utc::now() - date_time).num_milliseconds() as f64 / 1000.;
-            let num_blocks_downloaded = storage.get_latest_block_height() - height;
-            info!(
-                "Synced {} Blocks in {:.2} seconds",
-                num_blocks_downloaded, elapsed_time_seconds
-            );
+                self.sync_state = SyncState::Idle;
 
-            sync_handler.sync_state = SyncState::Idle;
-
-            if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
-                channel.write(&GetSync::new(block_locator_hashes)).await?;
+                if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                    channel.write(&GetSync::new(block_locator_hashes)).await?;
+                }
+            } else {
+                channel.write(&GetBlock::new(self.block_headers.remove(0))).await?;
             }
-        } else {
-            channel
-                .write(&GetBlock::new(sync_handler.block_headers.remove(0)))
-                .await?;
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 pub async fn process_transaction_internal(

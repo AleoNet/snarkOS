@@ -1,6 +1,6 @@
 use crate::{RpcFunctions, RpcImpl};
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
-use snarkos_network::base::Context;
+use snarkos_network::context::Context;
 use snarkos_storage::BlockStorage;
 
 use jsonrpc_http_server::ServerBuilder;

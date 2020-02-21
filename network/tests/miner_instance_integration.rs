@@ -1,9 +1,8 @@
 mod miner_instance_integration {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_network::{test_data::*, MinerInstance};
+    use snarkos_network::{context::Context, server::MinerInstance, test_data::*};
 
     use serial_test::serial;
-    use snarkos_network::base::Context;
     use std::{str::FromStr, sync::Arc};
     use tokio::{runtime, sync::Mutex};
     use wagyu_bitcoin::{BitcoinAddress, Mainnet};

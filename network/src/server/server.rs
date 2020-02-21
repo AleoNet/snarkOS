@@ -18,8 +18,9 @@ use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as Tran
 use snarkos_storage::BlockStorage;
 
 use crate::{
-    base::{handshake::*, sync::*, Context},
+    context::Context,
     message::{types::*, Channel, Message, MessageName},
+    protocol::*,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -344,8 +345,7 @@ impl Server {
         }
 
         if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-            drop(sync_handler); //Todo: look at again
-            increment_sync_handler(channel, Arc::clone(&self.sync_handler_lock), Arc::clone(&self.storage)).await?;
+            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
         }
 
         Ok(())

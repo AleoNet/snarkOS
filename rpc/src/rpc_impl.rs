@@ -7,7 +7,7 @@ use snarkos_consensus::{
     ConsensusParameters,
 };
 use snarkos_errors::rpc::RpcError;
-use snarkos_network::base::{process_transaction_internal, Context};
+use snarkos_network::{context::Context, protocol::process_transaction_internal};
 use snarkos_objects::{transaction::*, BlockHeaderHash};
 use snarkos_storage::BlockStorage;
 

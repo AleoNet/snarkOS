@@ -78,7 +78,7 @@ pub trait Field:
     // Sets `self` to `self`'s inverse if it exists. Otherwise it is a no-op.
     fn inverse_in_place(&mut self) -> Option<&mut Self>;
 
-    /// Exponentiates this element by a power of the base prime modulus via
+    /// Exponentiates this element by a power of the protocol prime modulus via
     /// the Frobenius automorphism.
     fn frobenius_map(&mut self, power: usize);
 

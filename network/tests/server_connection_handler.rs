@@ -1,6 +1,6 @@
 //mod server_connection_handler {
 //    use snarkos_consensus::test_data::*;
-//    use snarkos_network::{base::Message, test_data::*};
+//    use snarkos_network::{protocol::Message, test_data::*};
 //
 //    use chrono::{Duration, Utc};
 //    use serial_test::serial;

@@ -823,7 +823,7 @@ mod projective_impl {
                 } else if bits_base_powers.len() == 1 {
                     let bit = bits_base_powers[0].0;
                     let base_power = bits_base_powers[0].1;
-                    let new_encoded = self.add_constant(&mut cs.ns(|| "Add base power"), &base_power)?;
+                    let new_encoded = self.add_constant(&mut cs.ns(|| "Add protocol power"), &base_power)?;
                     *self = Self::conditionally_select(&mut cs.ns(|| "Conditional Select"), &bit, &new_encoded, &self)?;
                 }
             }

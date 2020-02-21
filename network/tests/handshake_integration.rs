@@ -1,8 +1,8 @@
 mod handshake_integration {
     use serial_test::serial;
     use snarkos_network::{
-        base::{handshake_request, handshake_response},
         message::{types::Version, Channel, Message, MessageName},
+        protocol::{handshake_request, handshake_response},
         test_data::*,
     };
     use std::sync::Arc;

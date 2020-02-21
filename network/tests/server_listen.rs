@@ -1,13 +1,14 @@
 mod server_listen {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_network::{
-        base::{handshake_response, Context, SyncHandler},
+        context::Context,
         message::{
             types::{GetPeers, Verack, Version},
             Message,
         },
+        protocol::{handshake_response, SyncHandler},
+        server::Server,
         test_data::*,
-        Server,
     };
     use snarkos_storage::BlockStorage;
 
