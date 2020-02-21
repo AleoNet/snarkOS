@@ -5,12 +5,10 @@ use snarkos_consensus::{
 use snarkos_objects::Block;
 use snarkos_storage::BlockStorage;
 
-use crate::{context::Context, protocol::propagate_block};
+use crate::{context::Context, server::propagate_block};
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
-
-//use crate::protocol::send_propagate_block;
 
 pub struct MinerInstance {
     pub coinbase_address: BitcoinAddress<Mainnet>,
