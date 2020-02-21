@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use snarkos_errors::network::message::MessageError;
 use std::net::SocketAddr;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Version {
     /// The network version number
     pub version: u64,
@@ -59,9 +59,9 @@ mod tests {
     #[test]
     fn test_version() {
         let version = Version {
-            version: 1,
+            version: 1u64,
             timestamp: Utc::now(),
-            height: 1,
+            height: 1u32,
             address_receiver: "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),
             address_sender: "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),
         };

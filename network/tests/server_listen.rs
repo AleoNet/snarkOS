@@ -5,7 +5,6 @@ mod server_listen {
         message::{
             types::{GetPeers, Verack, Version},
             Message,
-            MessageName,
         },
         test_data::*,
         Server,
@@ -112,14 +111,14 @@ mod server_listen {
             let channel = get_next_channel(&mut bootnode_listener).await;
             let (name, bytes) = channel.read().await.unwrap();
 
-            assert_eq!(MessageName::from("version"), name);
+            assert_eq!(Version::name(), name);
             assert!(Version::deserialize(bytes).is_ok());
 
             // 4. Check that bootnode received GetPeers message
 
             let (name, bytes) = channel.read().await.unwrap();
 
-            assert_eq!(MessageName::from("getpeers"), name);
+            assert_eq!(GetPeers::name(), name);
             assert!(GetPeers::deserialize(bytes).is_ok());
 
             // 5. Send handshake response from bootnode to server
@@ -133,7 +132,7 @@ mod server_listen {
 
             let (name, bytes) = channel.read().await.unwrap();
 
-            assert_eq!(MessageName::from("verack"), name);
+            assert_eq!(Verack::name(), name);
             assert!(Verack::deserialize(bytes).is_ok());
         });
 

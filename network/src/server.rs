@@ -131,7 +131,7 @@ impl Server {
     /// handle an incoming message
     async fn message_handler(&mut self) -> Result<(), ServerError> {
         while let Some((tx, name, bytes, channel)) = self.receiver.recv().await {
-            println!("message {:?}, received from {:?}", name.to_string(), channel.address);
+            info!("Message {:?}, Received from {:?}", name.to_string(), channel.address);
             if name == Block::name() {
                 self.receive_block_message(Block::deserialize(bytes)?, channel, true)
                     .await?;
@@ -180,12 +180,6 @@ impl Server {
         channel: Arc<Channel>,
         propagate: bool,
     ) -> Result<(), ServerError> {
-        info!(
-            "Received new block!  {:?}\n From peer  {:?}",
-            BlockStruct::deserialize(&message.data)?.header.get_hash(),
-            channel.address
-        );
-
         let block = BlockStruct::deserialize(&message.data)?;
 
         if !self.storage.is_exist(&block.header.get_hash()) {
@@ -207,8 +201,6 @@ impl Server {
 
     /// A peer has requested a block
     async fn receive_get_block(&mut self, message: GetBlock, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received GetBlock from: {:?}", channel.address);
-
         if let Ok(block) = self.storage.get_block(message.block_hash) {
             channel.write(&SyncBlock::new(block.serialize()?)).await?;
         }
@@ -222,8 +214,6 @@ impl Server {
         _message: GetMemoryPool,
         channel: Arc<Channel>,
     ) -> Result<(), ServerError> {
-        info!("Received GetMemoryPool from: {:?}", channel.address);
-
         let memory_pool = self.memory_pool_lock.lock().await;
 
         let mut transactions = vec![];
@@ -244,8 +234,6 @@ impl Server {
 
     /// A peer has sent us their memory pool transactions
     async fn receive_memory_pool(&mut self, message: MemoryPool, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received MemoryPool transactions from {:?}", channel.address);
-
         let mut memory_pool = self.memory_pool_lock.lock().await;
 
         for transaction_bytes in message.transactions {
@@ -267,8 +255,6 @@ impl Server {
     /// A node has requested our list of peer addresses
     /// send an Address message with our current peer list
     async fn receive_get_peers(&mut self, _message: GetPeers, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received GetPeers from:  {:?}", channel.address);
-
         channel
             .write(&Peers::new(self.context.peer_book.read().await.peers.addresses.clone()))
             .await?;
@@ -282,8 +268,6 @@ impl Server {
     /// can look at futures crate to handle multiple futures
     /// set server status to listening
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received Address from:   {:?}", channel.address);
-
         let mut peer_book = self.context.peer_book.write().await;
         for (addr, time) in message.addresses.iter() {
             if &self.context.local_addr == addr {
@@ -304,23 +288,20 @@ impl Server {
     }
 
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received Ping from:      {:?}", channel.address);
-
         channel.write(&Pong::new(message)).await?;
 
         Ok(())
     }
 
     async fn receive_pong(&mut self, _message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received Pong from:      {:?}", channel.address);
+        let peer_book = &mut self.context.peer_book.write().await;
+        peer_book.peers.update(channel.address, Utc::now());
 
         Ok(())
     }
 
     /// A peer has requested our chain state to sync with
     async fn receive_get_sync(&mut self, message: GetSync, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received sync request from: {:?}", channel.address);
-
         let latest_shared_hash = self.storage.get_latest_shared_hash(message.block_locator_hashes)?;
         let current_height = self.storage.get_latest_block_height();
 
@@ -350,8 +331,6 @@ impl Server {
 
     /// A peer has sent us their chain state
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
-        info!("Received sync response");
-
         let mut sync_handler = self.sync_handler_lock.lock().await;
 
         for block_hash in message.block_hashes {
@@ -371,8 +350,6 @@ impl Server {
 
     /// A peer has sent us a transaction
     async fn receive_transaction(&mut self, message: Transaction, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received Transaction from:    {:?}", channel.address);
-
         process_transaction_internal(
             self.context.clone(),
             self.storage.clone(),
@@ -388,8 +365,6 @@ impl Server {
     /// A miner has acknowledged our Version message
     /// add them to our peer book
     async fn receive_verack(&mut self, _message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
-        info!("Received Verack from:  {:?}", channel.address);
-
         let peer_book = &mut self.context.peer_book.write().await;
 
         if &self.context.local_addr != &channel.address {
@@ -405,8 +380,6 @@ impl Server {
     /// check if sending node is a new peer
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<(), ServerError> {
         let peer_address = message.address_sender;
-        info!("Received Version from: {:?}", peer_address);
-
         let peer_book = &mut self.context.peer_book.read().await;
 
         if peer_book.peers.addresses.len() < self.context.max_peers as usize && self.context.local_addr != peer_address
