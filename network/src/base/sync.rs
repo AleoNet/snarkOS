@@ -109,7 +109,7 @@ pub async fn process_transaction_internal(
 
 /// Announce block to peers
 pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: SocketAddr) -> Result<(), SendError> {
-    println!("Propagating block to peers");
+    info!("Propagating block to peers");
 
     for (socket, _) in &context.peer_book.read().await.peers.addresses {
         if *socket != block_miner && *socket != context.local_addr {
@@ -118,6 +118,5 @@ pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: 
             }
         }
     }
-    println!("done propagating");
     Ok(())
 }

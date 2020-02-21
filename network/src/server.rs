@@ -118,12 +118,12 @@ impl Server {
         task::spawn(async move {
             loop {
                 let (tx, rx) = oneshot::channel();
-                let (message_name, message_bytes) = channel.read().await.unwrap();
+                let (message_name, message_bytes) = channel.read().await.expect("ERROR OK: peer closed connection");
                 thread_sender
                     .send((tx, message_name, message_bytes, channel.clone()))
                     .await
-                    .expect("Error sending to self");
-                rx.await.unwrap();
+                    .expect("could not send to message handler");
+                rx.await.expect("message handler errored");
             }
         });
     }
@@ -431,7 +431,6 @@ impl Server {
                 }
             }
         }
-
         Ok(())
     }
 

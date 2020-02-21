@@ -6,7 +6,7 @@ pub struct GetMemoryPool;
 
 impl Message for GetMemoryPool {
     fn name() -> MessageName {
-        MessageName::from("getmemorypool")
+        MessageName::from("getmempool")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
