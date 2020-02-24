@@ -273,7 +273,14 @@ impl Server {
 
                 Ok(())
             }
-            Err(error) => Err(ServerError::HandshakeError(error)),
+            Err(error) => {
+                info!(
+                    "Invalid Verack message from: {:?} Full error: {:?}",
+                    channel.address,
+                    ServerError::HandshakeError(error)
+                );
+                Ok(())
+            }
         }
     }
 

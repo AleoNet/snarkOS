@@ -1,4 +1,4 @@
-use snarkos_errors::network::{HandshakeError, SendError};
+use snarkos_errors::network::HandshakeError;
 
 use crate::message::{
     types::{Verack, Version},
@@ -98,7 +98,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_handshake() {
+    async fn test_handshake_full() {
         let version = 1u64;
         let height = 0u32;
         let server_address = random_socket_address();

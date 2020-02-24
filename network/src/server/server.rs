@@ -54,13 +54,13 @@ impl Server {
         let context = self.context.clone();
 
         let mut listener = TcpListener::bind(&local_addr).await?;
-        println!("listening at: {:?}", local_addr);
+        info!("listening at: {:?}", local_addr);
 
         for bootnode in self.context.bootnodes.clone() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
 
             if local_addr != bootnode_address && !self.context.is_bootnode {
-                println!("Connecting to bootnode: {:?}", bootnode_address);
+                info!("Connecting to bootnode: {:?}", bootnode_address);
 
                 let channel = self
                     .context
