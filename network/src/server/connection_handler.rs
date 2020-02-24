@@ -1,6 +1,5 @@
 use crate::{
     message::types::{GetMemoryPool, GetPeers, Ping},
-    protocol::*,
     Server,
 };
 
@@ -39,13 +38,12 @@ impl Server {
                     for (socket_addr, _last_seen) in peer_book.gossiped.addresses.clone() {
                         if let Some(channel) = context.connections.read().await.get(&socket_addr) {
                             if socket_addr != context.local_addr {
-                                if let Err(_) = handshake_request(
-                                    channel,
-                                    1u64,
-                                    storage.get_latest_block_height(),
-                                    context.local_addr,
-                                )
-                                .await
+                                if let Err(_) = context
+                                    .handshakes
+                                    .write()
+                                    .await
+                                    .send_request(channel, 1u64, storage.get_latest_block_height(), context.local_addr)
+                                    .await
                                 {
                                     peer_book.disconnect_peer(&socket_addr);
                                 }

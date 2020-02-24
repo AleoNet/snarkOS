@@ -1,10 +1,13 @@
 use crate::address_book::AddressBook;
 
 use std::net::SocketAddr;
+//use crate::Handshakes;
 
 /// Log of connected, disconnected, and known peers
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerBook {
+    //    /// Handshake protocols initiated with remote nodes
+    //    pub handshakes: Handshakes,
     /// Connected peers
     pub peers: AddressBook,
     /// Disconnected peers
@@ -16,6 +19,7 @@ pub struct PeerBook {
 impl PeerBook {
     pub fn new() -> Self {
         Self {
+            //            handshakes: Handshakes::new(),
             peers: AddressBook::new(),
             disconnected: AddressBook::new(),
             gossiped: AddressBook::new(),

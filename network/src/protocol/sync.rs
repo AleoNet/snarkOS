@@ -15,10 +15,10 @@ pub enum SyncState {
     Syncing(DateTime<Utc>, u32),
 }
 
-/// Manages syncing chain state with a sync node
-/// 1. The server_node sends a GetSync message to a sync_node
-/// 2. The sync_node responds with a vector of block_headers the server_node is missing
-/// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the vector
+/// Sync Protocol: Manages syncing chain state with a sync node.
+/// 1. The server_node sends a GetSync message to a sync_node.
+/// 2. The sync_node responds with a vector of block_headers the server_node is missing.
+/// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the vector.
 pub struct SyncHandler {
     pub block_headers: Vec<BlockHeaderHash>,
     pub sync_node: SocketAddr,

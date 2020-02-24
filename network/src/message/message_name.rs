@@ -77,8 +77,6 @@ mod tests {
 
     #[test]
     fn test_command_parse() {
-        //        println!("{:?}", serde_json::to_vec(&MessageName::from("helloooo")).unwrap());
-        //        println!("{:?}", serde_json::to_vec(&MessageName::from("h")).unwrap());
         let command: MessageName = "ping".into();
         assert_eq!(MessageName("70696e670000000000000000".into()), command);
     }

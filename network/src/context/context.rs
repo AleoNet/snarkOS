@@ -1,22 +1,13 @@
 use crate::peer_book::PeerBook;
 
-use crate::Connections;
+use crate::{Connections, Handshakes};
 use std::net::SocketAddr;
 use tokio::sync::RwLock;
 
 /// Network context.
 pub struct Context {
-    /// Tcp stream connections
-    pub connections: RwLock<Connections>,
-
-    /// This node is a bootnode
-    pub is_bootnode: bool,
-
     /// Personal socket address
     pub local_addr: SocketAddr,
-
-    /// Peer book
-    pub peer_book: RwLock<PeerBook>,
 
     /// Frequency the server requests memory pool transactions x 10 seconds
     pub memory_pool_interval: u8,
@@ -27,7 +18,20 @@ pub struct Context {
     /// Maximum number of peers to connect to
     pub max_peers: u16,
 
+    /// This node is a bootnode
+    pub is_bootnode: bool,
+
+    /// list of bootnodes
     pub bootnodes: Vec<String>,
+
+    /// Tcp stream connections
+    pub connections: RwLock<Connections>,
+
+    /// Peer book
+    pub peer_book: RwLock<PeerBook>,
+
+    /// Handshakes with other nodes
+    pub handshakes: RwLock<Handshakes>,
 }
 
 impl Context {
@@ -40,14 +44,15 @@ impl Context {
         bootnodes: Vec<String>,
     ) -> Self {
         Self {
-            connections: RwLock::new(Connections::new()),
-            is_bootnode,
             local_addr,
-            peer_book: RwLock::new(PeerBook::new()),
             memory_pool_interval,
             min_peers,
             max_peers,
+            is_bootnode,
             bootnodes,
+            connections: RwLock::new(Connections::new()),
+            peer_book: RwLock::new(PeerBook::new()),
+            handshakes: RwLock::new(Handshakes::new()),
         }
     }
 }

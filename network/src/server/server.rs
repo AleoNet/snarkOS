@@ -10,31 +10,20 @@ use snarkos_storage::BlockStorage;
 
 use crate::{
     context::Context,
-    message::{types::*, Channel, MessageName},
+    message::{Channel, MessageName},
     protocol::*,
 };
 use std::{net::SocketAddr, sync::Arc};
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum ServerStatus {
-    /// Listening for a client request or a peer message.
-    Listening,
-    /// Awaiting a peer message we can interpret as a client request.
-    AwaitingResponse(),
-    /// A failure has occurred and we are shutting down the server.
-    Failed,
-}
 
 pub struct Server {
     pub consensus: ConsensusParameters,
     pub context: Arc<Context>,
     pub storage: Arc<BlockStorage>,
     pub memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
-    pub receiver: mpsc::Receiver<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
-    pub sender: mpsc::Sender<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
-    pub status: ServerStatus,
     pub sync_handler_lock: Arc<Mutex<SyncHandler>>,
     pub connection_frequency: u64,
+    pub sender: mpsc::Sender<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
+    pub receiver: mpsc::Receiver<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
 }
 
 impl Server {
@@ -54,7 +43,6 @@ impl Server {
             memory_pool_lock,
             receiver,
             sender,
-            status: ServerStatus::Listening,
             sync_handler_lock,
             connection_frequency,
         }
@@ -66,21 +54,35 @@ impl Server {
         let context = self.context.clone();
 
         let mut listener = TcpListener::bind(&local_addr).await?;
-        info!("listening at: {:?}", local_addr);
+        println!("listening at: {:?}", local_addr);
 
         for bootnode in self.context.bootnodes.clone() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
 
             if local_addr != bootnode_address && !self.context.is_bootnode {
-                info!("Connecting to bootnode: {:?}", bootnode_address);
+                println!("Connecting to bootnode: {:?}", bootnode_address);
 
-                let connections = &mut self.context.connections.write().await;
-                let channel = connections.connect_and_store(bootnode_address).await?;
+                let channel = self
+                    .context
+                    .connections
+                    .write()
+                    .await
+                    .connect_and_store(bootnode_address)
+                    .await?;
 
                 Self::spawn_connection_thread(channel.clone(), sender.clone());
 
-                handshake_request(channel.clone(), 1, self.storage.get_latest_block_height(), local_addr).await?;
-                channel.write(&GetPeers).await?;
+                self.context
+                    .handshakes
+                    .write()
+                    .await
+                    .send_request(
+                        channel.clone(),
+                        1u64,
+                        self.storage.get_latest_block_height(),
+                        local_addr,
+                    )
+                    .await?;
             }
         }
 

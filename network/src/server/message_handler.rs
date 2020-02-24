@@ -6,7 +6,6 @@ use crate::{
     message::{types::*, Channel, Message},
     process_transaction_internal,
     propagate_block,
-    protocol::*,
     Server,
 };
 
@@ -151,7 +150,6 @@ impl Server {
     /// send a Version message to each peer in the list
     /// this is going to be a lot of awaits in a loop...
     /// can look at futures crate to handle multiple futures
-    /// set server status to listening
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
         let mut peer_book = self.context.peer_book.write().await;
         for (addr, time) in message.addresses.iter() {
@@ -250,24 +248,40 @@ impl Server {
         Ok(())
     }
 
-    /// A miner has acknowledged our Version message
+    /// A new peer has acknowledged our Version message
     /// add them to our peer book
-    async fn receive_verack(&mut self, _message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
-        let peer_book = &mut self.context.peer_book.write().await;
+    async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
+        match self
+            .context
+            .handshakes
+            .write()
+            .await
+            .accept_response(channel.address, message)
+            .await
+        {
+            Ok(()) => {
+                let peer_book = &mut self.context.peer_book.write().await;
 
-        if &self.context.local_addr != &channel.address {
-            peer_book.disconnected.remove(&channel.address);
-            peer_book.gossiped.remove(&channel.address);
-            peer_book.peers.update(channel.address, Utc::now());
+                if &self.context.local_addr != &channel.address {
+                    peer_book.disconnected.remove(&channel.address);
+                    peer_book.gossiped.remove(&channel.address);
+                    peer_book.peers.update(channel.address, Utc::now());
+                }
+
+                // get new peer's peers
+                channel.write(&GetPeers).await?;
+
+                Ok(())
+            }
+            Err(error) => Err(ServerError::HandshakeError(error)),
         }
-
-        Ok(())
     }
 
     /// A miner is trying to connect with us
     /// check if sending node is a new peer
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<(), ServerError> {
         let peer_address = message.address_sender;
+        let peer_height = message.height;
         let peer_book = &mut self.context.peer_book.read().await;
 
         if peer_book.peers.addresses.len() < self.context.max_peers as usize && self.context.local_addr != peer_address
@@ -280,10 +294,22 @@ impl Server {
 
             let latest_height = self.storage.get_latest_block_height();
 
-            handshake_response(channel.clone(), new_peer, 1, latest_height, self.context.local_addr).await?;
+            self.context
+                .handshakes
+                .write()
+                .await
+                .send_response_request(
+                    message,
+                    new_peer,
+                    channel.clone(),
+                    1,
+                    latest_height,
+                    self.context.local_addr,
+                )
+                .await?;
 
             // if our peer has a longer chain, send a sync message
-            if message.height > latest_height {
+            if peer_height > latest_height {
                 let mut sync_handler = self.sync_handler_lock.lock().await;
                 sync_handler.sync_node = peer_address;
 
