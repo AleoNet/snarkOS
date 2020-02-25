@@ -1,7 +1,7 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use rand::Rng;
 use std::net::SocketAddr;
 
@@ -17,7 +17,7 @@ pub struct Version {
     pub nonce: u64,
 
     /// Message timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: i64,
 
     /// Network address of message recipient
     pub address_receiver: SocketAddr,
@@ -34,7 +34,7 @@ impl Version {
             version,
             height,
             nonce: rng.gen::<u64>(),
-            timestamp: Utc::now(),
+            timestamp: Utc::now().timestamp(),
             address_receiver,
             address_sender,
         }
@@ -47,17 +47,17 @@ impl Message for Version {
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 75 {
-            return Err(MessageError::InvalidLength(vec.len(), 75));
+        if vec.len() != 48 {
+            return Err(MessageError::InvalidLength(vec.len(), 48));
         }
 
         Ok(Version {
             version: bincode::deserialize(&vec[..8])?,
             height: bincode::deserialize(&vec[8..12])?,
             nonce: bincode::deserialize(&vec[12..20])?,
-            timestamp: bincode::deserialize(&vec[20..55])?,
-            address_receiver: bincode::deserialize(&vec[55..65])?,
-            address_sender: bincode::deserialize(&vec[65..75])?,
+            timestamp: bincode::deserialize(&vec[20..28])?,
+            address_receiver: bincode::deserialize(&vec[28..38])?,
+            address_sender: bincode::deserialize(&vec[38..48])?,
         })
     }
 
