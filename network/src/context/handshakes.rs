@@ -62,10 +62,10 @@ impl Handshakes {
 
     /// Accept a handshake response from a peer that has received our handshake request.
     /// Update the stored handshake status upon success.
-    pub async fn accept_response(&mut self, peer_address: SocketAddr, message: Verack) -> Result<(), HandshakeError> {
-        match self.addresses.get_mut(&peer_address) {
+    pub async fn accept_response(&mut self, address: SocketAddr, message: Verack) -> Result<(), HandshakeError> {
+        match self.addresses.get_mut(&address) {
             Some(stored_handshake) => stored_handshake.accept(message).await,
-            None => Err(HandshakeError::HandshakeMissing(peer_address)),
+            None => Err(HandshakeError::HandshakeMissing(address)),
         }
     }
 

@@ -13,5 +13,8 @@ pub use context::*;
 pub mod handshakes;
 pub use handshakes::*;
 
+pub mod pings;
+pub use pings::*;
+
 pub mod peer_book;
 pub use peer_book::*;

@@ -1,6 +1,6 @@
 use crate::peer_book::PeerBook;
 
-use crate::{Connections, Handshakes};
+use crate::{Connections, Handshakes, Pings};
 use std::net::SocketAddr;
 use tokio::sync::RwLock;
 
@@ -32,6 +32,9 @@ pub struct Context {
 
     /// Handshakes with other nodes
     pub handshakes: RwLock<Handshakes>,
+
+    /// Pings sent to other nodes
+    pub pings: RwLock<Pings>,
 }
 
 impl Context {
@@ -53,6 +56,7 @@ impl Context {
             connections: RwLock::new(Connections::new()),
             peer_book: RwLock::new(PeerBook::new()),
             handshakes: RwLock::new(Handshakes::new()),
+            pings: RwLock::new(Pings::new()),
         }
     }
 }

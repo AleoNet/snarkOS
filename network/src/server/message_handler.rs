@@ -6,6 +6,7 @@ use crate::{
     message::{types::*, Channel, Message},
     process_transaction_internal,
     propagate_block,
+    Pings,
     Server,
 };
 
@@ -171,18 +172,33 @@ impl Server {
     }
 
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
-        channel.write(&Pong::new(message)).await?;
+        Pings::send_pong(message, channel).await?;
 
         Ok(())
     }
 
-    async fn receive_pong(&mut self, _message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
-        self.context
-            .peer_book
+    async fn receive_pong(&mut self, message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
+        match self
+            .context
+            .pings
             .write()
             .await
-            .peers
-            .update(channel.address, Utc::now());
+            .accept_pong(channel.address, message)
+            .await
+        {
+            Ok(()) => {
+                self.context
+                    .peer_book
+                    .write()
+                    .await
+                    .peers
+                    .update(channel.address, Utc::now());
+            }
+            Err(error) => info!(
+                "Invalid Pong message from: {:?}, Full error: {:?}",
+                channel.address, error
+            ),
+        }
 
         Ok(())
     }
@@ -270,8 +286,6 @@ impl Server {
 
                 // get new peer's peers
                 channel.write(&GetPeers).await?;
-
-                Ok(())
             }
             Err(error) => {
                 info!(
@@ -279,9 +293,9 @@ impl Server {
                     channel.address,
                     ServerError::HandshakeError(error)
                 );
-                Ok(())
             }
         }
+        Ok(())
     }
 
     /// A miner is trying to connect with us

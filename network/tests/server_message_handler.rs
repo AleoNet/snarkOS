@@ -4,6 +4,7 @@ mod server_message_handler {
         message::{types::*, Channel, Message},
         test_data::*,
         HandshakeState,
+        PingState,
     };
     use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
 
@@ -416,6 +417,7 @@ mod server_message_handler {
             start_test_server(server);
 
             // 2. Send ping request to server from peer
+
             let ping = Ping::new();
             let ping_bytes = ping.serialize().unwrap();
             let (tx, rx) = oneshot::channel();
@@ -433,6 +435,7 @@ mod server_message_handler {
             rx.await.unwrap();
 
             // 3. Check that peer received pong
+
             let channel = get_next_channel(&mut peer_listener).await;
             let (name, bytes) = channel.read().await.unwrap();
 
@@ -446,7 +449,7 @@ mod server_message_handler {
 
     #[test]
     #[serial]
-    fn receive_pong() {
+    fn receive_pong_unknown() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
@@ -484,6 +487,158 @@ mod server_message_handler {
             // 3. Check that server updated peer
 
             let peer_book = context.peer_book.read().await;
+            assert!(!peer_book.peer_contains(&peer_address));
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn receive_pong_rejected() {
+        let mut rt = Runtime::new().unwrap();
+
+        let (storage, path) = initialize_test_blockchain();
+
+        rt.block_on(async move {
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let mut server_sender = server.sender.clone();
+            let context = Arc::clone(&server.context);
+
+            // 1. Add peer to pings
+
+            let channel_server_side = context
+                .connections
+                .write()
+                .await
+                .store(peer_address, Channel::connect(peer_address).await.unwrap());
+            let channel_peer_side = get_next_channel(&mut peer_listener).await;
+
+            // 2. Send ping request from server to peer
+
+            context
+                .pings
+                .write()
+                .await
+                .send_ping(channel_server_side.clone())
+                .await
+                .unwrap();
+
+            // 3. Start server
+
+            start_test_server(server);
+
+            // 4. Accept server ping request
+
+            let (name, _bytes) = channel_peer_side.read().await.unwrap();
+            assert_eq!(Ping::name(), name);
+
+            // 5. Send invalid pong response to server from peer
+
+            let (tx, rx) = oneshot::channel();
+            tokio::spawn(async move {
+                server_sender
+                    .send((
+                        tx,
+                        Pong::name(),
+                        Pong::new(Ping::new()).serialize().unwrap(),
+                        channel_server_side,
+                    ))
+                    .await
+                    .unwrap()
+            });
+            rx.await.unwrap();
+
+            // 6. Check that server did not add peer to peerlist
+
+            let pings = context.pings.read().await;
+            let peer_book = context.peer_book.read().await;
+
+            assert_eq!(PingState::Rejected, pings.get_state(peer_address).unwrap());
+            assert!(!peer_book.peer_contains(&peer_address));
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn receive_pong_accepted() {
+        let mut rt = Runtime::new().unwrap();
+
+        let (storage, path) = initialize_test_blockchain();
+
+        rt.block_on(async move {
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let mut server_sender = server.sender.clone();
+            let context = Arc::clone(&server.context);
+
+            // 1. Add peer to pings
+
+            let channel_server_side = context
+                .connections
+                .write()
+                .await
+                .store(peer_address, Channel::connect(peer_address).await.unwrap());
+            let channel_peer_side = get_next_channel(&mut peer_listener).await;
+
+            // 2. Send ping request from server to peer
+
+            context
+                .pings
+                .write()
+                .await
+                .send_ping(channel_server_side.clone())
+                .await
+                .unwrap();
+
+            // 3. Start server
+
+            start_test_server(server);
+
+            // 4. Accept server ping request
+
+            let (name, bytes) = channel_peer_side.read().await.unwrap();
+            assert_eq!(Ping::name(), name);
+
+            let ping_message = Ping::deserialize(bytes).unwrap();
+
+            // 5. Send pong response to server from peer
+
+            let (tx, rx) = oneshot::channel();
+            tokio::spawn(async move {
+                server_sender
+                    .send((
+                        tx,
+                        Pong::name(),
+                        Pong::new(ping_message).serialize().unwrap(),
+                        channel_server_side,
+                    ))
+                    .await
+                    .unwrap()
+            });
+            rx.await.unwrap();
+
+            // 6. Check that server did not add peer to peerlist
+
+            let pings = context.pings.read().await;
+            let peer_book = context.peer_book.read().await;
+
+            assert_eq!(PingState::Accepted, pings.get_state(peer_address).unwrap());
             assert!(peer_book.peer_contains(&peer_address));
         });
 
@@ -838,7 +993,7 @@ mod server_message_handler {
 
     #[test]
     #[serial]
-    fn receive_verack_normal() {
+    fn receive_verack_rejected() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
@@ -863,6 +1018,87 @@ mod server_message_handler {
                 .write()
                 .await
                 .store(peer_address, Channel::connect(peer_address).await.unwrap());
+            let channel_peer_side = get_next_channel(&mut peer_listener).await;
+
+            // 2. Send handshake request from server to peer
+
+            context
+                .handshakes
+                .write()
+                .await
+                .send_request(channel_server_side.clone(), version, height, server_address)
+                .await
+                .unwrap();
+
+            // 3. Start server
+
+            start_test_server(server);
+
+            // 4. Accept server handshake request
+
+            let (name, _bytes) = channel_peer_side.read().await.unwrap();
+            assert_eq!(Version::name(), name);
+
+            let invalid_version = Version::new(version, height, server_address, peer_address);
+
+            // 5. Send invalid Verack from peer to server
+
+            let (tx, rx) = oneshot::channel();
+            tokio::spawn(async move {
+                server_sender
+                    .send((
+                        tx,
+                        Verack::name(),
+                        Verack::new(invalid_version).serialize().unwrap(),
+                        channel_server_side,
+                    ))
+                    .await
+                    .unwrap();
+            });
+            rx.await.unwrap();
+
+            // 6. Check that server did not add peer to peerlist
+
+            let handshakes = context.handshakes.read().await;
+            let peer_book = &mut context.peer_book.read().await;
+
+            assert_eq!(HandshakeState::Rejected, handshakes.get_state(peer_address).unwrap());
+            assert!(!peer_book.peer_contains(&peer_address));
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn receive_verack_accepted() {
+        let mut rt = Runtime::new().unwrap();
+
+        let (storage, path) = initialize_test_blockchain();
+
+        rt.block_on(async move {
+            let version = 1u64;
+            let height = 0u32;
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let mut server_sender = server.sender.clone();
+            let context = server.context.clone();
+
+            // 1. Add peer to server connections
+
+            let channel_server_side = context
+                .connections
+                .write()
+                .await
+                .connect_and_store(peer_address)
+                .await
+                .unwrap();
             let channel_peer_side = get_next_channel(&mut peer_listener).await;
 
             // 2. Send handshake request from server to peer
@@ -906,6 +1142,7 @@ mod server_message_handler {
 
             let handshakes = context.handshakes.read().await;
             let peer_book = &mut context.peer_book.read().await;
+
             assert_eq!(HandshakeState::Accepted, handshakes.get_state(peer_address).unwrap());
             assert!(peer_book.peer_contains(&peer_address));
         });
