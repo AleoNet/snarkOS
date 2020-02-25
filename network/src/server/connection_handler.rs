@@ -64,7 +64,6 @@ impl Server {
                 }
 
                 // Purge peers that haven't responded in 2 loops
-
                 let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
 
                 for (socket_addr, last_seen) in peer_book.peers.addresses.clone() {

@@ -518,7 +518,9 @@ mod server_message_handler {
                 .connections
                 .write()
                 .await
-                .store(peer_address, Channel::connect(peer_address).await.unwrap());
+                .connect_and_store(peer_address)
+                .await
+                .unwrap();
             let channel_peer_side = get_next_channel(&mut peer_listener).await;
 
             // 2. Send ping request from server to peer
@@ -593,7 +595,9 @@ mod server_message_handler {
                 .connections
                 .write()
                 .await
-                .store(peer_address, Channel::connect(peer_address).await.unwrap());
+                .connect_and_store(peer_address)
+                .await
+                .unwrap();
             let channel_peer_side = get_next_channel(&mut peer_listener).await;
 
             // 2. Send ping request from server to peer
@@ -796,7 +800,9 @@ mod server_message_handler {
                 .connections
                 .write()
                 .await
-                .store(bootnode_address, Channel::connect(bootnode_address).await.unwrap());
+                .connect_and_store(bootnode_address)
+                .await
+                .unwrap();
 
             let block_hash = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
             let block_hash_clone = block_hash.clone();
@@ -911,7 +917,9 @@ mod server_message_handler {
                 .connections
                 .write()
                 .await
-                .store(peer_address, Channel::connect(peer_address).await.unwrap());
+                .connect_and_store(peer_address)
+                .await
+                .unwrap();
             let channel_peer_side = get_next_channel(&mut peer_listener).await;
 
             // 1. Start server
@@ -1017,7 +1025,9 @@ mod server_message_handler {
                 .connections
                 .write()
                 .await
-                .store(peer_address, Channel::connect(peer_address).await.unwrap());
+                .connect_and_store(peer_address)
+                .await
+                .unwrap();
             let channel_peer_side = get_next_channel(&mut peer_listener).await;
 
             // 2. Send handshake request from server to peer

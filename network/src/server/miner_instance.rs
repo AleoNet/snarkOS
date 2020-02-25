@@ -49,7 +49,7 @@ impl MinerInstance {
             loop {
                 let block_serialized = miner.mine_block(&self.storage, &self.memory_pool_lock).await.unwrap();
 
-                println!(
+                info!(
                     "Block found!           {:?}",
                     Block::deserialize(&block_serialized).unwrap()
                 );
