@@ -54,17 +54,18 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             config.bootnodes.clone(),
         ),
         consensus.clone(),
-        Arc::clone(&storage),
-        Arc::clone(&memory_pool_lock),
-        Arc::clone(&sync_handler_lock),
-        10000,
+        storage.clone(),
+        memory_pool_lock.clone(),
+        sync_handler_lock.clone(),
+        10000, // 10 seconds
     );
 
-    // Start rpc server
+    // Start rpc thread
+
     if config.jsonrpc {
         start_rpc_server(
             config.rpc_port,
-            Arc::clone(&storage),
+            storage.clone(),
             server.context.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
@@ -72,20 +73,22 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         .await?;
     }
 
+    // Start miner thread
+
     let coinbase_address = BitcoinAddress::<Mainnet>::from_str(&config.coinbase_address).unwrap();
 
     if config.miner {
         MinerInstance {
             coinbase_address,
             consensus: consensus.clone(),
-            storage: Arc::clone(&storage),
-            memory_pool_lock: Arc::clone(&memory_pool_lock),
+            storage: storage.clone(),
+            memory_pool_lock: memory_pool_lock.clone(),
             server_context: server.context.clone(),
         }
         .spawn();
     }
 
-    // Start server
+    // Start server thread
 
     server.listen().await?;
 
