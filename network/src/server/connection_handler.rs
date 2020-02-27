@@ -4,16 +4,16 @@ use crate::{
 };
 
 use chrono::{Duration as ChronoDuration, Utc};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 use tokio::{task, time::delay_for};
 
 impl Server {
     /// Manage number of active connections according to the connection frequency
     pub(in crate::server) async fn connection_handler(&self) {
-        let context = Arc::clone(&self.context);
-        let memory_pool_lock = Arc::clone(&self.memory_pool_lock);
-        let sync_handler_lock = Arc::clone(&self.sync_handler_lock);
-        let storage = Arc::clone(&self.storage);
+        let context = self.context.clone();
+        let memory_pool_lock = self.memory_pool_lock.clone();
+        let sync_handler_lock = self.sync_handler_lock.clone();
+        let storage = self.storage.clone();
         let connection_frequency = self.connection_frequency;
 
         task::spawn(async move {

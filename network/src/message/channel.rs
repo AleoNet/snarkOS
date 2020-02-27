@@ -13,6 +13,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream, sync::RwLock};
 pub struct Channel {
     pub address: SocketAddr,
     pub io: Arc<RwLock<TcpStream>>,
+    //    pub read:
 }
 
 impl Channel {
@@ -32,11 +33,12 @@ impl Channel {
     }
 
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
+        info!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
+
         let serialized = message.serialize()?;
         let header = MessageHeader::new(M::name(), serialized.len() as u32);
 
         self.io.write().await.write_all(&header.serialize()?).await?;
-
         self.io.write().await.write_all(&serialized).await?;
 
         Ok(())
@@ -44,6 +46,12 @@ impl Channel {
 
     pub async fn read(&self) -> Result<(MessageName, Vec<u8>), ConnectError> {
         let header = read_header(&mut *self.io.write().await).await?;
+
+        info!(
+            "Message {:?}, Received from {:?}",
+            header.name.to_string(),
+            self.address
+        );
 
         Ok((
             header.name,

@@ -128,9 +128,7 @@ pub async fn ping(address: SocketAddr, mut listener: TcpListener) {
     });
 
     rx.await.unwrap();
-    println!("waited");
     let channel = get_next_channel(&mut listener).await;
-    println!("getting next channel");
     let (name, _bytes) = channel.read().await.unwrap();
 
     assert_eq!(MessageName::from("ping"), name);

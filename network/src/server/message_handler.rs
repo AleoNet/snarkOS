@@ -16,44 +16,49 @@ use std::sync::Arc;
 impl Server {
     /// handle an incoming message
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
-        while let Some((tx, name, bytes, channel)) = self.receiver.recv().await {
-            info!("Message {:?}, Received from {:?}", name.to_string(), channel.address);
+        while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
-                self.receive_block_message(Block::deserialize(bytes)?, channel, true)
+                self.receive_block_message(Block::deserialize(bytes)?, channel.clone(), true)
                     .await?;
             } else if name == GetBlock::name() {
-                self.receive_get_block(GetBlock::deserialize(bytes)?, channel).await?;
+                self.receive_get_block(GetBlock::deserialize(bytes)?, channel.clone())
+                    .await?;
             } else if name == GetMemoryPool::name() {
-                self.receive_get_memory_pool(GetMemoryPool::deserialize(bytes)?, channel)
+                self.receive_get_memory_pool(GetMemoryPool::deserialize(bytes)?, channel.clone())
                     .await?;
             } else if name == GetPeers::name() {
-                self.receive_get_peers(GetPeers::deserialize(bytes)?, channel).await?;
+                self.receive_get_peers(GetPeers::deserialize(bytes)?, channel.clone())
+                    .await?;
             } else if name == GetSync::name() {
-                self.receive_get_sync(GetSync::deserialize(bytes)?, channel).await?;
+                self.receive_get_sync(GetSync::deserialize(bytes)?, channel.clone())
+                    .await?;
             } else if name == MemoryPool::name() {
                 self.receive_memory_pool(MemoryPool::deserialize(bytes)?).await?;
             } else if name == Peers::name() {
-                self.receive_peers(Peers::deserialize(bytes)?, channel).await?;
+                self.receive_peers(Peers::deserialize(bytes)?, channel.clone()).await?;
             } else if name == Ping::name() {
-                self.receive_ping(Ping::deserialize(bytes)?, channel).await?;
+                self.receive_ping(Ping::deserialize(bytes)?, channel.clone()).await?;
             } else if name == Pong::name() {
-                self.receive_pong(Pong::deserialize(bytes)?, channel).await?;
+                self.receive_pong(Pong::deserialize(bytes)?, channel.clone()).await?;
             } else if name == Sync::name() {
                 self.receive_sync(Sync::deserialize(bytes)?).await?;
             } else if name == SyncBlock::name() {
-                self.receive_block_message(Block::deserialize(bytes)?, channel, false)
+                self.receive_block_message(Block::deserialize(bytes)?, channel.clone(), false)
                     .await?;
             } else if name == Transaction::name() {
-                self.receive_transaction(Transaction::deserialize(bytes)?, channel)
+                self.receive_transaction(Transaction::deserialize(bytes)?, channel.clone())
                     .await?;
             } else if name == Version::name() {
-                self.receive_version(Version::deserialize(bytes)?, channel).await?;
+                channel = self
+                    .receive_version(Version::deserialize(bytes)?, channel.clone())
+                    .await?;
             } else if name == Verack::name() {
-                self.receive_verack(Verack::deserialize(bytes)?, channel).await?;
+                self.receive_verack(Verack::deserialize(bytes)?, channel.clone())
+                    .await?;
             } else {
                 info!("Name not recognized {:?}", name.to_string());
             }
-            tx.send(()).expect("error resetting message handler");
+            tx.send(channel).expect("error resetting message handler");
         }
         Ok(())
     }
@@ -300,7 +305,11 @@ impl Server {
 
     /// A miner is trying to connect with us
     /// check if sending node is a new peer
-    async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<(), ServerError> {
+    async fn receive_version(
+        &mut self,
+        message: Version,
+        mut channel: Arc<Channel>,
+    ) -> Result<Arc<Channel>, ServerError> {
         let peer_address = message.address_sender;
         let peer_height = message.height;
         let peer_book = &mut self.context.peer_book.read().await;
@@ -308,7 +317,7 @@ impl Server {
         if peer_book.peers.addresses.len() < self.context.max_peers as usize && self.context.local_addr != peer_address
         {
             let mut connections = self.context.connections.write().await;
-            let channel = connections.update(channel.address, peer_address)?;
+            channel = connections.update(channel.address, peer_address)?;
             drop(connections);
 
             let new_peer = !peer_book.peers.addresses.contains_key(&peer_address);
@@ -339,6 +348,6 @@ impl Server {
                 }
             }
         }
-        Ok(())
+        Ok(channel)
     }
 }

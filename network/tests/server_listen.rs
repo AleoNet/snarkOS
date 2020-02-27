@@ -3,7 +3,7 @@ mod server_listen {
     use snarkos_network::{
         context::Context,
         message::{
-            types::{Verack, Version},
+            types::{GetPeers, GetSync, Verack, Version},
             Message,
         },
         protocol::SyncHandler,
@@ -14,7 +14,6 @@ mod server_listen {
     use snarkos_storage::BlockStorage;
 
     use serial_test::serial;
-    use snarkos_network::message::types::{GetPeers, GetSync};
     use std::{net::SocketAddr, sync::Arc};
     use tokio::{
         net::TcpListener,

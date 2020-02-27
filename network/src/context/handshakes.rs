@@ -27,6 +27,7 @@ impl Handshakes {
         height: u32,
         address_sender: SocketAddr,
     ) -> Result<(), HandshakeError> {
+        info!("New handshake with: {:?}", channel.address);
         self.addresses.insert(
             channel.address,
             Handshake::send_new(channel, version, height, address_sender).await?,
@@ -48,6 +49,7 @@ impl Handshakes {
         let peer_address = channel.address;
         match Handshake::receive_new(message, new_peer, channel, version, height, address_sender).await? {
             Some(handshake) => {
+                info!("New handshake with: {:?}", peer_address);
                 self.addresses.insert(peer_address, handshake);
                 Ok(())
             }

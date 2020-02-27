@@ -37,7 +37,6 @@ impl Handshake {
         height: u32,
         address_sender: SocketAddr,
     ) -> Result<Self, HandshakeError> {
-        info!("Sending Handshake Version to {:?}", channel.address);
         let message = Version::new(version, height, channel.address, address_sender);
         channel.write(&message).await?;
 
@@ -60,8 +59,6 @@ impl Handshake {
         height: u32,
         address_sender: SocketAddr,
     ) -> Result<Option<Handshake>, HandshakeError> {
-        info!("Sending Handshake Verack to:  {:?}", channel.address);
-
         channel.write(&Verack::new(message)).await?;
 
         let mut handshake = None;

@@ -23,10 +23,18 @@ pub async fn stream_read<'a, T: AsyncRead + Unpin>(
     stream: &'a mut T,
     buffer: &'a mut [u8],
 ) -> Result<usize, StreamReadError> {
-    loop {
-        return Ok(stream.read_exact(buffer).await?);
-    }
+    return Ok(stream.read_exact(buffer).await?);
 }
+//
+//pub async fn data_is_ready(stream: &mut TcpStream) -> Result<(), MessageHeaderError> {
+//    loop {
+//        let buffer = &mut [0u8; 16];
+//
+//        if stream.peek(buffer).poll()?.is_ready() {
+//            return Ok(())
+//        }
+//    }
+//}
 
 #[cfg(test)]
 mod tests {
@@ -112,4 +120,70 @@ mod tests {
 
         assert_eq!(message_copy, actual);
     }
+
+    //    use std::sync::Arc;
+    //    use tokio::sync::Mutex;
+    ////    use futures::Future;
+    //    use futures::future::poll_fn;
+    //    use std::task::Poll;
+    //    use tokio_util::codec::{
+    //        Framed,
+    //        LinesCodec,
+    //        LinesCodecError
+    //    };
+    //
+    ////    #[derive(Clone)]
+    //    pub struct TestChannel {
+    //        io: Framed<TcpStream, LinesCodec>
+    ////        read: Arc<Mutex<tokio::net::tcp::ReadHalf<'a>>>,
+    ////        write: Arc<Mutex<tokio::net::tcp::WriteHalf<'a>>>
+    //    }
+    //
+    //    #[tokio::test]
+    //    #[serial]
+    //    async fn testing() {
+    //
+    //        let address = random_socket_address();
+    //        let mut listener = TcpListener::bind(address).await.unwrap();
+    //        let message = Ping::new();
+    //        let message_copy = message.clone();
+    //
+    //        let (tx, rx) = tokio::sync::oneshot::channel();
+    //        tokio::spawn(async move {
+    ////            let test = TestChannel{ io: std::sync::Arc::new(tokio::sync::Mutex::new(TcpStream::connect(address).await.unwrap())) };
+    ////            let test = TestChannel {
+    ////                io: Framed::new(TcpStream::connect(address).await.unwrap(), LinesCodec::new())
+    ////            };
+    ////            let test_ref = test.clone();
+    //
+    ////            let (tz, rz) = tokio::sync::oneshot::channel();
+    ////            tokio::spawn(async move {
+    ////                tz.send(()).unwrap();
+    ////                loop {
+    ////                    println!("acquiring to read");
+    ////
+    ////                    let mut buf = [0; 10];
+    ////                    let boolean = test_ref.io.lock().await.poll_peek(buf).is_pending();
+    //////                    test_ref.io.lock().await.read_exact(buf).await.unwrap();
+    ////                    println!("releasing read");
+    ////                }
+    ////            });
+    ////            rz.await.unwrap();
+    //
+    ////            test.io.lock().await.write_all(&message.serialize().unwrap()).await.unwrap();
+    //            println!("acquiring to write");
+    //            let lines = Framed::new(TcpStream::connect(address).await.unwrap(), LinesCodec::new());
+    //            lines.send(String::from("fuck you"));
+    ////            test.io.lock().await.write_all(&message.serialize().unwrap()).await.unwrap();
+    //            println!("releasing write");
+    //
+    //            tx.send(()).unwrap();
+    //        });
+    //
+    //        let (mut stream, _sock) = listener.accept().await.unwrap();
+    //        let bytes = read_message(&mut stream, 8usize).await.unwrap();
+    //        let actual = Ping::deserialize(bytes).unwrap();
+    //
+    //        rx.await.unwrap();
+    //    }
 }

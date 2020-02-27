@@ -5,7 +5,7 @@ use tokio::{
 };
 
 use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParameters};
-use snarkos_errors::network::ServerError;
+use snarkos_errors::network::{ConnectError, ServerError};
 use snarkos_storage::BlockStorage;
 
 use crate::{
@@ -22,8 +22,8 @@ pub struct Server {
     pub memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
     pub sync_handler_lock: Arc<Mutex<SyncHandler>>,
     pub connection_frequency: u64,
-    pub sender: mpsc::Sender<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
-    pub receiver: mpsc::Receiver<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
+    pub sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+    pub receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
 }
 
 impl Server {
@@ -70,7 +70,7 @@ impl Server {
                     .connect_and_store(bootnode_address)
                     .await?;
 
-                Self::spawn_connection_thread(channel.clone(), sender.clone());
+                info!("New connection to {:?}", bootnode_address);
 
                 self.context
                     .handshakes
@@ -83,6 +83,8 @@ impl Server {
                         local_addr,
                     )
                     .await?;
+
+                Self::spawn_connection_thread(channel, sender.clone());
             }
         }
 
@@ -93,8 +95,10 @@ impl Server {
                 let connections = &mut context.connections.write().await;
                 let channel = connections.store(peer_address, Channel::new(stream, peer_address).await.unwrap());
 
+                info!("New connection to: {:?}", peer_address);
+
                 // Inner loop spawns one thread per connection to read messages
-                Self::spawn_connection_thread(channel.clone(), sender.clone());
+                Self::spawn_connection_thread(channel, sender.clone());
             }
         });
 
@@ -106,19 +110,28 @@ impl Server {
     }
 
     fn spawn_connection_thread(
-        channel: Arc<Channel>,
-        mut thread_sender: mpsc::Sender<(oneshot::Sender<()>, MessageName, Vec<u8>, Arc<Channel>)>,
+        mut channel: Arc<Channel>,
+        mut thread_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     ) {
         // Inner loop spawns one thread per connection to read messages
         task::spawn(async move {
             loop {
                 let (tx, rx) = oneshot::channel();
-                let (message_name, message_bytes) = channel.read().await.expect("ERROR OK: peer closed connection");
+                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(silent_disconnect);
+                if MessageName::from("disconnect") == message_name {
+                    break;
+                }
                 thread_sender
                     .send((tx, message_name, message_bytes, channel.clone()))
                     .await
                     .expect("could not send to message handler");
-                rx.await.expect("message handler errored");
+                channel = rx.await.expect("message handler errored");
+
+                fn silent_disconnect(error: ConnectError) -> (MessageName, Vec<u8>) {
+                    info!("Peer node disconnected due to error: {:?}", error);
+
+                    (MessageName::from("disconnect"), vec![])
+                }
             }
         });
     }
