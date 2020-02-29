@@ -3,7 +3,6 @@ mod server_message_handler {
     use snarkos_network::{
         message::{types::*, Channel, Message},
         test_data::*,
-        HandshakeState,
         PingState,
     };
     use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
@@ -899,24 +898,26 @@ mod server_message_handler {
     //
     //            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
     //            let mut server_sender = server.sender.clone();
-    //
-    //            // 1. Add peer to server connections
-    //
     //            let context = server.context.clone();
-    //            let channel_server_side = context
-    //                .connections
-    //                .write()
-    //                .await
-    //                .connect_and_store(peer_address)
-    //                .await
-    //                .unwrap();
-    //            let channel_peer_side = get_next_channel(&mut peer_listener).await;
     //
     //            // 1. Start server
     //
     //            start_test_server(server);
     //
-    //            // 2. Send Version message to server from peer
+    //            // 2. Add peer to server connections
+    //
+    //            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+    //            let channel_peer_side = get_channel(&mut peer_listener, server_address).await;
+    //
+    //            context
+    //                .connections
+    //                .write()
+    //                .await
+    //                .store(&channel_server_side);
+    //
+    //
+    //
+    //            // 3. Send Version message to server from peer
     //
     //            let version = Version::new(1u64, 0u32, server_address, peer_address);
     //
@@ -929,7 +930,7 @@ mod server_message_handler {
     //            });
     //            rx.await.unwrap();
     //
-    //            // 3. Check that server correctly responded with a Verack message
+    //            // 4. Check that server correctly responded with a Verack message
     //
     //            let (name, _bytes) = channel_peer_side.read().await.unwrap();
     //
@@ -939,7 +940,7 @@ mod server_message_handler {
     //        drop(rt);
     //        kill_storage_async(path);
     //    }
-
+    //
     //    #[test]
     //    #[serial]
     //    fn receive_verack_unknown() {

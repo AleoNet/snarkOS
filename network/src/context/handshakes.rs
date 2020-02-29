@@ -32,7 +32,7 @@ impl Handshakes {
         let handshake = Handshake::send_new(version, height, address_sender, address_receiver).await?;
 
         self.addresses.insert(address_receiver, handshake.clone());
-        info!("New handshake with: {:?}", address_receiver);
+        info!("Request handshake with: {:?}", address_receiver);
 
         Ok(handshake)
     }
@@ -43,7 +43,7 @@ impl Handshakes {
         version: u64,
         height: u32,
         address_sender: SocketAddr,
-        address_receiver: SocketAddr,
+        _address_receiver: SocketAddr,
         reader: TcpStream,
     ) -> Result<Handshake, HandshakeError> {
         let channel = Channel::new_read_only(reader)?;
@@ -53,12 +53,11 @@ impl Handshakes {
 
         if Version::name() == name {
             let peer_message = Version::deserialize(bytes)?;
+            let peer_address = peer_message.address_sender;
 
             let handshake = Handshake::receive_new(version, height, channel, peer_message, address_sender).await?;
 
-            self.addresses.insert(address_receiver, handshake.clone());
-
-            info!("New handshake with: {:?}", address_receiver);
+            self.addresses.insert(peer_address, handshake.clone());
 
             Ok(handshake)
         } else if Verack::name() == name {
@@ -69,7 +68,7 @@ impl Handshakes {
                 Some(handshake) => {
                     handshake.accept(peer_message).await?;
                     handshake.update_reader(channel);
-                    info!("New handshake with: {:?}", address_receiver);
+                    info!("New handshake with: {:?}", peer_address);
 
                     // Get our new peer's peer_list
                     handshake.channel.write(&GetPeers).await?;
@@ -102,7 +101,11 @@ impl Handshakes {
     /// Update the stored handshake status upon success.
     pub async fn accept_response(&mut self, address: SocketAddr, message: Verack) -> Result<(), HandshakeError> {
         match self.get_mut(&address) {
-            Some(stored_handshake) => stored_handshake.accept(message).await,
+            Some(stored_handshake) => {
+                info!("New handshake with: {:?}", address);
+
+                stored_handshake.accept(message).await
+            }
             None => Err(HandshakeError::HandshakeMissing(address)),
         }
     }
@@ -142,8 +145,6 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_handshakes() {
-        let version = 1u64;
-        let height = 0u32;
         let server_address = random_socket_address();
         let peer_address = random_socket_address();
 

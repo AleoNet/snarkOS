@@ -21,7 +21,7 @@ pub struct ProofGadget<PairingE: PairingEngine, F: Field, P: PairingGadget<Pairi
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "P::G1Gadget: Clone, P::GTGadget: Clone, P::G1PreparedGadget: Clone, \
-             P::G2PreparedGadget: Clone, "))]
+                            P::G2PreparedGadget: Clone, "))]
 pub struct VerifyingKeyGadget<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> {
     pub h_g2: P::G2Gadget,
     pub g_alpha_g1: P::G1Gadget,
@@ -57,7 +57,7 @@ impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> VerifyingKe
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "P::G1Gadget: Clone, P::GTGadget: Clone, P::G1PreparedGadget: Clone, \
-             P::G2PreparedGadget: Clone, "))]
+                            P::G2PreparedGadget: Clone, "))]
 pub struct PreparedVerifyingKeyGadget<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> {
     pub g_alpha: P::G1Gadget,
     pub h_beta: P::G2Gadget,
@@ -76,12 +76,12 @@ pub struct Gm17VerifierGadget<Pairing: PairingEngine, F: Field, P: PairingGadget
 }
 
 impl<
-    Pairing: PairingEngine,
-    F: Field,
-    P: PairingGadget<Pairing, F>,
-    C: ConstraintSynthesizer<Pairing::Fr>,
-    V: ToConstraintField<Pairing::Fr>,
-> SNARKVerifierGadget<GM17<Pairing, C, V>, F> for Gm17VerifierGadget<Pairing, F, P>
+        Pairing: PairingEngine,
+        F: Field,
+        P: PairingGadget<Pairing, F>,
+        C: ConstraintSynthesizer<Pairing::Fr>,
+        V: ToConstraintField<Pairing::Fr>,
+    > SNARKVerifierGadget<GM17<Pairing, C, V>, F> for Gm17VerifierGadget<Pairing, F, P>
 {
     type ProofGadget = ProofGadget<Pairing, F, P>;
     type VerificationKeyGadget = VerifyingKeyGadget<Pairing, F, P>;

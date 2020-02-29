@@ -1,14 +1,10 @@
 use snarkos_errors::network::HandshakeError;
 
-use crate::{
-    message::{
-        types::{Verack, Version},
-        Channel,
-    },
-    Message,
+use crate::message::{
+    types::{Verack, Version},
+    Channel,
 };
 use std::{net::SocketAddr, sync::Arc};
-use tokio::net::TcpStream;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum HandshakeState {
@@ -128,13 +124,11 @@ mod tests {
     use super::*;
     use crate::{message::Message, test_data::random_socket_address};
     use serial_test::serial;
-    use tokio::{net::TcpListener, sync::Mutex};
+    use tokio::net::TcpListener;
 
     #[tokio::test]
     #[serial]
     async fn test_handshake_full() {
-        let version = 1u64;
-        let height = 0u32;
         let server_address = random_socket_address();
         let peer_address = random_socket_address();
 
@@ -177,7 +171,7 @@ mod tests {
 
         let (reader, _socket) = peer_listener.accept().await.unwrap();
         let read_channel = Channel::new_read_only(reader).unwrap();
-        let (name, bytes) = read_channel.read().await.unwrap();
+        let (_name, bytes) = read_channel.read().await.unwrap();
 
         // 4. Peer receives server_handshake Version.
         // Peer sends server_handshake Verack, peer_handshake Version
