@@ -1,4 +1,4 @@
-use crate::network::{ConnectError, SendError};
+use crate::network::{message::MessageError, ConnectError, SendError};
 use std::net::SocketAddr;
 
 #[derive(Debug, Fail)]
@@ -15,6 +15,9 @@ pub enum HandshakeError {
     #[fail(display = "No handshake found for peer: {:?}", _0)]
     HandshakeMissing(SocketAddr),
 
+    #[fail(display = "Handshake message expected. Got {:?}", _0)]
+    InvalidMessage(String),
+
     #[fail(display = "Version message expected. Got {:?}", _0)]
     InvalidVersion(String),
 
@@ -29,6 +32,9 @@ pub enum HandshakeError {
 
     #[fail(display = "{}", _0)]
     SendError(SendError),
+
+    #[fail(display = "{}", _0)]
+    MessageError(MessageError),
 }
 
 impl From<ConnectError> for HandshakeError {
@@ -40,5 +46,11 @@ impl From<ConnectError> for HandshakeError {
 impl From<SendError> for HandshakeError {
     fn from(error: SendError) -> Self {
         HandshakeError::SendError(error)
+    }
+}
+
+impl From<MessageError> for HandshakeError {
+    fn from(error: MessageError) -> Self {
+        HandshakeError::MessageError(error)
     }
 }

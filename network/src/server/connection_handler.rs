@@ -28,24 +28,24 @@ impl Server {
                 if peer_book.peers.addresses.len() < context.min_peers as usize {
                     for (socket_addr, _last_seen) in peer_book.peers.addresses.clone() {
                         if let Some(channel) = context.connections.read().await.get(&socket_addr) {
-                            if let Err(_) = channel.write(&GetPeers).await {
-                                peer_book.disconnect_peer(&socket_addr);
-                            }
+                            //                            if let Err(_) = channel.write(&GetPeers).await {
+                            //                                peer_book.disconnect_peer(&socket_addr);
+                            //                            }
                         }
                     }
 
                     for (socket_addr, _last_seen) in peer_book.gossiped.addresses.clone() {
                         if let Some(channel) = context.connections.read().await.get(&socket_addr) {
                             if socket_addr != context.local_addr {
-                                if let Err(_) = context
-                                    .handshakes
-                                    .write()
-                                    .await
-                                    .send_request(channel, 1u64, storage.get_latest_block_height(), context.local_addr)
-                                    .await
-                                {
-                                    peer_book.disconnect_peer(&socket_addr);
-                                }
+                                //                                if let Err(_) = context
+                                //                                    .handshakes
+                                //                                    .write()
+                                //                                    .await
+                                //                                    .send_request(channel, 1u64, storage.get_latest_block_height(), context.local_addr)
+                                //                                    .await
+                                //                                {
+                                //                                    peer_book.disconnect_peer(&socket_addr);
+                                //                                }
                             }
                         }
                     }
@@ -56,9 +56,9 @@ impl Server {
                     // Ping peers and update last seen if there is a response
                     if socket_addr != context.local_addr {
                         if let Some(channel) = context.connections.read().await.get(&socket_addr) {
-                            if let Err(_) = context.pings.write().await.send_ping(channel).await {
-                                peer_book.disconnect_peer(&socket_addr);
-                            }
+                            //                            if let Err(_) = context.pings.write().await.send_ping(channel).await {
+                            //                                peer_book.disconnect_peer(&socket_addr);
+                            //                            }
                         }
                     }
                 }
@@ -90,9 +90,9 @@ impl Server {
 
                     if context.local_addr != sync_handler.sync_node {
                         if let Some(channel) = context.connections.read().await.get(&sync_handler.sync_node) {
-                            if let Err(_) = channel.write(&GetMemoryPool).await {
-                                peer_book.disconnect_peer(&sync_handler.sync_node);
-                            }
+                            //                            if let Err(_) = channel.write(&GetMemoryPool).await {
+                            //                                peer_book.disconnect_peer(&sync_handler.sync_node);
+                            //                            }
                         }
                     }
 

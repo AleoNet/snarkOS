@@ -51,7 +51,6 @@ impl Server {
     pub async fn listen(mut self) -> Result<(), ServerError> {
         let local_addr = self.context.local_addr;
         let sender = self.sender.clone();
-        let context = self.context.clone();
 
         let mut listener = TcpListener::bind(&local_addr).await?;
         info!("listening at: {:?}", local_addr);
@@ -62,43 +61,44 @@ impl Server {
             if local_addr != bootnode_address && !self.context.is_bootnode {
                 info!("Connecting to bootnode: {:?}", bootnode_address);
 
-                let channel = self
-                    .context
-                    .connections
-                    .write()
-                    .await
-                    .connect_and_store(bootnode_address)
-                    .await?;
-
-                info!("New connection to {:?}", bootnode_address);
-
                 self.context
                     .handshakes
                     .write()
                     .await
                     .send_request(
-                        channel.clone(),
                         1u64,
                         self.storage.get_latest_block_height(),
                         local_addr,
+                        bootnode_address,
                     )
                     .await?;
 
-                Self::spawn_connection_thread(channel, sender.clone());
+                //                Self::spawn_connection_thread(bootnode_address, sender.clone());
             }
         }
+
+        let storage = self.storage.clone();
+        let context = self.context.clone();
 
         // Outer loop spawns one thread to accept new connections
         task::spawn(async move {
             loop {
                 let (stream, peer_address) = listener.accept().await.unwrap();
-                let connections = &mut context.connections.write().await;
-                let channel = connections.store(peer_address, Channel::new(stream, peer_address).await.unwrap());
 
-                info!("New connection to: {:?}", peer_address);
+                let height = storage.get_latest_block_height();
+
+                let handshake = context
+                    .handshakes
+                    .write()
+                    .await
+                    .receive_request_new(1u64, height, local_addr, peer_address, stream)
+                    .await
+                    .unwrap();
+
+                context.connections.write().await.store_channel(&handshake.channel);
 
                 // Inner loop spawns one thread per connection to read messages
-                Self::spawn_connection_thread(channel, sender.clone());
+                Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
             }
         });
 

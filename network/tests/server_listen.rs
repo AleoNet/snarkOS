@@ -3,7 +3,7 @@ mod server_listen {
     use snarkos_network::{
         context::Context,
         message::{
-            types::{GetPeers, GetSync, Verack, Version},
+            types::{GetPeers, GetSync, Verack},
             Message,
         },
         protocol::SyncHandler,
@@ -110,41 +110,33 @@ mod server_listen {
 
             // 3. Check that bootnode received Version message
 
-            let channel = get_next_channel(&mut bootnode_listener).await;
-            let (name, bytes) = channel.read().await.unwrap();
-
-            assert_eq!(Version::name(), name);
+            let (reader, _peer) = bootnode_listener.accept().await.unwrap();
 
             // 4. Send handshake response from bootnode to server
 
-            let channel = Arc::new(channel.update_address(server_address).unwrap());
-            let mut bootnode_hand = Handshakes::new();
-            let version_message = Version::deserialize(bytes).unwrap();
-            bootnode_hand
-                .send_response_request(version_message, true, channel.clone(), 1u64, 1u32, bootnode_address)
+            let mut bootnode_handshakes = Handshakes::new();
+            let mut bootnode_hand = bootnode_handshakes
+                .receive_request_new(1u64, 1u32, bootnode_address, server_address, reader)
                 .await
                 .unwrap();
 
             // 5. Check that bootnode received a GetPeers message
 
-            let (name, _bytes) = channel.read().await.unwrap();
+            let (name, _bytes) = bootnode_hand.channel.read().await.unwrap();
 
             assert_eq!(GetPeers::name(), name);
 
             // 6. Check that bootnode received Verack message
 
-            let (name, bytes) = channel.read().await.unwrap();
+            let (name, bytes) = bootnode_hand.channel.read().await.unwrap();
 
             assert_eq!(Verack::name(), name);
             let verack_message = Verack::deserialize(bytes).unwrap();
-            bootnode_hand
-                .accept_response(channel.address, verack_message)
-                .await
-                .unwrap();
+            bootnode_hand.accept(verack_message).await.unwrap();
 
             // 7. Check that bootnode received GetSync message
 
-            let (name, _bytes) = channel.read().await.unwrap();
+            let (name, _bytes) = bootnode_hand.channel.read().await.unwrap();
             assert_eq!(GetSync::name(), name);
         });
 

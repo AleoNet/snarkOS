@@ -19,7 +19,6 @@ log = { version = "0.4.8" }
 rand = { version = "0.7.3" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2", features = ["full"] }
-#tokio-util = { version = "0.2.0", features = ["codec"]}
 wagyu-bitcoin = { version = "0.6.1" }
 
 [dev-dependencies]

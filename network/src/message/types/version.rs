@@ -39,6 +39,23 @@ impl Version {
             address_sender,
         }
     }
+
+    pub fn from(
+        version: u64,
+        height: u32,
+        address_receiver: SocketAddr,
+        address_sender: SocketAddr,
+        nonce: u64,
+    ) -> Self {
+        Self {
+            version,
+            height,
+            nonce,
+            timestamp: Utc::now().timestamp(),
+            address_receiver,
+            address_sender,
+        }
+    }
 }
 
 impl Message for Version {

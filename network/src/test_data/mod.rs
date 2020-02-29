@@ -1,8 +1,17 @@
-use crate::{context::Context, protocol::SyncHandler, server::Server};
+use crate::{
+    context::Context,
+    message::{
+        types::{Ping, Version},
+        Channel,
+    },
+    protocol::SyncHandler,
+    server::Server,
+    Handshake,
+    Message,
+};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
-use crate::message::{types::Ping, Channel, MessageName};
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -97,11 +106,42 @@ pub fn initialize_test_server(
 pub fn start_test_server(server: Server) {
     tokio::spawn(async move { server.listen().await.unwrap() });
 }
+//
+//pub async fn connect_channel(peer_address: SocketAddr) -> Arc<Channel> {
+//    let mut channel = Channel::new_write_only(peer_address).await.unwrap();
+//
+//}
 
 /// Returns the next tcp channel connected to the listener
-pub async fn get_next_channel(listener: &mut TcpListener) -> Arc<Channel> {
-    let (stream, peer_address) = listener.accept().await.unwrap();
-    Arc::new(Channel::new(stream, peer_address).await.unwrap())
+pub async fn get_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
+    let (reader, _peer) = listener.accept().await.unwrap();
+    let channel = Channel::new_read_only(reader).unwrap();
+    channel.update_writer(address).await.unwrap()
+}
+
+pub async fn do_handshake_get_channel(peer_address: SocketAddr, server_address: SocketAddr) -> Arc<Channel> {
+    // Simulate message handler
+    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+    let (reader, _peer) = peer_listener.accept().await.unwrap();
+
+    // Simulate Handshakes
+    let channel = Channel::new_read_only(reader).unwrap();
+    let (name, bytes) = channel.read().await.unwrap();
+    assert_eq!(Version::name(), name);
+
+    // Get final handshake with server
+    let handshake = Handshake::receive_new(
+        1u64,
+        0u32,
+        channel,
+        Version::deserialize(bytes).unwrap(),
+        server_address,
+    )
+    .await
+    .unwrap();
+
+    // return Arc::clone() of channel
+    handshake.channel.clone()
 }
 
 /// Starts a fake node that accepts all messages at the given socket address
@@ -122,16 +162,16 @@ pub fn accept_all_messages(mut peer_listener: TcpListener) {
 pub async fn ping(address: SocketAddr, mut listener: TcpListener) {
     let (tx, rx) = oneshot::channel();
     tokio::spawn(async move {
-        let channel = Arc::new(Channel::connect(address).await.unwrap());
+        let channel = Arc::new(Channel::new_write_only(address).await.unwrap());
         channel.write(&Ping::new()).await.unwrap();
         tx.send(()).unwrap();
     });
 
     rx.await.unwrap();
-    let channel = get_next_channel(&mut listener).await;
+    let channel = get_channel(&mut listener, address).await;
     let (name, _bytes) = channel.read().await.unwrap();
 
-    assert_eq!(MessageName::from("ping"), name);
+    assert_eq!(Ping::name(), name);
 }
 
 ///// Complete a full handshake between a server and peer

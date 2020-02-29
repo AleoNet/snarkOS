@@ -7,45 +7,92 @@ use crate::message::{
 
 use snarkos_errors::network::ConnectError;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::RwLock};
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
+/// Allows for reading and writing messages to a peer.
+/// Storing two streams allows for simultaneous reading/writing.
+/// Each stream is protected by an Arc + Mutex to allow for channel cloning.
 #[derive(Clone, Debug)]
 pub struct Channel {
     pub address: SocketAddr,
-    pub io: Arc<RwLock<TcpStream>>,
-    //    pub read:
+    pub reader: Arc<Mutex<TcpStream>>,
+    pub writer: Arc<Mutex<TcpStream>>,
 }
 
 impl Channel {
-    pub async fn new(stream: TcpStream, address: SocketAddr) -> Result<Self, ConnectError> {
+    pub async fn new(
+        address: SocketAddr,
+        reader: Arc<Mutex<TcpStream>>,
+        writer: Arc<Mutex<TcpStream>>,
+    ) -> Result<Self, ConnectError> {
         Ok(Self {
             address,
-            io: Arc::new(RwLock::new(stream)),
+            reader,
+            writer,
         })
     }
 
-    pub async fn connect(address: SocketAddr) -> Result<Self, ConnectError> {
-        // Open an asynchronous Tokio TcpStream to the socket address.
+    /// Returns a new channel with a writer only stream
+    pub async fn new_write_only(address: SocketAddr) -> Result<Self, ConnectError> {
+        let stream = Arc::new(Mutex::new(TcpStream::connect(address).await?));
+
         Ok(Self {
             address,
-            io: Arc::new(RwLock::new(TcpStream::connect(address).await?)),
+            reader: stream.clone(),
+            writer: stream,
         })
     }
 
+    /// Returns a new channel with a reader only stream
+    pub fn new_read_only(reader: TcpStream) -> Result<Self, ConnectError> {
+        let address = reader.peer_addr()?;
+        let stream = Arc::new(Mutex::new(reader));
+
+        Ok(Self {
+            address,
+            reader: stream.clone(),
+            writer: stream.clone(),
+        })
+    }
+
+    pub fn update_address(&mut self, address: SocketAddr) {
+        self.address = address;
+    }
+
+    /// Adds a reader stream to a channel that was writer only
+    pub fn update_reader(&self, reader: Arc<Mutex<TcpStream>>) -> Self {
+        Self {
+            address: self.address,
+            reader,
+            writer: self.writer.clone(),
+        }
+    }
+
+    /// Adds a writer stream to a channel that was reader only
+    pub async fn update_writer(&self, address: SocketAddr) -> Result<Self, ConnectError> {
+        Ok(Self {
+            address,
+            reader: self.reader.clone(),
+            writer: Arc::new(Mutex::new(TcpStream::connect(address).await?)),
+        })
+    }
+
+    /// Writes a message header + message
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
         info!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
 
         let serialized = message.serialize()?;
         let header = MessageHeader::new(M::name(), serialized.len() as u32);
 
-        self.io.write().await.write_all(&header.serialize()?).await?;
-        self.io.write().await.write_all(&serialized).await?;
+        self.writer.lock().await.write_all(&header.serialize()?).await?;
+        self.writer.lock().await.write_all(&serialized).await?;
 
         Ok(())
     }
 
+    /// Reads a message header + message
     pub async fn read(&self) -> Result<(MessageName, Vec<u8>), ConnectError> {
-        let header = read_header(&mut *self.io.write().await).await?;
+        let header = read_header(&mut *self.reader.lock().await).await?;
 
         info!(
             "Message {:?}, Received from {:?}",
@@ -55,15 +102,8 @@ impl Channel {
 
         Ok((
             header.name,
-            read_message(&mut *self.io.write().await, header.len as usize).await?,
+            read_message(&mut *self.reader.lock().await, header.len as usize).await?,
         ))
-    }
-
-    pub fn update_address(&self, address: SocketAddr) -> Result<Self, ConnectError> {
-        Ok(Self {
-            address,
-            io: self.io.clone(),
-        })
     }
 }
 
@@ -72,27 +112,68 @@ mod tests {
     use crate::message::types::Ping;
 
     use super::*;
+    use crate::test_data::random_socket_address;
     use serial_test::serial;
     use tokio::net::TcpListener;
 
     #[tokio::test]
     #[serial]
     async fn test_channel_multiple_messages() {
-        let address = "127.0.0.1:8080".parse::<SocketAddr>().unwrap();
-        let mut listener = TcpListener::bind(address).await.unwrap();
+        let server_address = random_socket_address();
+        let peer_address = random_socket_address();
+
+        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
+            let mut server_listener = TcpListener::bind(server_address).await.unwrap();
+
+            tx.send(()).unwrap();
+
+            // 1. Server connects to peer
+
+            let channel = Channel::new_write_only(peer_address).await.unwrap();
+
+            // 4. Server accepts peer connection
+
+            let (reader, _socket) = server_listener.accept().await.unwrap();
+
+            channel.update_reader(Arc::new(Mutex::new(reader)));
+
+            // 5. Server writes message
+
             let message = Ping {
                 nonce: 18446744073709551615u64,
             };
-            let channel = Channel::connect(address).await.unwrap();
+
             channel.write(&message).await.unwrap();
-            channel.write(&message).await.unwrap();
+
+            // 6. Server reads message
+
+            let (name, bytes) = channel.read().await.unwrap();
+
+            assert_eq!(Ping::name(), name);
+            assert_eq!(
+                Ping {
+                    nonce: 18446744073709551615u64
+                },
+                Ping::deserialize(bytes).unwrap()
+            );
         });
+        rx.await.unwrap();
 
-        let (stream, address) = listener.accept().await.unwrap();
+        // 2. Peer accepts server connection
 
-        let channel = Channel::new(stream, address).await.unwrap();
+        let (reader, _address) = peer_listener.accept().await.unwrap();
+
+        // 3. Peer connects to server
+
+        let mut channel = Channel::new_read_only(reader).unwrap();
+        channel = channel.update_writer(server_address).await.unwrap();
+
+        // 6. Peer reads ping message
+
         let (name, bytes) = channel.read().await.unwrap();
 
         assert_eq!(Ping::name(), name);
@@ -103,14 +184,12 @@ mod tests {
             Ping::deserialize(bytes).unwrap()
         );
 
-        let (name, bytes) = channel.read().await.unwrap();
+        // 7. Peer writes ping message
 
-        assert_eq!(Ping::name(), name);
-        assert_eq!(
-            Ping {
-                nonce: 18446744073709551615u64
-            },
-            Ping::deserialize(bytes).unwrap()
-        );
+        let message = Ping {
+            nonce: 18446744073709551615u64,
+        };
+
+        channel.write(&message).await.unwrap();
     }
 }

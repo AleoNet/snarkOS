@@ -305,41 +305,21 @@ impl Server {
 
     /// A miner is trying to connect with us
     /// check if sending node is a new peer
-    async fn receive_version(
-        &mut self,
-        message: Version,
-        mut channel: Arc<Channel>,
-    ) -> Result<Arc<Channel>, ServerError> {
+    async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<Arc<Channel>, ServerError> {
         let peer_address = message.address_sender;
-        let peer_height = message.height;
         let peer_book = &mut self.context.peer_book.read().await;
 
         if peer_book.peers.addresses.len() < self.context.max_peers as usize && self.context.local_addr != peer_address
         {
-            let mut connections = self.context.connections.write().await;
-            channel = connections.update(channel.address, peer_address)?;
-            drop(connections);
-
-            let new_peer = !peer_book.peers.addresses.contains_key(&peer_address);
-
-            let latest_height = self.storage.get_latest_block_height();
-
             self.context
                 .handshakes
                 .write()
                 .await
-                .send_response_request(
-                    message,
-                    new_peer,
-                    channel.clone(),
-                    1,
-                    latest_height,
-                    self.context.local_addr,
-                )
+                .receive_request(message.clone(), peer_address)
                 .await?;
 
             // if our peer has a longer chain, send a sync message
-            if peer_height > latest_height {
+            if message.height > self.storage.get_latest_block_height() {
                 let mut sync_handler = self.sync_handler_lock.lock().await;
                 sync_handler.sync_node = peer_address;
 
