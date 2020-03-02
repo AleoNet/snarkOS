@@ -18,7 +18,7 @@ snarkos-models = { path = "../models" }
 snarkos-utilities = { path = "../utilities" }
 
 derivative = { version = "1" }
-digest = { version = "0.7" }
+digest = { version = "0.8" }
 
 [dev-dependencies]
 blake2 = { version = "0.7" }

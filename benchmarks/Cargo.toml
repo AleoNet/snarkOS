@@ -26,7 +26,7 @@ snarkos-utilities = { path = "../utilities" }
 
 blake2 = { version = "0.7" }
 derivative = { version = "1" }
-digest = { version = "0.7" }
+digest = { version = "0.8" }
 rand = { version = "0.7" }
 rayon = { version = "1" }
 sha2 = { version = "0.8" }
