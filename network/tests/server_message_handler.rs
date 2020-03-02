@@ -100,7 +100,8 @@ mod server_message_handler {
             rx.await.unwrap();
 
             // 3. Check that server correctly sent SyncBlock message
-            let channel = get_channel(&mut peer_listener, server_address).await;
+
+            let channel = accept_channel(&mut peer_listener, server_address).await;
             let (name, bytes) = channel.read().await.unwrap();
             assert_eq!(SyncBlock::name(), name);
             assert_eq!(
@@ -149,7 +150,7 @@ mod server_message_handler {
                     .unwrap();
             });
             rx.await.unwrap();
-            get_channel(&mut peer_listener, server_address).await;
+            accept_channel(&mut peer_listener, server_address).await;
 
             // 3. Check that server did not send a response since it has no transactions to send
             ping(peer_address, peer_listener).await;
@@ -211,7 +212,7 @@ mod server_message_handler {
 
             // 4. Check that server correctly responded with MemoryPool
 
-            let channel = get_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut peer_listener, server_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(MemoryPool::name(), name);
@@ -321,7 +322,7 @@ mod server_message_handler {
 
             // 3. Check that server correctly responded with PeersResponse message
 
-            let channel = get_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut peer_listener, server_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(Peers::name(), name);
@@ -435,7 +436,7 @@ mod server_message_handler {
 
             // 3. Check that peer received pong
 
-            let channel = get_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut peer_listener, server_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(Pong::name(), name);
@@ -516,7 +517,7 @@ mod server_message_handler {
             start_test_server(server);
 
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
-            let channel_peer_side = get_channel(&mut peer_listener, server_address).await;
+            let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
 
             // 2. Add peer to pings
 
@@ -589,7 +590,7 @@ mod server_message_handler {
             start_test_server(server);
 
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
-            let channel_peer_side = get_channel(&mut peer_listener, server_address).await;
+            let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
 
             // 2. Add peer to pings
 
@@ -678,7 +679,7 @@ mod server_message_handler {
                     .unwrap()
             });
             rx.await.unwrap();
-            get_channel(&mut bootnode_listener, server_address).await;
+            accept_channel(&mut bootnode_listener, server_address).await;
 
             // 3. Check that server inserted block into storage
 
@@ -686,6 +687,7 @@ mod server_message_handler {
             assert!(storage_ref.is_exist(&block.header.get_hash()));
 
             // 4. Check that bootnode did not receive any messages
+
             ping(bootnode_address, bootnode_listener).await;
         });
 
@@ -754,7 +756,7 @@ mod server_message_handler {
 
             // 4. Check that server correctly sent Sync message
 
-            let channel = get_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut peer_listener, server_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(Sync::name(), name);
@@ -818,7 +820,8 @@ mod server_message_handler {
             rx.await.unwrap();
 
             // 3. Check that server sent a BlockRequest message to sync node
-            let channel = get_channel(&mut bootnode_listener, server_address).await;
+
+            let channel = accept_channel(&mut bootnode_listener, server_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(GetBlock::name(), name);

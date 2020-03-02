@@ -15,7 +15,7 @@ impl<F: PrimeField> ToConstraintField<F> for F {
     }
 }
 
-// Impl for protocol field
+// Impl for base field
 impl<F: Field> ToConstraintField<F> for [F] {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, Error> {

@@ -112,13 +112,59 @@ mod tests {
     use crate::message::types::{Ping, Pong};
 
     use super::*;
-    use crate::test_data::random_socket_address;
+    use crate::test_data::{random_socket_address, simulate_active_node};
     use serial_test::serial;
     use tokio::net::TcpListener;
 
     #[tokio::test]
     #[serial]
-    async fn test_channel_read_write() {
+    async fn test_write() {
+        // 1. Start peer node
+
+        let peer_address = random_socket_address();
+        simulate_active_node(peer_address).await;
+
+        // 2. Server connect to peer
+
+        let server_channel = Channel::new_write_only(peer_address).await.unwrap();
+
+        // 3. Server write message to peer
+
+        server_channel.write(&Ping::new()).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_read() {
+        let peer_address = random_socket_address();
+        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+        tokio::spawn(async move {
+            // 1. Server connects to peer
+
+            let server_channel = Channel::new_write_only(peer_address).await.unwrap();
+
+            // 2. Server writes ping message
+
+            server_channel.write(&Ping::new()).await.unwrap();
+        });
+
+        // 2. Peer accepts server connection
+
+        let (reader, _address) = peer_listener.accept().await.unwrap();
+        let peer_channel = Channel::new_read_only(reader).unwrap();
+
+        // 4. Peer reads ping message
+
+        let (name, bytes) = peer_channel.read().await.unwrap();
+
+        assert_eq!(Ping::name(), name);
+        assert!(Ping::deserialize(bytes).is_ok());
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_channel_update() {
         let server_address = random_socket_address();
         let peer_address = random_socket_address();
 
@@ -147,6 +193,7 @@ mod tests {
             let server_ping = Ping {
                 nonce: 18446744073709551615u64,
             };
+
             channel.write(&server_ping).await.unwrap();
 
             // 6. Server reads pong
@@ -163,10 +210,10 @@ mod tests {
         // 2. Peer accepts server connection
 
         let (reader, _address) = peer_listener.accept().await.unwrap();
+        let mut channel = Channel::new_read_only(reader).unwrap();
 
         // 3. Peer connects to server
 
-        let mut channel = Channel::new_read_only(reader).unwrap();
         channel = channel.update_writer(server_address).await.unwrap();
 
         // 6. Peer reads ping message

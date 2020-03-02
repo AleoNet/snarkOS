@@ -118,16 +118,8 @@ impl Handshakes {
         }
     }
 
-    pub fn contains(&self, address: &SocketAddr) -> bool {
-        self.addresses.contains_key(address)
-    }
-
     fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut Handshake> {
         self.addresses.get_mut(&address)
-    }
-
-    pub fn insert(&mut self, address: SocketAddr, handshake: Handshake) -> Option<Handshake> {
-        self.addresses.insert(address, handshake)
     }
 
     pub fn remove(&mut self, address: &SocketAddr) -> Option<Handshake> {

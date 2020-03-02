@@ -2349,13 +2349,11 @@ dependencies = [
 
 [[package]]
 name = "snarkos-network"
-version = "0.1.0"
+version = "0.8.0"
 dependencies = [
  "bincode",
  "byteorder",
  "chrono",
- "futures",
- "futures-await-test",
  "hex 0.4.1",
  "log",
  "rand 0.7.3",

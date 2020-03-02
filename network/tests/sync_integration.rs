@@ -49,7 +49,7 @@ mod sync_integration {
 
             // 3. Check that bootnode received GetBlock message
 
-            let channel = get_channel(&mut bootnode_listener, bootnode_address).await;
+            let channel = accept_channel(&mut bootnode_listener, bootnode_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(GetBlock::name(), name);
@@ -88,7 +88,7 @@ mod sync_integration {
 
             // 3. Check that bootnode received GetSync message
 
-            let channel = get_channel(&mut bootnode_listener, bootnode_address).await;
+            let channel = accept_channel(&mut bootnode_listener, bootnode_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(GetSync::name(), name);

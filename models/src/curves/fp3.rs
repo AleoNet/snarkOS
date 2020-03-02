@@ -69,7 +69,7 @@ impl<P: Fp3Parameters> Fp3<P> {
         self.c2.mul_assign(value);
     }
 
-    // Calculate the norm of an element with respect to the protocol field Fp.
+    // Calculate the norm of an element with respect to the base field Fp.
     pub fn norm(&self) -> P::Fp {
         let mut self_to_p = *self;
         self_to_p.frobenius_map(1);

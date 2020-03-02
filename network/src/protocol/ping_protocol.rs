@@ -62,10 +62,10 @@ mod tests {
     use super::*;
     use crate::{
         message::Message,
-        test_data::{get_channel, random_socket_address},
+        test_data::{accept_channel, connect_channel, random_socket_address},
     };
     use serial_test::serial;
-    use tokio::{net::TcpListener, sync::Mutex};
+    use tokio::net::TcpListener;
 
     #[tokio::test]
     #[serial]
@@ -77,15 +77,13 @@ mod tests {
 
         let mut server_listener = TcpListener::bind(server_address).await.unwrap();
 
+        let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
             // 2. Peer connects to server address
-            let channel = Channel::new_write_only(server_address).await.unwrap();
 
-            let (reader, _socket) = peer_listener.accept().await.unwrap();
-
-            let channel = Arc::new(channel.update_reader(Arc::new(Mutex::new(reader))));
+            let channel = Arc::new(connect_channel(&mut peer_listener, server_address).await);
 
             // 4. Peer send ping request
 
@@ -98,11 +96,13 @@ mod tests {
             assert_eq!(Pong::name(), name);
 
             peer_ping.accept(Pong::deserialize(bytes).unwrap()).await.unwrap();
+
+            tx.send(()).unwrap();
         });
 
         // 3. Server accepts Peer connection
 
-        let channel = Arc::new(get_channel(&mut server_listener, peer_address).await);
+        let channel = Arc::new(accept_channel(&mut server_listener, peer_address).await);
 
         // 4. Server receives peer ping request. Sends pong response
 
@@ -113,5 +113,7 @@ mod tests {
         PingProtocol::receive(Ping::deserialize(bytes).unwrap(), channel)
             .await
             .unwrap();
+
+        rx.await.unwrap();
     }
 }

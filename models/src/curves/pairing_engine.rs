@@ -33,7 +33,7 @@ pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
         + PairingCurve<PairWith = Self::G1Affine, PairingResult = Self::Fqk>
         + From<Self::G2Projective>;
 
-    /// The protocol field that hosts G1.
+    /// The base field that hosts G1.
     type Fq: PrimeField + SquareRootField;
 
     /// The extension field that hosts G2.
@@ -159,7 +159,7 @@ pub trait ProjectiveCurve:
     fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize;
 
     /// Recommends a wNAF window size given the number of scalars you intend to
-    /// multiply a protocol by. Always returns a number between 2 and 22,
+    /// multiply a base by. Always returns a number between 2 and 22,
     /// inclusive.
     #[must_use]
     fn recommended_wnaf_for_num_scalars(num_scalars: usize) -> usize;

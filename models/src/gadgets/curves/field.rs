@@ -162,7 +162,7 @@ pub trait FieldGadget<NativeF: Field, F: Field>:
         let mut res = Self::one(cs.ns(|| "Alloc result"))?;
         for (i, bit) in bits.into_iter().enumerate() {
             res = res.square(cs.ns(|| format!("Double {}", i)))?;
-            let tmp = res.mul(cs.ns(|| format!("Add {}-th protocol power", i)), self)?;
+            let tmp = res.mul(cs.ns(|| format!("Add {}-th base power", i)), self)?;
             res = Self::conditionally_select(cs.ns(|| format!("Conditional Select {}", i)), bit, &tmp, &res)?;
         }
         Ok(res)

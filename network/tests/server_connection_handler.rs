@@ -266,7 +266,7 @@ mod server_connection_handler {
                 .await
                 .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
 
-            let channel_sync_side = get_channel(&mut sync_node_listener, server_address).await;
+            let channel_sync_side = accept_channel(&mut sync_node_listener, server_address).await;
 
             // 3. Wait for memory pool interval
 
