@@ -109,7 +109,7 @@ impl Channel {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::types::Ping;
+    use crate::message::types::{Ping, Pong};
 
     use super::*;
     use crate::test_data::random_socket_address;
@@ -118,13 +118,14 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_channel_multiple_messages() {
+    async fn test_channel_read_write() {
         let server_address = random_socket_address();
         let peer_address = random_socket_address();
 
         let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
         let (tx, rx) = tokio::sync::oneshot::channel();
+        let (ty, ry) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
             let mut server_listener = TcpListener::bind(server_address).await.unwrap();
@@ -133,33 +134,29 @@ mod tests {
 
             // 1. Server connects to peer
 
-            let channel = Channel::new_write_only(peer_address).await.unwrap();
+            let mut channel = Channel::new_write_only(peer_address).await.unwrap();
 
             // 4. Server accepts peer connection
 
             let (reader, _socket) = server_listener.accept().await.unwrap();
 
-            channel.update_reader(Arc::new(Mutex::new(reader)));
+            channel = channel.update_reader(Arc::new(Mutex::new(reader)));
 
-            // 5. Server writes message
+            // 5. Server writes ping
 
-            let message = Ping {
+            let server_ping = Ping {
                 nonce: 18446744073709551615u64,
             };
+            channel.write(&server_ping).await.unwrap();
 
-            channel.write(&message).await.unwrap();
-
-            // 6. Server reads message
+            // 6. Server reads pong
 
             let (name, bytes) = channel.read().await.unwrap();
+            let peer_pong = Pong::deserialize(bytes).unwrap();
 
-            assert_eq!(Ping::name(), name);
-            assert_eq!(
-                Ping {
-                    nonce: 18446744073709551615u64
-                },
-                Ping::deserialize(bytes).unwrap()
-            );
+            assert_eq!(Pong::name(), name);
+            assert_eq!(Pong::new(server_ping), peer_pong);
+            ty.send(()).unwrap();
         });
         rx.await.unwrap();
 
@@ -175,21 +172,20 @@ mod tests {
         // 6. Peer reads ping message
 
         let (name, bytes) = channel.read().await.unwrap();
+        let server_ping = Ping::deserialize(bytes).unwrap();
 
         assert_eq!(Ping::name(), name);
         assert_eq!(
             Ping {
                 nonce: 18446744073709551615u64
             },
-            Ping::deserialize(bytes).unwrap()
+            server_ping
         );
 
-        // 7. Peer writes ping message
+        // 7. Peer writes pong message
 
-        let message = Ping {
-            nonce: 18446744073709551615u64,
-        };
+        channel.write(&Pong::new(server_ping)).await.unwrap();
 
-        channel.write(&message).await.unwrap();
+        ry.await.unwrap();
     }
 }

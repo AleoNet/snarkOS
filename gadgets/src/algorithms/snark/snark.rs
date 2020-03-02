@@ -76,12 +76,12 @@ pub struct Gm17VerifierGadget<Pairing: PairingEngine, F: Field, P: PairingGadget
 }
 
 impl<
-        Pairing: PairingEngine,
-        F: Field,
-        P: PairingGadget<Pairing, F>,
-        C: ConstraintSynthesizer<Pairing::Fr>,
-        V: ToConstraintField<Pairing::Fr>,
-    > SNARKVerifierGadget<GM17<Pairing, C, V>, F> for Gm17VerifierGadget<Pairing, F, P>
+    Pairing: PairingEngine,
+    F: Field,
+    P: PairingGadget<Pairing, F>,
+    C: ConstraintSynthesizer<Pairing::Fr>,
+    V: ToConstraintField<Pairing::Fr>,
+> SNARKVerifierGadget<GM17<Pairing, C, V>, F> for Gm17VerifierGadget<Pairing, F, P>
 {
     type ProofGadget = ProofGadget<Pairing, F, P>;
     type VerificationKeyGadget = VerifyingKeyGadget<Pairing, F, P>;
