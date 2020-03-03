@@ -28,7 +28,7 @@ snarkos-objects = { path = "../objects" }
 snarkos-storage = { path = "../storage" }
 
 chrono = { version = "0.4", features = ["serde"] }
-hex = { version = "0.4.0" }
+hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.0.5" }
 jsonrpc-core-client = { version = "14.0.5" }
 jsonrpc-derive = { version = "14.0.5" }
