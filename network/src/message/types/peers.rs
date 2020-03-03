@@ -1,6 +1,7 @@
 use crate::message::{Message, MessageName};
-use chrono::{DateTime, Utc};
 use snarkos_errors::network::message::MessageError;
+
+use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
 
 #[derive(Debug, PartialEq, Clone)]

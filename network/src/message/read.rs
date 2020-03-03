@@ -1,6 +1,6 @@
+use crate::message::MessageHeader;
 use snarkos_errors::network::message::{MessageError, MessageHeaderError, StreamReadError};
 
-use crate::message::MessageHeader;
 use tokio::{io::AsyncRead, prelude::*};
 
 pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) -> Result<Vec<u8>, MessageError> {

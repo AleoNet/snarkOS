@@ -6,6 +6,7 @@ use crate::{
     Message,
 };
 use snarkos_errors::network::HandshakeError;
+
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::TcpStream;
 

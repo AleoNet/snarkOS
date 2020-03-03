@@ -1,10 +1,10 @@
 use crate::{
     consensus::ConsensusError,
+    network::SendError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
 
-use crate::network::SendError;
 use std::fmt::Debug;
 
 #[derive(Debug, Fail)]

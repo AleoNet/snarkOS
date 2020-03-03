@@ -1,5 +1,6 @@
 use crate::message::{types::Version, Message, MessageName};
 use snarkos_errors::network::message::MessageError;
+
 use std::net::SocketAddr;
 
 #[derive(Debug, PartialEq, Clone)]

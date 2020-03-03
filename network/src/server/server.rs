@@ -1,19 +1,18 @@
-use tokio::{
-    net::TcpListener,
-    sync::{mpsc, oneshot, Mutex},
-    task,
-};
-
-use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParameters};
-use snarkos_errors::network::ServerError;
-use snarkos_storage::BlockStorage;
-
 use crate::{
     context::Context,
     message::{Channel, MessageName},
     protocol::*,
 };
+use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParameters};
+use snarkos_errors::network::ServerError;
+use snarkos_storage::BlockStorage;
+
 use std::{net::SocketAddr, sync::Arc};
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, oneshot, Mutex},
+    task,
+};
 
 pub struct Server {
     pub consensus: ConsensusParameters,

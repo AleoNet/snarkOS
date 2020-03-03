@@ -1,10 +1,13 @@
 mod server_connection_handler {
     use snarkos_consensus::test_data::*;
-    use snarkos_network::{message::Message, test_data::*, Channel};
+    use snarkos_network::{
+        message::{types::GetMemoryPool, Message},
+        test_data::*,
+        Channel,
+    };
 
     use chrono::{Duration, Utc};
     use serial_test::serial;
-    use snarkos_network::message::types::GetMemoryPool;
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};
 

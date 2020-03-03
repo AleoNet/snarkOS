@@ -1,9 +1,9 @@
-use snarkos_errors::network::HandshakeError;
-
 use crate::message::{
     types::{Verack, Version},
     Channel,
 };
+use snarkos_errors::network::HandshakeError;
+
 use std::{net::SocketAddr, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq)]

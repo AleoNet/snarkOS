@@ -1,7 +1,3 @@
-use snarkos_consensus::miner::Entry;
-use snarkos_errors::network::ServerError;
-use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
-
 use crate::{
     message::{types::*, Channel, Message},
     process_transaction_internal,
@@ -10,6 +6,9 @@ use crate::{
     Server,
     SyncState,
 };
+use snarkos_consensus::miner::Entry;
+use snarkos_errors::network::ServerError;
+use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
 
 use chrono::Utc;
 use std::sync::Arc;

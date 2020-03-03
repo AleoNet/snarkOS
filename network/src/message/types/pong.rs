@@ -1,7 +1,6 @@
-use crate::message::{Message, MessageName};
+use crate::message::{types::Ping, Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-use crate::message::types::Ping;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 

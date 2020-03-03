@@ -3,6 +3,7 @@ use crate::{
     Channel,
 };
 use snarkos_errors::network::PingProtocolError;
+
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -64,6 +65,7 @@ mod tests {
         message::Message,
         test_data::{accept_channel, connect_channel, random_socket_address},
     };
+
     use serial_test::serial;
     use tokio::net::TcpListener;
 

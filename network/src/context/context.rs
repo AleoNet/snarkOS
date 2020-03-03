@@ -1,6 +1,5 @@
-use crate::peer_book::PeerBook;
+use crate::{Connections, Handshakes, PeerBook, Pings};
 
-use crate::{Connections, Handshakes, Pings};
 use std::net::SocketAddr;
 use tokio::sync::RwLock;
 

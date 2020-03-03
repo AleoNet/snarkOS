@@ -1,4 +1,5 @@
 use crate::network::message::{MessageError, MessageHeaderError};
+
 use std::net::SocketAddr;
 
 #[derive(Debug, Fail)]
