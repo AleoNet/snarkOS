@@ -74,6 +74,7 @@ mod miner_instance_integration {
 
             //            rx.await.unwrap();
         });
+        println!("dropping");
 
         // Kill the miner
         drop(rt);

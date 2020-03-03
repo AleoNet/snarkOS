@@ -1,41 +1,41 @@
 pub mod block;
-pub use block::*;
+pub use self::block::*;
 
 pub mod getblock;
-pub use getblock::*;
+pub use self::getblock::*;
 
 pub mod getmemorypool;
-pub use getmemorypool::*;
+pub use self::getmemorypool::*;
 
 pub mod getpeers;
-pub use getpeers::*;
+pub use self::getpeers::*;
 
 pub mod getsync;
-pub use getsync::*;
+pub use self::getsync::*;
 
 pub mod memorypool;
-pub use memorypool::*;
+pub use self::memorypool::*;
 
 pub mod peers;
-pub use peers::*;
+pub use self::peers::*;
 
 pub mod ping;
-pub use ping::*;
+pub use self::ping::*;
 
 pub mod pong;
-pub use pong::*;
+pub use self::pong::*;
 
 pub mod sync;
-pub use sync::*;
+pub use self::sync::*;
 
 pub mod syncblock;
-pub use syncblock::*;
+pub use self::syncblock::*;
 
 pub mod transaction;
-pub use transaction::*;
+pub use self::transaction::*;
 
 pub mod verack;
-pub use verack::*;
+pub use self::verack::*;
 
 pub mod version;
-pub use version::*;
+pub use self::version::*;

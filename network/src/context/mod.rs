@@ -1,20 +1,20 @@
 pub mod address_book;
-pub use address_book::*;
+pub use self::address_book::*;
 
 pub mod bootnodes;
-pub use bootnodes::*;
+pub use self::bootnodes::*;
 
 pub mod connections;
-pub use connections::*;
+pub use self::connections::*;
 
 pub mod context;
-pub use context::*;
+pub use self::context::*;
 
 pub mod handshakes;
-pub use handshakes::*;
+pub use self::handshakes::*;
 
 pub mod pings;
-pub use pings::*;
+pub use self::pings::*;
 
 pub mod peer_book;
-pub use peer_book::*;
+pub use self::peer_book::*;

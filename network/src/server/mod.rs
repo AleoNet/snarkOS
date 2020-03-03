@@ -3,10 +3,10 @@ pub(self) mod connection_handler;
 pub(self) mod message_handler;
 
 pub mod miner_instance;
-pub use miner_instance::*;
+pub use self::miner_instance::*;
 
 pub mod server;
-pub use server::*;
+pub use self::server::*;
 
 use crate::{
     message::types::{Block, Transaction},

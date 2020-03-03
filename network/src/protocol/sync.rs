@@ -9,6 +9,7 @@ use snarkos_storage::BlockStorage;
 use chrono::{DateTime, Utc};
 use std::{net::SocketAddr, sync::Arc};
 
+#[derive(PartialEq)]
 pub enum SyncState {
     Idle,
     // (timestamp, block_height)
