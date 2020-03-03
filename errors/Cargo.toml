@@ -18,5 +18,5 @@ failure = { version = "0.1.5" }
 hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.0.5" }
 rocksdb = { version = "0.13.0" }
-secp256k1 = { version = "0.15.5" }
+secp256k1 = { version = "0.17.2" }
 wagyu-model = { version = "0.6.1" }

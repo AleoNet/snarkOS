@@ -2038,6 +2038,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp256k1"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2932dc07acd2066ff2e3921a4419606b220ba6cd03a9935123856cc534877056"
+dependencies = [
+ "secp256k1-sys",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ab2c26f0d3552a0f12e639ae8a64afc2e3db9c52fe32f5fc6c289d38519f220"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "security-framework"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2287,7 +2305,7 @@ dependencies = [
  "hex 0.4.2",
  "jsonrpc-core",
  "rocksdb",
- "secp256k1",
+ "secp256k1 0.17.2",
  "wagyu-model",
 ]
 
@@ -2347,7 +2365,7 @@ dependencies = [
  "base58",
  "chrono",
  "hex 0.4.2",
- "secp256k1",
+ "secp256k1 0.17.2",
  "serde",
  "sha2",
  "snarkos-algorithms",
@@ -2968,7 +2986,7 @@ dependencies = [
  "pbkdf2",
  "rand 0.7.3",
  "ripemd160",
- "secp256k1",
+ "secp256k1 0.15.5",
  "serde",
  "serde_json",
  "sha2",
@@ -2992,7 +3010,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "ripemd160",
- "secp256k1",
+ "secp256k1 0.15.5",
  "sha2",
 ]
 
