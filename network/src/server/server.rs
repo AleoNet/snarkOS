@@ -5,7 +5,7 @@ use tokio::{
 };
 
 use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParameters};
-use snarkos_errors::network::{ConnectError, ServerError};
+use snarkos_errors::network::ServerError;
 use snarkos_storage::BlockStorage;
 
 use crate::{
@@ -48,6 +48,11 @@ impl Server {
         }
     }
 
+    /// Starts the server
+    /// 1. Send a handshake request to all bootnodes
+    /// 2. Listen for and accept new tcp connections at local_addr
+    /// 3. Manage peers via handshake and ping protocols
+    /// 4. Handle all messages sent to this server
     pub async fn listen(mut self) -> Result<(), ServerError> {
         let local_addr = self.context.local_addr;
         let sender = self.sender.clone();
@@ -72,8 +77,6 @@ impl Server {
                         bootnode_address,
                     )
                     .await?;
-
-                //                Self::spawn_connection_thread(bootnode_address, sender.clone());
             }
         }
 
@@ -87,18 +90,19 @@ impl Server {
 
                 let height = storage.get_latest_block_height();
 
-                let handshake = context
+                // Follow handshake protocol and drop peer connection if unsuccessful
+                if let Ok(handshake) = context
                     .handshakes
                     .write()
                     .await
                     .receive_request_new(1u64, height, local_addr, peer_address, stream)
                     .await
-                    .unwrap();
+                {
+                    context.connections.write().await.store_channel(&handshake.channel);
 
-                context.connections.write().await.store_channel(&handshake.channel);
-
-                // Inner loop spawns one thread per connection to read messages
-                Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
+                    // Inner loop spawns one thread per connection to read messages
+                    Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
+                }
             }
         });
 
@@ -109,29 +113,36 @@ impl Server {
         Ok(())
     }
 
+    /// Spawns one thread per peer tcp connection to read messages
     fn spawn_connection_thread(
         mut channel: Arc<Channel>,
-        mut thread_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+        mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     ) {
-        // Inner loop spawns one thread per connection to read messages
         task::spawn(async move {
             loop {
+                // Use a oneshot channel to give channel control to the message handler after receiving
                 let (tx, rx) = oneshot::channel();
-                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(silent_disconnect);
-                if MessageName::from("disconnect") == message_name {
-                    break;
-                }
-                thread_sender
-                    .send((tx, message_name, message_bytes, channel.clone()))
-                    .await
-                    .expect("could not send to message handler");
-                channel = rx.await.expect("message handler errored");
 
-                fn silent_disconnect(error: ConnectError) -> (MessageName, Vec<u8>) {
+                // Read the next message from the channel. This is a blocking operation.
+                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|error| {
                     info!("Peer node disconnected due to error: {:?}", error);
 
                     (MessageName::from("disconnect"), vec![])
+                });
+
+                // Break out of the loop if the peer disconnects
+                if MessageName::from("disconnect") == message_name {
+                    break;
                 }
+
+                // Send the successful read data to the message handler
+                message_handler_sender
+                    .send((tx, message_name, message_bytes, channel.clone()))
+                    .await
+                    .expect("could not send to message handler");
+
+                // Wait for the message handler to give back channel control
+                channel = rx.await.expect("message handler errored");
             }
         });
     }

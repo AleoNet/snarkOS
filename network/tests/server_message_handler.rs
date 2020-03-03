@@ -151,9 +151,6 @@ mod server_message_handler {
             });
             rx.await.unwrap();
             accept_channel(&mut peer_listener, server_address).await;
-
-            // 3. Check that server did not send a response since it has no transactions to send
-            ping(peer_address, peer_listener).await;
         });
 
         drop(rt);
@@ -662,6 +659,9 @@ mod server_message_handler {
 
             start_test_server(server);
 
+            let channel_server_side = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+            accept_channel(&mut bootnode_listener, server_address).await;
+
             // 2. Send SyncBlock message to server
 
             let block_bytes = hex::decode(BLOCK_1).unwrap();
@@ -673,22 +673,17 @@ mod server_message_handler {
                         tx,
                         SyncBlock::name(),
                         SyncBlock::new(block_bytes_ref).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        channel_server_side,
                     ))
                     .await
                     .unwrap()
             });
             rx.await.unwrap();
-            accept_channel(&mut bootnode_listener, server_address).await;
 
             // 3. Check that server inserted block into storage
 
             let block = BlockStruct::deserialize(&block_bytes).unwrap();
             assert!(storage_ref.is_exist(&block.header.get_hash()));
-
-            // 4. Check that bootnode did not receive any messages
-
-            ping(bootnode_address, bootnode_listener).await;
         });
 
         drop(rt);

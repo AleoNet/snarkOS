@@ -1,9 +1,6 @@
 use crate::{
     context::Context,
-    message::{
-        types::{Ping, Version},
-        Channel,
-    },
+    message::{types::Version, Channel},
     protocol::SyncHandler,
     server::Server,
     Handshake,
@@ -14,10 +11,7 @@ use snarkos_storage::BlockStorage;
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{
-    net::TcpListener,
-    sync::{oneshot, Mutex},
-};
+use tokio::{net::TcpListener, sync::Mutex};
 
 pub const ALEO_PORT: &'static str = "4130";
 pub const LOCALHOST: &'static str = "127.0.0.1:";
@@ -127,20 +121,4 @@ pub fn accept_all_messages(mut peer_listener: TcpListener) {
             peer_listener.accept().await.unwrap();
         }
     });
-}
-
-/// Send a dummy message to the peer and make sure no other messages were received
-pub async fn ping(address: SocketAddr, mut listener: TcpListener) {
-    let (tx, rx) = oneshot::channel();
-    tokio::spawn(async move {
-        let channel = Arc::new(Channel::new_write_only(address).await.unwrap());
-        channel.write(&Ping::new()).await.unwrap();
-        tx.send(()).unwrap();
-    });
-
-    rx.await.unwrap();
-    let channel = accept_channel(&mut listener, address).await;
-    let (name, _bytes) = channel.read().await.unwrap();
-
-    assert_eq!(Ping::name(), name);
 }
