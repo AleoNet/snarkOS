@@ -13,19 +13,10 @@ use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::Mutex};
 
-pub const ALEO_PORT: &'static str = "4130";
 pub const LOCALHOST: &'static str = "127.0.0.1:";
-pub const LOCALHOST_PEER: &'static str = "127.0.0.2:";
-pub const LOCALHOST_BOOTNODE: &'static str = "127.0.0.3:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
 pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
-
-/// Returns a socket address from the aleo server port on localhost
-pub fn aleo_socket_address() -> SocketAddr {
-    let string = format!("{}{}", LOCALHOST, ALEO_PORT);
-    string.parse::<SocketAddr>().unwrap()
-}
 
 /// Returns a random tcp socket address
 pub fn random_socket_address() -> SocketAddr {

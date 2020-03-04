@@ -3,12 +3,12 @@ use crate::{Connections, Handshakes, PeerBook, Pings};
 use std::net::SocketAddr;
 use tokio::sync::RwLock;
 
-/// Network context.
+/// The network context for this node.
 pub struct Context {
-    /// Personal socket address
-    pub local_addr: SocketAddr,
+    /// The ip address/socket of this node.
+    pub local_address: SocketAddr,
 
-    /// Frequency the server requests memory pool transactions x 10 seconds
+    /// Frequency the server requests memory pool transactions.
     pub memory_pool_interval: u8,
 
     /// Mininmum number of peers to connect to
@@ -17,28 +17,29 @@ pub struct Context {
     /// Maximum number of peers to connect to
     pub max_peers: u16,
 
-    /// This node is a bootnode
+    /// If enabled, node will not connect to bootnodes on startup.
     pub is_bootnode: bool,
 
-    /// list of bootnodes
+    /// Hardcoded nodes and user-specified nodes this node should connect to on startup.
     pub bootnodes: Vec<String>,
 
-    /// Tcp stream connections
-    pub connections: RwLock<Connections>,
-
-    /// Peer book
+    /// Manages connected, gossiped, and disconnected peers
     pub peer_book: RwLock<PeerBook>,
 
-    /// Handshakes with other nodes
+    /// Handshakes to make connected peers
     pub handshakes: RwLock<Handshakes>,
 
-    /// Pings sent to other nodes
+    /// Connected peer channels for reading/writing messages
+    pub connections: RwLock<Connections>,
+
+    /// Ping/pongs with connected peers
     pub pings: RwLock<Pings>,
 }
 
 impl Context {
+    /// Construct a new network `Context`.
     pub fn new(
-        local_addr: SocketAddr,
+        local_address: SocketAddr,
         memory_pool_interval: u8,
         min_peers: u16,
         max_peers: u16,
@@ -46,7 +47,7 @@ impl Context {
         bootnodes: Vec<String>,
     ) -> Self {
         Self {
-            local_addr,
+            local_address,
             memory_pool_interval,
             min_peers,
             max_peers,

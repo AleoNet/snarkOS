@@ -14,7 +14,9 @@ use chrono::Utc;
 use std::sync::Arc;
 
 impl Server {
-    /// handle an incoming message
+    /// Handles all messages sent from connected peers.
+    ///
+    /// Messages are received by a single tokio mpsc receiver with the message name, bytes, associated channel, and a tokio oneshot sender to let the connection thread know when we are done processing the message.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
@@ -63,7 +65,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has sent us a new block to process
+    /// A peer has sent us a new block to process.
     async fn receive_block_message(
         &mut self,
         message: Block,
@@ -72,7 +74,7 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
-        // verify the block and insert it into the storage
+        // Verify the block and insert it into the storage
         if !self.storage.is_exist(&block.header.get_hash()) {
             let mut memory_pool = self.memory_pool_lock.lock().await;
             let inserted = self
@@ -99,7 +101,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has requested a block
+    /// A peer has requested a block.
     async fn receive_get_block(&mut self, message: GetBlock, channel: Arc<Channel>) -> Result<(), ServerError> {
         if let Ok(block) = self.storage.get_block(message.block_hash) {
             channel.write(&SyncBlock::new(block.serialize()?)).await?;
@@ -108,7 +110,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has requested our memory pool transactions
+    /// A peer has requested our memory pool transactions.
     async fn receive_get_memory_pool(
         &mut self,
         _message: GetMemoryPool,
@@ -132,7 +134,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has sent us their memory pool transactions
+    /// A peer has sent us their memory pool transactions.
     async fn receive_memory_pool(&mut self, message: MemoryPool) -> Result<(), ServerError> {
         let mut memory_pool = self.memory_pool_lock.lock().await;
 
@@ -152,8 +154,9 @@ impl Server {
         Ok(())
     }
 
-    /// A node has requested our list of peer addresses
-    /// send an Address message with our current peer list
+    /// A node has requested our list of peer addresses.
+    ///
+    /// Send an Address message with our current peer list.
     async fn receive_get_peers(&mut self, _message: GetPeers, channel: Arc<Channel>) -> Result<(), ServerError> {
         channel
             .write(&Peers::new(self.context.peer_book.read().await.peers.addresses.clone()))
@@ -162,14 +165,14 @@ impl Server {
         Ok(())
     }
 
-    /// A miner has sent their list of peer addresses
-    /// send a Version message to each peer in the list
-    /// this is going to be a lot of awaits in a loop...
-    /// can look at futures crate to handle multiple futures
+    /// A miner has sent their list of peer addresses.
+    ///
+    /// Add all new/updated addresses to our gossiped.
+    /// The connection handler will be responsible for sending out handshake requests to them.
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
         let mut peer_book = self.context.peer_book.write().await;
         for (addr, time) in message.addresses.iter() {
-            if &self.context.local_addr == addr {
+            if &self.context.local_address == addr {
                 continue;
             } else if peer_book.peer_contains(addr) {
                 peer_book.peers.update(addr.clone(), time.clone());
@@ -186,12 +189,18 @@ impl Server {
         Ok(())
     }
 
+    /// A peer has sent us a ping message.
+    ///
+    /// Reply with a pong message.
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
         Pings::send_pong(message, channel).await?;
 
         Ok(())
     }
 
+    /// A peer has sent us a pong message.
+    ///
+    /// See if it matches a ping we sent out.
     async fn receive_pong(&mut self, message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
         match self
             .context
@@ -218,7 +227,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has requested our chain state to sync with
+    /// A peer has requested our chain state to sync with.
     async fn receive_get_sync(&mut self, message: GetSync, channel: Arc<Channel>) -> Result<(), ServerError> {
         let latest_shared_hash = self.storage.get_latest_shared_hash(message.block_locator_hashes)?;
         let current_height = self.storage.get_latest_block_height();
@@ -247,7 +256,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has sent us their chain state
+    /// A peer has sent us their chain state.
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
         let mut sync_handler = self.sync_handler_lock.lock().await;
 
@@ -265,7 +274,7 @@ impl Server {
         Ok(())
     }
 
-    /// A peer has sent us a transaction
+    /// A peer has sent us a transaction.
     async fn receive_transaction(&mut self, message: Transaction, channel: Arc<Channel>) -> Result<(), ServerError> {
         process_transaction_internal(
             self.context.clone(),
@@ -279,8 +288,10 @@ impl Server {
         Ok(())
     }
 
-    /// A new peer has acknowledged our Version message
-    /// add them to our peer book
+    /// A connected peer has acknowledged a handshake request.
+    ///
+    /// Check if the Verack matches the last handshake message we sent.
+    /// Update our peer book and send a request for more peers.
     async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
         match self
             .context
@@ -293,7 +304,7 @@ impl Server {
             Ok(()) => {
                 let peer_book = &mut self.context.peer_book.write().await;
 
-                if &self.context.local_addr != &channel.address {
+                if &self.context.local_address != &channel.address {
                     peer_book.disconnected.remove(&channel.address);
                     peer_book.gossiped.remove(&channel.address);
                     peer_book.peers.update(channel.address, Utc::now());
@@ -313,13 +324,19 @@ impl Server {
         Ok(())
     }
 
-    /// A miner is trying to connect with us
-    /// check if sending node is a new peer
+    /// A connected peer has sent handshake request.
+    ///
+    /// Update peer's channel.
+    /// If peer's block height is greater than ours, send a sync request.
+    ///
+    /// This method may seem redundant to handshake protocol functions but a peer can send additional
+    /// Version messages if they want to update their ip address/port or want to share their chain height.
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<Arc<Channel>, ServerError> {
         let peer_address = message.address_sender;
         let peer_book = &mut self.context.peer_book.read().await;
 
-        if peer_book.peers.addresses.len() < self.context.max_peers as usize && self.context.local_addr != peer_address
+        if peer_book.peers.addresses.len() < self.context.max_peers as usize
+            && self.context.local_address != peer_address
         {
             self.context
                 .handshakes

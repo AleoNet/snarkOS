@@ -8,6 +8,9 @@ use std::{
     str,
 };
 
+/// Returns a fixed size hash.
+///
+/// Used for restricting message header length.
 macro_rules! fixed_hash {
     ($hash: ident, $size: expr) => {
         #[repr(C)]

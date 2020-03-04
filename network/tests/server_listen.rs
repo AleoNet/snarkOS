@@ -116,7 +116,7 @@ mod server_listen {
 
             let mut bootnode_handshakes = Handshakes::new();
             let mut bootnode_hand = bootnode_handshakes
-                .receive_request_new(1u64, 1u32, bootnode_address, server_address, reader)
+                .receive_any(1u64, 1u32, bootnode_address, server_address, reader)
                 .await
                 .unwrap();
 

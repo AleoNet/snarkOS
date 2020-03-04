@@ -9,7 +9,8 @@ use snarkos_errors::network::ConnectError;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
-/// Allows for reading and writing messages to a peer.
+/// A Channel for reading and writing messages to a peer.
+///
 /// Storing two streams allows for simultaneous reading/writing.
 /// Each stream is protected by an Arc + Mutex to allow for channel cloning.
 #[derive(Clone, Debug)]
@@ -32,7 +33,7 @@ impl Channel {
         })
     }
 
-    /// Returns a new channel with a writer only stream
+    /// Returns a new channel with a writer only stream.
     pub async fn new_write_only(address: SocketAddr) -> Result<Self, ConnectError> {
         let stream = Arc::new(Mutex::new(TcpStream::connect(address).await?));
 
@@ -43,7 +44,7 @@ impl Channel {
         })
     }
 
-    /// Returns a new channel with a reader only stream
+    /// Returns a new channel with a reader only stream.
     pub fn new_read_only(reader: TcpStream) -> Result<Self, ConnectError> {
         let address = reader.peer_addr()?;
         let stream = Arc::new(Mutex::new(reader));
@@ -55,11 +56,16 @@ impl Channel {
         })
     }
 
-    pub fn update_address(&mut self, address: SocketAddr) {
-        self.address = address;
+    /// Returns a new channel with the specified address.
+    pub fn update_address(&self, address: SocketAddr) -> Self {
+        Self {
+            address,
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
     }
 
-    /// Adds a reader stream to a channel that was writer only
+    /// Returns a new channel with the specified reader stream.
     pub fn update_reader(&self, reader: Arc<Mutex<TcpStream>>) -> Self {
         Self {
             address: self.address,
@@ -68,7 +74,7 @@ impl Channel {
         }
     }
 
-    /// Adds a writer stream to a channel that was reader only
+    /// Returns a new channel with the specified address and new writer stream.
     pub async fn update_writer(&self, address: SocketAddr) -> Result<Self, ConnectError> {
         Ok(Self {
             address,
@@ -77,7 +83,7 @@ impl Channel {
         })
     }
 
-    /// Writes a message header + message
+    /// Writes a message header + message.
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
         info!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
 
@@ -90,7 +96,7 @@ impl Channel {
         Ok(())
     }
 
-    /// Reads a message header + message
+    /// Reads a message header + message.
     pub async fn read(&self) -> Result<(MessageName, Vec<u8>), ConnectError> {
         let header = read_header(&mut *self.reader.lock().await).await?;
 

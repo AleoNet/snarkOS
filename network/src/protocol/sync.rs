@@ -12,14 +12,15 @@ use std::{net::SocketAddr, sync::Arc};
 #[derive(PartialEq)]
 pub enum SyncState {
     Idle,
-    // (timestamp, block_height)
+    /// (timestamp, block_height)
     Syncing(DateTime<Utc>, u32),
 }
 
-/// Sync Protocol: Manages syncing chain state with a sync node.
+/// Manages syncing chain state with a sync node.
+///
 /// 1. The server_node sends a GetSync message to a sync_node.
-/// 2. The sync_node responds with a vector of block_headers the server_node is missing.
-/// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the vector.
+/// 2. The sync_node responds with a Sync message with block_headers the server_node is missing.
+/// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the message.
 pub struct SyncHandler {
     pub block_headers: Vec<BlockHeaderHash>,
     pub sync_node: SocketAddr,
@@ -27,6 +28,7 @@ pub struct SyncHandler {
 }
 
 impl SyncHandler {
+    /// Construct a new `SyncHandler`.
     pub fn new(bootnode: SocketAddr) -> Self {
         Self {
             block_headers: vec![],
@@ -35,6 +37,7 @@ impl SyncHandler {
         }
     }
 
+    /// Set the SyncState to syncing and update the latest block height.
     pub fn update_syncing(&mut self, block_height: u32) {
         match self.sync_state {
             SyncState::Idle => self.sync_state = SyncState::Syncing(Utc::now(), block_height),
@@ -42,6 +45,7 @@ impl SyncHandler {
         }
     }
 
+    /// Finish syncing or ask for the next block from the sync node.
     pub async fn increment(&mut self, channel: Arc<Channel>, storage: Arc<BlockStorage>) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
             if self.block_headers.is_empty() {

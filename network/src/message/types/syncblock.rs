@@ -1,7 +1,9 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-/// A serialized block from a sync node
+/// A response to a GetBlock request.
+///
+/// See network/protocol/sync.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct SyncBlock {
     /// block data

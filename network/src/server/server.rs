@@ -14,6 +14,7 @@ use tokio::{
     task,
 };
 
+/// The main networking component of a node.
 pub struct Server {
     pub consensus: ConsensusParameters,
     pub context: Arc<Context>,
@@ -26,6 +27,7 @@ pub struct Server {
 }
 
 impl Server {
+    /// Constructs a new `Server`.
     pub fn new(
         context: Context,
         consensus: ConsensusParameters,
@@ -47,22 +49,24 @@ impl Server {
         }
     }
 
-    /// Starts the server
-    /// 1. Send a handshake request to all bootnodes
-    /// 2. Listen for and accept new tcp connections at local_addr
-    /// 3. Manage peers via handshake and ping protocols
-    /// 4. Handle all messages sent to this server
+    /// Starts the server event loop.
+    ///
+    /// 1. Send a handshake request to all bootnodes.
+    /// 2. Listen for and accept new tcp connections at local_address.
+    /// 3. Manage peers via handshake and ping protocols.
+    /// 4. Handle all messages sent to this server.
+    /// 5. Start connection handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
-        let local_addr = self.context.local_addr;
+        let local_address = self.context.local_address;
         let sender = self.sender.clone();
 
-        let mut listener = TcpListener::bind(&local_addr).await?;
-        info!("listening at: {:?}", local_addr);
+        let mut listener = TcpListener::bind(&local_address).await?;
+        info!("listening at: {:?}", local_address);
 
         for bootnode in self.context.bootnodes.clone() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
 
-            if local_addr != bootnode_address && !self.context.is_bootnode {
+            if local_address != bootnode_address && !self.context.is_bootnode {
                 info!("Connecting to bootnode: {:?}", bootnode_address);
 
                 self.context
@@ -72,7 +76,7 @@ impl Server {
                     .send_request(
                         1u64,
                         self.storage.get_latest_block_height(),
-                        local_addr,
+                        local_address,
                         bootnode_address,
                     )
                     .await?;
@@ -94,7 +98,7 @@ impl Server {
                     .handshakes
                     .write()
                     .await
-                    .receive_request_new(1u64, height, local_addr, peer_address, stream)
+                    .receive_any(1u64, height, local_address, peer_address, stream)
                     .await
                 {
                     context.connections.write().await.store_channel(&handshake.channel);
@@ -112,7 +116,11 @@ impl Server {
         Ok(())
     }
 
-    /// Spawns one thread per peer tcp connection to read messages
+    /// Spawns one thread per peer tcp connection to read messages.
+    ///
+    /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
+    /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
+    /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
     fn spawn_connection_thread(
         mut channel: Arc<Channel>,
         mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
@@ -129,18 +137,18 @@ impl Server {
                     (MessageName::from("disconnect"), vec![])
                 });
 
-                // Break out of the loop if the peer disconnects
+                // Break out of the loop if the peer disconnects.
                 if MessageName::from("disconnect") == message_name {
                     break;
                 }
 
-                // Send the successful read data to the message handler
+                // Send the successful read data to the message handler.
                 message_handler_sender
                     .send((tx, message_name, message_bytes, channel.clone()))
                     .await
                     .expect("could not send to message handler");
 
-                // Wait for the message handler to give back channel control
+                // Wait for the message handler to give back channel control.
                 channel = rx.await.expect("message handler errored");
             }
         });

@@ -1,10 +1,10 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-/// One of our peers has found a new block
+/// A newly mined block message.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
-    /// block data
+    /// Serialized block data
     pub data: Vec<u8>,
 }
 
