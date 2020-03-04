@@ -3,6 +3,9 @@ use snarkos_errors::network::message::MessageError;
 
 use std::net::SocketAddr;
 
+/// A handshake response to a Version message.
+///
+/// See network/protocol/handshake.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Verack {
     /// Random nonce sequence number

@@ -13,12 +13,17 @@ pub enum HandshakeState {
     Rejected,
 }
 
-/// Handshake protocol
+/// Establishes a connection between this node and a peer to send messages.
+///
 /// 1. The server sends a Version message to a peer.
 /// 2. The peer responds with a Verack message followed by a Version message.
 /// 3. The server verifies the Verack and adds the peer to its peer list.
 /// 4. The server sees the Version message and responds with a Verack.
 /// 5. The peer verifies the Verack and adds the server to its peer list.
+///
+/// Essentially receiving a Version message means you should send a Verack message.
+/// If you receive a Verack message from a peer and accept it, then the handshake is complete.
+/// Peers with completed handshakes are added to your connections and your connected peer list.
 #[derive(Clone, Debug)]
 pub struct Handshake {
     pub state: HandshakeState,
@@ -30,7 +35,7 @@ pub struct Handshake {
 }
 
 impl Handshake {
-    /// Send the initial version message to a peer
+    /// Send the initial Version message to a peer
     pub async fn send_new(
         version: u64,
         height: u32,
@@ -55,8 +60,9 @@ impl Handshake {
         })
     }
 
-    /// Receive the initial version message from a new peer.
-    /// Send a verack message + version message
+    /// Receive the initial Version message from a new peer.
+    ///
+    /// Send a Verack message + Version message
     pub async fn receive_new(
         version: u64,
         height: u32,
@@ -93,14 +99,15 @@ impl Handshake {
         })
     }
 
-    /// Receive the version message for an existing peer handshake.
-    /// Send a verack message
+    /// Receive the Version message for an existing peer handshake.
+    ///
+    /// Send a Verack message.
     pub async fn receive(&mut self, message: Version) -> Result<(), HandshakeError> {
         self.channel.write(&Verack::new(message)).await?;
         Ok(())
     }
 
-    /// Accept the verack from a peer
+    /// Accept the Verack from a peer.
     pub async fn accept(&mut self, message: Verack) -> Result<(), HandshakeError> {
         if self.nonce != message.nonce {
             self.state = HandshakeState::Rejected;
@@ -113,7 +120,14 @@ impl Handshake {
         Ok(())
     }
 
-    /// Sets the reader TcpStream for the channel
+    /// Updates the stored channel address if needed for an existing peer handshake.
+    pub fn update_address(&mut self, address: SocketAddr) {
+        if self.channel.address != address {
+            self.channel = Arc::new(self.channel.update_address(address))
+        }
+    }
+
+    /// Updates the stored reader stream for an existing peer handshake.
     pub fn update_reader(&mut self, read_channel: Channel) {
         self.channel = Arc::new(self.channel.update_reader(read_channel.reader))
     }

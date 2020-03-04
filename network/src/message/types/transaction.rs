@@ -1,10 +1,10 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-/// A transaction sent by a peer
+/// A transaction sent by a peer.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
-    /// transaciton bytes
+    /// Serialized transaction bytes
     pub(crate) bytes: Vec<u8>,
 }
 

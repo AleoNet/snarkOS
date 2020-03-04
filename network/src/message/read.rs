@@ -3,6 +3,7 @@ use snarkos_errors::network::message::{MessageError, MessageHeaderError, StreamR
 
 use tokio::{io::AsyncRead, prelude::*};
 
+/// Returns message bytes read from an input stream.
 pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) -> Result<Vec<u8>, MessageError> {
     let mut buffer: Vec<u8> = vec![0; len];
 
@@ -11,6 +12,7 @@ pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) 
     Ok(buffer)
 }
 
+/// Returns a message header read from an input stream.
 pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
     let mut buffer = [0u8; 16];
 
@@ -19,11 +21,13 @@ pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<Mes
     Ok(MessageHeader::from(buffer))
 }
 
+/// Reads bytes from an input stream to fill the buffer.
 pub async fn stream_read<'a, T: AsyncRead + Unpin>(
     stream: &'a mut T,
     buffer: &'a mut [u8],
-) -> Result<usize, StreamReadError> {
-    return Ok(stream.read_exact(buffer).await?);
+) -> Result<(), StreamReadError> {
+    stream.read_exact(buffer).await?;
+    return Ok(());
 }
 
 #[cfg(test)]

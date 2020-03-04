@@ -2,13 +2,15 @@ use crate::address_book::AddressBook;
 
 use std::net::SocketAddr;
 
-/// Log of connected, disconnected, and known peers
+/// Stores connected, disconnected, and known peers.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerBook {
     /// Connected peers
     pub peers: AddressBook,
+
     /// Disconnected peers
     pub disconnected: AddressBook,
+
     /// Gossiped but uncontacted peers
     pub gossiped: AddressBook,
 }
@@ -34,6 +36,7 @@ impl PeerBook {
         self.gossiped.addresses.contains_key(socket_addr)
     }
 
+    /// Move a peer from connected peers to disconnected peers.
     pub fn disconnect_peer(&mut self, socket_addr: &SocketAddr) -> bool {
         match self.peers.remove(&socket_addr) {
             Some(last_seen) => {

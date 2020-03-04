@@ -41,7 +41,7 @@ pub async fn process_transaction_internal(
                 info!("Transaction added to mempool. Propagating transaction to peers");
 
                 for (socket, _) in &context.peer_book.read().await.peers.addresses {
-                    if *socket != transaction_sender && *socket != context.local_addr {
+                    if *socket != transaction_sender && *socket != context.local_address {
                         if let Some(channel) = context.connections.read().await.get(socket) {
                             channel.write(&Transaction::new(transaction_bytes.clone())).await?;
                         }
@@ -59,7 +59,7 @@ pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: 
     info!("Propagating block to peers");
 
     for (socket, _) in &context.peer_book.read().await.peers.addresses {
-        if *socket != block_miner && *socket != context.local_addr {
+        if *socket != block_miner && *socket != context.local_address {
             if let Some(channel) = context.connections.read().await.get(socket) {
                 channel.write(&Block::new(data.clone())).await?;
             }

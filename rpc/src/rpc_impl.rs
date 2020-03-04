@@ -219,7 +219,7 @@ impl RpcFunctions for RpcImpl {
                     self.storage.clone(),
                     self.memory_pool_lock.clone(),
                     transaction.serialize()?,
-                    self.server_context.local_addr,
+                    self.server_context.local_address,
                 ))?;
 
                 Ok(hex::encode(transaction.to_transaction_id()?))
