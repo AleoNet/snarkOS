@@ -4,7 +4,7 @@ use std::{collections::HashMap, net::SocketAddr};
 /// Stores the existence of a peer and the date they were last seen.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AddressBook {
-    pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
+    addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }
 
 impl AddressBook {
@@ -33,8 +33,23 @@ impl AddressBook {
         }
     }
 
+    /// Returns true if address is stored in the mapping.
+    pub fn contains(&self, address: &SocketAddr) -> bool {
+        self.addresses.contains_key(address)
+    }
+
     /// Remove an address mapping and return its last seen date.
     pub fn remove(&mut self, address: &SocketAddr) -> Option<DateTime<Utc>> {
         self.addresses.remove(address)
+    }
+
+    /// Returns the number of stored peers.
+    pub fn length(&self) -> u16 {
+        self.addresses.len() as u16
+    }
+
+    /// Returns copy of addresses
+    pub fn get_addresses(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
+        self.addresses.clone()
     }
 }

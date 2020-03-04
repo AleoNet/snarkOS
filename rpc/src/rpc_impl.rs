@@ -232,7 +232,7 @@ impl RpcFunctions for RpcImpl {
         // Create a temporary tokio runtime to make an asynchronous function call
         let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
 
-        Ok(peer_book.peers.addresses.len())
+        Ok(peer_book.connected_total() as usize)
     }
 
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
@@ -241,7 +241,7 @@ impl RpcFunctions for RpcImpl {
 
         let mut peers = vec![];
 
-        for (peer, _last_seen) in &peer_book.peers.addresses {
+        for (peer, _last_seen) in &peer_book.get_connected() {
             peers.push(peer.clone());
         }
 

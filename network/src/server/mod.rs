@@ -20,7 +20,7 @@ use snarkos_storage::BlockStorage;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 
-/// Process a transaction
+/// Verify a transaction, add it to the memory pool, propagate it to peers.
 pub async fn process_transaction_internal(
     context: Arc<Context>,
     storage: Arc<BlockStorage>,
@@ -40,7 +40,7 @@ pub async fn process_transaction_internal(
             if inserted.is_some() {
                 info!("Transaction added to mempool. Propagating transaction to peers");
 
-                for (socket, _) in &context.peer_book.read().await.peers.addresses {
+                for (socket, _) in &context.peer_book.read().await.get_connected() {
                     if *socket != transaction_sender && *socket != context.local_address {
                         if let Some(channel) = context.connections.read().await.get(socket) {
                             channel.write(&Transaction::new(transaction_bytes.clone())).await?;
@@ -54,11 +54,11 @@ pub async fn process_transaction_internal(
     Ok(())
 }
 
-/// Announce block to peers
+/// Broadcast block to connected peers
 pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: SocketAddr) -> Result<(), SendError> {
     info!("Propagating block to peers");
 
-    for (socket, _) in &context.peer_book.read().await.peers.addresses {
+    for (socket, _) in &context.peer_book.read().await.get_connected() {
         if *socket != block_miner && *socket != context.local_address {
             if let Some(channel) = context.connections.read().await.get(socket) {
                 channel.write(&Block::new(data.clone())).await?;

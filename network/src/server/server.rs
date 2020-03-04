@@ -7,7 +7,10 @@ use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParamete
 use snarkos_errors::network::ServerError;
 use snarkos_storage::BlockStorage;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::{Shutdown, SocketAddr},
+    sync::Arc,
+};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, Mutex},
@@ -86,25 +89,36 @@ impl Server {
         let storage = self.storage.clone();
         let context = self.context.clone();
 
-        // Outer loop spawns one thread to accept new connections
+        // Outer loop spawns one thread to accept new connections.
         task::spawn(async move {
             loop {
-                let (stream, peer_address) = listener.accept().await.unwrap();
+                let (stream, peer_address) = listener.accept().await.expect("Listener failed to accept connection");
 
-                let height = storage.get_latest_block_height();
+                // Check if we have too many connected peers
+                if context.peer_book.read().await.connected_total() >= context.max_peers {
+                    stream
+                        .shutdown(Shutdown::Write)
+                        .expect("Failed to shutdown peer stream");
+                } else {
+                    // Follow handshake protocol and drop peer connection if unsuccessful.
+                    if let Ok(handshake) = context
+                        .handshakes
+                        .write()
+                        .await
+                        .receive_any(
+                            1u64,
+                            storage.get_latest_block_height(),
+                            local_address,
+                            peer_address,
+                            stream,
+                        )
+                        .await
+                    {
+                        context.connections.write().await.store_channel(&handshake.channel);
 
-                // Follow handshake protocol and drop peer connection if unsuccessful
-                if let Ok(handshake) = context
-                    .handshakes
-                    .write()
-                    .await
-                    .receive_any(1u64, height, local_address, peer_address, stream)
-                    .await
-                {
-                    context.connections.write().await.store_channel(&handshake.channel);
-
-                    // Inner loop spawns one thread per connection to read messages
-                    Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
+                        // Inner loop spawns one thread per connection to read messages
+                        Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
+                    }
                 }
             }
         });
@@ -127,7 +141,7 @@ impl Server {
     ) {
         task::spawn(async move {
             loop {
-                // Use a oneshot channel to give channel control to the message handler after receiving
+                // Use a oneshot channel to give channel control to the message handler after reading from the channel.
                 let (tx, rx) = oneshot::channel();
 
                 // Read the next message from the channel. This is a blocking operation.

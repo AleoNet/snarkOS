@@ -1,11 +1,4 @@
-use crate::{
-    context::Context,
-    message::{types::Version, Channel},
-    protocol::SyncHandler,
-    server::Server,
-    Handshake,
-    Message,
-};
+use crate::{context::Context, message::Channel, protocol::SyncHandler, server::Server};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
@@ -73,31 +66,6 @@ pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> 
     let channel = Channel::new_read_only(reader).unwrap();
 
     channel.update_writer(address).await.unwrap()
-}
-
-pub async fn do_handshake_get_channel(peer_address: SocketAddr, server_address: SocketAddr) -> Arc<Channel> {
-    // Simulate message handler
-    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
-    let (reader, _peer) = peer_listener.accept().await.unwrap();
-
-    // Simulate Handshakes
-    let channel = Channel::new_read_only(reader).unwrap();
-    let (name, bytes) = channel.read().await.unwrap();
-    assert_eq!(Version::name(), name);
-
-    // Get final handshake with server
-    let handshake = Handshake::receive_new(
-        1u64,
-        0u32,
-        channel,
-        Version::deserialize(bytes).unwrap(),
-        server_address,
-    )
-    .await
-    .unwrap();
-
-    // return Arc::clone() of channel
-    handshake.channel.clone()
 }
 
 /// Starts a fake node that accepts all tcp connections at the given socket address

@@ -1,49 +1,78 @@
 use crate::address_book::AddressBook;
 
-use std::net::SocketAddr;
+use chrono::{DateTime, Utc};
+use std::{collections::HashMap, net::SocketAddr};
 
 /// Stores connected, disconnected, and known peers.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerBook {
     /// Connected peers
-    pub peers: AddressBook,
+    connected: AddressBook,
 
     /// Disconnected peers
-    pub disconnected: AddressBook,
+    disconnected: AddressBook,
 
     /// Gossiped but uncontacted peers
-    pub gossiped: AddressBook,
+    gossiped: AddressBook,
 }
 
 impl PeerBook {
     pub fn new() -> Self {
         Self {
-            peers: AddressBook::new(),
+            connected: AddressBook::new(),
             disconnected: AddressBook::new(),
             gossiped: AddressBook::new(),
         }
     }
 
-    pub fn peer_contains(&self, socket_addr: &SocketAddr) -> bool {
-        self.peers.addresses.contains_key(socket_addr)
+    /// Returns copy of connected peers.
+    pub fn get_connected(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
+        self.connected.get_addresses()
     }
 
-    pub fn disconnected_contains(&self, socket_addr: &SocketAddr) -> bool {
-        self.disconnected.addresses.contains_key(socket_addr)
+    /// Returns copy of gossiped peers.
+    pub fn get_gossiped(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
+        self.gossiped.get_addresses()
     }
 
-    pub fn gossiped_contains(&self, socket_addr: &SocketAddr) -> bool {
-        self.gossiped.addresses.contains_key(socket_addr)
+    /// Returns true if address is a connected peer.
+    pub fn connected_contains(&self, address: &SocketAddr) -> bool {
+        self.connected.contains(address)
+    }
+
+    /// Returns true if address is a disconnected peer.
+    pub fn disconnected_contains(&self, address: &SocketAddr) -> bool {
+        self.disconnected.contains(address)
+    }
+
+    /// Returns true if address is a gossiped peer.
+    pub fn gossiped_contains(&self, address: &SocketAddr) -> bool {
+        self.gossiped.contains(address)
+    }
+
+    /// Move a peer from disconnected/gossiped to connected peers.
+    pub fn update_connected(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+        self.disconnected.remove(&address);
+        self.gossiped.remove(&address);
+        self.connected.update(address, date)
+    }
+
+    /// Move a peer from connected/disconnected to gossiped peers.
+    pub fn update_gossiped(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+        self.connected.remove(&address);
+        self.disconnected.remove(&address);
+        self.gossiped.update(address, date)
     }
 
     /// Move a peer from connected peers to disconnected peers.
-    pub fn disconnect_peer(&mut self, socket_addr: &SocketAddr) -> bool {
-        match self.peers.remove(&socket_addr) {
-            Some(last_seen) => {
-                warn!("Disconnected from peer {:?}", socket_addr);
-                self.disconnected.update(socket_addr.clone(), last_seen.clone())
-            }
-            None => false,
-        }
+    pub fn disconnect_peer(&mut self, address: SocketAddr) -> bool {
+        self.connected.remove(&address);
+        self.gossiped.remove(&address);
+        self.disconnected.update(address, Utc::now())
+    }
+
+    /// Returns the number of connected peers.
+    pub fn connected_total(&self) -> u16 {
+        self.connected.length()
     }
 }

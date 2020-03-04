@@ -159,7 +159,7 @@ impl Server {
     /// Send an Address message with our current peer list.
     async fn receive_get_peers(&mut self, _message: GetPeers, channel: Arc<Channel>) -> Result<(), ServerError> {
         channel
-            .write(&Peers::new(self.context.peer_book.read().await.peers.addresses.clone()))
+            .write(&Peers::new(self.context.peer_book.read().await.get_connected()))
             .await?;
 
         Ok(())
@@ -170,21 +170,18 @@ impl Server {
     /// Add all new/updated addresses to our gossiped.
     /// The connection handler will be responsible for sending out handshake requests to them.
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
-        let mut peer_book = self.context.peer_book.write().await;
+        let peer_book = &mut self.context.peer_book.write().await;
         for (addr, time) in message.addresses.iter() {
             if &self.context.local_address == addr {
                 continue;
-            } else if peer_book.peer_contains(addr) {
-                peer_book.peers.update(addr.clone(), time.clone());
-            } else if peer_book.disconnected_contains(addr) {
-                peer_book.disconnected.remove(addr);
-                peer_book.gossiped.update(addr.clone(), time.clone());
+            } else if peer_book.connected_contains(addr) {
+                peer_book.update_connected(addr.clone(), time.clone());
             } else {
-                peer_book.gossiped.update(addr.clone(), time.clone());
+                peer_book.update_gossiped(addr.clone(), time.clone());
             }
         }
 
-        peer_book.peers.update(channel.address, Utc::now());
+        peer_book.update_connected(channel.address, Utc::now());
 
         Ok(())
     }
@@ -215,8 +212,7 @@ impl Server {
                     .peer_book
                     .write()
                     .await
-                    .peers
-                    .update(channel.address, Utc::now());
+                    .update_connected(channel.address, Utc::now());
             }
             Err(error) => info!(
                 "Invalid Pong message from: {:?}, Full error: {:?}",
@@ -302,15 +298,14 @@ impl Server {
             .await
         {
             Ok(()) => {
-                let peer_book = &mut self.context.peer_book.write().await;
+                // Add connected peer.
+                self.context
+                    .peer_book
+                    .write()
+                    .await
+                    .update_connected(channel.address, Utc::now());
 
-                if &self.context.local_address != &channel.address {
-                    peer_book.disconnected.remove(&channel.address);
-                    peer_book.gossiped.remove(&channel.address);
-                    peer_book.peers.update(channel.address, Utc::now());
-                }
-
-                // get new peer's peers
+                // Ask connected peer for more peers.
                 channel.write(&GetPeers).await?;
             }
             Err(error) => {
@@ -335,9 +330,7 @@ impl Server {
         let peer_address = message.address_sender;
         let peer_book = &mut self.context.peer_book.read().await;
 
-        if peer_book.peers.addresses.len() < self.context.max_peers as usize
-            && self.context.local_address != peer_address
-        {
+        if peer_book.connected_total() < self.context.max_peers && self.context.local_address != peer_address {
             self.context
                 .handshakes
                 .write()
