@@ -29,9 +29,29 @@ members = [
     "utilities"
 ]
 
+[lib]
+name = "node"
+path = "node/lib.rs"
+
 [[bin]]
 name = "snarkos"
 path = "node/main.rs"
+
+[dependencies]
+snarkos-consensus = { path = "./consensus" }
+snarkos-errors = { path = "./errors" }
+snarkos-network = { path = "./network" }
+snarkos-objects = { path = "objects" }
+snarkos-rpc = { path = "./rpc" }
+snarkos-storage = { path = "./storage" }
+
+clap = { version = "2.33.0" }
+env_logger = { version = "0.7.1" }
+hex = { version = "0.4.1" }
+log = { version = "0.4.8" }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "0.2", features = ["full"] }
+wagyu-bitcoin = { version = "0.6.1" }
 
 [profile.release]
 opt-level = 3

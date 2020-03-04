@@ -1,5 +1,5 @@
 use crate::{
-    network::{PeerError, SendError},
+    network::{message::MessageError, ConnectError, HandshakeError, PingProtocolError, SendError},
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
@@ -9,14 +9,23 @@ pub enum ServerError {
     #[fail(display = "{}", _0)]
     BlockError(BlockError),
 
-    #[fail(display = "{}", _0)]
-    PeerError(PeerError),
-
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
 
     #[fail(display = "{}", _0)]
+    ConnectError(ConnectError),
+
+    #[fail(display = "{}", _0)]
+    HandshakeError(HandshakeError),
+
+    #[fail(display = "{}", _0)]
     Message(String),
+
+    #[fail(display = "{}", _0)]
+    MessageError(MessageError),
+
+    #[fail(display = "{}", _0)]
+    PingProtocolError(PingProtocolError),
 
     #[fail(display = "{}", _0)]
     SendError(SendError),
@@ -34,9 +43,27 @@ impl From<BlockError> for ServerError {
     }
 }
 
-impl From<PeerError> for ServerError {
-    fn from(error: PeerError) -> Self {
-        ServerError::PeerError(error)
+impl From<ConnectError> for ServerError {
+    fn from(error: ConnectError) -> Self {
+        ServerError::ConnectError(error)
+    }
+}
+
+impl From<HandshakeError> for ServerError {
+    fn from(error: HandshakeError) -> Self {
+        ServerError::HandshakeError(error)
+    }
+}
+
+impl From<MessageError> for ServerError {
+    fn from(error: MessageError) -> Self {
+        ServerError::MessageError(error)
+    }
+}
+
+impl From<PingProtocolError> for ServerError {
+    fn from(error: PingProtocolError) -> Self {
+        ServerError::PingProtocolError(error)
     }
 }
 

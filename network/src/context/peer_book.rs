@@ -22,8 +22,6 @@ impl PeerBook {
         }
     }
 
-    // Temporary contains helpers while we use primitive Vec for address storage
-
     pub fn peer_contains(&self, socket_addr: &SocketAddr) -> bool {
         self.peers.addresses.contains_key(socket_addr)
     }

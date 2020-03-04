@@ -7,21 +7,17 @@ use snarkos_consensus::{
     ConsensusParameters,
 };
 use snarkos_errors::rpc::RpcError;
-use snarkos_network::base::{Context, Message};
+use snarkos_network::{context::Context, server::process_transaction_internal};
 use snarkos_objects::{transaction::*, BlockHeaderHash};
 use snarkos_storage::BlockStorage;
 
 use chrono::Utc;
-use std::{net::SocketAddr, str::FromStr, sync::Arc, thread};
-use tokio::{
-    runtime::Runtime,
-    sync::{mpsc, Mutex},
-};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use tokio::{runtime::Runtime, sync::Mutex};
 use wagyu_bitcoin::{BitcoinAddress, BitcoinPrivateKey, Mainnet};
 
 pub struct RpcImpl {
     pub storage: Arc<BlockStorage>,
-    pub sender: mpsc::Sender<(Message, SocketAddr)>,
     pub rpc_server: SocketAddr,
     pub server_context: Arc<Context>,
     pub consensus: ConsensusParameters,
@@ -31,7 +27,6 @@ pub struct RpcImpl {
 impl RpcImpl {
     pub fn new(
         storage: Arc<BlockStorage>,
-        sender: mpsc::Sender<(Message, SocketAddr)>,
         rpc_server: SocketAddr,
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
@@ -39,7 +34,6 @@ impl RpcImpl {
     ) -> Self {
         Self {
             storage,
-            sender,
             rpc_server,
             server_context,
             consensus,
@@ -220,18 +214,13 @@ impl RpcFunctions for RpcImpl {
 
         match check_for_double_spend(&self.storage, &transaction) {
             Ok(_) => {
-                let message = Message::Transaction {
-                    transaction_bytes: transaction.serialize()?,
-                };
-
-                let mut sender = self.sender.clone();
-                let node = self.server_context.local_addr;
-
-                let thread = thread::spawn(move || {
-                    sender.try_send((message, node)).unwrap();
-                });
-
-                thread.join()?;
+                Runtime::new()?.block_on(process_transaction_internal(
+                    self.server_context.clone(),
+                    self.storage.clone(),
+                    self.memory_pool_lock.clone(),
+                    transaction.serialize()?,
+                    self.server_context.local_addr,
+                ))?;
 
                 Ok(hex::encode(transaction.to_transaction_id()?))
             }
@@ -335,7 +324,6 @@ mod tests {
         json_test::Rpc::new(
             RpcImpl::new(
                 storage,
-                server.sender.clone(),
                 rpc_addr,
                 server.context.clone(),
                 consensus,

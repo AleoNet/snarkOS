@@ -1,53 +1,32 @@
 use crate::{
-    base::{handshake_request, handshake_response, Context, Message},
-    Server,
-    SyncHandler,
+    context::Context,
+    message::{types::Version, Channel},
+    protocol::SyncHandler,
+    server::Server,
+    Handshake,
+    Message,
 };
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{
-    net::{TcpListener, TcpStream},
-    prelude::*,
-    sync::Mutex,
-};
+use tokio::{net::TcpListener, sync::Mutex};
 
+pub const ALEO_PORT: &'static str = "4130";
 pub const LOCALHOST: &'static str = "127.0.0.1:";
-pub const LOCALHOST_SERVER: &'static str = "127.0.0.1:";
 pub const LOCALHOST_PEER: &'static str = "127.0.0.2:";
 pub const LOCALHOST_BOOTNODE: &'static str = "127.0.0.3:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
 pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
 
-///// Returns a tcp listener to the aleo server port on localhost
-//pub async fn aleo_listener() -> TcpListener {
-//    TcpListener::bind(format!("{}{}", LOCALHOST, ALEO_SERVER_PORT)).await.unwrap()
-//}
+/// Returns a socket address from the aleo server port on localhost
+pub fn aleo_socket_address() -> SocketAddr {
+    let string = format!("{}{}", LOCALHOST, ALEO_PORT);
+    string.parse::<SocketAddr>().unwrap()
+}
 
-///// Returns a random server tcp socket address
-//pub fn random_server_address() -> SocketAddr {
-//    let mut rng = rand::thread_rng();
-//    let string = format!("{}{}", LOCALHOST_SERVER, rng.gen_range(1023, 9999));
-//    string.parse::<SocketAddr>().unwrap()
-//}
-
-///// Returns a random peer tcp socket address
-//pub fn random_peer_address() -> SocketAddr {
-//    let mut rng = rand::thread_rng();
-//    let string = format!("{}{}", LOCALHOST_PEER, rng.gen_range(1023, 9999));
-//    string.parse::<SocketAddr>().unwrap()
-//}
-//
-///// Returns a random bootnode tcp socket address
-//pub fn random_bootnode_address() -> SocketAddr {
-//    let mut rng = rand::thread_rng();
-//    let string = format!("{}{}", LOCALHOST_BOOTNODE, rng.gen_range(1023, 9999));
-//    string.parse::<SocketAddr>().unwrap()
-//}
-//
 /// Returns a random tcp socket address
 pub fn random_socket_address() -> SocketAddr {
     let mut rng = rand::thread_rng();
@@ -89,72 +68,57 @@ pub fn start_test_server(server: Server) {
     tokio::spawn(async move { server.listen().await.unwrap() });
 }
 
-/// Returns the next message received by the given peer listener
-pub async fn get_next_message(peer_listener: &mut TcpListener) -> Message {
-    let (mut stream, _) = peer_listener.accept().await.unwrap();
-    let mut buf = [0u8; 1024];
-    let n = stream.read(&mut buf).await.unwrap();
-    bincode::deserialize(&buf[0..n]).unwrap()
+/// Returns a tcp channel connected to the address
+pub async fn connect_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
+    let channel = Channel::new_write_only(address).await.unwrap();
+    let (reader, _socket) = listener.accept().await.unwrap();
+
+    channel.update_reader(Arc::new(Mutex::new(reader)))
 }
 
-/// Starts a fake node that accepts all messages at the given socket address
+/// Returns the next tcp channel connected to the listener
+pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
+    let (reader, _peer) = listener.accept().await.unwrap();
+    let channel = Channel::new_read_only(reader).unwrap();
+
+    channel.update_writer(address).await.unwrap()
+}
+
+pub async fn do_handshake_get_channel(peer_address: SocketAddr, server_address: SocketAddr) -> Arc<Channel> {
+    // Simulate message handler
+    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+    let (reader, _peer) = peer_listener.accept().await.unwrap();
+
+    // Simulate Handshakes
+    let channel = Channel::new_read_only(reader).unwrap();
+    let (name, bytes) = channel.read().await.unwrap();
+    assert_eq!(Version::name(), name);
+
+    // Get final handshake with server
+    let handshake = Handshake::receive_new(
+        1u64,
+        0u32,
+        channel,
+        Version::deserialize(bytes).unwrap(),
+        server_address,
+    )
+    .await
+    .unwrap();
+
+    // return Arc::clone() of channel
+    handshake.channel.clone()
+}
+
+/// Starts a fake node that accepts all tcp connections at the given socket address
 pub async fn simulate_active_node(address: SocketAddr) {
     accept_all_messages(TcpListener::bind(address).await.unwrap());
 }
 
-/// Starts a fake node that accepts all messages received by the given peer listener
+/// Starts a fake node that accepts all tcp connections received by the given peer listener
 pub fn accept_all_messages(mut peer_listener: TcpListener) {
     tokio::spawn(async move {
         loop {
             peer_listener.accept().await.unwrap();
         }
     });
-}
-
-/// Send a dummy message to the peer and make sure no other messages were received
-pub async fn ping(address: SocketAddr, mut listener: TcpListener) {
-    {
-        let mut stream = TcpStream::connect(&address).await.unwrap();
-        let ping = bincode::serialize("ping").unwrap();
-        let _result = stream.write(&ping).await.unwrap();
-    }
-
-    let (mut stream, _) = listener.accept().await.unwrap();
-    let mut buf = [0u8; 1024];
-    let n = stream.read(&mut buf).await.unwrap();
-
-    let actual_message: String = bincode::deserialize(&buf[0..n]).unwrap();
-
-    assert_eq!(n, 12);
-    assert_eq!(actual_message, "ping");
-}
-
-/// Complete a full handshake between a server and peer
-pub async fn peer_server_handshake(peer_address: SocketAddr, server_address: SocketAddr) {
-    // 1. Start peer server
-
-    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
-    sleep(100).await;
-
-    // 2. Initiate handshake request from peer to server
-
-    handshake_request(1, server_address).await.unwrap();
-    sleep(100).await;
-
-    // 3. Check that server sent a Verack message
-
-    let actual = get_next_message(&mut peer_listener).await;
-    let expected = Message::Verack;
-    assert_eq!(actual, expected);
-
-    // 4. Check that server sent a Version message
-
-    get_next_message(&mut peer_listener).await;
-
-    // 5. Initiate handshake response from peer to server
-
-    handshake_response(1, server_address, false).await.unwrap();
-
-    drop(peer_listener);
-    sleep(100).await;
 }

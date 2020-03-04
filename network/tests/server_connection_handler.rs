@@ -1,6 +1,10 @@
 mod server_connection_handler {
     use snarkos_consensus::test_data::*;
-    use snarkos_network::{base::Message, test_data::*};
+    use snarkos_network::{
+        message::{types::GetMemoryPool, Message},
+        test_data::*,
+        Channel,
+    };
 
     use chrono::{Duration, Utc};
     use serial_test::serial;
@@ -251,17 +255,28 @@ mod server_connection_handler {
             let mut sync_node_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
             let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let context = server.context.clone();
 
             // 1. Start server
 
             start_test_server(server);
 
-            // 2. Wait for memory pool interval
+            // 2. Add sync handler to connections
 
-            let expected = Message::MemoryPoolRequest;
-            let actual = get_next_message(&mut sync_node_listener).await;
+            context
+                .connections
+                .write()
+                .await
+                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
 
-            assert_eq!(actual, expected);
+            let channel_sync_side = accept_channel(&mut sync_node_listener, server_address).await;
+
+            // 3. Wait for memory pool interval
+
+            let (name, bytes) = channel_sync_side.read().await.unwrap();
+
+            assert_eq!(GetMemoryPool::name(), name);
+            assert!(GetMemoryPool::deserialize(bytes).is_ok());
         });
 
         drop(rt);

@@ -1,5 +1,6 @@
 use crate::{
     consensus::ConsensusError,
+    network::SendError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
@@ -24,6 +25,9 @@ pub enum RpcError {
     Message(String),
 
     #[fail(display = "{}", _0)]
+    SendError(SendError),
+
+    #[fail(display = "{}", _0)]
     StorageError(StorageError),
 
     #[fail(display = "{}", _0)]
@@ -39,6 +43,12 @@ impl From<BlockError> for RpcError {
 impl From<ConsensusError> for RpcError {
     fn from(error: ConsensusError) -> Self {
         RpcError::ConsensusError(error)
+    }
+}
+
+impl From<SendError> for RpcError {
+    fn from(error: SendError) -> Self {
+        RpcError::SendError(error)
     }
 }
 

@@ -18,6 +18,7 @@ snarkos-objects = { path = "../objects" }
 snarkos-storage = { path = "../storage" }
 
 bincode = { version = "1.2.0" }
+byteorder = { version = "1" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version="0.4.2" }
 log = { version = "0.4.8" }
@@ -29,4 +30,3 @@ wagyu-bitcoin = { version = "0.6.1" }
 [dev-dependencies]
 tokio-test = { version = "0.2.0" }
 serial_test = "*"
-futures-await-test = { version = "0.3.0" }
