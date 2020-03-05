@@ -14,7 +14,6 @@ pub enum PingState {
 }
 
 /// Maintain connected peers.
-///
 /// 1. The server sends a Ping message to a peer.
 /// 2. The peer responds with a Pong message.
 /// 3. The server verifies the Pong message and updates the peer's last seen date

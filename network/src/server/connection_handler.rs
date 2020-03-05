@@ -9,7 +9,6 @@ use tokio::{task, time::delay_for};
 
 impl Server {
     /// Manages the number of active connections according to the connection frequency.
-    ///
     /// 1. Get more connected peers if we are under the minimum number specified by the network context.
     ///     1.1 Ask our connected peers for their peers.
     ///     1.2 Ask our gossiped peers to handshake and become connected.

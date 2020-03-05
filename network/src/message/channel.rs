@@ -10,7 +10,6 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
 /// A Channel for reading and writing messages to a peer.
-///
 /// Storing two streams allows for simultaneous reading/writing.
 /// Each stream is protected by an Arc + Mutex to allow for channel cloning.
 #[derive(Clone, Debug)]

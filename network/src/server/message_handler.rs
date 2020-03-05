@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 impl Server {
     /// Handles all messages sent from connected peers.
-    ///
-    /// Messages are received by a single tokio mpsc receiver with the message name, bytes, associated channel, and a tokio oneshot sender to let the connection thread know when we are done processing the message.
+    /// Messages are received by a single tokio mpsc receiver with the message name, bytes, associated channel, and a tokio oneshot sender.
+    /// The oneshot sender lets connection thread know when the message is handled.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
@@ -155,7 +155,6 @@ impl Server {
     }
 
     /// A node has requested our list of peer addresses.
-    ///
     /// Send an Address message with our current peer list.
     async fn receive_get_peers(&mut self, _message: GetPeers, channel: Arc<Channel>) -> Result<(), ServerError> {
         channel
@@ -166,7 +165,6 @@ impl Server {
     }
 
     /// A miner has sent their list of peer addresses.
-    ///
     /// Add all new/updated addresses to our gossiped.
     /// The connection handler will be responsible for sending out handshake requests to them.
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
@@ -190,7 +188,6 @@ impl Server {
     }
 
     /// A peer has sent us a ping message.
-    ///
     /// Reply with a pong message.
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
         Pings::send_pong(message, channel).await?;
@@ -199,7 +196,6 @@ impl Server {
     }
 
     /// A peer has sent us a pong message.
-    ///
     /// See if it matches a ping we sent out.
     async fn receive_pong(&mut self, message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
         match self
@@ -289,7 +285,6 @@ impl Server {
     }
 
     /// A connected peer has acknowledged a handshake request.
-    ///
     /// Check if the Verack matches the last handshake message we sent.
     /// Update our peer book and send a request for more peers.
     async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
@@ -325,7 +320,6 @@ impl Server {
     }
 
     /// A connected peer has sent handshake request.
-    ///
     /// Update peer's channel.
     /// If peer's block height is greater than ours, send a sync request.
     ///

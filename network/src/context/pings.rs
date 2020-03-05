@@ -23,7 +23,6 @@ impl Pings {
     }
 
     /// Send a ping request to a peer.
-    ///
     /// Store the result upon success.
     pub async fn send_ping(&mut self, channel: Arc<Channel>) -> Result<(), PingProtocolError> {
         self.addresses

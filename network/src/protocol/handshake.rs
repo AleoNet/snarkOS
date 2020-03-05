@@ -61,7 +61,6 @@ impl Handshake {
     }
 
     /// Receive the initial Version message from a new peer.
-    ///
     /// Send a Verack message + Version message
     pub async fn receive_new(
         version: u64,
@@ -100,7 +99,6 @@ impl Handshake {
     }
 
     /// Receive the Version message for an existing peer handshake.
-    ///
     /// Send a Verack message.
     pub async fn receive(&mut self, message: Version) -> Result<(), HandshakeError> {
         self.channel.write(&Verack::new(message)).await?;
