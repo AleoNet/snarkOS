@@ -1,6 +1,6 @@
 //! Transactions memory pool
 //!
-//! `MemoryPool` keeps a vector of transactions seen by the miner
+//! `MemoryPool` keeps a vector of transactions seen by the miner.
 
 use crate::{check_for_double_spend, check_for_double_spends};
 use snarkos_errors::consensus::ConsensusError;
@@ -9,12 +9,15 @@ use snarkos_storage::BlockStorage;
 
 use std::collections::HashMap;
 
+/// Stores a transaction and it's size in the memory pool.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Entry {
     pub size: usize,
     pub transaction: Transaction,
 }
 
+/// Stores transactions received by the server.
+/// Transaction entries will eventually be fetched by the miner and assembled into blocks.
 #[derive(Debug, Clone)]
 pub struct MemoryPool {
     pub total_size: usize,
@@ -78,7 +81,7 @@ impl MemoryPool {
         Ok(())
     }
 
-    /// Adds entry to memory pool if valid in the current blockchain
+    /// Adds entry to memory pool if valid in the current blockchain.
     #[inline]
     pub fn insert(&mut self, storage: &BlockStorage, entry: Entry) -> Result<Option<Vec<u8>>, ConsensusError> {
         match check_for_double_spend(storage, &entry.transaction.clone()) {
@@ -113,7 +116,7 @@ impl MemoryPool {
         }
     }
 
-    /// Cleanse the memory pool of outdated transactions
+    /// Cleanse the memory pool of outdated transactions.
     #[inline]
     pub fn cleanse(&mut self, storage: &BlockStorage) -> Result<(), ConsensusError> {
         let mut new_memory_pool = Self::new();
@@ -129,7 +132,7 @@ impl MemoryPool {
         Ok(())
     }
 
-    /// Removes transaction from memory pool or error
+    /// Removes transaction from memory pool or error.
     #[inline]
     pub fn remove(&mut self, entry: &Entry) -> Result<Option<Vec<u8>>, ConsensusError> {
         if self.contains(entry) {
@@ -145,7 +148,7 @@ impl MemoryPool {
         Ok(None)
     }
 
-    /// Removes transaction from memory pool based on the transaction id
+    /// Removes transaction from memory pool based on the transaction id.
     #[inline]
     pub fn remove_by_hash(&mut self, transaction_id: &Vec<u8>) -> Result<Option<Entry>, ConsensusError> {
         match self.transactions.clone().get(transaction_id) {
@@ -179,7 +182,7 @@ impl MemoryPool {
         }
     }
 
-    /// Removes transaction from memory pool based on outpoints (when transactions are spent)
+    /// Removes transaction from memory pool based on outpoints (when transactions are spent).
     #[inline]
     pub fn remove_by_outpoint(&mut self, outpoint: &Outpoint) -> Result<Vec<Entry>, ConsensusError> {
         let outpoint = Outpoint::new(outpoint.transaction_id.clone(), outpoint.index, None, None)?;
@@ -199,7 +202,7 @@ impl MemoryPool {
         Ok(removed)
     }
 
-    /// Returns whether or not the memory pool contains the entry
+    /// Returns whether or not the memory pool contains the entry.
     #[inline]
     pub fn contains(&self, entry: &Entry) -> bool {
         match &entry.transaction.to_transaction_id() {
@@ -208,7 +211,7 @@ impl MemoryPool {
         }
     }
 
-    /// Get candidate transactions for a new block
+    /// Get candidate transactions for a new block.
     #[inline]
     pub fn get_candidates(&self, storage: &BlockStorage, max_size: usize) -> Result<Transactions, ConsensusError> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);

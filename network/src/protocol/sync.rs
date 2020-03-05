@@ -17,7 +17,6 @@ pub enum SyncState {
 }
 
 /// Manages syncing chain state with a sync node.
-///
 /// 1. The server_node sends a GetSync message to a sync_node.
 /// 2. The sync_node responds with a Sync message with block_headers the server_node is missing.
 /// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the message.

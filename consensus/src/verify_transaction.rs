@@ -2,6 +2,7 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{Transaction, Transactions};
 use snarkos_storage::BlockStorage;
 
+/// Ensure that all inputs in all transactions are unspent.
 pub fn check_for_double_spends(storage: &BlockStorage, transactions: &Transactions) -> Result<(), ConsensusError> {
     let mut new_spends: Vec<(Vec<u8>, u32)> = vec![];
     for transaction in transactions.iter() {
@@ -23,6 +24,7 @@ pub fn check_for_double_spends(storage: &BlockStorage, transactions: &Transactio
     Ok(())
 }
 
+/// Ensure that all inputs in a single transaction are unspent.
 pub fn check_for_double_spend(storage: &BlockStorage, transaction: &Transaction) -> Result<(), ConsensusError> {
     for input in &transaction.parameters.inputs {
         // Already spent
@@ -36,6 +38,7 @@ pub fn check_for_double_spend(storage: &BlockStorage, transaction: &Transaction)
     Ok(())
 }
 
+/// Ensure that only one coinbase transaction exists for all transactions.
 pub fn check_single_coinbase(transactions: &Transactions) -> Result<(), ConsensusError> {
     let mut coinbase_transaction_count = 0;
     for transaction in transactions.iter() {
@@ -55,6 +58,7 @@ pub fn check_single_coinbase(transactions: &Transactions) -> Result<(), Consensu
     }
 }
 
+/// Perform the coinbase and double spend checks on all transactions
 pub fn check_block_transactions(storage: &BlockStorage, transactions: &Transactions) -> Result<(), ConsensusError> {
     check_single_coinbase(transactions)?;
     check_for_double_spends(storage, transactions)

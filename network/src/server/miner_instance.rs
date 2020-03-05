@@ -38,7 +38,6 @@ impl MinerInstance {
     }
 
     /// Spawns a new miner on a new thread using MinerInstance parameters.
-    ///
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
     /// Miner threads are asynchronous so the only way to stop them is to kill the runtime they were started in. This may be changed in the future.

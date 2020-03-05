@@ -53,7 +53,6 @@ impl Server {
     }
 
     /// Starts the server event loop.
-    ///
     /// 1. Send a handshake request to all bootnodes.
     /// 2. Listen for and accept new tcp connections at local_address.
     /// 3. Manage peers via handshake and ping protocols.
@@ -131,7 +130,6 @@ impl Server {
     }
 
     /// Spawns one thread per peer tcp connection to read messages.
-    ///
     /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
     /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
     /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.

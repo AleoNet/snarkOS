@@ -8,7 +8,7 @@ use snarkos_network::bootnodes::*;
 use clap::ArgMatches;
 use serde::Serialize;
 
-/// Represents options for a Bitcoin wallet
+/// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize)]
 pub struct Config {
     // Flags
@@ -175,6 +175,7 @@ impl Config {
     }
 }
 
+/// Parses command line arguments into node configuration parameters.
 pub struct ConfigCli;
 
 impl CLI for ConfigCli {

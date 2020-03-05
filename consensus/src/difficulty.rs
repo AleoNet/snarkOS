@@ -1,6 +1,6 @@
 pub const DIFFICULTY_BOMB_DIVISOR: f64 = 1024f64;
 
-/// Linear difficulty recalculation using time elapsed
+/// Linear difficulty recalculation using time elapsed.
 pub fn naive_retarget(
     block_timestamp: i64,
     parent_timestamp: i64,
@@ -29,7 +29,7 @@ pub fn naive_retarget(
     }
 }
 
-/// Bitcoin difficulty retarget algorithm
+/// Bitcoin difficulty retarget algorithm.
 pub fn bitcoin_retarget(
     block_timestamp: i64,
     parent_timestamp: i64,
@@ -65,7 +65,7 @@ pub fn bitcoin_retarget(
     x
 }
 
-/// Custom difficulty retarget algorithm
+/// Custom difficulty retarget algorithm.
 pub fn custom_retarget(
     _block_timestamp: i64,
     _parent_timestamp: i64,
@@ -75,7 +75,7 @@ pub fn custom_retarget(
     unimplemented!()
 }
 
-/// Ethereum difficulty retarget algorithm
+/// Ethereum difficulty retarget algorithm.
 pub fn ethereum_retarget(block_timestamp: i64, parent_timestamp: i64, parent_difficulty: u64) -> u64 {
     let parent_diff = parent_difficulty as f64;
     let mut x: f64;

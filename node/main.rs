@@ -16,6 +16,14 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
+/// Builds a node from configuration parameters.
+/// 1. Creates consensus parameters.
+/// 2. Creates new storage database or uses existing.
+/// 2. Creates new memory pool or uses existing from storage.
+/// 3. Creates network server.
+/// 4. Starts rpc server thread.
+/// 5. Starts miner thread.
+/// 6. Starts network server listener.
 async fn start_server(config: Config) -> Result<(), NodeError> {
     if !config.quiet {
         std::env::set_var("RUST_LOG", "info");
