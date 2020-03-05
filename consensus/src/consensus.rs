@@ -109,6 +109,7 @@ impl ConsensusParameters {
     }
 
     pub fn is_genesis(block: &Block) -> bool {
+        //TODO: DELETE THIS METHOD
         block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
     }
 

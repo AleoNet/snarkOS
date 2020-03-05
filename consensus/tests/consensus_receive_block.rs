@@ -1,11 +1,9 @@
-mod consensus_receive_single_blocks {
+mod consensus_receive_block {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_objects::Block;
 
-    // Notes:
-    //  - "duplicate block" refers to an identical block with the same block hash
-    //  - "already mined block" refers to a block with a different block hash but the same previous_block_hash
-
+    // Receive two new blocks in order.
+    // Block 1 references the genesis block and block 2 references block 1
     #[test]
     fn new_in_order() {
         let (mut blockchain, path) = initialize_test_blockchain();
@@ -38,6 +36,10 @@ mod consensus_receive_single_blocks {
         kill_storage_sync(blockchain, path);
     }
 
+    // Receive two new blocks out of order.
+    // Like the test above, except block 2 is received first as an orphan with no parent.
+    // The consensus mechanism should push the orphan into storage until block 1 is received.
+    // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     #[test]
     fn new_out_of_order() {
         let (mut blockchain, path) = initialize_test_blockchain();
@@ -66,6 +68,7 @@ mod consensus_receive_single_blocks {
         kill_storage_sync(blockchain, path);
     }
 
+    // Receive two blocks with identical hashes.
     #[test]
     fn duplicate() {
         let (mut blockchain, path) = initialize_test_blockchain();
