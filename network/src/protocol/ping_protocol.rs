@@ -20,9 +20,9 @@ pub enum PingState {
 /// 3. The server verifies the Pong message and updates the peer's last seen date
 #[derive(Clone, Debug)]
 pub struct PingProtocol {
-    pub state: PingState,
-    pub channel: Arc<Channel>,
-    pub nonce: u64,
+    state: PingState,
+    channel: Arc<Channel>,
+    nonce: u64,
 }
 
 impl PingProtocol {
@@ -56,6 +56,11 @@ impl PingProtocol {
         self.state = PingState::Accepted;
 
         Ok(())
+    }
+
+    /// Returns current ping protocol state.
+    pub fn get_state(&self) -> PingState {
+        self.state.clone()
     }
 }
 

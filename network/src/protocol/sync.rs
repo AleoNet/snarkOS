@@ -9,7 +9,7 @@ use snarkos_storage::BlockStorage;
 use chrono::{DateTime, Utc};
 use std::{net::SocketAddr, sync::Arc};
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum SyncState {
     Idle,
     /// (timestamp, block_height)
@@ -22,9 +22,9 @@ pub enum SyncState {
 /// 2. The sync_node responds with a Sync message with block_headers the server_node is missing.
 /// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the message.
 pub struct SyncHandler {
-    pub block_headers: Vec<BlockHeaderHash>,
     pub sync_node: SocketAddr,
     pub sync_state: SyncState,
+    block_headers: Vec<BlockHeaderHash>,
 }
 
 impl SyncHandler {
@@ -42,6 +42,18 @@ impl SyncHandler {
         match self.sync_state {
             SyncState::Idle => self.sync_state = SyncState::Syncing(Utc::now(), block_height),
             SyncState::Syncing(date_time, _old_height) => self.sync_state = SyncState::Syncing(date_time, block_height),
+        }
+    }
+
+    /// Process a vector of block header hashes.
+    ///
+    /// Push new hashes to the sync handler so we can ask the sync node for them.
+    pub fn receive_hashes(&mut self, hashes: Vec<BlockHeaderHash>, height: u32) {
+        for block_hash in hashes {
+            if !self.block_headers.contains(&block_hash) {
+                self.block_headers.push(block_hash.clone());
+            }
+            self.update_syncing(height);
         }
     }
 

@@ -78,13 +78,13 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let coinbase_address = BitcoinAddress::<Mainnet>::from_str(&config.coinbase_address).unwrap();
 
     if config.miner {
-        MinerInstance {
+        MinerInstance::new(
             coinbase_address,
-            consensus: consensus.clone(),
-            storage: storage.clone(),
-            memory_pool_lock: memory_pool_lock.clone(),
-            server_context: server.context.clone(),
-        }
+            consensus.clone(),
+            storage.clone(),
+            memory_pool_lock.clone(),
+            server.context.clone(),
+        )
         .spawn();
     }
 

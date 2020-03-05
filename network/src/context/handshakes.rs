@@ -13,7 +13,7 @@ use tokio::net::TcpStream;
 /// Stores the address and latest state of peers we are handshaking with.
 #[derive(Clone, Debug)]
 pub struct Handshakes {
-    pub addresses: HashMap<SocketAddr, Handshake>,
+    addresses: HashMap<SocketAddr, Handshake>,
 }
 
 impl Handshakes {
@@ -25,6 +25,7 @@ impl Handshakes {
     }
 
     /// Create a new handshake with a peer and send a handshake request to them.
+    ///
     /// If the request is sent successfully, the handshake is stored and returned.
     pub async fn send_request(
         &mut self,
@@ -131,7 +132,7 @@ impl Handshakes {
     /// Returns the state of the handshake at a peer address.
     pub fn get_state(&self, address: SocketAddr) -> Option<HandshakeState> {
         match self.addresses.get(&address) {
-            Some(stored_handshake) => Some(stored_handshake.state.clone()),
+            Some(stored_handshake) => Some(stored_handshake.get_state()),
             None => None,
         }
     }

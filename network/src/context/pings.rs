@@ -11,7 +11,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 /// Stores connected peers and the latest state of a ping/pong protocol.
 #[derive(Clone, Debug)]
 pub struct Pings {
-    pub addresses: HashMap<SocketAddr, PingProtocol>,
+    addresses: HashMap<SocketAddr, PingProtocol>,
 }
 
 impl Pings {
@@ -47,7 +47,7 @@ impl Pings {
     /// Returns ping state for current peer.
     pub fn get_state(&self, address: SocketAddr) -> Option<PingState> {
         match self.addresses.get(&address) {
-            Some(stored_ping) => Some(stored_ping.state.clone()),
+            Some(stored_ping) => Some(stored_ping.get_state()),
             None => None,
         }
     }

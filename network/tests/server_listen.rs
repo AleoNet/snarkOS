@@ -14,11 +14,9 @@ mod server_listen {
     use snarkos_storage::BlockStorage;
 
     use serial_test::serial;
-    use snarkos_network::message::types::Ping;
     use std::{net::SocketAddr, sync::Arc};
     use tokio::{
-        io::{AsyncReadExt, AsyncWriteExt},
-        net::{TcpListener, TcpStream},
+        net::TcpListener,
         runtime::Runtime,
         sync::{oneshot, oneshot::Sender, Mutex},
     };

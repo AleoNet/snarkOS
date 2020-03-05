@@ -254,14 +254,10 @@ impl Server {
 
     /// A peer has sent us their chain state.
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
+        let height = self.storage.get_latest_block_height();
         let mut sync_handler = self.sync_handler_lock.lock().await;
 
-        for block_hash in message.block_hashes {
-            if !sync_handler.block_headers.contains(&block_hash) {
-                sync_handler.block_headers.push(block_hash.clone());
-            }
-            sync_handler.update_syncing(self.storage.get_latest_block_height());
-        }
+        sync_handler.receive_hashes(message.block_hashes, height);
 
         if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
             sync_handler.increment(channel, Arc::clone(&self.storage)).await?;

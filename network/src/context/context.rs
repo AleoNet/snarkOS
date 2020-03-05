@@ -4,6 +4,8 @@ use std::net::SocketAddr;
 use tokio::sync::RwLock;
 
 /// The network context for this node.
+///
+/// All variables are public to allow server components to acquire read/write access.
 pub struct Context {
     /// The ip address/socket of this node.
     pub local_address: SocketAddr,

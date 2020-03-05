@@ -26,12 +26,11 @@ pub enum HandshakeState {
 /// Peers with completed handshakes are added to your connections and your connected peer list.
 #[derive(Clone, Debug)]
 pub struct Handshake {
-    pub state: HandshakeState,
     pub channel: Arc<Channel>,
-    pub version: u64,
-    pub height: u32,
-    pub nonce: u64,
-    pub address_sender: SocketAddr,
+    state: HandshakeState,
+    version: u64,
+    height: u32,
+    nonce: u64,
 }
 
 impl Handshake {
@@ -56,7 +55,6 @@ impl Handshake {
             version,
             height,
             nonce: message.nonce,
-            address_sender,
         })
     }
 
@@ -95,7 +93,6 @@ impl Handshake {
             version,
             height,
             nonce: peer_message.nonce,
-            address_sender,
         })
     }
 
@@ -130,6 +127,11 @@ impl Handshake {
     /// Updates the stored reader stream for an existing peer handshake.
     pub fn update_reader(&mut self, read_channel: Channel) {
         self.channel = Arc::new(self.channel.update_reader(read_channel.reader))
+    }
+
+    /// Returns current handshake state.
+    pub fn get_state(&self) -> HandshakeState {
+        self.state.clone()
     }
 }
 

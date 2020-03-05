@@ -12,11 +12,11 @@ use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
-    pub coinbase_address: BitcoinAddress<Mainnet>,
-    pub consensus: ConsensusParameters,
-    pub storage: Arc<BlockStorage>,
-    pub memory_pool_lock: Arc<Mutex<MemoryPool>>,
-    pub server_context: Arc<Context>,
+    coinbase_address: BitcoinAddress<Mainnet>,
+    consensus: ConsensusParameters,
+    storage: Arc<BlockStorage>,
+    memory_pool_lock: Arc<Mutex<MemoryPool>>,
+    server_context: Arc<Context>,
 }
 
 impl MinerInstance {
