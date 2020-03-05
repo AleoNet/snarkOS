@@ -1,10 +1,9 @@
 use crate::{bitcoin_retarget, check_block_transactions, miner::MemoryPool};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transaction, Transactions};
+use snarkos_objects::{merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transactions};
 use snarkos_storage::{BlockPath, BlockStorage};
 
 use chrono::Utc;
-use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -49,67 +48,7 @@ impl ConsensusParameters {
         //        ethereum_retarget(block_timestamp, prev_header.time, prev_header.difficulty_target)
     }
 
-    /// Run proof of work to find genesis block (parent header is 0).
-    pub fn find_genesis(&self, transactions: &Transactions) -> Result<BlockHeader, ConsensusError> {
-        //TODO: DELETE THIS METHOD
-        let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transactions.to_transaction_ids()?));
-
-        let time = Utc::now().timestamp();
-
-        let header = BlockHeader {
-            merkle_root_hash: MerkleRootHash(merkle_root_bytes),
-            previous_block_hash: BlockHeaderHash([0u8; 32]),
-            time,
-            difficulty_target: 0x0000_7FFF_FFFF_FFFF_u64,
-            nonce: 0u32,
-        };
-
-        let mut hash_input = header.serialize();
-
-        for nonce in 0..self.max_nonce {
-            hash_input[80..84].copy_from_slice(&nonce.to_le_bytes());
-            let header = BlockHeader::deserialize(&hash_input);
-            let hash_result = header.to_difficulty_hash();
-
-            if hash_result <= header.difficulty_target {
-                return Ok(BlockHeader::deserialize(&hash_input));
-            }
-        }
-
-        Err(ConsensusError::NonceLimitError)
-    }
-
-    /// Mine and return genesis block.
-    pub fn genesis_block(
-        //TODO: DELETE THIS METHOD
-        &self,
-        receiving_address: &BitcoinAddress<Mainnet>,
-        storage: &BlockStorage,
-    ) -> Result<Block, ConsensusError> {
-        // 1. create genesis transaction
-        // 2. add transaction to block
-        // 3. mine block
-
-        let genesis_transaction = Transaction::create_coinbase_transaction(
-            storage.get_latest_block_height() + 1,
-            block_reward(storage.get_latest_block_height() + 1),
-            0u64,
-            receiving_address,
-        )?;
-
-        let transactions = Transactions::from(&[genesis_transaction]);
-        let genesis_block_header = self.find_genesis(&transactions)?;
-
-        let genesis_block = Block {
-            header: genesis_block_header,
-            transactions,
-        };
-        Ok(genesis_block)
-    }
-
     pub fn is_genesis(block: &Block) -> bool {
-        //TODO: DELETE THIS METHOD
         block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
     }
 
@@ -176,11 +115,6 @@ impl ConsensusParameters {
         } else {
             Err(ConsensusError::TransactionOverspending)
         }
-    }
-
-    pub fn verify_hash(block_header: &BlockHeader, hash_result: u64) -> bool {
-        //TODO: DELETE THIS METHOD
-        hash_result == block_header.to_difficulty_hash()
     }
 
     /// Verifies that the block header is valid.

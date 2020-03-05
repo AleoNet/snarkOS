@@ -12,41 +12,35 @@ use snarkos_objects::{transaction::*, BlockHeaderHash};
 use snarkos_storage::BlockStorage;
 
 use chrono::Utc;
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
 use wagyu_bitcoin::{BitcoinAddress, BitcoinPrivateKey, Mainnet};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
 pub struct RpcImpl {
-    //TODO: MAKE THESE FIELDS PUBLIC
     /// Blockchain database storage.
-    pub storage: Arc<BlockStorage>,
-
-    /// Address the rpc server is binded to.
-    pub rpc_server: SocketAddr, //TODO: REMOVE THIS VARIABLE
+    storage: Arc<BlockStorage>,
 
     /// Network context held by the server.
-    pub server_context: Arc<Context>,
+    server_context: Arc<Context>,
 
     /// Consensus parameters generated from node config.
-    pub consensus: ConsensusParameters,
+    consensus: ConsensusParameters,
 
     /// Handle to access the memory pool of transactions.
-    pub memory_pool_lock: Arc<Mutex<MemoryPool>>,
+    memory_pool_lock: Arc<Mutex<MemoryPool>>,
 }
 
 impl RpcImpl {
     pub fn new(
         storage: Arc<BlockStorage>,
-        rpc_server: SocketAddr,
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool>>,
     ) -> Self {
         Self {
             storage,
-            rpc_server,
             server_context,
             consensus,
             memory_pool_lock,
@@ -340,7 +334,6 @@ mod tests {
     fn initialize_test_rpc(storage: Arc<BlockStorage>) -> Rpc {
         let bootnode_address = random_socket_address();
         let server_address = random_socket_address();
-        let rpc_addr = "127.0.0.1:3030".parse::<SocketAddr>().unwrap();
 
         let server = initialize_test_server(
             server_address,
@@ -352,14 +345,7 @@ mod tests {
         let consensus = TEST_CONSENSUS;
 
         json_test::Rpc::new(
-            RpcImpl::new(
-                storage,
-                rpc_addr,
-                server.context.clone(),
-                consensus,
-                server.memory_pool_lock,
-            )
-            .to_delegate(),
+            RpcImpl::new(storage, server.context.clone(), consensus, server.memory_pool_lock).to_delegate(),
         )
     }
 
