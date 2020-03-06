@@ -3,7 +3,6 @@ use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
 /// A request for a block with the specified hash.
-///
 /// See network/protocol/sync.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct GetBlock {

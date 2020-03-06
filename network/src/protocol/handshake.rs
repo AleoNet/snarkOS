@@ -14,14 +14,13 @@ pub enum HandshakeState {
 }
 
 /// Establishes a connection between this node and a peer to send messages.
-///
 /// 1. The server sends a Version message to a peer.
 /// 2. The peer responds with a Verack message followed by a Version message.
 /// 3. The server verifies the Verack and adds the peer to its peer list.
 /// 4. The server sees the Version message and responds with a Verack.
 /// 5. The peer verifies the Verack and adds the server to its peer list.
 ///
-/// Essentially receiving a Version message means you should send a Verack message.
+/// Receiving a Version message means you should send a Verack message.
 /// If you receive a Verack message from a peer and accept it, then the handshake is complete.
 /// Peers with completed handshakes are added to your connections and your connected peer list.
 #[derive(Clone, Debug)]

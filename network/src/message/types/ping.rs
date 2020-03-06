@@ -6,7 +6,6 @@ use rand::Rng;
 use std::io::Cursor;
 
 /// A ping protocol request for a Pong.
-///
 /// See network/protocol/ping_protocol.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Ping {

@@ -25,7 +25,6 @@ impl Handshakes {
     }
 
     /// Create a new handshake with a peer and send a handshake request to them.
-    ///
     /// If the request is sent successfully, the handshake is stored and returned.
     pub async fn send_request(
         &mut self,
@@ -43,12 +42,10 @@ impl Handshakes {
     }
 
     /// Receive the first message upon accepting a peer connection.
-    ///
     /// If the message is a Version:
     ///     1. Create a new handshake.
     ///     2. Send a handshake response.
     ///     3. If the response is sent successfully, store and return the handshake.
-    ///
     /// If the message is a Verack:
     ///     1. Get the existing handshake.
     ///     2. Mark the handshake as accepted.

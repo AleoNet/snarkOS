@@ -4,8 +4,8 @@ use crate::message::{
     MessageHeader,
     MessageName,
 };
-
 use snarkos_errors::network::ConnectError;
+
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
