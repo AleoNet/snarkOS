@@ -1,6 +1,35 @@
-use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{Transaction, Transactions};
-use snarkos_storage::BlockStorage;
+use snarkos_errors::{
+    consensus::ConsensusError,
+    storage::StorageError,
+    unwrap_option_or_error,
+};
+use snarkos_objects::{Transaction, Transactions, Outpoint};
+use snarkos_storage::{BlockStorage, Key, TransactionMeta};
+
+/// Returns true if the given outpoint is already spent.
+fn is_spent(storage: &BlockStorage, outpoint: &Outpoint) -> Result<bool, ConsensusError> {
+    let transaction_id_key = Key::TransactionMeta(outpoint.transaction_id.clone());
+
+    let transaction_meta: TransactionMeta = unwrap_option_or_error!(
+             storage.get(&transaction_id_key)?.transaction_meta();
+                ConsensusError::StorageError(StorageError::InvalidTransactionId(hex::encode(&outpoint.transaction_id)))
+        );
+    Ok(transaction_meta.spent[outpoint.index as usize])
+}
+
+/// Ensure that all inputs in a single transaction are unspent.
+pub fn check_for_double_spend(storage: &BlockStorage, transaction: &Transaction) -> Result<(), ConsensusError> {
+    for input in &transaction.parameters.inputs {
+        // Already spent
+        if is_spent(storage, &input.outpoint.clone())? {
+            return Err(ConsensusError::AlreadySpent(
+                input.outpoint.transaction_id.clone(),
+                input.outpoint.index,
+            ));
+        }
+    }
+    Ok(())
+}
 
 /// Ensure that all inputs in all transactions are unspent.
 pub fn check_for_double_spends(storage: &BlockStorage, transactions: &Transactions) -> Result<(), ConsensusError> {
@@ -12,7 +41,7 @@ pub fn check_for_double_spends(storage: &BlockStorage, transactions: &Transactio
             }
             let new_spend = (input.outpoint.transaction_id.clone(), input.outpoint.index);
             // Already spent
-            if storage.is_spent(&input.outpoint.clone())? || new_spends.contains(&new_spend) {
+            if is_spent(&storage, &input.outpoint.clone())? || new_spends.contains(&new_spend) {
                 return Err(ConsensusError::AlreadySpent(
                     input.outpoint.transaction_id.clone(),
                     input.outpoint.index,
@@ -24,19 +53,6 @@ pub fn check_for_double_spends(storage: &BlockStorage, transactions: &Transactio
     Ok(())
 }
 
-/// Ensure that all inputs in a single transaction are unspent.
-pub fn check_for_double_spend(storage: &BlockStorage, transaction: &Transaction) -> Result<(), ConsensusError> {
-    for input in &transaction.parameters.inputs {
-        // Already spent
-        if storage.is_spent(&input.outpoint.clone())? {
-            return Err(ConsensusError::AlreadySpent(
-                input.outpoint.transaction_id.clone(),
-                input.outpoint.index,
-            ));
-        }
-    }
-    Ok(())
-}
 
 /// Ensure that only one coinbase transaction exists for all transactions.
 pub fn check_single_coinbase(transactions: &Transactions) -> Result<(), ConsensusError> {

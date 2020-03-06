@@ -1,5 +1,5 @@
 use snarkos_objects::BlockHeaderHash;
-
+//TODO: MOVE ALL OF THIS
 #[derive(Clone, Debug)]
 pub enum BlockPath {
     ExistingBlock,

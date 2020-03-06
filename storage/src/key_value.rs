@@ -20,6 +20,7 @@ pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
 //pub const KEY_BEST_BLOCK_HASH: &'static str = "BEST_BLOCK_HASH";
 
+/// Wrapper for which transaction outpoints are spent.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionMeta {
     pub spent: Vec<bool>,
