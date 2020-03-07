@@ -1,5 +1,5 @@
 use crate::ConsensusParameters;
-use snarkos_storage::BlockStorage;
+use snarkos_storage::{transaction::get_balance, BlockStorage};
 
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
@@ -115,11 +115,11 @@ pub fn check_block_1_balances(blockchain: &BlockStorage) {
     let recipient_2 = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[2].address).unwrap();
     let recipient_3 = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[3].address).unwrap();
 
-    let genesis_miner_balance = blockchain.get_balance(&genesis_miner_address);
-    let miner_balance = blockchain.get_balance(&miner_address);
-    let balance_1 = blockchain.get_balance(&recipient_1);
-    let balance_2 = blockchain.get_balance(&recipient_2);
-    let balance_3 = blockchain.get_balance(&recipient_3);
+    let genesis_miner_balance = get_balance(&blockchain, &genesis_miner_address);
+    let miner_balance = get_balance(&blockchain, &miner_address);
+    let balance_1 = get_balance(&blockchain, &recipient_1);
+    let balance_2 = get_balance(&blockchain, &recipient_2);
+    let balance_3 = get_balance(&blockchain, &recipient_3);
 
     assert_eq!(genesis_miner_balance, BLOCK_1_GENESIS_MINER_BALANCE);
     assert_eq!(miner_balance, BLOCK_1_MINER_BALANCE);
@@ -135,11 +135,11 @@ pub fn check_block_2_balances(blockchain: &BlockStorage) {
     let recipient_2 = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[2].address).unwrap();
     let recipient_3 = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[3].address).unwrap();
 
-    let genesis_miner_balance = blockchain.get_balance(&genesis_miner_address);
-    let miner_balance = blockchain.get_balance(&miner_address);
-    let balance_1 = blockchain.get_balance(&recipient_1);
-    let balance_2 = blockchain.get_balance(&recipient_2);
-    let balance_3 = blockchain.get_balance(&recipient_3);
+    let genesis_miner_balance = get_balance(&blockchain, &genesis_miner_address);
+    let miner_balance = get_balance(&blockchain, &miner_address);
+    let balance_1 = get_balance(&blockchain, &recipient_1);
+    let balance_2 = get_balance(&blockchain, &recipient_2);
+    let balance_3 = get_balance(&blockchain, &recipient_3);
 
     assert_eq!(genesis_miner_balance, BLOCK_2_GENESIS_MINER_BALANCE);
     assert_eq!(miner_balance, BLOCK_2_MINER_BALANCE);
@@ -155,11 +155,11 @@ pub fn check_block_3_balances(blockchain: &BlockStorage) {
     let recipient_2 = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[2].address).unwrap();
     let recipient_3 = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[3].address).unwrap();
 
-    let genesis_miner_balance = blockchain.get_balance(&genesis_miner_address);
-    let miner_balance = blockchain.get_balance(&miner_address);
-    let balance_1 = blockchain.get_balance(&recipient_1);
-    let balance_2 = blockchain.get_balance(&recipient_2);
-    let balance_3 = blockchain.get_balance(&recipient_3);
+    let genesis_miner_balance = get_balance(&blockchain, &genesis_miner_address);
+    let miner_balance = get_balance(&blockchain, &miner_address);
+    let balance_1 = get_balance(&blockchain, &recipient_1);
+    let balance_2 = get_balance(&blockchain, &recipient_2);
+    let balance_3 = get_balance(&blockchain, &recipient_3);
 
     assert_eq!(genesis_miner_balance, BLOCK_3_GENESIS_MINER_BALANCE);
     assert_eq!(miner_balance, BLOCK_3_MINER_BALANCE);

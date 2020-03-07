@@ -1,15 +1,20 @@
 use crate::{rpc_types::*, RpcFunctions};
-use snarkos_consensus::{
-    block_reward,
-    check_for_double_spend,
-    check_for_double_spends,
-    miner::MemoryPool,
-    ConsensusParameters,
-};
+use snarkos_consensus::{block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::rpc::RpcError;
 use snarkos_network::{context::Context, server::process_transaction_internal};
 use snarkos_objects::{transaction::*, BlockHeaderHash};
-use snarkos_storage::BlockStorage;
+use snarkos_storage::{
+    transaction::{
+        calculate_transaction_fees,
+        check_for_double_spend,
+        check_for_double_spends,
+        get_balance,
+        get_outpoint,
+        get_spendable_outpoints,
+        get_transaction_bytes,
+    },
+    BlockStorage,
+};
 
 use chrono::Utc;
 use std::{str::FromStr, sync::Arc};
@@ -59,7 +64,7 @@ impl RpcFunctions for RpcImpl {
     fn get_balance(&self, address_string: String) -> Result<u64, RpcError> {
         let address = BitcoinAddress::<Mainnet>::from_str(&address_string)?;
 
-        Ok(self.storage.get_balance(&address))
+        Ok(get_balance(&self.storage, &address))
     }
 
     /// Returns all stored information on a block hash.
@@ -122,7 +127,7 @@ impl RpcFunctions for RpcImpl {
         let address = BitcoinAddress::<Mainnet>::from_str(&address_string)?;
 
         let mut result = vec![];
-        for (outpoint, _balance) in self.storage.get_spendable_outpoints(&address) {
+        for (outpoint, _balance) in get_spendable_outpoints(&self.storage, &address) {
             let utxo = (hex::encode(outpoint.transaction_id), outpoint.index);
 
             result.push(utxo);
@@ -134,10 +139,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         Ok(hex::encode(
-            &self
-                .storage
-                .get_transaction_bytes(&hex::decode(transaction_id)?)?
-                .serialize()?,
+            &get_transaction_bytes(&self.storage, &hex::decode(transaction_id)?)?.serialize()?,
         ))
     }
 
@@ -212,10 +214,11 @@ impl RpcFunctions for RpcImpl {
 
         for input in transaction.parameters.inputs.clone() {
             if !input.outpoint.is_coinbase() && input.outpoint.script_pub_key.is_none() {
-                transaction = transaction.update_outpoint(
-                    self.storage
-                        .get_outpoint(&input.outpoint.transaction_id, input.outpoint.index as usize)?,
-                );
+                transaction = transaction.update_outpoint(get_outpoint(
+                    &self.storage,
+                    &input.outpoint.transaction_id,
+                    input.outpoint.index as usize,
+                )?);
             }
         }
 
@@ -286,7 +289,7 @@ impl RpcFunctions for RpcImpl {
         let mut transaction_strings = vec![];
 
         let coinbase_value =
-            block_reward(block_height + 1) + self.storage.calculate_transaction_fees(&full_transactions)?;
+            block_reward(block_height + 1) + calculate_transaction_fees(&self.storage, &full_transactions)?;
 
         for transaction in full_transactions.iter() {
             transaction_strings.push(hex::encode(transaction.serialize()?));
@@ -318,8 +321,7 @@ mod tests {
     use jsonrpc_test as json_test;
     use jsonrpc_test::Rpc;
     use serde_json::Value;
-    use std::collections::HashMap;
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     pub const GENESIS_BLOCK_JSON: &'static str = "{\n  \"confirmations\": 0,\n  \"hash\": \"3a8a5db71a2e00007b47cac0c43e5b96ca6f0107dd98ab568ac51b829856a46a\",\n  \"height\": 0,\n  \"merkle_root\": \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\",\n  \"next_block_hash\": \"This is the latest block\",\n  \"nonce\": 121136,\n  \"previous_block_hash\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"size\": 166,\n  \"transactions\": [\n    \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\"\n  ]\n}";
     pub const GENESIS_UNSPENT: &'static str =

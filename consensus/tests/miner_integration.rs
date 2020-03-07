@@ -11,7 +11,7 @@ mod miner_integration {
         TransactionParameters,
         Transactions,
     };
-    use snarkos_storage::BlockStorage;
+    use snarkos_storage::{transaction::get_balance, BlockStorage};
 
     use futures_await_test::async_test;
     use std::{str::FromStr, sync::Arc};
@@ -27,7 +27,7 @@ mod miner_integration {
 
         let previous_block = &blockchain.get_latest_block().unwrap();
         let tx_to_spend = &previous_block.clone().transactions[0];
-        let starting_balance = blockchain.get_balance(&genesis_miner_address);
+        let starting_balance = get_balance(blockchain, &genesis_miner_address);
 
         let input = TransactionInput::new(
             tx_to_spend.to_transaction_id().unwrap(),
@@ -71,7 +71,7 @@ mod miner_integration {
         let input_1 =
             TransactionInput::new(tx_to_spend.to_transaction_id().unwrap(), 0, Some(recipient_1.clone())).unwrap();
         let output_1 =
-            TransactionOutput::new(&recipient_3, blockchain.get_balance(&recipient_1) - STANDARD_TX_FEE).unwrap();
+            TransactionOutput::new(&recipient_3, get_balance(blockchain, &recipient_1) - STANDARD_TX_FEE).unwrap();
 
         let transaction_parameters_1 = TransactionParameters {
             version: 1,
@@ -87,7 +87,7 @@ mod miner_integration {
         let input_2 =
             TransactionInput::new(tx_to_spend.to_transaction_id().unwrap(), 1, Some(recipient_2.clone())).unwrap();
         let output_2 =
-            TransactionOutput::new(&recipient_3, blockchain.get_balance(&recipient_2) - STANDARD_TX_FEE).unwrap();
+            TransactionOutput::new(&recipient_3, get_balance(blockchain, &recipient_2) - STANDARD_TX_FEE).unwrap();
 
         let transaction_parameters_2 = TransactionParameters {
             version: 1,
@@ -179,7 +179,7 @@ mod miner_integration {
 
         let previous_block = &blockchain.get_latest_block().unwrap();
         let tx_to_spend = &previous_block.clone().transactions[0];
-        let starting_balance = blockchain.get_balance(&genesis_miner_address);
+        let starting_balance = get_balance(&blockchain, &genesis_miner_address);
         let tx_fee = 10000;
 
         let input = TransactionInput::new(
@@ -202,6 +202,7 @@ mod miner_integration {
             inputs: vec![input.clone()],
             outputs: output_2,
         };
+        println!("1");
 
         let transaction_1 = Transaction::new(&transaction_parameters_1).unwrap();
         let transaction_2 = Transaction::new(&transaction_parameters_2).unwrap();
@@ -211,6 +212,7 @@ mod miner_integration {
         let signed_transaction_2 = transaction_2
             .sign(&BitcoinPrivateKey::<N>::from_str(TEST_WALLETS[0].private_key).unwrap())
             .unwrap();
+        println!("2");
 
         assert!(
             miner
@@ -222,6 +224,7 @@ mod miner_integration {
                 .is_err()
         );
 
+        println!("3");
         let (parent_header, transactions) = miner
             .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1.clone()]))
             .await
@@ -235,6 +238,7 @@ mod miner_integration {
             header,
             transactions: Transactions::from(&[signed_transaction_1.clone(), signed_transaction_2.clone()]),
         };
+        println!("4");
 
         assert!(
             miner
@@ -242,22 +246,26 @@ mod miner_integration {
                 .process_block(&mut blockchain, &mut memory_pool, &invalid_block)
                 .is_err()
         );
+        println!("4");
         miner
             .consensus
             .process_block(&mut blockchain, &mut memory_pool, &new_block_1)
             .unwrap();
+        println!("5");
         assert!(
             miner
                 .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1]))
                 .await
                 .is_err()
         );
+        println!("6");
         assert!(
             miner
                 .establish_block(&blockchain, &Transactions::from(&[signed_transaction_2]))
                 .await
                 .is_err()
         );
+        println!("7");
 
         kill_storage_sync(blockchain, path);
     }

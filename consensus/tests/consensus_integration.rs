@@ -1,10 +1,10 @@
 mod consensus_integration {
     use snarkos_consensus::{
-        check_block_transactions,
         miner::{MemoryPool, Miner},
         test_data::*,
     };
     use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transaction, Transactions};
+    use snarkos_storage::transaction::check_block_transactions;
 
     use std::str::FromStr;
     use wagyu_bitcoin::{BitcoinAddress, Mainnet};

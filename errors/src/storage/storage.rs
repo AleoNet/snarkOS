@@ -1,14 +1,9 @@
-use crate::objects::{BlockError, TransactionError};
-
 use bincode;
 use rocksdb;
 use std::fmt::Debug;
 
 #[derive(Debug, Fail)]
 pub enum StorageError {
-    #[fail(display = "{}", _0)]
-    BlockError(BlockError),
-
     #[fail(display = "block already exists {:?}", _0)]
     BlockExists([u8; 32]),
 
@@ -36,9 +31,6 @@ pub enum StorageError {
     #[fail(display = "invalid next block: latest hash: {:?} parent: {:?} ", _0, _1)]
     InvalidNextBlock(String, String),
 
-    #[fail(display = "missing outpoint with transaction with id {} and index {}", _0, _1)]
-    InvalidOutpoint(String, usize),
-
     #[fail(display = "invalid block with parent hash {}", _0)]
     InvalidParentHash(String),
 
@@ -62,23 +54,7 @@ pub enum StorageError {
 
     #[fail(display = "Null Error {:?}", _0)]
     NullError(()),
-
-    #[fail(display = "{}", _0)]
-    TransactionError(TransactionError),
 }
-
-impl From<BlockError> for StorageError {
-    fn from(error: BlockError) -> Self {
-        StorageError::BlockError(error)
-    }
-}
-
-impl From<TransactionError> for StorageError {
-    fn from(error: TransactionError) -> Self {
-        StorageError::TransactionError(error)
-    }
-}
-
 impl From<bincode::Error> for StorageError {
     fn from(error: bincode::Error) -> Self {
         StorageError::Crate("bincode", format!("{:?}", error))

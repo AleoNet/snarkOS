@@ -2,10 +2,12 @@
 //!
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
-use crate::{check_for_double_spend, check_for_double_spends};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{transaction::Transaction, Outpoint, Transactions};
-use snarkos_storage::BlockStorage;
+use snarkos_storage::{
+    transaction::{check_for_double_spend, check_for_double_spends},
+    BlockStorage,
+};
 
 use std::collections::HashMap;
 

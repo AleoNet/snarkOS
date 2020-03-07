@@ -1,4 +1,4 @@
-use crate::objects::TransactionError;
+use crate::{objects::TransactionError, storage::StorageError};
 
 #[derive(Debug, Fail)]
 pub enum BlockError {
@@ -10,6 +10,9 @@ pub enum BlockError {
 
     #[fail(display = "{}", _0)]
     TransactionError(TransactionError),
+
+    #[fail(display = "{}", _0)]
+    StorageError(StorageError),
 }
 
 impl From<TransactionError> for BlockError {
@@ -21,5 +24,11 @@ impl From<TransactionError> for BlockError {
 impl From<BlockError> for Box<dyn std::error::Error> {
     fn from(error: BlockError) -> Self {
         error.into()
+    }
+}
+
+impl From<StorageError> for BlockError {
+    fn from(error: StorageError) -> Self {
+        BlockError::StorageError(error)
     }
 }
