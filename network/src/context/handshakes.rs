@@ -10,19 +10,22 @@ use snarkos_errors::network::HandshakeError;
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::TcpStream;
 
+/// Stores the address and latest state of peers we are handshaking with.
 #[derive(Clone, Debug)]
 pub struct Handshakes {
-    pub addresses: HashMap<SocketAddr, Handshake>,
+    addresses: HashMap<SocketAddr, Handshake>,
 }
 
 impl Handshakes {
+    /// Construct a new store of connected peer `Handshakes`.
     pub fn new() -> Self {
         Self {
             addresses: HashMap::default(),
         }
     }
 
-    /// Send a handshake request to a peer. Store the result upon success.
+    /// Create a new handshake with a peer and send a handshake request to them.
+    /// If the request is sent successfully, the handshake is stored and returned.
     pub async fn send_request(
         &mut self,
         version: u64,
@@ -38,8 +41,17 @@ impl Handshakes {
         Ok(handshake)
     }
 
-    /// Receive a handshake request from a new peer. Send response and store the result upon success.
-    pub async fn receive_request_new(
+    /// Receive the first message upon accepting a peer connection.
+    /// If the message is a Version:
+    ///     1. Create a new handshake.
+    ///     2. Send a handshake response.
+    ///     3. If the response is sent successfully, store and return the handshake.
+    /// If the message is a Verack:
+    ///     1. Get the existing handshake.
+    ///     2. Mark the handshake as accepted.
+    ///     3. Send a request for peers.
+    ///     4. Return the accepted handshake.
+    pub async fn receive_any(
         &mut self,
         version: u64,
         height: u32,
@@ -83,7 +95,9 @@ impl Handshakes {
         }
     }
 
-    /// Receive a handshake request from an existing peer. Send response.
+    /// Receive a handshake request from a connected peer.
+    /// Update the handshake channel address if needed.
+    /// Send a handshake response.
     pub async fn receive_request(
         &mut self,
         message: Version,
@@ -91,15 +105,16 @@ impl Handshakes {
     ) -> Result<(), HandshakeError> {
         match self.get_mut(&address_receiver) {
             Some(stored_handshake) => {
+                stored_handshake.update_address(address_receiver);
                 stored_handshake.receive(message).await?;
+
                 Ok(())
             }
             None => Err(HandshakeError::HandshakeMissing(address_receiver)),
         }
     }
 
-    /// Accept a handshake response from a peer that has received our handshake request.
-    /// Update the stored handshake status upon success.
+    /// Accept a handshake response from a connected peer.
     pub async fn accept_response(&mut self, address: SocketAddr, message: Verack) -> Result<(), HandshakeError> {
         match self.get_mut(&address) {
             Some(stored_handshake) => {
@@ -111,20 +126,17 @@ impl Handshakes {
         }
     }
 
-    /// Gets the state of a handshake with a peer
+    /// Returns the state of the handshake at a peer address.
     pub fn get_state(&self, address: SocketAddr) -> Option<HandshakeState> {
         match self.addresses.get(&address) {
-            Some(stored_handshake) => Some(stored_handshake.state.clone()),
+            Some(stored_handshake) => Some(stored_handshake.get_state()),
             None => None,
         }
     }
 
+    /// Returns a mutable reference to the handshake at a peer address.
     fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut Handshake> {
         self.addresses.get_mut(&address)
-    }
-
-    pub fn remove(&mut self, address: &SocketAddr) -> Option<Handshake> {
-        self.addresses.remove(address)
     }
 }
 
@@ -197,7 +209,7 @@ mod tests {
 
         let mut peer_handshakes = Handshakes::new();
         let peer_hand = peer_handshakes
-            .receive_request_new(1u64, 0u32, peer_address, server_address, reader)
+            .receive_any(1u64, 0u32, peer_address, server_address, reader)
             .await
             .unwrap();
 

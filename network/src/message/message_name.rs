@@ -3,6 +3,7 @@ use snarkos_errors::network::message::MessageNameError;
 
 use std::{fmt, str};
 
+/// A fixed size message name.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct MessageName(HASH96);
 

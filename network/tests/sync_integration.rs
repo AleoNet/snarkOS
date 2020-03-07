@@ -28,8 +28,7 @@ mod sync_integration {
             // 1. Push hash to sync handler, set syncing to true
 
             let mut sync_handler = SyncHandler::new(bootnode_address);
-            sync_handler.block_headers.push(block_hash.clone());
-            sync_handler.update_syncing(1);
+            sync_handler.receive_hashes(vec![block_hash.clone()], 1);
 
             // 2. Call increment_sync_handler internally
 

@@ -5,8 +5,11 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use rand::Rng;
 use std::io::Cursor;
 
+/// A ping protocol request for a Pong.
+/// See network/protocol/ping_protocol.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Ping {
+    /// Unique ping protocol identifier
     pub nonce: u64,
 }
 

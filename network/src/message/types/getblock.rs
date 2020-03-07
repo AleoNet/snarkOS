@@ -2,10 +2,11 @@ use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
-/// One of our peers has found a new block
+/// A request for a block with the specified hash.
+/// See network/protocol/sync.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct GetBlock {
-    /// block data
+    /// Header hash of requested block
     pub block_hash: BlockHeaderHash,
 }
 

@@ -1,6 +1,7 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
+/// A request for a peer's connected peer addresses.
 #[derive(Debug, PartialEq, Clone)]
 pub struct GetPeers;
 

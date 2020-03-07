@@ -12,29 +12,35 @@ use snarkos_objects::{transaction::*, BlockHeaderHash};
 use snarkos_storage::BlockStorage;
 
 use chrono::Utc;
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
 use wagyu_bitcoin::{BitcoinAddress, BitcoinPrivateKey, Mainnet};
 
+/// Implements JSON-RPC HTTP endpoint functions for a node.
+/// The constructor is given Arc::clone() copies of all needed node components.
 pub struct RpcImpl {
-    pub storage: Arc<BlockStorage>,
-    pub rpc_server: SocketAddr,
-    pub server_context: Arc<Context>,
-    pub consensus: ConsensusParameters,
-    pub memory_pool_lock: Arc<Mutex<MemoryPool>>,
+    /// Blockchain database storage.
+    storage: Arc<BlockStorage>,
+
+    /// Network context held by the server.
+    server_context: Arc<Context>,
+
+    /// Consensus parameters generated from node config.
+    consensus: ConsensusParameters,
+
+    /// Handle to access the memory pool of transactions.
+    memory_pool_lock: Arc<Mutex<MemoryPool>>,
 }
 
 impl RpcImpl {
     pub fn new(
         storage: Arc<BlockStorage>,
-        rpc_server: SocketAddr,
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool>>,
     ) -> Self {
         Self {
             storage,
-            rpc_server,
             server_context,
             consensus,
             memory_pool_lock,
@@ -43,16 +49,20 @@ impl RpcImpl {
 }
 
 impl RpcFunctions for RpcImpl {
+    /// Dummy function for smoke testing.
     fn add(&self, a: u64, b: u64) -> Result<u64, RpcError> {
+        // TODO: REMOVE IN PRODUCTION
         Ok(a + b)
     }
 
+    /// Returns the total amount of currency in the spendable outpoints held by the address.
     fn get_balance(&self, address_string: String) -> Result<u64, RpcError> {
         let address = BitcoinAddress::<Mainnet>::from_str(&address_string)?;
 
         Ok(self.storage.get_balance(&address))
     }
 
+    /// Returns all stored information on a block hash.
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
         let block_hash = hex::decode(&block_hash_string)?;
         assert_eq!(block_hash.len(), 32);
@@ -88,22 +98,26 @@ impl RpcFunctions for RpcImpl {
         }
     }
 
+    /// Returns latest block height + 1 to account for genesis block 0.
     fn get_block_count(&self) -> Result<u32, RpcError> {
         Ok(self.storage.get_block_count())
     }
 
+    /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
         let best_block_hash = self.storage.get_block_hash(self.storage.get_latest_block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
     }
 
+    /// Returns the block hash of the index specified if it exists in the canonical chain.
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
         let block_hash = self.storage.get_block_hash(block_height)?;
 
         Ok(hex::encode(&block_hash.0))
     }
 
+    /// Returns unspent transaction outpoints owned by and address.
     fn list_unspent(&self, address_string: String) -> Result<Vec<(String, u32)>, RpcError> {
         let address = BitcoinAddress::<Mainnet>::from_str(&address_string)?;
 
@@ -117,6 +131,7 @@ impl RpcFunctions for RpcImpl {
         Ok(result)
     }
 
+    /// Returns hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         Ok(hex::encode(
             &self
@@ -126,6 +141,7 @@ impl RpcFunctions for RpcImpl {
         ))
     }
 
+    /// Returns hex encoded bytes of a transaction from transaction inputs and outputs.
     fn create_raw_transaction(
         &self,
         inputs: Vec<RPCTransactionOutpoint>,
@@ -155,6 +171,7 @@ impl RpcFunctions for RpcImpl {
         Ok(raw_transaction_bytes)
     }
 
+    /// Returns information about a transaction from serialized bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
         let transaction = Transaction::from_str(&transaction_bytes)?;
 
@@ -185,6 +202,7 @@ impl RpcFunctions for RpcImpl {
         })
     }
 
+    /// Returns hex encoded bytes of a transaction that is signed given private keys.
     fn sign_raw_transaction(
         &self,
         unsigned_transaction_bytes: String,
@@ -209,6 +227,9 @@ impl RpcFunctions for RpcImpl {
         Ok(hex::encode(transaction.serialize()?))
     }
 
+    /// Send raw transaction bytes to this node to be added into the mempool.
+    /// If valid, the transaction will be stored and propagated to all peers.
+    /// Returns the transaction id if valid.
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction = Transaction::from_str(&transaction_bytes)?;
 
@@ -219,7 +240,7 @@ impl RpcFunctions for RpcImpl {
                     self.storage.clone(),
                     self.memory_pool_lock.clone(),
                     transaction.serialize()?,
-                    self.server_context.local_addr,
+                    self.server_context.local_address,
                 ))?;
 
                 Ok(hex::encode(transaction.to_transaction_id()?))
@@ -228,26 +249,29 @@ impl RpcFunctions for RpcImpl {
         }
     }
 
+    /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
         let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
 
-        Ok(peer_book.peers.addresses.len())
+        Ok(peer_book.connected_total() as usize)
     }
 
+    /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
         let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
 
         let mut peers = vec![];
 
-        for (peer, _last_seen) in &peer_book.peers.addresses {
+        for (peer, _last_seen) in &peer_book.get_connected() {
             peers.push(peer.clone());
         }
 
         Ok(PeerInfo { peers })
     }
 
+    /// Returns the current mempool and consensus information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         let block_height = self.storage.get_latest_block_height();
         let block = self.storage.get_block_from_block_num(block_height)?;
@@ -294,7 +318,7 @@ mod tests {
     use jsonrpc_test as json_test;
     use jsonrpc_test::Rpc;
     use serde_json::Value;
-    use std::collections::HashMap;
+    use std::{collections::HashMap, net::SocketAddr};
 
     pub const GENESIS_BLOCK_JSON: &'static str = "{\n  \"confirmations\": 0,\n  \"hash\": \"3a8a5db71a2e00007b47cac0c43e5b96ca6f0107dd98ab568ac51b829856a46a\",\n  \"height\": 0,\n  \"merkle_root\": \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\",\n  \"next_block_hash\": \"This is the latest block\",\n  \"nonce\": 121136,\n  \"previous_block_hash\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"size\": 166,\n  \"transactions\": [\n    \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\"\n  ]\n}";
     pub const GENESIS_UNSPENT: &'static str =
@@ -310,7 +334,6 @@ mod tests {
     fn initialize_test_rpc(storage: Arc<BlockStorage>) -> Rpc {
         let bootnode_address = random_socket_address();
         let server_address = random_socket_address();
-        let rpc_addr = "127.0.0.1:3030".parse::<SocketAddr>().unwrap();
 
         let server = initialize_test_server(
             server_address,
@@ -322,14 +345,7 @@ mod tests {
         let consensus = TEST_CONSENSUS;
 
         json_test::Rpc::new(
-            RpcImpl::new(
-                storage,
-                rpc_addr,
-                server.context.clone(),
-                consensus,
-                server.memory_pool_lock,
-            )
-            .to_delegate(),
+            RpcImpl::new(storage, server.context.clone(), consensus, server.memory_pool_lock).to_delegate(),
         )
     }
 

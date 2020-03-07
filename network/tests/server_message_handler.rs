@@ -353,10 +353,10 @@ mod server_message_handler {
 
             // 1. Start peer and server
 
-            simulate_active_node(peer_address).await;
+            simulate_active_node(bootnode_address).await;
             start_test_server(server);
 
-            // 2. Send Peers message to server with new peer address
+            // 2. Send Peers message to server with new peer address form bootnode
 
             let mut addresses = HashMap::<SocketAddr, DateTime<Utc>>::new();
             addresses.insert(peer_address, Utc::now());
@@ -368,7 +368,7 @@ mod server_message_handler {
                         tx,
                         Peers::name(),
                         Peers::new(addresses).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -377,15 +377,7 @@ mod server_message_handler {
 
             // 3. Check that new peer address was added correctly
 
-            assert!(
-                server_context
-                    .peer_book
-                    .read()
-                    .await
-                    .gossiped
-                    .addresses
-                    .contains_key(&peer_address)
-            );
+            assert!(server_context.peer_book.read().await.gossiped_contains(&peer_address));
         });
 
         drop(rt);
@@ -484,7 +476,7 @@ mod server_message_handler {
             // 3. Check that server updated peer
 
             let peer_book = context.peer_book.read().await;
-            assert!(!peer_book.peer_contains(&peer_address));
+            assert!(!peer_book.connected_contains(&peer_address));
         });
 
         drop(rt);
@@ -557,7 +549,7 @@ mod server_message_handler {
             let peer_book = context.peer_book.read().await;
 
             assert_eq!(PingState::Rejected, pings.get_state(peer_address).unwrap());
-            assert!(!peer_book.peer_contains(&peer_address));
+            assert!(!peer_book.connected_contains(&peer_address));
         });
 
         drop(rt);
@@ -632,7 +624,7 @@ mod server_message_handler {
             let peer_book = context.peer_book.read().await;
 
             assert_eq!(PingState::Accepted, pings.get_state(peer_address).unwrap());
-            assert!(peer_book.peer_contains(&peer_address));
+            assert!(peer_book.connected_contains(&peer_address));
         });
 
         drop(rt);

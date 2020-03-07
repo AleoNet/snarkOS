@@ -4,6 +4,7 @@ use snarkos_errors::network::message::MessageHeaderError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
+/// A fixed size message corresponding to a variable sized message.
 #[derive(Debug, PartialEq, Eq)]
 pub struct MessageHeader {
     pub name: MessageName,

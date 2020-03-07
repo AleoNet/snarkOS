@@ -116,7 +116,7 @@ mod server_listen {
 
             let mut bootnode_handshakes = Handshakes::new();
             let mut bootnode_hand = bootnode_handshakes
-                .receive_request_new(1u64, 1u32, bootnode_address, server_address, reader)
+                .receive_any(1u64, 1u32, bootnode_address, server_address, reader)
                 .await
                 .unwrap();
 
@@ -143,4 +143,57 @@ mod server_listen {
         drop(rt);
         kill_storage_async(path);
     }
+    //
+    //
+    // #[test]
+    // #[serial]
+    // fn test_max_peers() {
+    //     let (storage, path) = initialize_test_blockchain();
+    //
+    //     let mut rt = Runtime::new().unwrap();
+    //
+    //     rt.block_on(async move {
+    //         let server_address = random_socket_address();
+    //         let bootnode_address = random_socket_address();
+    //
+    //         // Maximum peers is initialized to 10.
+    //         let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+    //
+    //         let context = server.context.clone();
+    //
+    //         // Add 10 connected peers.
+    //         let mut peer_book = context.peer_book.write().await;
+    //
+    //         for _x in 0..10 {
+    //             peer_book.add_connected(random_socket_address());
+    //         }
+    //
+    //         assert_eq!(peer_book.connected_total(), context.max_peers);
+    //
+    //         rt.spawn(async move {
+    //             server.listen().await.unwrap()
+    //         });
+    //
+    //         sleep(100).await;
+    //
+    //         let (tx, rx) = oneshot::channel();
+    //         tokio::spawn(async move {
+    //             // Should fail
+    //             let mut stream = TcpStream::connect(server_address).await.unwrap();
+    //             println!("connected");
+    //             sleep(2000).await;
+    //
+    //             stream.read(&mut vec![1u8; 1]).await.unwrap();
+    //
+    //             // println!("writing");
+    //             // assert_err!(stream.write_all(&Ping::new().serialize().unwrap()).await);
+    //             // assert_err!();
+    //             tx.send(()).unwrap();
+    //         });
+    //         rx.await.unwrap()
+    //     });
+    //
+    //     drop(rt);
+    //     kill_storage_async(path);
+    // }
 }

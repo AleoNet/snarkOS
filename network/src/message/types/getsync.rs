@@ -2,7 +2,8 @@ use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
-/// Request blocks from sync node
+/// A request for knowledge of specified block locator hashes.
+/// See network/protocol/sync.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct GetSync {
     /// hashes of blocks requested

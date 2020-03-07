@@ -9,22 +9,24 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
+/// Compiles transactions into blocks to be submitted to the network.
+/// Uses a proof of work based algorithm to find valid blocks.
 #[derive(Clone)]
 pub struct Miner {
-    // receiving address that block rewards will be sent to
+    /// Receiving address that block rewards will be sent to.
     address: BitcoinAddress<Mainnet>,
 
-    // parameters for current blockchain consensus
+    /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
 }
 
 impl Miner {
-    /// Returns a new instance of a miner with consensus params
+    /// Returns a new instance of a miner with consensus params.
     pub fn new(address: BitcoinAddress<Mainnet>, consensus: ConsensusParameters) -> Self {
         Self { address, consensus }
     }
 
-    /// Fetches new transactions from the memory pool
+    /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions(
         storage: &Arc<BlockStorage>,
         memory_pool: &Arc<Mutex<MemoryPool>>,
@@ -52,7 +54,7 @@ impl Miner {
         Ok(())
     }
 
-    /// Acquires the storage lock and returns the previous block header and verified transactions
+    /// Acquires the storage lock and returns the previous block header and verified transactions.
     pub async fn establish_block(
         &self,
         storage: &Arc<BlockStorage>,
@@ -67,7 +69,8 @@ impl Miner {
         Ok((previous_block_header, transactions))
     }
 
-    /// Run proof of work to find block. Returns BlockHeader with nonce solution
+    /// Run proof of work to find block.
+    /// Returns BlockHeader with nonce solution.
     pub fn find_block(
         &self,
         transactions: &Transactions,
@@ -100,7 +103,8 @@ impl Miner {
         }
     }
 
-    /// Mines the next block
+    /// Returns a mined block.
+    /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
     pub async fn mine_block(
         &self,
         storage: &Arc<BlockStorage>,

@@ -4,8 +4,10 @@ use snarkos_errors::network::message::MessageError;
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
 
+/// A response to a GetPeers request.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Peers {
+    /// A list of gossiped peer addresses and their last seen dates
     pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }
 

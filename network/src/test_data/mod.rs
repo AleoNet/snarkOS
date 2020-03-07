@@ -1,11 +1,4 @@
-use crate::{
-    context::Context,
-    message::{types::Version, Channel},
-    protocol::SyncHandler,
-    server::Server,
-    Handshake,
-    Message,
-};
+use crate::{context::Context, message::Channel, protocol::SyncHandler, server::Server};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
@@ -13,19 +6,10 @@ use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::Mutex};
 
-pub const ALEO_PORT: &'static str = "4130";
 pub const LOCALHOST: &'static str = "127.0.0.1:";
-pub const LOCALHOST_PEER: &'static str = "127.0.0.2:";
-pub const LOCALHOST_BOOTNODE: &'static str = "127.0.0.3:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
 pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
-
-/// Returns a socket address from the aleo server port on localhost
-pub fn aleo_socket_address() -> SocketAddr {
-    let string = format!("{}{}", LOCALHOST, ALEO_PORT);
-    string.parse::<SocketAddr>().unwrap()
-}
 
 /// Returns a random tcp socket address
 pub fn random_socket_address() -> SocketAddr {
@@ -82,31 +66,6 @@ pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> 
     let channel = Channel::new_read_only(reader).unwrap();
 
     channel.update_writer(address).await.unwrap()
-}
-
-pub async fn do_handshake_get_channel(peer_address: SocketAddr, server_address: SocketAddr) -> Arc<Channel> {
-    // Simulate message handler
-    let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
-    let (reader, _peer) = peer_listener.accept().await.unwrap();
-
-    // Simulate Handshakes
-    let channel = Channel::new_read_only(reader).unwrap();
-    let (name, bytes) = channel.read().await.unwrap();
-    assert_eq!(Version::name(), name);
-
-    // Get final handshake with server
-    let handshake = Handshake::receive_new(
-        1u64,
-        0u32,
-        channel,
-        Version::deserialize(bytes).unwrap(),
-        server_address,
-    )
-    .await
-    .unwrap();
-
-    // return Arc::clone() of channel
-    handshake.channel.clone()
 }
 
 /// Starts a fake node that accepts all tcp connections at the given socket address

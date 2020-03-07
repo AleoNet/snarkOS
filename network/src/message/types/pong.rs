@@ -4,8 +4,11 @@ use snarkos_errors::network::message::MessageError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
+/// A response to a Ping request.
+/// See network/protocol/ping_protocol.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pong {
+    /// Unique ping protocol identifier
     pub nonce: u64,
 }
 

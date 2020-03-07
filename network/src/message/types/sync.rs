@@ -2,10 +2,11 @@ use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
-/// Vector of block hashes from a sync node
+/// A response to a GetSync message.
+/// See network/protocol/sync.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Sync {
-    /// hashes of blocks to share
+    /// Known hashes of blocks to share
     pub block_hashes: Vec<BlockHeaderHash>,
 }
 

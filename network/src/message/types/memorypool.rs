@@ -1,8 +1,10 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
+/// A response to a GetMemoryPool request.
 #[derive(Debug, PartialEq, Clone)]
 pub struct MemoryPool {
+    /// Vector of memory pool transactions
     pub transactions: Vec<Vec<u8>>,
 }
 
