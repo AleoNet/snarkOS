@@ -1,5 +1,5 @@
 use crate::{commitment::PedersenCommitmentParameters, crh::PedersenSize};
-use snarkos_errors::algorithms::{CryptoError, CommitmentError};
+use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{AffineCurve, Group, PrimeField, ProjectiveCurve},
@@ -46,7 +46,7 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
 
 impl<G: Group + ProjectiveCurve, S: PedersenSize> PedersenCommitment<G, S> {
     /// Returns the affine x-coordinate of a given commitment.
-    fn compress(output: G) -> Result<<G::Affine as AffineCurve>::BaseField, CryptoError> {
+    fn compress(output: G) -> Result<<G::Affine as AffineCurve>::BaseField, CommitmentError> {
         let affine = output.into_affine();
         debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
         Ok(affine.to_x_coordinate())
