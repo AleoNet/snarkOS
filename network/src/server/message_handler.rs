@@ -75,7 +75,7 @@ impl Server {
         let block = BlockStruct::deserialize(&message.data)?;
 
         // Verify the block and insert it into the storage
-        if !self.storage.is_exist(&block.header.get_hash()) {
+        if !self.storage.block_hash_exists(&block.header.get_hash()) {
             let mut memory_pool = self.memory_pool_lock.lock().await;
             let inserted = self
                 .consensus
@@ -103,7 +103,7 @@ impl Server {
 
     /// A peer has requested a block.
     async fn receive_get_block(&mut self, message: GetBlock, channel: Arc<Channel>) -> Result<(), ServerError> {
-        if let Ok(block) = self.storage.get_block(message.block_hash) {
+        if let Ok(block) = self.storage.get_block(&message.block_hash) {
             channel.write(&SyncBlock::new(block.serialize()?)).await?;
         }
 

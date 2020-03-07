@@ -53,7 +53,7 @@ mod server_message_handler {
 
             let block = BlockStruct::deserialize(&hex::decode(BLOCK_1).unwrap()).unwrap();
 
-            assert!(storage_ref.is_exist(&block.header.get_hash()));
+            assert!(storage_ref.block_hash_exists(&block.header.get_hash()));
         });
 
         drop(rt);
@@ -675,7 +675,7 @@ mod server_message_handler {
             // 3. Check that server inserted block into storage
 
             let block = BlockStruct::deserialize(&block_bytes).unwrap();
-            assert!(storage_ref.is_exist(&block.header.get_hash()));
+            assert!(storage_ref.block_hash_exists(&block.header.get_hash()));
         });
 
         drop(rt);

@@ -175,7 +175,7 @@ impl ConsensusParameters {
         // 4. Check cached blocks to insert/canonize
         if let Ok(child_header_hash) = storage.find_child_block(&block.header.get_hash()) {
             // There exists a cached child block that we can add to our chain
-            if let Ok(child_block) = storage.get_block(child_header_hash) {
+            if let Ok(child_block) = storage.get_block(&child_header_hash) {
                 // process it
                 num_canonized += self.process_block(&storage, memory_pool, &child_block)?;
                 info!("1 new block accepted from cache");
@@ -199,7 +199,7 @@ impl ConsensusParameters {
         }
 
         // Block is an unknown orphan
-        if !storage.is_previous_block_exist(block) && !storage.is_previous_block_canon(block) {
+        if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(block) {
             if Self::is_genesis(&block) && storage.is_empty() {
                 self.process_block(&storage, memory_pool, &block)?;
             } else {
@@ -217,7 +217,7 @@ impl ConsensusParameters {
                         storage.revert_for_fork(&side_chain_path)?;
 
                         if !side_chain_path.path.is_empty() {
-                            let parent_block = storage.get_block(side_chain_path.path[0].clone())?;
+                            let parent_block = storage.get_block(&side_chain_path.path[0].clone())?;
                             let num_canonized = self.process_block(&storage, memory_pool, &parent_block)?;
                             assert_eq!(side_chain_path.path.len(), num_canonized as usize);
                         }

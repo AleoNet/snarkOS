@@ -1,7 +1,6 @@
 use crate::{
     bytes_to_u32,
     transaction::get_transaction_bytes,
-    BlockPath,
     Key,
     KeyValue,
     SideChainPath,
@@ -14,7 +13,7 @@ use crate::{
     NUM_COLS,
 };
 use snarkos_errors::{storage::StorageError, unwrap_option_or_continue, unwrap_option_or_error};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, Transactions};
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 
 use parking_lot::RwLock;
 use std::{
@@ -100,37 +99,26 @@ impl BlockStorage {
         }
     }
 
-    // TRANSACTION GET METHODS =====================================================================
+    // KEY VALUE GETTERS ===========================================================================
 
-    /// Get a transaction given the transaction id
-    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Option<TransactionValue> {
-        match self.get(&Key::Transactions(transaction_id.clone())) {
-            Ok(value) => match value.transactions() {
-                Some(transaction_value) => Some(transaction_value),
-                None => None,
-            },
-            Err(_) => None,
-        }
+    /// Get the stored memory pool transactions
+    pub fn get_memory_pool_transactions(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        Ok(self.get(&Key::Meta(KEY_MEMORY_POOL))?.meta())
     }
 
-    pub fn get_transaction_meta(&self, transaction_id: &Vec<u8>) -> Result<TransactionMeta, StorageError> {
-        Ok(unwrap_option_or_error!(
-            self.get(&Key::TransactionMeta(transaction_id.clone()))?.transaction_meta();
-            StorageError::InvalidTransactionMeta(hex::encode(&transaction_id))
-        ))
+    /// Store the memory pool transactions
+    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+        self.storage
+            .insert(KeyValue::Meta(KEY_MEMORY_POOL, transactions_serialized))
     }
-
-    // BLOCK HEADER GET METHODS ====================================================================
 
     /// Get a block header given the block hash
-    pub fn get_block_header(&self, block_hash: BlockHeaderHash) -> Result<BlockHeader, StorageError> {
+    pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockHeaders(block_hash.clone()))?.block_header();
             StorageError::MissingValue(block_hash.to_string())
         ))
     }
-
-    // BLOCK HEADER HASH GET METHODS ===============================================================
 
     /// Get the block hash given a block number
     pub fn get_block_hash(&self, block_num: u32) -> Result<BlockHeaderHash, StorageError> {
@@ -139,66 +127,6 @@ impl BlockStorage {
             StorageError::InvalidBlockNumber(block_num)
         ))
     }
-
-    /// Returns true if the block for the given block header hash exists.
-    pub fn is_exist(&self, block_hash: &BlockHeaderHash) -> bool {
-        //TODO: MOVE
-        if self.is_empty() {
-            return false;
-        }
-
-        match self.get(&Key::BlockHeaders(block_hash.clone())) {
-            Ok(block_header) => block_header.block_header().is_some(),
-            Err(_) => return false,
-        }
-    }
-
-    /// Returns the latest shared block header hash.
-    /// If the block locator hashes are for a side chain, returns the common point of fork.
-    /// If the block locator hashes are for the canon chain, returns the latest block header hash.
-    pub fn get_latest_shared_hash(
-        &self,
-        block_locator_hashes: Vec<BlockHeaderHash>,
-    ) -> Result<BlockHeaderHash, StorageError> {
-        //TODO: MOVE
-        for block_hash in block_locator_hashes {
-            if self.is_canon(&block_hash) {
-                return Ok(block_hash);
-            }
-        }
-
-        self.get_block_hash(0)
-    }
-
-    /// Get the list of block locator hashes (Bitcoin protocol)
-    pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
-        //TODO: MOVE
-        let mut step = 1;
-        let mut index = self.get_latest_block_height();
-        let mut block_locator_hashes = vec![];
-
-        while index > 0 {
-            block_locator_hashes.push(self.get_block_hash(index)?);
-
-            if block_locator_hashes.len() >= 10 {
-                step *= 2;
-            }
-
-            if index < step {
-                if index != 1 {
-                    block_locator_hashes.push(self.get_block_hash(0)?);
-                }
-
-                break;
-            }
-
-            index -= step;
-        }
-
-        Ok(block_locator_hashes)
-    }
-
-    // BLOCK NUMBER GET METHODS ====================================================================
 
     /// Get the block num given a block hash
     pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
@@ -216,39 +144,23 @@ impl BlockStorage {
         ))
     }
 
-    // BLOCK GET METHODS ===========================================================================
-
-    /// Get a block given the block hash
-    pub fn get_block(&self, block_hash: BlockHeaderHash) -> Result<Block, StorageError> {
-        let block_transactions: Vec<Vec<u8>> = unwrap_option_or_error!(
-            self.get(&Key::BlockTransactions(block_hash.clone()))?.block_transaction();
-            StorageError::MissingValue(block_hash.to_string())
-        );
-
-        let mut transactions = vec![];
-        for block_transaction_id in block_transactions {
-            transactions.push(get_transaction_bytes(self, &block_transaction_id).unwrap());
+    /// Get a transaction given the transaction id
+    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Option<TransactionValue> {
+        match self.get(&Key::Transactions(transaction_id.clone())) {
+            Ok(value) => match value.transactions() {
+                Some(transaction_value) => Some(transaction_value),
+                None => None,
+            },
+            Err(_) => None,
         }
-
-        Ok(Block {
-            header: self.get_block_header(block_hash)?,
-            transactions: Transactions::from(&transactions),
-        })
     }
 
-    /// Get a block given the block number
-    pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block, StorageError> {
-        //TODO: MOVE
-        if block_num > self.get_latest_block_height() {
-            return Err(StorageError::InvalidBlockNumber(block_num));
-        }
-
-        let block_hash: BlockHeaderHash = unwrap_option_or_error!(
-            self.get(&Key::BlockHashes(block_num))?.block_hash();
-            StorageError::MissingValue(block_num.to_string())
-        );
-
-        self.get_block(block_hash)
+    /// Get the transaction meta wrapper given the transaction id
+    pub fn get_transaction_meta(&self, transaction_id: &Vec<u8>) -> Result<TransactionMeta, StorageError> {
+        Ok(unwrap_option_or_error!(
+            self.get(&Key::TransactionMeta(transaction_id.clone()))?.transaction_meta();
+            StorageError::InvalidTransactionMeta(hex::encode(&transaction_id))
+        ))
     }
 
     /// Find the potential child block given a parent block header
@@ -259,110 +171,12 @@ impl BlockStorage {
         ))
     }
 
-    /// Get the latest block in the chain
-    pub fn get_latest_block(&self) -> Result<Block, StorageError> {
-        self.get_block_from_block_num(self.get_latest_block_height())
-    }
-
-    /// Find the potential parent block given a block header
-    pub fn find_parent_block(&self, block_header: &BlockHeader) -> Result<Block, StorageError> {
-        self.get_block(block_header.previous_block_hash.clone())
-    }
-
-    /// Returns true if the block exists in the canon chain.
-    pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
-        self.is_exist(block_hash) && self.get(&Key::BlockNumbers(block_hash.clone())).is_ok()
-    }
-
-    /// Returns true if the block corresponding to this block's previous_block_hash exists.
-    pub fn is_previous_block_exist(&self, block: &Block) -> bool {
-        self.is_exist(&block.header.previous_block_hash)
-    }
-
-    /// Returns true if the block corresponding to this block's previous_block_hash is in the canon chain.
-    pub fn is_previous_block_canon(&self, block: &Block) -> bool {
-        self.is_canon(&block.header.previous_block_hash)
-    }
-
-    /// Returns the block number of a conflicting block that has already been mined
-    pub fn already_mined(&self, block: &Block) -> Result<Option<u32>, StorageError> {
-        // look up new block's previous block by hash
-        // if the block after previous_block_number exists, then someone has already mined this new block
-        let previous_block_number: u32 = unwrap_option_or_error!(
-            self.get(&Key::BlockNumbers(block.header.previous_block_hash.clone()))?.block_number();
-            StorageError::MissingValue(block.header.previous_block_hash.clone().to_string())
-        );
-
-        let existing_block_number = previous_block_number + 1;
-
-        if self.get_block_from_block_num(existing_block_number).is_ok() {
-            // the storage has a conflicting block with the same previous_block_hash
-            Ok(Some(existing_block_number))
-        } else {
-            // the new block has no conflicts
-            Ok(None)
-        }
-    }
-
-    // BLOCK PATH METHOD ===========================================================================
-
-    /// Get the block's path/origin
-    pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
-        //TODO: MOVE
-        let block_hash = block_header.get_hash();
-        if self.is_exist(&block_hash) {
-            return Ok(BlockPath::ExistingBlock);
-        }
-
-        if &self.get_latest_block()?.header.get_hash() == &block_header.previous_block_hash {
-            return Ok(BlockPath::CanonChain(self.get_latest_block_height() + 1));
-        }
-
-        const OLDEST_FORK_THRESHOLD: u32 = 1024;
-        let mut side_chain_path = vec![];
-        let mut parent_hash = block_header.previous_block_hash.clone();
-
-        for _ in 0..=OLDEST_FORK_THRESHOLD {
-            // check if the part is part of the canon chain
-            match &self.get_block_num(&parent_hash) {
-                // This is a canon parent
-                Ok(block_num) => {
-                    return Ok(BlockPath::SideChain(SideChainPath {
-                        shared_block_number: *block_num,
-                        new_block_number: block_num + side_chain_path.len() as u32 + 1,
-                        path: side_chain_path,
-                    }));
-                }
-                // Add to the side_chain_path
-                Err(_) => {
-                    side_chain_path.insert(0, parent_hash.clone());
-                    parent_hash = self.get_block_header(parent_hash)?.previous_block_hash;
-                }
-            }
-        }
-
-        Err(StorageError::IrrelevantBlock)
-    }
-
-    // OBJECT MEMORY POOL METHODS ==================================================================
-
-    /// Get the stored memory pool transactions
-    pub fn get_memory_pool_transactions(&self) -> Result<Option<Vec<u8>>, StorageError> {
-        Ok(self.get(&Key::Meta(KEY_MEMORY_POOL))?.meta())
-    }
-
-    /// Store the memory pool transactions
-    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
-        self.storage
-            .insert(KeyValue::Meta(KEY_MEMORY_POOL, transactions_serialized))
-    }
-
     // INSERT COMMIT ===============================================================================
 
     /// Insert a block into the storage but do not commit
     pub fn insert_only(&self, block: Block) -> Result<(), StorageError> {
         // Verify that the block does not already exist in storage.
-        if self.is_exist(&block.header.get_hash()) {
+        if self.block_hash_exists(&block.header.get_hash()) {
             return Err(StorageError::BlockExists(block.header.get_hash().0));
         }
 
@@ -406,7 +220,7 @@ impl BlockStorage {
         let block_hash = block.header.get_hash();
 
         // If the block does not exist in the storage
-        if !self.is_exist(&block_hash) {
+        if !self.block_hash_exists(&block_hash) {
             // Insert it first
             self.insert_only(block)?;
         }
@@ -416,7 +230,7 @@ impl BlockStorage {
 
     /// Commit/canonize a particular block
     pub fn commit(&self, block_header_hash: BlockHeaderHash) -> Result<(), StorageError> {
-        let block = self.get_block(block_header_hash.clone())?;
+        let block = self.get_block(&block_header_hash.clone())?;
 
         let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
             && self.get_latest_block_height() == 0
@@ -746,7 +560,7 @@ mod tests {
 
     mod test_invalid {
         use super::*;
-        use snarkos_objects::{BlockHeader, MerkleRootHash};
+        use snarkos_objects::{BlockHeader, MerkleRootHash, Transactions};
 
         #[test]
         pub fn test_invalid_block_addition() {

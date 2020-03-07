@@ -75,7 +75,7 @@ impl RpcFunctions for RpcImpl {
         let block_header_hash = BlockHeaderHash::new(block_hash);
         let height = self.storage.get_block_num(&block_header_hash)?;
 
-        if let Ok(block) = self.storage.get_block(block_header_hash) {
+        if let Ok(block) = self.storage.get_block(&block_header_hash) {
             let mut transactions = vec![];
 
             for transaction in block.transactions.iter() {
