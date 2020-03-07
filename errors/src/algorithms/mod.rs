@@ -12,3 +12,6 @@ pub use self::prf::*;
 
 pub mod signature;
 pub use self::signature::*;
+
+pub mod snark;
+pub use self::snark::*;

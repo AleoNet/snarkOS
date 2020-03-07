@@ -1,16 +1,15 @@
 use crate::curves::{Field, Fp2, Fp2Parameters, FpParameters, PrimeField};
-
-pub type Error = Box<dyn std::error::Error>;
+use snarkos_errors::curves::ConstraintFieldError;
 
 /// Types that can be converted to a vector of `F` elements. Useful for specifying
 /// how public inputs to a constraint system should be represented inside
 /// that constraint system.
 pub trait ToConstraintField<F: Field> {
-    fn to_field_elements(&self) -> Result<Vec<F>, Error>;
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError>;
 }
 
 impl<F: PrimeField> ToConstraintField<F> for F {
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         Ok(vec![*self])
     }
 }
@@ -18,14 +17,14 @@ impl<F: PrimeField> ToConstraintField<F> for F {
 // Impl for base field
 impl<F: Field> ToConstraintField<F> for [F] {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         Ok(self.to_vec())
     }
 }
 
 impl<F: Field> ToConstraintField<F> for () {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         Ok(Vec::new())
     }
 }
@@ -33,7 +32,7 @@ impl<F: Field> ToConstraintField<F> for () {
 // Impl for constraint Fp2<F>
 impl<P: Fp2Parameters> ToConstraintField<P::Fp> for Fp2<P> {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<P::Fp>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<P::Fp>, ConstraintFieldError> {
         let mut c0 = self.c0.to_field_elements()?;
         let c1 = self.c1.to_field_elements()?;
         c0.extend_from_slice(&c1);
@@ -43,7 +42,7 @@ impl<P: Fp2Parameters> ToConstraintField<P::Fp> for Fp2<P> {
 
 impl<F: PrimeField> ToConstraintField<F> for [u8] {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         let max_size = <F as PrimeField>::Params::CAPACITY / 8;
         let max_size = max_size as usize;
         let fes = self
@@ -63,7 +62,7 @@ impl<F: PrimeField> ToConstraintField<F> for [u8] {
 
 impl<F: PrimeField> ToConstraintField<F> for [u8; 32] {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.as_ref().to_field_elements()
     }
 }

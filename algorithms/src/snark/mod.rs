@@ -1,10 +1,8 @@
 //! An implementation of the [Groth-Maller][GM17] simulation extractable zkSNARK.
 //! [GM17]: https://eprint.iacr.org/2017/540
 
-use snarkos_models::{
-    curves::pairing_engine::{PairingCurve, PairingEngine},
-    gadgets::r1cs::SynthesisError,
-};
+use snarkos_errors::gadgets::SynthesisError;
+use snarkos_models::curves::pairing_engine::{PairingCurve, PairingEngine};
 use snarkos_utilities::bytes::ToBytes;
 
 use std::io::{self, Read, Result as IoResult, Write};

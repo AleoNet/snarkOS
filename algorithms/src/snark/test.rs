@@ -1,6 +1,7 @@
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::Field,
-    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, SynthesisError},
+    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
 struct MySillyCircuit<F: Field> {

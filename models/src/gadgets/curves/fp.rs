@@ -7,7 +7,6 @@ use crate::{
             ConstraintSystem,
             ConstraintVar::{self, *},
             LinearCombination,
-            SynthesisError,
         },
         utilities::{
             alloc::AllocGadget,
@@ -20,6 +19,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes, to_bytes};
 
 use std::borrow::Borrow;

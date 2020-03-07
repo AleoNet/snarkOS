@@ -1,5 +1,5 @@
 #[derive(Debug, Fail)]
-pub enum SignatureError {
+pub enum ConstraintFieldError {
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
 
@@ -7,8 +7,8 @@ pub enum SignatureError {
     Message(String),
 }
 
-impl From<std::io::Error> for SignatureError {
+impl From<std::io::Error> for ConstraintFieldError {
     fn from(error: std::io::Error) -> Self {
-        SignatureError::Crate("std::io", format!("{:?}", error))
+        ConstraintFieldError::Crate("std::io", format!("{:?}", error))
     }
 }

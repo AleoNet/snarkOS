@@ -3,9 +3,10 @@ use crate::{
     msm::FixedBaseMSM,
     snark::{r1cs_to_sap::R1CStoSAP, Parameters, VerifyingKey},
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, Field, PairingEngine, PrimeField, ProjectiveCurve},
-    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, SynthesisError, Variable},
+    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, Variable},
 };
 use snarkos_utilities::rand::UniformRand;
 

@@ -1,10 +1,11 @@
 use crate::{
     curves::Field,
     gadgets::{
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{boolean::Boolean, uint8::UInt8},
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 pub mod alloc;
 pub mod boolean;

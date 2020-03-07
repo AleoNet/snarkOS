@@ -2,9 +2,10 @@ use crate::{
     fft::EvaluationDomain,
     snark::{generator::KeypairAssembly, prover::ProvingAssignment},
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, PairingEngine},
-    gadgets::r1cs::{Index, SynthesisError},
+    gadgets::r1cs::Index,
 };
 
 use std::ops::{AddAssign, SubAssign};

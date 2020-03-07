@@ -1,6 +1,5 @@
 mod assignment;
 mod constraint_system;
-mod error;
 mod impl_constraint_var;
 mod impl_lc;
 mod test_constraint_system;
@@ -9,7 +8,6 @@ mod test_fr;
 pub use crate::curves::to_field_vec::ToConstraintField;
 pub use assignment::*;
 pub use constraint_system::{ConstraintSynthesizer, ConstraintSystem, Namespace};
-pub use error::SynthesisError;
 pub use test_constraint_system::TestConstraintSystem;
 pub use test_fr::*;
 
