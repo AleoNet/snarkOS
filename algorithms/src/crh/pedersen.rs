@@ -1,5 +1,5 @@
 use crate::crh::{PedersenCRHParameters, PedersenSize};
-use snarkos_errors::algorithms::{CryptoError, Error};
+use snarkos_errors::algorithms::{CryptoError, CRHError};
 use snarkos_models::{
     algorithms::CRH,
     curves::{AffineCurve, Group, ProjectiveCurve},
@@ -36,7 +36,7 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
         }
     }
 
-    fn hash(&self, input: &[u8]) -> Result<Self::Output, Error> {
+    fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS {
             // TODO (howardwu): Return a CRHError.
             panic!(

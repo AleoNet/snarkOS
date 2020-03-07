@@ -1,3 +1,12 @@
+pub mod commitment;
+pub use self::commitment::*;
+
+pub mod crh;
+pub use self::crh::*;
+
+pub mod merkle;
+pub use self::merkle::*;
+
 pub mod prf;
 pub use self::prf::*;
 

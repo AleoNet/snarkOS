@@ -1,4 +1,4 @@
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::algorithms::CommitmentScheme;
 
 use blake2::Blake2s as b2s;
@@ -16,7 +16,7 @@ impl CommitmentScheme for Blake2sCommitment {
         Self
     }
 
-    fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, Error> {
+    fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
         let mut h = b2s::new();
         h.input(input);
         h.input(randomness.as_ref());

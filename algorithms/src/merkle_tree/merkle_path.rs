@@ -1,5 +1,5 @@
 use crate::merkle_tree::MerkleParameters;
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::CRH;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -14,7 +14,7 @@ pub struct MerklePath<P: MerkleParameters> {
 }
 
 impl<P: MerkleParameters> MerklePath<P> {
-    pub fn verify<L: ToBytes>(&self, root_hash: &<P::H as CRH>::Output, leaf: &L) -> Result<bool, Error> {
+    pub fn verify<L: ToBytes>(&self, root_hash: &<P::H as CRH>::Output, leaf: &L) -> Result<bool, MerkleError> {
         if self.path.len() != P::HEIGHT - 1 {
             return Ok(false);
         }
