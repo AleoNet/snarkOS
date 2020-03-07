@@ -43,14 +43,14 @@ impl From<ConnectError> for HandshakeError {
     }
 }
 
-impl From<SendError> for HandshakeError {
-    fn from(error: SendError) -> Self {
-        HandshakeError::SendError(error)
-    }
-}
-
 impl From<MessageError> for HandshakeError {
     fn from(error: MessageError) -> Self {
         HandshakeError::MessageError(error)
+    }
+}
+
+impl From<SendError> for HandshakeError {
+    fn from(error: SendError) -> Self {
+        HandshakeError::SendError(error)
     }
 }

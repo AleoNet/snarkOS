@@ -15,6 +15,12 @@ pub enum MessageHeaderError {
     StreamReadError(StreamReadError),
 }
 
+impl From<StreamReadError> for MessageHeaderError {
+    fn from(error: StreamReadError) -> Self {
+        MessageHeaderError::StreamReadError(error)
+    }
+}
+
 impl From<bincode::Error> for MessageHeaderError {
     fn from(error: bincode::Error) -> Self {
         MessageHeaderError::Crate("bincode", format!("{:?}", error))
@@ -24,11 +30,5 @@ impl From<bincode::Error> for MessageHeaderError {
 impl From<std::io::Error> for MessageHeaderError {
     fn from(error: std::io::Error) -> Self {
         MessageHeaderError::Crate("std::io", format!("{:?}", error))
-    }
-}
-
-impl From<StreamReadError> for MessageHeaderError {
-    fn from(error: StreamReadError) -> Self {
-        MessageHeaderError::StreamReadError(error)
     }
 }

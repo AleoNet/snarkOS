@@ -2,14 +2,12 @@ use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_models::curves::Group;
 
 use rand::Rng;
-use std::marker::PhantomData;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCommitmentParameters<G: Group, S: PedersenSize> {
     pub bases: Vec<Vec<G>>,
     pub random_base: Vec<G>,
     pub crh: PedersenCRH<G, S>,
-    _size: PhantomData<S>,
 }
 
 impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
@@ -24,7 +22,6 @@ impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
             bases,
             random_base,
             crh,
-            _size: PhantomData,
         }
     }
 

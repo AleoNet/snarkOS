@@ -1,4 +1,4 @@
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::CRHError;
 use snarkos_utilities::bytes::ToBytes;
 
 use rand::Rng;
@@ -12,5 +12,5 @@ pub trait CRH: From<<Self as CRH>::Parameters> {
 
     fn setup<R: Rng>(r: &mut R) -> Self;
 
-    fn hash(&self, input: &[u8]) -> Result<Self::Output, Error>;
+    fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError>;
 }
