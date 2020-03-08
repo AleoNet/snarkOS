@@ -1,4 +1,4 @@
-use crate::algorithms::{CommitmentError, CRHError, PRFError, SNARKError};
+use crate::{algorithms::{CommitmentError, CRHError, PRFError, SNARKError}, dpc::LedgerError};
 
 #[derive(Debug, Fail)]
 pub enum DPCError {
@@ -10,6 +10,9 @@ pub enum DPCError {
 
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[fail(display = "{}", _0)]
+    LedgerError(LedgerError),
 
     #[fail(display = "{}", _0)]
     Message(String),
@@ -30,6 +33,12 @@ impl From<CommitmentError> for DPCError {
 impl From<CRHError> for DPCError {
     fn from(error: CRHError) -> Self {
         DPCError::CRHError(error)
+    }
+}
+
+impl From<LedgerError> for DPCError {
+    fn from(error: LedgerError) -> Self {
+        DPCError::LedgerError(error)
     }
 }
 

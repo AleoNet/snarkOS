@@ -10,7 +10,7 @@ use crate::{
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
+    algorithms::SNARK,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};

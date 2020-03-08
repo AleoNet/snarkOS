@@ -1,4 +1,9 @@
-use crate::Error;
+use crate::{dpc::Transaction, ledger::*};
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
+use snarkos_errors::dpc::LedgerError;
+use snarkos_models::algorithms::CRH;
+use snarkos_utilities::bytes::ToBytes;
+
 use rand::Rng;
 use std::{
     collections::{HashMap, HashSet},
@@ -6,37 +11,32 @@ use std::{
     rc::Rc,
 };
 
-use crate::{dpc::Transaction, ledger::*};
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
-use snarkos_models::algorithms::CRH;
-use snarkos_utilities::bytes::ToBytes;
-
 pub struct IdealLedger<T: Transaction, P: MerkleParameters>
-where
-    T::Commitment: ToBytes,
+    where
+        T::Commitment: ToBytes,
 {
-    crh_params:     Rc<<P::H as CRH>::Parameters>,
-    transactions:   Vec<T>,
+    crh_params: Rc<P::H>,
+    transactions: Vec<T>,
     cm_merkle_tree: MerkleTree<P>,
-    cur_cm_index:   usize,
-    cur_sn_index:   usize,
+    cur_cm_index: usize,
+    cur_sn_index: usize,
     cur_memo_index: usize,
-    comm_to_index:  HashMap<T::Commitment, usize>,
-    sn_to_index:    HashMap<T::SerialNumber, usize>,
-    memo_to_index:  HashMap<T::Memorandum, usize>,
+    comm_to_index: HashMap<T::Commitment, usize>,
+    sn_to_index: HashMap<T::SerialNumber, usize>,
+    memo_to_index: HashMap<T::Memorandum, usize>,
     current_digest: Option<MerkleTreeDigest<P>>,
-    past_digests:   HashSet<MerkleTreeDigest<P>>,
-    genesis_cm:     T::Commitment,
-    genesis_sn:     T::SerialNumber,
-    genesis_memo:   T::Memorandum,
+    past_digests: HashSet<MerkleTreeDigest<P>>,
+    genesis_cm: T::Commitment,
+    genesis_sn: T::SerialNumber,
+    genesis_memo: T::Memorandum,
 }
 
 impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P>
-where
-    T: Eq,
-    T::Commitment: ToBytes + Clone,
-    T::SerialNumber: ToBytes + Clone,
-    T::Memorandum: Hash + Clone,
+    where
+        T: Eq,
+        T::Commitment: ToBytes + Clone,
+        T::SerialNumber: ToBytes + Clone,
+        T::Memorandum: Hash + Clone,
 {
     type Parameters = P;
 
@@ -45,12 +45,12 @@ where
     type Memo = T::Memorandum;
     type Transaction = T;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParams<Self::Parameters>, Error> {
+    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParams<Self::Parameters>, LedgerError> {
         Ok(P::H::setup(rng))
     }
 
     fn new(
-        parameters: <P::H as CRH>::Parameters,
+        parameters: P::H,
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
@@ -94,14 +94,12 @@ where
         &self.crh_params
     }
 
-    fn push(&mut self, transaction: Self::Transaction) -> Result<(), Error> {
-        let push_time = start_timer!(|| "IdealLedger::PushTx");
-
+    fn push(&mut self, transaction: Self::Transaction) -> Result<(), LedgerError> {
         let mut cur_sn_index = self.cur_sn_index;
         for sn in transaction.old_serial_numbers() {
             if sn != &self.genesis_sn {
                 if self.sn_to_index.contains_key(sn) {
-                    Err(LedgerError::DuplicateSn)?;
+                    return Err(LedgerError::DuplicateSn);
                 }
                 self.sn_to_index.insert(sn.clone(), cur_sn_index);
                 cur_sn_index += 1;
@@ -112,7 +110,7 @@ where
         let mut cur_cm_index = self.cur_cm_index;
         for cm in transaction.new_commitments() {
             if cm == &self.genesis_cm || self.comm_to_index.contains_key(cm) {
-                Err(LedgerError::InvalidCm)?;
+                return Err(LedgerError::InvalidCm);
             }
             self.comm_to_index.insert(cm.clone(), cur_cm_index);
             cur_cm_index += 1;
@@ -121,7 +119,7 @@ where
 
         if transaction.memorandum() != &self.genesis_memo {
             if self.memo_to_index.contains_key(transaction.memorandum()) {
-                Err(LedgerError::DuplicateMemo)?;
+                return Err(LedgerError::DuplicateMemo);
             } else {
                 self.memo_to_index
                     .insert(transaction.memorandum().clone(), self.cur_memo_index);
@@ -146,7 +144,6 @@ where
 
         self.transactions.push(transaction);
 
-        end_timer!(push_time);
         Ok(())
     }
 
@@ -170,9 +167,7 @@ where
         self.memo_to_index.contains_key(memo)
     }
 
-    fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, Error> {
-        let witness_time = start_timer!(|| "Generate membership witness");
-
+    fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, LedgerError> {
         let cm_index = self
             .comm_to_index
             .get(cm)
@@ -180,21 +175,19 @@ where
 
         let result = self.cm_merkle_tree.generate_proof(*cm_index, cm)?;
 
-        end_timer!(witness_time);
         Ok(result)
     }
 
-    fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, Error> {
+    fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, LedgerError> {
         Ok(MerklePath::default())
     }
 
-    fn prove_memo(&self, _memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, Error> {
+    fn prove_memo(&self, _memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, LedgerError> {
         Ok(MerklePath::default())
     }
-
 
     fn verify_cm(
-        parameters: &MerkleTreeParams<Self::Parameters>,
+        _parameters: &MerkleTreeParams<Self::Parameters>,
         digest: &MerkleTreeDigest<Self::Parameters>,
         cm: &Self::Commitment,
         witness: &MerklePath<Self::Parameters>,
@@ -220,33 +213,3 @@ where
         true
     }
 }
-
-#[derive(Debug)]
-pub enum LedgerError {
-    DuplicateSn,
-    DuplicateMemo,
-    InvalidCm,
-    InvalidCmIndex,
-}
-
-impl std::fmt::Display for LedgerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let msg = match self {
-            LedgerError::DuplicateSn => "duplicate sn pushed to ledger",
-            LedgerError::DuplicateMemo => "duplicate memo pushed to ledger",
-            LedgerError::InvalidCm => "invalid cm pushed to ledger",
-            LedgerError::InvalidCmIndex => "invalid cm index during proving",
-
-        };
-        write!(f, "{}", msg)
-    }
-}
-
-impl std::error::Error for LedgerError {
-    #[inline]
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-

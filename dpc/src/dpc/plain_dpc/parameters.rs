@@ -1,6 +1,6 @@
 use crate::dpc::plain_dpc::PlainDPCComponents;
 
-use snarkos_models::algorithms::{CRH, CommitmentScheme, SNARK};
+use snarkos_models::algorithms::SNARK;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: PlainDPCComponents"))]
@@ -58,27 +58,27 @@ impl<C: PlainDPCComponents> PublicParameters<C> {
         &self.pred_nizk_pp
     }
 
-    pub fn sn_nonce_crh_pp(&self) -> &<C::SnNonceH as CRH>::Parameters {
-        &self.comm_and_crh_pp.sn_nonce_crh_pp.parameters()
+    pub fn sn_nonce_crh_pp(&self) -> &C::SnNonceH {
+        &self.comm_and_crh_pp.sn_nonce_crh_pp
     }
 
-    pub fn pred_vk_crh_pp(&self) -> &<C::PredVkH as CRH>::Parameters {
-        &self.comm_and_crh_pp.pred_vk_crh_pp.parameters()
+    pub fn pred_vk_crh_pp(&self) -> &C::PredVkH {
+        &self.comm_and_crh_pp.pred_vk_crh_pp
     }
 
-    pub fn local_data_comm_pp(&self) -> &<C::LocalDataComm as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.local_data_comm_pp.parameters()
+    pub fn local_data_comm_pp(&self) -> &C::LocalDataComm {
+        &self.comm_and_crh_pp.local_data_comm_pp
     }
 
-    pub fn addr_comm_pp(&self) -> &<C::AddrC as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.addr_comm_pp.parameters()
+    pub fn addr_comm_pp(&self) -> &C::AddrC {
+        &self.comm_and_crh_pp.addr_comm_pp
     }
 
-    pub fn rec_comm_pp(&self) -> &<C::RecC as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.rec_comm_pp.parameters()
+    pub fn rec_comm_pp(&self) -> &C::RecC {
+        &self.comm_and_crh_pp.rec_comm_pp
     }
 
-    pub fn pred_vk_comm_pp(&self) -> &<C::PredVkComm as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.pred_vk_comm_pp.parameters()
+    pub fn pred_vk_comm_pp(&self) -> &C::PredVkComm {
+        &self.comm_and_crh_pp.pred_vk_comm_pp
     }
 }

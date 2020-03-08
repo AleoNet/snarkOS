@@ -1,5 +1,6 @@
-use crate::{dpc::Transaction, Error};
+use crate::dpc::Transaction;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
+use snarkos_errors::dpc::LedgerError;
 
 use rand::Rng;
 
@@ -17,7 +18,7 @@ pub trait Ledger {
 
     type Transaction: Transaction;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParams<Self::Parameters>, Error>;
+    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParams<Self::Parameters>, LedgerError>;
 
     /// Creates an empty ledger
     fn new(
@@ -34,7 +35,7 @@ pub trait Ledger {
     fn parameters(&self) -> &MerkleTreeParams<Self::Parameters>;
 
     /// Append a (valid) transaction tx to the ledger.
-    fn push(&mut self, transaction: Self::Transaction) -> Result<(), Error>;
+    fn push(&mut self, transaction: Self::Transaction) -> Result<(), LedgerError>;
 
     /// Return a short digest of the current state of the transaction set data
     /// structure.
@@ -47,9 +48,9 @@ pub trait Ledger {
     fn contains_sn(&self, sn: &Self::SerialNumber) -> bool;
     fn contains_memo(&self, memo: &Self::Memo) -> bool;
 
-    fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, Error>;
-    fn prove_sn(&self, sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, Error>;
-    fn prove_memo(&self, memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, Error>;
+    fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, LedgerError>;
+    fn prove_sn(&self, sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, LedgerError>;
+    fn prove_memo(&self, memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, LedgerError>;
 
     fn verify_cm(
         parameters: &MerkleTreeParams<Self::Parameters>,
