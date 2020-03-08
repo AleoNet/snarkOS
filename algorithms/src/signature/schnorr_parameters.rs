@@ -1,4 +1,4 @@
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
 
 use digest::Digest;
@@ -14,7 +14,7 @@ pub struct SchnorrParameters<G: Group, H: Digest> {
 
 impl<F: Field, G: Group + ToConstraintField<F>, D: Digest> ToConstraintField<F> for SchnorrParameters<G, D> {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.generator.to_field_elements()
     }
 }

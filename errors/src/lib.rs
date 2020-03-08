@@ -4,6 +4,7 @@ extern crate failure;
 pub mod algorithms;
 pub mod consensus;
 pub mod curves;
+pub mod gadgets;
 pub mod network;
 pub mod node;
 pub mod objects;

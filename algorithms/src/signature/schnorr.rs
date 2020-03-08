@@ -1,5 +1,5 @@
 use crate::signature::SchnorrParameters;
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::SignatureError;
 use snarkos_models::{
     algorithms::SignatureScheme,
     curves::{Field, Group, PrimeField},
@@ -42,7 +42,7 @@ where
     type PrivateKey = G::ScalarField;
     type PublicKey = G;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, Error> {
+    fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, SignatureError> {
         let setup_time = start_timer!(|| "SchnorrSig::Setup");
 
         let mut salt = [0u8; 32];
@@ -60,7 +60,7 @@ where
     fn keygen<R: Rng>(
         parameters: &Self::Parameters,
         rng: &mut R,
-    ) -> Result<(Self::PublicKey, Self::PrivateKey), Error> {
+    ) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError> {
         let keygen_time = start_timer!(|| "SchnorrSig::KeyGen");
 
         let private_key = G::ScalarField::rand(rng);
@@ -75,7 +75,7 @@ where
         private_key: &Self::PrivateKey,
         message: &[u8],
         rng: &mut R,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self::Output, SignatureError> {
         let sign_time = start_timer!(|| "SchnorrSig::Sign");
         // (k, e);
         let (random_scalar, verifier_challenge) = loop {
@@ -113,7 +113,7 @@ where
         public_key: &Self::PublicKey,
         message: &[u8],
         signature: &Self::Output,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, SignatureError> {
         let verify_time = start_timer!(|| "SchnorrSig::Verify");
 
         let SchnorrOutput {
@@ -143,7 +143,7 @@ where
         parameters: &Self::Parameters,
         public_key: &Self::PublicKey,
         randomness: &[u8],
-    ) -> Result<Self::PublicKey, Error> {
+    ) -> Result<Self::PublicKey, SignatureError> {
         let rand_pk_time = start_timer!(|| "SchnorrSig::RandomizePubKey");
 
         let mut randomized_pk = *public_key;
@@ -166,7 +166,7 @@ where
         _parameter: &Self::Parameters,
         signature: &Self::Output,
         randomness: &[u8],
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self::Output, SignatureError> {
         let rand_signature_time = start_timer!(|| "SchnorrSig::RandomizeSig");
         let SchnorrOutput {
             prover_response,

@@ -1,10 +1,11 @@
 use crate::curves::templates::bls12::AffineGadget;
 use snarkos_curves::templates::bls12::{Bls12Parameters, TwistType};
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::Field,
     gadgets::{
         curves::{FieldGadget, Fp2Gadget, GroupGadget},
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{eq::NEqGadget, uint8::UInt8, ToBytesGadget},
     },
 };

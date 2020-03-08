@@ -1,4 +1,4 @@
-use crate::gadgets::r1cs::SynthesisError;
+use snarkos_errors::gadgets::SynthesisError;
 
 pub trait Assignment<T> {
     fn get(self) -> Result<T, SynthesisError>;

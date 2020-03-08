@@ -1,10 +1,11 @@
 use crate::curves::templates::bls12::AffineGadget;
 use snarkos_curves::templates::bls12::{Bls12Parameters, G1Prepared};
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::ProjectiveCurve,
     gadgets::{
         curves::{FpGadget, GroupGadget},
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{uint8::UInt8, ToBytesGadget},
     },
 };

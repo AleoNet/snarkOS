@@ -2,7 +2,7 @@ use crate::{
     curves::{Field, Fp2, Fp2Parameters, PrimeField},
     gadgets::{
         curves::{FieldGadget, FpGadget},
-        r1cs::{Assignment, ConstraintSystem, ConstraintVar, SynthesisError},
+        r1cs::{Assignment, ConstraintSystem, ConstraintVar},
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,
@@ -14,6 +14,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::{borrow::Borrow, marker::PhantomData};
 

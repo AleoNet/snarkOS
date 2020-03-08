@@ -2,10 +2,11 @@ use crate::{
     algorithms::SNARK,
     curves::Field,
     gadgets::{
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, ToBitsGadget, ToBytesGadget},
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 pub trait SNARKVerifierGadget<N: SNARK, F: Field> {
     type VerificationKeyGadget: AllocGadget<N::VerificationParameters, F> + ToBytesGadget<F>;

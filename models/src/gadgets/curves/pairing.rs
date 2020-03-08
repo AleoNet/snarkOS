@@ -2,10 +2,11 @@ use crate::{
     curves::{Field, PairingEngine},
     gadgets::{
         curves::{FieldGadget, GroupGadget},
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::ToBytesGadget,
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 

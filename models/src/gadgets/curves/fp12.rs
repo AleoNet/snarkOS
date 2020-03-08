@@ -8,7 +8,7 @@ use crate::{
     },
     gadgets::{
         curves::FieldGadget,
-        r1cs::{Assignment, ConstraintSystem, SynthesisError},
+        r1cs::{Assignment, ConstraintSystem},
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,
@@ -20,6 +20,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::bititerator::BitIterator;
 
 use std::{borrow::Borrow, marker::PhantomData};

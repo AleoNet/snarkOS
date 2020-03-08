@@ -2,7 +2,7 @@ use crate::{
     algorithms::CRH,
     curves::Field,
     gadgets::{
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget},
@@ -12,6 +12,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 

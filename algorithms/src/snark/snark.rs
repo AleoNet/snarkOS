@@ -8,7 +8,7 @@ use crate::snark::{
     Proof,
     VerifyingKey,
 };
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::SNARKError;
 use snarkos_models::{
     algorithms::SNARK,
     curves::{to_field_vec::ToConstraintField, PairingEngine},
@@ -38,7 +38,7 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
     fn setup<R: Rng>(
         circuit: Self::Circuit,
         rng: &mut R,
-    ) -> Result<(Self::ProvingParameters, Self::PreparedVerificationParameters), Error> {
+    ) -> Result<(Self::ProvingParameters, Self::PreparedVerificationParameters), SNARKError> {
         let setup_time = start_timer!(|| "{Groth-Maller 2017}::Setup");
         let pp = generate_random_parameters::<E, Self::Circuit, R>(circuit, rng)?;
         let vk = prepare_verifying_key(&pp.vk);
@@ -50,7 +50,7 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
         pp: &Self::ProvingParameters,
         input_and_witness: Self::AssignedCircuit,
         rng: &mut R,
-    ) -> Result<Self::Proof, Error> {
+    ) -> Result<Self::Proof, SNARKError> {
         let proof_time = start_timer!(|| "{Groth-Maller 2017}::Prove");
         let result = create_random_proof::<E, _, _>(input_and_witness, pp, rng)?;
         end_timer!(proof_time);
@@ -61,7 +61,7 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
         vk: &Self::PreparedVerificationParameters,
         input: &Self::VerifierInput,
         proof: &Self::Proof,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, SNARKError> {
         let verify_time = start_timer!(|| "{Groth-Maller 2017}::Verify");
         let conversion_time = start_timer!(|| "Convert input to E::Fr");
         let input = input.to_field_elements()?;
