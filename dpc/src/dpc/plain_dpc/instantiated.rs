@@ -30,6 +30,7 @@ use snarkos_gadgets::{
         bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget,
     },
 };
+use snarkos_models::algorithms::CRH;
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
