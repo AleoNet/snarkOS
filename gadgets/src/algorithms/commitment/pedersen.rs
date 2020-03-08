@@ -155,38 +155,12 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
     type RandomnessGadget = PedersenRandomnessGadget<G>;
 
     fn check_commitment_gadget<CS: ConstraintSystem<F>>(
-        mut cs: CS,
+        cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
         randomness: &Self::RandomnessGadget,
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        assert!((input.len() * 8) <= (S::WINDOW_SIZE * S::NUM_WINDOWS));
-
-        let mut padded_input = input.to_vec();
-        // Pad if input length is less than `W::WINDOW_SIZE * W::NUM_WINDOWS`.
-        if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
-            let current_length = input.len();
-            for _ in current_length..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
-                padded_input.push(UInt8::constant(0u8));
-            }
-        }
-
-        assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
-        assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
-
-        // Allocate new variable for commitment output.
-        let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.into_bits_le()).collect();
-        let input_in_bits = input_in_bits.chunks(S::WINDOW_SIZE);
-        let mut result =
-            GG::precomputed_base_multiscalar_mul(cs.ns(|| "msm"), &parameters.parameters.bases, input_in_bits)?;
-
-        // Compute h^r
-        let rand_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
-        result.precomputed_base_scalar_mul(
-            cs.ns(|| "randomizer"),
-            rand_bits.iter().zip(&parameters.parameters.random_base),
-        )?;
-
-        Ok(result.to_x_coordinate())
+        let output = PedersenCommitmentGadget::<G, F, GG>::check_commitment_gadget(cs, parameters, input, randomness)?;
+        Ok(output.to_x_coordinate())
     }
 }

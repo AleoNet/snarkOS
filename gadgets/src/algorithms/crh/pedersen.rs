@@ -110,21 +110,7 @@ impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: P
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        let mut padded_input = input.to_vec();
-        // Pad the input if it is not the current length.
-        if input.len() * 8 < S::WINDOW_SIZE * S::NUM_WINDOWS {
-            let current_length = input.len();
-            for _ in current_length..(S::WINDOW_SIZE * S::NUM_WINDOWS / 8) {
-                padded_input.push(UInt8::constant(0u8));
-            }
-        }
-        assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
-        assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
-
-        // Allocate new variable for the result.
-        let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.into_bits_le()).collect();
-        let input_in_bits = input_in_bits.chunks(S::WINDOW_SIZE);
-
-        Ok(GG::precomputed_base_multiscalar_mul(cs, &parameters.parameters.bases, input_in_bits)?.to_x_coordinate())
+        let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(cs, parameters, input)?;
+        Ok(output.to_x_coordinate())
     }
 }
