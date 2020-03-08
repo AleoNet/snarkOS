@@ -1,4 +1,4 @@
-use crate::{curves::bls12_377::PairingGadget as Bls12_377PairingGadget, algorithms::snark::*};
+use crate::{algorithms::snark::*, curves::bls12_377::PairingGadget as Bls12_377PairingGadget};
 use snarkos_algorithms::snark::{create_random_proof, generate_random_parameters, GM17};
 use snarkos_curves::bls12_377::{Bls12_377, Fq, Fr};
 use snarkos_errors::gadgets::SynthesisError;
@@ -77,7 +77,7 @@ fn gm17_verifier_test() {
         },
         rng,
     )
-        .unwrap();
+    .unwrap();
 
     {
         let proof = {
@@ -91,7 +91,7 @@ fn gm17_verifier_test() {
                 &params,
                 rng,
             )
-                .unwrap()
+            .unwrap()
         };
 
         let mut cs = TestConstraintSystem::<Fq>::new();
@@ -121,7 +121,7 @@ fn gm17_verifier_test() {
             input_gadgets.iter(),
             &proof_gadget,
         )
-            .unwrap();
+        .unwrap();
         if !cs.is_satisfied() {
             println!("=========================================================");
             println!("Unsatisfied constraints:");

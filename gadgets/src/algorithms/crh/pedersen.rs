@@ -94,6 +94,4 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
 }
 
 #[cfg(test)]
-mod test {
-
-}
+mod test {}

@@ -1,9 +1,6 @@
 use crate::{
     curves::Field,
-    gadgets::{
-        r1cs::ConstraintSystem,
-        utilities::boolean::Boolean,
-    },
+    gadgets::{r1cs::ConstraintSystem, utilities::boolean::Boolean},
 };
 use snarkos_errors::gadgets::SynthesisError;
 
