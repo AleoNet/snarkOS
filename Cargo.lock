@@ -2306,6 +2306,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-dpc"
+version = "0.8.0"
+dependencies = [
+ "criterion",
+ "derivative",
+ "hex 0.4.2",
+ "rand 0.7.3",
+ "rand_xorshift 0.2.0",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-gadgets",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-profiler",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-errors"
 version = "0.8.0"
 dependencies = [

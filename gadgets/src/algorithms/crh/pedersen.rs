@@ -1,10 +1,10 @@
 use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group},
+    curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         algorithms::CRHGadget,
-        curves::GroupGadget,
+        curves::{GroupGadget, CompressedGroupGadget},
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
@@ -93,7 +93,73 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     }
 }
 
-#[cfg(test)]
-mod test {
+// pub struct PedersenCompressedCRHGadget<
+//     G: Group + ProjectiveCurve,
+//     F: Field,
+//     GG: CompressedGroupGadget<G, F>,
+// >(PhantomData<G>, PhantomData<F>, PhantomData<GG>);
+//
+// impl<
+//     G: Group + ProjectiveCurve,
+//     F: PrimeField,
+//     GG: CompressedGroupGadget<G, F>,
+//     S: PedersenSize,
+// > CompressedCRHGadget<PedersenCRH<G, S>, F> for PedersenCompressedCRHGadget<G, F, GG> where GG::BaseFieldGadget: AllocGadget<G, F>
+// {
+//     type OutputGadget = GG::BaseFieldGadget;
+//     type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;
+//
+//     fn check_compressed_evaluation_gadget<CS: ConstraintSystem<F>>(
+//         mut cs: CS,
+//         parameters: &Self::ParametersGadget,
+//         input: &[UInt8],
+//     ) -> Result<Self::OutputGadget, SynthesisError> {
+//         let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(
+//             cs.ns(|| "pedersen_commitment_gadget"),
+//             parameters,
+//             input,
+//         )?;
+//         Ok(output.to_x_coordinate())
+//     }
+// }
 
+
+pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
+    _group: PhantomData<*const G>,
+    _group_gadget: PhantomData<*const GG>,
+    _engine: PhantomData<F>,
+}
+
+impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize> CRHGadget<PedersenCRH<G, S>, F>
+for PedersenCompressedCRHGadget<G, F, GG> where GG::BaseFieldGadget: AllocGadget<G, F>
+{
+    type OutputGadget = GG::BaseFieldGadget;
+    type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;
+
+    fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        let mut padded_input = input.to_vec();
+        // Pad the input if it is not the current length.
+        if input.len() * 8 < S::WINDOW_SIZE * S::NUM_WINDOWS {
+            let current_length = input.len();
+            for _ in current_length..(S::WINDOW_SIZE * S::NUM_WINDOWS / 8) {
+                padded_input.push(UInt8::constant(0u8));
+            }
+        }
+        assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
+        assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
+
+        // Allocate new variable for the result.
+        let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.into_bits_le()).collect();
+        let input_in_bits = input_in_bits.chunks(S::WINDOW_SIZE);
+
+        Ok(GG::precomputed_base_multiscalar_mul(
+            cs,
+            &parameters.parameters.bases,
+            input_in_bits,
+        )?.to_x_coordinate())
+    }
 }

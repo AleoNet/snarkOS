@@ -70,7 +70,7 @@ pub struct PreparedVerifyingKeyGadget<Pairing: PairingEngine, F: Field, P: Pairi
     pub query: Vec<P::G1Gadget>,
 }
 
-pub struct Gm17VerifierGadget<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> {
+pub struct GM17VerifierGadget<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> {
     _pairing_engine: PhantomData<Pairing>,
     _engine: PhantomData<F>,
     _pairing_gadget: PhantomData<P>,
@@ -82,7 +82,7 @@ impl<
     P: PairingGadget<Pairing, F>,
     C: ConstraintSynthesizer<Pairing::Fr>,
     V: ToConstraintField<Pairing::Fr>,
-> SNARKVerifierGadget<GM17<Pairing, C, V>, F> for Gm17VerifierGadget<Pairing, F, P>
+> SNARKVerifierGadget<GM17<Pairing, C, V>, F> for GM17VerifierGadget<Pairing, F, P>
 {
     type ProofGadget = ProofGadget<Pairing, F, P>;
     type VerificationKeyGadget = VerifyingKeyGadget<Pairing, F, P>;
