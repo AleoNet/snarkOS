@@ -143,11 +143,11 @@ pub trait GroupGadget<G: Group, F: Field>:
 
 pub trait CompressedGroupGadget<G: Group + ProjectiveCurve, F: Field>: GroupGadget<G, F> {
     type BaseFieldGadget: ToBytesGadget<F>
-    + EqGadget<F>
-    + CondSelectGadget<F>
-    + AllocGadget<<G::Affine as AffineCurve>::BaseField, F>
-    + Clone
-    + Debug;
+        + EqGadget<F>
+        + CondSelectGadget<F>
+        + AllocGadget<<G::Affine as AffineCurve>::BaseField, F>
+        + Clone
+        + Debug;
 
     fn to_x_coordinate(&self) -> Self::BaseFieldGadget;
 }

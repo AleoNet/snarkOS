@@ -1,16 +1,15 @@
 use algebra::{to_bytes, ToBytes};
-use rand::SeedableRng;
-use rand_xorshift::XorShiftRng;
 #[cfg(debug_assertions)]
 use gm17::PreparedVerifyingKey;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 use crypto_primitives::{nizk::NIZK, CRH};
 
 use dpc::{
-    plain_dpc::{
-        instantiated::*, predicate::PrivatePredInput, predicate_circuit::*, LocalData, DPC,
-    },
-    DPCScheme, Record,
+    plain_dpc::{instantiated::*, predicate::PrivatePredInput, predicate_circuit::*, LocalData, DPC},
+    DPCScheme,
+    Record,
 };
 
 use dpc::ledger::Ledger;
@@ -21,24 +20,22 @@ fn integration_test() {
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
     let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
-    let parameters =
-        <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
-            .expect("DPC setup failed");
+    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
+        .expect("DPC setup failed");
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.pred_nizk_pp.vk.clone().into();
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
-    let genesis_address =
-        DPC::create_address_helper(&parameters.comm_and_crh_pp, &genesis_metadata, &mut rng)
-            .unwrap();
-    let genesis_sn_nonce =
-        SnNonceCRH::evaluate(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[34u8; 1]).unwrap();
-    let genesis_pred_vk_bytes = to_bytes![PredVkCRH::evaluate(
-        &parameters.comm_and_crh_pp.pred_vk_crh_pp,
-        &to_bytes![parameters.pred_nizk_pp.vk].unwrap()
-    )
-    .unwrap()]
+    let genesis_address = DPC::create_address_helper(&parameters.comm_and_crh_pp, &genesis_metadata, &mut rng).unwrap();
+    let genesis_sn_nonce = SnNonceCRH::evaluate(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[34u8; 1]).unwrap();
+    let genesis_pred_vk_bytes = to_bytes![
+        PredVkCRH::evaluate(
+            &parameters.comm_and_crh_pp.pred_vk_crh_pp,
+            &to_bytes![parameters.pred_nizk_pp.vk].unwrap()
+        )
+        .unwrap()
+    ]
     .unwrap();
     let genesis_record = DPC::generate_record(
         &parameters.comm_and_crh_pp,
@@ -68,11 +65,8 @@ fn integration_test() {
     let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
-        let old_sn_nonce = SnNonceCRH::evaluate(
-            &parameters.comm_and_crh_pp.sn_nonce_crh_pp,
-            &[64u8 + (i as u8); 1],
-        )
-        .unwrap();
+        let old_sn_nonce =
+            SnNonceCRH::evaluate(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[64u8 + (i as u8); 1]).unwrap();
         let old_record = DPC::generate_record(
             &parameters.comm_and_crh_pp,
             &old_sn_nonce,
@@ -91,8 +85,7 @@ fn integration_test() {
 
     // Create an address for an actual new record.
     let new_metadata = [2u8; 32];
-    let new_address =
-        DPC::create_address_helper(&parameters.comm_and_crh_pp, &new_metadata, &mut rng).unwrap();
+    let new_address = DPC::create_address_helper(&parameters.comm_and_crh_pp, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
     let new_payload = [2u8; 32];
@@ -114,11 +107,7 @@ fn integration_test() {
         for i in 0..NUM_INPUT_RECORDS {
             let proof = PredicateNIZK::prove(
                 &parameters.pred_nizk_pp.pk,
-                EmptyPredicateCircuit::new(
-                    &local_data.comm_and_crh_pp,
-                    &local_data.local_data_comm,
-                    i as u8,
-                ),
+                EmptyPredicateCircuit::new(&local_data.comm_and_crh_pp, &local_data.local_data_comm, i as u8),
                 &mut rng,
             )
             .expect("Proving should work");
@@ -126,13 +115,10 @@ fn integration_test() {
             {
                 let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                     local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.clone(),
-                    local_data_comm:    local_data.local_data_comm.clone(),
-                    position:           i as u8,
+                    local_data_comm: local_data.local_data_comm.clone(),
+                    position: i as u8,
                 };
-                assert!(
-                    PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof)
-                        .expect("Proof should verify")
-                );
+                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
 
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
@@ -149,11 +135,7 @@ fn integration_test() {
         for i in 0..NUM_OUTPUT_RECORDS {
             let proof = PredicateNIZK::prove(
                 &parameters.pred_nizk_pp.pk,
-                EmptyPredicateCircuit::new(
-                    &local_data.comm_and_crh_pp,
-                    &local_data.local_data_comm,
-                    i as u8,
-                ),
+                EmptyPredicateCircuit::new(&local_data.comm_and_crh_pp, &local_data.local_data_comm, i as u8),
                 &mut rng,
             )
             .expect("Proving should work");
@@ -161,13 +143,10 @@ fn integration_test() {
             {
                 let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                     local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.clone(),
-                    local_data_comm:    local_data.local_data_comm.clone(),
-                    position:           i as u8,
+                    local_data_comm: local_data.local_data_comm.clone(),
+                    position: i as u8,
                 };
-                assert!(
-                    PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof)
-                        .expect("Proof should verify")
-                );
+                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),

@@ -2,7 +2,7 @@ use crate::crh::{PedersenCRHParameters, PedersenSize};
 use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
-    curves::{Field, Group, to_field_vec::ToConstraintField},
+    curves::{to_field_vec::ToConstraintField, Field, Group},
 };
 
 use rand::Rng;
@@ -98,8 +98,7 @@ impl<G: Group, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCR
     }
 }
 
-impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCRH<G, S>
-{
+impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCRH<G, S> {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.parameters.to_field_elements()

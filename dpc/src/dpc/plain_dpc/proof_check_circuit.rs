@@ -1,8 +1,6 @@
 use crate::{
     constraints::{plain_dpc::execute_proof_check_gadget, Assignment},
-    dpc::plain_dpc::{
-        parameters::CommAndCRHPublicParameters, predicate::PrivatePredInput, PlainDPCComponents,
-    },
+    dpc::plain_dpc::{parameters::CommAndCRHPublicParameters, predicate::PrivatePredInput, PlainDPCComponents},
 };
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
@@ -16,7 +14,7 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 #[derivative(Clone(bound = "C: PlainDPCComponents"))]
 pub struct ProofCheckVerifierInput<C: PlainDPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
-    pub predicate_comm:  <C::PredVkComm as CommitmentScheme>::Output,
+    pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
 }
 
@@ -71,8 +69,8 @@ pub struct ProofCheckCircuit<C: PlainDPCComponents> {
 
     new_private_pred_inputs: Option<Vec<PrivatePredInput<C>>>,
 
-    predicate_comm:  Option<<C::PredVkComm as CommitmentScheme>::Output>,
-    predicate_rand:  Option<<C::PredVkComm as CommitmentScheme>::Randomness>,
+    predicate_comm: Option<<C::PredVkComm as CommitmentScheme>::Output>,
+    predicate_rand: Option<<C::PredVkComm as CommitmentScheme>::Randomness>,
     local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
 }
 
@@ -84,12 +82,8 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
 
-        let old_private_pred_inputs =
-            Some(vec![predicate_nizk_vk_and_proof.clone(); num_input_records]);
-        let new_private_pred_inputs = Some(vec![
-            predicate_nizk_vk_and_proof.clone();
-            num_output_records
-        ]);
+        let old_private_pred_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_input_records]);
+        let new_private_pred_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_output_records]);
 
         let predicate_comm = Some(<C::PredVkComm as CommitmentScheme>::Output::default());
         let predicate_rand = Some(<C::PredVkComm as CommitmentScheme>::Randomness::default());
@@ -135,8 +129,8 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
 
             new_private_pred_inputs: Some(new_private_pred_inputs.to_vec()),
 
-            predicate_comm:  Some(predicate_comm.clone()),
-            predicate_rand:  Some(predicate_rand.clone()),
+            predicate_comm: Some(predicate_comm.clone()),
+            predicate_rand: Some(predicate_rand.clone()),
             local_data_comm: Some(local_data_comm.clone()),
         }
     }
@@ -147,10 +141,7 @@ where
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
-    fn generate_constraints<CS: ConstraintSystem<C::ProofCheckF>>(
-        self,
-        cs: &mut CS,
-    ) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<C::ProofCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_proof_check_gadget::<C, CS>(
             cs,
             self.comm_and_crh_parameters.get()?,

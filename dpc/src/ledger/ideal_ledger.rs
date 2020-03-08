@@ -12,8 +12,8 @@ use std::{
 };
 
 pub struct IdealLedger<T: Transaction, P: MerkleParameters>
-    where
-        T::Commitment: ToBytes,
+where
+    T::Commitment: ToBytes,
 {
     crh_params: Rc<P::H>,
     transactions: Vec<T>,
@@ -32,17 +32,16 @@ pub struct IdealLedger<T: Transaction, P: MerkleParameters>
 }
 
 impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P>
-    where
-        T: Eq,
-        T::Commitment: ToBytes + Clone,
-        T::SerialNumber: ToBytes + Clone,
-        T::Memorandum: Hash + Clone,
+where
+    T: Eq,
+    T::Commitment: ToBytes + Clone,
+    T::SerialNumber: ToBytes + Clone,
+    T::Memorandum: Hash + Clone,
 {
-    type Parameters = P;
-
     type Commitment = T::Commitment;
-    type SerialNumber = T::SerialNumber;
     type Memo = T::Memorandum;
+    type Parameters = P;
+    type SerialNumber = T::SerialNumber;
     type Transaction = T;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParams<Self::Parameters>, LedgerError> {
@@ -168,10 +167,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P>
     }
 
     fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, LedgerError> {
-        let cm_index = self
-            .comm_to_index
-            .get(cm)
-            .ok_or(LedgerError::InvalidCmIndex)?;
+        let cm_index = self.comm_to_index.get(cm).ok_or(LedgerError::InvalidCmIndex)?;
 
         let result = self.cm_merkle_tree.generate_proof(*cm_index, cm)?;
 

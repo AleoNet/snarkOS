@@ -1,8 +1,13 @@
 use crate::{
     dpc::plain_dpc::{
-        core_checks_circuit::*, predicate::DPCPredicate, proof_check_circuit::*,
-        transaction::DPCTransaction, LocalData as DPCLocalData, PlainDPCComponents, DPC,
+        core_checks_circuit::*,
+        predicate::DPCPredicate,
         predicate_circuit::{EmptyPredicateCircuit, PredicateLocalData},
+        proof_check_circuit::*,
+        transaction::DPCTransaction,
+        LocalData as DPCLocalData,
+        PlainDPCComponents,
+        DPC,
     },
     ledger::ideal_ledger::IdealLedger,
 };
@@ -26,9 +31,7 @@ use snarkos_gadgets::{
         prf::Blake2sGadget,
         snark::GM17VerifierGadget,
     },
-    curves::{
-        bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget,
-    },
+    curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::algorithms::CRH;
 
@@ -41,32 +44,32 @@ pub struct SnNonceWindow;
 // `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 + 8 + 256 bits
 const SN_NONCE_SIZE_BITS: usize = NUM_INPUT_RECORDS * 2 * 256 + 8 + 256;
 impl PedersenSize for SnNonceWindow {
-    const WINDOW_SIZE: usize = SN_NONCE_SIZE_BITS / 8;
     const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = SN_NONCE_SIZE_BITS / 8;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
-    const WINDOW_SIZE: usize = 248;
     const NUM_WINDOWS: usize = 38;
+    const WINDOW_SIZE: usize = 248;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LocalDataWindow;
 
 impl PedersenSize for LocalDataWindow {
-    const WINDOW_SIZE: usize = 248;
     const NUM_WINDOWS: usize = 30;
+    const WINDOW_SIZE: usize = 248;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct TwoToOneWindow;
 // `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 bits
 impl PedersenSize for TwoToOneWindow {
-    const WINDOW_SIZE: usize = 128;
     const NUM_WINDOWS: usize = 4;
+    const WINDOW_SIZE: usize = 128;
 }
 
 type H = MerkleTreeCRH;
@@ -94,51 +97,45 @@ impl Default for CommitmentMerkleParameters {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RecordWindow;
 impl PedersenSize for RecordWindow {
-    const WINDOW_SIZE: usize = 225;
     const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 225;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct AddressWindow;
 impl PedersenSize for AddressWindow {
-    const WINDOW_SIZE: usize = 128;
     const NUM_WINDOWS: usize = 4;
+    const WINDOW_SIZE: usize = 128;
 }
 
 pub struct Components;
 
 impl PlainDPCComponents for Components {
-    const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
-    const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
-
-    type CoreCheckF = CoreCheckF;
-    type ProofCheckF = ProofCheckF;
-
-    type MerkleParameters = CommitmentMerkleParameters;
-    type MerkleTree_HGadget = MerkleTreeCRHGadget;
-
     type AddrC = AddressComm;
-    type RecC = RecordComm;
-
     type AddrCGadget = AddressCommGadget;
-    type RecCGadget = RecordCommGadget;
-
-    type SnNonceH = SnNonceCRH;
-    type SnNonceHGadget = SnNonceCRHGadget;
-    type MainNIZK = CoreCheckNIZK;
-    type ProofCheckNIZK = ProofCheckNIZK;
-    type P = PRF;
-    type PGadget = PRFGadget;
-
-    type PredicateNIZK = PredicateNIZK<Self>;
-    type PredicateNIZKGadget = PredicateNIZKGadget;
-
-    type PredVkH = PredVkCRH;
-    type PredVkHGadget = PredVkCRHGadget;
-    type PredVkComm = PredicateComm;
-    type PredVkCommGadget = PredicateCommGadget;
+    type CoreCheckF = CoreCheckF;
     type LocalDataComm = LocalDataComm;
     type LocalDataCommGadget = LocalDataCommGadget;
+    type MainNIZK = CoreCheckNIZK;
+    type MerkleParameters = CommitmentMerkleParameters;
+    type MerkleTree_HGadget = MerkleTreeCRHGadget;
+    type P = PRF;
+    type PGadget = PRFGadget;
+    type PredVkComm = PredicateComm;
+    type PredVkCommGadget = PredicateCommGadget;
+    type PredVkH = PredVkCRH;
+    type PredVkHGadget = PredVkCRHGadget;
+    type PredicateNIZK = PredicateNIZK<Self>;
+    type PredicateNIZKGadget = PredicateNIZKGadget;
+    type ProofCheckF = ProofCheckF;
+    type ProofCheckNIZK = ProofCheckNIZK;
+    type RecC = RecordComm;
+    type RecCGadget = RecordCommGadget;
+    type SnNonceH = SnNonceCRH;
+    type SnNonceHGadget = SnNonceCRHGadget;
+
+    const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
+    const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
 }
 
 // Native primitives
@@ -158,10 +155,8 @@ pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredVkCRH = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
 pub type Predicate = DPCPredicate<Components>;
-pub type CoreCheckNIZK =
-    GM17<CoreCheckPairing, CoreChecksCircuit<Components>, CoreChecksVerifierInput<Components>>;
-pub type ProofCheckNIZK =
-    GM17<ProofCheckPairing, ProofCheckCircuit<Components>, ProofCheckVerifierInput<Components>>;
+pub type CoreCheckNIZK = GM17<CoreCheckPairing, CoreChecksCircuit<Components>, CoreChecksVerifierInput<Components>>;
+pub type ProofCheckNIZK = GM17<ProofCheckPairing, ProofCheckCircuit<Components>, ProofCheckVerifierInput<Components>>;
 pub type PredicateNIZK<C> = GM17<CoreCheckPairing, EmptyPredicateCircuit<C>, PredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
@@ -178,7 +173,6 @@ pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, E
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateNIZKGadget = GM17VerifierGadget<CoreCheckPairing, ProofCheckF, PairingGadget>;
-
 
 pub type MerkleTreeIdealLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;

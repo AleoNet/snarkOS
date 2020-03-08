@@ -2,7 +2,7 @@ use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
-    curves::{AffineCurve, Field, Group, ProjectiveCurve, to_field_vec::ToConstraintField},
+    curves::{to_field_vec::ToConstraintField, AffineCurve, Field, Group, ProjectiveCurve},
 };
 
 use rand::Rng;
@@ -27,7 +27,7 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CRH for PedersenCompressedCRH<
     /// Returns the affine x-coordinate as the collision-resistant hash output.
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         let crh = PedersenCRH::<G, S> {
-            parameters: self.parameters.clone()
+            parameters: self.parameters.clone(),
         };
 
         let output = crh.hash(input)?;
@@ -47,7 +47,8 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> From<PedersenCRHParameters<G, 
     }
 }
 
-impl<F: Field, G: Group + ProjectiveCurve + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCompressedCRH<G, S>
+impl<F: Field, G: Group + ProjectiveCurve + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F>
+    for PedersenCompressedCRH<G, S>
 {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {

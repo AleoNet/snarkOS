@@ -13,7 +13,7 @@ pub enum CommitmentError {
 }
 
 impl From<CRHError> for CommitmentError {
-   fn from(error: CRHError) -> Self {
-       CommitmentError::CRHError(error)
-   }
+    fn from(error: CRHError) -> Self {
+        CommitmentError::CRHError(error)
+    }
 }

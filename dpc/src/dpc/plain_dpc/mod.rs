@@ -1,8 +1,5 @@
 use crate::{
-    dpc::{
-        AddressKeyPair, DPCScheme, Predicate,
-        Record, Transaction,
-    },
+    dpc::{AddressKeyPair, DPCScheme, Predicate, Record, Transaction},
     ledger::*,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
@@ -10,10 +7,7 @@ use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, PRF, SNARK},
     curves::PrimeField,
-    gadgets::algorithms::{
-        CommitmentGadget, CRHGadget, PRFGadget,
-        SNARKVerifierGadget,
-    },
+    gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SNARKVerifierGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -141,18 +135,18 @@ pub struct DPC<Components: PlainDPCComponents> {
 /// stores references to existing information like old records and secret keys.
 pub(crate) struct ExecuteContext<'a, Components: PlainDPCComponents> {
     comm_and_crh_pp: &'a CommAndCRHPublicParameters<Components>,
-    ledger_digest:   MerkleTreeDigest<Components::MerkleParameters>,
+    ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
 
     // Old record stuff
     old_address_secret_keys: &'a [AddressSecretKey<Components>],
-    old_records:             &'a [DPCRecord<Components>],
-    old_witnesses:           Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers:      Vec<<Components::P as PRF>::Output>,
+    old_records: &'a [DPCRecord<Components>],
+    old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
+    old_serial_numbers: Vec<<Components::P as PRF>::Output>,
 
     // New record stuff
-    new_records:             Vec<DPCRecord<Components>>,
+    new_records: Vec<DPCRecord<Components>>,
     new_sn_nonce_randomness: Vec<[u8; 32]>,
-    new_commitments:         Vec<<Components::RecC as CommitmentScheme>::Output>,
+    new_commitments: Vec<<Components::RecC as CommitmentScheme>::Output>,
 
     // Predicate and local data commitment and randomness
     predicate_comm: <Components::PredVkComm as CommitmentScheme>::Output,
@@ -167,7 +161,7 @@ impl<Components: PlainDPCComponents> ExecuteContext<'_, Components> {
         LocalData {
             comm_and_crh_pp: self.comm_and_crh_pp.clone(),
 
-            old_records:        self.old_records.to_vec(),
+            old_records: self.old_records.to_vec(),
             old_serial_numbers: self.old_serial_numbers.to_vec(),
 
             new_records: self.new_records.to_vec(),
@@ -183,7 +177,7 @@ pub struct LocalData<Components: PlainDPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<Components>,
 
     // Old records and serial numbers
-    pub old_records:        Vec<DPCRecord<Components>>,
+    pub old_records: Vec<DPCRecord<Components>>,
     pub old_serial_numbers: Vec<<Components::P as PRF>::Output>,
 
     // New records
@@ -240,14 +234,9 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         comm_and_crh_pp: &CommAndCRHPublicParameters<Components>,
         rng: &mut R,
     ) -> Result<PredNIZKParameters<Components>, DPCError> {
-        let (pk, pvk) =
-            Components::PredicateNIZK::setup(EmptyPredicateCircuit::blank(comm_and_crh_pp), rng)?;
+        let (pk, pvk) = Components::PredicateNIZK::setup(EmptyPredicateCircuit::blank(comm_and_crh_pp), rng)?;
 
-        let proof = Components::PredicateNIZK::prove(
-            &pk,
-            EmptyPredicateCircuit::blank(comm_and_crh_pp),
-            rng,
-        )?;
+        let proof = Components::PredicateNIZK::prove(&pk, EmptyPredicateCircuit::blank(comm_and_crh_pp), rng)?;
 
         Ok(PredNIZKParameters {
             pk,
@@ -298,11 +287,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
             sn_nonce                       // 256 bits = 32 bytes
         ]?;
 
-        let commitment = Components::RecC::commit(
-            &parameters.rec_comm_pp,
-            &commitment_input,
-            &commitment_randomness,
-        )?;
+        let commitment = Components::RecC::commit(&parameters.rec_comm_pp, &commitment_input, &commitment_randomness)?;
 
         let record = DPCRecord {
             address_public_key: address_public_key.clone(),
@@ -343,10 +328,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
             r_pk,
         };
 
-        Ok(AddressPair {
-            public_key,
-            secret_key,
-        })
+        Ok(AddressPair { public_key, secret_key })
     }
 
     pub(crate) fn execute_helper<'a, L, R: Rng>(
@@ -377,10 +359,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_address_secret_keys.len());
 
-        assert_eq!(
-            Components::NUM_OUTPUT_RECORDS,
-            new_address_public_keys.len()
-        );
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_address_public_keys.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -479,13 +458,9 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
 
-        let local_data_rand =
-            <Components::LocalDataComm as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm = Components::LocalDataComm::commit(
-            &parameters.local_data_comm_pp,
-            &predicate_input,
-            &local_data_rand,
-        )?;
+        let local_data_rand = <Components::LocalDataComm as CommitmentScheme>::Randomness::rand(rng);
+        let local_data_comm =
+            Components::LocalDataComm::commit(&parameters.local_data_comm_pp, &predicate_input, &local_data_rand)?;
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
@@ -498,13 +473,8 @@ impl<Components: PlainDPCComponents> DPC<Components> {
             for hash in new_birth_pred_hashes {
                 input.extend_from_slice(&hash);
             }
-            let predicate_rand =
-                <Components::PredVkComm as CommitmentScheme>::Randomness::rand(rng);
-            let predicate_comm = Components::PredVkComm::commit(
-                &parameters.pred_vk_comm_pp,
-                &input,
-                &predicate_rand,
-            )?;
+            let predicate_rand = <Components::PredVkComm as CommitmentScheme>::Randomness::rand(rng);
+            let predicate_comm = Components::PredVkComm::commit(&parameters.pred_vk_comm_pp, &input, &predicate_rand)?;
             (predicate_comm, predicate_rand)
         };
         end_timer!(pred_hash_comm_timer);
@@ -543,16 +513,19 @@ where
 {
     type AddressKeyPair = AddressPair<Components>;
     type Auxiliary = [u8; 32];
+    type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
-    type Payload = <Self::Record as Record>::Payload;
     type Parameters = PublicParameters<Components>;
+    type Payload = <Self::Record as Record>::Payload;
     type Predicate = DPCPredicate<Components>;
     type PrivatePredInput = PrivatePredInput<Components>;
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
-    type LocalData = LocalData<Components>;
 
-    fn setup<R: Rng>(ledger_pp: &MerkleTreeParams<Components::MerkleParameters>, rng: &mut R) -> Result<Self::Parameters, DPCError> {
+    fn setup<R: Rng>(
+        ledger_pp: &MerkleTreeParams<Components::MerkleParameters>,
+        rng: &mut R,
+    ) -> Result<Self::Parameters, DPCError> {
         let setup_time = start_timer!(|| "PlainDPC::Setup");
         let comm_and_crh_pp = Self::generate_comm_and_crh_parameters(rng)?;
 
@@ -561,22 +534,17 @@ where
         end_timer!(pred_nizk_setup_time);
 
         let private_pred_input = PrivatePredInput {
-            vk:    pred_nizk_pp.vk.clone(),
+            vk: pred_nizk_pp.vk.clone(),
             proof: pred_nizk_pp.proof.clone(),
         };
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");
-        let core_nizk_pp = Components::MainNIZK::setup(
-            CoreChecksCircuit::blank(&comm_and_crh_pp, ledger_pp),
-            rng,
-        )?;
+        let core_nizk_pp = Components::MainNIZK::setup(CoreChecksCircuit::blank(&comm_and_crh_pp, ledger_pp), rng)?;
         end_timer!(nizk_setup_time);
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Proof Checks NIZK Setup");
-        let proof_check_nizk_pp = Components::ProofCheckNIZK::setup(
-            ProofCheckCircuit::blank(&comm_and_crh_pp, &private_pred_input),
-            rng,
-        )?;
+        let proof_check_nizk_pp =
+            Components::ProofCheckNIZK::setup(ProofCheckCircuit::blank(&comm_and_crh_pp, &private_pred_input), rng)?;
         end_timer!(nizk_setup_time);
         end_timer!(setup_time);
         Ok(PublicParameters {
@@ -706,11 +674,7 @@ where
         Ok((new_records, transaction))
     }
 
-    fn verify(
-        parameters: &Self::Parameters,
-        transaction: &Self::Transaction,
-        ledger: &L,
-    ) -> Result<bool, DPCError> {
+    fn verify(parameters: &Self::Parameters, transaction: &Self::Transaction, ledger: &L) -> Result<bool, DPCError> {
         let verify_time = start_timer!(|| "PlainDPC::Verify");
         let ledger_time = start_timer!(|| "Ledger checks");
         for sn in transaction.old_serial_numbers() {
@@ -738,27 +702,23 @@ where
         end_timer!(ledger_time);
 
         let input = CoreChecksVerifierInput {
-            comm_and_crh_pp:    parameters.comm_and_crh_pp.clone(),
-            ledger_pp:          ledger.parameters().clone(),
-            ledger_digest:      transaction.stuff.digest.clone(),
+            comm_and_crh_pp: parameters.comm_and_crh_pp.clone(),
+            ledger_pp: ledger.parameters().clone(),
+            ledger_digest: transaction.stuff.digest.clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
-            new_commitments:    transaction.new_commitments().to_vec(),
-            memo:               transaction.memorandum().clone(),
-            predicate_comm:     transaction.stuff.predicate_comm.clone(),
-            local_data_comm:    transaction.stuff.local_data_comm.clone(),
+            new_commitments: transaction.new_commitments().to_vec(),
+            memo: transaction.memorandum().clone(),
+            predicate_comm: transaction.stuff.predicate_comm.clone(),
+            local_data_comm: transaction.stuff.local_data_comm.clone(),
         };
-        if !Components::MainNIZK::verify(
-            &parameters.core_nizk_pp.1,
-            &input,
-            &transaction.stuff.core_proof,
-        )? {
+        if !Components::MainNIZK::verify(&parameters.core_nizk_pp.1, &input, &transaction.stuff.core_proof)? {
             eprintln!("Core NIZK didn't verify.");
             return Ok(false);
         };
 
         let input = ProofCheckVerifierInput {
             comm_and_crh_pp: parameters.comm_and_crh_pp.clone(),
-            predicate_comm:  transaction.stuff.predicate_comm.clone(),
+            predicate_comm: transaction.stuff.predicate_comm.clone(),
             local_data_comm: transaction.stuff.local_data_comm.clone(),
         };
 

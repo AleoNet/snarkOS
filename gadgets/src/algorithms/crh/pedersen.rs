@@ -1,10 +1,10 @@
-use snarkos_algorithms::crh::{PedersenCRH, PedersenCompressedCRH, PedersenCRHParameters, PedersenSize};
+use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenCompressedCRH, PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         algorithms::CRHGadget,
-        curves::{GroupGadget, CompressedGroupGadget},
+        curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
@@ -123,15 +123,14 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
 //     }
 // }
 
-
 pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
     _group: PhantomData<*const G>,
     _group_gadget: PhantomData<*const GG>,
     _engine: PhantomData<F>,
 }
 
-impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize> CRHGadget<PedersenCompressedCRH<G, S>, F>
-for PedersenCompressedCRHGadget<G, F, GG>
+impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    CRHGadget<PedersenCompressedCRH<G, S>, F> for PedersenCompressedCRHGadget<G, F, GG>
 {
     type OutputGadget = GG::BaseFieldGadget;
     type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;
@@ -156,10 +155,6 @@ for PedersenCompressedCRHGadget<G, F, GG>
         let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.into_bits_le()).collect();
         let input_in_bits = input_in_bits.chunks(S::WINDOW_SIZE);
 
-        Ok(GG::precomputed_base_multiscalar_mul(
-            cs,
-            &parameters.parameters.bases,
-            input_in_bits,
-        )?.to_x_coordinate())
+        Ok(GG::precomputed_base_multiscalar_mul(cs, &parameters.parameters.bases, input_in_bits)?.to_x_coordinate())
     }
 }

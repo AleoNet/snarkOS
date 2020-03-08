@@ -1,6 +1,7 @@
 use crate::{
-    constraints::Assignment, dpc::Record, plain_dpc::parameters::CommAndCRHPublicParameters,
-    plain_dpc::record::DPCRecord, plain_dpc::*
+    constraints::Assignment,
+    dpc::Record,
+    plain_dpc::{parameters::CommAndCRHPublicParameters, record::DPCRecord, *},
 };
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
@@ -16,62 +17,44 @@ use snarkos_utilities::bytes::ToBytes;
 use std::io::{Result as IoResult, Write};
 
 pub struct PredicateHashInput<C: PlainDPCComponents> {
-    pub old_rec_comms:      Vec<<C::RecC as CommitmentScheme>::Output>,
-    pub old_apks:           Vec<<C::AddrC as CommitmentScheme>::Output>,
-    pub old_dummy_flags:    Vec<bool>,
-    pub old_payloads:       Vec<<DPCRecord<C> as Record>::Payload>,
+    pub old_rec_comms: Vec<<C::RecC as CommitmentScheme>::Output>,
+    pub old_apks: Vec<<C::AddrC as CommitmentScheme>::Output>,
+    pub old_dummy_flags: Vec<bool>,
+    pub old_payloads: Vec<<DPCRecord<C> as Record>::Payload>,
     pub old_death_pred_ids: Vec<Vec<u8>>,
     pub old_birth_pred_ids: Vec<Vec<u8>>,
     pub old_serial_numbers: Vec<<C::P as PRF>::Output>,
 
-    pub new_rec_comms:      Vec<<C::RecC as CommitmentScheme>::Output>,
-    pub new_apks:           Vec<<C::AddrC as CommitmentScheme>::Output>,
-    pub new_dummy_flags:    Vec<bool>,
-    pub new_payloads:       Vec<<DPCRecord<C> as Record>::Payload>,
+    pub new_rec_comms: Vec<<C::RecC as CommitmentScheme>::Output>,
+    pub new_apks: Vec<<C::AddrC as CommitmentScheme>::Output>,
+    pub new_dummy_flags: Vec<bool>,
+    pub new_payloads: Vec<<DPCRecord<C> as Record>::Payload>,
     pub new_death_pred_ids: Vec<Vec<u8>>,
     pub new_birth_pred_ids: Vec<Vec<u8>>,
 
-    pub memo:      [u8; 32],
+    pub memo: [u8; 32],
     pub auxiliary: [u8; 32],
 }
 
 impl<C: PlainDPCComponents> Default for PredicateHashInput<C> {
     fn default() -> Self {
         Self {
-            old_rec_comms:      vec![
-                <C::RecC as CommitmentScheme>::Output::default();
-                C::NUM_INPUT_RECORDS
-            ],
-            old_apks:           vec![
-                <C::AddrC as CommitmentScheme>::Output::default();
-                C::NUM_INPUT_RECORDS
-            ],
-            old_dummy_flags:    vec![false; C::NUM_INPUT_RECORDS],
-            old_payloads:       vec![
-                <DPCRecord<C> as Record>::Payload::default();
-                C::NUM_INPUT_RECORDS
-            ],
+            old_rec_comms: vec![<C::RecC as CommitmentScheme>::Output::default(); C::NUM_INPUT_RECORDS],
+            old_apks: vec![<C::AddrC as CommitmentScheme>::Output::default(); C::NUM_INPUT_RECORDS],
+            old_dummy_flags: vec![false; C::NUM_INPUT_RECORDS],
+            old_payloads: vec![<DPCRecord<C> as Record>::Payload::default(); C::NUM_INPUT_RECORDS],
             old_death_pred_ids: vec![vec![0u8; 48]; C::NUM_INPUT_RECORDS],
             old_birth_pred_ids: vec![vec![0u8; 48]; C::NUM_INPUT_RECORDS],
             old_serial_numbers: vec![<C::P as PRF>::Output::default(); C::NUM_INPUT_RECORDS],
 
-            new_rec_comms:      vec![
-                <C::RecC as CommitmentScheme>::Output::default();
-                C::NUM_OUTPUT_RECORDS
-            ],
-            new_apks:           vec![
-                <C::AddrC as CommitmentScheme>::Output::default();
-                C::NUM_OUTPUT_RECORDS
-            ],
-            new_dummy_flags:    vec![false; C::NUM_OUTPUT_RECORDS],
-            new_payloads:       vec![
-                <DPCRecord<C> as Record>::Payload::default();
-                C::NUM_OUTPUT_RECORDS
-            ],
+            new_rec_comms: vec![<C::RecC as CommitmentScheme>::Output::default(); C::NUM_OUTPUT_RECORDS],
+            new_apks: vec![<C::AddrC as CommitmentScheme>::Output::default(); C::NUM_OUTPUT_RECORDS],
+            new_dummy_flags: vec![false; C::NUM_OUTPUT_RECORDS],
+            new_payloads: vec![<DPCRecord<C> as Record>::Payload::default(); C::NUM_OUTPUT_RECORDS],
             new_death_pred_ids: vec![vec![0u8; 48]; C::NUM_OUTPUT_RECORDS],
             new_birth_pred_ids: vec![vec![0u8; 48]; C::NUM_OUTPUT_RECORDS],
 
-            memo:      [0u8; 32],
+            memo: [0u8; 32],
             auxiliary: [0u8; 32],
         }
     }
@@ -105,8 +88,8 @@ impl<C: PlainDPCComponents> ToBytes for PredicateHashInput<C> {
 
 pub struct PredicateLocalData<C: PlainDPCComponents> {
     pub local_data_comm_pp: <C::LocalDataComm as CommitmentScheme>::Parameters,
-    pub local_data_comm:    <C::LocalDataComm as CommitmentScheme>::Output,
-    pub position:           u8,
+    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub position: u8,
 }
 
 // Convert each component to bytes and pack into field elements.
@@ -129,7 +112,7 @@ pub struct EmptyPredicateCircuit<C: PlainDPCComponents> {
 
     // Commitment to Predicate input.
     local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
-    position:        u8,
+    position: u8,
 }
 
 impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
@@ -138,8 +121,8 @@ impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
 
         Self {
             comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
-            local_data_comm:         Some(local_data_comm),
-            position:                0u8,
+            local_data_comm: Some(local_data_comm),
+            position: 0u8,
         }
     }
 
@@ -163,21 +146,15 @@ impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for EmptyPredic
     fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[self.position])?;
 
-        let _local_data_comm_pp =
-            <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare Pred Input Comm parameters"),
-                || {
-                    self.comm_and_crh_parameters
-                        .get()
-                        .map(|pp| &pp.local_data_comm_pp)
-                },
-            )?;
+        let _local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare Pred Input Comm parameters"),
+            || self.comm_and_crh_parameters.get().map(|pp| &pp.local_data_comm_pp),
+        )?;
 
-        let _local_data_comm =
-            <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-                cs.ns(|| "Allocate predicate commitment"),
-                || self.local_data_comm.get(),
-            )?;
+        let _local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+            cs.ns(|| "Allocate predicate commitment"),
+            || self.local_data_comm.get(),
+        )?;
 
         Ok(())
     }

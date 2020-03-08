@@ -2,7 +2,12 @@ use super::instantiated::*;
 use crate::{
     constraints::plain_dpc::{execute_core_checks_gadget, execute_proof_check_gadget},
     dpc::{
-        plain_dpc::{predicate::PrivatePredInput, predicate_circuit::{EmptyPredicateCircuit, PredicateLocalData}, ExecuteContext, DPC},
+        plain_dpc::{
+            predicate::PrivatePredInput,
+            predicate_circuit::{EmptyPredicateCircuit, PredicateLocalData},
+            ExecuteContext,
+            DPC,
+        },
         Record,
     },
     ledger::Ledger,
@@ -25,24 +30,18 @@ fn test_execute_constraint_systems() {
     // "always-accept" predicate.
     let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
     let comm_and_crh_pp = InstantiatedDPC::generate_comm_and_crh_parameters(&mut rng).unwrap();
-    let pred_nizk_pp =
-        InstantiatedDPC::generate_pred_nizk_parameters(&comm_and_crh_pp, &mut rng).unwrap();
+    let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&comm_and_crh_pp, &mut rng).unwrap();
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.vk.clone().into();
 
-    let pred_nizk_vk_bytes = to_bytes![PredVkCRH::evaluate(
-        &comm_and_crh_pp.pred_vk_crh_pp,
-        &to_bytes![pred_nizk_pp.vk].unwrap()
-    )
-    .unwrap()]
-    .unwrap();
+    let pred_nizk_vk_bytes =
+        to_bytes![PredVkCRH::evaluate(&comm_and_crh_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap()).unwrap()]
+            .unwrap();
 
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
-    let genesis_address =
-        DPC::create_address_helper(&comm_and_crh_pp, &genesis_metadata, &mut rng).unwrap();
-    let genesis_sn_nonce =
-        SnNonceCRH::evaluate(&comm_and_crh_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
+    let genesis_address = DPC::create_address_helper(&comm_and_crh_pp, &genesis_metadata, &mut rng).unwrap();
+    let genesis_sn_nonce = SnNonceCRH::evaluate(&comm_and_crh_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
         &comm_and_crh_pp,
         &genesis_sn_nonce,
@@ -75,8 +74,7 @@ fn test_execute_constraint_systems() {
 
     // Create an address for an actual new record.
     let new_metadata = [1u8; 32];
-    let new_address =
-        DPC::create_address_helper(&comm_and_crh_pp, &new_metadata, &mut rng).unwrap();
+    let new_address = DPC::create_address_helper(&comm_and_crh_pp, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
     let new_payload = [1u8; 32];
@@ -184,13 +182,10 @@ fn test_execute_constraint_systems() {
         {
             let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.clone(),
-                local_data_comm:    local_data_comm.clone(),
-                position:           i as u8,
+                local_data_comm: local_data_comm.clone(),
+                position: i as u8,
             };
-            assert!(
-                PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof)
-                    .expect("Proof should verify")
-            );
+            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
         let private_input: PrivatePredInput<Components> = PrivatePredInput {
             vk: pred_nizk_pp.vk.clone(),

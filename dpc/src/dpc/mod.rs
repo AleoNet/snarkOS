@@ -127,9 +127,5 @@ pub trait DPCScheme<L: Ledger> {
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;
 
     /// Returns true iff the transaction is valid according to the ledger.
-    fn verify(
-        parameters: &Self::Parameters,
-        transaction: &Self::Transaction,
-        ledger: &L,
-    ) -> Result<bool, DPCError>;
+    fn verify(parameters: &Self::Parameters, transaction: &Self::Transaction, ledger: &L) -> Result<bool, DPCError>;
 }

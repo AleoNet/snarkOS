@@ -1,9 +1,4 @@
-#![deny(
-    unused_import_braces,
-    unused_qualifications,
-    trivial_casts,
-    trivial_numeric_casts
-)]
+#![deny(unused_import_braces, unused_qualifications, trivial_casts, trivial_numeric_casts)]
 #![deny(
     single_use_lifetimes,
     unused_qualifications,
@@ -48,10 +43,10 @@ extern crate snarkos_profiler;
 #[macro_use]
 extern crate derivative;
 
-pub(crate) mod dpc;
 pub mod constraints;
+pub(crate) mod dpc;
 pub mod ledger;
 
-pub type Error  = Box<dyn std::error::Error>;
+pub type Error = Box<dyn std::error::Error>;
 
 pub use crate::dpc::*;

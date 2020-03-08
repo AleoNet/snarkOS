@@ -5,14 +5,14 @@ use snarkos_models::algorithms::SNARK;
 use std::marker::PhantomData;
 
 pub struct PrivatePredInput<C: PlainDPCComponents> {
-    pub vk:    <C::PredicateNIZK as SNARK>::VerificationParameters,
+    pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateNIZK as SNARK>::Proof,
 }
 
 impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
     fn default() -> Self {
         Self {
-            vk:    <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
+            vk: <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
             proof: <C::PredicateNIZK as SNARK>::Proof::default(),
         }
     }
@@ -21,17 +21,14 @@ impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
 impl<C: PlainDPCComponents> Clone for PrivatePredInput<C> {
     fn clone(&self) -> Self {
         Self {
-            vk:    self.vk.clone(),
+            vk: self.vk.clone(),
             proof: self.proof.clone(),
         }
     }
 }
 
 #[derive(Derivative)]
-#[derivative(
-    Clone(bound = "C: PlainDPCComponents"),
-    Default(bound = "C: PlainDPCComponents")
-)]
+#[derivative(Clone(bound = "C: PlainDPCComponents"), Default(bound = "C: PlainDPCComponents"))]
 pub struct DPCPredicate<C: PlainDPCComponents> {
     #[derivative(Default(value = "vec![0u8; 32]"))]
     identity: Vec<u8>,
@@ -48,8 +45,8 @@ impl<C: PlainDPCComponents> DPCPredicate<C> {
 }
 
 impl<C: PlainDPCComponents> Predicate for DPCPredicate<C> {
-    type PublicInput = ();
     type PrivateWitness = PrivatePredInput<C>;
+    type PublicInput = ();
 
     fn evaluate(&self, _p: &Self::PublicInput, _w: &Self::PrivateWitness) -> bool {
         unimplemented!()

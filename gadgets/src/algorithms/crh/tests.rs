@@ -47,10 +47,10 @@ fn crh_primitive_gadget_test() {
     let crh = TestCRH::setup(rng);
     let native_result = crh.hash(&input).unwrap();
 
-    let parameters_gadget = <TestCRHGadget as CRHGadget<TestCRH, Fr>>::ParametersGadget::alloc(
-        &mut cs.ns(|| "gadget_parameters"),
-        || Ok(&crh.parameters),
-    )
+    let parameters_gadget =
+        <TestCRHGadget as CRHGadget<TestCRH, Fr>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || {
+            Ok(&crh.parameters)
+        })
         .unwrap();
     println!("number of constraints for input + params: {}", cs.num_constraints());
 
@@ -59,7 +59,7 @@ fn crh_primitive_gadget_test() {
         &parameters_gadget,
         &input_bytes,
     )
-        .unwrap();
+    .unwrap();
 
     println!("number of constraints total: {}", cs.num_constraints());
 

@@ -42,9 +42,7 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
     }
 }
 
-impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F>
-for PedersenCRHParameters<G, S>
-{
+impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCRHParameters<G, S> {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         Ok(Vec::new())

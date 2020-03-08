@@ -1,10 +1,20 @@
-use crate::{algorithms::{crh::PedersenCRHGadget, merkle_tree::*}, curves::edwards_bls12::EdwardsBlsGadget};
+use crate::{
+    algorithms::{crh::PedersenCRHGadget, merkle_tree::*},
+    curves::edwards_bls12::EdwardsBlsGadget,
+};
 use snarkos_algorithms::{
     crh::{PedersenCRH, PedersenSize},
     merkle_tree::{MerkleParameters, MerkleTree},
 };
 use snarkos_curves::edwards_bls12::{EdwardsAffine as Edwards, Fq};
-use snarkos_models::{algorithms::CRH, gadgets::{algorithms::CRHGadget, r1cs::{ConstraintSystem, TestConstraintSystem}, utilities::{alloc::AllocGadget, uint8::UInt8}}};
+use snarkos_models::{
+    algorithms::CRH,
+    gadgets::{
+        algorithms::CRHGadget,
+        r1cs::{ConstraintSystem, TestConstraintSystem},
+        utilities::{alloc::AllocGadget, uint8::UInt8},
+    },
+};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
@@ -61,16 +71,16 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
                 Ok(root)
             }
         })
-            .unwrap();
+        .unwrap();
 
         let constraints_from_digest = cs.num_constraints();
         println!("constraints from digest: {}", constraints_from_digest);
 
         // Allocate Parameters for CRH
-        let crh_parameters = <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(
-            &mut cs.ns(|| format!("new_parameters_{}", i)),
-            || Ok(crh_parameters.clone()),
-        )
+        let crh_parameters =
+            <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| format!("new_parameters_{}", i)), || {
+                Ok(crh_parameters.clone())
+            })
             .unwrap();
 
         let constraints_from_parameters = cs.num_constraints() - constraints_from_digest;
@@ -96,7 +106,7 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
             &root,
             &leaf_g,
         )
-            .unwrap();
+        .unwrap();
         if !cs.is_satisfied() {
             satisfied = false;
             println!("Unsatisfied constraint: {}", cs.which_is_unsatisfied().unwrap());

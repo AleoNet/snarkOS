@@ -38,7 +38,7 @@ impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
 }
 
 impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F>
-for PedersenCommitmentParameters<G, S>
+    for PedersenCommitmentParameters<G, S>
 {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {

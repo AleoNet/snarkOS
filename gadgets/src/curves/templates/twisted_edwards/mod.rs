@@ -3,7 +3,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, MontgomeryModelParameters, TEModelParameters},
     gadgets::{
-        curves::{FieldGadget, GroupGadget, CompressedGroupGadget},
+        curves::{CompressedGroupGadget, FieldGadget, GroupGadget},
         r1cs::{ConstraintSystem, Namespace},
         utilities::{
             alloc::AllocGadget,
@@ -966,9 +966,8 @@ mod projective_impl {
         }
     }
 
-
-    impl<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>>
-    CompressedGroupGadget<TEProjective<P>, F> for AffineGadget<P, F, FG>
+    impl<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>> CompressedGroupGadget<TEProjective<P>, F>
+        for AffineGadget<P, F, FG>
     {
         type BaseFieldGadget = FG;
 

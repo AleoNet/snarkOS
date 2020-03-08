@@ -1,8 +1,5 @@
 use crate::dpc::{
-    plain_dpc::{
-        address::AddressPublicKey, predicate::DPCPredicate,
-        PlainDPCComponents,
-    },
+    plain_dpc::{address::AddressPublicKey, predicate::DPCPredicate, PlainDPCComponents},
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, PRF};
@@ -11,15 +8,12 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use std::marker::PhantomData;
 
 #[derive(Derivative)]
-#[derivative(
-    Default(bound = "C: PlainDPCComponents"),
-    Clone(bound = "C: PlainDPCComponents")
-)]
+#[derivative(Default(bound = "C: PlainDPCComponents"), Clone(bound = "C: PlainDPCComponents"))]
 pub struct DPCRecord<C: PlainDPCComponents> {
     pub(super) address_public_key: AddressPublicKey<C>,
 
     pub(super) is_dummy: bool,
-    pub(super) payload:  [u8; 32],
+    pub(super) payload: [u8; 32],
 
     #[derivative(Default(value = "default_predicate_hash::<C::PredVkH>()"))]
     pub(super) birth_predicate_repr: Vec<u8>,
@@ -28,7 +22,7 @@ pub struct DPCRecord<C: PlainDPCComponents> {
 
     pub(super) serial_number_nonce: <C::SnNonceH as CRH>::Output,
 
-    pub(super) commitment:            <C::RecC as CommitmentScheme>::Output,
+    pub(super) commitment: <C::RecC as CommitmentScheme>::Output,
     pub(super) commitment_randomness: <C::RecC as CommitmentScheme>::Randomness,
 
     pub(super) _components: PhantomData<C>,
@@ -42,11 +36,10 @@ impl<C: PlainDPCComponents> Record for DPCRecord<C> {
     type AddressPublicKey = AddressPublicKey<C>;
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecC as CommitmentScheme>::Randomness;
-
     type Payload = [u8; 32];
     type Predicate = DPCPredicate<C>;
-    type SerialNumberNonce = <C::SnNonceH as CRH>::Output;
     type SerialNumber = <C::P as PRF>::Output;
+    type SerialNumberNonce = <C::SnNonceH as CRH>::Output;
 
     fn address_public_key(&self) -> &Self::AddressPublicKey {
         &self.address_public_key

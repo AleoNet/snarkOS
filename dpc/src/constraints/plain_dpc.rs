@@ -1,8 +1,11 @@
 use crate::{
     dpc::{
         plain_dpc::{
-            address::AddressSecretKey, parameters::CommAndCRHPublicParameters,
-            predicate::PrivatePredInput, record::DPCRecord, PlainDPCComponents,
+            address::AddressSecretKey,
+            parameters::CommAndCRHPublicParameters,
+            predicate::PrivatePredInput,
+            record::DPCRecord,
+            PlainDPCComponents,
         },
         Record,
     },
@@ -15,14 +18,9 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, PRF},
     curves::to_field_vec::ToConstraintField,
     gadgets::{
-        algorithms::{
-            CommitmentGadget, CRHGadget, PRFGadget,
-            SNARKVerifierGadget,
-        },
+        algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SNARKVerifierGadget},
         r1cs::ConstraintSystem,
-        utilities::{
-            alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget,
-        },
+        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -176,30 +174,22 @@ where
     // 5. ledger_digest.
     // 6. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
     // 7. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
-    let (
-        addr_comm_pp,
-        rec_comm_pp,
-        pred_vk_comm_pp,
-        local_data_comm_pp,
-        sn_nonce_crh_pp,
-        ledger_pp,
-    ) = {
+    let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, ledger_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
-        let addr_comm_pp = AddrCGadget::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Addr Comm parameters"),
-            || Ok(&comm_crh_parameters.addr_comm_pp),
-        )?;
+        let addr_comm_pp =
+            AddrCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Addr Comm parameters"), || {
+                Ok(&comm_crh_parameters.addr_comm_pp)
+            })?;
 
-        let rec_comm_pp = RecCGadget::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Rec Comm parameters"),
-            || Ok(&comm_crh_parameters.rec_comm_pp),
-        )?;
+        let rec_comm_pp =
+            RecCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Rec Comm parameters"), || {
+                Ok(&comm_crh_parameters.rec_comm_pp)
+            })?;
 
-        let local_data_comm_pp =
-            <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare Local Data Comm parameters"),
-                || Ok(&comm_crh_parameters.local_data_comm_pp),
-            )?;
+        let local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare Local Data Comm parameters"),
+            || Ok(&comm_crh_parameters.local_data_comm_pp),
+        )?;
 
         let pred_vk_comm_pp =
             <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::ParametersGadget::alloc_input(
@@ -207,10 +197,10 @@ where
                 || Ok(&comm_crh_parameters.pred_vk_comm_pp),
             )?;
 
-        let sn_nonce_crh_pp = SnNonceHGadget::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare SN Nonce CRH parameters"),
-            || Ok(&comm_crh_parameters.sn_nonce_crh_pp),
-        )?;
+        let sn_nonce_crh_pp =
+            SnNonceHGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SN Nonce CRH parameters"), || {
+                Ok(&comm_crh_parameters.sn_nonce_crh_pp)
+            })?;
 
         let ledger_pp = <C::MerkleTree_HGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),
@@ -226,10 +216,10 @@ where
         )
     };
 
-    let digest_gadget =
-        <C::MerkleTree_HGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(&mut cs.ns(|| "Declare ledger digest"), || {
-            Ok(ledger_digest)
-        })?;
+    let digest_gadget = <C::MerkleTree_HGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+        &mut cs.ns(|| "Declare ledger digest"),
+        || Ok(ledger_digest),
+    )?;
 
     for (i, (((record, witness), secret_key), given_serial_number)) in old_records
         .iter()
@@ -256,47 +246,38 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_apk =
-                AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
-                    Ok(&record.address_public_key().public_key)
-                })?;
+            let given_apk = AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
+                Ok(&record.address_public_key().public_key)
+            })?;
             old_apks.push(given_apk.clone());
 
-            let given_commitment =
-                RecCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Commitment"), || {
-                    Ok(record.commitment().clone())
-                })?;
+            let given_commitment = RecCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Commitment"), || {
+                Ok(record.commitment().clone())
+            })?;
             old_rec_comms.push(given_commitment.clone());
 
-            let given_is_dummy =
-                Boolean::alloc(&mut declare_cs.ns(|| "is_dummy"), || Ok(record.is_dummy()))?;
+            let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "is_dummy"), || Ok(record.is_dummy()))?;
             old_dummy_flags.push(given_is_dummy.clone());
 
-            let given_payload =
-                UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), record.payload())?;
+            let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), record.payload())?;
             old_payloads.push(given_payload.clone());
 
-            let given_birth_pred_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "Birth predicate"),
-                &record.birth_predicate_repr(),
-            )?;
+            let given_birth_pred_hash =
+                UInt8::alloc_vec(&mut declare_cs.ns(|| "Birth predicate"), &record.birth_predicate_repr())?;
             old_birth_pred_hashes.push(given_birth_pred_hash.clone());
 
-            let given_death_pred_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "Death predicate"),
-                &record.death_predicate_repr(),
-            )?;
+            let given_death_pred_hash =
+                UInt8::alloc_vec(&mut declare_cs.ns(|| "Death predicate"), &record.death_predicate_repr())?;
             old_death_pred_hashes.push(given_death_pred_hash.clone());
 
-            let given_comm_rand = RecCGadget::RandomnessGadget::alloc(
-                &mut declare_cs.ns(|| "Commitment randomness"),
-                || Ok(record.commitment_randomness()),
-            )?;
-
-            let sn_nonce =
-                SnNonceHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Sn nonce"), || {
-                    Ok(record.serial_number_nonce())
+            let given_comm_rand =
+                RecCGadget::RandomnessGadget::alloc(&mut declare_cs.ns(|| "Commitment randomness"), || {
+                    Ok(record.commitment_randomness())
                 })?;
+
+            let sn_nonce = SnNonceHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Sn nonce"), || {
+                Ok(record.serial_number_nonce())
+            })?;
             (
                 given_apk,
                 given_commitment,
@@ -317,10 +298,10 @@ where
         {
             let witness_cs = &mut cs.ns(|| "Check membership witness");
 
-            let witness_gadget =
-                MerklePathGadget::<_, C::MerkleTree_HGadget, _>::alloc(&mut witness_cs.ns(|| "Declare witness"), || {
-                    Ok(witness)
-                })?;
+            let witness_gadget = MerklePathGadget::<_, C::MerkleTree_HGadget, _>::alloc(
+                &mut witness_cs.ns(|| "Declare witness"),
+                || Ok(witness),
+            )?;
 
             witness_gadget.conditionally_check_membership(
                 &mut witness_cs.ns(|| "Perform check"),
@@ -340,16 +321,10 @@ where
         let sk_prf = {
             // Declare variables for addr_sk contents.
             let address_cs = &mut cs.ns(|| "Check address keypair");
-            let sk_prf =
-                PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &secret_key.sk_prf);
-            let metadata = UInt8::alloc_vec(
-                &mut address_cs.ns(|| "Declare metadata"),
-                &secret_key.metadata,
-            )?;
-            let r_pk = AddrCGadget::RandomnessGadget::alloc(
-                &mut address_cs.ns(|| "Declare r_pk"),
-                || Ok(&secret_key.r_pk),
-            )?;
+            let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &secret_key.sk_prf);
+            let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &secret_key.metadata)?;
+            let r_pk =
+                AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || Ok(&secret_key.r_pk))?;
 
             let mut apk_input = sk_prf.clone();
             apk_input.extend_from_slice(&metadata);
@@ -384,10 +359,9 @@ where
                 &sn_nonce_bytes,
             )?;
 
-            let given_sn = PGadget::OutputGadget::alloc_input(
-                &mut sn_cs.ns(|| "Declare given serial number"),
-                || Ok(given_serial_number),
-            )?;
+            let given_sn = PGadget::OutputGadget::alloc_input(&mut sn_cs.ns(|| "Declare given serial number"), || {
+                Ok(given_serial_number)
+            })?;
 
             candidate_serial_number.enforce_equal(
                 &mut sn_cs.ns(|| "Check that given and computed serial numbers are equal"),
@@ -402,8 +376,7 @@ where
         {
             let comm_cs = &mut cs.ns(|| "Check that record is well-formed");
             let apk_bytes = given_apk.to_bytes(&mut comm_cs.ns(|| "Convert apk to bytes"))?;
-            let is_dummy_bytes =
-                given_is_dummy.to_bytes(&mut comm_cs.ns(|| "Convert is_dummy to bytes"))?;
+            let is_dummy_bytes = given_is_dummy.to_bytes(&mut comm_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut comm_input = Vec::new();
             comm_input.extend_from_slice(&apk_bytes);
@@ -429,8 +402,7 @@ where
         let cs = &mut cs.ns(|| "Convert input serial numbers to bytes");
         let mut sn_nonce_input = Vec::new();
         for (i, old_sn) in old_sns.iter().enumerate() {
-            let bytes = old_sn
-                .to_bytes(&mut cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
+            let bytes = old_sn.to_bytes(&mut cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
             sn_nonce_input.extend_from_slice(&bytes);
         }
         sn_nonce_input
@@ -457,49 +429,39 @@ where
             sn_nonce,
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
-            let given_apk =
-                AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
-                    Ok(&record.address_public_key().public_key)
-                })?;
+            let given_apk = AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
+                Ok(&record.address_public_key().public_key)
+            })?;
             new_apks.push(given_apk.clone());
             let given_record_comm = RecCGadget::OutputGadget::alloc(
                 &mut declare_cs.ns(|| "Record Commitment"),
                 || Ok(record.commitment()),
             )?;
             new_rec_comms.push(given_record_comm.clone());
-            let given_comm = RecCGadget::OutputGadget::alloc_input(
-                &mut declare_cs.ns(|| "Given Commitment"),
-                || Ok(commitment),
-            )?;
+            let given_comm =
+                RecCGadget::OutputGadget::alloc_input(&mut declare_cs.ns(|| "Given Commitment"), || Ok(commitment))?;
 
-            let given_is_dummy =
-                Boolean::alloc(&mut declare_cs.ns(|| "is_dummy"), || Ok(record.is_dummy()))?;
+            let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "is_dummy"), || Ok(record.is_dummy()))?;
             new_dummy_flags.push(given_is_dummy.clone());
 
-            let given_payload =
-                UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), record.payload())?;
+            let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), record.payload())?;
             new_payloads.push(given_payload.clone());
 
-            let given_birth_pred_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "Birth predicate"),
-                &record.birth_predicate_repr(),
-            )?;
+            let given_birth_pred_hash =
+                UInt8::alloc_vec(&mut declare_cs.ns(|| "Birth predicate"), &record.birth_predicate_repr())?;
             new_birth_pred_hashes.push(given_birth_pred_hash.clone());
-            let given_death_pred_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "Death predicate"),
-                &record.death_predicate_repr(),
-            )?;
+            let given_death_pred_hash =
+                UInt8::alloc_vec(&mut declare_cs.ns(|| "Death predicate"), &record.death_predicate_repr())?;
             new_death_pred_hashes.push(given_death_pred_hash.clone());
 
-            let given_comm_rand = RecCGadget::RandomnessGadget::alloc(
-                &mut declare_cs.ns(|| "Commitment randomness"),
-                || Ok(record.commitment_randomness()),
-            )?;
-
-            let sn_nonce =
-                SnNonceHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Sn nonce"), || {
-                    Ok(record.serial_number_nonce())
+            let given_comm_rand =
+                RecCGadget::RandomnessGadget::alloc(&mut declare_cs.ns(|| "Commitment randomness"), || {
+                    Ok(record.commitment_randomness())
                 })?;
+
+            let sn_nonce = SnNonceHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Sn nonce"), || {
+                Ok(record.serial_number_nonce())
+            })?;
 
             (
                 given_apk,
@@ -523,10 +485,8 @@ where
             let cur_record_num = UInt8::constant(j);
             let mut cur_record_num_bytes_le = vec![cur_record_num];
 
-            let sn_nonce_randomness = UInt8::alloc_vec(
-                sn_cs.ns(|| "Allocate serial number nonce randomness"),
-                sn_nonce_rand,
-            )?;
+            let sn_nonce_randomness =
+                UInt8::alloc_vec(sn_cs.ns(|| "Allocate serial number nonce randomness"), sn_nonce_rand)?;
             cur_record_num_bytes_le.extend_from_slice(&sn_nonce_randomness);
             cur_record_num_bytes_le.extend_from_slice(&sn_nonce_input);
 
@@ -549,12 +509,9 @@ where
         // *******************************************************************
         {
             let comm_cs = &mut cs.ns(|| "Check that record is well-formed");
-            let apk_bytes =
-                given_apk.to_bytes(&mut comm_cs.ns(|| "Convert Addr PubKey to bytes"))?;
-            let is_dummy_bytes =
-                given_is_dummy.to_bytes(&mut comm_cs.ns(|| "Convert is_dummy to bytes"))?;
-            let sn_nonce_bytes =
-                sn_nonce.to_bytes(&mut comm_cs.ns(|| "Convert sn nonce to bytes"))?;
+            let apk_bytes = given_apk.to_bytes(&mut comm_cs.ns(|| "Convert Addr PubKey to bytes"))?;
+            let is_dummy_bytes = given_is_dummy.to_bytes(&mut comm_cs.ns(|| "Convert is_dummy to bytes"))?;
+            let sn_nonce_bytes = sn_nonce.to_bytes(&mut comm_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             let mut comm_input = Vec::new();
             comm_input.extend_from_slice(&apk_bytes);
@@ -595,17 +552,15 @@ where
             input.extend_from_slice(&new_birth_pred_hashes[j]);
         }
 
-        let given_comm_rand =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::RandomnessGadget::alloc(
-                &mut comm_cs.ns(|| "Commitment randomness"),
-                || Ok(predicate_rand),
-            )?;
+        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::RandomnessGadget::alloc(
+            &mut comm_cs.ns(|| "Commitment randomness"),
+            || Ok(predicate_rand),
+        )?;
 
-        let given_comm =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::OutputGadget::alloc_input(
-                &mut comm_cs.ns(|| "Commitment output"),
-                || Ok(predicate_comm),
-            )?;
+        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::OutputGadget::alloc_input(
+            &mut comm_cs.ns(|| "Commitment output"),
+            || Ok(predicate_comm),
+        )?;
 
         let candidate_commitment =
             <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::check_commitment_gadget(
@@ -626,11 +581,9 @@ where
         let mut local_data_bytes = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with Input Record {}", i));
-            local_data_bytes
-                .extend_from_slice(&old_rec_comms[i].to_bytes(&mut cs.ns(|| "Record Comm"))?);
+            local_data_bytes.extend_from_slice(&old_rec_comms[i].to_bytes(&mut cs.ns(|| "Record Comm"))?);
             local_data_bytes.extend_from_slice(&old_apks[i].to_bytes(&mut cs.ns(|| "Apk"))?);
-            local_data_bytes
-                .extend_from_slice(&old_dummy_flags[i].to_bytes(&mut cs.ns(|| "IsDummy"))?);
+            local_data_bytes.extend_from_slice(&old_dummy_flags[i].to_bytes(&mut cs.ns(|| "IsDummy"))?);
             local_data_bytes.extend_from_slice(&old_payloads[i]);
             local_data_bytes.extend_from_slice(&old_birth_pred_hashes[i]);
             local_data_bytes.extend_from_slice(&old_death_pred_hashes[i]);
@@ -639,11 +592,9 @@ where
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with Output Record {}", j));
-            local_data_bytes
-                .extend_from_slice(&new_rec_comms[j].to_bytes(&mut cs.ns(|| "Record Comm"))?);
+            local_data_bytes.extend_from_slice(&new_rec_comms[j].to_bytes(&mut cs.ns(|| "Record Comm"))?);
             local_data_bytes.extend_from_slice(&new_apks[j].to_bytes(&mut cs.ns(|| "Apk"))?);
-            local_data_bytes
-                .extend_from_slice(&new_dummy_flags[j].to_bytes(&mut cs.ns(|| "IsDummy"))?);
+            local_data_bytes.extend_from_slice(&new_dummy_flags[j].to_bytes(&mut cs.ns(|| "IsDummy"))?);
             local_data_bytes.extend_from_slice(&new_payloads[j]);
             local_data_bytes.extend_from_slice(&new_birth_pred_hashes[j]);
             local_data_bytes.extend_from_slice(&new_death_pred_hashes[j]);
@@ -654,17 +605,15 @@ where
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
-        let local_data_comm_rand =
-            <C::LocalDataCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-                cs.ns(|| "Allocate local data commitment randomness"),
-                || Ok(local_data_rand),
-            )?;
+        let local_data_comm_rand = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+            cs.ns(|| "Allocate local data commitment randomness"),
+            || Ok(local_data_rand),
+        )?;
 
-        let declared_local_data_comm =
-            <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-                cs.ns(|| "Allocate local data commitment"),
-                || Ok(local_data_comm),
-            )?;
+        let declared_local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+            cs.ns(|| "Allocate local data commitment"),
+            || Ok(local_data_comm),
+        )?;
 
         let comm = C::LocalDataCommGadget::check_commitment_gadget(
             cs.ns(|| "Commit to local data"),
@@ -706,10 +655,11 @@ where
     let (pred_vk_comm_pp, pred_vk_crh_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
 
-        let pred_vk_comm_pp = <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-            || Ok(&comm_crh_parameters.pred_vk_comm_pp),
-        )?;
+        let pred_vk_comm_pp =
+            <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
+                || Ok(&comm_crh_parameters.pred_vk_comm_pp),
+            )?;
 
         let pred_vk_crh_pp = <C::PredVkHGadget as CRHGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
@@ -760,20 +710,17 @@ where
     for i in 0..C::NUM_INPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check death predicate for input record {}", i));
 
-        let death_pred_proof =
-            <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
-                &mut cs.ns(|| "Allocate proof"),
-                || Ok(&old_death_pred_vk_and_pf[i].proof),
-            )?;
+        let death_pred_proof = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+            &mut cs.ns(|| "Allocate proof"),
+            || Ok(&old_death_pred_vk_and_pf[i].proof),
+        )?;
 
-        let death_pred_vk =
-            <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
-                &mut cs.ns(|| "Allocate verification key"),
-                || Ok(&old_death_pred_vk_and_pf[i].vk),
-            )?;
+        let death_pred_vk = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+            &mut cs.ns(|| "Allocate verification key"),
+            || Ok(&old_death_pred_vk_and_pf[i].vk),
+        )?;
 
-        let death_pred_vk_bytes =
-            death_pred_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
+        let death_pred_vk_bytes = death_pred_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
         let claimed_death_pred_hash = C::PredVkHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death predicate vk hash"),
@@ -781,8 +728,8 @@ where
             &death_pred_vk_bytes,
         )?;
 
-        let claimed_death_pred_hash_bytes = claimed_death_pred_hash
-            .to_bytes(&mut cs.ns(|| "Convert death_pred vk hash to bytes"))?;
+        let claimed_death_pred_hash_bytes =
+            claimed_death_pred_hash.to_bytes(&mut cs.ns(|| "Convert death_pred vk hash to bytes"))?;
 
         old_death_pred_hashes.push(claimed_death_pred_hash_bytes);
 
@@ -800,20 +747,17 @@ where
     for j in 0..C::NUM_OUTPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check birth predicate for output record {}", j));
 
-        let birth_pred_proof =
-            <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
-                &mut cs.ns(|| "Allocate proof"),
-                || Ok(&new_birth_pred_vk_and_pf[j].proof),
-            )?;
+        let birth_pred_proof = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+            &mut cs.ns(|| "Allocate proof"),
+            || Ok(&new_birth_pred_vk_and_pf[j].proof),
+        )?;
 
-        let birth_pred_vk =
-            <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
-                &mut cs.ns(|| "Allocate verification key"),
-                || Ok(&new_birth_pred_vk_and_pf[j].vk),
-            )?;
+        let birth_pred_vk = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+            &mut cs.ns(|| "Allocate verification key"),
+            || Ok(&new_birth_pred_vk_and_pf[j].vk),
+        )?;
 
-        let birth_pred_vk_bytes =
-            birth_pred_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
+        let birth_pred_vk_bytes = birth_pred_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
 
         let claimed_birth_pred_hash = C::PredVkHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute birth predicate vk hash"),
@@ -821,8 +765,8 @@ where
             &birth_pred_vk_bytes,
         )?;
 
-        let claimed_birth_pred_hash_bytes = claimed_birth_pred_hash
-            .to_bytes(&mut cs.ns(|| "Convert birth_pred vk hash to bytes"))?;
+        let claimed_birth_pred_hash_bytes =
+            claimed_birth_pred_hash.to_bytes(&mut cs.ns(|| "Convert birth_pred vk hash to bytes"))?;
 
         new_birth_pred_hashes.push(claimed_birth_pred_hash_bytes);
 
@@ -848,11 +792,10 @@ where
             input.extend_from_slice(&new_birth_pred_hashes[j]);
         }
 
-        let given_comm_rand =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::RandomnessGadget::alloc(
-                &mut comm_cs.ns(|| "Commitment randomness"),
-                || Ok(predicate_rand),
-            )?;
+        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::RandomnessGadget::alloc(
+            &mut comm_cs.ns(|| "Commitment randomness"),
+            || Ok(predicate_rand),
+        )?;
 
         let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::OutputGadget::alloc_input(
             &mut comm_cs.ns(|| "Commitment output"),

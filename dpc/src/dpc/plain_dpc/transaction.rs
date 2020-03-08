@@ -10,9 +10,9 @@ use snarkos_models::algorithms::{CommitmentScheme, PRF, SNARK};
 )]
 pub struct DPCTransaction<C: PlainDPCComponents> {
     old_serial_numbers: Vec<<C::P as PRF>::Output>,
-    new_commitments:    Vec<<C::RecC as CommitmentScheme>::Output>,
-    memorandum:         [u8; 32],
-    pub stuff:          DPCStuff<C>,
+    new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
+    memorandum: [u8; 32],
+    pub stuff: DPCStuff<C>,
 }
 
 #[derive(Derivative)]
@@ -61,10 +61,10 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
 }
 
 impl<C: PlainDPCComponents> Transaction for DPCTransaction<C> {
-    type Stuff = DPCStuff<C>;
-    type SerialNumber = <C::P as PRF>::Output;
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
+    type SerialNumber = <C::P as PRF>::Output;
+    type Stuff = DPCStuff<C>;
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
         self.old_serial_numbers.as_slice()

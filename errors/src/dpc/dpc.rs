@@ -1,4 +1,7 @@
-use crate::{algorithms::{CommitmentError, CRHError, PRFError, SNARKError}, dpc::LedgerError};
+use crate::{
+    algorithms::{CRHError, CommitmentError, PRFError, SNARKError},
+    dpc::LedgerError,
+};
 
 #[derive(Debug, Fail)]
 pub enum DPCError {

@@ -17,14 +17,14 @@ pub struct CommAndCRHPublicParameters<C: PlainDPCComponents> {
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: PlainDPCComponents"))]
 pub struct PredNIZKParameters<C: PlainDPCComponents> {
-    pub pk:    <C::PredicateNIZK as SNARK>::ProvingParameters,
-    pub vk:    <C::PredicateNIZK as SNARK>::VerificationParameters,
+    pub pk: <C::PredicateNIZK as SNARK>::ProvingParameters,
+    pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateNIZK as SNARK>::Proof,
 }
 
 pub struct PublicParameters<C: PlainDPCComponents> {
-    pub comm_and_crh_pp:     CommAndCRHPublicParameters<C>,
-    pub pred_nizk_pp:        PredNIZKParameters<C>,
+    pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
+    pub pred_nizk_pp: PredNIZKParameters<C>,
     pub proof_check_nizk_pp: (
         <C::ProofCheckNIZK as SNARK>::ProvingParameters,
         <C::ProofCheckNIZK as SNARK>::PreparedVerificationParameters,
