@@ -171,7 +171,8 @@ impl<P: Parameters> ToBytes for GroupAffine<P> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.x.write(&mut writer)?;
-        self.y.write(&mut writer)
+        self.y.write(&mut writer)?;
+        self.infinity.write(writer)
     }
 }
 
