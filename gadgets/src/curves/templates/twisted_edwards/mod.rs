@@ -3,7 +3,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, MontgomeryModelParameters, TEModelParameters},
     gadgets::{
-        curves::{FieldGadget, GroupGadget},
+        curves::{FieldGadget, GroupGadget, CompressedGroupGadget},
         r1cs::{ConstraintSystem, Namespace},
         utilities::{
             alloc::AllocGadget,
@@ -963,6 +963,17 @@ mod projective_impl {
 
         fn cost_of_double() -> usize {
             4 + FG::cost_of_mul()
+        }
+    }
+
+
+    impl<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>>
+    CompressedGroupGadget<TEProjective<P>, F> for AffineGadget<P, F, FG>
+    {
+        type BaseFieldGadget = FG;
+
+        fn to_x_coordinate(&self) -> Self::BaseFieldGadget {
+            self.x.clone()
         }
     }
 
