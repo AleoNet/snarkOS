@@ -35,7 +35,7 @@ where
         v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_crh_pp.parameters().to_field_elements()?);
 
         let local_data_comm_pp_fe =
-            ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.comm_and_crh_pp.local_data_comm_pp)
+            ToConstraintField::<C::CoreCheckF>::to_field_elements(self.comm_and_crh_pp.local_data_comm_pp.parameters())
                 .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.local_data_comm)

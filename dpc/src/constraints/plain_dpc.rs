@@ -204,7 +204,7 @@ where
 
         let ledger_pp = <C::MerkleTree_HGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),
-            || Ok(ledger_parameters),
+            || Ok(ledger_parameters.parameters()),
         )?;
         (
             addr_comm_pp,
@@ -658,12 +658,12 @@ where
         let pred_vk_comm_pp =
             <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-                || Ok(&comm_crh_parameters.pred_vk_comm_pp),
+                || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
             )?;
 
         let pred_vk_crh_pp = <C::PredVkHGadget as CRHGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
-            || Ok(&comm_crh_parameters.pred_vk_crh_pp),
+            || Ok(comm_crh_parameters.pred_vk_crh_pp.parameters()),
         )?;
 
         (pred_vk_comm_pp, pred_vk_crh_pp)
@@ -675,7 +675,7 @@ where
 
     // First we convert the input for the predicates into `CoreCheckF` field elements
     let local_data_comm_pp_fe =
-        ToConstraintField::<C::CoreCheckF>::to_field_elements(&comm_crh_parameters.local_data_comm_pp)
+        ToConstraintField::<C::CoreCheckF>::to_field_elements(comm_crh_parameters.local_data_comm_pp.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(local_data_comm)

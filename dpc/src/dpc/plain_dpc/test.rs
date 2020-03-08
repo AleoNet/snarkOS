@@ -15,7 +15,7 @@ use crate::{
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
-    algorithms::SNARK,
+    algorithms::{CommitmentScheme, CRH, SNARK},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -35,13 +35,13 @@ fn test_execute_constraint_systems() {
     let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.vk.clone().into();
 
     let pred_nizk_vk_bytes =
-        to_bytes![PredVkCRH::evaluate(&comm_and_crh_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap()).unwrap()]
+        to_bytes![PredVkCRH::hash(&comm_and_crh_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap()).unwrap()]
             .unwrap();
 
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&comm_and_crh_pp, &genesis_metadata, &mut rng).unwrap();
-    let genesis_sn_nonce = SnNonceCRH::evaluate(&comm_and_crh_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
+    let genesis_sn_nonce = SnNonceCRH::hash(&comm_and_crh_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
         &comm_and_crh_pp,
         &genesis_sn_nonce,
@@ -181,7 +181,7 @@ fn test_execute_constraint_systems() {
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
-                local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.clone(),
+                local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                 local_data_comm: local_data_comm.clone(),
                 position: i as u8,
             };
