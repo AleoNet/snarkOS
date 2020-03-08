@@ -25,7 +25,7 @@ impl From<CRHError> for MerkleError {
 }
 
 impl From<std::io::Error> for MerkleError {
-   fn from(error: std::io::Error) -> Self {
-       MerkleError::Crate("std::io", format!("{:?}", error))
-   }
+    fn from(error: std::io::Error) -> Self {
+        MerkleError::Crate("std::io", format!("{:?}", error))
+    }
 }

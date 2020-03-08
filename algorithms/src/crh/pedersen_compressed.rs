@@ -27,7 +27,7 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CRH for PedersenCompressedCRH<
     /// Returns the affine x-coordinate as the collision-resistant hash output.
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         let crh = PedersenCRH::<G, S> {
-            parameters: self.parameters.clone()
+            parameters: self.parameters.clone(),
         };
 
         let output = crh.hash(input)?;

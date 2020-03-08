@@ -3,7 +3,16 @@ use snarkos_algorithms::prf::blake2s::Blake2s as B2SPRF;
 use snarkos_curves::bls12_377::Fr;
 use snarkos_models::{
     algorithms::PRF,
-    gadgets::{algorithms::PRFGadget, r1cs::{ConstraintSystem, TestConstraintSystem}, utilities::{alloc::AllocGadget, boolean::{AllocatedBit, Boolean}, eq::EqGadget, uint8::UInt8}},
+    gadgets::{
+        algorithms::PRFGadget,
+        r1cs::{ConstraintSystem, TestConstraintSystem},
+        utilities::{
+            alloc::AllocGadget,
+            boolean::{AllocatedBit, Boolean},
+            eq::EqGadget,
+            uint8::UInt8,
+        },
+    },
 };
 
 use blake2::Blake2s;
@@ -41,8 +50,7 @@ fn test_blake2s_prf() {
     let input_gadget = UInt8::alloc_vec(&mut cs.ns(|| "declare_input"), &input).unwrap();
     let out = B2SPRF::evaluate(&seed, &input).unwrap();
     let actual_out_gadget =
-        <Blake2sGadget as PRFGadget<_, Fr>>::OutputGadget::alloc(&mut cs.ns(|| "declare_output"), || Ok(out))
-            .unwrap();
+        <Blake2sGadget as PRFGadget<_, Fr>>::OutputGadget::alloc(&mut cs.ns(|| "declare_output"), || Ok(out)).unwrap();
 
     let output_gadget =
         Blake2sGadget::check_evaluation_gadget(&mut cs.ns(|| "eval_blake2s"), &seed_gadget, &input_gadget).unwrap();

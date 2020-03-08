@@ -1,6 +1,9 @@
 use super::*;
 use crate::curves::edwards_bls12::EdwardsBlsGadget;
-use snarkos_algorithms::{commitment::{PedersenCommitment, Blake2sCommitment}, crh::PedersenSize};
+use snarkos_algorithms::{
+    commitment::{Blake2sCommitment, PedersenCommitment},
+    crh::PedersenSize,
+};
 use snarkos_curves::edwards_bls12::{EdwardsProjective, Fq, Fr};
 use snarkos_models::{
     algorithms::CommitmentScheme,
@@ -48,7 +51,7 @@ fn blake2s_commitment_gadget_test() {
         &input_bytes,
         &randomness_bytes,
     )
-        .unwrap();
+    .unwrap();
 
     for i in 0..32 {
         assert_eq!(native_result[i], gadget_result.0[i].get_value().unwrap());
@@ -84,25 +87,23 @@ fn pedersen_commitment_gadget_test() {
         input_bytes.push(UInt8::alloc(cs, || Ok(*input_byte)).unwrap());
     }
 
-    let randomness_gadget =
-        <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::RandomnessGadget::alloc(
-            &mut cs.ns(|| "randomness_gadget"),
-            || Ok(&randomness),
-        )
-            .unwrap();
-    let parameters_gadget =
-        <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::ParametersGadget::alloc(
-            &mut cs.ns(|| "parameters_gadget"),
-            || Ok(&commitment.parameters),
-        )
-            .unwrap();
+    let randomness_gadget = <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::RandomnessGadget::alloc(
+        &mut cs.ns(|| "randomness_gadget"),
+        || Ok(&randomness),
+    )
+    .unwrap();
+    let parameters_gadget = <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::ParametersGadget::alloc(
+        &mut cs.ns(|| "parameters_gadget"),
+        || Ok(&commitment.parameters),
+    )
+    .unwrap();
     let output_gadget = <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::check_commitment_gadget(
         &mut cs.ns(|| "commitment_gadget"),
         &parameters_gadget,
         &input_bytes,
         &randomness_gadget,
     )
-        .unwrap();
+    .unwrap();
 
     let native_output = native_output.into_affine();
     assert_eq!(native_output.x, output_gadget.x.value.unwrap());

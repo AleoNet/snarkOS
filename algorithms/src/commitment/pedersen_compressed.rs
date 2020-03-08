@@ -1,4 +1,7 @@
-use crate::{commitment::{PedersenCommitment, PedersenCommitmentParameters}, crh::PedersenSize};
+use crate::{
+    commitment::{PedersenCommitment, PedersenCommitmentParameters},
+    crh::PedersenSize,
+};
 use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
     algorithms::CommitmentScheme,
@@ -18,13 +21,15 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
     type Randomness = <G as Group>::ScalarField;
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
-        Self { parameters: PedersenCommitmentParameters::new(rng) }
+        Self {
+            parameters: PedersenCommitmentParameters::new(rng),
+        }
     }
 
     /// Returns the affine x-coordinate as the commitment.
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
         let commitment = PedersenCommitment::<G, S> {
-            parameters: self.parameters.clone()
+            parameters: self.parameters.clone(),
         };
 
         let output = commitment.commit(input, randomness)?;

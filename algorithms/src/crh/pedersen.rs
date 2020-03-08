@@ -1,9 +1,6 @@
 use crate::crh::{PedersenCRHParameters, PedersenSize};
 use snarkos_errors::algorithms::CRHError;
-use snarkos_models::{
-    algorithms::CRH,
-    curves::Group,
-};
+use snarkos_models::{algorithms::CRH, curves::Group};
 
 use rand::Rng;
 use rayon::prelude::*;
