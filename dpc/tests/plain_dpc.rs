@@ -6,7 +6,7 @@ use snarkos_dpc::{
     Record,
     ledger::Ledger
 };
-use snarkos_models::algorithms::{NIZK, CRH};
+use snarkos_models::algorithms::{SNARK, CommitmentScheme, CRH};
 use snarkos_utilities::{to_bytes, bytes::ToBytes};
 
 use rand::SeedableRng;
@@ -26,9 +26,9 @@ fn integration_test() {
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&parameters.comm_and_crh_pp, &genesis_metadata, &mut rng).unwrap();
-    let genesis_sn_nonce = SnNonceCRH::evaluate(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[34u8; 1]).unwrap();
+    let genesis_sn_nonce = SnNonceCRH::hash(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[34u8; 1]).unwrap();
     let genesis_pred_vk_bytes = to_bytes![
-        PredVkCRH::evaluate(
+        PredVkCRH::hash(
             &parameters.comm_and_crh_pp.pred_vk_crh_pp,
             &to_bytes![parameters.pred_nizk_pp.vk].unwrap()
         )
@@ -64,7 +64,7 @@ fn integration_test() {
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce =
-            SnNonceCRH::evaluate(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[64u8 + (i as u8); 1]).unwrap();
+            SnNonceCRH::hash(&parameters.comm_and_crh_pp.sn_nonce_crh_pp, &[64u8 + (i as u8); 1]).unwrap();
         let old_record = DPC::generate_record(
             &parameters.comm_and_crh_pp,
             &old_sn_nonce,
@@ -103,7 +103,7 @@ fn integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut old_proof_and_vk = vec![];
         for i in 0..NUM_INPUT_RECORDS {
-            let proof = PredicateSNARK::prove(
+            let proof = PredicateNIZK::prove(
                 &parameters.pred_nizk_pp.pk,
                 EmptyPredicateCircuit::new(&local_data.comm_and_crh_pp, &local_data.local_data_comm, i as u8),
                 &mut rng,
@@ -112,11 +112,11 @@ fn integration_test() {
             #[cfg(debug_assertions)]
             {
                 let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
-                    local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.clone(),
+                    local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                     local_data_comm: local_data.local_data_comm.clone(),
                     position: i as u8,
                 };
-                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
 
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
@@ -131,7 +131,7 @@ fn integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut new_proof_and_vk = vec![];
         for i in 0..NUM_OUTPUT_RECORDS {
-            let proof = PredicateSNARK::prove(
+            let proof = PredicateNIZK::prove(
                 &parameters.pred_nizk_pp.pk,
                 EmptyPredicateCircuit::new(&local_data.comm_and_crh_pp, &local_data.local_data_comm, i as u8),
                 &mut rng,
@@ -140,11 +140,11 @@ fn integration_test() {
             #[cfg(debug_assertions)]
             {
                 let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
-                    local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.clone(),
+                    local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                     local_data_comm: local_data.local_data_comm.clone(),
                     position: i as u8,
                 };
-                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),
