@@ -13,4 +13,6 @@ pub trait CRH: From<<Self as CRH>::Parameters> {
     fn setup<R: Rng>(r: &mut R) -> Self;
 
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError>;
+
+    fn parameters(&self) -> &Self::Parameters;
 }

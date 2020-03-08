@@ -42,4 +42,8 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
 
         Ok(output)
     }
+
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
+    }
 }

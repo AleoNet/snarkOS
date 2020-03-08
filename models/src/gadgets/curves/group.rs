@@ -145,7 +145,7 @@ pub trait CompressedGroupGadget<G: Group + ProjectiveCurve, F: Field>: GroupGadg
     type BaseFieldGadget: ToBytesGadget<F>
     + EqGadget<F>
     + CondSelectGadget<F>
-    // + AllocGadget<<G::Affine as AffineCurve>::BaseField, F>
+    + AllocGadget<<G::Affine as AffineCurve>::BaseField, F>
     + Clone
     + Debug;
 

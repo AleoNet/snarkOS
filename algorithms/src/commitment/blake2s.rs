@@ -25,4 +25,8 @@ impl CommitmentScheme for Blake2sCommitment {
         result.copy_from_slice(&h.result());
         Ok(result)
     }
+
+    fn parameters(&self) -> &Self::Parameters {
+        &()
+    }
 }

@@ -1,5 +1,5 @@
 use snarkos_algorithms::{
-    commitment::{PedersenCommitment, PedersenCommitmentParameters},
+    commitment::{PedersenCommitment, PedersenCompressedCommitment, PedersenCommitmentParameters},
     crh::PedersenSize,
 };
 use snarkos_errors::gadgets::SynthesisError;
@@ -181,8 +181,8 @@ pub struct PedersenCompressedCommitmentGadget<G: Group + ProjectiveCurve, F: Fie
     PhantomData<F>,
 );
 
-impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize> CommitmentGadget<PedersenCommitment<G, S>, F>
-for PedersenCompressedCommitmentGadget<G, F, GG> where GG::BaseFieldGadget: AllocGadget<G, F>
+impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize> CommitmentGadget<PedersenCompressedCommitment<G, S>, F>
+for PedersenCompressedCommitmentGadget<G, F, GG>
 {
     type OutputGadget = GG::BaseFieldGadget;
     type ParametersGadget = PedersenCommitmentParametersGadget<G, S, F>;

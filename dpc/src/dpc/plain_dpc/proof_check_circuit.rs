@@ -3,9 +3,8 @@ use crate::{
     dpc::plain_dpc::{
         parameters::CommAndCRHPublicParameters, predicate::PrivatePredInput, PlainDPCComponents,
     },
-    Error,
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::to_field_vec::ToConstraintField,
@@ -31,11 +30,11 @@ where
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::ProofCheckF>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<C::ProofCheckF>, ConstraintFieldError> {
         let mut v = Vec::new();
 
-        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.to_field_elements()?);
-        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_crh_pp.to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_crh_pp.parameters().to_field_elements()?);
 
         let local_data_comm_pp_fe =
             ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.comm_and_crh_pp.local_data_comm_pp)

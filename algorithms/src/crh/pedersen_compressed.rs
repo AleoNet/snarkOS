@@ -8,7 +8,7 @@ use snarkos_models::{
 use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PedersenCompressedCRH<G: Group, S: PedersenSize> {
+pub struct PedersenCompressedCRH<G: Group + ProjectiveCurve, S: PedersenSize> {
     pub parameters: PedersenCRHParameters<G, S>,
 }
 
@@ -35,15 +35,19 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CRH for PedersenCompressedCRH<
         debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
         Ok(affine.to_x_coordinate())
     }
+
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
+    }
 }
 
-impl<G: Group, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCompressedCRH<G, S> {
+impl<G: Group + ProjectiveCurve, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCompressedCRH<G, S> {
     fn from(parameters: PedersenCRHParameters<G, S>) -> Self {
         Self { parameters }
     }
 }
 
-impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCompressedCRH<G, S>
+impl<F: Field, G: Group + ProjectiveCurve + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCompressedCRH<G, S>
 {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {

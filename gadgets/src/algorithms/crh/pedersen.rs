@@ -1,4 +1,4 @@
-use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
+use snarkos_algorithms::crh::{PedersenCRH, PedersenCompressedCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, ProjectiveCurve},
@@ -130,8 +130,8 @@ pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG:
     _engine: PhantomData<F>,
 }
 
-impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize> CRHGadget<PedersenCRH<G, S>, F>
-for PedersenCompressedCRHGadget<G, F, GG> where GG::BaseFieldGadget: AllocGadget<G, F>
+impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize> CRHGadget<PedersenCompressedCRH<G, S>, F>
+for PedersenCompressedCRHGadget<G, F, GG>
 {
     type OutputGadget = GG::BaseFieldGadget;
     type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;

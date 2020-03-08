@@ -5,13 +5,13 @@ use snarkos_models::algorithms::{CRH, CommitmentScheme, SNARK};
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: PlainDPCComponents"))]
 pub struct CommAndCRHPublicParameters<C: PlainDPCComponents> {
-    pub addr_comm_pp:       <C::AddrC as CommitmentScheme>::Parameters,
-    pub rec_comm_pp:        <C::RecC as CommitmentScheme>::Parameters,
-    pub pred_vk_comm_pp:    <C::PredVkComm as CommitmentScheme>::Parameters,
-    pub local_data_comm_pp: <C::LocalDataComm as CommitmentScheme>::Parameters,
+    pub addr_comm_pp: C::AddrC,
+    pub rec_comm_pp: C::RecC,
+    pub pred_vk_comm_pp: C::PredVkComm,
+    pub local_data_comm_pp: C::LocalDataComm,
 
-    pub sn_nonce_crh_pp: <C::SnNonceH as CRH>::Parameters,
-    pub pred_vk_crh_pp:  <C::PredVkH as CRH>::Parameters,
+    pub sn_nonce_crh_pp: C::SnNonceH,
+    pub pred_vk_crh_pp: C::PredVkH,
 }
 
 #[derive(Derivative)]
@@ -59,26 +59,26 @@ impl<C: PlainDPCComponents> PublicParameters<C> {
     }
 
     pub fn sn_nonce_crh_pp(&self) -> &<C::SnNonceH as CRH>::Parameters {
-        &self.comm_and_crh_pp.sn_nonce_crh_pp
+        &self.comm_and_crh_pp.sn_nonce_crh_pp.parameters()
     }
 
     pub fn pred_vk_crh_pp(&self) -> &<C::PredVkH as CRH>::Parameters {
-        &self.comm_and_crh_pp.pred_vk_crh_pp
+        &self.comm_and_crh_pp.pred_vk_crh_pp.parameters()
     }
 
     pub fn local_data_comm_pp(&self) -> &<C::LocalDataComm as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.local_data_comm_pp
+        &self.comm_and_crh_pp.local_data_comm_pp.parameters()
     }
 
     pub fn addr_comm_pp(&self) -> &<C::AddrC as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.addr_comm_pp
+        &self.comm_and_crh_pp.addr_comm_pp.parameters()
     }
 
     pub fn rec_comm_pp(&self) -> &<C::RecC as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.rec_comm_pp
+        &self.comm_and_crh_pp.rec_comm_pp.parameters()
     }
 
     pub fn pred_vk_comm_pp(&self) -> &<C::PredVkComm as CommitmentScheme>::Parameters {
-        &self.comm_and_crh_pp.pred_vk_comm_pp
+        &self.comm_and_crh_pp.pred_vk_comm_pp.parameters()
     }
 }

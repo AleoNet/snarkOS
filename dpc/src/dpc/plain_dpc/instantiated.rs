@@ -173,7 +173,7 @@ pub type LocalDataCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, Co
 
 pub type SnNonceCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
-pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsSWGadget>;
+pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, EdwardsSWGadget>;
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateNIZKGadget = GM17VerifierGadget<CoreCheckPairing, ProofCheckF, PairingGadget>;

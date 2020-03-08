@@ -56,7 +56,7 @@ where
         genesis_memo: Self::Memo,
     ) -> Self {
         let params = Rc::new(parameters);
-        let cm_merkle_tree = MerkleTree::<P>::new(params.clone(), &[genesis_cm.clone()]).unwrap();
+        let cm_merkle_tree = MerkleTree::<P>::new(&[genesis_cm.clone()]).unwrap();
 
         let mut cur_cm_index = 0;
         let mut comm_to_index = HashMap::new();
@@ -138,7 +138,7 @@ where
             .cloned()
             .collect::<Vec<_>>();
         assert!(commitments[0] == self.genesis_cm);
-        self.cm_merkle_tree = MerkleTree::new(self.crh_params.clone(), &commitments)?;
+        self.cm_merkle_tree = MerkleTree::new(&commitments)?;
 
         let new_digest = self.cm_merkle_tree.root();
         self.past_digests.insert(new_digest.clone());

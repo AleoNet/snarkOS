@@ -1,4 +1,5 @@
-use crate::Error;
+use snarkos_errors::dpc::DPCError;
+
 use rand::Rng;
 use std::hash::Hash;
 
@@ -93,7 +94,7 @@ pub trait DPCScheme<L: Ledger> {
     fn setup<R: Rng>(
         ledger_parameters: &MerkleTreeParams<L::Parameters>,
         rng: &mut R,
-    ) -> Result<Self::Parameters, Error>;
+    ) -> Result<Self::Parameters, DPCError>;
 
     /// Returns an address key pair, given public parameters, metadata, and an
     /// rng.
@@ -101,7 +102,7 @@ pub trait DPCScheme<L: Ledger> {
         parameters: &Self::Parameters,
         metadata: &Self::Metadata,
         rng: &mut R,
-    ) -> Result<Self::AddressKeyPair, Error>;
+    ) -> Result<Self::AddressKeyPair, DPCError>;
 
     /// Returns new records and a transaction based on the authorized
     /// consumption of old records.
@@ -123,12 +124,12 @@ pub trait DPCScheme<L: Ledger> {
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         ledger: &L,
         rng: &mut R,
-    ) -> Result<(Vec<Self::Record>, Self::Transaction), Error>;
+    ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;
 
     /// Returns true iff the transaction is valid according to the ledger.
     fn verify(
         parameters: &Self::Parameters,
         transaction: &Self::Transaction,
         ledger: &L,
-    ) -> Result<bool, Error>;
+    ) -> Result<bool, DPCError>;
 }

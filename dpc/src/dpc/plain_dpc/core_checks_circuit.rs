@@ -1,5 +1,3 @@
-use crate::Error;
-
 use crate::{
     constraints::{plain_dpc::execute_core_checks_gadget, Assignment},
     dpc::plain_dpc::{
@@ -9,7 +7,7 @@ use crate::{
     ledger::MerkleTreeParams,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, PRF},
     curves::to_field_vec::ToConstraintField,
@@ -57,17 +55,17 @@ where
     MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
         let mut v = Vec::new();
 
-        v.extend_from_slice(&self.comm_and_crh_pp.addr_comm_pp.to_field_elements()?);
-        v.extend_from_slice(&self.comm_and_crh_pp.rec_comm_pp.to_field_elements()?);
-        v.extend_from_slice(&self.comm_and_crh_pp.local_data_comm_pp.to_field_elements()?);
-        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.addr_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.rec_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.local_data_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.parameters().to_field_elements()?);
 
-        v.extend_from_slice(&self.comm_and_crh_pp.sn_nonce_crh_pp.to_field_elements()?);
+        v.extend_from_slice(&self.comm_and_crh_pp.sn_nonce_crh_pp.parameters().to_field_elements()?);
 
-        v.extend_from_slice(&self.ledger_pp.to_field_elements()?);
+        v.extend_from_slice(&self.ledger_pp.parameters().to_field_elements()?);
         v.extend_from_slice(&self.ledger_digest.to_field_elements()?);
 
         for sn in &self.old_serial_numbers {

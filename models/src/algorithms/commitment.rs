@@ -12,4 +12,6 @@ pub trait CommitmentScheme: Sized {
     fn setup<R: Rng>(r: &mut R) -> Self;
 
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError>;
+
+    fn parameters(&self) -> &Self::Parameters;
 }

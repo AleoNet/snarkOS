@@ -1,8 +1,8 @@
 use crate::{
     constraints::Assignment, dpc::Record, plain_dpc::parameters::CommAndCRHPublicParameters,
-    plain_dpc::record::DPCRecord, plain_dpc::*, Error,
+    plain_dpc::record::DPCRecord, plain_dpc::*
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, PRF},
     curves::to_field_vec::ToConstraintField,
@@ -115,7 +115,7 @@ where
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
         let mut v = ToConstraintField::<C::CoreCheckF>::to_field_elements([self.position].as_ref())?;
         v.extend_from_slice(&self.local_data_comm_pp.to_field_elements()?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);

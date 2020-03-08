@@ -86,6 +86,10 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
 
         Ok(result)
     }
+
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
+    }
 }
 
 impl<G: Group, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCRH<G, S> {

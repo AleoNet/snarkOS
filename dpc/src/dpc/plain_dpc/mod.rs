@@ -1,7 +1,3 @@
-use crate::Error;
-use rand::Rng;
-use std::marker::PhantomData;
-
 use crate::{
     dpc::{
         AddressKeyPair, DPCScheme, Predicate,
@@ -10,6 +6,7 @@ use crate::{
     ledger::*,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
+use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, PRF, SNARK},
     curves::PrimeField,
@@ -23,6 +20,9 @@ use snarkos_utilities::{
     rand::UniformRand,
     to_bytes,
 };
+
+use rand::Rng;
+use std::marker::PhantomData;
 
 pub mod address;
 use self::address::*;
@@ -199,29 +199,29 @@ pub struct LocalData<Components: PlainDPCComponents> {
 impl<Components: PlainDPCComponents> DPC<Components> {
     pub fn generate_comm_and_crh_parameters<R: Rng>(
         rng: &mut R,
-    ) -> Result<CommAndCRHPublicParameters<Components>, Error> {
+    ) -> Result<CommAndCRHPublicParameters<Components>, DPCError> {
         let time = start_timer!(|| "Address commitment scheme setup");
-        let addr_comm_pp = Components::AddrC::setup(rng)?;
+        let addr_comm_pp = Components::AddrC::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
-        let rec_comm_pp = Components::RecC::setup(rng)?;
+        let rec_comm_pp = Components::RecC::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
-        let pred_vk_comm_pp = Components::PredVkComm::setup(rng)?;
+        let pred_vk_comm_pp = Components::PredVkComm::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let local_data_comm_pp = Components::LocalDataComm::setup(rng)?;
+        let local_data_comm_pp = Components::LocalDataComm::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SnNonceH::setup(rng)?;
+        let sn_nonce_crh_pp = Components::SnNonceH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredVkH::setup(rng)?;
+        let pred_vk_crh_pp = Components::PredVkH::setup(rng);
         end_timer!(time);
 
         let comm_and_crh_pp = CommAndCRHPublicParameters {
@@ -239,7 +239,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
     pub fn generate_pred_nizk_parameters<R: Rng>(
         comm_and_crh_pp: &CommAndCRHPublicParameters<Components>,
         rng: &mut R,
-    ) -> Result<PredNIZKParameters<Components>, Error> {
+    ) -> Result<PredNIZKParameters<Components>, DPCError> {
         let (pk, pvk) =
             Components::PredicateNIZK::setup(EmptyPredicateCircuit::blank(comm_and_crh_pp), rng)?;
 
@@ -259,7 +259,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
     pub fn generate_sn(
         record: &DPCRecord<Components>,
         address_secret_key: &AddressSecretKey<Components>,
-    ) -> Result<<Components::P as PRF>::Output, Error> {
+    ) -> Result<<Components::P as PRF>::Output, DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
         let sk_prf = &address_secret_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
@@ -280,7 +280,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         birth_predicate: &DPCPredicate<Components>,
         death_predicate: &DPCPredicate<Components>,
         rng: &mut R,
-    ) -> Result<DPCRecord<Components>, Error> {
+    ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
         // Sample new commitment randomness.
         let commitment_randomness = <Components::RecC as CommitmentScheme>::Randomness::rand(rng);
@@ -323,7 +323,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         parameters: &CommAndCRHPublicParameters<Components>,
         metadata: &[u8; 32],
         rng: &mut R,
-    ) -> Result<AddressPair<Components>, Error> {
+    ) -> Result<AddressPair<Components>, DPCError> {
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
         let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
@@ -366,7 +366,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
 
         ledger: &L,
         rng: &mut R,
-    ) -> Result<ExecuteContext<'a, Components>, Error>
+    ) -> Result<ExecuteContext<'a, Components>, DPCError>
     where
         L: Ledger<
             Parameters = Components::MerkleParameters,
@@ -425,7 +425,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
             let sn_randomness: [u8; 32] = rng.gen();
 
             let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
-            let sn_nonce = Components::SnNonceH::evaluate(&parameters.sn_nonce_crh_pp, &crh_input)?;
+            let sn_nonce = Components::SnNonceH::hash(&parameters.sn_nonce_crh_pp, &crh_input)?;
 
             end_timer!(sn_nonce_time);
 
@@ -552,7 +552,7 @@ where
     type Transaction = DPCTransaction<Components>;
     type LocalData = LocalData<Components>;
 
-    fn setup<R: Rng>(ledger_pp: &MerkleTreeParams<Components::MerkleParameters>, rng: &mut R) -> Result<Self::Parameters, Error> {
+    fn setup<R: Rng>(ledger_pp: &MerkleTreeParams<Components::MerkleParameters>, rng: &mut R) -> Result<Self::Parameters, DPCError> {
         let setup_time = start_timer!(|| "PlainDPC::Setup");
         let comm_and_crh_pp = Self::generate_comm_and_crh_parameters(rng)?;
 
@@ -591,7 +591,7 @@ where
         parameters: &Self::Parameters,
         metadata: &Self::Metadata,
         rng: &mut R,
-    ) -> Result<Self::AddressKeyPair, Error> {
+    ) -> Result<Self::AddressKeyPair, DPCError> {
         let create_addr_time = start_timer!(|| "PlainDPC::CreateAddr");
         let result = Self::create_address_helper(&parameters.comm_and_crh_pp, metadata, rng)?;
         end_timer!(create_addr_time);
@@ -615,7 +615,7 @@ where
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         ledger: &L,
         rng: &mut R,
-    ) -> Result<(Vec<Self::Record>, Self::Transaction), Error> {
+    ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
         let exec_time = start_timer!(|| "PlainDPC::Exec");
         let context = Self::execute_helper(
             &parameters.comm_and_crh_pp,
@@ -710,7 +710,7 @@ where
         parameters: &Self::Parameters,
         transaction: &Self::Transaction,
         ledger: &L,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, DPCError> {
         let verify_time = start_timer!(|| "PlainDPC::Verify");
         let ledger_time = start_timer!(|| "Ledger checks");
         for sn in transaction.old_serial_numbers() {
