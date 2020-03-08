@@ -2,7 +2,7 @@ use crate::crh::{PedersenCRHParameters, PedersenSize};
 use snarkos_errors::algorithms::CRHError;
 use snarkos_models::{
     algorithms::CRH,
-    curves::{AffineCurve, Group, ProjectiveCurve},
+    curves::Group,
 };
 
 use rand::Rng;
@@ -85,15 +85,6 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
             .reduce(G::zero, |a, b| a + &b);
 
         Ok(result)
-    }
-}
-
-impl<G: Group + ProjectiveCurve, S: PedersenSize> PedersenCRH<G, S> {
-    /// Returns the affine x-coordinate of a given collision-resistant hash output.
-    fn compress(output: G) -> Result<<G::Affine as AffineCurve>::BaseField, CRHError> {
-        let affine = output.into_affine();
-        debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
-        Ok(affine.to_x_coordinate())
     }
 }
 

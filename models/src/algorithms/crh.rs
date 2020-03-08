@@ -5,8 +5,8 @@ use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
 pub trait CRH: From<<Self as CRH>::Parameters> {
-    type Parameters: Clone;
     type Output: Debug + ToBytes + Clone + Eq + Hash + Default;
+    type Parameters: Clone;
 
     const INPUT_SIZE_BITS: usize;
 
