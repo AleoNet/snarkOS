@@ -1,10 +1,11 @@
 use snarkos_algorithms::signature::{SchnorrParameters, SchnorrSignature};
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group},
     gadgets::{
         algorithms::SignaturePublicKeyRandomizationGadget,
         curves::GroupGadget,
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,

@@ -1,10 +1,11 @@
 use crate::algorithms::prf::{blake2s_gadget, Blake2sOutputGadget};
 use snarkos_algorithms::commitment::Blake2sCommitment;
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, PrimeField},
     gadgets::{
         algorithms::CommitmentGadget,
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8, ToBytesGadget},
     },
 };

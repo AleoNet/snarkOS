@@ -1,9 +1,10 @@
 use snarkos_curves::templates::twisted_edwards_extended::GroupAffine as TEAffine;
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, MontgomeryModelParameters, TEModelParameters},
     gadgets::{
         curves::{FieldGadget, GroupGadget},
-        r1cs::{ConstraintSystem, Namespace, SynthesisError},
+        r1cs::{ConstraintSystem, Namespace},
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,

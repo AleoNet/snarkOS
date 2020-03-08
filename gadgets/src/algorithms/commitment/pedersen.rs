@@ -2,12 +2,13 @@ use snarkos_algorithms::{
     commitment::{PedersenCommitment, PedersenCommitmentParameters},
     crh::PedersenSize,
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, PrimeField},
     gadgets::{
         algorithms::CommitmentGadget,
         curves::GroupGadget,
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
