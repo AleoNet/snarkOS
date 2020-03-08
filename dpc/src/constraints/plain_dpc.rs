@@ -178,28 +178,28 @@ where
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
             AddrCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Addr Comm parameters"), || {
-                Ok(&comm_crh_parameters.addr_comm_pp)
+                Ok(comm_crh_parameters.addr_comm_pp.parameters())
             })?;
 
         let rec_comm_pp =
             RecCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Rec Comm parameters"), || {
-                Ok(&comm_crh_parameters.rec_comm_pp)
+                Ok(comm_crh_parameters.rec_comm_pp.parameters())
             })?;
 
         let local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Local Data Comm parameters"),
-            || Ok(&comm_crh_parameters.local_data_comm_pp),
+            || Ok(comm_crh_parameters.local_data_comm_pp.parameters()),
         )?;
 
         let pred_vk_comm_pp =
             <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-                || Ok(&comm_crh_parameters.pred_vk_comm_pp),
+                || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
             )?;
 
         let sn_nonce_crh_pp =
             SnNonceHGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SN Nonce CRH parameters"), || {
-                Ok(&comm_crh_parameters.sn_nonce_crh_pp)
+                Ok(comm_crh_parameters.sn_nonce_crh_pp.parameters())
             })?;
 
         let ledger_pp = <C::MerkleTree_HGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
