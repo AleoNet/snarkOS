@@ -5,6 +5,7 @@ use blake2::Blake2s as b2s;
 use digest::Digest;
 use rand::Rng;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Blake2sCommitment;
 
 impl CommitmentScheme for Blake2sCommitment {

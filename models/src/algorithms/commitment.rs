@@ -4,7 +4,7 @@ use snarkos_utilities::{bytes::ToBytes, rand::UniformRand};
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait CommitmentScheme: Sized {
+pub trait CommitmentScheme: Sized + Clone {
     type Output: ToBytes + Clone + Default + Eq + Hash + Debug;
     type Parameters: Clone;
     type Randomness: Clone + ToBytes + Default + Eq + UniformRand + Debug;
