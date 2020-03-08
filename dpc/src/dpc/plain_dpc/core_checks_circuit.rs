@@ -8,7 +8,7 @@ use crate::{
     },
     ledger::MerkleTreeParams,
 };
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, PRF},
@@ -56,6 +56,7 @@ where
 
     MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
+    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
         let mut v = Vec::new();
