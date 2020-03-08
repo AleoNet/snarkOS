@@ -1,18 +1,16 @@
-use algebra::{to_bytes, ToBytes};
 #[cfg(debug_assertions)]
-use gm17::PreparedVerifyingKey;
-use rand::SeedableRng;
-use rand_xorshift::XorShiftRng;
-
-use crypto_primitives::{nizk::NIZK, CRH};
-
-use dpc::{
+use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_dpc::{
     plain_dpc::{instantiated::*, predicate::PrivatePredInput, predicate_circuit::*, LocalData, DPC},
     DPCScheme,
     Record,
+    ledger::Ledger
 };
+use snarkos_models::algorithms::{NIZK, CRH};
+use snarkos_utilities::{to_bytes, bytes::ToBytes};
 
-use dpc::ledger::Ledger;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 #[test]
 fn integration_test() {
@@ -105,7 +103,7 @@ fn integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut old_proof_and_vk = vec![];
         for i in 0..NUM_INPUT_RECORDS {
-            let proof = PredicateNIZK::prove(
+            let proof = PredicateSNARK::prove(
                 &parameters.pred_nizk_pp.pk,
                 EmptyPredicateCircuit::new(&local_data.comm_and_crh_pp, &local_data.local_data_comm, i as u8),
                 &mut rng,
@@ -118,7 +116,7 @@ fn integration_test() {
                     local_data_comm: local_data.local_data_comm.clone(),
                     position: i as u8,
                 };
-                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
 
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
@@ -133,7 +131,7 @@ fn integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut new_proof_and_vk = vec![];
         for i in 0..NUM_OUTPUT_RECORDS {
-            let proof = PredicateNIZK::prove(
+            let proof = PredicateSNARK::prove(
                 &parameters.pred_nizk_pp.pk,
                 EmptyPredicateCircuit::new(&local_data.comm_and_crh_pp, &local_data.local_data_comm, i as u8),
                 &mut rng,
@@ -146,7 +144,7 @@ fn integration_test() {
                     local_data_comm: local_data.local_data_comm.clone(),
                     position: i as u8,
                 };
-                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),
