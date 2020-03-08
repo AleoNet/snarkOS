@@ -33,21 +33,3 @@ pub trait CRHGadget<H: CRH, F: Field>: Sized {
         input: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError>;
 }
-
-// pub trait CompressedCRHGadget<H: CRH, F: Field>: Sized {
-//     type ParametersGadget: AllocGadget<H::Parameters, F> + Clone;
-//     type OutputGadget: ConditionalEqGadget<F>
-//     + EqGadget<F>
-//     + ToBytesGadget<F>
-//     + CondSelectGadget<F>
-//     + AllocGadget<H::Output, F>
-//     + Debug
-//     + Clone
-//     + Sized;
-//
-//     fn check_compressed_evaluation_gadget<CS: ConstraintSystem<F>>(
-//         cs: CS,
-//         parameters: &Self::ParametersGadget,
-//         input: &[UInt8],
-//     ) -> Result<Self::OutputGadget, SynthesisError>;
-// }

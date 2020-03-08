@@ -44,9 +44,8 @@ extern crate snarkos_profiler;
 extern crate derivative;
 
 pub mod constraints;
+
 pub(crate) mod dpc;
-pub mod ledger;
-
-pub type Error = Box<dyn std::error::Error>;
-
 pub use crate::dpc::*;
+
+pub mod ledger;

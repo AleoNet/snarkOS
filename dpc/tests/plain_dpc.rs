@@ -1,13 +1,13 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
+    ledger::Ledger,
     plain_dpc::{instantiated::*, predicate::PrivatePredInput, predicate_circuit::*, LocalData, DPC},
     DPCScheme,
     Record,
-    ledger::Ledger
 };
-use snarkos_models::algorithms::{SNARK, CommitmentScheme, CRH};
-use snarkos_utilities::{to_bytes, bytes::ToBytes};
+use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;

@@ -141,40 +141,6 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
     }
 }
 
-// pub struct PedersenCompressedCommitmentGadget<
-//     G: Group + ProjectiveCurve,
-//     F: Field,
-//     GG: CompressedGroupGadget<G, F>,
-// >(PhantomData<G>, PhantomData<F>, PhantomData<GG>);
-//
-// impl<
-//     G: Group + ProjectiveCurve,
-//     F: PrimeField,
-//     GG: CompressedGroupGadget<G, F>,
-//     S: PedersenSize,
-// > CompressedCommitmentGadget<PedersenCommitment<G, S>, F>
-// for PedersenCompressedCommitmentGadget<G, F, GG> where GG::BaseFieldGadget: AllocGadget<G, F>
-// {
-//     type OutputGadget = GG::BaseFieldGadget;
-//     type ParametersGadget = PedersenCommitmentParametersGadget<G, S, F>;
-//     type RandomnessGadget = PedersenRandomnessGadget<G>;
-//
-//     fn check_compressed_commitment_gadget<CS: ConstraintSystem<F>>(
-//         mut cs: CS,
-//         parameters: &Self::ParametersGadget,
-//         input: &[UInt8],
-//         randomness: &Self::RandomnessGadget,
-//     ) -> Result<Self::OutputGadget, SynthesisError> {
-//         let output = PedersenCommitmentGadget::<G, F, GG>::check_commitment_gadget(
-//             cs.ns(|| "pedersen_commitment_gadget"),
-//             parameters,
-//             input,
-//             randomness,
-//         )?;
-//         Ok(output.to_x_coordinate())
-//     }
-// }
-
 pub struct PedersenCompressedCommitmentGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>>(
     PhantomData<G>,
     PhantomData<GG>,

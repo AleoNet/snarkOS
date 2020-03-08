@@ -148,7 +148,11 @@ impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for EmptyPredic
 
         let _local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Pred Input Comm parameters"),
-            || self.comm_and_crh_parameters.get().map(|pp| pp.local_data_comm_pp.parameters()),
+            || {
+                self.comm_and_crh_parameters
+                    .get()
+                    .map(|pp| pp.local_data_comm_pp.parameters())
+            },
         )?;
 
         let _local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(

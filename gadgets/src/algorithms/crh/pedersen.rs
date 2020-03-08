@@ -93,36 +93,6 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     }
 }
 
-// pub struct PedersenCompressedCRHGadget<
-//     G: Group + ProjectiveCurve,
-//     F: Field,
-//     GG: CompressedGroupGadget<G, F>,
-// >(PhantomData<G>, PhantomData<F>, PhantomData<GG>);
-//
-// impl<
-//     G: Group + ProjectiveCurve,
-//     F: PrimeField,
-//     GG: CompressedGroupGadget<G, F>,
-//     S: PedersenSize,
-// > CompressedCRHGadget<PedersenCRH<G, S>, F> for PedersenCompressedCRHGadget<G, F, GG> where GG::BaseFieldGadget: AllocGadget<G, F>
-// {
-//     type OutputGadget = GG::BaseFieldGadget;
-//     type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;
-//
-//     fn check_compressed_evaluation_gadget<CS: ConstraintSystem<F>>(
-//         mut cs: CS,
-//         parameters: &Self::ParametersGadget,
-//         input: &[UInt8],
-//     ) -> Result<Self::OutputGadget, SynthesisError> {
-//         let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(
-//             cs.ns(|| "pedersen_commitment_gadget"),
-//             parameters,
-//             input,
-//         )?;
-//         Ok(output.to_x_coordinate())
-//     }
-// }
-
 pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
     _group: PhantomData<*const G>,
     _group_gadget: PhantomData<*const GG>,
