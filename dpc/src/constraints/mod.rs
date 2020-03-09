@@ -1,5 +1,7 @@
 use snarkos_errors::gadgets::SynthesisError;
 
+pub mod payment_dpc;
+
 pub mod plain_dpc;
 
 pub trait Assignment<T> {

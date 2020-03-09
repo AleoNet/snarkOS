@@ -5,6 +5,8 @@ use std::hash::Hash;
 
 pub mod plain_dpc;
 
+pub mod payment_dpc;
+
 use crate::ledger::*;
 
 pub trait AddressKeyPair {
