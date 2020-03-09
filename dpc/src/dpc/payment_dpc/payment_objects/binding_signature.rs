@@ -1,6 +1,7 @@
-use snarkos_algorithms::{commitment::PedersenCompressedCommitment, crh::PedersenSize};
+use snarkos_algorithms::{commitment::PedersenCommitment, crh::PedersenSize};
 use snarkos_errors::dpc::BindingSignatureError;
 use snarkos_models::{
+    algorithms::CommitmentScheme,
     curves::{
         pairing_engine::{AffineCurve, ProjectiveCurve},
         Field, Group,
@@ -68,7 +69,7 @@ impl BindingSignature {
 //      Need to convert compressed commitment x-coordinate into full affine point
 
 pub fn create_binding_signature<R: Rng, G: Group + ProjectiveCurve, S: PedersenSize>(
-    parameters: &PedersenCompressedCommitment<G, S>,
+    parameters: &PedersenCommitment<G, S>,
     input_value_commitments: &Vec<<G as ProjectiveCurve>::Affine>,
     output_value_commitments: &Vec<<G as ProjectiveCurve>::Affine>,
     input_value_commitment_randomness: &Vec<<G as Group>::ScalarField>,
@@ -80,7 +81,7 @@ pub fn create_binding_signature<R: Rng, G: Group + ProjectiveCurve, S: PedersenS
     // Calculate Value balance commitment
     let zero_randomness = <G as Group>::ScalarField::default();
     let value_balance_commitment =
-        parameters.commit_to_affine(&value_balance.to_le_bytes(), &zero_randomness)?;
+        parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?;
 
     // Calculate the bsk and bvk
     let mut bsk = <G as Group>::ScalarField::default();
@@ -102,12 +103,12 @@ pub fn create_binding_signature<R: Rng, G: Group + ProjectiveCurve, S: PedersenS
         bvk = bvk.add(&vc_output.into_projective().neg());
     }
 
-    bvk = bvk.add(&value_balance_commitment.into_projective().neg());
+    bvk = bvk.add(&value_balance_commitment.neg());
 
     // Make sure bvk can be derived from bsk
     let zero: u64 = 0;
-    let expected_bvk = parameters.commit_to_affine(&zero.to_le_bytes(), &bsk)?;
-    assert_eq!(bvk, expected_bvk.into_projective());
+    let expected_bvk = parameters.commit(&zero.to_le_bytes(), &bsk)?;
+    assert_eq!(bvk, expected_bvk);
 
     // Generate randomness
     let mut sig_rand = [0u8; 80];
@@ -118,10 +119,10 @@ pub fn create_binding_signature<R: Rng, G: Group + ProjectiveCurve, S: PedersenS
     let r: <G as Group>::ScalarField = hash_into_field::<G>(&sig_rand[..], input);
 
     let r_g = parameters
-        .commit_to_affine(&zero.to_le_bytes(), &r)?;
+        .commit(&zero.to_le_bytes(), &r)?;
 
     let mut rbar = [0u8; 64]; // TODO Look into compression with into_affine().x
-    r_g.write(&mut rbar[..])?;
+    r_g.into_affine().write(&mut rbar[..])?;
 
     let mut s: <G as Group>::ScalarField = hash_into_field::<G>(&rbar[..], input);
     s = s.mul(&bsk);
@@ -134,7 +135,7 @@ pub fn create_binding_signature<R: Rng, G: Group + ProjectiveCurve, S: PedersenS
 }
 
 pub fn verify_binding_signature<G: Group + ProjectiveCurve, S: PedersenSize>(
-    parameters: &PedersenCompressedCommitment<G, S>,
+    parameters: &PedersenCommitment<G, S>,
     input_value_commitments: &Vec<<G as ProjectiveCurve>::Affine>,
     output_value_commitments: &Vec<<G as ProjectiveCurve>::Affine>,
     value_balance: u64,
@@ -144,7 +145,7 @@ pub fn verify_binding_signature<G: Group + ProjectiveCurve, S: PedersenSize>(
     // Calculate Value balance commitment
     let zero_randomness = <G as Group>::ScalarField::default();
     let value_balance_commitment =
-        parameters.commit_to_affine(&value_balance.to_le_bytes(), &zero_randomness)?;
+        parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?;
 
     // Craft verifying key
     let mut bvk = G::default();
@@ -157,7 +158,7 @@ pub fn verify_binding_signature<G: Group + ProjectiveCurve, S: PedersenSize>(
         bvk = bvk.add(&vc_output.into_projective().neg());
     }
 
-    bvk = bvk.add(&value_balance_commitment.into_projective().neg());
+    bvk = bvk.add(&value_balance_commitment.neg());
 
     //Verify the signature
     let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
@@ -168,9 +169,9 @@ pub fn verify_binding_signature<G: Group + ProjectiveCurve, S: PedersenSize>(
     let s: <G as Group>::ScalarField = FromBytes::read(&signature.sbar[..])?;
 
     let zero: u64 = 0;
-    let recommit = parameters.commit_to_affine(&zero.to_le_bytes(), &s)?;
+    let recommit = parameters.commit(&zero.to_le_bytes(), &s)?;
 
-    let check_verification = bvk.mul(&c).add(&projective_r).add(&recommit.into_projective().neg());
+    let check_verification = bvk.mul(&c).add(&projective_r).add(&recommit.neg());
 
     Ok(check_verification.eq(&G::default()))
 }
@@ -205,7 +206,7 @@ mod tests {
         let input_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
 
         let input_value_commitment = value_comm_pp
-            .commit_to_affine(
+            .commit(
                 &input_amount.to_le_bytes(),
                 &input_value_commitment_randomness,
             )
@@ -214,7 +215,7 @@ mod tests {
         let output_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
 
         let output_value_commitment = value_comm_pp
-            .commit_to_affine(
+            .commit(
                 &output_amount.to_le_bytes(),
                 &output_value_commitment_randomness,
             )
@@ -224,8 +225,8 @@ mod tests {
 
         let binding_signature = create_binding_signature(
             &value_comm_pp,
-            &vec![input_value_commitment],
-            &vec![output_value_commitment],
+            &vec![input_value_commitment.into_affine()],
+            &vec![output_value_commitment.into_affine()],
             &vec![input_value_commitment_randomness],
             &vec![output_value_commitment_randomness],
             value_balance,
@@ -236,8 +237,8 @@ mod tests {
 
         let verified = verify_binding_signature(
             &value_comm_pp,
-            &vec![input_value_commitment],
-            &vec![output_value_commitment],
+            &vec![input_value_commitment.into_affine()],
+            &vec![output_value_commitment.into_affine()],
             value_balance,
             &sighash,
             binding_signature,

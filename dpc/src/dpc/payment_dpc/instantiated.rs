@@ -12,7 +12,7 @@ use crate::{
     ledger::ideal_ledger::IdealLedger,
 };
 use snarkos_algorithms::{
-    commitment::{Blake2sCommitment, PedersenCompressedCommitment},
+    commitment::{Blake2sCommitment, PedersenCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
     merkle_tree::MerkleParameters,
     prf::Blake2s,
@@ -26,7 +26,7 @@ use snarkos_curves::{
 };
 use snarkos_gadgets::{
     algorithms::{
-        commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
+        commitment::{Blake2sCommitmentGadget, PedersenCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::PedersenCompressedCRHGadget,
         prf::Blake2sGadget,
         snark::GM17VerifierGadget,
@@ -162,7 +162,7 @@ pub type AddressComm = PedersenCompressedCommitment<EdwardsBls, AddressWindow>;
 pub type RecordComm = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateComm = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
-pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
+pub type ValueComm = PedersenCommitment<EdwardsBls, ValueWindow>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -180,7 +180,7 @@ pub type RecordCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreC
 pub type AddressCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 pub type PredicateCommGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
-pub type ValueCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
+pub type ValueCommGadget = PedersenCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 
 pub type SnNonceCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
