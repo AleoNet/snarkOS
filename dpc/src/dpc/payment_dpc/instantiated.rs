@@ -91,7 +91,7 @@ pub struct ValueWindow;
 
 impl PedersenSize for ValueWindow {
     const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 128;
+    const WINDOW_SIZE: usize = 350;
 }
 
 type H = MerkleTreeCRH;
