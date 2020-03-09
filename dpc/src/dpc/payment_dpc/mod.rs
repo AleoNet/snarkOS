@@ -33,6 +33,8 @@ use self::transaction::*;
 pub mod core_checks_circuit;
 use self::core_checks_circuit::*;
 
+use mod payment_objects;
+
 pub mod proof_check_circuit;
 use self::proof_check_circuit::*;
 
