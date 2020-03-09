@@ -1,10 +1,10 @@
-use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
+use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenCompressedCRH, PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group},
+    curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         algorithms::CRHGadget,
-        curves::GroupGadget,
+        curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
@@ -93,5 +93,24 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     }
 }
 
-#[cfg(test)]
-mod test {}
+pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
+    _group: PhantomData<*const G>,
+    _group_gadget: PhantomData<*const GG>,
+    _engine: PhantomData<F>,
+}
+
+impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    CRHGadget<PedersenCompressedCRH<G, S>, F> for PedersenCompressedCRHGadget<G, F, GG>
+{
+    type OutputGadget = GG::BaseFieldGadget;
+    type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;
+
+    fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(cs, parameters, input)?;
+        Ok(output.to_x_coordinate())
+    }
+}

@@ -18,6 +18,7 @@ members = [
     "consensus",
     "console",
     "curves",
+    "dpc",
     "errors",
     "gadgets",
     "models",

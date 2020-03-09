@@ -1,0 +1,33 @@
+[package]
+name = "snarkos-dpc"
+version = "0.8.0"
+authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+description = "Errors for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+[features]
+print-trace = [ "snarkos-profiler/print-trace" ]
+
+[dependencies]
+snarkos-algorithms = { path = "../algorithms" }
+snarkos-curves = { path = "../curves"}
+snarkos-errors = { path = "../errors" }
+snarkos-gadgets = { path = "../gadgets"}
+snarkos-models = { path = "../models"}
+snarkos-objects = { path = "../objects" }
+snarkos-profiler = { path = "../profiler" }
+snarkos-utilities = { path = "../utilities"}
+
+hex = { version = "0.4.2" }
+rand = { version = "0.7" }
+derivative = { version = "1" }
+
+[dev-dependencies]
+criterion = "0.3.1"
+rand_xorshift = { version = "0.2" }

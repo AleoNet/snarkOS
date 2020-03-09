@@ -22,6 +22,7 @@ use snarkos_models::{
 use snarkos_utilities::bititerator::BitIterator;
 
 use std::{borrow::Borrow, marker::PhantomData, ops::Neg};
+
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
 #[must_use]

@@ -5,6 +5,7 @@ use blake2::Blake2s as b2s;
 use digest::Digest;
 use rand::Rng;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Blake2sCommitment;
 
 impl CommitmentScheme for Blake2sCommitment {
@@ -24,5 +25,9 @@ impl CommitmentScheme for Blake2sCommitment {
         let mut result = [0u8; 32];
         result.copy_from_slice(&h.result());
         Ok(result)
+    }
+
+    fn parameters(&self) -> &Self::Parameters {
+        &()
     }
 }

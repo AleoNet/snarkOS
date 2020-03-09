@@ -11,7 +11,7 @@ use snarkos_models::{
 use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PedersenCompressedCommitment<G: Group, S: PedersenSize> {
+pub struct PedersenCompressedCommitment<G: Group + ProjectiveCurve, S: PedersenSize> {
     pub parameters: PedersenCommitmentParameters<G, S>,
 }
 
@@ -36,5 +36,9 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
         let affine = output.into_affine();
         debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
         Ok(affine.to_x_coordinate())
+    }
+
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
     }
 }

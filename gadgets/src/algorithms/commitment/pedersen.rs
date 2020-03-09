@@ -1,13 +1,13 @@
 use snarkos_algorithms::{
-    commitment::{PedersenCommitment, PedersenCommitmentParameters},
+    commitment::{PedersenCommitment, PedersenCommitmentParameters, PedersenCompressedCommitment},
     crh::PedersenSize,
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group, PrimeField},
+    curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
         algorithms::CommitmentGadget,
-        curves::GroupGadget,
+        curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
@@ -138,5 +138,29 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
         )?;
 
         Ok(result)
+    }
+}
+
+pub struct PedersenCompressedCommitmentGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>>(
+    PhantomData<G>,
+    PhantomData<GG>,
+    PhantomData<F>,
+);
+
+impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    CommitmentGadget<PedersenCompressedCommitment<G, S>, F> for PedersenCompressedCommitmentGadget<G, F, GG>
+{
+    type OutputGadget = GG::BaseFieldGadget;
+    type ParametersGadget = PedersenCommitmentParametersGadget<G, S, F>;
+    type RandomnessGadget = PedersenRandomnessGadget<G>;
+
+    fn check_commitment_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+        randomness: &Self::RandomnessGadget,
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        let output = PedersenCommitmentGadget::<G, F, GG>::check_commitment_gadget(cs, parameters, input, randomness)?;
+        Ok(output.to_x_coordinate())
     }
 }
