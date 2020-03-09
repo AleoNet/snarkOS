@@ -72,6 +72,28 @@ impl PedersenSize for TwoToOneWindow {
     const WINDOW_SIZE: usize = 128;
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct RecordWindow;
+impl PedersenSize for RecordWindow {
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 225;
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct AddressWindow;
+impl PedersenSize for AddressWindow {
+    const NUM_WINDOWS: usize = 4;
+    const WINDOW_SIZE: usize = 128;
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ValueWindow;
+
+impl PedersenSize for ValueWindow {
+    const NUM_WINDOWS: usize = 4;
+    const WINDOW_SIZE: usize = 128;
+}
+
 type H = MerkleTreeCRH;
 
 #[derive(Clone, PartialEq, Eq)]
@@ -92,20 +114,6 @@ impl Default for CommitmentMerkleParameters {
         let mut rng = rand::thread_rng();
         Self(H::setup(&mut rng))
     }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RecordWindow;
-impl PedersenSize for RecordWindow {
-    const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 225;
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct AddressWindow;
-impl PedersenSize for AddressWindow {
-    const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 128;
 }
 
 pub struct Components;
@@ -133,6 +141,8 @@ impl PlainDPCComponents for Components {
     type RecCGadget = RecordCommGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
+    type ValueComm = ValueComm;
+    type ValueCommGadget = ValueCommGadget;
 
     const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
@@ -149,6 +159,7 @@ pub type AddressComm = PedersenCompressedCommitment<EdwardsBls, AddressWindow>;
 pub type RecordComm = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateComm = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
+pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -166,6 +177,7 @@ pub type RecordCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreC
 pub type AddressCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 pub type PredicateCommGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
+pub type ValueCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 
 pub type SnNonceCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;

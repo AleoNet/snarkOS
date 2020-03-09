@@ -33,7 +33,7 @@ use self::transaction::*;
 pub mod core_checks_circuit;
 use self::core_checks_circuit::*;
 
-use mod payment_objects;
+pub mod payment_objects;
 
 pub mod proof_check_circuit;
 use self::proof_check_circuit::*;
@@ -94,6 +94,10 @@ pub trait PlainDPCComponents: 'static + Sized {
     // `Self::MainN` and every predicate SNARK.
     type LocalDataComm: CommitmentScheme;
     type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::CoreCheckF>;
+
+    // Commitment scheme for committing to a record value
+    type ValueComm: CommitmentScheme;
+    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::CoreCheckF>;
 
     // SNARK for non-proof-verification checks
     type MainNIZK: SNARK<
@@ -212,6 +216,10 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         let local_data_comm_pp = Components::LocalDataComm::setup(rng);
         end_timer!(time);
 
+        let time = start_timer!(|| "Local Data Commitment setup");
+        let value_comm_pp = Components::ValueComm::setup(rng);
+        end_timer!(time);
+
         let time = start_timer!(|| "Serial Nonce CRH setup");
         let sn_nonce_crh_pp = Components::SnNonceH::setup(rng);
         end_timer!(time);
@@ -225,6 +233,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
             rec_comm_pp,
             pred_vk_comm_pp,
             local_data_comm_pp,
+            value_comm_pp,
 
             sn_nonce_crh_pp,
             pred_vk_crh_pp,
