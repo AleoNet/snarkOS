@@ -3,18 +3,7 @@ use snarkos_consensus::{block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::rpc::RpcError;
 use snarkos_network::{context::Context, server::process_transaction_internal};
 use snarkos_objects::{transaction::*, BlockHeaderHash};
-use snarkos_storage::{
-    transaction::{
-        calculate_transaction_fees,
-        check_for_double_spend,
-        check_for_double_spends,
-        get_balance,
-        get_outpoint,
-        get_spendable_outpoints,
-        get_transaction_bytes,
-    },
-    BlockStorage,
-};
+use snarkos_storage::BlockStorage;
 
 use chrono::Utc;
 use std::{str::FromStr, sync::Arc};
@@ -64,7 +53,7 @@ impl RpcFunctions for RpcImpl {
     fn get_balance(&self, address_string: String) -> Result<u64, RpcError> {
         let address = BitcoinAddress::<Mainnet>::from_str(&address_string)?;
 
-        Ok(get_balance(&self.storage, &address))
+        Ok(self.storage.get_balance(&address))
     }
 
     /// Returns all stored information on a block hash.
@@ -127,7 +116,7 @@ impl RpcFunctions for RpcImpl {
         let address = BitcoinAddress::<Mainnet>::from_str(&address_string)?;
 
         let mut result = vec![];
-        for (outpoint, _balance) in get_spendable_outpoints(&self.storage, &address) {
+        for (outpoint, _balance) in self.storage.get_spendable_outpoints(&address) {
             let utxo = (hex::encode(outpoint.transaction_id), outpoint.index);
 
             result.push(utxo);
@@ -139,7 +128,10 @@ impl RpcFunctions for RpcImpl {
     /// Returns hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         Ok(hex::encode(
-            &get_transaction_bytes(&self.storage, &hex::decode(transaction_id)?)?.serialize()?,
+            &self
+                .storage
+                .get_transaction_bytes(&hex::decode(transaction_id)?)?
+                .serialize()?,
         ))
     }
 
@@ -214,11 +206,10 @@ impl RpcFunctions for RpcImpl {
 
         for input in transaction.parameters.inputs.clone() {
             if !input.outpoint.is_coinbase() && input.outpoint.script_pub_key.is_none() {
-                transaction = transaction.update_outpoint(get_outpoint(
-                    &self.storage,
-                    &input.outpoint.transaction_id,
-                    input.outpoint.index as usize,
-                )?);
+                transaction = transaction.update_outpoint(
+                    self.storage
+                        .get_outpoint(&input.outpoint.transaction_id, input.outpoint.index as usize)?,
+                );
             }
         }
 
@@ -236,7 +227,7 @@ impl RpcFunctions for RpcImpl {
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction = Transaction::from_str(&transaction_bytes)?;
 
-        match check_for_double_spend(&self.storage, &transaction) {
+        match self.storage.check_for_double_spend(&transaction) {
             Ok(_) => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
@@ -284,12 +275,12 @@ impl RpcFunctions for RpcImpl {
         let memory_pool = Runtime::new()?.block_on(self.memory_pool_lock.lock());
         let full_transactions = memory_pool.get_candidates(&self.storage, self.consensus.max_block_size)?;
 
-        check_for_double_spends(&self.storage, &full_transactions)?;
+        self.storage.check_for_double_spends(&full_transactions)?;
 
         let mut transaction_strings = vec![];
 
         let coinbase_value =
-            block_reward(block_height + 1) + calculate_transaction_fees(&self.storage, &full_transactions)?;
+            block_reward(block_height + 1) + self.storage.calculate_transaction_fees(&full_transactions)?;
 
         for transaction in full_transactions.iter() {
             transaction_strings.push(hex::encode(transaction.serialize()?));

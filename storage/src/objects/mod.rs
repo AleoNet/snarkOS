@@ -7,8 +7,11 @@ pub use self::block::*;
 pub mod block_header;
 pub use self::block_header::*;
 
-pub mod fork;
-pub use self::fork::*;
+pub mod block_path;
+pub use self::block_path::*;
+
+pub mod insert_commit;
+pub use self::insert_commit::*;
 
 pub mod transaction;
 pub use self::transaction::*;

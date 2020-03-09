@@ -1,10 +1,7 @@
 use crate::{block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{merkle_root, Block, BlockHeader, MerkleRootHash, Transaction, Transactions};
-use snarkos_storage::{
-    transaction::{calculate_transaction_fees, check_block_transactions},
-    BlockStorage,
-};
+use snarkos_storage::BlockStorage;
 
 use chrono::Utc;
 use rand::Rng;
@@ -44,7 +41,7 @@ impl Miner {
         storage: &BlockStorage,
         transactions: &mut Transactions,
     ) -> Result<(), ConsensusError> {
-        let transaction_fees = calculate_transaction_fees(storage, &transactions)?;
+        let transaction_fees = storage.calculate_transaction_fees(&transactions)?;
         transactions.insert(
             0,
             Transaction::create_coinbase_transaction(
@@ -65,7 +62,7 @@ impl Miner {
     ) -> Result<(BlockHeader, Transactions), ConsensusError> {
         let mut transactions = transactions.clone();
         self.add_coinbase_transaction(&storage, &mut transactions)?;
-        check_block_transactions(&storage, &transactions)?;
+        storage.check_block_transactions(&transactions)?;
 
         let previous_block_header = storage.get_latest_block()?.header;
 

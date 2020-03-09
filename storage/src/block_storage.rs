@@ -1,9 +1,7 @@
 use crate::{
     bytes_to_u32,
-    transaction::get_transaction_bytes,
     Key,
     KeyValue,
-    SideChainPath,
     Storage,
     TransactionMeta,
     TransactionValue,
@@ -12,12 +10,11 @@ use crate::{
     KEY_MEMORY_POOL,
     NUM_COLS,
 };
-use snarkos_errors::{storage::StorageError, unwrap_option_or_continue, unwrap_option_or_error};
+use snarkos_errors::{storage::StorageError, unwrap_option_or_error};
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 
 use parking_lot::RwLock;
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -29,7 +26,7 @@ pub struct BlockStorage {
 }
 
 impl BlockStorage {
-    /// Create a new storage
+    /// Create a new blockchain storage.
     pub fn new() -> Result<Arc<Self>, StorageError> {
         let mut path = std::env::current_dir()?;
         path.push("../../db");
@@ -39,7 +36,7 @@ impl BlockStorage {
         BlockStorage::open_at_path(path, genesis)
     }
 
-    /// Open the blockchain storage at a particular path
+    /// Open the blockchain storage at a particular path.
     pub fn open_at_path<P: AsRef<Path>>(path: P, genesis: String) -> Result<Arc<Self>, StorageError> {
         fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
 
@@ -49,7 +46,7 @@ impl BlockStorage {
         }
     }
 
-    /// Get the latest state of the storage
+    /// Get the latest state of the storage.
     pub fn get_latest_state(storage: Storage, genesis: String) -> Result<Arc<Self>, StorageError> {
         let value = storage.get(&Key::Meta(KEY_BEST_BLOCK_NUMBER))?;
 
@@ -75,23 +72,22 @@ impl BlockStorage {
         }
     }
 
-    /// Returns true if there are no blocks in the chain.
-    pub fn is_empty(&self) -> bool {
-        //TODO: FIX THIS FUNCTION
-        self.get_latest_block().is_err()
-    }
-
-    /// Get the latest block height of the chain
+    /// Get the latest block height of the chain.
     pub fn get_latest_block_height(&self) -> u32 {
         *self.latest_block_height.read()
     }
 
-    /// Get the latest number of blocks in the chain
+    /// Get the latest number of blocks in the chain.
     pub fn get_block_count(&self) -> u32 {
         *self.latest_block_height.read() + 1
     }
 
-    /// Retrieve a value given a key
+    /// Destroy the storage given a path.
+    pub fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {
+        Storage::destroy_storage(path)
+    }
+
+    /// Retrieve a value given a key.
     pub fn get(&self, key: &Key) -> Result<Value, StorageError> {
         match self.storage.get(key)? {
             Some(data) => Ok(Value::from_bytes(&key, &data)?),
@@ -101,18 +97,18 @@ impl BlockStorage {
 
     // KEY VALUE GETTERS ===========================================================================
 
-    /// Get the stored memory pool transactions
+    /// Get the stored memory pool transactions.
     pub fn get_memory_pool_transactions(&self) -> Result<Option<Vec<u8>>, StorageError> {
         Ok(self.get(&Key::Meta(KEY_MEMORY_POOL))?.meta())
     }
 
-    /// Store the memory pool transactions
+    /// Store the memory pool transactions.
     pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
         self.storage
             .insert(KeyValue::Meta(KEY_MEMORY_POOL, transactions_serialized))
     }
 
-    /// Get a block header given the block hash
+    /// Get a block header given the block hash.
     pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockHeaders(block_hash.clone()))?.block_header();
@@ -120,7 +116,7 @@ impl BlockStorage {
         ))
     }
 
-    /// Get the block hash given a block number
+    /// Get the block hash given a block number.
     pub fn get_block_hash(&self, block_num: u32) -> Result<BlockHeaderHash, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockHashes(block_num))?.block_hash();
@@ -128,7 +124,7 @@ impl BlockStorage {
         ))
     }
 
-    /// Get the block num given a block hash
+    /// Get the block num given a block hash.
     pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockNumbers(block_hash.clone()))?.block_number();
@@ -136,7 +132,7 @@ impl BlockStorage {
         ))
     }
 
-    /// Get the list of transaction ids given a block hash
+    /// Get the list of transaction ids given a block hash.
     pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Vec<Vec<u8>>, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockTransactions(block_hash.clone()))?.block_transaction();
@@ -144,7 +140,15 @@ impl BlockStorage {
         ))
     }
 
-    /// Get a transaction given the transaction id
+    /// Find the potential child block given a parent block header.
+    pub fn get_child_hash(&self, parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
+        Ok(unwrap_option_or_error!(
+            self.get(&Key::ChildHashes(parent_header.clone()))?.child_hashes();
+            StorageError::InvalidParentHash(hex::encode(parent_header.0))
+        ))
+    }
+
+    /// Get a transaction given the transaction id.
     pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Option<TransactionValue> {
         match self.get(&Key::Transactions(transaction_id.clone())) {
             Ok(value) => match value.transactions() {
@@ -155,309 +159,18 @@ impl BlockStorage {
         }
     }
 
-    /// Get the transaction meta wrapper given the transaction id
+    /// Get the transaction meta wrapper given the transaction id.
     pub fn get_transaction_meta(&self, transaction_id: &Vec<u8>) -> Result<TransactionMeta, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::TransactionMeta(transaction_id.clone()))?.transaction_meta();
             StorageError::InvalidTransactionMeta(hex::encode(&transaction_id))
         ))
     }
-
-    /// Find the potential child block given a parent block header
-    pub fn find_child_block(&self, parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
-        Ok(unwrap_option_or_error!(
-            self.get(&Key::ChildHashes(parent_header.clone()))?.child_hashes();
-            StorageError::InvalidParentHash(hex::encode(parent_header.0))
-        ))
-    }
-
-    // INSERT COMMIT ===============================================================================
-
-    /// Insert a block into the storage but do not commit
-    pub fn insert_only(&self, block: Block) -> Result<(), StorageError> {
-        // Verify that the block does not already exist in storage.
-        if self.block_hash_exists(&block.header.get_hash()) {
-            return Err(StorageError::BlockExists(block.header.get_hash().0));
-        }
-
-        let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids().unwrap();
-        let transaction_bytes: Vec<Vec<u8>> = block.transactions.serialize().unwrap();
-
-        let mut transactions_to_store = vec![];
-        for (index, tx_bytes) in transaction_bytes.iter().enumerate() {
-            let transaction_value = match self.get_transaction(&transaction_ids[index]) {
-                Some(transaction_value) => transaction_value.increment(),
-                None => TransactionValue::new(tx_bytes.clone()),
-            };
-
-            transactions_to_store.push(KeyValue::Transactions(
-                transaction_ids[index].clone(),
-                transaction_value,
-            ));
-
-            transactions_to_store.push(KeyValue::TransactionMeta(
-                transaction_ids[index].clone(),
-                TransactionMeta {
-                    spent: vec![false; block.transactions[index].parameters.outputs.len()],
-                },
-            ));
-        }
-
-        let block_header_hash = block.header.get_hash();
-        let block_transactions = KeyValue::BlockTransactions(block_header_hash.clone(), transaction_ids);
-        let child_hashes = KeyValue::ChildHashes(block.header.previous_block_hash.clone(), block_header_hash.clone());
-        let block_header = KeyValue::BlockHeaders(block_header_hash, block.header);
-
-        self.storage
-            .insert_batch(vec![block_header, block_transactions, child_hashes])?;
-        self.storage.insert_batch(transactions_to_store)?;
-
-        Ok(())
-    }
-
-    /// Insert a block into the storage and commit as part of the longest chain
-    pub fn insert_and_commit(&self, block: Block) -> Result<(), StorageError> {
-        let block_hash = block.header.get_hash();
-
-        // If the block does not exist in the storage
-        if !self.block_hash_exists(&block_hash) {
-            // Insert it first
-            self.insert_only(block)?;
-        }
-        // Commit it
-        self.commit(block_hash)
-    }
-
-    /// Commit/canonize a particular block
-    pub fn commit(&self, block_header_hash: BlockHeaderHash) -> Result<(), StorageError> {
-        let block = self.get_block(&block_header_hash.clone())?;
-
-        let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
-            && self.get_latest_block_height() == 0
-            && self.is_empty();
-
-        if !is_genesis {
-            let latest_block = self.get_latest_block()?;
-
-            if latest_block.header.get_hash() != block.header.previous_block_hash {
-                return Err(StorageError::InvalidNextBlock(
-                    latest_block.header.get_hash().to_string(),
-                    block.header.previous_block_hash.to_string(),
-                ));
-            }
-        }
-
-        // Update transaction spent status
-
-        let mut transaction_meta_updates: HashMap<Vec<u8>, TransactionMeta> = HashMap::new();
-        for transaction in block.transactions.iter() {
-            for input in &transaction.parameters.inputs {
-                if input.outpoint.is_coinbase() {
-                    continue;
-                }
-
-                let mut new_transaction_meta = match transaction_meta_updates.get(&input.outpoint.transaction_id) {
-                    Some(transaction_meta) => transaction_meta.clone(),
-                    None => unwrap_option_or_error!(
-                        self.get(&Key::TransactionMeta(input.outpoint.transaction_id.clone()))?.transaction_meta();
-                        StorageError::InvalidTransactionMeta(hex::encode(&input.outpoint.transaction_id))
-                    ),
-                };
-
-                if new_transaction_meta.spent[input.outpoint.index as usize] {
-                    return Err(StorageError::DoubleSpend(hex::encode(&input.outpoint.transaction_id)));
-                }
-
-                new_transaction_meta.spent[input.outpoint.index as usize] = true;
-                transaction_meta_updates.insert(input.outpoint.transaction_id.clone(), new_transaction_meta);
-            }
-        }
-
-        let mut update_spent_transactions = vec![];
-        for (txid, transaction_meta) in transaction_meta_updates {
-            update_spent_transactions.push(KeyValue::TransactionMeta(txid, transaction_meta));
-        }
-
-        // Handle storage inserts and height update
-
-        let mut height = self.latest_block_height.write();
-        let mut new_best_block_number = 0;
-        if !is_genesis {
-            new_best_block_number = *height + 1;
-        }
-
-        let best_block_number = KeyValue::Meta(KEY_BEST_BLOCK_NUMBER, new_best_block_number.to_le_bytes().to_vec());
-        let block_hash = KeyValue::BlockHashes(new_best_block_number, block_header_hash.clone());
-        let block_numbers = KeyValue::BlockNumbers(block_header_hash, new_best_block_number);
-
-        self.storage
-            .insert_batch(vec![best_block_number, block_hash, block_numbers])?;
-        self.storage.insert_batch(update_spent_transactions)?;
-
-        if !is_genesis {
-            *height += 1;
-        }
-
-        Ok(())
-    }
-
-    /// Remove a block and it's related data from the storage
-    pub fn remove_block(&self, block_hash: BlockHeaderHash) -> Result<(), StorageError> {
-        let block_header_key = Key::BlockHeaders(block_hash.clone());
-        let block_transactions_key = Key::BlockTransactions(block_hash);
-
-        let block_transactions: Vec<Vec<u8>> = unwrap_option_or_error!(
-           self.get(&block_transactions_key)?.block_transaction();
-           StorageError::MissingValue(block_transactions_key.to_string())
-        );
-
-        for block_transaction_id in block_transactions {
-            self.decrement_transaction_value(&block_transaction_id)?;
-        }
-
-        self.storage
-            .remove_batch(vec![block_header_key, block_transactions_key])?;
-
-        Ok(())
-    }
-
-    /// Remove the latest block
-    pub fn remove_latest_block(&self) -> Result<(), StorageError> {
-        // De-commit the block from the valid chain
-
-        let latest_block_height = self.get_latest_block_height();
-        if latest_block_height == 0 {
-            return Err(StorageError::InvalidBlockRemovalNum(0, 0));
-        }
-        let block_hash_key = Key::BlockHashes(latest_block_height);
-
-        let block_hash: BlockHeaderHash = unwrap_option_or_error!(
-            self.get(&block_hash_key)?.block_hash();
-            StorageError::MissingValue(block_hash_key.to_string())
-        );
-
-        let block_numbers_key = Key::BlockNumbers(block_hash.clone());
-        let block_transactions_key = Key::BlockTransactions(block_hash.clone());
-
-        let block_transactions: Vec<Vec<u8>> = unwrap_option_or_error!(
-            self.get(&block_transactions_key)?.block_transaction();
-            StorageError::MissingValue(block_numbers_key.to_string())
-        );
-
-        let mut transaction_meta_updates: HashMap<Vec<u8>, TransactionMeta> = HashMap::new();
-
-        for block_transaction_id in block_transactions {
-            // Update transaction meta spends
-
-            for input in get_transaction_bytes(self, &block_transaction_id)
-                .unwrap()
-                .parameters
-                .inputs
-            {
-                if input.outpoint.is_coinbase() {
-                    continue;
-                }
-
-                let mut new_transaction_meta = match transaction_meta_updates.get(&input.outpoint.transaction_id) {
-                    Some(transaction_meta) => transaction_meta.clone(),
-                    None => unwrap_option_or_continue!(
-                        self.get(&Key::TransactionMeta(input.outpoint.transaction_id.clone()))?
-                            .transaction_meta()
-                    ),
-                };
-
-                new_transaction_meta.spent[input.outpoint.index as usize] = false;
-                transaction_meta_updates.insert(input.outpoint.transaction_id.clone(), new_transaction_meta);
-            }
-        }
-
-        // Update spent status of relevant utxos
-
-        let mut update_spent_transactions = vec![];
-        for (txid, transaction_meta) in transaction_meta_updates {
-            update_spent_transactions.push(KeyValue::TransactionMeta(txid, transaction_meta));
-        }
-
-        let update_best_block_num = latest_block_height - 1;
-        let best_block_number = KeyValue::Meta(KEY_BEST_BLOCK_NUMBER, (update_best_block_num).to_le_bytes().to_vec());
-
-        let mut storage_inserts = vec![best_block_number];
-        storage_inserts.extend(update_spent_transactions);
-
-        self.storage.insert_batch(storage_inserts)?;
-        self.storage.remove_batch(vec![block_hash_key, block_numbers_key])?;
-
-        let mut latest_block_height = self.latest_block_height.write();
-        *latest_block_height -= 1;
-
-        // Remove the block structure
-
-        self.remove_block(block_hash)?;
-
-        Ok(())
-    }
-
-    /// Remove the latest `num_blocks` blocks.
-    pub fn remove_latest_blocks(&self, num_blocks: u32) -> Result<(), StorageError> {
-        let latest_block_height = self.get_latest_block_height();
-        if num_blocks > latest_block_height {
-            return Err(StorageError::InvalidBlockRemovalNum(num_blocks, latest_block_height));
-        }
-
-        for _ in 0..num_blocks {
-            self.remove_latest_block()?;
-        }
-        Ok(())
-    }
-
-    /// Revert the chain to the state before the fork
-    pub fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
-        let latest_block_height = self.get_latest_block_height();
-
-        if side_chain_path.new_block_number > latest_block_height {
-            for _ in (side_chain_path.shared_block_number)..latest_block_height {
-                self.remove_latest_block()?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Decrement or remove the transaction_value
-    pub fn decrement_transaction_value(&self, transaction_id: &Vec<u8>) -> Result<(), StorageError> {
-        let transaction_id_key = Key::Transactions(transaction_id.clone());
-
-        match self.get(&transaction_id_key) {
-            Ok(value) => match value.transactions() {
-                Some(transaction_value) => {
-                    let tx_value = transaction_value.decrement();
-
-                    if tx_value.count > 0 {
-                        // Update
-                        let update_transaction = KeyValue::Transactions(transaction_id.clone(), tx_value);
-                        self.storage.insert(update_transaction)
-                    } else {
-                        // Remove
-                        self.storage.remove(&transaction_id_key)?;
-                        self.storage.remove(&Key::TransactionMeta(transaction_id.clone()))
-                    }
-                }
-                None => Ok(()),
-            },
-            Err(_) => Ok(()),
-        }
-    }
-
-    /// Destroy the storage given a path
-    pub fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {
-        Storage::destroy_storage(path)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transaction::get_balance;
 
     use hex;
     use std::str::FromStr;
@@ -524,7 +237,7 @@ mod tests {
 
         let address = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[0].address).unwrap();
 
-        assert_eq!(get_balance(&blockchain, &address), 100000000);
+        assert_eq!(blockchain.get_balance(&address), 100000000);
         assert!(blockchain.remove_latest_block().is_err());
 
         kill_storage(blockchain, path);

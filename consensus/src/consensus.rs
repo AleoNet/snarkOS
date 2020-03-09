@@ -1,11 +1,7 @@
 use crate::{bitcoin_retarget, miner::MemoryPool};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transactions};
-use snarkos_storage::{
-    transaction::{calculate_transaction_fees, check_block_transactions, get_outpoint},
-    BlockPath,
-    BlockStorage,
-};
+use snarkos_storage::{BlockPath, BlockStorage};
 
 use chrono::Utc;
 
@@ -99,24 +95,22 @@ impl ConsensusParameters {
         storage: &BlockStorage,
         transactions: &Transactions,
     ) -> Result<(), ConsensusError> {
-        check_block_transactions(storage, transactions)?;
+        storage.check_block_transactions(transactions)?;
 
         for transaction in transactions.iter() {
             let mut transaction = transaction.clone();
             for input in transaction.parameters.inputs.clone() {
                 if !input.outpoint.is_coinbase() && input.outpoint.script_pub_key.is_none() {
-                    transaction = transaction.update_outpoint(get_outpoint(
-                        storage,
-                        &input.outpoint.transaction_id,
-                        input.outpoint.index as usize,
-                    )?);
+                    transaction = transaction.update_outpoint(
+                        storage.get_outpoint(&input.outpoint.transaction_id, input.outpoint.index as usize)?,
+                    );
                 }
             }
             transaction.verify_signatures()?;
         }
 
         // Check that transactions have sufficient input balance
-        if calculate_transaction_fees(storage, transactions).is_ok() {
+        if storage.calculate_transaction_fees(transactions).is_ok() {
             Ok(())
         } else {
             Err(ConsensusError::TransactionOverspending)
@@ -173,7 +167,7 @@ impl ConsensusParameters {
         }
 
         // 4. Check cached blocks to insert/canonize
-        if let Ok(child_header_hash) = storage.find_child_block(&block.header.get_hash()) {
+        if let Ok(child_header_hash) = storage.get_child_hash(&block.header.get_hash()) {
             // There exists a cached child block that we can add to our chain
             if let Ok(child_block) = storage.get_block(&child_header_hash) {
                 // process it

@@ -11,7 +11,7 @@ mod miner_integration {
         TransactionParameters,
         Transactions,
     };
-    use snarkos_storage::{transaction::get_balance, BlockStorage};
+    use snarkos_storage::BlockStorage;
 
     use futures_await_test::async_test;
     use std::{str::FromStr, sync::Arc};
@@ -27,7 +27,7 @@ mod miner_integration {
 
         let previous_block = &blockchain.get_latest_block().unwrap();
         let tx_to_spend = &previous_block.clone().transactions[0];
-        let starting_balance = get_balance(blockchain, &genesis_miner_address);
+        let starting_balance = blockchain.get_balance(&genesis_miner_address);
 
         let input = TransactionInput::new(
             tx_to_spend.to_transaction_id().unwrap(),
@@ -71,7 +71,7 @@ mod miner_integration {
         let input_1 =
             TransactionInput::new(tx_to_spend.to_transaction_id().unwrap(), 0, Some(recipient_1.clone())).unwrap();
         let output_1 =
-            TransactionOutput::new(&recipient_3, get_balance(blockchain, &recipient_1) - STANDARD_TX_FEE).unwrap();
+            TransactionOutput::new(&recipient_3, blockchain.get_balance(&recipient_1) - STANDARD_TX_FEE).unwrap();
 
         let transaction_parameters_1 = TransactionParameters {
             version: 1,
@@ -87,7 +87,7 @@ mod miner_integration {
         let input_2 =
             TransactionInput::new(tx_to_spend.to_transaction_id().unwrap(), 1, Some(recipient_2.clone())).unwrap();
         let output_2 =
-            TransactionOutput::new(&recipient_3, get_balance(blockchain, &recipient_2) - STANDARD_TX_FEE).unwrap();
+            TransactionOutput::new(&recipient_3, blockchain.get_balance(&recipient_2) - STANDARD_TX_FEE).unwrap();
 
         let transaction_parameters_2 = TransactionParameters {
             version: 1,
@@ -179,7 +179,7 @@ mod miner_integration {
 
         let previous_block = &blockchain.get_latest_block().unwrap();
         let tx_to_spend = &previous_block.clone().transactions[0];
-        let starting_balance = get_balance(&blockchain, &genesis_miner_address);
+        let starting_balance = blockchain.get_balance(&genesis_miner_address);
         let tx_fee = 10000;
 
         let input = TransactionInput::new(

@@ -12,18 +12,18 @@ pub enum BlockPath {
 
 #[derive(Clone, Debug)]
 pub struct SideChainPath {
-    /// Latest block number before diverging from the canon chain
+    /// Latest block number before diverging from the canon chain.
     pub shared_block_number: u32,
 
     /// New block number
     pub new_block_number: u32,
 
-    /// Path of block hashes from the shared block to the latest diverging block (oldest first)
+    /// Path of block hashes from the shared block to the latest diverging block (oldest first).
     pub path: Vec<BlockHeaderHash>,
 }
 
 impl BlockStorage {
-    /// Get the block's path/origin
+    /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();
         if self.block_hash_exists(&block_hash) {
