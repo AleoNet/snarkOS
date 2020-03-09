@@ -119,7 +119,7 @@ pub fn create_binding_signature<R: Rng, G: Group + ProjectiveCurve, S: PedersenS
         .commit(&zero.to_le_bytes(), &r)?
         .into_affine();
 
-    let mut rbar = [0u8; 64]; // Look into compression with into_affine().x
+    let mut rbar = [0u8; 64]; // TODO Look into compression with into_affine().x
     r_g.write(&mut rbar[..])?;
 
     let mut s: <G as Group>::ScalarField = hash_into_field::<G>(&rbar[..], input);
@@ -174,83 +174,89 @@ pub fn verify_binding_signature<G: Group + ProjectiveCurve, S: PedersenSize>(
     Ok(check_verification.eq(&G::default()))
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//
-//    use crate::payment_dpc::instantiated::*;
-//
-//    use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls12;
-//    use snarkos_models::{
-//        algorithms::CommitmentScheme,
-//        curves::{pairing_engine::ProjectiveCurve, Group},
-//    };
-//    use snarkos_utilities::rand::UniformRand;
-//
-//    type G = EdwardsBls12;
-//
-//    #[test]
-//    fn test_value_commitment_binding_signature() {
-//        let rng = &mut rand::thread_rng();
-//
-//        // Setup parameters
-//        let comm_and_crh_pp = InstantiatedDPC::generate_comm_and_crh_parameters(rng).unwrap();
-//
-//        let input_amount: u64 = rng.gen_range(1, 100000);
-//        let output_amount: u64 = rng.gen_range(0, input_amount);
-//
-//        let value_balance = input_amount - output_amount;
-//
-//        // Input value commitment
-//
-//        let input_value_commitment_randomness = <G as Group>::ScalarField::rand(rng); //<G as Group>::ScalarField::default();
-//
-//        let input_value_commitment = comm_and_crh_pp
-//            .value_comm_pp
-//            .commit(
-//                &input_amount.to_le_bytes(),
-//                &input_value_commitment_randomness,
-//            )
-//            .unwrap();
-//
-//        // Output value commitment
-//
-//        let output_value_commitment_randomness = <G as Group>::ScalarField::rand(rng); //<G as Group>::ScalarField::default();
-//
-//        let output_value_commitment = comm_and_crh_pp
-//            .value_comm_pp
-//            .commit(
-//                &output_amount.to_le_bytes(),
-//                &output_value_commitment_randomness,
-//            )
-//            .unwrap();
-//
-//        let sighash = [1u8; 64].to_vec();
-//
-//        let binding_signature = create_binding_signature(
-//            &comm_and_crh_pp.value_comm_pp,
-//            &vec![input_value_commitment.into_affine()],
-//            &vec![output_value_commitment.into_affine()],
-//            &vec![input_value_commitment_randomness],
-//            &vec![output_value_commitment_randomness],
-//            value_balance,
-//            &sighash,
-//            rng,
-//        )
-//        .unwrap();
-//
-//        let verified = verify_binding_signature(
-//            &comm_and_crh_pp.value_comm_pp,
-//            &vec![input_value_commitment.into_affine()],
-//            &vec![output_value_commitment.into_affine()],
-//            value_balance,
-//            &sighash,
-//            binding_signature,
-//        )
-//        .unwrap();
-//
-//        println!("binding signature verified: {:?}", verified);
-//
-//        assert!(verified);
-//    }
-//}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls12;
+    use snarkos_models::{
+        algorithms::CommitmentScheme,
+        curves::Group,
+    };
+    use snarkos_utilities::rand::UniformRand;
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    struct ValueWindow;
+
+    impl PedersenSize for ValueWindow {
+        // TODO fix window size inconsistency -
+        //  Will fail test a % of the time when WINDOW_SIZE is smaller (128, 248, etc.)
+        const WINDOW_SIZE: usize = 350;
+        const NUM_WINDOWS: usize = 8;
+    }
+
+    type G = EdwardsBls12;
+    type Comm = PedersenCommitment<G, ValueWindow>;
+
+    #[test]
+    fn test_value_commitment_binding_signature() {
+        let rng = &mut rand::thread_rng();
+
+        // Setup parameters
+
+        let value_comm_pp = Comm::setup(rng);
+
+        let input_amount: u64 = rng.gen_range(1, 100000);
+        let output_amount: u64 = rng.gen_range(0, input_amount);
+
+        let value_balance = input_amount - output_amount;
+
+        // Input value commitment
+
+        let input_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
+
+        let input_value_commitment = value_comm_pp
+            .commit(
+                &input_amount.to_le_bytes(),
+                &input_value_commitment_randomness,
+            )
+            .unwrap();
+
+        let output_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
+
+        let output_value_commitment = value_comm_pp
+            .commit(
+                &output_amount.to_le_bytes(),
+                &output_value_commitment_randomness,
+            )
+            .unwrap();
+
+        let sighash = [1u8; 64].to_vec();
+
+        let binding_signature = create_binding_signature(
+            &value_comm_pp,
+            &vec![input_value_commitment.into_affine()],
+            &vec![output_value_commitment.into_affine()],
+            &vec![input_value_commitment_randomness],
+            &vec![output_value_commitment_randomness],
+            value_balance,
+            &sighash,
+            rng,
+        )
+        .unwrap();
+
+        let verified = verify_binding_signature(
+            &value_comm_pp,
+            &vec![input_value_commitment.into_affine()],
+            &vec![output_value_commitment.into_affine()],
+            value_balance,
+            &sighash,
+            binding_signature,
+        )
+        .unwrap();
+
+        println!("binding signature verified: {:?}", verified);
+
+        assert!(verified);
+    }
+}
