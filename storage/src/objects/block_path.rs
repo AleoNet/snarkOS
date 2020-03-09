@@ -1,8 +1,7 @@
 use crate::BlockStorage;
-use snarkos_errors::storage::StorageError;
+use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_objects::{BlockHeader, BlockHeaderHash};
 
-//TODO: MOVE ALL OF THIS
 #[derive(Clone, Debug)]
 pub enum BlockPath {
     ExistingBlock,
@@ -57,6 +56,8 @@ impl BlockStorage {
             }
         }
 
-        Err(StorageError::IrrelevantBlock)
+        Err(StorageError::BlockError(BlockError::IrrelevantBlock(
+            block_hash.to_string(),
+        )))
     }
 }

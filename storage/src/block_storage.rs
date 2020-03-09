@@ -112,7 +112,7 @@ impl BlockStorage {
     pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockHeaders(block_hash.clone()))?.block_header();
-            StorageError::MissingValue(block_hash.to_string())
+            StorageError::MissingBlockHeader(block_hash.to_string())
         ))
     }
 
@@ -120,7 +120,7 @@ impl BlockStorage {
     pub fn get_block_hash(&self, block_num: u32) -> Result<BlockHeaderHash, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockHashes(block_num))?.block_hash();
-            StorageError::InvalidBlockNumber(block_num)
+            StorageError::MissingBlockHash(block_num)
         ))
     }
 
@@ -128,15 +128,15 @@ impl BlockStorage {
     pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::BlockNumbers(block_hash.clone()))?.block_number();
-            StorageError::InvalidBlockHash(hex::encode(block_hash.0))
+            StorageError::MissingBlockNumber(block_hash.to_string())
         ))
     }
 
     /// Get the list of transaction ids given a block hash.
     pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Vec<Vec<u8>>, StorageError> {
         Ok(unwrap_option_or_error!(
-            self.get(&Key::BlockTransactions(block_hash.clone()))?.block_transaction();
-            StorageError::InvalidBlockHash(hex::encode(block_hash.0))
+            self.get(&Key::BlockTransactions(block_hash.clone()))?.block_transactions();
+            StorageError::MissingBlockTransactions(block_hash.to_string())
         ))
     }
 
@@ -144,7 +144,7 @@ impl BlockStorage {
     pub fn get_child_hash(&self, parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::ChildHashes(parent_header.clone()))?.child_hashes();
-            StorageError::InvalidParentHash(hex::encode(parent_header.0))
+            StorageError::MissingChildBlock(parent_header.to_string())
         ))
     }
 
@@ -163,7 +163,7 @@ impl BlockStorage {
     pub fn get_transaction_meta(&self, transaction_id: &Vec<u8>) -> Result<TransactionMeta, StorageError> {
         Ok(unwrap_option_or_error!(
             self.get(&Key::TransactionMeta(transaction_id.clone()))?.transaction_meta();
-            StorageError::InvalidTransactionMeta(hex::encode(&transaction_id))
+            StorageError::MissingTransactionMeta(hex::encode(&transaction_id))
         ))
     }
 }

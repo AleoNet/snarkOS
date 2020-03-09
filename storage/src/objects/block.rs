@@ -1,6 +1,7 @@
 use crate::{BlockStorage, Key, KeyValue, TransactionMeta, KEY_BEST_BLOCK_NUMBER};
-use snarkos_errors::storage::StorageError;
+use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, Transactions};
+
 use std::collections::HashMap;
 
 impl BlockStorage {
@@ -10,7 +11,7 @@ impl BlockStorage {
 
         let mut transactions = vec![];
         for block_transaction_id in block_transactions {
-            transactions.push(self.get_transaction_bytes(&block_transaction_id).unwrap());
+            transactions.push(self.get_transaction_bytes(&block_transaction_id)?);
         }
 
         Ok(Block {
@@ -22,7 +23,7 @@ impl BlockStorage {
     /// Get a block given the block number.
     pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block, StorageError> {
         if block_num > self.get_latest_block_height() {
-            return Err(StorageError::InvalidBlockNumber(block_num));
+            return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_num)));
         }
 
         let block_hash = self.get_block_hash(block_num)?;
@@ -95,12 +96,7 @@ impl BlockStorage {
         for block_transaction_id in block_transactions {
             // Update transaction meta spends
 
-            for input in self
-                .get_transaction_bytes(&block_transaction_id)
-                .unwrap()
-                .parameters
-                .inputs
-            {
+            for input in self.get_transaction_bytes(&block_transaction_id)?.parameters.inputs {
                 if input.outpoint.is_coinbase() {
                     continue;
                 }

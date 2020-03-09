@@ -1,6 +1,10 @@
 use crate::{BlockStorage, KeyValue, SideChainPath, TransactionMeta, TransactionValue, KEY_BEST_BLOCK_NUMBER};
-use snarkos_errors::storage::StorageError;
+use snarkos_errors::{
+    objects::{BlockError, TransactionError},
+    storage::StorageError,
+};
 use snarkos_objects::{Block, BlockHeaderHash};
+
 use std::collections::HashMap;
 
 /// Protocol methods for inserting blocks to storage and committing them to the blockchain.
@@ -13,7 +17,9 @@ impl BlockStorage {
     pub fn insert_only(&self, block: Block) -> Result<(), StorageError> {
         // Verify that the block does not already exist in storage.
         if self.block_hash_exists(&block.header.get_hash()) {
-            return Err(StorageError::BlockExists(block.header.get_hash().0));
+            return Err(StorageError::BlockError(BlockError::BlockExists(
+                block.header.get_hash().to_string(),
+            )));
         }
 
         let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids().unwrap();
@@ -63,10 +69,10 @@ impl BlockStorage {
             let latest_block = self.get_latest_block()?;
 
             if latest_block.header.get_hash() != block.header.previous_block_hash {
-                return Err(StorageError::InvalidNextBlock(
+                return Err(StorageError::BlockError(BlockError::InvalidParent(
                     latest_block.header.get_hash().to_string(),
                     block.header.previous_block_hash.to_string(),
-                ));
+                )));
             }
         }
 
@@ -85,7 +91,9 @@ impl BlockStorage {
                 };
 
                 if new_transaction_meta.spent[input.outpoint.index as usize] {
-                    return Err(StorageError::DoubleSpend(hex::encode(&input.outpoint.transaction_id)));
+                    return Err(StorageError::TransactionError(TransactionError::DoubleSpend(
+                        hex::encode(&input.outpoint.transaction_id),
+                    )));
                 }
 
                 new_transaction_meta.spent[input.outpoint.index as usize] = true;

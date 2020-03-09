@@ -1,5 +1,3 @@
-use crate::storage::StorageError;
-
 use std::fmt::Debug;
 
 #[derive(Debug, Fail)]
@@ -7,17 +5,17 @@ pub enum TransactionError {
     #[fail(display = "UTXO has already been spent {:?} index: {:?}", _0, _1)]
     AlreadySpent(Vec<u8>, u32),
 
+    #[fail(display = "there is a double spend occuring with this transaction {}", _0)]
+    DoubleSpend(String),
+
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
-
-    #[fail(display = "invalid coinbase transaction")]
-    InvalidCoinbaseTransaction,
 
     #[fail(display = "insufficient funds from input: {} to spend as output: {}", _0, _1)]
     InsufficientFunds(u64, u64),
 
-    #[fail(display = "missing outpoint with transaction with id {} and index {}", _0, _1)]
-    InvalidOutpoint(String, usize),
+    #[fail(display = "invalid coinbase transaction")]
+    InvalidCoinbaseTransaction,
 
     #[fail(display = "invalid pub key hash script_pub_key: {} script_sig: {}", _0, _1)]
     InvalidPubKeyHash(String, String),
@@ -27,9 +25,6 @@ pub enum TransactionError {
 
     #[fail(display = "invalid transaction id {:?}", _0)]
     InvalidTransactionId(usize),
-
-    #[fail(display = "invalid transaction id {:?}", _0)]
-    InvalidTransactionIdString(String),
 
     #[fail(display = "invalid variable size integer: {:?}", _0)]
     InvalidVariableSizeInteger(usize),
@@ -45,9 +40,6 @@ pub enum TransactionError {
 
     #[fail(display = "Null Error {:?}", _0)]
     NullError(()),
-
-    #[fail(display = "{}", _0)]
-    StorageError(StorageError),
 }
 
 impl From<base58::FromBase58Error> for TransactionError {
@@ -113,11 +105,5 @@ impl From<&'static str> for TransactionError {
 impl From<TransactionError> for Box<dyn std::error::Error> {
     fn from(error: TransactionError) -> Self {
         error.into()
-    }
-}
-
-impl From<StorageError> for TransactionError {
-    fn from(error: StorageError) -> Self {
-        TransactionError::StorageError(error)
     }
 }

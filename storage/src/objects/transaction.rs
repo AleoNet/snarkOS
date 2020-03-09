@@ -6,25 +6,24 @@ use snarkos_errors::{
     unwrap_result_or_continue,
 };
 use snarkos_objects::{create_script_pub_key, BlockHeaderHash, Outpoint, Transaction, Transactions};
+
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
 impl BlockStorage {
     /// Get a transaction bytes given the transaction id.
-    pub fn get_transaction_bytes(&self, transaction_id: &Vec<u8>) -> Result<Transaction, TransactionError> {
+    pub fn get_transaction_bytes(&self, transaction_id: &Vec<u8>) -> Result<Transaction, StorageError> {
         match self.get_transaction(&transaction_id.clone()) {
-            Some(transaction) => Ok(Transaction::deserialize(&transaction.transaction_bytes).unwrap()),
-            None => Err(TransactionError::InvalidTransactionIdString(hex::encode(
-                &transaction_id,
-            ))),
+            Some(transaction) => Ok(Transaction::deserialize(&transaction.transaction_bytes)?),
+            None => Err(StorageError::InvalidTransactionId(hex::encode(&transaction_id))),
         }
     }
 
     /// Find the outpoint given the transaction id and index.
-    pub fn get_outpoint(&self, transaction_id: &Vec<u8>, index: usize) -> Result<Outpoint, TransactionError> {
+    pub fn get_outpoint(&self, transaction_id: &Vec<u8>, index: usize) -> Result<Outpoint, StorageError> {
         let transaction = self.get_transaction_bytes(&transaction_id)?;
 
         if transaction.parameters.outputs.len() < index {
-            return Err(TransactionError::InvalidOutpoint(hex::encode(transaction_id), index));
+            return Err(StorageError::InvalidOutpoint(hex::encode(transaction_id), index));
         }
         let output = transaction.parameters.outputs[index].clone();
 
@@ -38,26 +37,26 @@ impl BlockStorage {
 
     /// Returns true if the given outpoint is already spent.
     /// Gets the previous transaction hash from storage and checks the outpoint's index.
-    pub fn is_spent(&self, outpoint: &Outpoint) -> Result<bool, TransactionError> {
+    pub fn is_spent(&self, outpoint: &Outpoint) -> Result<bool, StorageError> {
         Ok(self.get_transaction_meta(&outpoint.transaction_id.clone())?.spent[outpoint.index as usize])
     }
 
     /// Ensure that all inputs in a single transaction are unspent.
-    pub fn check_for_double_spend(&self, transaction: &Transaction) -> Result<(), TransactionError> {
+    pub fn check_for_double_spend(&self, transaction: &Transaction) -> Result<(), StorageError> {
         for input in &transaction.parameters.inputs {
             // Already spent
             if self.is_spent(&input.outpoint.clone())? {
-                return Err(TransactionError::AlreadySpent(
+                return Err(StorageError::TransactionError(TransactionError::AlreadySpent(
                     input.outpoint.transaction_id.clone(),
                     input.outpoint.index,
-                ));
+                )));
             }
         }
         Ok(())
     }
 
     /// Ensure that all inputs in all transactions are unspent.
-    pub fn check_for_double_spends(&self, transactions: &Transactions) -> Result<(), TransactionError> {
+    pub fn check_for_double_spends(&self, transactions: &Transactions) -> Result<(), StorageError> {
         let mut new_spends: Vec<(Vec<u8>, u32)> = vec![];
         for transaction in transactions.iter() {
             for input in &transaction.parameters.inputs {
@@ -67,10 +66,10 @@ impl BlockStorage {
                 let new_spend = (input.outpoint.transaction_id.clone(), input.outpoint.index);
                 // Already spent
                 if self.is_spent(&input.outpoint.clone())? || new_spends.contains(&new_spend) {
-                    return Err(TransactionError::AlreadySpent(
+                    return Err(StorageError::TransactionError(TransactionError::AlreadySpent(
                         input.outpoint.transaction_id.clone(),
                         input.outpoint.index,
-                    ));
+                    )));
                 }
                 new_spends.push(new_spend);
             }
@@ -79,14 +78,16 @@ impl BlockStorage {
     }
 
     /// Ensure that only one coinbase transaction exists for all transactions.
-    fn check_single_coinbase(transactions: &Transactions) -> Result<(), TransactionError> {
+    fn check_single_coinbase(transactions: &Transactions) -> Result<(), StorageError> {
         let mut coinbase_transaction_count = 0;
         for transaction in transactions.iter() {
             let input_length = transaction.parameters.inputs.len();
             for input in &transaction.parameters.inputs {
                 if input.outpoint.is_coinbase() {
                     if input_length > 1 {
-                        return Err(TransactionError::InvalidCoinbaseTransaction);
+                        return Err(StorageError::TransactionError(
+                            TransactionError::InvalidCoinbaseTransaction,
+                        ));
                     }
                     coinbase_transaction_count += 1;
                 }
@@ -94,14 +95,14 @@ impl BlockStorage {
         }
         match coinbase_transaction_count {
             1 => Ok(()),
-            _ => Err(TransactionError::MultipleCoinbaseTransactions(
-                coinbase_transaction_count,
+            _ => Err(StorageError::TransactionError(
+                TransactionError::MultipleCoinbaseTransactions(coinbase_transaction_count),
             )),
         }
     }
 
     /// Perform the coinbase and double spend checks on all transactions
-    pub fn check_block_transactions(&self, transactions: &Transactions) -> Result<(), TransactionError> {
+    pub fn check_block_transactions(&self, transactions: &Transactions) -> Result<(), StorageError> {
         BlockStorage::check_single_coinbase(transactions)?;
         self.check_for_double_spends(transactions)
     }
@@ -128,7 +129,7 @@ impl BlockStorage {
     }
 
     /// Calculate the miner transaction fees from transactions.
-    pub fn calculate_transaction_fees(&self, transactions: &Transactions) -> Result<u64, TransactionError> {
+    pub fn calculate_transaction_fees(&self, transactions: &Transactions) -> Result<u64, StorageError> {
         let mut balance = 0;
 
         for transaction in transactions.iter() {
@@ -154,7 +155,7 @@ impl BlockStorage {
 
     /// Traverse of blockchain to find the spendable outpoints and balances for an address.
     pub fn get_spendable_outpoints(&self, address: &BitcoinAddress<Mainnet>) -> Vec<(Outpoint, u64)> {
-        let script_pub_key = create_script_pub_key(address).unwrap();
+        let script_pub_key = create_script_pub_key(address).expect("Unable to decode address");
 
         let mut spendable_outpoints: Vec<(Outpoint, u64)> = vec![];
 

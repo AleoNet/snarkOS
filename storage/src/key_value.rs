@@ -166,7 +166,7 @@ impl Value {
         }
     }
 
-    pub fn block_transaction(self) -> Option<Vec<Vec<u8>>> {
+    pub fn block_transactions(self) -> Option<Vec<Vec<u8>>> {
         match self {
             Value::BlockTransactions(transactions) => Some(transactions),
             _ => None,
