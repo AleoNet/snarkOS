@@ -1,4 +1,7 @@
-use crate::{crh::{PedersenCRH, PedersenSize}, merkle_tree::*};
+use crate::{
+    crh::{PedersenCRH, PedersenSize},
+    merkle_tree::*,
+};
 use snarkos_curves::edwards_bls12::EdwardsAffine as Edwards;
 use snarkos_models::{algorithms::CRH, curves::pairing_engine::AffineCurve};
 use snarkos_utilities::bytes::ToBytes;
