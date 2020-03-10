@@ -14,7 +14,10 @@ mod miner_integration {
     use snarkos_storage::{test_data::*, BlockStorage};
 
     use futures_await_test::async_test;
-    use std::{str::FromStr, sync::Arc};
+    use std::{
+        str::FromStr,
+        sync::{Arc, Mutex},
+    };
     use tokio::sync::Mutex;
     use wagyu_bitcoin::{BitcoinAddress, BitcoinPrivateKey, Mainnet};
 
@@ -202,7 +205,6 @@ mod miner_integration {
             inputs: vec![input.clone()],
             outputs: output_2,
         };
-        println!("1");
 
         let transaction_1 = Transaction::new(&transaction_parameters_1).unwrap();
         let transaction_2 = Transaction::new(&transaction_parameters_2).unwrap();
@@ -212,7 +214,6 @@ mod miner_integration {
         let signed_transaction_2 = transaction_2
             .sign(&BitcoinPrivateKey::<N>::from_str(TEST_WALLETS[0].private_key).unwrap())
             .unwrap();
-        println!("2");
 
         assert!(
             miner
@@ -224,7 +225,6 @@ mod miner_integration {
                 .is_err()
         );
 
-        println!("3");
         let (parent_header, transactions) = miner
             .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1.clone()]))
             .await
@@ -238,7 +238,6 @@ mod miner_integration {
             header,
             transactions: Transactions::from(&[signed_transaction_1.clone(), signed_transaction_2.clone()]),
         };
-        println!("4");
 
         assert!(
             miner
@@ -246,26 +245,22 @@ mod miner_integration {
                 .process_block(&mut blockchain, &mut memory_pool, &invalid_block)
                 .is_err()
         );
-        println!("4");
         miner
             .consensus
             .process_block(&mut blockchain, &mut memory_pool, &new_block_1)
             .unwrap();
-        println!("5");
         assert!(
             miner
                 .establish_block(&blockchain, &Transactions::from(&[signed_transaction_1]))
                 .await
                 .is_err()
         );
-        println!("6");
         assert!(
             miner
                 .establish_block(&blockchain, &Transactions::from(&[signed_transaction_2]))
                 .await
                 .is_err()
         );
-        println!("7");
 
         kill_storage_sync(blockchain, path);
     }

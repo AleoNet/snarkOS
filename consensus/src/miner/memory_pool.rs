@@ -45,21 +45,18 @@ impl MemoryPool {
     pub fn from_storage(storage: &BlockStorage) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
-        match storage.get_memory_pool() {
-            Ok(serialized_transactions_option) => {
-                if let Some(serialized_transactions) = serialized_transactions_option {
-                    let transaction_bytes: Vec<Vec<u8>> = bincode::deserialize(&serialized_transactions)?;
+        if let Ok(serialized_transactions_option) = storage.get_memory_pool() {
+            if let Some(serialized_transactions) = serialized_transactions_option {
+                let transaction_bytes: Vec<Vec<u8>> = bincode::deserialize(&serialized_transactions)?;
 
-                    for tx_bytes in transaction_bytes {
-                        let transaction = Transaction::deserialize(&tx_bytes)?;
-                        let size = tx_bytes.len();
-                        let entry = Entry { transaction, size };
-                        memory_pool.insert(storage, entry)?;
-                    }
+                for tx_bytes in transaction_bytes {
+                    let transaction = Transaction::deserialize(&tx_bytes)?;
+                    let size = tx_bytes.len();
+                    let entry = Entry { transaction, size };
+                    memory_pool.insert(storage, entry)?;
                 }
             }
-            Err(_) => {} //TODO (collin): fire error
-        };
+        }
 
         Ok(memory_pool)
     }

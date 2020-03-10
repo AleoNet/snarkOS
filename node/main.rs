@@ -12,7 +12,11 @@ use snarkos_network::{
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::BlockStorage;
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::Mutex;
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
@@ -47,8 +51,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    // let bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
-    let bootnode = "0.0.0.0:4130".parse::<SocketAddr>()?;
+    let bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
 
     let sync_handler = SyncHandler::new(bootnode);
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
