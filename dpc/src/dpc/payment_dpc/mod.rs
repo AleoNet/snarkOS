@@ -1,5 +1,5 @@
 use crate::{
-    dpc::{AddressKeyPair, DPCScheme, Predicate, Record, Transaction},
+    dpc::{payment_dpc::record_payload::PaymentRecordPayload, AddressKeyPair, DPCScheme, Predicate, Record, Transaction},
     ledger::*,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
@@ -21,6 +21,9 @@ use std::marker::PhantomData;
 pub mod address;
 use self::address::*;
 
+pub mod binding_signature;
+//use self::binding_signature::*;
+
 pub mod predicate;
 use self::predicate::*;
 
@@ -33,16 +36,17 @@ use self::transaction::*;
 pub mod core_checks_circuit;
 use self::core_checks_circuit::*;
 
-pub mod payment_objects;
+pub mod payment_circuit;
+use self::payment_circuit::*;
 
 pub mod proof_check_circuit;
 use self::proof_check_circuit::*;
 
-pub mod predicate_circuit;
-use self::predicate_circuit::*;
-
 pub mod parameters;
 use self::parameters::*;
+
+pub mod record_payload;
+//use self::record_payload::*;
 
 pub mod instantiated;
 
@@ -115,9 +119,9 @@ pub trait PlainDPCComponents: 'static + Sized {
 
     // SNARK for a "dummy predicate" that does nothing with its input.
     type PredicateNIZK: SNARK<
-        Circuit = EmptyPredicateCircuit<Self>,
-        AssignedCircuit = EmptyPredicateCircuit<Self>,
-        VerifierInput = PredicateLocalData<Self>,
+        Circuit = PaymentCircuit<Self>,
+        AssignedCircuit = PaymentCircuit<Self>,
+        VerifierInput = PaymentPredicateLocalData<Self>,
     >;
 
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
@@ -245,9 +249,9 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         comm_and_crh_pp: &CommAndCRHPublicParameters<Components>,
         rng: &mut R,
     ) -> Result<PredNIZKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateNIZK::setup(EmptyPredicateCircuit::blank(comm_and_crh_pp), rng)?;
+        let (pk, pvk) = Components::PredicateNIZK::setup(PaymentCircuit::blank(comm_and_crh_pp), rng)?;
 
-        let proof = Components::PredicateNIZK::prove(&pk, EmptyPredicateCircuit::blank(comm_and_crh_pp), rng)?;
+        let proof = Components::PredicateNIZK::prove(&pk, PaymentCircuit::blank(comm_and_crh_pp), rng)?;
 
         Ok(PredNIZKParameters {
             pk,
@@ -276,7 +280,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         sn_nonce: &<Components::SnNonceH as CRH>::Output,
         address_public_key: &AddressPublicKey<Components>,
         is_dummy: bool,
-        payload: &[u8; 32],
+        payload: &PaymentRecordPayload,
         birth_predicate: &DPCPredicate<Components>,
         death_predicate: &DPCPredicate<Components>,
         rng: &mut R,
@@ -303,7 +307,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         let record = DPCRecord {
             address_public_key: address_public_key.clone(),
             is_dummy,
-            payload: *payload,
+            payload: payload.clone(),
             birth_predicate_repr,
             death_predicate_repr,
             serial_number_nonce: sn_nonce.clone(),

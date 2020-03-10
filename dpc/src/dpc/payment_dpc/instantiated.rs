@@ -1,8 +1,8 @@
 use crate::{
     dpc::payment_dpc::{
         core_checks_circuit::*,
+        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
         predicate::DPCPredicate,
-        predicate_circuit::{EmptyPredicateCircuit, PredicateLocalData},
         proof_check_circuit::*,
         transaction::DPCTransaction,
         LocalData as DPCLocalData,
@@ -53,7 +53,7 @@ pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
     const NUM_WINDOWS: usize = 38;
-    const WINDOW_SIZE: usize = 248;
+    const WINDOW_SIZE: usize = 400;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -171,7 +171,7 @@ pub type PredVkCRH = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 pub type Predicate = DPCPredicate<Components>;
 pub type CoreCheckNIZK = GM17<CoreCheckPairing, CoreChecksCircuit<Components>, CoreChecksVerifierInput<Components>>;
 pub type ProofCheckNIZK = GM17<ProofCheckPairing, ProofCheckCircuit<Components>, ProofCheckVerifierInput<Components>>;
-pub type PredicateNIZK<C> = GM17<CoreCheckPairing, EmptyPredicateCircuit<C>, PredicateLocalData<C>>;
+pub type PredicateNIZK<C> = GM17<CoreCheckPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
 // Gadgets

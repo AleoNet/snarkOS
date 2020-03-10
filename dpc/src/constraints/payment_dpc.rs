@@ -259,7 +259,7 @@ fn execute_core_checks_gadget_helper<
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "is_dummy"), || Ok(record.is_dummy()))?;
             old_dummy_flags.push(given_is_dummy.clone());
 
-            let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), record.payload())?;
+            let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), &record.payload().to_bytes())?;
             old_payloads.push(given_payload.clone());
 
             let given_birth_pred_hash =
@@ -444,7 +444,7 @@ fn execute_core_checks_gadget_helper<
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "is_dummy"), || Ok(record.is_dummy()))?;
             new_dummy_flags.push(given_is_dummy.clone());
 
-            let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), record.payload())?;
+            let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "Payload"), &record.payload().to_bytes())?;
             new_payloads.push(given_payload.clone());
 
             let given_birth_pred_hash =

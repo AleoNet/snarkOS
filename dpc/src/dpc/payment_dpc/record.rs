@@ -1,5 +1,5 @@
 use crate::dpc::{
-    payment_dpc::{address::AddressPublicKey, predicate::DPCPredicate, PlainDPCComponents},
+    payment_dpc::{address::AddressPublicKey, predicate::DPCPredicate, record_payload::PaymentRecordPayload, PlainDPCComponents},
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, PRF};
@@ -13,7 +13,7 @@ pub struct DPCRecord<C: PlainDPCComponents> {
     pub(super) address_public_key: AddressPublicKey<C>,
 
     pub(super) is_dummy: bool,
-    pub(super) payload: [u8; 32],
+    pub(super) payload: PaymentRecordPayload,
 
     #[derivative(Default(value = "default_predicate_hash::<C::PredVkH>()"))]
     pub(super) birth_predicate_repr: Vec<u8>,
@@ -36,7 +36,7 @@ impl<C: PlainDPCComponents> Record for DPCRecord<C> {
     type AddressPublicKey = AddressPublicKey<C>;
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecC as CommitmentScheme>::Randomness;
-    type Payload = [u8; 32];
+    type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
     type SerialNumber = <C::P as PRF>::Output;
     type SerialNumberNonce = <C::SnNonceH as CRH>::Output;
