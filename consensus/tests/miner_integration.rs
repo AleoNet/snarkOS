@@ -14,10 +14,7 @@ mod miner_integration {
     use snarkos_storage::{test_data::*, BlockStorage};
 
     use futures_await_test::async_test;
-    use std::{
-        str::FromStr,
-        sync::{Arc, Mutex},
-    };
+    use std::{str::FromStr, sync::Arc};
     use tokio::sync::Mutex;
     use wagyu_bitcoin::{BitcoinAddress, BitcoinPrivateKey, Mainnet};
 

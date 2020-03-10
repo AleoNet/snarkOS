@@ -2445,6 +2445,7 @@ dependencies = [
  "serde",
  "snarkos-errors",
  "snarkos-objects",
+ "snarkos-utilities",
  "wagyu-bitcoin",
  "wagyu-model",
 ]

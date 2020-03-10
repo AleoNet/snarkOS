@@ -72,7 +72,7 @@ impl MemoryPool {
 
         let serialized_transactions = bincode::serialize(&transactions)?;
 
-        storage.store_memory_pool(serialized_transactions)?;
+        storage.store_to_memory_pool(serialized_transactions)?;
 
         Ok(())
     }

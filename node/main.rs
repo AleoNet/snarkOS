@@ -12,11 +12,7 @@ use snarkos_network::{
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::BlockStorage;
 
-use std::{
-    net::SocketAddr,
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 

@@ -80,6 +80,6 @@ impl PeerBook {
 
     /// Writes connected peers to storage.
     pub fn store(&self, storage: &BlockStorage) -> Result<(), ServerError> {
-        Ok(storage.store_peer_book(bincode::serialize(&self.get_connected())?)?)
+        Ok(storage.store_to_peer_book(bincode::serialize(&self.get_connected())?)?)
     }
 }

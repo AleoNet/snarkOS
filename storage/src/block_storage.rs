@@ -11,8 +11,9 @@ use crate::{
     KEY_PEER_BOOK,
     NUM_COLS,
 };
-use snarkos_errors::{storage::StorageError, unwrap_option_or_error};
+use snarkos_errors::storage::StorageError;
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkos_utilities::unwrap_option_or_error;
 
 use parking_lot::RwLock;
 use std::{
@@ -104,7 +105,7 @@ impl BlockStorage {
     }
 
     /// Store the memory pool transactions.
-    pub fn store_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
         self.storage
             .insert(KeyValue::Meta(KEY_MEMORY_POOL, transactions_serialized))
     }
@@ -115,7 +116,7 @@ impl BlockStorage {
     }
 
     /// Store the connected peers.
-    pub fn store_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
         self.storage.insert(KeyValue::Meta(KEY_PEER_BOOK, peers_serialized))
     }
 
@@ -280,7 +281,7 @@ mod tests {
         let (storage, path) = initialize_test_blockchain();
         let transactions_serialized = vec![0u8];
 
-        assert!(storage.store_memory_pool(transactions_serialized.clone()).is_ok());
+        assert!(storage.store_to_memory_pool(transactions_serialized.clone()).is_ok());
         assert!(storage.get_memory_pool().is_ok());
         assert!(storage.get_memory_pool().unwrap().is_some());
         assert_eq!(transactions_serialized, storage.get_memory_pool().unwrap().unwrap());
@@ -293,7 +294,7 @@ mod tests {
         let (storage, path) = initialize_test_blockchain();
         let peers_serialized = vec![0u8];
 
-        assert!(storage.store_peer_book(peers_serialized.clone()).is_ok());
+        assert!(storage.store_to_peer_book(peers_serialized.clone()).is_ok());
         assert!(storage.get_peer_book().is_ok());
         assert!(storage.get_peer_book().unwrap().is_some());
         assert_eq!(peers_serialized, storage.get_peer_book().unwrap().unwrap());
