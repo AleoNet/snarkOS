@@ -683,15 +683,21 @@ pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
     let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(local_data_comm)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
+    let value_comm_pp_fe =
+        ToConstraintField::<C::CoreCheckF>::to_field_elements(comm_crh_parameters.value_comm_pp.parameters())
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+
     // Then we convert these field elements into bytes
     let pred_input = [
         to_bytes![local_data_comm_pp_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
         to_bytes![local_data_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+        to_bytes![value_comm_pp_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
     ];
 
     let pred_input_bytes = [
         UInt8::alloc_input_vec(cs.ns(|| "Allocate local data pp "), &pred_input[0])?,
         UInt8::alloc_input_vec(cs.ns(|| "Allocate local data comm"), &pred_input[1])?,
+        UInt8::alloc_input_vec(cs.ns(|| "Allocate value comm pp"), &pred_input[2])?,
     ];
 
     let pred_input_bits = [
@@ -700,6 +706,10 @@ pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
             .flat_map(|byte| byte.into_bits_le())
             .collect::<Vec<_>>(),
         pred_input_bytes[1]
+            .iter()
+            .flat_map(|byte| byte.into_bits_le())
+            .collect::<Vec<_>>(),
+        pred_input_bytes[2]
             .iter()
             .flat_map(|byte| byte.into_bits_le())
             .collect::<Vec<_>>(),

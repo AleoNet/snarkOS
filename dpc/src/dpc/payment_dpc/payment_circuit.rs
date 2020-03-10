@@ -26,11 +26,9 @@ pub struct PaymentPredicateLocalData<C: PlainDPCComponents> {
 impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for PaymentPredicateLocalData<C>
 where
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::LocalDataComm as CommitmentScheme>::Output:
-        ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
     <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::ValueComm as CommitmentScheme>::Output:
-        ToConstraintField<C::CoreCheckF>,
+    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
         let mut v = ToConstraintField::<C::CoreCheckF>::to_field_elements(&[self.position][..])?;
@@ -56,11 +54,9 @@ pub struct PaymentCircuit<C: PlainDPCComponents> {
 
 impl<C: PlainDPCComponents> PaymentCircuit<C> {
     pub fn blank(comm_and_crh_parameters: &CommAndCRHPublicParameters<C>) -> Self {
-        let local_data_comm =
-            <C::LocalDataComm as CommitmentScheme>::Output::default();
+        let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
         let value_commitment_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
-        let value_commitment =
-            <C::ValueComm as CommitmentScheme>::Output::default();
+        let value_commitment = <C::ValueComm as CommitmentScheme>::Output::default();
 
         Self {
             parameters: Some(comm_and_crh_parameters.clone()),

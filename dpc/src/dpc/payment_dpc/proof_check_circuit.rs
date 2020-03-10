@@ -27,6 +27,7 @@ where
 
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::ProofCheckF>, ConstraintFieldError> {
         let mut v = Vec::new();
@@ -41,10 +42,14 @@ where
         let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.local_data_comm)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
+        let value_comm_pp_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(self.comm_and_crh_pp.value_comm_pp.parameters())
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+
         // Then we convert these field elements into bytes
         let pred_input = [
             to_bytes![local_data_comm_pp_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
             to_bytes![local_data_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+            to_bytes![value_comm_pp_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
         ];
 
         // Then we convert them into `C::ProofCheckF::Fr` elements.
@@ -53,6 +58,9 @@ where
         )?);
         v.extend_from_slice(&ToConstraintField::<C::ProofCheckF>::to_field_elements(
             pred_input[1].as_slice(),
+        )?);
+        v.extend_from_slice(&ToConstraintField::<C::ProofCheckF>::to_field_elements(
+            pred_input[2].as_slice(),
         )?);
 
         v.extend_from_slice(&self.predicate_comm.to_field_elements()?);
@@ -156,3 +164,4 @@ where
         Ok(())
     }
 }
+

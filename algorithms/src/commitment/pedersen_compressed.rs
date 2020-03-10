@@ -42,17 +42,3 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
         &self.parameters
     }
 }
-
-impl<G: Group + ProjectiveCurve, S: PedersenSize> PedersenCompressedCommitment<G, S> {
-    /// Returns the affine as the commitment.
-    pub fn commit_to_affine(&self, input: &[u8], randomness: &<G as Group>::ScalarField) -> Result<G::Affine, CommitmentError> {
-        let commitment = PedersenCommitment::<G, S> {
-            parameters: self.parameters.clone(),
-        };
-
-        let output = commitment.commit(input, randomness)?;
-        let affine = output.into_affine();
-        debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
-        Ok(affine)
-    }
-}
