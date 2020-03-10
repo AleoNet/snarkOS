@@ -1,10 +1,10 @@
 mod consensus_integration {
     use snarkos_consensus::{
-        check_block_transactions,
         miner::{MemoryPool, Miner},
         test_data::*,
     };
     use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transaction, Transactions};
+    use snarkos_storage::test_data::*;
 
     use std::str::FromStr;
     use wagyu_bitcoin::{BitcoinAddress, Mainnet};
@@ -156,7 +156,7 @@ mod consensus_integration {
             previous_block.transactions[0].clone(),
         ]);
 
-        assert!(check_block_transactions(&mut blockchain, &transactions).is_err());
+        assert!(blockchain.check_block_transactions(&transactions).is_err());
 
         let header = miner.find_block(&transactions, &previous_block.header).unwrap();
 

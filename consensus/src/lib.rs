@@ -12,8 +12,5 @@ pub use self::difficulty::*;
 
 pub mod miner;
 
-pub mod verify_transaction;
-pub use self::verify_transaction::*;
-
 #[allow(dead_code)]
 pub mod test_data;

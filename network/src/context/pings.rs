@@ -60,6 +60,7 @@ mod tests {
         Message,
         PingState,
     };
+
     use serial_test::serial;
     use tokio::net::TcpListener;
 

@@ -6,6 +6,7 @@ mod sync_integration {
         test_data::*,
     };
     use snarkos_objects::BlockHeaderHash;
+    use snarkos_storage::test_data::*;
 
     use serial_test::serial;
     use std::sync::Arc;

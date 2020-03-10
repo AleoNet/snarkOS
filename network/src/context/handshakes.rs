@@ -32,13 +32,13 @@ impl Handshakes {
         height: u32,
         address_sender: SocketAddr,
         address_receiver: SocketAddr,
-    ) -> Result<Handshake, HandshakeError> {
+    ) -> Result<(), HandshakeError> {
         let handshake = Handshake::send_new(version, height, address_sender, address_receiver).await?;
 
-        self.addresses.insert(address_receiver, handshake.clone());
+        self.addresses.insert(address_receiver, handshake);
         info!("Request handshake with: {:?}", address_receiver);
 
-        Ok(handshake)
+        Ok(())
     }
 
     /// Receive the first message upon accepting a peer connection.
@@ -163,7 +163,7 @@ mod tests {
 
             let mut server_handshakes = Handshakes::new();
 
-            let mut server_hand = server_handshakes
+            server_handshakes
                 .send_request(1u64, 0u32, server_address, peer_address)
                 .await
                 .unwrap();
@@ -172,7 +172,6 @@ mod tests {
 
             let (reader, _socket) = server_listener.accept().await.unwrap();
             let read_channel = Channel::new_read_only(reader).unwrap();
-            server_hand.update_reader(read_channel);
 
             assert_eq!(
                 HandshakeState::Waiting,
@@ -181,7 +180,7 @@ mod tests {
 
             // 6. Server accepts server_handshake response
 
-            let (_name, bytes) = server_hand.channel.read().await.unwrap();
+            let (_name, bytes) = read_channel.read().await.unwrap();
             let message = Verack::deserialize(bytes).unwrap();
 
             server_handshakes.accept_response(peer_address, message).await.unwrap();
@@ -193,7 +192,7 @@ mod tests {
 
             // 7. Server receives peer_handshake request
 
-            let (_name, bytes) = server_hand.channel.read().await.unwrap();
+            let (_name, bytes) = read_channel.read().await.unwrap();
             let message = Version::deserialize(bytes).unwrap();
 
             // 8. Server sends peer_handshake response

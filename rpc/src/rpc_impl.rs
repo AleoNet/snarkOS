@@ -1,11 +1,5 @@
 use crate::{rpc_types::*, RpcFunctions};
-use snarkos_consensus::{
-    block_reward,
-    check_for_double_spend,
-    check_for_double_spends,
-    miner::MemoryPool,
-    ConsensusParameters,
-};
+use snarkos_consensus::{block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::rpc::RpcError;
 use snarkos_network::{context::Context, server::process_transaction_internal};
 use snarkos_objects::{transaction::*, BlockHeaderHash};
@@ -70,7 +64,7 @@ impl RpcFunctions for RpcImpl {
         let block_header_hash = BlockHeaderHash::new(block_hash);
         let height = self.storage.get_block_num(&block_header_hash)?;
 
-        if let Ok(block) = self.storage.get_block(block_header_hash) {
+        if let Ok(block) = self.storage.get_block(&block_header_hash) {
             let mut transactions = vec![];
 
             for transaction in block.transactions.iter() {
@@ -233,7 +227,7 @@ impl RpcFunctions for RpcImpl {
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction = Transaction::from_str(&transaction_bytes)?;
 
-        match check_for_double_spend(&self.storage, &transaction) {
+        match self.storage.check_for_double_spend(&transaction) {
             Ok(_) => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
@@ -281,7 +275,7 @@ impl RpcFunctions for RpcImpl {
         let memory_pool = Runtime::new()?.block_on(self.memory_pool_lock.lock());
         let full_transactions = memory_pool.get_candidates(&self.storage, self.consensus.max_block_size)?;
 
-        check_for_double_spends(&self.storage, &full_transactions)?;
+        self.storage.check_for_double_spends(&full_transactions)?;
 
         let mut transaction_strings = vec![];
 
@@ -314,6 +308,7 @@ mod tests {
     use super::*;
     use snarkos_consensus::test_data::*;
     use snarkos_network::test_data::*;
+    use snarkos_storage::test_data::*;
 
     use jsonrpc_test as json_test;
     use jsonrpc_test::Rpc;

@@ -1,4 +1,4 @@
-use crate::{block_reward, check_block_transactions, miner::MemoryPool, ConsensusParameters};
+use crate::{block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{merkle_root, Block, BlockHeader, MerkleRootHash, Transaction, Transactions};
 use snarkos_storage::BlockStorage;
@@ -62,7 +62,7 @@ impl Miner {
     ) -> Result<(BlockHeader, Transactions), ConsensusError> {
         let mut transactions = transactions.clone();
         self.add_coinbase_transaction(&storage, &mut transactions)?;
-        check_block_transactions(&storage, &transactions)?;
+        storage.check_block_transactions(&transactions)?;
 
         let previous_block_header = storage.get_latest_block()?.header;
 
