@@ -183,29 +183,10 @@ mod server_listen {
             // 5. Send handshake response from peer to server
 
             let mut peer_handshakes = Handshakes::new();
-            let mut peer_hand = peer_handshakes
+            peer_handshakes
                 .receive_any(1u64, 1u32, peer_address, server_address, reader)
                 .await
                 .unwrap();
-
-            // 6. Check that peer received a GetPeers message
-
-            let (name, _bytes) = peer_hand.channel.read().await.unwrap();
-
-            assert_eq!(GetPeers::name(), name);
-
-            // 7. Check that peer received Verack message
-
-            let (name, bytes) = peer_hand.channel.read().await.unwrap();
-
-            assert_eq!(Verack::name(), name);
-            let verack_message = Verack::deserialize(bytes).unwrap();
-            peer_hand.accept(verack_message).await.unwrap();
-
-            // 8. Check that peer received GetSync message
-
-            let (name, _bytes) = peer_hand.channel.read().await.unwrap();
-            assert_eq!(GetSync::name(), name);
         });
 
         drop(rt);

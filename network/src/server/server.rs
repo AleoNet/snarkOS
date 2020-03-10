@@ -1,4 +1,5 @@
 use crate::{
+    bootnodes::MAINNET_BOOTNODES,
     context::Context,
     message::{Channel, MessageName},
     protocol::*,
@@ -52,6 +53,106 @@ impl Server {
             sync_handler_lock,
             connection_frequency,
         }
+    }
+
+    /// Send a handshake request to a node at address without blocking the server listener.
+    fn send_handshake_non_blocking(&self, address: SocketAddr) {
+        let context = self.context.clone();
+        let storage = self.storage.clone();
+
+        task::spawn(async move {
+            context
+                .handshakes
+                .write()
+                .await
+                .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                .await
+                .unwrap_or_else(|error| {
+                    info!("Failed to connect to address: {:?}", error);
+                    ()
+                });
+        });
+    }
+
+    /// Send a handshake request to all bootnodes from config.
+    async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
+        let local_address = self.context.local_address;
+        let hardcoded_bootnodes = MAINNET_BOOTNODES
+            .iter()
+            .map(|node| (*node).to_string())
+            .collect::<Vec<String>>();
+
+        for bootnode in self.context.bootnodes.clone() {
+            // Bootnodes should not connect to hardcoded bootnodes.
+            if self.context.is_bootnode && hardcoded_bootnodes.contains(&bootnode) {
+                continue;
+            }
+
+            let bootnode_address = bootnode.parse::<SocketAddr>()?;
+
+            if local_address != bootnode_address {
+                info!("Connecting to bootnode: {:?}", bootnode_address);
+
+                self.send_handshake_non_blocking(bootnode_address);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Send a handshake request to every peer this server previously connected to.
+    async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
+        if let Ok(serialized_peers_option) = self.storage.get_peer_book() {
+            if let Some(serialized_peers) = serialized_peers_option {
+                let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> =
+                    bincode::deserialize(&serialized_peers)?;
+
+                for (stored_peer, _old_time) in stored_connected_peers {
+                    info!("Connecting to stored peer: {:?}", stored_peer);
+
+                    self.send_handshake_non_blocking(stored_peer);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Spawns one thread per peer tcp connection to read messages.
+    /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
+    /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
+    /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
+    fn spawn_connection_thread(
+        mut channel: Arc<Channel>,
+        mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+    ) {
+        task::spawn(async move {
+            loop {
+                // Use a oneshot channel to give channel control to the message handler after reading from the channel.
+                let (tx, rx) = oneshot::channel();
+
+                // Read the next message from the channel. This is a blocking operation.
+                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|error| {
+                    info!("Peer node disconnected due to error: {:?}", error);
+
+                    (MessageName::from("disconnect"), vec![])
+                });
+
+                // Break out of the loop if the peer disconnects.
+                if MessageName::from("disconnect") == message_name {
+                    break;
+                }
+
+                // Send the successful read data to the message handler.
+                message_handler_sender
+                    .send((tx, message_name, message_bytes, channel.clone()))
+                    .await
+                    .expect("could not send to message handler");
+
+                // Wait for the message handler to give back channel control.
+                channel = rx.await.expect("message handler errored");
+            }
+        });
     }
 
     /// Starts the server event loop.
@@ -111,98 +212,6 @@ impl Server {
         self.connection_handler().await;
 
         self.message_handler().await?;
-
-        Ok(())
-    }
-
-    /// Spawns one thread per peer tcp connection to read messages.
-    /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
-    /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
-    /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
-    fn spawn_connection_thread(
-        mut channel: Arc<Channel>,
-        mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
-    ) {
-        task::spawn(async move {
-            loop {
-                // Use a oneshot channel to give channel control to the message handler after reading from the channel.
-                let (tx, rx) = oneshot::channel();
-
-                // Read the next message from the channel. This is a blocking operation.
-                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|error| {
-                    info!("Peer node disconnected due to error: {:?}", error);
-
-                    (MessageName::from("disconnect"), vec![])
-                });
-
-                // Break out of the loop if the peer disconnects.
-                if MessageName::from("disconnect") == message_name {
-                    break;
-                }
-
-                // Send the successful read data to the message handler.
-                message_handler_sender
-                    .send((tx, message_name, message_bytes, channel.clone()))
-                    .await
-                    .expect("could not send to message handler");
-
-                // Wait for the message handler to give back channel control.
-                channel = rx.await.expect("message handler errored");
-            }
-        });
-    }
-
-    /// Send a handshake request to all bootnodes from config.
-    async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
-        let local_address = self.context.local_address;
-
-        for bootnode in self.context.bootnodes.clone() {
-            let bootnode_address = bootnode.parse::<SocketAddr>()?;
-
-            if local_address != bootnode_address && !self.context.is_bootnode {
-                info!("Connecting to bootnode: {:?}", bootnode_address);
-
-                self.context
-                    .handshakes
-                    .write()
-                    .await
-                    .send_request(
-                        1u64,
-                        self.storage.get_latest_block_height(),
-                        local_address,
-                        bootnode_address,
-                    )
-                    .await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Send a handshake request to every peer this server previously connected to.
-    async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
-        if let Ok(serialized_peers_option) = self.storage.get_peer_book() {
-            if let Some(serialized_peers) = serialized_peers_option {
-                let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> =
-                    bincode::deserialize(&serialized_peers)?;
-
-                for (stored_peer, _old_time) in stored_connected_peers {
-                    info!("Connecting to stored peer: {:?}", stored_peer);
-
-                    self.context
-                        .handshakes
-                        .write()
-                        .await
-                        .send_request(
-                            1u64,
-                            self.storage.get_latest_block_height(),
-                            self.context.local_address,
-                            stored_peer,
-                        )
-                        .await?;
-                }
-            }
-        };
 
         Ok(())
     }
