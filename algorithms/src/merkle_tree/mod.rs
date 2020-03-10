@@ -6,3 +6,6 @@ pub use self::merkle_path::*;
 
 pub mod merkle_tree;
 pub use self::merkle_tree::*;
+
+#[cfg(test)]
+pub mod tests;

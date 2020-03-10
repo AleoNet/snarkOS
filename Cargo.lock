@@ -287,6 +287,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ci_info"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9c4ad4399f16ccee06f6a62acad539f42de4a80fa21cbe994df1bbb51bee3b9"
+dependencies = [
+ "envmnt",
+]
+
+[[package]]
 name = "clang-sys"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -565,6 +574,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "envmnt"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d779a6b692f4df25a68178f49ddc4629331092aaf025d03f2c633e58e217f37f"
+dependencies = [
+ "fsio",
+ "indexmap",
+]
+
+[[package]]
 name = "ethbloom"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -659,6 +678,12 @@ name = "foreign-types-shared"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
+
+[[package]]
+name = "fsio"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2131cb03096f67334dfba2f0bc46afc5564b08a919d042c6e217e2665741fc54"
 
 [[package]]
 name = "fuchsia-cprng"
@@ -794,6 +819,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
 dependencies = [
  "typenum",
+]
+
+[[package]]
+name = "getopts"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]
@@ -1418,6 +1452,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "nias"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f76f01f5c032698d0e4d61dd761213ebfaeb11bb22d558811dd740bf75046376"
+
+[[package]]
 name = "nom"
 version = "4.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2010,6 +2050,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusty-hook"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed2351ba8488923fc94abe445d2f9c667d531a29c8c20dd822670644ad99e19"
+dependencies = [
+ "ci_info",
+ "getopts",
+ "nias",
+ "toml",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2208,6 +2260,7 @@ dependencies = [
  "env_logger 0.7.1",
  "hex 0.4.2",
  "log",
+ "rusty-hook",
  "serde",
  "snarkos-consensus",
  "snarkos-errors",
