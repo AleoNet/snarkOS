@@ -18,6 +18,7 @@ pub const NUM_COLS: u32 = 8;
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
+pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
 //pub const KEY_BEST_BLOCK_HASH: &'static str = "BEST_BLOCK_HASH";
 
 /// Wrapper for which transaction outpoints are spent.

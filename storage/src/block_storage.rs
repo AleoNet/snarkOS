@@ -8,6 +8,7 @@ use crate::{
     Value,
     KEY_BEST_BLOCK_NUMBER,
     KEY_MEMORY_POOL,
+    KEY_PEER_BOOK,
     NUM_COLS,
 };
 use snarkos_errors::{storage::StorageError, unwrap_option_or_error};
@@ -98,14 +99,24 @@ impl BlockStorage {
     // KEY VALUE GETTERS ===========================================================================
 
     /// Get the stored memory pool transactions.
-    pub fn get_memory_pool_transactions(&self) -> Result<Option<Vec<u8>>, StorageError> {
+    pub fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
         Ok(self.get(&Key::Meta(KEY_MEMORY_POOL))?.meta())
     }
 
     /// Store the memory pool transactions.
-    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn store_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
         self.storage
             .insert(KeyValue::Meta(KEY_MEMORY_POOL, transactions_serialized))
+    }
+
+    /// Get the stored old connected peers.
+    pub fn get_peer_book(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        Ok(self.get(&Key::Meta(KEY_PEER_BOOK))?.meta())
+    }
+
+    /// Store the connected peers.
+    pub fn store_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+        self.storage.insert(KeyValue::Meta(KEY_PEER_BOOK, peers_serialized))
     }
 
     /// Get a block header given the block hash.
@@ -172,6 +183,7 @@ impl BlockStorage {
 mod tests {
     use super::*;
 
+    use crate::test_data::initialize_test_blockchain;
     use hex;
     use std::str::FromStr;
     use wagyu_bitcoin::{BitcoinAddress, Mainnet};
@@ -261,6 +273,32 @@ mod tests {
         assert!(blockchain.storage.storage.get(b"my key").is_ok());
 
         kill_storage(blockchain, path);
+    }
+
+    #[test]
+    pub fn test_storage_memory_pool() {
+        let (storage, path) = initialize_test_blockchain();
+        let transactions_serialized = vec![0u8];
+
+        assert!(storage.store_memory_pool(transactions_serialized.clone()).is_ok());
+        assert!(storage.get_memory_pool().is_ok());
+        assert!(storage.get_memory_pool().unwrap().is_some());
+        assert_eq!(transactions_serialized, storage.get_memory_pool().unwrap().unwrap());
+
+        kill_storage(storage, path);
+    }
+
+    #[test]
+    pub fn test_storage_peer_book() {
+        let (storage, path) = initialize_test_blockchain();
+        let peers_serialized = vec![0u8];
+
+        assert!(storage.store_peer_book(peers_serialized.clone()).is_ok());
+        assert!(storage.get_peer_book().is_ok());
+        assert!(storage.get_peer_book().unwrap().is_some());
+        assert_eq!(peers_serialized, storage.get_peer_book().unwrap().unwrap());
+
+        kill_storage(storage, path);
     }
 
     #[test]

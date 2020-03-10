@@ -4,6 +4,7 @@ mod consensus_integration {
         test_data::*,
     };
     use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transaction, Transactions};
+    use snarkos_storage::test_data::*;
 
     use std::str::FromStr;
     use wagyu_bitcoin::{BitcoinAddress, Mainnet};

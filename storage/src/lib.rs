@@ -11,3 +11,6 @@ pub use self::storage::*;
 
 pub mod key_value;
 pub use self::key_value::*;
+
+#[allow(dead_code)]
+pub mod test_data;

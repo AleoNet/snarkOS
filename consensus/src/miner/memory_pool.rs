@@ -45,7 +45,7 @@ impl MemoryPool {
     pub fn from_storage(storage: &BlockStorage) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
-        match storage.get_memory_pool_transactions() {
+        match storage.get_memory_pool() {
             Ok(serialized_transactions_option) => {
                 if let Some(serialized_transactions) = serialized_transactions_option {
                     let transaction_bytes: Vec<Vec<u8>> = bincode::deserialize(&serialized_transactions)?;
@@ -58,7 +58,7 @@ impl MemoryPool {
                     }
                 }
             }
-            Err(_) => {}
+            Err(_) => {} //TODO (collin): fire error
         };
 
         Ok(memory_pool)
@@ -75,7 +75,7 @@ impl MemoryPool {
 
         let serialized_transactions = bincode::serialize(&transactions)?;
 
-        storage.store_to_memory_pool(serialized_transactions)?;
+        storage.store_memory_pool(serialized_transactions)?;
 
         Ok(())
     }
@@ -250,7 +250,7 @@ impl MemoryPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_data::*;
+    use snarkos_storage::test_data::*;
 
     use hex;
 

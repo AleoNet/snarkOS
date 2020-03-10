@@ -92,12 +92,15 @@ impl Server {
                     };
                 }
 
+                // Store connected peers in database.
+                peer_book.store(&storage).expect("Unable to store peers to database");
+
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
                     let mut memory_pool = memory_pool_lock.lock().await;
 
                     match (memory_pool.cleanse(&storage), memory_pool.store(&storage)) {
-                        (_, _) => {}
+                        (_, _) => {} //TODO: write logic for this
                     };
 
                     // Ask our sync node for more transactions.

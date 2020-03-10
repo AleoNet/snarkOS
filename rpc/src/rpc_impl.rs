@@ -308,6 +308,7 @@ mod tests {
     use super::*;
     use snarkos_consensus::test_data::*;
     use snarkos_network::test_data::*;
+    use snarkos_storage::test_data::*;
 
     use jsonrpc_test as json_test;
     use jsonrpc_test::Rpc;

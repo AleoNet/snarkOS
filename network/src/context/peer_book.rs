@@ -1,4 +1,6 @@
 use crate::address_book::AddressBook;
+use snarkos_errors::network::ServerError;
+use snarkos_storage::BlockStorage;
 
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
@@ -74,5 +76,10 @@ impl PeerBook {
     /// Returns the number of connected peers.
     pub fn connected_total(&self) -> u16 {
         self.connected.length()
+    }
+
+    /// Writes connected peers to storage.
+    pub fn store(&self, storage: &BlockStorage) -> Result<(), ServerError> {
+        Ok(storage.store_peer_book(bincode::serialize(&self.get_connected())?)?)
     }
 }

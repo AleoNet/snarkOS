@@ -1,11 +1,15 @@
 mod server_message_handler {
-    use snarkos_consensus::{miner::Entry, test_data::*};
+    use snarkos_consensus::{
+        miner::Entry,
+        test_data::{GENESIS_BLOCK as GENESIS_BLOCK_0, *},
+    };
     use snarkos_network::{
         message::{types::*, Channel, Message},
         test_data::*,
         PingState,
     };
     use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
+    use snarkos_storage::test_data::*;
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;
@@ -105,7 +109,9 @@ mod server_message_handler {
             let (name, bytes) = channel.read().await.unwrap();
             assert_eq!(SyncBlock::name(), name);
             assert_eq!(
-                SyncBlock::new(hex::decode(GENESIS_BLOCK).unwrap()).serialize().unwrap(),
+                SyncBlock::new(hex::decode(GENESIS_BLOCK_0).unwrap())
+                    .serialize()
+                    .unwrap(),
                 bytes
             );
         });

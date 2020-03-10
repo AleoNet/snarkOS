@@ -11,10 +11,11 @@ mod server_listen {
         test_data::*,
         Handshakes,
     };
-    use snarkos_storage::BlockStorage;
+    use snarkos_storage::{test_data::*, BlockStorage};
 
+    use chrono::{DateTime, Utc};
     use serial_test::serial;
-    use std::{net::SocketAddr, sync::Arc};
+    use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{
         net::TcpListener,
         runtime::Runtime,
@@ -137,6 +138,73 @@ mod server_listen {
             // 7. Check that bootnode received GetSync message
 
             let (name, _bytes) = bootnode_hand.channel.read().await.unwrap();
+            assert_eq!(GetSync::name(), name);
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn startup_handshake_stored_peers() {
+        let (storage, path) = initialize_test_blockchain();
+
+        let mut rt = Runtime::new().unwrap();
+
+        rt.block_on(async move {
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
+
+            // 1. Add peer to storage
+            let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
+
+            connected_peers.insert(peer_address, Utc::now());
+            storage
+                .store_peer_book(bincode::serialize(&connected_peers).unwrap())
+                .unwrap();
+
+            // 2. Start peer
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            // 3. Start server
+
+            let (tx, rx) = oneshot::channel();
+
+            tokio::spawn(async move { start_server(tx, server_address, peer_address, storage, true).await });
+
+            rx.await.unwrap();
+
+            // 4. Check that peer received Version message
+
+            let (reader, _peer) = peer_listener.accept().await.unwrap();
+
+            // 5. Send handshake response from peer to server
+
+            let mut peer_handshakes = Handshakes::new();
+            let mut peer_hand = peer_handshakes
+                .receive_any(1u64, 1u32, peer_address, server_address, reader)
+                .await
+                .unwrap();
+
+            // 6. Check that peer received a GetPeers message
+
+            let (name, _bytes) = peer_hand.channel.read().await.unwrap();
+
+            assert_eq!(GetPeers::name(), name);
+
+            // 7. Check that peer received Verack message
+
+            let (name, bytes) = peer_hand.channel.read().await.unwrap();
+
+            assert_eq!(Verack::name(), name);
+            let verack_message = Verack::deserialize(bytes).unwrap();
+            peer_hand.accept(verack_message).await.unwrap();
+
+            // 8. Check that peer received GetSync message
+
+            let (name, _bytes) = peer_hand.channel.read().await.unwrap();
             assert_eq!(GetSync::name(), name);
         });
 

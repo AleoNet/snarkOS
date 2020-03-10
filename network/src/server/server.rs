@@ -7,7 +7,9 @@ use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParamete
 use snarkos_errors::network::ServerError;
 use snarkos_storage::BlockStorage;
 
+use chrono::{DateTime, Utc};
 use std::{
+    collections::HashMap,
     net::{Shutdown, SocketAddr},
     sync::Arc,
 };
@@ -54,37 +56,21 @@ impl Server {
 
     /// Starts the server event loop.
     /// 1. Send a handshake request to all bootnodes.
-    /// 2. Listen for and accept new tcp connections at local_address.
-    /// 3. Manage peers via handshake and ping protocols.
-    /// 4. Handle all messages sent to this server.
-    /// 5. Start connection handler.
+    /// 2. Send a handshake request to all stored peers.
+    /// 3. Listen for and accept new tcp connections at local_address.
+    /// 4. Manage peers via handshake and ping protocols.
+    /// 5. Handle all messages sent to this server.
+    /// 6. Start connection handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
         let local_address = self.context.local_address;
-        let sender = self.sender.clone();
 
         let mut listener = TcpListener::bind(&local_address).await?;
         info!("listening at: {:?}", local_address);
 
-        for bootnode in self.context.bootnodes.clone() {
-            let bootnode_address = bootnode.parse::<SocketAddr>()?;
+        self.connect_bootnodes().await?;
+        self.connect_peers_from_storage().await?;
 
-            if local_address != bootnode_address && !self.context.is_bootnode {
-                info!("Connecting to bootnode: {:?}", bootnode_address);
-
-                self.context
-                    .handshakes
-                    .write()
-                    .await
-                    .send_request(
-                        1u64,
-                        self.storage.get_latest_block_height(),
-                        local_address,
-                        bootnode_address,
-                    )
-                    .await?;
-            }
-        }
-
+        let sender = self.sender.clone();
         let storage = self.storage.clone();
         let context = self.context.clone();
 
@@ -164,5 +150,60 @@ impl Server {
                 channel = rx.await.expect("message handler errored");
             }
         });
+    }
+
+    /// Send a handshake request to all bootnodes from config.
+    async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
+        let local_address = self.context.local_address;
+
+        for bootnode in self.context.bootnodes.clone() {
+            let bootnode_address = bootnode.parse::<SocketAddr>()?;
+
+            if local_address != bootnode_address && !self.context.is_bootnode {
+                info!("Connecting to bootnode: {:?}", bootnode_address);
+
+                self.context
+                    .handshakes
+                    .write()
+                    .await
+                    .send_request(
+                        1u64,
+                        self.storage.get_latest_block_height(),
+                        local_address,
+                        bootnode_address,
+                    )
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Send a handshake request to every peer this server previously connected to.
+    async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
+        if let Ok(serialized_peers_option) = self.storage.get_peer_book() {
+            if let Some(serialized_peers) = serialized_peers_option {
+                let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> =
+                    bincode::deserialize(&serialized_peers)?;
+
+                for (stored_peer, _old_time) in stored_connected_peers {
+                    info!("Connecting to stored peer: {:?}", stored_peer);
+
+                    self.context
+                        .handshakes
+                        .write()
+                        .await
+                        .send_request(
+                            1u64,
+                            self.storage.get_latest_block_height(),
+                            self.context.local_address,
+                            stored_peer,
+                        )
+                        .await?;
+                }
+            }
+        };
+
+        Ok(())
     }
 }

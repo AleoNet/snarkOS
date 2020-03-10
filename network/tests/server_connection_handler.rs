@@ -1,10 +1,10 @@
 mod server_connection_handler {
-    use snarkos_consensus::test_data::*;
     use snarkos_network::{
         message::{types::GetMemoryPool, Message},
         test_data::*,
         Channel,
     };
+    use snarkos_storage::test_data::*;
 
     use chrono::{Duration, Utc};
     use serial_test::serial;
