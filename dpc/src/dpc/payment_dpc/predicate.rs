@@ -1,12 +1,13 @@
 use crate::dpc::{payment_dpc::PlainDPCComponents, Predicate};
 
-use snarkos_models::algorithms::SNARK;
+use snarkos_models::algorithms::{CommitmentScheme, SNARK};
 
 use std::marker::PhantomData;
 
 pub struct PrivatePredInput<C: PlainDPCComponents> {
     pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateNIZK as SNARK>::Proof,
+    pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
 }
 
 impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
@@ -14,6 +15,8 @@ impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
         Self {
             vk: <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
             proof: <C::PredicateNIZK as SNARK>::Proof::default(),
+            value_commitment:
+            <C::ValueComm as CommitmentScheme>::Output::default(),
         }
     }
 }
@@ -23,6 +26,7 @@ impl<C: PlainDPCComponents> Clone for PrivatePredInput<C> {
         Self {
             vk: self.vk.clone(),
             proof: self.proof.clone(),
+            value_commitment: self.value_commitment.clone(),
         }
     }
 }

@@ -551,6 +551,8 @@ where
         let private_pred_input = PrivatePredInput {
             vk: pred_nizk_pp.vk.clone(),
             proof: pred_nizk_pp.proof.clone(),
+            value_commitment:
+            <Components::ValueComm as CommitmentScheme>::Output::default(),
         };
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");

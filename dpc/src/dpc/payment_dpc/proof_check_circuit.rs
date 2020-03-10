@@ -140,6 +140,8 @@ impl<C: PlainDPCComponents> ConstraintSynthesizer<C::ProofCheckF> for ProofCheck
 where
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
     fn generate_constraints<CS: ConstraintSystem<C::ProofCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_proof_check_gadget::<C, CS>(

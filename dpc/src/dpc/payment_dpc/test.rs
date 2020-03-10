@@ -211,6 +211,7 @@ fn test_execute_payment_constraint_systems() {
         let private_input: PrivatePredInput<Components> = PrivatePredInput {
             vk: pred_nizk_pp.vk.clone(),
             proof,
+            value_commitment,
         };
         old_proof_and_vk.push(private_input);
     }
@@ -260,6 +261,7 @@ fn test_execute_payment_constraint_systems() {
         let private_input: PrivatePredInput<Components> = PrivatePredInput {
             vk: pred_nizk_pp.vk.clone(),
             proof,
+            value_commitment,
         };
         new_proof_and_vk.push(private_input);
     }
