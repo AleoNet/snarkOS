@@ -16,7 +16,7 @@ mod miner_integration {
     use futures_await_test::async_test;
     use std::{
         str::FromStr,
-        sync::{Arc, Mutex},
+        sync::Arc,
     };
     use tokio::sync::Mutex;
     use wagyu_bitcoin::{BitcoinAddress, BitcoinPrivateKey, Mainnet};
