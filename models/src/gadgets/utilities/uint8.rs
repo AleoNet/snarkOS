@@ -2,7 +2,7 @@ use crate::{
     curves::{to_field_vec::ToConstraintField, Field, FpParameters, PrimeField},
     gadgets::{
         curves::fp::FpGadget,
-        r1cs::{Assignment, ConstraintSystem, SynthesisError},
+        r1cs::{Assignment, ConstraintSystem},
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
@@ -11,6 +11,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::borrow::Borrow;
 

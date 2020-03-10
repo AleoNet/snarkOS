@@ -1,7 +1,5 @@
-use crate::{
-    curves::Field,
-    gadgets::r1cs::{ConstraintSystem, SynthesisError},
-};
+use crate::{curves::Field, gadgets::r1cs::ConstraintSystem};
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::borrow::Borrow;
 

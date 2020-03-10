@@ -10,11 +10,12 @@ use snarkos_curves::templates::bls12::{
     G2Projective,
     TwistType,
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Fp12, ModelParameters, PairingCurve},
     gadgets::{
         curves::{FieldGadget, Fp12Gadget, Fp2Gadget, FpGadget, PairingGadget},
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
     },
 };
 use snarkos_utilities::bititerator::BitIterator;

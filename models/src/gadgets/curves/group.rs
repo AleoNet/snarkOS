@@ -1,7 +1,7 @@
 use crate::{
-    curves::{Field, Group},
+    curves::{AffineCurve, Field, Group, ProjectiveCurve},
     gadgets::{
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,
@@ -12,6 +12,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::{borrow::Borrow, fmt::Debug};
 
@@ -138,4 +139,15 @@ pub trait GroupGadget<G: Group, F: Field>:
     fn cost_of_add() -> usize;
 
     fn cost_of_double() -> usize;
+}
+
+pub trait CompressedGroupGadget<G: Group + ProjectiveCurve, F: Field>: GroupGadget<G, F> {
+    type BaseFieldGadget: ToBytesGadget<F>
+        + EqGadget<F>
+        + CondSelectGadget<F>
+        + AllocGadget<<G::Affine as AffineCurve>::BaseField, F>
+        + Clone
+        + Debug;
+
+    fn to_x_coordinate(&self) -> Self::BaseFieldGadget;
 }

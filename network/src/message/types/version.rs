@@ -6,7 +6,6 @@ use rand::Rng;
 use std::net::SocketAddr;
 
 /// A handshake request for a Verack.
-///
 /// See network/protocol/handshake.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Version {

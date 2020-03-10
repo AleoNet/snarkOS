@@ -1,13 +1,14 @@
 use snarkos_algorithms::{
-    commitment::{PedersenCommitment, PedersenCommitmentParameters},
+    commitment::{PedersenCommitment, PedersenCommitmentParameters, PedersenCompressedCommitment},
     crh::PedersenSize,
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group, PrimeField},
+    curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
         algorithms::CommitmentGadget,
-        curves::GroupGadget,
-        r1cs::{ConstraintSystem, SynthesisError},
+        curves::{CompressedGroupGadget, GroupGadget},
+        r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
@@ -140,76 +141,26 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::curves::edwards_bls12::EdwardsBlsGadget;
-    use snarkos_algorithms::{commitment::PedersenCommitment, crh::PedersenSize};
-    use snarkos_curves::edwards_bls12::{EdwardsProjective, Fq, Fr};
-    use snarkos_models::{
-        algorithms::CommitmentScheme,
-        curves::ProjectiveCurve,
-        gadgets::{
-            algorithms::CommitmentGadget,
-            r1cs::{ConstraintSystem, TestConstraintSystem},
-            utilities::uint8::UInt8,
-        },
-    };
-    use snarkos_utilities::rand::UniformRand;
+pub struct PedersenCompressedCommitmentGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>>(
+    PhantomData<G>,
+    PhantomData<GG>,
+    PhantomData<F>,
+);
 
-    use rand::thread_rng;
+impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    CommitmentGadget<PedersenCompressedCommitment<G, S>, F> for PedersenCompressedCommitmentGadget<G, F, GG>
+{
+    type OutputGadget = GG::BaseFieldGadget;
+    type ParametersGadget = PedersenCommitmentParametersGadget<G, S, F>;
+    type RandomnessGadget = PedersenRandomnessGadget<G>;
 
-    #[test]
-    fn commitment_gadget_test() {
-        let mut cs = TestConstraintSystem::<Fq>::new();
-
-        #[derive(Clone, PartialEq, Eq, Hash)]
-        pub(super) struct Size;
-
-        impl PedersenSize for Size {
-            const NUM_WINDOWS: usize = 8;
-            const WINDOW_SIZE: usize = 4;
-        }
-
-        type TestCommitment = PedersenCommitment<EdwardsProjective, Size>;
-        type TestCommitmentGadget = PedersenCommitmentGadget<EdwardsProjective, Fq, EdwardsBlsGadget>;
-
-        let rng = &mut thread_rng();
-
-        let input = [1u8; 4];
-        let randomness = Fr::rand(rng);
-        let commitment = PedersenCommitment::<EdwardsProjective, Size>::setup(rng);
-        let native_output = commitment.commit(&input, &randomness).unwrap();
-
-        let mut input_bytes = vec![];
-        for (byte_i, input_byte) in input.iter().enumerate() {
-            let cs = cs.ns(|| format!("input_byte_gadget_{}", byte_i));
-            input_bytes.push(UInt8::alloc(cs, || Ok(*input_byte)).unwrap());
-        }
-
-        let randomness_gadget =
-            <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::RandomnessGadget::alloc(
-                &mut cs.ns(|| "randomness_gadget"),
-                || Ok(&randomness),
-            )
-            .unwrap();
-        let parameters_gadget =
-            <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::ParametersGadget::alloc(
-                &mut cs.ns(|| "parameters_gadget"),
-                || Ok(&commitment.parameters),
-            )
-            .unwrap();
-        let output_gadget = <TestCommitmentGadget as CommitmentGadget<TestCommitment, Fq>>::check_commitment_gadget(
-            &mut cs.ns(|| "commitment_gadget"),
-            &parameters_gadget,
-            &input_bytes,
-            &randomness_gadget,
-        )
-        .unwrap();
-
-        let native_output = native_output.into_affine();
-        assert_eq!(native_output.x, output_gadget.x.value.unwrap());
-        assert_eq!(native_output.y, output_gadget.y.value.unwrap());
-        assert!(cs.is_satisfied());
+    fn check_commitment_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+        randomness: &Self::RandomnessGadget,
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        let output = PedersenCommitmentGadget::<G, F, GG>::check_commitment_gadget(cs, parameters, input, randomness)?;
+        Ok(output.to_x_coordinate())
     }
 }

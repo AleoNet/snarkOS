@@ -1,4 +1,5 @@
-use snarkos_models::curves::Group;
+use snarkos_errors::curves::ConstraintFieldError;
+use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
 
 use rand::Rng;
 use std::marker::PhantomData;
@@ -38,5 +39,12 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
             base.double_in_place();
         }
         powers
+    }
+}
+
+impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCRHParameters<G, S> {
+    #[inline]
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
+        Ok(Vec::new())
     }
 }

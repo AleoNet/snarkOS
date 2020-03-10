@@ -1,7 +1,7 @@
 use crate::{
     curves::{Field, FpParameters, PrimeField},
     gadgets::{
-        r1cs::{Assignment, ConstraintSystem, ConstraintVar, LinearCombination, SynthesisError, Variable},
+        r1cs::{Assignment, ConstraintSystem, ConstraintVar, LinearCombination, Variable},
         utilities::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget},
@@ -11,6 +11,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::bititerator::BitIterator;
 
 use std::borrow::Borrow;

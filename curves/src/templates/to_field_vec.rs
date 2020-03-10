@@ -2,8 +2,9 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine as SWAffine, GroupProjective as SWProjective},
     twisted_edwards_extended::{GroupAffine as TEAffine, GroupProjective as TEProjective},
 };
+use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::curves::{
-    to_field_vec::{Error, ToConstraintField},
+    to_field_vec::ToConstraintField,
     Field,
     ProjectiveCurve,
     SWModelParameters,
@@ -15,7 +16,7 @@ where
     M::BaseField: ToConstraintField<F>,
 {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         let mut x_fe = self.x.to_field_elements()?;
         let y_fe = self.y.to_field_elements()?;
         x_fe.extend_from_slice(&y_fe);
@@ -28,7 +29,7 @@ where
     M::BaseField: ToConstraintField<F>,
 {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         let affine = self.into_affine();
         let mut x_fe = affine.x.to_field_elements()?;
         let y_fe = affine.y.to_field_elements()?;
@@ -42,7 +43,7 @@ where
     M::BaseField: ToConstraintField<F>,
 {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         let mut x_fe = self.x.to_field_elements()?;
         let y_fe = self.y.to_field_elements()?;
         x_fe.extend_from_slice(&y_fe);
@@ -55,7 +56,7 @@ where
     M::BaseField: ToConstraintField<F>,
 {
     #[inline]
-    fn to_field_elements(&self) -> Result<Vec<F>, Error> {
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         let affine = self.into_affine();
         let mut x_fe = affine.x.to_field_elements()?;
         let y_fe = affine.y.to_field_elements()?;

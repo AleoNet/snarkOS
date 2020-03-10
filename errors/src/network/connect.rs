@@ -20,12 +20,6 @@ pub enum ConnectError {
     AddressNotFound(SocketAddr),
 }
 
-impl From<std::io::Error> for ConnectError {
-    fn from(error: std::io::Error) -> Self {
-        ConnectError::Crate("std::io", format!("{:?}", error))
-    }
-}
-
 impl From<MessageError> for ConnectError {
     fn from(error: MessageError) -> Self {
         ConnectError::MessageError(error)
@@ -35,5 +29,11 @@ impl From<MessageError> for ConnectError {
 impl From<MessageHeaderError> for ConnectError {
     fn from(error: MessageHeaderError) -> Self {
         ConnectError::MessageHeaderError(error)
+    }
+}
+
+impl From<std::io::Error> for ConnectError {
+    fn from(error: std::io::Error) -> Self {
+        ConnectError::Crate("std::io", format!("{:?}", error))
     }
 }

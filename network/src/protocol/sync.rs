@@ -45,7 +45,6 @@ impl SyncHandler {
     }
 
     /// Process a vector of block header hashes.
-    ///
     /// Push new hashes to the sync handler so we can ask the sync node for them.
     pub fn receive_hashes(&mut self, hashes: Vec<BlockHeaderHash>, height: u32) {
         for block_hash in hashes {

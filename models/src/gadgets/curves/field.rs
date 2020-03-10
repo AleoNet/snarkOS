@@ -1,7 +1,7 @@
 use crate::{
     curves::Field,
     gadgets::{
-        r1cs::{ConstraintSystem, SynthesisError},
+        r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,
@@ -12,6 +12,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 

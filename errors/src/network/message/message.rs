@@ -24,6 +24,12 @@ impl From<MessageHeaderError> for MessageError {
     }
 }
 
+impl From<StreamReadError> for MessageError {
+    fn from(error: StreamReadError) -> Self {
+        MessageError::SteamReadError(error)
+    }
+}
+
 impl From<bincode::Error> for MessageError {
     fn from(error: bincode::Error) -> Self {
         MessageError::Crate("bincode", format!("{:?}", error))
@@ -33,11 +39,5 @@ impl From<bincode::Error> for MessageError {
 impl From<std::io::Error> for MessageError {
     fn from(error: std::io::Error) -> Self {
         MessageError::Crate("std::io", format!("{:?}", error))
-    }
-}
-
-impl From<StreamReadError> for MessageError {
-    fn from(error: StreamReadError) -> Self {
-        MessageError::SteamReadError(error)
     }
 }

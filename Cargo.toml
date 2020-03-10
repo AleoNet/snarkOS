@@ -18,6 +18,7 @@ members = [
     "consensus",
     "console",
     "curves",
+    "dpc",
     "errors",
     "gadgets",
     "models",
@@ -70,8 +71,8 @@ debug-assertions = false
 opt-level = 0
 
 [profile.test]
-#opt-level = 3
-#lto = "thin"
-#incremental = true
+opt-level = 3
+lto = "thin"
+incremental = true
 debug-assertions = true
 debug = true

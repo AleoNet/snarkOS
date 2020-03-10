@@ -3,7 +3,6 @@ use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
 /// A response to a GetSync message.
-///
 /// See network/protocol/sync.rs for more details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Sync {

@@ -1,5 +1,5 @@
 use crate::merkle_tree::{MerkleParameters, MerklePath};
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::CRH;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -13,7 +13,7 @@ pub struct MerkleTree<P: MerkleParameters> {
 impl<P: MerkleParameters> MerkleTree<P> {
     pub const HEIGHT: u8 = P::HEIGHT as u8;
 
-    pub fn new<L: ToBytes>(leaves: &[L]) -> Result<Self, Error> {
+    pub fn new<L: ToBytes>(leaves: &[L]) -> Result<Self, MerkleError> {
         let new_time = start_timer!(|| "MerkleTree::New");
 
         let parameters = P::default();
@@ -21,7 +21,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         let last_level_size = leaves.len().next_power_of_two();
         let tree_size = 2 * last_level_size - 1;
         let tree_height = tree_height(tree_size);
-        // TODO (howardwu): Return a MerkleTreeError.
+        // TODO (howardwu): Return a MerkleError.
         assert!(tree_height as u8 <= Self::HEIGHT);
 
         // Initialize the merkle tree.
@@ -88,7 +88,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         self.root.clone().unwrap()
     }
 
-    pub fn generate_proof<L: ToBytes>(&self, index: usize, leaf: &L) -> Result<MerklePath<P>, Error> {
+    pub fn generate_proof<L: ToBytes>(&self, index: usize, leaf: &L) -> Result<MerklePath<P>, MerkleError> {
         let prove_time = start_timer!(|| "MerkleTree::GenProof");
         let mut path = vec![];
 
@@ -100,7 +100,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
 
         // Check that the given index corresponds to the correct leaf.
         if leaf_hash != self.tree[tree_index] {
-            return Err(MerkleTreeError::IncorrectLeafIndex(tree_index).into());
+            return Err(MerkleError::IncorrectLeafIndex(tree_index));
         }
 
         // Iterate from the leaf up to the root, storing all intermediate hash values.
@@ -117,7 +117,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         }
 
         // Store the root node. Set boolean as true for consistency with digest location.
-        // TODO (howardwu): Return a MerkleTreeError.
+        // TODO (howardwu): Return a MerkleError.
         assert!(path.len() < Self::HEIGHT as usize);
         if path.len() != (Self::HEIGHT - 1) as usize {
             path.push((self.tree[0].clone(), empty_hash));
@@ -128,7 +128,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         end_timer!(prove_time);
 
         if path.len() != (Self::HEIGHT - 1) as usize {
-            Err(MerkleTreeError::IncorrectPathLength(path.len()).into())
+            Err(MerkleError::IncorrectPathLength(path.len()))
         } else {
             Ok(MerklePath {
                 parameters: self.parameters.clone(),
@@ -146,29 +146,6 @@ impl<P: MerkleParameters> Default for MerkleTree<P> {
             root: None,
             parameters: P::default(),
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum MerkleTreeError {
-    IncorrectLeafIndex(usize),
-    IncorrectPathLength(usize),
-}
-
-impl std::fmt::Display for MerkleTreeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let msg = match self {
-            MerkleTreeError::IncorrectLeafIndex(index) => format!("incorrect leaf index: {}", index),
-            MerkleTreeError::IncorrectPathLength(len) => format!("incorrect path length: {}", len),
-        };
-        write!(f, "{}", msg)
-    }
-}
-
-impl std::error::Error for MerkleTreeError {
-    #[inline]
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
     }
 }
 

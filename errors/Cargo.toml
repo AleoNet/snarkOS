@@ -14,7 +14,7 @@ edition = "2018"
 [dependencies]
 base58 = { version = "0.1" }
 bincode = { version = "1.2.0" }
-failure = { version = "0.1.5" }
+failure = { version = "0.1.7" }
 hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.0.5" }
 rocksdb = { version = "0.13.0" }

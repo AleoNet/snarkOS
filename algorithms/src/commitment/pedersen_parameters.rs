@@ -1,15 +1,14 @@
 use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
-use snarkos_models::curves::Group;
+use snarkos_errors::curves::ConstraintFieldError;
+use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
 
 use rand::Rng;
-use std::marker::PhantomData;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCommitmentParameters<G: Group, S: PedersenSize> {
     pub bases: Vec<Vec<G>>,
     pub random_base: Vec<G>,
     pub crh: PedersenCRH<G, S>,
-    _size: PhantomData<S>,
 }
 
 impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
@@ -24,7 +23,6 @@ impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
             bases,
             random_base,
             crh,
-            _size: PhantomData,
         }
     }
 
@@ -36,5 +34,14 @@ impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
             base.double_in_place();
         }
         powers
+    }
+}
+
+impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F>
+    for PedersenCommitmentParameters<G, S>
+{
+    #[inline]
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
+        Ok(Vec::new())
     }
 }

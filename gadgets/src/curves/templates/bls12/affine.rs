@@ -2,11 +2,12 @@ use snarkos_curves::templates::short_weierstrass::short_weierstrass_jacobian::{
     GroupAffine as SWAffine,
     GroupProjective as SWProjective,
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, Field, PrimeField, ProjectiveCurve, SWModelParameters},
     gadgets::{
         curves::{FieldGadget, GroupGadget},
-        r1cs::{Assignment, ConstraintSystem, SynthesisError},
+        r1cs::{Assignment, ConstraintSystem},
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,
@@ -21,6 +22,7 @@ use snarkos_models::{
 use snarkos_utilities::bititerator::BitIterator;
 
 use std::{borrow::Borrow, marker::PhantomData, ops::Neg};
+
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
 #[must_use]

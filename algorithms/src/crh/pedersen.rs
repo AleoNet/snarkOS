@@ -1,8 +1,8 @@
 use crate::crh::{PedersenCRHParameters, PedersenSize};
-use snarkos_errors::algorithms::{CryptoError, Error};
+use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
-    curves::{AffineCurve, Group, ProjectiveCurve},
+    curves::{to_field_vec::ToConstraintField, Field, Group},
 };
 
 use rand::Rng;
@@ -36,7 +36,7 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
         }
     }
 
-    fn hash(&self, input: &[u8]) -> Result<Self::Output, Error> {
+    fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS {
             // TODO (howardwu): Return a CRHError.
             panic!(
@@ -86,19 +86,21 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
 
         Ok(result)
     }
-}
 
-impl<G: Group + ProjectiveCurve, S: PedersenSize> PedersenCRH<G, S> {
-    /// Returns the affine x-coordinate of a given collision-resistant hash output.
-    fn compress(output: G) -> Result<<G::Affine as AffineCurve>::BaseField, CryptoError> {
-        let affine = output.into_affine();
-        debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
-        Ok(affine.to_x_coordinate())
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
     }
 }
 
 impl<G: Group, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCRH<G, S> {
     fn from(parameters: PedersenCRHParameters<G, S>) -> Self {
         Self { parameters }
+    }
+}
+
+impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintField<F> for PedersenCRH<G, S> {
+    #[inline]
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
+        self.parameters.to_field_elements()
     }
 }

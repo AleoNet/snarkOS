@@ -1,7 +1,7 @@
 use crate::{
     curves::{Field, FpParameters, PrimeField},
     gadgets::{
-        r1cs::{Assignment, ConstraintSystem, LinearCombination, SynthesisError},
+        r1cs::{Assignment, ConstraintSystem, LinearCombination},
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
@@ -11,6 +11,7 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::bytes::ToBytes;
 
 /// Represents an interpretation of 32 `Boolean` objects as an

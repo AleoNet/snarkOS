@@ -1,4 +1,4 @@
-use snarkos_errors::algorithms::Error;
+use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::CRH;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -13,12 +13,12 @@ pub trait MerkleParameters: Clone + Default {
     fn crh(&self) -> &Self::H;
 
     /// Returns the hash of a given leaf.
-    fn hash_leaf<L: ToBytes>(&self, leaf: &L, buffer: &mut [u8]) -> Result<<Self::H as CRH>::Output, Error> {
+    fn hash_leaf<L: ToBytes>(&self, leaf: &L, buffer: &mut [u8]) -> Result<<Self::H as CRH>::Output, MerkleError> {
         let mut writer = Cursor::new(buffer);
         leaf.write(&mut writer)?;
 
         let buffer = writer.into_inner();
-        self.crh().hash(&buffer[..(Self::H::INPUT_SIZE_BITS / 8)])
+        Ok(self.crh().hash(&buffer[..(Self::H::INPUT_SIZE_BITS / 8)])?)
     }
 
     /// Returns the output hash, given a left and right hash value.
@@ -27,7 +27,7 @@ pub trait MerkleParameters: Clone + Default {
         left: &<Self::H as CRH>::Output,
         right: &<Self::H as CRH>::Output,
         buffer: &mut [u8],
-    ) -> Result<<Self::H as CRH>::Output, Error> {
+    ) -> Result<<Self::H as CRH>::Output, MerkleError> {
         let mut writer = Cursor::new(buffer);
 
         // Construct left input.
@@ -36,11 +36,11 @@ pub trait MerkleParameters: Clone + Default {
         right.write(&mut writer)?;
 
         let buffer = writer.into_inner();
-        self.crh().hash(&buffer[..(<Self::H as CRH>::INPUT_SIZE_BITS / 8)])
+        Ok(self.crh().hash(&buffer[..(<Self::H as CRH>::INPUT_SIZE_BITS / 8)])?)
     }
 
-    fn hash_empty(&self) -> Result<<Self::H as CRH>::Output, Error> {
+    fn hash_empty(&self) -> Result<<Self::H as CRH>::Output, MerkleError> {
         let empty_buffer = vec![0u8; <Self::H as CRH>::INPUT_SIZE_BITS / 8];
-        self.crh().hash(&empty_buffer)
+        Ok(self.crh().hash(&empty_buffer)?)
     }
 }
