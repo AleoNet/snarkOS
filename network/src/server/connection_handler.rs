@@ -17,7 +17,7 @@ impl Server {
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
-    pub(in crate::server) async fn connection_handler(&self) {
+    pub(in crate::server) fn connection_handler(&self) {
         let context = self.context.clone();
         let memory_pool_lock = self.memory_pool_lock.clone();
         let sync_handler_lock = self.sync_handler_lock.clone();

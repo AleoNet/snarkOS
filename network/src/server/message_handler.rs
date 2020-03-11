@@ -16,7 +16,7 @@ use std::sync::Arc;
 impl Server {
     /// Handles all messages sent from connected peers.
     /// Messages are received by a single tokio mpsc receiver with the message name, bytes, associated channel, and a tokio oneshot sender.
-    /// The oneshot sender lets connection thread know when the message is handled.
+    /// The oneshot sender lets the connection thread know when the message is handled.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {

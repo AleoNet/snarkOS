@@ -16,6 +16,7 @@ snarkos-consensus = { path = "../consensus" }
 snarkos-errors = { path = "../errors" }
 snarkos-objects = { path = "../objects" }
 snarkos-storage = { path = "../storage" }
+snarkos-utilities = { path = "../utilities" }
 
 bincode = { version = "1.2.0" }
 byteorder = { version = "1" }

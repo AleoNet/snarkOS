@@ -4,11 +4,7 @@ use node::{
 };
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::node::NodeError;
-use snarkos_network::{
-    context::Context,
-    protocol::SyncHandler,
-    server::{MinerInstance, Server},
-};
+use snarkos_network::{context::Context, protocol::SyncHandler, server::Server};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::BlockStorage;
 
@@ -47,7 +43,11 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    let bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
+    let mut bootnode = socket_address;
+
+    if !config.is_bootnode {
+        bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
+    }
 
     let sync_handler = SyncHandler::new(bootnode);
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
@@ -86,14 +86,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let coinbase_address = BitcoinAddress::<Mainnet>::from_str(&config.coinbase_address).unwrap();
 
     if config.miner {
-        MinerInstance::new(
-            coinbase_address,
-            consensus.clone(),
-            storage.clone(),
-            memory_pool_lock.clone(),
-            server.context.clone(),
-        )
-        .spawn();
+        server.start_miner(coinbase_address);
     }
 
     // Start server thread

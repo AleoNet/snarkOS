@@ -25,7 +25,7 @@ Contains components for [connecting](./src/protocol/handshake.rs), [maintaining]
 
 ### server
 
-Contains components for starting the [miner](./src/server/miner_instance.rs) and [server](./src/server/server.rs) as well as functions for the [connection handler](./src/server/connection_handler.rs) and [message handler](./src/server/message_handler.rs).
+Contains components for starting the [miner](src/server/start_miner.rs) and [server](./src/server/server.rs) as well as functions for the [connection handler](./src/server/connection_handler.rs) and [message handler](./src/server/message_handler.rs).
 
 ### test_data
 

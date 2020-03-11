@@ -2,8 +2,8 @@ pub(self) mod connection_handler;
 
 pub(self) mod message_handler;
 
-pub mod miner_instance;
-pub use self::miner_instance::*;
+pub mod start_miner;
+pub use self::start_miner::*;
 
 pub mod server;
 pub use self::server::*;

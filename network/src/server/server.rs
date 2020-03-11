@@ -209,8 +209,7 @@ impl Server {
             }
         });
 
-        self.connection_handler().await;
-
+        self.connection_handler();
         self.message_handler().await?;
 
         Ok(())
