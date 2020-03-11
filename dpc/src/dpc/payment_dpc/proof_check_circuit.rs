@@ -42,8 +42,9 @@ where
         let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.local_data_comm)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_pp_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(self.comm_and_crh_pp.value_comm_pp.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_pp_fe =
+            ToConstraintField::<C::CoreCheckF>::to_field_elements(self.comm_and_crh_pp.value_comm_pp.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         // Then we convert these field elements into bytes
         let pred_input = [
@@ -164,4 +165,3 @@ where
         Ok(())
     }
 }
-

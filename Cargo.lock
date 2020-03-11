@@ -159,6 +159,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94cb07b0da6a73955f8fb85d24c466778e70cda767a568229b104f0264089330"
+dependencies = [
+ "byte-tools 0.3.1",
+ "crypto-mac 0.7.0",
+ "digest 0.8.1",
+ "opaque-debug",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2223,7 +2235,7 @@ dependencies = [
 name = "snarkos-algorithms"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "criterion",
  "csv",
  "derivative",
@@ -2244,7 +2256,7 @@ dependencies = [
 name = "snarkos-benchmarks"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "criterion",
  "csv",
  "derivative",
@@ -2309,6 +2321,7 @@ dependencies = [
 name = "snarkos-dpc"
 version = "0.8.0"
 dependencies = [
+ "blake2 0.8.1",
  "criterion",
  "derivative",
  "hex 0.4.2",
@@ -2342,7 +2355,7 @@ dependencies = [
 name = "snarkos-gadgets"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "derivative",
  "digest 0.7.6",
  "rand 0.7.3",

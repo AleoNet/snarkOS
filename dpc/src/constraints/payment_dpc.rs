@@ -130,26 +130,26 @@ fn execute_core_checks_gadget_helper<
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
 ) -> Result<(), SynthesisError>
-    where
-        C: PlainDPCComponents<
-            AddrC = AddrC,
-            RecC = RecC,
-            SnNonceH = SnNonceH,
-            P = P,
-            AddrCGadget = AddrCGadget,
-            SnNonceHGadget = SnNonceHGadget,
-            RecCGadget = RecCGadget,
-            PGadget = PGadget,
-        >,
-        AddrC: CommitmentScheme,
-        RecC: CommitmentScheme,
-        SnNonceH: CRH,
-        P: PRF,
-        RecC::Output: Eq,
-        AddrCGadget: CommitmentGadget<AddrC, C::CoreCheckF>,
-        RecCGadget: CommitmentGadget<RecC, C::CoreCheckF>,
-        SnNonceHGadget: CRHGadget<SnNonceH, C::CoreCheckF>,
-        PGadget: PRFGadget<P, C::CoreCheckF>,
+where
+    C: PlainDPCComponents<
+        AddrC = AddrC,
+        RecC = RecC,
+        SnNonceH = SnNonceH,
+        P = P,
+        AddrCGadget = AddrCGadget,
+        SnNonceHGadget = SnNonceHGadget,
+        RecCGadget = RecCGadget,
+        PGadget = PGadget,
+    >,
+    AddrC: CommitmentScheme,
+    RecC: CommitmentScheme,
+    SnNonceH: CRH,
+    P: PRF,
+    RecC::Output: Eq,
+    AddrCGadget: CommitmentGadget<AddrC, C::CoreCheckF>,
+    RecCGadget: CommitmentGadget<RecC, C::CoreCheckF>,
+    SnNonceHGadget: CRHGadget<SnNonceH, C::CoreCheckF>,
+    PGadget: PRFGadget<P, C::CoreCheckF>,
 {
     let mut old_sns = Vec::with_capacity(old_records.len());
     let mut old_rec_comms = Vec::with_capacity(old_records.len());
@@ -647,11 +647,11 @@ pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
 
     local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
 ) -> Result<(), SynthesisError>
-    where
-        <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-        <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-        <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-        <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+where
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
     // Declare public parameters.
     let (pred_vk_comm_pp, pred_vk_crh_pp) = {
@@ -748,16 +748,16 @@ pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
         let position = UInt8::constant(i as u8).into_bits_le();
 
         // Convert the value commitment to bytes
-        let value_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
-            &old_death_pred_vk_and_pf[i].value_commitment,
-        )
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_fe =
+            ToConstraintField::<C::CoreCheckF>::to_field_elements(&old_death_pred_vk_and_pf[i].value_commitment)
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_bytes =
-            to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_bytes = to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm =
-            UInt8::alloc_vec(cs.ns(|| format!("Allocate input value commitment {}", i)), &value_comm_bytes)?;
+        let value_comm = UInt8::alloc_vec(
+            cs.ns(|| format!("Allocate input value commitment {}", i)),
+            &value_comm_bytes,
+        )?;
 
         let value_comm_flatten = value_comm
             .iter()
@@ -804,16 +804,16 @@ pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
         let position = UInt8::constant(j as u8).into_bits_le();
 
         // Convert the value commitment to bytes
-        let value_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
-            &new_birth_pred_vk_and_pf[j].value_commitment,
-        )
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_fe =
+            ToConstraintField::<C::CoreCheckF>::to_field_elements(&new_birth_pred_vk_and_pf[j].value_commitment)
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_bytes =
-            to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_bytes = to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm =
-            UInt8::alloc_vec(cs.ns(|| format!("Allocate output value commitment {}", j)), &value_comm_bytes)?;
+        let value_comm = UInt8::alloc_vec(
+            cs.ns(|| format!("Allocate output value commitment {}", j)),
+            &value_comm_bytes,
+        )?;
 
         let value_comm_flatten = value_comm
             .iter()

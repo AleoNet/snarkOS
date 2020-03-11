@@ -182,7 +182,7 @@ fn test_execute_payment_constraint_systems() {
             &value.to_le_bytes(),
             &value_commitment_rand,
         )
-            .unwrap();
+        .unwrap();
 
         let proof = PredicateNIZK::prove(
             &pred_nizk_pp.pk,
@@ -227,7 +227,7 @@ fn test_execute_payment_constraint_systems() {
             &value.to_le_bytes(),
             &value_commitment_rand,
         )
-            .unwrap();
+        .unwrap();
 
         let proof = PredicateNIZK::prove(
             &pred_nizk_pp.pk,
@@ -252,10 +252,7 @@ fn test_execute_payment_constraint_systems() {
                 value_commitment: value_commitment.clone(),
                 position: j as u8,
             };
-            assert!(
-                PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof)
-                    .expect("Proof should verify")
-            );
+            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
 
         let private_input: PrivatePredInput<Components> = PrivatePredInput {

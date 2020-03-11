@@ -89,10 +89,7 @@ impl<C: PlainDPCComponents> PaymentCircuit<C> {
 }
 
 impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for PaymentCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(
-        self,
-        cs: &mut CS,
-    ) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,
             self.parameters.get()?,
@@ -121,29 +118,25 @@ fn execute_payment_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::C
         || Ok(comm_and_crh_parameters.local_data_comm_pp.parameters().clone()),
     )?;
 
-    let _local_data_comm =
-        <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-            cs.ns(|| "Allocate local data commitment"),
-            || Ok(local_data_commitment),
-        )?;
+    let _local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+        cs.ns(|| "Allocate local data commitment"),
+        || Ok(local_data_commitment),
+    )?;
 
-    let value_comm_randomness =
-        <C::ValueCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-            cs.ns(|| "Allocate value commitment randomness"),
-            || Ok(value_commitment_randomness),
-        )?;
+    let value_comm_randomness = <C::ValueCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+        cs.ns(|| "Allocate value commitment randomness"),
+        || Ok(value_commitment_randomness),
+    )?;
 
-    let value_comm_pp =
-        <C::ValueCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare value comm parameters"),
-            || Ok(comm_and_crh_parameters.value_comm_pp.parameters()),
-        )?;
+    let value_comm_pp = <C::ValueCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+        &mut cs.ns(|| "Declare value comm parameters"),
+        || Ok(comm_and_crh_parameters.value_comm_pp.parameters()),
+    )?;
 
-    let declared_value_commitment =
-        <C::ValueCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-            cs.ns(|| "Allocate declared value commitment"),
-            || Ok(value_commitment),
-        )?;
+    let declared_value_commitment = <C::ValueCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+        cs.ns(|| "Allocate declared value commitment"),
+        || Ok(value_commitment),
+    )?;
 
     let value_input = UInt8::alloc_vec(cs.ns(|| "Alloc value"), &value.to_le_bytes())?;
 

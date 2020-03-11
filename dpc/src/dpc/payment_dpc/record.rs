@@ -1,5 +1,10 @@
 use crate::dpc::{
-    payment_dpc::{address::AddressPublicKey, predicate::DPCPredicate, record_payload::PaymentRecordPayload, PlainDPCComponents},
+    payment_dpc::{
+        address::AddressPublicKey,
+        predicate::DPCPredicate,
+        record_payload::PaymentRecordPayload,
+        PlainDPCComponents,
+    },
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, PRF};

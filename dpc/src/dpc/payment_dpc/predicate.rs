@@ -15,8 +15,7 @@ impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
         Self {
             vk: <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
             proof: <C::PredicateNIZK as SNARK>::Proof::default(),
-            value_commitment:
-            <C::ValueComm as CommitmentScheme>::Output::default(),
+            value_commitment: <C::ValueComm as CommitmentScheme>::Output::default(),
         }
     }
 }

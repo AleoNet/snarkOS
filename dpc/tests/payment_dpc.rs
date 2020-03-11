@@ -2,7 +2,15 @@
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
     ledger::Ledger,
-    payment_dpc::{instantiated::*, record_payload::PaymentRecordPayload, predicate::PrivatePredInput, payment_circuit::*, LocalData, DPC, PlainDPCComponents},
+    payment_dpc::{
+        instantiated::*,
+        payment_circuit::*,
+        predicate::PrivatePredInput,
+        record_payload::PaymentRecordPayload,
+        LocalData,
+        PlainDPCComponents,
+        DPC,
+    },
     DPCScheme,
     Record,
 };
@@ -14,7 +22,6 @@ use rand_xorshift::XorShiftRng;
 
 #[test]
 fn payment_integration_test() {
-
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
@@ -24,7 +31,7 @@ fn payment_integration_test() {
         .expect("DPC setup failed");
 
     #[cfg(debug_assertions)]
-        let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.pred_nizk_pp.vk.clone().into();
+    let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.pred_nizk_pp.vk.clone().into();
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&parameters.comm_and_crh_pp, &genesis_metadata, &mut rng).unwrap();
@@ -37,7 +44,7 @@ fn payment_integration_test() {
         )
         .unwrap()
     ]
-        .unwrap();
+    .unwrap();
 
     let genesis_record = DPC::generate_record(
         &parameters.comm_and_crh_pp,
@@ -49,7 +56,7 @@ fn payment_integration_test() {
         &Predicate::new(genesis_pred_vk_bytes.clone()),
         &mut rng,
     )
-        .unwrap();
+    .unwrap();
 
     // Generate serial number for the genesis record.
     let genesis_sn = DPC::generate_sn(&genesis_record, &genesis_address.secret_key).unwrap();
@@ -79,7 +86,7 @@ fn payment_integration_test() {
             &Predicate::new(genesis_pred_vk_bytes.clone()),
             &mut rng,
         )
-            .unwrap();
+        .unwrap();
         old_records.push(old_record);
     }
 
@@ -110,16 +117,14 @@ fn payment_integration_test() {
             let input_value = local_data.old_records[i].payload().balance;
 
             // Generate value commitment randomness
-            let value_commitment_rand = <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+            let value_commitment_rand =
+                <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data
                 .comm_and_crh_pp
                 .value_comm_pp
-                .commit(
-                    &input_value.to_le_bytes(),
-                    &value_commitment_rand,
-                )
+                .commit(&input_value.to_le_bytes(), &value_commitment_rand)
                 .unwrap();
 
             // Instantiate death predicate circuit
@@ -133,23 +138,19 @@ fn payment_integration_test() {
             );
 
             // Generate the predicate proof
-            let proof = PredicateNIZK::prove(
-                &parameters.pred_nizk_pp.pk,
-                death_predicate_circuit,
-                &mut rng,
-            )
+            let proof = PredicateNIZK::prove(&parameters.pred_nizk_pp.pk, death_predicate_circuit, &mut rng)
                 .expect("Proving should work");
             #[cfg(debug_assertions)]
-                {
-                    let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
-                        local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
-                        local_data_comm: local_data.local_data_comm.clone(),
-                        value_comm_pp: local_data.comm_and_crh_pp.value_comm_pp.parameters().clone(),
-                        value_commitment: value_commitment.clone(),
-                        position: i as u8,
-                    };
-                    assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
-                }
+            {
+                let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                    local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
+                    local_data_comm: local_data.local_data_comm.clone(),
+                    value_comm_pp: local_data.comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                    value_commitment: value_commitment.clone(),
+                    position: i as u8,
+                };
+                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+            }
 
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),
@@ -167,16 +168,14 @@ fn payment_integration_test() {
             let output_value = local_data.new_records[j].payload().balance;
 
             // Generate value commitment randomness
-            let value_commitment_rand = <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+            let value_commitment_rand =
+                <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data
                 .comm_and_crh_pp
                 .value_comm_pp
-                .commit(
-                    &output_value.to_le_bytes(),
-                    &value_commitment_rand,
-                )
+                .commit(&output_value.to_le_bytes(), &value_commitment_rand)
                 .unwrap();
 
             // Instantiate birth predicate circuit
@@ -190,23 +189,19 @@ fn payment_integration_test() {
             );
 
             // Generate the predicate proof
-            let proof = PredicateNIZK::prove(
-                &parameters.pred_nizk_pp.pk,
-                birth_predicate_circuit,
-                &mut rng,
-            )
+            let proof = PredicateNIZK::prove(&parameters.pred_nizk_pp.pk, birth_predicate_circuit, &mut rng)
                 .expect("Proving should work");
             #[cfg(debug_assertions)]
-                {
-                    let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
-                        local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
-                        local_data_comm: local_data.local_data_comm.clone(),
-                        value_comm_pp: local_data.comm_and_crh_pp.value_comm_pp.parameters().clone(),
-                        value_commitment: value_commitment.clone(),
-                        position: j as u8,
-                    };
-                    assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
-                }
+            {
+                let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                    local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
+                    local_data_comm: local_data.local_data_comm.clone(),
+                    value_comm_pp: local_data.comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                    value_commitment: value_commitment.clone(),
+                    position: j as u8,
+                };
+                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+            }
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),
                 proof,
@@ -232,7 +227,7 @@ fn payment_integration_test() {
         &ledger,
         &mut rng,
     )
-        .unwrap();
+    .unwrap();
 
     assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
 

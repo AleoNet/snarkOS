@@ -11,20 +11,13 @@ pub struct PaymentRecordPayload {
 
 impl Default for PaymentRecordPayload {
     fn default() -> Self {
-        Self {
-            balance: 0,
-            lock: 0,
-        }
+        Self { balance: 0, lock: 0 }
     }
 }
 
 impl PaymentRecordPayload {
     pub fn to_bytes(&self) -> Vec<u8> {
-        [
-            self.balance.to_le_bytes().to_vec(),
-            self.lock.to_le_bytes().to_vec(),
-        ]
-        .concat()
+        [self.balance.to_le_bytes().to_vec(), self.lock.to_le_bytes().to_vec()].concat()
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
