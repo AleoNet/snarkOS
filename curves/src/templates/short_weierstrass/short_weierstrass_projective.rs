@@ -148,6 +148,10 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     fn to_x_coordinate(&self) -> Self::BaseField {
         self.x.clone()
     }
+
+    fn to_y_coordinate(&self) -> Self::BaseField {
+        self.y.clone()
+    }
 }
 
 impl<P: Parameters> Neg for GroupAffine<P> {
