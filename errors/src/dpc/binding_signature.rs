@@ -8,6 +8,9 @@ pub enum BindingSignatureError {
     #[fail(display = "{}", _0)]
     CommitmentError(CommitmentError),
 
+    #[fail(display = "Affine point is not in the correct subgroup on curve {:?}", _0)]
+    NotInCorrectSubgroupOnCurve(Vec<u8>),
+
     #[fail(display = "{}", _0)]
     Message(String),
 }

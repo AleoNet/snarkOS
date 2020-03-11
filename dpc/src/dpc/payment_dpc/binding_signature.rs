@@ -54,20 +54,20 @@ pub fn hash_into_field<G: Group + ProjectiveCurve>(a: &[u8], b: &[u8]) -> <G as 
 
 pub fn recover_affine(
     x: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField,
-) -> Option<<G as ProjectiveCurve>::Affine> {
+) -> Result<<G as ProjectiveCurve>::Affine, BindingSignatureError> {
     if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::get_point_from_x(x, false) {
         if affine.is_in_correct_subgroup_assuming_on_curve() {
-            return Some(affine);
+            return Ok(affine);
         }
     }
 
     if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::get_point_from_x(x, true) {
         if affine.is_in_correct_subgroup_assuming_on_curve() {
-            return Some(affine);
+            return Ok(affine);
         }
     }
 
-    None
+    Err(BindingSignatureError::NotInCorrectSubgroupOnCurve(to_bytes![x]?))
 }
 
 // Binding signature scheme derived from Zcash's redDSA
@@ -113,22 +113,22 @@ pub fn create_binding_signature<R: Rng, S: PedersenSize>(
     }
 
     for vc_input in input_value_commitments {
-        let recovered_input_value_commitment = recover_affine(vc_input).unwrap();
+        let recovered_input_value_commitment = recover_affine(vc_input)?;
         bvk = bvk.add(&recovered_input_value_commitment);
     }
 
     for vc_output in output_value_commitments {
-        let recovered_output_value_commitment = recover_affine(vc_output).unwrap();
+        let recovered_output_value_commitment = recover_affine(vc_output)?;
         bvk = bvk.add(&recovered_output_value_commitment.neg());
     }
 
-    let recovered_value_balance_commitment = recover_affine(value_balance_commitment).unwrap();
+    let recovered_value_balance_commitment = recover_affine(value_balance_commitment)?;
     bvk = bvk.add(&recovered_value_balance_commitment.neg());
 
     // Make sure bvk can be derived from bsk
     let zero: u64 = 0;
     let expected_bvk_x = parameters.commit(&zero.to_le_bytes(), &bsk)?;
-    let expected_bvk = recover_affine(expected_bvk_x).unwrap();
+    let expected_bvk = recover_affine(expected_bvk_x)?;
     assert_eq!(bvk, expected_bvk);
 
     // Generate randomness
@@ -170,23 +170,23 @@ pub fn verify_binding_signature<S: PedersenSize>(
     let mut bvk = <G as ProjectiveCurve>::Affine::default();
 
     for vc_input in input_value_commitments {
-        let recovered_input_value_commitment = recover_affine(vc_input).unwrap();
+        let recovered_input_value_commitment = recover_affine(vc_input)?;
         bvk = bvk.add(&recovered_input_value_commitment);
     }
 
     for vc_output in output_value_commitments {
-        let recovered_output_value_commitment = recover_affine(vc_output).unwrap();
+        let recovered_output_value_commitment = recover_affine(vc_output)?;
         bvk = bvk.add(&recovered_output_value_commitment.neg());
     }
 
-    let recovered_value_balance_commitment = recover_affine(value_balance_commitment).unwrap();
+    let recovered_value_balance_commitment = recover_affine(value_balance_commitment)?;
     bvk = bvk.add(&recovered_value_balance_commitment.neg());
 
     //Verify the signature
     let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
 
     let affine_r_x: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(&signature.rbar[..])?;
-    let affine_r = recover_affine(affine_r_x).unwrap();
+    let affine_r = recover_affine(affine_r_x)?;
 
     let s: <G as Group>::ScalarField = FromBytes::read(&signature.sbar[..])?;
 
