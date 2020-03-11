@@ -33,59 +33,53 @@ impl Server {
                 // Let's wait for connection_frequency seconds before starting each loop.
                 delay_for(Duration::from_millis(connection_frequency)).await;
 
-                let peer_book = &mut context.peer_book.write().await;
                 let connections = context.connections.read().await;
+                let peer_book = &mut context.peer_book.write().await;
                 let pings = &mut context.pings.write().await;
+                let sync_handler = &mut sync_handler_lock.lock().await;
 
-                // We have less peers than our minimum peer requirement. Look for more peers.
+                // We have less peers than our minimum peer requirement.
                 if peer_book.connected_total() < context.min_peers {
-                    // Ask our connected peers.
-                    for (address, _last_seen) in peer_book.get_connected() {
-                        if let Some(channel) = connections.get(&address) {
+                    // Send a handshake request to each gossiped peer.
+                    for (address, _last_seen) in peer_book.get_gossiped() {
+                        if let Err(_) = context
+                            .handshakes
+                            .write()
+                            .await
+                            .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                            .await
+                        {
+                            peer_book.disconnect_peer(address);
+                        }
+                    }
+                }
+
+                // Send messages to connected peers.
+                for (address, last_seen) in peer_book.get_connected() {
+                    if let Some(channel) = connections.get(&address) {
+                        // We have less peers than our minimum peer requirement.
+                        if peer_book.connected_total() < context.min_peers {
+                            // Ask peer for their list of connected peers.
                             if let Err(_) = channel.write(&GetPeers).await {
                                 peer_book.disconnect_peer(address);
                             }
                         }
-                    }
 
-                    // Try and connect to our gossiped peers.
-                    for (address, _last_seen) in peer_book.get_gossiped() {
-                        if address != context.local_address {
-                            if let Err(_) = context
-                                .handshakes
-                                .write()
-                                .await
-                                .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
-                                .await
-                            {
-                                peer_book.disconnect_peer(address);
-                            }
+                        // Send a ping protocol request to maintain the connection.
+                        if let Err(_) = pings.send_ping(channel).await {
+                            peer_book.disconnect_peer(address);
                         }
-                    }
-                }
 
-                // Send a ping protocol request to each of our connected peers to maintain the connection.
-                for (address, _last_seen) in peer_book.get_connected() {
-                    if address != context.local_address {
-                        if let Some(channel) = connections.get(&address) {
-                            if let Err(_) = pings.send_ping(channel).await {
-                                peer_book.disconnect_peer(address);
-                            }
+                        // Purge peer that has not responded in two frequency loops.
+                        let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
+
+                        if Utc::now() - last_seen.clone() > response_timeout {
+                            peer_book.disconnect_peer(address);
                         }
-                    }
-                }
-
-                // Purge peers that haven't responded in two frequency loops.
-                let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
-
-                for (address, last_seen) in peer_book.get_connected() {
-                    if Utc::now() - last_seen.clone() > response_timeout {
-                        peer_book.disconnect_peer(address);
                     }
                 }
 
                 // If we have disconnected from our sync node, then find a new one.
-                let mut sync_handler = sync_handler_lock.lock().await;
                 if peer_book.disconnected_contains(&sync_handler.sync_node) {
                     match peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
                         Some(peer) => sync_handler.sync_node = peer.0.clone(),
@@ -123,8 +117,6 @@ impl Server {
                 } else {
                     interval_ticker += 1;
                 }
-
-                drop(sync_handler);
             }
         });
     }

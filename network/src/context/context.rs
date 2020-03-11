@@ -55,7 +55,7 @@ impl Context {
             is_bootnode,
             bootnodes,
             connections: RwLock::new(Connections::new()),
-            peer_book: RwLock::new(PeerBook::new()),
+            peer_book: RwLock::new(PeerBook::new(local_address)),
             handshakes: RwLock::new(Handshakes::new()),
             pings: RwLock::new(Pings::new()),
         }

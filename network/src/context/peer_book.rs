@@ -8,6 +8,9 @@ use std::{collections::HashMap, net::SocketAddr};
 /// Stores connected, disconnected, and known peers.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerBook {
+    /// Local server ip address
+    local_address: SocketAddr,
+
     /// Connected peers
     connected: AddressBook,
 
@@ -19,8 +22,9 @@ pub struct PeerBook {
 }
 
 impl PeerBook {
-    pub fn new() -> Self {
+    pub fn new(local_address: SocketAddr) -> Self {
         Self {
+            local_address,
             connected: AddressBook::new(),
             disconnected: AddressBook::new(),
             gossiped: AddressBook::new(),
@@ -54,6 +58,9 @@ impl PeerBook {
 
     /// Move a peer from disconnected/gossiped to connected peers.
     pub fn update_connected(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+        if address == self.local_address {
+            return false;
+        }
         self.disconnected.remove(&address);
         self.gossiped.remove(&address);
         self.connected.update(address, date)
@@ -61,6 +68,9 @@ impl PeerBook {
 
     /// Move a peer from connected/disconnected to gossiped peers.
     pub fn update_gossiped(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+        if address == self.local_address {
+            return false;
+        }
         self.connected.remove(&address);
         self.disconnected.remove(&address);
         self.gossiped.update(address, date)
@@ -68,6 +78,9 @@ impl PeerBook {
 
     /// Move a peer from connected peers to disconnected peers.
     pub fn disconnect_peer(&mut self, address: SocketAddr) -> bool {
+        if address == self.local_address {
+            return false;
+        }
         self.connected.remove(&address);
         self.gossiped.remove(&address);
         self.disconnected.update(address, Utc::now())

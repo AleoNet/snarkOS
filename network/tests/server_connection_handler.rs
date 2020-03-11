@@ -8,190 +8,218 @@ mod server_connection_handler {
 
     use chrono::{Duration, Utc};
     use serial_test::serial;
+    use snarkos_network::message::types::{GetPeers, Ping, Version};
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};
 
-    mod peer_searching {
-        use super::*;
+    #[test]
+    #[serial]
+    fn gossiped_peer_handshake() {
+        let mut rt = Runtime::new().unwrap();
+        let (storage, path) = initialize_test_blockchain();
 
-        #[test]
-        #[serial]
-        fn peer_connect() {
-            let mut rt = Runtime::new().unwrap();
-            let (storage, path) = initialize_test_blockchain();
+        rt.block_on(async move {
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
 
-            rt.block_on(async move {
-                let bootnode_address = random_socket_address();
-                let server_address = random_socket_address();
-                let peer_address = random_socket_address();
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-                let peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let context = server.context.clone();
 
-                let server =
-                    initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
-                let context = Arc::clone(&server.context);
+            // 1. Add peer to gossiped in peer_book
 
-                // 1. Add peer to connected in peer_book
+            let mut peer_book = context.peer_book.write().await;
+            peer_book.update_gossiped(peer_address, Utc::now());
+            drop(peer_book);
 
-                let mut peer_book = context.peer_book.write().await;
-                peer_book.update_connected(peer_address, Utc::now());
-                drop(peer_book);
+            // 2. Start server
 
-                // 2. Start server
+            start_test_server(server);
 
-                start_test_server(server);
+            // 3. Check that peer received server request
 
-                // 3. Check that peer received server connect
+            let (stream, _socket) = peer_listener.accept().await.unwrap();
+            let channel_peer_side = Channel::new_read_only(stream).unwrap();
+            let (message, _bytes) = channel_peer_side.read().await.unwrap();
 
-                accept_all_messages(peer_listener);
+            assert_eq!(Version::name(), message);
 
-                // 4. Check that the server did not move the peer
+            // 4. Check that the server did not move the peer from gossiped
 
-                let peer_book = context.peer_book.read().await;
+            let peer_book = context.peer_book.read().await;
 
-                assert!(peer_book.connected_contains(&peer_address));
-                assert!(!peer_book.gossiped_contains(&peer_address));
-                assert!(!peer_book.disconnected_contains(&peer_address));
-            });
+            assert!(!peer_book.connected_contains(&peer_address));
+            assert!(peer_book.gossiped_contains(&peer_address));
+            assert!(!peer_book.disconnected_contains(&peer_address));
+        });
 
-            drop(rt);
-            kill_storage_async(path);
-        }
+        drop(rt);
+        kill_storage_async(path);
+    }
 
-        #[test]
-        #[serial]
-        fn peer_disconnect() {
-            let mut rt = Runtime::new().unwrap();
-            let (storage, path) = initialize_test_blockchain();
+    #[test]
+    #[serial]
+    fn gossiped_no_handshake() {
+        let mut rt = Runtime::new().unwrap();
+        let (storage, path) = initialize_test_blockchain();
 
-            rt.block_on(async move {
-                let bootnode_address = random_socket_address();
-                let server_address = random_socket_address();
-                let peer_address = random_socket_address();
+        rt.block_on(async move {
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
 
-                let server =
-                    initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
-                let context = Arc::clone(&server.context);
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let context = server.context.clone();
 
-                // 1. Add peer with old date to connected in peer_book
+            let mut peer_book = context.peer_book.write().await;
 
-                let mut peer_book = context.peer_book.write().await;
-                peer_book.update_connected(peer_address, Utc::now() - Duration::minutes(1));
-                drop(peer_book);
+            // 1. Add the minimum number of connected to the server peer book
 
-                // 2. Start server
+            peer_book.update_connected(random_socket_address(), Utc::now());
+            peer_book.update_connected(random_socket_address(), Utc::now());
 
-                start_test_server(server);
+            // 2. Add peer with old date to gossiped in peer_book
 
-                // 3. Wait for connection handler loop
+            peer_book.update_gossiped(peer_address, Utc::now() - Duration::minutes(1));
+            drop(peer_book);
 
-                sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
+            // 3. Start server
 
-                // 4. Check that the server moved peer from peers to disconnected
+            start_test_server(server);
 
-                let peer_book = context.peer_book.read().await;
+            // 4. Wait for connection handler loop
 
-                assert!(!peer_book.connected_contains(&peer_address));
-                assert!(!peer_book.gossiped_contains(&peer_address));
-                assert!(peer_book.disconnected_contains(&peer_address));
-            });
+            sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
 
-            drop(rt);
-            kill_storage_async(path);
-        }
+            // 5. Check that the server did not move peer from gossiped
 
-        #[test]
-        #[serial]
-        fn gossiped_peer_connect() {
-            let mut rt = Runtime::new().unwrap();
-            let (storage, path) = initialize_test_blockchain();
+            let peer_book = context.peer_book.read().await;
 
-            rt.block_on(async move {
-                let bootnode_address = random_socket_address();
-                let server_address = random_socket_address();
-                let peer_address = random_socket_address();
+            assert!(!peer_book.connected_contains(&peer_address));
+            assert!(peer_book.gossiped_contains(&peer_address));
+            assert!(!peer_book.disconnected_contains(&peer_address));
+        });
 
-                let peer_listener = TcpListener::bind(peer_address).await.unwrap();
+        drop(rt);
+        kill_storage_async(path);
+    }
 
-                let server =
-                    initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
-                let context = Arc::clone(&server.context);
+    #[test]
+    #[serial]
+    fn connected_getpeers_ping() {
+        let mut rt = Runtime::new().unwrap();
+        let (storage, path) = initialize_test_blockchain();
 
-                // 1. Add peer to gossiped in peer_book
+        rt.block_on(async move {
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
 
-                let mut peer_book = context.peer_book.write().await;
-                peer_book.update_gossiped(peer_address, Utc::now());
-                drop(peer_book);
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-                // 2. Start server
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let context = server.context.clone();
 
-                start_test_server(server);
+            // 1. Add peer to connected in peer_book
 
-                // 3. Check that peer received server connect
+            let mut peer_book = context.peer_book.write().await;
+            peer_book.update_connected(peer_address, Utc::now());
+            drop(peer_book);
 
-                accept_all_messages(peer_listener);
+            // 2. Create channel between peer and server
 
-                // 4. Check that the server did not move the peer from gossiped
+            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            let (stream, _socket) = peer_listener.accept().await.unwrap();
+            let channel_peer_side = Channel::new_read_only(stream).unwrap();
 
-                let peer_book = context.peer_book.read().await;
+            // 3. Add peer to connections
 
-                assert!(!peer_book.connected_contains(&peer_address));
-                assert!(peer_book.gossiped_contains(&peer_address));
-                assert!(!peer_book.disconnected_contains(&peer_address));
-            });
+            let mut connections = context.connections.write().await;
+            connections.store_channel(&channel_server_side);
+            drop(connections);
 
-            drop(rt);
-            kill_storage_async(path);
-        }
+            // 4. Start server
 
-        #[test]
-        #[serial]
-        fn gossiped_peer_disconnect() {
-            let mut rt = Runtime::new().unwrap();
-            let (storage, path) = initialize_test_blockchain();
+            start_test_server(server);
 
-            rt.block_on(async move {
-                let bootnode_address = random_socket_address();
-                let server_address = random_socket_address();
-                let peer_address = random_socket_address();
+            // 3. Check that peer received server GetPeers
 
-                let server =
-                    initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
-                let context = Arc::clone(&server.context);
+            let (message, _bytes) = channel_peer_side.read().await.unwrap();
+            assert_eq!(GetPeers::name(), message);
 
-                let mut peer_book = context.peer_book.write().await;
+            // 4. Check that peer received server Ping
 
-                // 1. Add the maximum number of connected to the server peer book
+            let (message, _bytes) = channel_peer_side.read().await.unwrap();
 
-                for _x in 0..10 {
-                    peer_book.update_connected(random_socket_address(), Utc::now());
-                }
+            assert_eq!(Ping::name(), message);
 
-                // 2. Add peer with old date to gossiped in peer_book
+            // 4. Check that the server did not move the peer
 
-                peer_book.update_gossiped(peer_address, Utc::now() - Duration::minutes(1));
-                drop(peer_book);
+            let peer_book = context.peer_book.read().await;
 
-                // 3. Start server
+            assert!(peer_book.connected_contains(&peer_address));
+            assert!(!peer_book.gossiped_contains(&peer_address));
+            assert!(!peer_book.disconnected_contains(&peer_address));
+        });
 
-                start_test_server(server);
+        drop(rt);
+        kill_storage_async(path);
+    }
 
-                // 4. Wait for connection handler loop
+    #[test]
+    #[serial]
+    fn connected_disconnect() {
+        let mut rt = Runtime::new().unwrap();
+        let (storage, path) = initialize_test_blockchain();
 
-                sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
+        rt.block_on(async move {
+            let bootnode_address = random_socket_address();
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
 
-                // 5. Check that the server did not move peer from gossiped
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-                let peer_book = context.peer_book.read().await;
+            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let context = server.context.clone();
 
-                assert!(!peer_book.connected_contains(&peer_address));
-                assert!(peer_book.gossiped_contains(&peer_address));
-                assert!(!peer_book.disconnected_contains(&peer_address));
-            });
+            // 1. Add peer with old date to connected in peer_book
 
-            drop(rt);
-            kill_storage_async(path);
-        }
+            let mut peer_book = context.peer_book.write().await;
+            peer_book.update_connected(peer_address, Utc::now() - Duration::minutes(1));
+            drop(peer_book);
+
+            // 2. create channel between peer and server
+
+            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            peer_listener.accept().await.unwrap();
+
+            // 2. Add peer to server connections
+
+            let mut connections = context.connections.write().await;
+            connections.store_channel(&channel_server_side);
+            drop(connections);
+
+            // 2. Start server
+
+            start_test_server(server);
+
+            // 3. Wait for connection handler loop
+
+            sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
+
+            // 4. Check that the server moved peer from peers to disconnected
+
+            let peer_book = context.peer_book.read().await;
+
+            assert!(!peer_book.connected_contains(&peer_address));
+            assert!(!peer_book.gossiped_contains(&peer_address));
+            assert!(peer_book.disconnected_contains(&peer_address));
+        });
+
+        drop(rt);
+        kill_storage_async(path);
     }
 
     #[test]
@@ -208,7 +236,7 @@ mod server_connection_handler {
             let peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
             let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
-            let context = Arc::clone(&server.context);
+            let context = server.context.clone();
             let sync_handler_lock = Arc::clone(&server.sync_handler_lock);
 
             // 1. Add peer to peers
