@@ -1,14 +1,18 @@
 mod server_connection_handler {
+    use snarkos_consensus::{miner::Entry, test_data::*};
     use snarkos_network::{
-        message::{types::GetMemoryPool, Message},
+        message::{
+            types::{GetMemoryPool, GetPeers, Ping, Version},
+            Message,
+        },
         test_data::*,
         Channel,
     };
+    use snarkos_objects::Transaction;
     use snarkos_storage::test_data::*;
 
     use chrono::{Duration, Utc};
     use serial_test::serial;
-    use snarkos_network::message::types::{GetPeers, Ping, Version};
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};
 
@@ -283,6 +287,90 @@ mod server_connection_handler {
             // 6. Check that the server set sync_node to peer
 
             assert_eq!(sync_handler.lock().await.sync_node, peer_address);
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn store_connected_peers() {
+        let mut rt = Runtime::new().unwrap();
+
+        let (storage, path) = initialize_test_blockchain();
+
+        rt.block_on(async move {
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
+
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![]);
+            let context = server.context.clone();
+            let storage = server.storage.clone();
+
+            // 1. Add peer to server peer book
+
+            let mut peer_book = context.peer_book.write().await;
+            peer_book.update_connected(peer_address, Utc::now());
+            drop(peer_book);
+
+            // 2. Start server
+
+            start_test_server(server);
+
+            // 3. Wait for connection handler to store peers
+
+            sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
+
+            // 4. Check storage for peers
+
+            assert!(storage.get_peer_book().unwrap().is_some());
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn store_memory_pool_transactions() {
+        let mut rt = Runtime::new().unwrap();
+
+        let (storage, path) = initialize_test_blockchain();
+
+        rt.block_on(async move {
+            let server_address = random_socket_address();
+
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![]);
+            let memory_pool = server.memory_pool_lock.clone();
+            let interval = server.context.memory_pool_interval;
+            let storage = server.storage.clone();
+
+            // 1. Add transaction to memory pool
+
+            let transaction_bytes = hex::decode(TRANSACTION).unwrap();
+            let mut memory_pool_lock = memory_pool.lock().await;
+
+            memory_pool_lock
+                .insert(&storage, Entry {
+                    size: transaction_bytes.len(),
+                    transaction: Transaction::deserialize(&transaction_bytes).unwrap(),
+                })
+                .unwrap();
+
+            drop(memory_pool_lock);
+
+            // 2. Start server
+
+            start_test_server(server);
+
+            // 3. Wait for connection handler to store peers
+
+            sleep(interval as u64 * CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
+
+            // 4. Check storage for memory pool
+
+            assert!(storage.get_memory_pool().unwrap().is_some());
         });
 
         drop(rt);
