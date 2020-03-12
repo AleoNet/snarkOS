@@ -1,6 +1,7 @@
 mod consensus_sidechain {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_objects::Block;
+    use snarkos_storage::test_data::*;
 
     // Receive two blocks that reference the same parent.
     // Treat the first block received as the canonical chain but store and keep the rejected sidechain block in storage.

@@ -1,10 +1,8 @@
 use crate::ConsensusParameters;
 use snarkos_storage::BlockStorage;
 
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::str::FromStr;
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
-
-pub const TEST_DB_PATH: &str = "../test_db";
 
 pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
     max_block_size: 1_000_000usize, // coinbase + 1 transaction
@@ -82,31 +80,6 @@ pub const BLOCK_3_MINER_BALANCE: u64 = 200_030_000;
 pub const BLOCK_3_BALANCE_1: u64 = 0;
 pub const BLOCK_3_BALANCE_2: u64 = 0;
 pub const BLOCK_3_BALANCE_3: u64 = 99_970_000;
-
-pub fn initialize_test_blockchain() -> (Arc<BlockStorage>, PathBuf) {
-    let mut path = std::env::current_dir().unwrap();
-    path.push(random_storage_path());
-
-    BlockStorage::destroy_storage(path.clone()).unwrap();
-
-    let blockchain = BlockStorage::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
-
-    (blockchain, path)
-}
-
-pub fn random_storage_path() -> String {
-    let ptr = Box::into_raw(Box::new(123));
-    format!("{}{}", TEST_DB_PATH, ptr as usize)
-}
-
-pub fn kill_storage_async(path: PathBuf) {
-    BlockStorage::destroy_storage(path).unwrap();
-}
-
-pub fn kill_storage_sync(storage: Arc<BlockStorage>, path: PathBuf) {
-    drop(storage);
-    BlockStorage::destroy_storage(path).unwrap();
-}
 
 pub fn check_block_1_balances(blockchain: &BlockStorage) {
     let genesis_miner_address = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[0].address).unwrap();

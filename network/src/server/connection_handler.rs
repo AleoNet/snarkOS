@@ -16,6 +16,7 @@ impl Server {
     /// 3. Purge peers that have not responded in connection_frequency x 2 seconds.
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
+    /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
     pub(in crate::server) async fn connection_handler(&self) {
         let context = self.context.clone();
         let memory_pool_lock = self.memory_pool_lock.clone();
@@ -92,13 +93,22 @@ impl Server {
                     };
                 }
 
+                // Store connected peers in database.
+                peer_book
+                    .store(&storage)
+                    .unwrap_or_else(|error| info!("Failed to store connected peers in database {}", error));
+
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
                     let mut memory_pool = memory_pool_lock.lock().await;
 
-                    match (memory_pool.cleanse(&storage), memory_pool.store(&storage)) {
-                        (_, _) => {}
-                    };
+                    memory_pool.cleanse(&storage).unwrap_or_else(|error| {
+                        info!("Failed to cleanse memory pool transactions in database {}", error)
+                    });
+
+                    memory_pool
+                        .store(&storage)
+                        .unwrap_or_else(|error| info!("Failed to store memory pool transaction in database {}", error));
 
                     // Ask our sync node for more transactions.
                     if context.local_address != sync_handler.sync_node {

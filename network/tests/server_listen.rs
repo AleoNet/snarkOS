@@ -11,10 +11,11 @@ mod server_listen {
         test_data::*,
         Handshakes,
     };
-    use snarkos_storage::BlockStorage;
+    use snarkos_storage::{test_data::*, BlockStorage};
 
+    use chrono::{DateTime, Utc};
     use serial_test::serial;
-    use std::{net::SocketAddr, sync::Arc};
+    use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{
         net::TcpListener,
         runtime::Runtime,
@@ -143,57 +144,52 @@ mod server_listen {
         drop(rt);
         kill_storage_async(path);
     }
-    //
-    //
-    // #[test]
-    // #[serial]
-    // fn test_max_peers() {
-    //     let (storage, path) = initialize_test_blockchain();
-    //
-    //     let mut rt = Runtime::new().unwrap();
-    //
-    //     rt.block_on(async move {
-    //         let server_address = random_socket_address();
-    //         let bootnode_address = random_socket_address();
-    //
-    //         // Maximum peers is initialized to 10.
-    //         let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
-    //
-    //         let context = server.context.clone();
-    //
-    //         // Add 10 connected peers.
-    //         let mut peer_book = context.peer_book.write().await;
-    //
-    //         for _x in 0..10 {
-    //             peer_book.add_connected(random_socket_address());
-    //         }
-    //
-    //         assert_eq!(peer_book.connected_total(), context.max_peers);
-    //
-    //         rt.spawn(async move {
-    //             server.listen().await.unwrap()
-    //         });
-    //
-    //         sleep(100).await;
-    //
-    //         let (tx, rx) = oneshot::channel();
-    //         tokio::spawn(async move {
-    //             // Should fail
-    //             let mut stream = TcpStream::connect(server_address).await.unwrap();
-    //             println!("connected");
-    //             sleep(2000).await;
-    //
-    //             stream.read(&mut vec![1u8; 1]).await.unwrap();
-    //
-    //             // println!("writing");
-    //             // assert_err!(stream.write_all(&Ping::new().serialize().unwrap()).await);
-    //             // assert_err!();
-    //             tx.send(()).unwrap();
-    //         });
-    //         rx.await.unwrap()
-    //     });
-    //
-    //     drop(rt);
-    //     kill_storage_async(path);
-    // }
+
+    #[test]
+    #[serial]
+    fn startup_handshake_stored_peers() {
+        let (storage, path) = initialize_test_blockchain();
+
+        let mut rt = Runtime::new().unwrap();
+
+        rt.block_on(async move {
+            let server_address = random_socket_address();
+            let peer_address = random_socket_address();
+
+            // 1. Add peer to storage
+            let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
+
+            connected_peers.insert(peer_address, Utc::now());
+            storage
+                .store_to_peer_book(bincode::serialize(&connected_peers).unwrap())
+                .unwrap();
+
+            // 2. Start peer
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            // 3. Start server
+
+            let (tx, rx) = oneshot::channel();
+
+            tokio::spawn(async move { start_server(tx, server_address, peer_address, storage, true).await });
+
+            rx.await.unwrap();
+
+            // 4. Check that peer received Version message
+
+            let (reader, _peer) = peer_listener.accept().await.unwrap();
+
+            // 5. Send handshake response from peer to server
+
+            let mut peer_handshakes = Handshakes::new();
+            peer_handshakes
+                .receive_any(1u64, 1u32, peer_address, server_address, reader)
+                .await
+                .unwrap();
+        });
+
+        drop(rt);
+        kill_storage_async(path);
+    }
 }

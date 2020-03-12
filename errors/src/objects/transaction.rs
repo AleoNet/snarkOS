@@ -2,11 +2,20 @@ use std::fmt::Debug;
 
 #[derive(Debug, Fail)]
 pub enum TransactionError {
+    #[fail(display = "UTXO has already been spent {:?} index: {:?}", _0, _1)]
+    AlreadySpent(Vec<u8>, u32),
+
+    #[fail(display = "there is a double spend occuring with this transaction {}", _0)]
+    DoubleSpend(String),
+
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
 
     #[fail(display = "insufficient funds from input: {} to spend as output: {}", _0, _1)]
     InsufficientFunds(u64, u64),
+
+    #[fail(display = "invalid coinbase transaction")]
+    InvalidCoinbaseTransaction,
 
     #[fail(display = "invalid pub key hash script_pub_key: {} script_sig: {}", _0, _1)]
     InvalidPubKeyHash(String, String),
@@ -25,6 +34,9 @@ pub enum TransactionError {
 
     #[fail(display = "missing outpoint script public key")]
     MissingOutpointScriptPublicKey,
+
+    #[fail(display = "the block has multiple coinbase transactions: {:?}", _0)]
+    MultipleCoinbaseTransactions(u32),
 
     #[fail(display = "Null Error {:?}", _0)]
     NullError(()),
