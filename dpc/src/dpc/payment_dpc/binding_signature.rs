@@ -1,4 +1,5 @@
-use snarkos_algorithms::crh::PedersenSize;
+use crate::payment_dpc::PlainDPCComponents;
+
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls12;
 use snarkos_errors::dpc::BindingSignatureError;
 use snarkos_models::{
@@ -20,7 +21,6 @@ use blake2::{
     VarBlake2b as b2s,
 };
 use rand::Rng;
-use snarkos_algorithms::commitment::PedersenCompressedCommitment;
 use std::ops::{Add, Mul, Neg};
 
 type G = EdwardsBls12;
@@ -52,16 +52,16 @@ pub fn hash_into_field<G: Group + ProjectiveCurve>(a: &[u8], b: &[u8]) -> <G as 
     res
 }
 
-pub fn recover_affine(
-    x: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField,
-) -> Result<<G as ProjectiveCurve>::Affine, BindingSignatureError> {
-    if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::get_point_from_x(x, false) {
+pub fn recover_affine_from_x_coord(x_bytes: &[u8]) -> Result<<G as ProjectiveCurve>::Affine, BindingSignatureError> {
+    let x: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(x_bytes)?;
+
+    if let Some(affine) = <G as ProjectiveCurve>::Affine::get_point_from_x(x, false) {
         if affine.is_in_correct_subgroup_assuming_on_curve() {
             return Ok(affine);
         }
     }
 
-    if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::get_point_from_x(x, true) {
+    if let Some(affine) = <G as ProjectiveCurve>::Affine::get_point_from_x(x, true) {
         if affine.is_in_correct_subgroup_assuming_on_curve() {
             return Ok(affine);
         }
@@ -86,49 +86,52 @@ impl BindingSignature {
     }
 }
 
-pub fn create_binding_signature<R: Rng, S: PedersenSize>(
-    parameters: &PedersenCompressedCommitment<G, S>,
-    input_value_commitments: Vec<<<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField>,
-    output_value_commitments: Vec<<<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField>,
-    input_value_commitment_randomness: &Vec<<G as Group>::ScalarField>,
-    output_value_commitment_randomness: &Vec<<G as Group>::ScalarField>,
+pub fn create_binding_signature<C: PlainDPCComponents, R: Rng>(
+    parameters: &C::ValueComm,
+    input_value_commitments: Vec<[u8; 32]>,
+    output_value_commitments: Vec<[u8; 32]>,
+    input_value_commitment_randomness: &Vec<[u8; 32]>,
+    output_value_commitment_randomness: &Vec<[u8; 32]>,
     value_balance: u64,
     input: &Vec<u8>,
     rng: &mut R,
 ) -> Result<BindingSignature, BindingSignatureError> {
     // Calculate Value balance commitment
-    let zero_randomness = <G as Group>::ScalarField::default();
-    let value_balance_commitment = parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?;
+    let zero_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
+    let value_balance_commitment = to_bytes![parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?]?;
 
     // Calculate the bsk and bvk
     let mut bsk = <G as Group>::ScalarField::default();
-    let mut bvk = <G as ProjectiveCurve>::Affine::default();
+    let mut bvk = <EdwardsBls12 as ProjectiveCurve>::Affine::default();
 
     for input_vc_randomness in input_value_commitment_randomness {
-        bsk = bsk.add(&input_vc_randomness);
+        let randomness: <G as Group>::ScalarField = FromBytes::read(&input_vc_randomness[..])?;
+        bsk = bsk.add(&randomness);
     }
 
     for output_vc_randomness in output_value_commitment_randomness {
-        bsk = bsk.add(&output_vc_randomness.neg());
+        let randomness: <G as Group>::ScalarField = FromBytes::read(&output_vc_randomness[..])?;
+        bsk = bsk.add(&randomness.neg());
     }
 
     for vc_input in input_value_commitments {
-        let recovered_input_value_commitment = recover_affine(vc_input)?;
+        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input)?;
         bvk = bvk.add(&recovered_input_value_commitment);
     }
 
     for vc_output in output_value_commitments {
-        let recovered_output_value_commitment = recover_affine(vc_output)?;
+        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output)?;
         bvk = bvk.add(&recovered_output_value_commitment.neg());
     }
 
-    let recovered_value_balance_commitment = recover_affine(value_balance_commitment)?;
+    let recovered_value_balance_commitment = recover_affine_from_x_coord(&value_balance_commitment)?;
     bvk = bvk.add(&recovered_value_balance_commitment.neg());
 
     // Make sure bvk can be derived from bsk
     let zero: u64 = 0;
-    let expected_bvk_x = parameters.commit(&zero.to_le_bytes(), &bsk)?;
-    let expected_bvk = recover_affine(expected_bvk_x)?;
+    let comm_bsk: <C::ValueComm as CommitmentScheme>::Randomness = FromBytes::read(&to_bytes![bsk]?[..])?;
+    let expected_bvk_x = to_bytes![parameters.commit(&zero.to_le_bytes(), &comm_bsk)?]?;
+    let expected_bvk = recover_affine_from_x_coord(&expected_bvk_x)?;
     assert_eq!(bvk, expected_bvk);
 
     // Generate randomness
@@ -137,8 +140,8 @@ pub fn create_binding_signature<R: Rng, S: PedersenSize>(
 
     // Generate signature using message
 
-    let r: <G as Group>::ScalarField = hash_into_field::<G>(&sig_rand[..], input);
-
+    let r_edwards: <G as Group>::ScalarField = hash_into_field::<G>(&sig_rand[..], input);
+    let r: <C::ValueComm as CommitmentScheme>::Randomness = FromBytes::read(&to_bytes![r_edwards]?[..])?;
     let r_g = parameters.commit(&zero.to_le_bytes(), &r)?;
 
     let mut rbar = [0u8; 32];
@@ -146,7 +149,7 @@ pub fn create_binding_signature<R: Rng, S: PedersenSize>(
 
     let mut s: <G as Group>::ScalarField = hash_into_field::<G>(&rbar[..], input);
     s = s.mul(&bsk);
-    s = s.add(&r);
+    s = s.add(&r_edwards);
 
     let mut sbar = [0u8; 32];
     sbar.copy_from_slice(&to_bytes![s]?[..]);
@@ -154,49 +157,48 @@ pub fn create_binding_signature<R: Rng, S: PedersenSize>(
     BindingSignature::new(rbar.to_vec(), sbar.to_vec())
 }
 
-pub fn verify_binding_signature<S: PedersenSize>(
-    parameters: &PedersenCompressedCommitment<G, S>,
-    input_value_commitments: Vec<<<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField>,
-    output_value_commitments: Vec<<<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField>,
+pub fn verify_binding_signature<C: PlainDPCComponents>(
+    parameters: &C::ValueComm,
+    input_value_commitments: Vec<[u8; 32]>,
+    output_value_commitments: Vec<[u8; 32]>,
     value_balance: u64,
     input: &Vec<u8>,
     signature: BindingSignature,
 ) -> Result<bool, BindingSignatureError> {
     // Calculate Value balance commitment
-    let zero_randomness = <G as Group>::ScalarField::default();
-    let value_balance_commitment = parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?;
+    let zero_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
+    let value_balance_commitment = to_bytes![parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?]?;
 
     // Craft verifying key
     let mut bvk = <G as ProjectiveCurve>::Affine::default();
 
     for vc_input in input_value_commitments {
-        let recovered_input_value_commitment = recover_affine(vc_input)?;
+        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input)?;
         bvk = bvk.add(&recovered_input_value_commitment);
     }
 
     for vc_output in output_value_commitments {
-        let recovered_output_value_commitment = recover_affine(vc_output)?;
+        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output)?;
         bvk = bvk.add(&recovered_output_value_commitment.neg());
     }
 
-    let recovered_value_balance_commitment = recover_affine(value_balance_commitment)?;
+    let recovered_value_balance_commitment = recover_affine_from_x_coord(&value_balance_commitment)?;
     bvk = bvk.add(&recovered_value_balance_commitment.neg());
 
     //Verify the signature
     let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
-
-    let affine_r_x: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(&signature.rbar[..])?;
-    let affine_r = recover_affine(affine_r_x)?;
-
-    let s: <G as Group>::ScalarField = FromBytes::read(&signature.sbar[..])?;
+    let affine_r = recover_affine_from_x_coord(&signature.rbar)?;
 
     let zero: u64 = 0;
-    let recommit = parameters.commit(&zero.to_le_bytes(), &s)?;
-    let recovered_recommit = recover_affine(recommit).unwrap();
+    let s: <C::ValueComm as CommitmentScheme>::Randomness = FromBytes::read(&signature.sbar[..])?;
+    let recommit = to_bytes![parameters.commit(&zero.to_le_bytes(), &s)?]?;
+    let recovered_recommit = recover_affine_from_x_coord(&recommit).unwrap();
 
     let check_verification = bvk.mul(&c).add(&affine_r).add(&recovered_recommit.neg());
 
-    Ok(check_verification.eq(&<G as ProjectiveCurve>::Affine::default()))
+    Ok(<<G as ProjectiveCurve>::Affine as AffineCurve>::is_zero(
+        &check_verification,
+    ))
 }
 
 #[cfg(test)]
@@ -224,35 +226,51 @@ mod tests {
         // Input value commitment
 
         let input_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
-
         let input_value_commitment = value_comm_pp
             .commit(&input_amount.to_le_bytes(), &input_value_commitment_randomness)
             .unwrap();
 
-        let output_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
+        // Output value commitment
 
+        let output_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
         let output_value_commitment = value_comm_pp
             .commit(&output_amount.to_le_bytes(), &output_value_commitment_randomness)
             .unwrap();
 
+        // Create the binding signature
+
+        let mut input_value_commitment_randomness_bytes = [0u8; 32];
+        let mut output_value_commitment_randomness_bytes = [0u8; 32];
+        let mut input_value_commitment_bytes = [0u8; 32];
+        let mut output_value_commitment_bytes = [0u8; 32];
+
+        input_value_commitment_randomness_bytes.copy_from_slice(&to_bytes![input_value_commitment_randomness].unwrap());
+        output_value_commitment_randomness_bytes
+            .copy_from_slice(&to_bytes![output_value_commitment_randomness].unwrap());
+
+        input_value_commitment_bytes.copy_from_slice(&to_bytes![input_value_commitment].unwrap());
+        output_value_commitment_bytes.copy_from_slice(&to_bytes![output_value_commitment].unwrap());
+
         let sighash = [1u8; 64].to_vec();
 
-        let binding_signature = create_binding_signature(
+        let binding_signature = create_binding_signature::<Components, _>(
             &value_comm_pp,
-            vec![input_value_commitment],
-            vec![output_value_commitment],
-            &vec![input_value_commitment_randomness],
-            &vec![output_value_commitment_randomness],
+            vec![input_value_commitment_bytes],
+            vec![output_value_commitment_bytes],
+            &vec![input_value_commitment_randomness_bytes],
+            &vec![output_value_commitment_randomness_bytes],
             value_balance,
             &sighash,
             rng,
         )
         .unwrap();
 
-        let verified = verify_binding_signature(
+        // Verify the binding signature
+
+        let verified = verify_binding_signature::<Components>(
             &value_comm_pp,
-            vec![input_value_commitment],
-            vec![output_value_commitment],
+            vec![input_value_commitment_bytes],
+            vec![output_value_commitment_bytes],
             value_balance,
             &sighash,
             binding_signature,
