@@ -1,4 +1,7 @@
-use crate::{dpc::payment_dpc::PlainDPCComponents, Transaction};
+use crate::{
+    dpc::payment_dpc::{binding_signature::BindingSignature, PlainDPCComponents},
+    Transaction,
+};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_models::algorithms::{CommitmentScheme, PRF, SNARK};
 
@@ -31,6 +34,11 @@ pub struct DPCStuff<C: PlainDPCComponents> {
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+
+    pub input_value_commitments: Vec<[u8; 32]>,
+    pub output_value_commitments: Vec<[u8; 32]>,
+    pub value_balance: u64,
+    pub binding_signature: BindingSignature,
 }
 
 impl<C: PlainDPCComponents> DPCTransaction<C> {
@@ -43,6 +51,10 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
         predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
         predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
         local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+        input_value_commitments: Vec<[u8; 32]>,
+        output_value_commitments: Vec<[u8; 32]>,
+        value_balance: u64,
+        binding_signature: BindingSignature,
     ) -> Self {
         let stuff = DPCStuff {
             digest,
@@ -50,6 +62,10 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
             predicate_proof,
             predicate_comm,
             local_data_comm,
+            input_value_commitments,
+            output_value_commitments,
+            value_balance,
+            binding_signature,
         };
         DPCTransaction {
             old_serial_numbers,

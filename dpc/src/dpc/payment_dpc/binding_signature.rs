@@ -88,8 +88,8 @@ impl BindingSignature {
 
 pub fn create_binding_signature<C: PlainDPCComponents, R: Rng>(
     parameters: &C::ValueComm,
-    input_value_commitments: Vec<[u8; 32]>,
-    output_value_commitments: Vec<[u8; 32]>,
+    input_value_commitments: &Vec<[u8; 32]>,
+    output_value_commitments: &Vec<[u8; 32]>,
     input_value_commitment_randomness: &Vec<[u8; 32]>,
     output_value_commitment_randomness: &Vec<[u8; 32]>,
     value_balance: u64,
@@ -115,12 +115,12 @@ pub fn create_binding_signature<C: PlainDPCComponents, R: Rng>(
     }
 
     for vc_input in input_value_commitments {
-        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input)?;
+        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input[..])?;
         bvk = bvk.add(&recovered_input_value_commitment);
     }
 
     for vc_output in output_value_commitments {
-        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output)?;
+        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output[..])?;
         bvk = bvk.add(&recovered_output_value_commitment.neg());
     }
 
@@ -159,11 +159,11 @@ pub fn create_binding_signature<C: PlainDPCComponents, R: Rng>(
 
 pub fn verify_binding_signature<C: PlainDPCComponents>(
     parameters: &C::ValueComm,
-    input_value_commitments: Vec<[u8; 32]>,
-    output_value_commitments: Vec<[u8; 32]>,
+    input_value_commitments: &Vec<[u8; 32]>,
+    output_value_commitments: &Vec<[u8; 32]>,
     value_balance: u64,
     input: &Vec<u8>,
-    signature: BindingSignature,
+    signature: &BindingSignature,
 ) -> Result<bool, BindingSignatureError> {
     // Calculate Value balance commitment
     let zero_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
@@ -173,12 +173,12 @@ pub fn verify_binding_signature<C: PlainDPCComponents>(
     let mut bvk = <G as ProjectiveCurve>::Affine::default();
 
     for vc_input in input_value_commitments {
-        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input)?;
+        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input[..])?;
         bvk = bvk.add(&recovered_input_value_commitment);
     }
 
     for vc_output in output_value_commitments {
-        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output)?;
+        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output[..])?;
         bvk = bvk.add(&recovered_output_value_commitment.neg());
     }
 
@@ -255,8 +255,8 @@ mod tests {
 
         let binding_signature = create_binding_signature::<Components, _>(
             &value_comm_pp,
-            vec![input_value_commitment_bytes],
-            vec![output_value_commitment_bytes],
+            &vec![input_value_commitment_bytes],
+            &vec![output_value_commitment_bytes],
             &vec![input_value_commitment_randomness_bytes],
             &vec![output_value_commitment_randomness_bytes],
             value_balance,
@@ -269,11 +269,11 @@ mod tests {
 
         let verified = verify_binding_signature::<Components>(
             &value_comm_pp,
-            vec![input_value_commitment_bytes],
-            vec![output_value_commitment_bytes],
+            &vec![input_value_commitment_bytes],
+            &vec![output_value_commitment_bytes],
             value_balance,
             &sighash,
-            binding_signature,
+            &binding_signature,
         )
         .unwrap();
 

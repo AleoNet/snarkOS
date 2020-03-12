@@ -1,6 +1,6 @@
 use crate::{
     dpc::{
-        payment_dpc::record_payload::PaymentRecordPayload,
+        payment_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
         AddressKeyPair,
         DPCScheme,
         Predicate,
@@ -29,7 +29,6 @@ pub mod address;
 use self::address::*;
 
 pub mod binding_signature;
-//use self::binding_signature::*;
 
 pub mod predicate;
 use self::predicate::*;
@@ -53,7 +52,6 @@ pub mod parameters;
 use self::parameters::*;
 
 pub mod record_payload;
-//use self::record_payload::*;
 
 pub mod instantiated;
 
@@ -171,6 +169,8 @@ pub(crate) struct ExecuteContext<'a, Components: PlainDPCComponents> {
 
     local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
     local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+
+    value_balance: u64,
 }
 
 impl<Components: PlainDPCComponents> ExecuteContext<'_, Components> {
@@ -392,6 +392,8 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         let mut joint_serial_numbers = Vec::new();
         let mut old_death_pred_hashes = Vec::new();
 
+        let mut value_balance: u64 = 0;
+
         // Compute the ledger membership witness and serial number from the old records.
         for (i, record) in old_records.iter().enumerate() {
             let input_record_time = start_timer!(|| format!("Process input record {}", i));
@@ -402,6 +404,8 @@ impl<Components: PlainDPCComponents> DPC<Components> {
                 let comm = &record.commitment();
                 let witness = ledger.prove_cm(comm)?;
                 old_witnesses.push(witness);
+
+                value_balance += record.payload.balance;
             }
 
             let sn = Self::generate_sn(record, &old_address_secret_keys[i])?;
@@ -440,6 +444,10 @@ impl<Components: PlainDPCComponents> DPC<Components> {
                 &new_death_predicates[j],
                 rng,
             )?;
+
+            if !record.is_dummy {
+                value_balance -= record.payload.balance;
+            }
 
             new_commitments.push(record.commitment.clone());
             new_sn_nonce_randomness.push(sn_randomness);
@@ -520,6 +528,8 @@ impl<Components: PlainDPCComponents> DPC<Components> {
             predicate_rand,
             local_data_comm,
             local_data_rand,
+
+            value_balance,
         };
         Ok(context)
     }
@@ -629,7 +639,7 @@ where
         let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data);
 
         let ExecuteContext {
-            comm_and_crh_pp: _comm_and_crh_pp,
+            comm_and_crh_pp,
             ledger_digest,
 
             old_records,
@@ -646,6 +656,7 @@ where
 
             local_data_comm,
             local_data_rand,
+            value_balance,
         } = context;
         let core_proof = {
             let circuit = CoreChecksCircuit::new(
@@ -683,6 +694,46 @@ where
             Components::ProofCheckNIZK::prove(&parameters.proof_check_nizk_pp.0, circuit, rng)?
         };
 
+        let mut old_value_commits = vec![];
+        let mut old_value_commit_randomness = vec![];
+        let mut new_value_commits = vec![];
+        let mut new_value_commit_randomness = vec![];
+
+        for death_pred_attr in old_death_pred_attributes {
+            let mut commitment = [0u8; 32];
+            let mut randomness = [0u8; 32];
+
+            death_pred_attr.value_commitment.write(&mut commitment[..])?;
+            death_pred_attr.value_commitment.write(&mut randomness[..])?;
+
+            old_value_commits.push(commitment);
+            old_value_commit_randomness.push(randomness);
+        }
+
+        for birth_pred_attr in new_birth_pred_attributes {
+            let mut commitment = [0u8; 32];
+            let mut randomness = [0u8; 32];
+
+            birth_pred_attr.value_commitment.write(&mut commitment[..])?;
+            birth_pred_attr.value_commitment.write(&mut randomness[..])?;
+
+            new_value_commits.push(commitment);
+            new_value_commit_randomness.push(randomness);
+        }
+
+        let sighash = to_bytes![local_data_comm]?;
+
+        let binding_signature = create_binding_signature::<Components, _>(
+            &comm_and_crh_pp.value_comm_pp,
+            &old_value_commits,
+            &new_value_commits,
+            &old_value_commit_randomness,
+            &new_value_commit_randomness,
+            value_balance,
+            &sighash,
+            rng,
+        )?;
+
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
@@ -692,6 +743,10 @@ where
             proof_checks_proof,
             predicate_comm,
             local_data_comm,
+            old_value_commits,
+            new_value_commits,
+            value_balance,
+            binding_signature,
         );
 
         end_timer!(exec_time);
@@ -754,6 +809,28 @@ where
             eprintln!("Predicate check NIZK didn't verify.");
             return Ok(false);
         }
+
+        if !Components::ProofCheckNIZK::verify(
+            &parameters.proof_check_nizk_pp.1,
+            &input,
+            &transaction.stuff.predicate_proof,
+        )? {
+            eprintln!("Predicate check NIZK didn't verify.");
+            return Ok(false);
+        }
+
+        if !verify_binding_signature::<Components>(
+            &parameters.comm_and_crh_pp.value_comm_pp,
+            &transaction.stuff.input_value_commitments,
+            &transaction.stuff.output_value_commitments,
+            transaction.stuff.value_balance,
+            &to_bytes![transaction.stuff.local_data_comm]?,
+            &transaction.stuff.binding_signature,
+        )? {
+            eprintln!("Binding signature didn't verify.");
+            return Ok(false);
+        }
+
         end_timer!(verify_time);
         Ok(true)
     }

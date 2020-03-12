@@ -124,6 +124,7 @@ fn test_execute_payment_constraint_systems() {
 
         local_data_comm,
         local_data_rand,
+        value_balance: _value_balance,
     } = context;
 
     //////////////////////////////////////////////////////////////////////////
