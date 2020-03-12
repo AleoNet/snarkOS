@@ -4,7 +4,7 @@ use crate::{
         address::AddressSecretKey,
         parameters::CommAndCRHPublicParameters,
         record::DPCRecord,
-        PlainDPCComponents,
+        PaymentDPCComponents,
     },
     ledger::MerkleTreeParams,
 };
@@ -16,7 +16,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
-pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
+pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
     // Commitment and CRH parameters
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
 
@@ -36,7 +36,7 @@ pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
     pub memo: [u8; 32],
 }
 
-impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
+impl<C: PaymentDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
 where
     <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
@@ -96,8 +96,8 @@ where
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct CoreChecksCircuit<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
+pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
     // Parameters
     comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
     ledger_parameters: Option<MerkleTreeParams<C::MerkleParameters>>,
@@ -126,7 +126,7 @@ pub struct CoreChecksCircuit<C: PlainDPCComponents> {
     auxiliary: Option<[u8; 32]>,
 }
 
-impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
+impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
     pub fn blank(
         comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
@@ -255,7 +255,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
+impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_core_checks_gadget::<C, CS>(
             cs,

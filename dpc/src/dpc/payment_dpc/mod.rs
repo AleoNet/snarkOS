@@ -63,7 +63,7 @@ mod test;
 /// Trait that stores all information about the components of a Plain DPC
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
-pub trait PlainDPCComponents: 'static + Sized {
+pub trait PaymentDPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;
     const NUM_OUTPUT_RECORDS: usize;
 
@@ -140,7 +140,7 @@ pub trait PlainDPCComponents: 'static + Sized {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DPC<Components: PlainDPCComponents> {
+pub struct DPC<Components: PaymentDPCComponents> {
     _components: PhantomData<Components>,
 }
 
@@ -148,7 +148,7 @@ pub struct DPC<Components: PlainDPCComponents> {
 /// final transaction after `execute_helper` has created old serial numbers and
 /// ledger witnesses, and new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub(crate) struct ExecuteContext<'a, Components: PlainDPCComponents> {
+pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
     comm_and_crh_pp: &'a CommAndCRHPublicParameters<Components>,
     ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
 
@@ -173,7 +173,7 @@ pub(crate) struct ExecuteContext<'a, Components: PlainDPCComponents> {
     value_balance: u64,
 }
 
-impl<Components: PlainDPCComponents> ExecuteContext<'_, Components> {
+impl<Components: PaymentDPCComponents> ExecuteContext<'_, Components> {
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             comm_and_crh_pp: self.comm_and_crh_pp.clone(),
@@ -190,7 +190,7 @@ impl<Components: PlainDPCComponents> ExecuteContext<'_, Components> {
 }
 
 /// Stores local data required to produce predicate proofs.
-pub struct LocalData<Components: PlainDPCComponents> {
+pub struct LocalData<Components: PaymentDPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<Components>,
 
     // Old records and serial numbers
@@ -207,7 +207,7 @@ pub struct LocalData<Components: PlainDPCComponents> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl<Components: PlainDPCComponents> DPC<Components> {
+impl<Components: PaymentDPCComponents> DPC<Components> {
     pub fn generate_comm_and_crh_parameters<R: Rng>(
         rng: &mut R,
     ) -> Result<CommAndCRHPublicParameters<Components>, DPCError> {
@@ -535,7 +535,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
     }
 }
 
-impl<Components: PlainDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
+impl<Components: PaymentDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
 where
     L: Ledger<
         Parameters = Components::MerkleParameters,
@@ -780,6 +780,8 @@ where
         }
         end_timer!(ledger_time);
 
+        // TODO (raychu86) Add binding signature check to circuit.
+
         let input = CoreChecksVerifierInput {
             comm_and_crh_pp: parameters.comm_and_crh_pp.clone(),
             ledger_pp: ledger.parameters().clone(),
@@ -800,15 +802,6 @@ where
             predicate_comm: transaction.stuff.predicate_comm.clone(),
             local_data_comm: transaction.stuff.local_data_comm.clone(),
         };
-
-        if !Components::ProofCheckNIZK::verify(
-            &parameters.proof_check_nizk_pp.1,
-            &input,
-            &transaction.stuff.predicate_proof,
-        )? {
-            eprintln!("Predicate check NIZK didn't verify.");
-            return Ok(false);
-        }
 
         if !Components::ProofCheckNIZK::verify(
             &parameters.proof_check_nizk_pp.1,

@@ -1,6 +1,6 @@
 use crate::{
     constraints::{payment_dpc::execute_proof_check_gadget, Assignment},
-    dpc::payment_dpc::{parameters::CommAndCRHPublicParameters, predicate::PrivatePredInput, PlainDPCComponents},
+    dpc::payment_dpc::{parameters::CommAndCRHPublicParameters, predicate::PrivatePredInput, PaymentDPCComponents},
 };
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
@@ -11,14 +11,14 @@ use snarkos_models::{
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct ProofCheckVerifierInput<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
+pub struct ProofCheckVerifierInput<C: PaymentDPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
 }
 
-impl<C: PlainDPCComponents> ToConstraintField<C::ProofCheckF> for ProofCheckVerifierInput<C>
+impl<C: PaymentDPCComponents> ToConstraintField<C::ProofCheckF> for ProofCheckVerifierInput<C>
 where
     <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::ProofCheckF>,
     <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::ProofCheckF>,
@@ -70,8 +70,8 @@ where
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct ProofCheckCircuit<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
+pub struct ProofCheckCircuit<C: PaymentDPCComponents> {
     comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
 
     old_private_pred_inputs: Option<Vec<PrivatePredInput<C>>>,
@@ -83,7 +83,7 @@ pub struct ProofCheckCircuit<C: PlainDPCComponents> {
     local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
 }
 
-impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
+impl<C: PaymentDPCComponents> ProofCheckCircuit<C> {
     pub fn blank(
         comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         predicate_nizk_vk_and_proof: &PrivatePredInput<C>,
@@ -145,7 +145,7 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::ProofCheckF> for ProofCheckCircuit<C>
+impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::ProofCheckF> for ProofCheckCircuit<C>
 where
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,

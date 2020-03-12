@@ -1,4 +1,4 @@
-use crate::payment_dpc::PlainDPCComponents;
+use crate::payment_dpc::PaymentDPCComponents;
 
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls12;
 use snarkos_errors::dpc::BindingSignatureError;
@@ -86,7 +86,7 @@ impl BindingSignature {
     }
 }
 
-pub fn create_binding_signature<C: PlainDPCComponents, R: Rng>(
+pub fn create_binding_signature<C: PaymentDPCComponents, R: Rng>(
     parameters: &C::ValueComm,
     input_value_commitments: &Vec<[u8; 32]>,
     output_value_commitments: &Vec<[u8; 32]>,
@@ -157,7 +157,7 @@ pub fn create_binding_signature<C: PlainDPCComponents, R: Rng>(
     BindingSignature::new(rbar.to_vec(), sbar.to_vec())
 }
 
-pub fn verify_binding_signature<C: PlainDPCComponents>(
+pub fn verify_binding_signature<C: PaymentDPCComponents>(
     parameters: &C::ValueComm,
     input_value_commitments: &Vec<[u8; 32]>,
     output_value_commitments: &Vec<[u8; 32]>,

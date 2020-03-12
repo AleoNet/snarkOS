@@ -8,7 +8,7 @@ use snarkos_dpc::{
         predicate::PrivatePredInput,
         record_payload::PaymentRecordPayload,
         LocalData,
-        PlainDPCComponents,
+        PaymentDPCComponents,
         DPC,
     },
     DPCScheme,
@@ -118,7 +118,7 @@ fn payment_integration_test() {
 
             // Generate value commitment randomness
             let value_commitment_randomness =
-                <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+                <<Components as PaymentDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data
@@ -171,7 +171,7 @@ fn payment_integration_test() {
 
             // Generate value commitment randomness
             let value_commitment_randomness =
-                <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+                <<Components as PaymentDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data

@@ -3,7 +3,7 @@ use crate::dpc::{
         address::AddressPublicKey,
         predicate::DPCPredicate,
         record_payload::PaymentRecordPayload,
-        PlainDPCComponents,
+        PaymentDPCComponents,
     },
     Record,
 };
@@ -13,8 +13,8 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use std::marker::PhantomData;
 
 #[derive(Derivative)]
-#[derivative(Default(bound = "C: PlainDPCComponents"), Clone(bound = "C: PlainDPCComponents"))]
-pub struct DPCRecord<C: PlainDPCComponents> {
+#[derivative(Default(bound = "C: PaymentDPCComponents"), Clone(bound = "C: PaymentDPCComponents"))]
+pub struct DPCRecord<C: PaymentDPCComponents> {
     pub(super) address_public_key: AddressPublicKey<C>,
 
     pub(super) is_dummy: bool,
@@ -37,7 +37,7 @@ fn default_predicate_hash<C: CRH>() -> Vec<u8> {
     to_bytes![C::Output::default()].unwrap()
 }
 
-impl<C: PlainDPCComponents> Record for DPCRecord<C> {
+impl<C: PaymentDPCComponents> Record for DPCRecord<C> {
     type AddressPublicKey = AddressPublicKey<C>;
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecC as CommitmentScheme>::Randomness;

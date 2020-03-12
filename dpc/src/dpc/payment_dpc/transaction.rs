@@ -1,5 +1,5 @@
 use crate::{
-    dpc::payment_dpc::{binding_signature::BindingSignature, PlainDPCComponents},
+    dpc::payment_dpc::{binding_signature::BindingSignature, PaymentDPCComponents},
     Transaction,
 };
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
@@ -7,11 +7,11 @@ use snarkos_models::algorithms::{CommitmentScheme, PRF, SNARK};
 
 #[derive(Derivative)]
 #[derivative(
-    Clone(bound = "C: PlainDPCComponents"),
-    PartialEq(bound = "C: PlainDPCComponents"),
-    Eq(bound = "C: PlainDPCComponents")
+    Clone(bound = "C: PaymentDPCComponents"),
+    PartialEq(bound = "C: PaymentDPCComponents"),
+    Eq(bound = "C: PaymentDPCComponents")
 )]
-pub struct DPCTransaction<C: PlainDPCComponents> {
+pub struct DPCTransaction<C: PaymentDPCComponents> {
     old_serial_numbers: Vec<<C::P as PRF>::Output>,
     new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
@@ -20,11 +20,11 @@ pub struct DPCTransaction<C: PlainDPCComponents> {
 
 #[derive(Derivative)]
 #[derivative(
-    Clone(bound = "C: PlainDPCComponents"),
-    PartialEq(bound = "C: PlainDPCComponents"),
-    Eq(bound = "C: PlainDPCComponents")
+    Clone(bound = "C: PaymentDPCComponents"),
+    PartialEq(bound = "C: PaymentDPCComponents"),
+    Eq(bound = "C: PaymentDPCComponents")
 )]
-pub struct DPCStuff<C: PlainDPCComponents> {
+pub struct DPCStuff<C: PaymentDPCComponents> {
     pub digest: MerkleTreeDigest<C::MerkleParameters>,
     #[derivative(PartialEq = "ignore")]
     pub core_proof: <C::MainNIZK as SNARK>::Proof,
@@ -41,7 +41,7 @@ pub struct DPCStuff<C: PlainDPCComponents> {
     pub binding_signature: BindingSignature,
 }
 
-impl<C: PlainDPCComponents> DPCTransaction<C> {
+impl<C: PaymentDPCComponents> DPCTransaction<C> {
     pub fn new(
         old_serial_numbers: Vec<<Self as Transaction>::SerialNumber>,
         new_commitments: Vec<<Self as Transaction>::Commitment>,
@@ -76,7 +76,7 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
     }
 }
 
-impl<C: PlainDPCComponents> Transaction for DPCTransaction<C> {
+impl<C: PaymentDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
     type SerialNumber = <C::P as PRF>::Output;

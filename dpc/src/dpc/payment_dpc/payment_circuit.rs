@@ -14,7 +14,7 @@ use snarkos_models::{
     },
 };
 
-pub struct PaymentPredicateLocalData<C: PlainDPCComponents> {
+pub struct PaymentPredicateLocalData<C: PaymentDPCComponents> {
     pub local_data_comm_pp: <C::LocalDataComm as CommitmentScheme>::Parameters,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
     pub value_comm_pp: <C::ValueComm as CommitmentScheme>::Parameters,
@@ -24,7 +24,7 @@ pub struct PaymentPredicateLocalData<C: PlainDPCComponents> {
 }
 
 /// Convert each component to bytes and pack into field elements.
-impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for PaymentPredicateLocalData<C>
+impl<C: PaymentDPCComponents> ToConstraintField<C::CoreCheckF> for PaymentPredicateLocalData<C>
 where
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
@@ -45,7 +45,7 @@ where
     }
 }
 
-pub struct PaymentCircuit<C: PlainDPCComponents> {
+pub struct PaymentCircuit<C: PaymentDPCComponents> {
     pub parameters: Option<CommAndCRHPublicParameters<C>>,
 
     pub local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
@@ -56,7 +56,7 @@ pub struct PaymentCircuit<C: PlainDPCComponents> {
     pub value: u64,
 }
 
-impl<C: PlainDPCComponents> PaymentCircuit<C> {
+impl<C: PaymentDPCComponents> PaymentCircuit<C> {
     pub fn blank(comm_and_crh_parameters: &CommAndCRHPublicParameters<C>) -> Self {
         let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
         let value_commitment_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
@@ -92,7 +92,7 @@ impl<C: PlainDPCComponents> PaymentCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for PaymentCircuit<C> {
+impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for PaymentCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,
@@ -106,7 +106,7 @@ impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for PaymentCirc
     }
 }
 
-fn execute_payment_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
+fn execute_payment_check_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
     cs: &mut CS,
     comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
     local_data_commitment: &<C::LocalDataComm as CommitmentScheme>::Output,

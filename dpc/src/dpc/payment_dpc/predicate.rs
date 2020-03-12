@@ -1,17 +1,17 @@
-use crate::dpc::{payment_dpc::PlainDPCComponents, Predicate};
+use crate::dpc::{payment_dpc::PaymentDPCComponents, Predicate};
 
 use snarkos_models::algorithms::{CommitmentScheme, SNARK};
 
 use std::marker::PhantomData;
 
-pub struct PrivatePredInput<C: PlainDPCComponents> {
+pub struct PrivatePredInput<C: PaymentDPCComponents> {
     pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateNIZK as SNARK>::Proof,
     pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
     pub value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
 }
 
-impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
+impl<C: PaymentDPCComponents> Default for PrivatePredInput<C> {
     fn default() -> Self {
         Self {
             vk: <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
@@ -22,7 +22,7 @@ impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
     }
 }
 
-impl<C: PlainDPCComponents> Clone for PrivatePredInput<C> {
+impl<C: PaymentDPCComponents> Clone for PrivatePredInput<C> {
     fn clone(&self) -> Self {
         Self {
             vk: self.vk.clone(),
@@ -34,14 +34,14 @@ impl<C: PlainDPCComponents> Clone for PrivatePredInput<C> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"), Default(bound = "C: PlainDPCComponents"))]
-pub struct DPCPredicate<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: PaymentDPCComponents"), Default(bound = "C: PaymentDPCComponents"))]
+pub struct DPCPredicate<C: PaymentDPCComponents> {
     #[derivative(Default(value = "vec![0u8; 32]"))]
     identity: Vec<u8>,
     _components: PhantomData<C>,
 }
 
-impl<C: PlainDPCComponents> DPCPredicate<C> {
+impl<C: PaymentDPCComponents> DPCPredicate<C> {
     pub fn new(identity: Vec<u8>) -> Self {
         Self {
             identity,
@@ -50,7 +50,7 @@ impl<C: PlainDPCComponents> DPCPredicate<C> {
     }
 }
 
-impl<C: PlainDPCComponents> Predicate for DPCPredicate<C> {
+impl<C: PaymentDPCComponents> Predicate for DPCPredicate<C> {
     type PrivateWitness = PrivatePredInput<C>;
     type PublicInput = ();
 
