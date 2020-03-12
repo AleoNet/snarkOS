@@ -330,12 +330,9 @@ mod tests {
         let bootnode_address = random_socket_address();
         let server_address = random_socket_address();
 
-        let server = initialize_test_server(
-            server_address,
-            bootnode_address,
-            storage.clone(),
-            CONNECTION_FREQUENCY_LONG,
-        );
+        let server = initialize_test_server(server_address, storage.clone(), CONNECTION_FREQUENCY_LONG, vec![
+            bootnode_address.to_string(),
+        ]);
 
         let consensus = TEST_CONSENSUS;
 

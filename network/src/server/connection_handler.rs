@@ -20,9 +20,8 @@ impl Server {
     pub(in crate::server) fn connection_handler(&self) {
         let context = self.context.clone();
         let memory_pool_lock = self.memory_pool_lock.clone();
-        let sync_handler_lock = self.sync_handler_lock.clone();
         let storage = self.storage.clone();
-        let connection_frequency = self.connection_frequency;
+        let connection_frequency = self.context.connection_frequency;
 
         // Start a separate thread for the handler.
         task::spawn(async move {
@@ -36,7 +35,7 @@ impl Server {
                 let connections = context.connections.read().await;
                 let peer_book = &mut context.peer_book.write().await;
                 let pings = &mut context.pings.write().await;
-                let sync_handler = &mut sync_handler_lock.lock().await;
+                let sync_handler = &mut context.sync_handler.lock().await;
 
                 // We have less peers than our minimum peer requirement.
                 if peer_book.connected_total() < context.min_peers {
@@ -46,7 +45,7 @@ impl Server {
                             .handshakes
                             .write()
                             .await
-                            .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                            .send_request(storage.get_latest_block_height(), context.local_address, address)
                             .await
                         {
                             peer_book.disconnect_peer(address);
@@ -69,13 +68,12 @@ impl Server {
                         if let Err(_) = pings.send_ping(channel).await {
                             peer_book.disconnect_peer(address);
                         }
+                    }
+                    // Purge peer that has not responded in two frequency loops.
+                    let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
 
-                        // Purge peer that has not responded in two frequency loops.
-                        let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
-
-                        if Utc::now() - last_seen.clone() > response_timeout {
-                            peer_book.disconnect_peer(address);
-                        }
+                    if Utc::now() - last_seen.clone() > response_timeout {
+                        peer_book.disconnect_peer(address);
                     }
                 }
 
@@ -96,13 +94,13 @@ impl Server {
                 if interval_ticker >= context.memory_pool_interval {
                     let mut memory_pool = memory_pool_lock.lock().await;
 
-                    memory_pool.cleanse(&storage).unwrap_or_else(|error| {
-                        info!("Failed to cleanse memory pool transactions in database {}", error)
-                    });
+                    memory_pool
+                        .cleanse(&storage)
+                        .unwrap_or_else(|error| info!("Failed to cleanse memory pool transactions {}", error));
 
                     memory_pool
                         .store(&storage)
-                        .unwrap_or_else(|error| info!("Failed to store memory pool transaction in database {}", error));
+                        .unwrap_or_else(|error| info!("Failed to store memory pool transactions {}", error));
 
                     // Ask our sync node for more transactions.
                     if context.local_address != sync_handler.sync_node {

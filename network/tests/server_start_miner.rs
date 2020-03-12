@@ -16,13 +16,12 @@ mod server_start_miner {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
 
             let context = server.context.clone();
             let storage = server.storage.clone();

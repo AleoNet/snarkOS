@@ -2,7 +2,6 @@ use crate::{
     bootnodes::MAINNET_BOOTNODES,
     context::Context,
     message::{Channel, MessageName},
-    protocol::*,
 };
 use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParameters};
 use snarkos_errors::network::ServerError;
@@ -26,8 +25,6 @@ pub struct Server {
     pub context: Arc<Context>,
     pub storage: Arc<BlockStorage>,
     pub memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
-    pub sync_handler_lock: Arc<Mutex<SyncHandler>>,
-    pub connection_frequency: u64,
     pub sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     pub receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
 }
@@ -35,23 +32,19 @@ pub struct Server {
 impl Server {
     /// Constructs a new `Server`.
     pub fn new(
-        context: Context,
         consensus: ConsensusParameters,
+        context: Arc<Context>,
         storage: Arc<BlockStorage>,
         memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
-        sync_handler_lock: Arc<Mutex<SyncHandler>>,
-        connection_frequency: u64,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(512);
         Server {
             consensus,
-            context: Arc::new(context),
+            context,
             storage,
             memory_pool_lock,
-            receiver,
             sender,
-            sync_handler_lock,
-            connection_frequency,
+            receiver,
         }
     }
 
@@ -65,12 +58,9 @@ impl Server {
                 .handshakes
                 .write()
                 .await
-                .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                .send_request(storage.get_latest_block_height(), context.local_address, address)
                 .await
-                .unwrap_or_else(|error| {
-                    info!("Failed to connect to address: {:?}", error);
-                    ()
-                });
+                .unwrap_or_else(|error| info!("Failed to connect to address: {:?}", error));
         });
     }
 
@@ -191,13 +181,7 @@ impl Server {
                         .handshakes
                         .write()
                         .await
-                        .receive_any(
-                            1u64,
-                            storage.get_latest_block_height(),
-                            local_address,
-                            peer_address,
-                            stream,
-                        )
+                        .receive_any(storage.get_latest_block_height(), local_address, peer_address, stream)
                         .await
                     {
                         context.connections.write().await.store_channel(&handshake.channel);

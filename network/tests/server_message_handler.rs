@@ -25,11 +25,10 @@ mod server_message_handler {
         let storage_ref = storage.clone();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
 
             // 1. Start peer and server
@@ -72,13 +71,12 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
 
             // 1. Start server
@@ -128,13 +126,12 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
 
             // 1. Start server
@@ -171,13 +168,12 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
 
             // 1. Insert transaction into server memory pool
@@ -239,11 +235,10 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
             let memory_pool_lock = Arc::clone(&server.memory_pool_lock);
 
@@ -299,7 +294,9 @@ mod server_message_handler {
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![
+                bootnode_address.to_string(),
+            ]);
             let mut server_sender = server.sender.clone();
 
             // 1. Start server and bootnode
@@ -353,7 +350,9 @@ mod server_message_handler {
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![
+                bootnode_address.to_string(),
+            ]);
             let mut server_sender = server.sender.clone();
             let server_context = Arc::clone(&server.context);
 
@@ -398,13 +397,12 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
 
             // 1. Start server
@@ -450,11 +448,10 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
             let context = Arc::clone(&server.context);
 
@@ -497,13 +494,12 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
             let context = Arc::clone(&server.context);
 
@@ -570,13 +566,12 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
             let mut server_sender = server.sender.clone();
             let context = Arc::clone(&server.context);
 
@@ -650,7 +645,9 @@ mod server_message_handler {
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
             let server_address = random_socket_address();
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![
+                bootnode_address.to_string(),
+            ]);
             let mut server_sender = server.sender.clone();
 
             // 1. Start server
@@ -702,7 +699,9 @@ mod server_message_handler {
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![
+                bootnode_address.to_string(),
+            ]);
             let mut server_sender_ref_1 = server.sender.clone();
             let mut server_sender_ref_2 = server.sender.clone();
 
@@ -779,7 +778,9 @@ mod server_message_handler {
 
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![
+                bootnode_address.to_string(),
+            ]);
             let mut server_sender = server.sender.clone();
             let context = server.context.clone();
             context
@@ -833,10 +834,9 @@ mod server_message_handler {
         let (storage, path) = initialize_test_blockchain();
 
         rt.block_on(async move {
-            let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_LONG);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_LONG, vec![]);
 
             let mut server_sender = server.sender.clone();
             let memory_pool_lock = server.memory_pool_lock.clone();

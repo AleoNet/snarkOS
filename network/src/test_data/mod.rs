@@ -1,4 +1,4 @@
-use crate::{context::Context, message::Channel, protocol::SyncHandler, server::Server};
+use crate::{context::Context, message::Channel, server::Server};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
@@ -26,24 +26,28 @@ pub async fn sleep(time: u64) {
 /// Returns a server struct with given argumnets
 pub fn initialize_test_server(
     server_address: SocketAddr,
-    bootnode_address: SocketAddr,
     storage: Arc<BlockStorage>,
     connection_frequency: u64,
+    bootnodes: Vec<String>,
 ) -> Server {
     let consensus = TEST_CONSENSUS;
     let memory_pool = MemoryPool::new();
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-    let sync_handler = SyncHandler::new(bootnode_address);
-    let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
     Server::new(
-        Context::new(server_address, 5, 2, 10, true, vec![]),
         consensus,
+        Arc::new(Context::new(
+            server_address,
+            1u64,
+            connection_frequency,
+            5,
+            2,
+            10,
+            false,
+            bootnodes,
+        )),
         storage,
         memory_pool_lock,
-        sync_handler_lock,
-        connection_frequency,
     )
 }
 

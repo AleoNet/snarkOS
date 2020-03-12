@@ -13,13 +13,15 @@ use tokio::net::TcpStream;
 /// Stores the address and latest state of peers we are handshaking with.
 #[derive(Clone, Debug)]
 pub struct Handshakes {
+    version: u64,
     addresses: HashMap<SocketAddr, Handshake>,
 }
 
 impl Handshakes {
     /// Construct a new store of connected peer `Handshakes`.
-    pub fn new() -> Self {
+    pub fn new(version: u64) -> Self {
         Self {
+            version,
             addresses: HashMap::default(),
         }
     }
@@ -28,12 +30,11 @@ impl Handshakes {
     /// If the request is sent successfully, the handshake is stored and returned.
     pub async fn send_request(
         &mut self,
-        version: u64,
         height: u32,
         address_sender: SocketAddr,
         address_receiver: SocketAddr,
     ) -> Result<(), HandshakeError> {
-        let handshake = Handshake::send_new(version, height, address_sender, address_receiver).await?;
+        let handshake = Handshake::send_new(self.version, height, address_sender, address_receiver).await?;
 
         self.addresses.insert(address_receiver, handshake);
         info!("Request handshake with: {:?}", address_receiver);
@@ -53,7 +54,6 @@ impl Handshakes {
     ///     4. Return the accepted handshake.
     pub async fn receive_any(
         &mut self,
-        version: u64,
         height: u32,
         address_sender: SocketAddr,
         _address_receiver: SocketAddr,
@@ -68,7 +68,12 @@ impl Handshakes {
             let peer_message = Version::deserialize(bytes)?;
             let peer_address = peer_message.address_sender;
 
-            let handshake = Handshake::receive_new(version, height, channel, peer_message, address_sender).await?;
+            // Reject peer connections sending an outdated version.
+            if peer_message.version < self.version {
+                return Err(HandshakeError::IncompatibleVersion(self.version, peer_message.version));
+            }
+
+            let handshake = Handshake::receive_new(self.version, height, channel, peer_message, address_sender).await?;
 
             self.addresses.insert(peer_address, handshake.clone());
 
@@ -161,10 +166,11 @@ mod tests {
 
             // 2. Server sends server_handshake request
 
-            let mut server_handshakes = Handshakes::new();
+            let version = 1u64;
+            let mut server_handshakes = Handshakes::new(version);
 
             server_handshakes
-                .send_request(1u64, 0u32, server_address, peer_address)
+                .send_request(0u32, server_address, peer_address)
                 .await
                 .unwrap();
 
@@ -206,9 +212,10 @@ mod tests {
 
         // 4. Peer sends server_handshake response, peer_handshake request
 
-        let mut peer_handshakes = Handshakes::new();
+        let version = 1u64;
+        let mut peer_handshakes = Handshakes::new(version);
         let peer_hand = peer_handshakes
-            .receive_any(1u64, 0u32, peer_address, server_address, reader)
+            .receive_any(0u32, peer_address, server_address, reader)
             .await
             .unwrap();
 
@@ -228,5 +235,43 @@ mod tests {
             HandshakeState::Accepted,
             peer_handshakes.get_state(server_address).unwrap()
         )
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn receive_old_version() {
+        let new_version = 2u64;
+        let old_version = 1u64;
+
+        let server_address = random_socket_address();
+        let peer_address = random_socket_address();
+
+        // 1. Bind to peer address
+        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+        tokio::spawn(async move {
+            // 2. Server sends outdated server_handshake request
+
+            let mut server_handshakes = Handshakes::new(old_version);
+
+            server_handshakes
+                .send_request(0u32, server_address, peer_address)
+                .await
+                .unwrap();
+        });
+
+        // 3. Peer accepts Server connection
+
+        let (reader, _socket) = peer_listener.accept().await.unwrap();
+
+        // 4. Peer receives outdated server_handshake request
+
+        let mut peer_handshakes = Handshakes::new(new_version);
+        assert!(
+            peer_handshakes
+                .receive_any(0u32, peer_address, server_address, reader)
+                .await
+                .is_err()
+        );
     }
 }

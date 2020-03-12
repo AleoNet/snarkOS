@@ -15,13 +15,16 @@ pub enum HandshakeError {
     #[fail(display = "No handshake found for peer: {:?}", _0)]
     HandshakeMissing(SocketAddr),
 
-    #[fail(display = "Handshake message expected. Got {:?}", _0)]
+    #[fail(display = "Version must be greater than {}. Got {}", _0, _1)]
+    IncompatibleVersion(u64, u64),
+
+    #[fail(display = "Handshake message expected. Got {}", _0)]
     InvalidMessage(String),
 
-    #[fail(display = "Version message expected. Got {:?}", _0)]
+    #[fail(display = "Version message expected. Got {}", _0)]
     InvalidVersion(String),
 
-    #[fail(display = "Verack message expected. Got {:?}", _0)]
+    #[fail(display = "Verack message expected. Got {}", _0)]
     InvalidVerack(String),
 
     #[fail(display = "Expected nonce {}. Got {}", _0, _1)]

@@ -25,7 +25,7 @@ pub struct Config {
     pub bootnodes: Vec<String>,
     pub coinbase_address: String,
     pub genesis: String,
-    pub mempool_interval: u8,
+    pub memory_pool_interval: u8,
     pub min_peers: u16,
     pub max_peers: u16,
 
@@ -54,7 +54,7 @@ impl Default for Config {
             coinbase_address: "1NpScgYSLW4WcvmZM55EY5cziEiqZx3wJu".into(),
             genesis: "00000000000000000000000000000000000000000000000000000000000000008c8d4f393f39c063c40a617c6e2584e6726448c4c0f7da7c848bfa573e628388fbf1285e00000000ffffffffff7f00005e4401000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04010000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac".into(),
             subcommand: None,
-            mempool_interval: 5,
+            memory_pool_interval: 5,
             min_peers: 2,
             max_peers: 20,
         }
@@ -161,7 +161,7 @@ impl Config {
 
     fn mempool_interval(&mut self, argument: Option<u8>) {
         if let Some(interval) = argument {
-            self.mempool_interval = interval
+            self.memory_pool_interval = interval
         }
     }
 

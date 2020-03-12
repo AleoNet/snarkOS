@@ -4,7 +4,7 @@ use node::{
 };
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::node::NodeError;
-use snarkos_network::{context::Context, protocol::SyncHandler, server::Server};
+use snarkos_network::{context::Context, server::Server};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::BlockStorage;
 
@@ -27,7 +27,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     }
 
     let address = format! {"{}:{}", config.ip, config.port};
-    let socket_address = address.parse::<SocketAddr>()?;
+    let local_address = address.parse::<SocketAddr>()?;
 
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000usize,
@@ -38,34 +38,26 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let mut path = std::env::current_dir()?;
     path.push(&config.path);
+
     let storage = BlockStorage::open_at_path(path, config.genesis)?;
 
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    let mut bootnode = socket_address;
-
-    if !config.is_bootnode {
-        bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
-    }
-
-    let sync_handler = SyncHandler::new(bootnode);
-    let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
     let server = Server::new(
-        Context::new(
-            socket_address,
-            config.mempool_interval,
+        consensus.clone(),
+        Arc::new(Context::new(
+            local_address,
+            1u64,
+            10000, //10 seconds
+            config.memory_pool_interval,
             config.min_peers,
             config.max_peers,
             config.is_bootnode,
             config.bootnodes.clone(),
-        ),
-        consensus.clone(),
+        )),
         storage.clone(),
         memory_pool_lock.clone(),
-        sync_handler_lock.clone(),
-        10000, // 10 seconds
     );
 
     // Start rpc thread

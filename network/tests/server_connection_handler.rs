@@ -25,7 +25,9 @@ mod server_connection_handler {
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![
+                bootnode_address.to_string(),
+            ]);
             let context = server.context.clone();
 
             // 1. Add peer to gossiped in peer_book
@@ -70,7 +72,9 @@ mod server_connection_handler {
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![
+                bootnode_address.to_string(),
+            ]);
             let context = server.context.clone();
 
             let mut peer_book = context.peer_book.write().await;
@@ -119,7 +123,9 @@ mod server_connection_handler {
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![
+                bootnode_address.to_string(),
+            ]);
             let context = server.context.clone();
 
             // 1. Add peer to connected in peer_book
@@ -146,14 +152,17 @@ mod server_connection_handler {
 
             // 3. Check that peer received server GetPeers
 
-            let (message, _bytes) = channel_peer_side.read().await.unwrap();
+            let (message, bytes) = channel_peer_side.read().await.unwrap();
+
             assert_eq!(GetPeers::name(), message);
+            assert!(GetPeers::deserialize(bytes).is_ok());
 
             // 4. Check that peer received server Ping
 
-            let (message, _bytes) = channel_peer_side.read().await.unwrap();
+            let (message, bytes) = channel_peer_side.read().await.unwrap();
 
             assert_eq!(Ping::name(), message);
+            assert!(Ping::deserialize(bytes).is_ok());
 
             // 4. Check that the server did not move the peer
 
@@ -181,7 +190,9 @@ mod server_connection_handler {
 
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![
+                bootnode_address.to_string(),
+            ]);
             let context = server.context.clone();
 
             // 1. Add peer with old date to connected in peer_book
@@ -195,21 +206,21 @@ mod server_connection_handler {
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
             peer_listener.accept().await.unwrap();
 
-            // 2. Add peer to server connections
+            // 3. Add peer to server connections
 
             let mut connections = context.connections.write().await;
             connections.store_channel(&channel_server_side);
             drop(connections);
 
-            // 2. Start server
+            // 4. Start server
 
             start_test_server(server);
 
-            // 3. Wait for connection handler loop
+            // 5. Wait for connection handler loop
 
             sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
 
-            // 4. Check that the server moved peer from peers to disconnected
+            // 6. Check that the server moved peer from peers to disconnected
 
             let peer_book = context.peer_book.read().await;
 
@@ -235,9 +246,15 @@ mod server_connection_handler {
 
             let peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![
+                bootnode_address.to_string(),
+            ]);
             let context = server.context.clone();
-            let sync_handler_lock = Arc::clone(&server.sync_handler_lock);
+            let sync_handler = server.context.sync_handler.clone();
+
+            let mut sync_handler_lock = sync_handler.lock().await;
+            sync_handler_lock.sync_node = bootnode_address;
+            drop(sync_handler_lock);
 
             // 1. Add peer to peers
 
@@ -249,7 +266,7 @@ mod server_connection_handler {
 
             accept_all_messages(peer_listener);
 
-            // 2. Start server
+            // 3. Start server
 
             start_test_server(server);
 
@@ -265,7 +282,7 @@ mod server_connection_handler {
 
             // 6. Check that the server set sync_node to peer
 
-            assert_eq!(sync_handler_lock.lock().await.sync_node, peer_address);
+            assert_eq!(sync_handler.lock().await.sync_node, peer_address);
         });
 
         drop(rt);
@@ -285,8 +302,14 @@ mod server_connection_handler {
 
             let mut sync_node_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
-            let server = initialize_test_server(server_address, bootnode_address, storage, CONNECTION_FREQUENCY_SHORT);
+            let server = initialize_test_server(server_address, storage, CONNECTION_FREQUENCY_SHORT, vec![
+                bootnode_address.to_string(),
+            ]);
             let context = server.context.clone();
+
+            let mut sync_handler_lock = context.sync_handler.lock().await;
+            sync_handler_lock.sync_node = bootnode_address;
+            drop(sync_handler_lock);
 
             // 1. Start server
 

@@ -6,7 +6,6 @@ mod server_listen {
             types::{GetPeers, GetSync, Verack},
             Message,
         },
-        protocol::SyncHandler,
         server::Server,
         test_data::*,
         Handshakes,
@@ -35,18 +34,13 @@ mod server_listen {
 
         let consensus = TEST_CONSENSUS;
 
-        let sync_handler = SyncHandler::new(bootnode_address);
-        let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
         let server = Server::new(
-            Context::new(server_address, 5, 0, 10, is_bootnode, vec![
-                bootnode_address.to_string(),
-            ]),
             consensus,
+            Arc::new(Context::new(server_address, 1u64, 10000, 5, 0, 10, is_bootnode, vec![
+                bootnode_address.to_string(),
+            ])),
             storage,
             memory_pool_lock,
-            sync_handler_lock,
-            10000,
         );
 
         tx.send(()).unwrap();
@@ -115,9 +109,10 @@ mod server_listen {
 
             // 4. Send handshake response from bootnode to server
 
-            let mut bootnode_handshakes = Handshakes::new();
+            let version = 1u64;
+            let mut bootnode_handshakes = Handshakes::new(version);
             let mut bootnode_hand = bootnode_handshakes
-                .receive_any(1u64, 1u32, bootnode_address, server_address, reader)
+                .receive_any(1u32, bootnode_address, server_address, reader)
                 .await
                 .unwrap();
 
@@ -182,9 +177,10 @@ mod server_listen {
 
             // 5. Send handshake response from peer to server
 
-            let mut peer_handshakes = Handshakes::new();
+            let version = 1u64;
+            let mut peer_handshakes = Handshakes::new(version);
             peer_handshakes
-                .receive_any(1u64, 1u32, peer_address, server_address, reader)
+                .receive_any(1u32, peer_address, server_address, reader)
                 .await
                 .unwrap();
         });

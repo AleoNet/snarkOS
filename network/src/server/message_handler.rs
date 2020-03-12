@@ -83,7 +83,7 @@ impl Server {
                 .is_ok();
             drop(memory_pool);
 
-            let mut sync_handler = self.sync_handler_lock.lock().await;
+            let mut sync_handler = self.context.sync_handler.lock().await;
 
             if inserted && propagate {
                 // This is a new block, send it to our peers.
@@ -251,7 +251,7 @@ impl Server {
     /// A peer has sent us their chain state.
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
         let height = self.storage.get_latest_block_height();
-        let mut sync_handler = self.sync_handler_lock.lock().await;
+        let mut sync_handler = self.context.sync_handler.lock().await;
 
         sync_handler.receive_hashes(message.block_hashes, height);
 
@@ -330,7 +330,7 @@ impl Server {
 
             // if our peer has a longer chain, send a sync message
             if message.height > self.storage.get_latest_block_height() {
-                let mut sync_handler = self.sync_handler_lock.lock().await;
+                let mut sync_handler = self.context.sync_handler.lock().await;
                 sync_handler.sync_node = peer_address;
 
                 if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
