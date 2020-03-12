@@ -84,6 +84,26 @@ impl BindingSignature {
 
         Ok(Self { rbar, sbar })
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.rbar[..]);
+        bytes.extend_from_slice(&self.sbar[..]);
+
+        bytes
+    }
+
+    pub fn from_bytes(signature_bytes: Vec<u8>) -> Result<Self, BindingSignatureError> {
+        assert_eq!(signature_bytes.len(), 64);
+
+        let rbar = signature_bytes[0..32].to_vec();
+        let sbar = signature_bytes[32..64].to_vec();
+
+        let _rbar: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(&rbar[..])?;
+        let _sbar: <G as Group>::ScalarField = FromBytes::read(&sbar[..])?;
+
+        Ok(Self { rbar, sbar })
+    }
 }
 
 pub fn create_binding_signature<C: PaymentDPCComponents, R: Rng>(
@@ -102,7 +122,7 @@ pub fn create_binding_signature<C: PaymentDPCComponents, R: Rng>(
 
     // Calculate the bsk and bvk
     let mut bsk = <G as Group>::ScalarField::default();
-    let mut bvk = <EdwardsBls12 as ProjectiveCurve>::Affine::default();
+    let mut bvk = <G as ProjectiveCurve>::Affine::default();
 
     for input_vc_randomness in input_value_commitment_randomness {
         let randomness: <G as Group>::ScalarField = FromBytes::read(&input_vc_randomness[..])?;
@@ -209,6 +229,77 @@ mod tests {
     use snarkos_models::curves::Group;
     use snarkos_utilities::rand::UniformRand;
 
+    fn generate_random_binding_signature<C: PaymentDPCComponents, R: Rng>(
+        value_comm_pp: &ValueComm,
+        input_amounts: Vec<u64>,
+        output_amounts: Vec<u64>,
+        sighash: &Vec<u8>,
+        rng: &mut R,
+    ) -> Result<(Vec<[u8; 32]>, Vec<[u8; 32]>, u64, BindingSignature), BindingSignatureError> {
+        let mut value_balance = 0;
+
+        let mut input_value_commitment_randomness = vec![];
+        let mut input_value_commitments = vec![];
+
+        let mut output_value_commitment_randomness = vec![];
+        let mut output_value_commitments = vec![];
+
+        for input_amount in input_amounts {
+            value_balance += input_amount;
+
+            let value_commit_randomness = <G as Group>::ScalarField::rand(rng);
+            let value_commitment = value_comm_pp
+                .commit(&input_amount.to_le_bytes(), &value_commit_randomness)
+                .unwrap();
+
+            let mut value_commitment_randomness_bytes = [0u8; 32];
+            let mut value_commitment_bytes = [0u8; 32];
+
+            value_commitment_randomness_bytes.copy_from_slice(&to_bytes![value_commit_randomness].unwrap());
+            value_commitment_bytes.copy_from_slice(&to_bytes![value_commitment].unwrap());
+
+            input_value_commitment_randomness.push(value_commitment_randomness_bytes);
+            input_value_commitments.push(value_commitment_bytes);
+        }
+
+        for output_amount in output_amounts {
+            value_balance -= output_amount;
+
+            let value_commit_randomness = <G as Group>::ScalarField::rand(rng);
+            let value_commitment = value_comm_pp
+                .commit(&output_amount.to_le_bytes(), &value_commit_randomness)
+                .unwrap();
+
+            let mut value_commitment_randomness_bytes = [0u8; 32];
+            let mut value_commitment_bytes = [0u8; 32];
+
+            value_commitment_randomness_bytes.copy_from_slice(&to_bytes![value_commit_randomness].unwrap());
+            value_commitment_bytes.copy_from_slice(&to_bytes![value_commitment].unwrap());
+
+            output_value_commitment_randomness.push(value_commitment_randomness_bytes);
+            output_value_commitments.push(value_commitment_bytes);
+        }
+
+        let binding_signature = create_binding_signature::<Components, _>(
+            value_comm_pp,
+            &input_value_commitments,
+            &output_value_commitments,
+            &input_value_commitment_randomness,
+            &output_value_commitment_randomness,
+            value_balance,
+            sighash,
+            rng,
+        )
+        .unwrap();
+
+        Ok((
+            input_value_commitments,
+            output_value_commitments,
+            value_balance,
+            binding_signature,
+        ))
+    }
+
     #[test]
     fn test_value_commitment_binding_signature() {
         let rng = &mut rand::thread_rng();
@@ -218,59 +309,29 @@ mod tests {
         let comm_and_crh_pp = InstantiatedDPC::generate_comm_and_crh_parameters(rng).unwrap();
         let value_comm_pp = comm_and_crh_pp.value_comm_pp;
 
-        let input_amount: u64 = rng.gen_range(1, 100000);
+        let input_amount: u64 = rng.gen_range(1, 100000000);
+        let input_amount_2: u64 = rng.gen_range(1, 100000000);
         let output_amount: u64 = rng.gen_range(0, input_amount);
-
-        let value_balance = input_amount - output_amount;
-
-        // Input value commitment
-
-        let input_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
-        let input_value_commitment = value_comm_pp
-            .commit(&input_amount.to_le_bytes(), &input_value_commitment_randomness)
-            .unwrap();
-
-        // Output value commitment
-
-        let output_value_commitment_randomness = <G as Group>::ScalarField::rand(rng);
-        let output_value_commitment = value_comm_pp
-            .commit(&output_amount.to_le_bytes(), &output_value_commitment_randomness)
-            .unwrap();
-
-        // Create the binding signature
-
-        let mut input_value_commitment_randomness_bytes = [0u8; 32];
-        let mut output_value_commitment_randomness_bytes = [0u8; 32];
-        let mut input_value_commitment_bytes = [0u8; 32];
-        let mut output_value_commitment_bytes = [0u8; 32];
-
-        input_value_commitment_randomness_bytes.copy_from_slice(&to_bytes![input_value_commitment_randomness].unwrap());
-        output_value_commitment_randomness_bytes
-            .copy_from_slice(&to_bytes![output_value_commitment_randomness].unwrap());
-
-        input_value_commitment_bytes.copy_from_slice(&to_bytes![input_value_commitment].unwrap());
-        output_value_commitment_bytes.copy_from_slice(&to_bytes![output_value_commitment].unwrap());
+        let output_amount_2: u64 = rng.gen_range(0, input_amount_2);
 
         let sighash = [1u8; 64].to_vec();
 
-        let binding_signature = create_binding_signature::<Components, _>(
-            &value_comm_pp,
-            &vec![input_value_commitment_bytes],
-            &vec![output_value_commitment_bytes],
-            &vec![input_value_commitment_randomness_bytes],
-            &vec![output_value_commitment_randomness_bytes],
-            value_balance,
-            &sighash,
-            rng,
-        )
-        .unwrap();
+        let (input_value_commitments, output_value_commitments, value_balance, binding_signature) =
+            generate_random_binding_signature::<Components, _>(
+                &value_comm_pp,
+                vec![input_amount, input_amount_2],
+                vec![output_amount, output_amount_2],
+                &sighash,
+                rng,
+            )
+            .unwrap();
 
         // Verify the binding signature
 
         let verified = verify_binding_signature::<Components>(
             &value_comm_pp,
-            &vec![input_value_commitment_bytes],
-            &vec![output_value_commitment_bytes],
+            &input_value_commitments,
+            &output_value_commitments,
             value_balance,
             &sighash,
             &binding_signature,
@@ -280,5 +341,36 @@ mod tests {
         println!("binding signature verified: {:?}", verified);
 
         assert!(verified);
+    }
+
+    #[test]
+    fn test_binding_signature_byte_conversion() {
+        let rng = &mut rand::thread_rng();
+
+        // Setup parameters
+
+        let comm_and_crh_pp = InstantiatedDPC::generate_comm_and_crh_parameters(rng).unwrap();
+        let value_comm_pp = comm_and_crh_pp.value_comm_pp;
+
+        let input_amount: u64 = rng.gen_range(1, 100000000);
+        let input_amount_2: u64 = rng.gen_range(1, 100000000);
+        let output_amount: u64 = rng.gen_range(0, input_amount);
+        let output_amount_2: u64 = rng.gen_range(0, input_amount_2);
+
+        let sighash = [1u8; 64].to_vec();
+
+        let (_, _, _, binding_signature) = generate_random_binding_signature::<Components, _>(
+            &value_comm_pp,
+            vec![input_amount, input_amount_2],
+            vec![output_amount, output_amount_2],
+            &sighash,
+            rng,
+        )
+        .unwrap();
+
+        let binding_signature_bytes = binding_signature.to_bytes();
+        let reconstructed_binding_signature = BindingSignature::from_bytes(binding_signature_bytes).unwrap();
+
+        assert_eq!(binding_signature, reconstructed_binding_signature);
     }
 }

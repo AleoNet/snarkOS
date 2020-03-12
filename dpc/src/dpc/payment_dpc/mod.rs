@@ -170,6 +170,7 @@ pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
     local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
     local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
 
+    // Value Balance
     value_balance: u64,
 }
 
@@ -658,6 +659,49 @@ where
             local_data_rand,
             value_balance,
         } = context;
+
+        // Generate binding signature
+
+        let mut old_value_commits = vec![];
+        let mut old_value_commit_randomness = vec![];
+        let mut new_value_commits = vec![];
+        let mut new_value_commit_randomness = vec![];
+
+        for death_pred_attr in &old_death_pred_attributes {
+            let mut commitment = [0u8; 32];
+            let mut randomness = [0u8; 32];
+
+            death_pred_attr.value_commitment.write(&mut commitment[..])?;
+            death_pred_attr.value_commitment.write(&mut randomness[..])?;
+
+            old_value_commits.push(commitment);
+            old_value_commit_randomness.push(randomness);
+        }
+
+        for birth_pred_attr in &new_birth_pred_attributes {
+            let mut commitment = [0u8; 32];
+            let mut randomness = [0u8; 32];
+
+            birth_pred_attr.value_commitment.write(&mut commitment[..])?;
+            birth_pred_attr.value_commitment.write(&mut randomness[..])?;
+
+            new_value_commits.push(commitment);
+            new_value_commit_randomness.push(randomness);
+        }
+
+        let sighash = to_bytes![local_data_comm]?;
+
+        let binding_signature = create_binding_signature::<Components, _>(
+            &comm_and_crh_pp.value_comm_pp,
+            &old_value_commits,
+            &new_value_commits,
+            &old_value_commit_randomness,
+            &new_value_commit_randomness,
+            value_balance,
+            &sighash,
+            rng,
+        )?;
+
         let core_proof = {
             let circuit = CoreChecksCircuit::new(
                 &parameters.comm_and_crh_pp,
@@ -693,46 +737,6 @@ where
 
             Components::ProofCheckNIZK::prove(&parameters.proof_check_nizk_pp.0, circuit, rng)?
         };
-
-        let mut old_value_commits = vec![];
-        let mut old_value_commit_randomness = vec![];
-        let mut new_value_commits = vec![];
-        let mut new_value_commit_randomness = vec![];
-
-        for death_pred_attr in old_death_pred_attributes {
-            let mut commitment = [0u8; 32];
-            let mut randomness = [0u8; 32];
-
-            death_pred_attr.value_commitment.write(&mut commitment[..])?;
-            death_pred_attr.value_commitment.write(&mut randomness[..])?;
-
-            old_value_commits.push(commitment);
-            old_value_commit_randomness.push(randomness);
-        }
-
-        for birth_pred_attr in new_birth_pred_attributes {
-            let mut commitment = [0u8; 32];
-            let mut randomness = [0u8; 32];
-
-            birth_pred_attr.value_commitment.write(&mut commitment[..])?;
-            birth_pred_attr.value_commitment.write(&mut randomness[..])?;
-
-            new_value_commits.push(commitment);
-            new_value_commit_randomness.push(randomness);
-        }
-
-        let sighash = to_bytes![local_data_comm]?;
-
-        let binding_signature = create_binding_signature::<Components, _>(
-            &comm_and_crh_pp.value_comm_pp,
-            &old_value_commits,
-            &new_value_commits,
-            &old_value_commit_randomness,
-            &new_value_commit_randomness,
-            value_balance,
-            &sighash,
-            rng,
-        )?;
 
         let transaction = Self::Transaction::new(
             old_serial_numbers,
@@ -780,7 +784,7 @@ where
         }
         end_timer!(ledger_time);
 
-        // TODO (raychu86) Add binding signature check to circuit.
+        // TODO Add binding signature check to circuit.
 
         let input = CoreChecksVerifierInput {
             comm_and_crh_pp: parameters.comm_and_crh_pp.clone(),
