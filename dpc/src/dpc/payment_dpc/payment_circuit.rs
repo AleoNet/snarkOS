@@ -18,6 +18,7 @@ pub struct PaymentPredicateLocalData<C: PlainDPCComponents> {
     pub local_data_comm_pp: <C::LocalDataComm as CommitmentScheme>::Parameters,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
     pub value_comm_pp: <C::ValueComm as CommitmentScheme>::Parameters,
+    pub value_comm_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
     pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
     pub position: u8,
 }
@@ -36,6 +37,9 @@ where
         v.extend_from_slice(&self.local_data_comm_pp.to_field_elements()?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
         v.extend_from_slice(&self.value_comm_pp.to_field_elements()?);
+        v.extend(ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            &to_bytes![self.value_comm_randomness]?[..],
+        )?);
         v.extend_from_slice(&self.value_commitment.to_field_elements()?);
         Ok(v)
     }
@@ -123,14 +127,14 @@ fn execute_payment_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::C
         || Ok(local_data_commitment),
     )?;
 
-    let value_comm_randomness = <C::ValueCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-        cs.ns(|| "Allocate value commitment randomness"),
-        || Ok(value_commitment_randomness),
-    )?;
-
     let value_comm_pp = <C::ValueCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
         &mut cs.ns(|| "Declare value comm parameters"),
         || Ok(comm_and_crh_parameters.value_comm_pp.parameters()),
+    )?;
+
+    let value_comm_randomness = <C::ValueCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc_input(
+        cs.ns(|| "Allocate value commitment randomness"),
+        || Ok(value_commitment_randomness),
     )?;
 
     let declared_value_commitment = <C::ValueCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(

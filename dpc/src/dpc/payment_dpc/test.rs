@@ -160,7 +160,7 @@ fn test_execute_payment_constraint_systems() {
 
     if core_cs.is_satisfied() {
         println!("\n\n\n\nAll Core check constraints:");
-        core_cs.print_named_objects();
+        //        core_cs.print_named_objects();
     }
     println!("=========================================================");
     println!("=========================================================");
@@ -175,12 +175,12 @@ fn test_execute_payment_constraint_systems() {
     for i in 0..NUM_INPUT_RECORDS {
         let value = old_records[i].payload.balance;
 
-        let value_commitment_rand = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+        let value_commitment_randomness = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
         let value_commitment = ValueComm::commit(
             &comm_and_crh_pp.value_comm_pp,
             &value.to_le_bytes(),
-            &value_commitment_rand,
+            &value_commitment_randomness,
         )
         .unwrap();
 
@@ -189,7 +189,7 @@ fn test_execute_payment_constraint_systems() {
             PaymentCircuit::new(
                 &comm_and_crh_pp,
                 &local_data_comm,
-                &value_commitment_rand,
+                &value_commitment_randomness,
                 &value_commitment,
                 i as u8,
                 value,
@@ -203,6 +203,7 @@ fn test_execute_payment_constraint_systems() {
                 local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                 local_data_comm: local_data_comm.clone(),
                 value_comm_pp: comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                value_comm_randomness: value_commitment_randomness.clone(),
                 value_commitment: value_commitment.clone(),
                 position: i as u8,
             };
@@ -212,6 +213,7 @@ fn test_execute_payment_constraint_systems() {
             vk: pred_nizk_pp.vk.clone(),
             proof,
             value_commitment,
+            value_commitment_randomness,
         };
         old_proof_and_vk.push(private_input);
     }
@@ -220,12 +222,12 @@ fn test_execute_payment_constraint_systems() {
     for j in 0..NUM_OUTPUT_RECORDS {
         let value = new_records[j].payload.balance;
 
-        let value_commitment_rand = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+        let value_commitment_randomness = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
         let value_commitment = ValueComm::commit(
             &comm_and_crh_pp.value_comm_pp,
             &value.to_le_bytes(),
-            &value_commitment_rand,
+            &value_commitment_randomness,
         )
         .unwrap();
 
@@ -234,7 +236,7 @@ fn test_execute_payment_constraint_systems() {
             PaymentCircuit::new(
                 &comm_and_crh_pp,
                 &local_data_comm,
-                &value_commitment_rand,
+                &value_commitment_randomness,
                 &value_commitment,
                 j as u8,
                 value,
@@ -249,6 +251,7 @@ fn test_execute_payment_constraint_systems() {
                 local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                 local_data_comm: local_data_comm.clone(),
                 value_comm_pp: comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                value_comm_randomness: value_commitment_randomness.clone(),
                 value_commitment: value_commitment.clone(),
                 position: j as u8,
             };
@@ -259,6 +262,7 @@ fn test_execute_payment_constraint_systems() {
             vk: pred_nizk_pp.vk.clone(),
             proof,
             value_commitment,
+            value_commitment_randomness,
         };
         new_proof_and_vk.push(private_input);
     }
@@ -282,7 +286,7 @@ fn test_execute_payment_constraint_systems() {
     }
     println!("\n\n\n\nAll Proof check constraints:");
     if pf_check_cs.is_satisfied() {
-        pf_check_cs.print_named_objects();
+        //        pf_check_cs.print_named_objects();
     }
     println!("=========================================================");
     println!("=========================================================");

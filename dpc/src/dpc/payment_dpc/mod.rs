@@ -559,6 +559,7 @@ where
             vk: pred_nizk_pp.vk.clone(),
             proof: pred_nizk_pp.proof.clone(),
             value_commitment: <Components::ValueComm as CommitmentScheme>::Output::default(),
+            value_commitment_randomness: <Components::ValueComm as CommitmentScheme>::Randomness::default(),
         };
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");
@@ -624,8 +625,8 @@ where
         )?;
 
         let local_data = context.into_local_data();
-        let old_death_pred_vk_and_proofs = old_death_pred_proof_generator(&local_data);
-        let new_birth_pred_vk_and_proofs = new_birth_pred_proof_generator(&local_data);
+        let old_death_pred_attributes = old_death_pred_proof_generator(&local_data);
+        let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data);
 
         let ExecuteContext {
             comm_and_crh_pp: _comm_and_crh_pp,
@@ -672,8 +673,8 @@ where
         let proof_checks_proof = {
             let circuit = ProofCheckCircuit::new(
                 &parameters.comm_and_crh_pp,
-                old_death_pred_vk_and_proofs.as_slice(),
-                new_birth_pred_vk_and_proofs.as_slice(),
+                old_death_pred_attributes.as_slice(),
+                new_birth_pred_attributes.as_slice(),
                 &predicate_comm,
                 &predicate_rand,
                 &local_data_comm,

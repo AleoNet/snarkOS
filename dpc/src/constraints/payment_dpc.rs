@@ -747,30 +747,59 @@ where
 
         let position = UInt8::constant(i as u8).into_bits_le();
 
-        // Convert the value commitment to bytes
+        // Convert the value commitment and value commitment randomness to bytes
+        let value_comm_randomness_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            &to_bytes![old_death_pred_vk_and_pf[i].value_commitment_randomness]?[..],
+        )
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
+
         let value_comm_fe =
             ToConstraintField::<C::CoreCheckF>::to_field_elements(&old_death_pred_vk_and_pf[i].value_commitment)
                 .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_bytes = to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_inputs = [
+            to_bytes![value_comm_randomness_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
+            to_bytes![value_comm_randomness_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
+            to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+        ];
 
-        let value_comm = UInt8::alloc_vec(
-            cs.ns(|| format!("Allocate input value commitment {}", i)),
-            &value_comm_bytes,
-        )?;
+        let value_comm_input_bytes = [
+            UInt8::alloc_vec(
+                cs.ns(|| format!("Allocate input value commitment randomness x {}", i)),
+                &value_comm_inputs[0],
+            )?,
+            UInt8::alloc_vec(
+                cs.ns(|| format!("Allocate input value commitment randomness y {}", i)),
+                &value_comm_inputs[1],
+            )?,
+            UInt8::alloc_vec(
+                cs.ns(|| format!("Allocate input value commitment {}", i)),
+                &value_comm_inputs[2],
+            )?,
+        ];
 
-        let value_comm_flatten = value_comm
-            .iter()
-            .flat_map(|byte| byte.into_bits_le())
-            .collect::<Vec<_>>();
+        let value_comm_input_bits = [
+            value_comm_input_bytes[0]
+                .iter()
+                .flat_map(|byte| byte.into_bits_le())
+                .collect::<Vec<_>>(),
+            value_comm_input_bytes[1]
+                .iter()
+                .flat_map(|byte| byte.into_bits_le())
+                .collect::<Vec<_>>(),
+            value_comm_input_bytes[2]
+                .iter()
+                .flat_map(|byte| byte.into_bits_le())
+                .collect::<Vec<_>>(),
+        ];
 
         C::PredicateNIZKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &death_pred_vk,
             ([position].iter())
                 .chain(pred_input_bits.iter())
-                .chain([value_comm_flatten].iter())
-                .filter(|inp| !inp.is_empty()),
+                .filter(|inp| !inp.is_empty())
+                .chain(value_comm_input_bits.iter()),
             &death_pred_proof,
         )?;
     }
@@ -803,30 +832,59 @@ where
 
         let position = UInt8::constant(j as u8).into_bits_le();
 
-        // Convert the value commitment to bytes
+        // Convert the value commitment and value commitment randomness to bytes
+        let value_comm_randomness_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            &to_bytes![new_birth_pred_vk_and_pf[j].value_commitment_randomness]?[..],
+        )
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
+
         let value_comm_fe =
             ToConstraintField::<C::CoreCheckF>::to_field_elements(&new_birth_pred_vk_and_pf[j].value_commitment)
                 .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_bytes = to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_inputs = [
+            to_bytes![value_comm_randomness_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
+            to_bytes![value_comm_randomness_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
+            to_bytes![value_comm_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+        ];
 
-        let value_comm = UInt8::alloc_vec(
-            cs.ns(|| format!("Allocate output value commitment {}", j)),
-            &value_comm_bytes,
-        )?;
+        let value_comm_input_bytes = [
+            UInt8::alloc_vec(
+                cs.ns(|| format!("Allocate output value commitment randomness x {}", j)),
+                &value_comm_inputs[0],
+            )?,
+            UInt8::alloc_vec(
+                cs.ns(|| format!("Allocate output value commitment randomness y {}", j)),
+                &value_comm_inputs[1],
+            )?,
+            UInt8::alloc_vec(
+                cs.ns(|| format!("Allocate output value commitment {}", j)),
+                &value_comm_inputs[2],
+            )?,
+        ];
 
-        let value_comm_flatten = value_comm
-            .iter()
-            .flat_map(|byte| byte.into_bits_le())
-            .collect::<Vec<_>>();
+        let value_comm_input_bits = [
+            value_comm_input_bytes[0]
+                .iter()
+                .flat_map(|byte| byte.into_bits_le())
+                .collect::<Vec<_>>(),
+            value_comm_input_bytes[1]
+                .iter()
+                .flat_map(|byte| byte.into_bits_le())
+                .collect::<Vec<_>>(),
+            value_comm_input_bytes[2]
+                .iter()
+                .flat_map(|byte| byte.into_bits_le())
+                .collect::<Vec<_>>(),
+        ];
 
         C::PredicateNIZKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &birth_pred_vk,
             ([position].iter())
                 .chain(pred_input_bits.iter())
-                .chain([value_comm_flatten].iter())
-                .filter(|inp| !inp.is_empty()),
+                .filter(|inp| !inp.is_empty())
+                .chain(value_comm_input_bits.iter()),
             &birth_pred_proof,
         )?;
     }

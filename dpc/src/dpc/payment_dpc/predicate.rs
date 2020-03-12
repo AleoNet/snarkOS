@@ -8,6 +8,7 @@ pub struct PrivatePredInput<C: PlainDPCComponents> {
     pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateNIZK as SNARK>::Proof,
     pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
+    pub value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
 }
 
 impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
@@ -16,6 +17,7 @@ impl<C: PlainDPCComponents> Default for PrivatePredInput<C> {
             vk: <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
             proof: <C::PredicateNIZK as SNARK>::Proof::default(),
             value_commitment: <C::ValueComm as CommitmentScheme>::Output::default(),
+            value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness::default(),
         }
     }
 }
@@ -26,6 +28,7 @@ impl<C: PlainDPCComponents> Clone for PrivatePredInput<C> {
             vk: self.vk.clone(),
             proof: self.proof.clone(),
             value_commitment: self.value_commitment.clone(),
+            value_commitment_randomness: self.value_commitment_randomness.clone(),
         }
     }
 }

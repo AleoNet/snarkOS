@@ -117,21 +117,21 @@ fn payment_integration_test() {
             let input_value = local_data.old_records[i].payload().balance;
 
             // Generate value commitment randomness
-            let value_commitment_rand =
+            let value_commitment_randomness =
                 <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data
                 .comm_and_crh_pp
                 .value_comm_pp
-                .commit(&input_value.to_le_bytes(), &value_commitment_rand)
+                .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
                 .unwrap();
 
             // Instantiate death predicate circuit
             let death_predicate_circuit = PaymentCircuit::new(
                 &local_data.comm_and_crh_pp,
                 &local_data.local_data_comm,
-                &value_commitment_rand,
+                &value_commitment_randomness,
                 &value_commitment,
                 i as u8,
                 input_value,
@@ -146,6 +146,7 @@ fn payment_integration_test() {
                     local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                     local_data_comm: local_data.local_data_comm.clone(),
                     value_comm_pp: local_data.comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                    value_comm_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: i as u8,
                 };
@@ -156,6 +157,7 @@ fn payment_integration_test() {
                 vk: parameters.pred_nizk_pp.vk.clone(),
                 proof,
                 value_commitment,
+                value_commitment_randomness,
             };
             old_proof_and_vk.push(private_input);
         }
@@ -168,21 +170,21 @@ fn payment_integration_test() {
             let output_value = local_data.new_records[j].payload().balance;
 
             // Generate value commitment randomness
-            let value_commitment_rand =
+            let value_commitment_randomness =
                 <<Components as PlainDPCComponents>::ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data
                 .comm_and_crh_pp
                 .value_comm_pp
-                .commit(&output_value.to_le_bytes(), &value_commitment_rand)
+                .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
                 .unwrap();
 
             // Instantiate birth predicate circuit
             let birth_predicate_circuit = PaymentCircuit::new(
                 &local_data.comm_and_crh_pp,
                 &local_data.local_data_comm,
-                &value_commitment_rand,
+                &value_commitment_randomness,
                 &value_commitment,
                 j as u8,
                 output_value,
@@ -197,6 +199,7 @@ fn payment_integration_test() {
                     local_data_comm_pp: local_data.comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
                     local_data_comm: local_data.local_data_comm.clone(),
                     value_comm_pp: local_data.comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                    value_comm_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: j as u8,
                 };
@@ -206,6 +209,7 @@ fn payment_integration_test() {
                 vk: parameters.pred_nizk_pp.vk.clone(),
                 proof,
                 value_commitment,
+                value_commitment_randomness,
             };
             new_proof_and_vk.push(private_input);
         }
