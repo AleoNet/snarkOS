@@ -18,7 +18,7 @@ use snarkos_utilities::{
 
 use blake2::{
     digest::{Input, VariableOutput},
-    VarBlake2b as b2s,
+    Blake2b as b2s,
 };
 use rand::Rng;
 use std::{
@@ -30,9 +30,11 @@ type G = EdwardsBls12;
 
 pub fn hash_into_field<G: Group + ProjectiveCurve>(a: &[u8], b: &[u8]) -> <G as Group>::ScalarField {
     let mut hasher = b2s::new(64).unwrap();
-    hasher.input(a);
-    hasher.input(b);
-    let hash: Vec<u8> = hasher.vec_result();
+    hasher.process(a);
+    hasher.process(b);
+
+    let mut hash = [0u8; 64];
+    hasher.variable_result(&mut hash).unwrap();
 
     let hash_u64_repr: Vec<u64> = hash
         .chunks(8)
