@@ -672,7 +672,7 @@ where
             let mut randomness = [0u8; 32];
 
             death_pred_attr.value_commitment.write(&mut commitment[..])?;
-            death_pred_attr.value_commitment.write(&mut randomness[..])?;
+            death_pred_attr.value_commitment_randomness.write(&mut randomness[..])?;
 
             old_value_commits.push(commitment);
             old_value_commit_randomness.push(randomness);
@@ -683,7 +683,7 @@ where
             let mut randomness = [0u8; 32];
 
             birth_pred_attr.value_commitment.write(&mut commitment[..])?;
-            birth_pred_attr.value_commitment.write(&mut randomness[..])?;
+            birth_pred_attr.value_commitment_randomness.write(&mut randomness[..])?;
 
             new_value_commits.push(commitment);
             new_value_commit_randomness.push(randomness);
@@ -720,6 +720,7 @@ where
                 &local_data_rand,
                 memorandum,
                 auxiliary,
+                &binding_signature,
             );
 
             Components::MainNIZK::prove(&parameters.core_nizk_pp.0, circuit, rng)?
@@ -784,8 +785,6 @@ where
         }
         end_timer!(ledger_time);
 
-        // TODO Add binding signature check to circuit.
-
         let input = CoreChecksVerifierInput {
             comm_and_crh_pp: parameters.comm_and_crh_pp.clone(),
             ledger_pp: ledger.parameters().clone(),
@@ -795,6 +794,7 @@ where
             memo: transaction.memorandum().clone(),
             predicate_comm: transaction.stuff.predicate_comm.clone(),
             local_data_comm: transaction.stuff.local_data_comm.clone(),
+            binding_signature: transaction.stuff.binding_signature.clone(),
         };
         if !Components::MainNIZK::verify(&parameters.core_nizk_pp.1, &input, &transaction.stuff.core_proof)? {
             eprintln!("Core NIZK didn't verify.");

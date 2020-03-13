@@ -21,7 +21,10 @@ use blake2::{
     VarBlake2b as b2s,
 };
 use rand::Rng;
-use std::ops::{Add, Mul, Neg};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    ops::{Add, Mul, Neg},
+};
 
 type G = EdwardsBls12;
 
@@ -103,6 +106,37 @@ impl BindingSignature {
         let _sbar: <G as Group>::ScalarField = FromBytes::read(&sbar[..])?;
 
         Ok(Self { rbar, sbar })
+    }
+}
+
+impl ToBytes for BindingSignature {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.rbar.write(&mut writer)?;
+        self.sbar.write(&mut writer)
+    }
+}
+
+impl FromBytes for BindingSignature {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let rbar: [u8; 32] = FromBytes::read(&mut reader)?;
+        let sbar: [u8; 32] = FromBytes::read(&mut reader)?;
+
+        Ok(Self {
+            rbar: rbar.to_vec(),
+            sbar: sbar.to_vec(),
+        })
+    }
+}
+
+impl Default for BindingSignature {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            rbar: [0u8; 32].to_vec(),
+            sbar: [0u8; 32].to_vec(),
+        }
     }
 }
 
@@ -368,8 +402,8 @@ mod tests {
         )
         .unwrap();
 
-        let binding_signature_bytes = binding_signature.to_bytes();
-        let reconstructed_binding_signature = BindingSignature::from_bytes(binding_signature_bytes).unwrap();
+        let binding_signature_bytes = to_bytes![binding_signature].unwrap();
+        let reconstructed_binding_signature: BindingSignature = FromBytes::read(&binding_signature_bytes[..]).unwrap();
 
         assert_eq!(binding_signature, reconstructed_binding_signature);
     }

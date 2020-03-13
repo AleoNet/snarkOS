@@ -3,6 +3,7 @@ use crate::{
     constraints::payment_dpc::{execute_core_checks_gadget, execute_proof_check_gadget},
     dpc::{
         payment_dpc::{
+            binding_signature::*,
             payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
             predicate::PrivatePredInput,
             record_payload::PaymentRecordPayload,
@@ -124,53 +125,10 @@ fn test_execute_payment_constraint_systems() {
 
         local_data_comm,
         local_data_rand,
-        value_balance: _value_balance,
+        value_balance,
     } = context;
 
-    //////////////////////////////////////////////////////////////////////////
-    // Check that the core check constraint system was satisfied.
-    let mut core_cs = TestConstraintSystem::<Fr>::new();
-
-    execute_core_checks_gadget::<_, _>(
-        &mut core_cs.ns(|| "Core checks"),
-        &comm_and_crh_pp,
-        ledger.parameters(),
-        &ledger_digest,
-        &old_records,
-        &old_witnesses,
-        &old_address_secret_keys,
-        &old_serial_numbers,
-        &new_records,
-        &new_sn_nonce_randomness,
-        &new_commitments,
-        &predicate_comm,
-        &predicate_rand,
-        &local_data_comm,
-        &local_data_rand,
-        &memo,
-        &auxiliary,
-    )
-    .unwrap();
-
-    if !core_cs.is_satisfied() {
-        println!("=========================================================");
-        println!("Unsatisfied constraints:");
-        println!("{}", core_cs.which_is_unsatisfied().unwrap());
-        println!("=========================================================");
-    }
-
-    if core_cs.is_satisfied() {
-        println!("\n\n\n\nAll Core check constraints:");
-        //        core_cs.print_named_objects();
-    }
-    println!("=========================================================");
-    println!("=========================================================");
-    println!("=========================================================\n\n\n");
-
-    assert!(core_cs.is_satisfied());
-
-    // Check that the proof check constraint system was satisfied.
-    let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
+    // Generate the predicate proofs
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {
@@ -267,6 +225,101 @@ fn test_execute_payment_constraint_systems() {
         };
         new_proof_and_vk.push(private_input);
     }
+
+    // Generate the binding signature
+
+    let mut old_value_commits = vec![];
+    let mut old_value_commit_randomness = vec![];
+    let mut new_value_commits = vec![];
+    let mut new_value_commit_randomness = vec![];
+
+    for death_pred_attr in &old_proof_and_vk {
+        let mut commitment = [0u8; 32];
+        let mut randomness = [0u8; 32];
+
+        death_pred_attr.value_commitment.write(&mut commitment[..]).unwrap();
+        death_pred_attr
+            .value_commitment_randomness
+            .write(&mut randomness[..])
+            .unwrap();
+
+        old_value_commits.push(commitment);
+        old_value_commit_randomness.push(randomness);
+    }
+
+    for birth_pred_attr in &new_proof_and_vk {
+        let mut commitment = [0u8; 32];
+        let mut randomness = [0u8; 32];
+
+        birth_pred_attr.value_commitment.write(&mut commitment[..]).unwrap();
+        birth_pred_attr
+            .value_commitment_randomness
+            .write(&mut randomness[..])
+            .unwrap();
+
+        new_value_commits.push(commitment);
+        new_value_commit_randomness.push(randomness);
+    }
+
+    let sighash = to_bytes![local_data_comm].unwrap();
+
+    let binding_signature = create_binding_signature::<Components, _>(
+        &comm_and_crh_pp.value_comm_pp,
+        &old_value_commits,
+        &new_value_commits,
+        &old_value_commit_randomness,
+        &new_value_commit_randomness,
+        value_balance,
+        &sighash,
+        &mut rng,
+    )
+    .unwrap();
+
+    //////////////////////////////////////////////////////////////////////////
+    // Check that the core check constraint system was satisfied.
+    let mut core_cs = TestConstraintSystem::<Fr>::new();
+
+    execute_core_checks_gadget::<_, _>(
+        &mut core_cs.ns(|| "Core checks"),
+        &comm_and_crh_pp,
+        ledger.parameters(),
+        &ledger_digest,
+        &old_records,
+        &old_witnesses,
+        &old_address_secret_keys,
+        &old_serial_numbers,
+        &new_records,
+        &new_sn_nonce_randomness,
+        &new_commitments,
+        &predicate_comm,
+        &predicate_rand,
+        &local_data_comm,
+        &local_data_rand,
+        &memo,
+        &auxiliary,
+        &binding_signature,
+    )
+    .unwrap();
+
+    if !core_cs.is_satisfied() {
+        println!("=========================================================");
+        println!("Unsatisfied constraints:");
+        println!("{}", core_cs.which_is_unsatisfied().unwrap());
+        println!("=========================================================");
+    }
+
+    if core_cs.is_satisfied() {
+        println!("\n\n\n\nAll Core check constraints:");
+        //        core_cs.print_named_objects();
+    }
+    println!("=========================================================");
+    println!("=========================================================");
+    println!("=========================================================\n\n\n");
+
+    assert!(core_cs.is_satisfied());
+
+    // Check that the proof check constraint system was satisfied.
+    let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
 
     execute_proof_check_gadget::<_, _>(
         &mut pf_check_cs.ns(|| "Check predicate proofs"),

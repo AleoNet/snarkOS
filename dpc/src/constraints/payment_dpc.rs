@@ -2,6 +2,7 @@ use crate::{
     dpc::{
         payment_dpc::{
             address::AddressSecretKey,
+            binding_signature::BindingSignature,
             parameters::CommAndCRHPublicParameters,
             predicate::PrivatePredInput,
             record::DPCRecord,
@@ -52,6 +53,7 @@ pub fn execute_core_checks_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<
     local_data_rand: &<C::LocalDataComm as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
+    binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
     execute_core_checks_gadget_helper::<
         C,
@@ -87,6 +89,7 @@ pub fn execute_core_checks_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<
         local_data_rand,
         memo,
         auxiliary,
+        binding_signature,
     )
 }
 
@@ -129,6 +132,7 @@ fn execute_core_checks_gadget_helper<
     local_data_rand: &<C::LocalDataComm as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
+    binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
     C: PaymentDPCComponents<
@@ -626,6 +630,10 @@ where
             &mut cs.ns(|| "Check that local data commitment is valid"),
             &declared_local_data_comm,
         )?;
+
+        let _binding_signature = UInt8::alloc_input_vec(&mut cs.ns(|| "Declare binding signature"), &to_bytes![
+            binding_signature
+        ]?)?;
     }
     Ok(())
 }

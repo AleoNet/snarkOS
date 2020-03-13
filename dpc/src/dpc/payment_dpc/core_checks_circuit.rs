@@ -2,6 +2,7 @@ use crate::{
     constraints::{payment_dpc::execute_core_checks_gadget, Assignment},
     dpc::payment_dpc::{
         address::AddressSecretKey,
+        binding_signature::BindingSignature,
         parameters::CommAndCRHPublicParameters,
         record::DPCRecord,
         PaymentDPCComponents,
@@ -34,6 +35,8 @@ pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
     pub memo: [u8; 32],
+
+    pub binding_signature: BindingSignature,
 }
 
 impl<C: PaymentDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
@@ -91,6 +94,10 @@ where
         )?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
 
+        v.extend_from_slice(&ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            &self.binding_signature.to_bytes()[..],
+        )?);
+
         Ok(v)
     }
 }
@@ -124,6 +131,7 @@ pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
 
     memo: Option<[u8; 32]>,
     auxiliary: Option<[u8; 32]>,
+    binding_signature: Option<BindingSignature>,
 }
 
 impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
@@ -153,6 +161,8 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
         let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
         let local_data_rand = <C::LocalDataComm as CommitmentScheme>::Randomness::default();
 
+        let binding_signature = BindingSignature::default();
+
         Self {
             // Parameters
             comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
@@ -179,6 +189,7 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
             local_data_rand: Some(local_data_rand),
             memo: Some(memo),
             auxiliary: Some(auxiliary),
+            binding_signature: Some(binding_signature),
         }
     }
 
@@ -210,6 +221,7 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
+        binding_signature: &BindingSignature,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -251,6 +263,7 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
 
             memo: Some(memo.clone()),
             auxiliary: Some(auxiliary.clone()),
+            binding_signature: Some(binding_signature.clone()),
         }
     }
 }
@@ -280,6 +293,7 @@ impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreCheck
             self.local_data_rand.get()?,
             self.memo.get()?,
             self.auxiliary.get()?,
+            self.binding_signature.get()?,
         )?;
         Ok(())
     }
