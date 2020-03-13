@@ -26,7 +26,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
-fn test_execute_payment_constraint_systems() {
+fn test_execute_delegated_payment_constraint_systems() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.

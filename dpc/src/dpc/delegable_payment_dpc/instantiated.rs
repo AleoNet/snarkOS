@@ -16,6 +16,7 @@ use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     merkle_tree::MerkleParameters,
     prf::Blake2s,
+    signature::SchnorrSignature,
     snark::GM17,
 };
 use snarkos_curves::{
@@ -29,11 +30,14 @@ use snarkos_gadgets::{
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::PedersenCompressedCRHGadget,
         prf::Blake2sGadget,
+        signature::SchnorrPublicKeyRandomizationGadget,
         snark::GM17VerifierGadget,
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::algorithms::CRH;
+
+use blake2::Blake2s as Blake2sHash;
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -142,6 +146,8 @@ impl PaymentDPCComponents for Components {
     type ProofCheckNIZK = ProofCheckNIZK;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
+    type S = AuthSignature;
+    type SGadget = AuthSignatureGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
     type ValueComm = ValueComm;
@@ -163,6 +169,8 @@ pub type RecordComm = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateComm = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
+
+type AuthSignature = SchnorrSignature<EdwardsBls, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -188,6 +196,8 @@ pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, E
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateNIZKGadget = GM17VerifierGadget<CoreCheckPairing, ProofCheckF, PairingGadget>;
+
+pub type AuthSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
 
 pub type MerkleTreeIdealLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
