@@ -1,5 +1,7 @@
 use snarkos_errors::gadgets::SynthesisError;
 
+pub mod delegable_payment_dpc;
+
 pub mod payment_dpc;
 
 pub mod plain_dpc;
