@@ -13,6 +13,9 @@ pub use self::context::*;
 pub mod handshakes;
 pub use self::handshakes::*;
 
+pub mod network;
+pub use self::network::*;
+
 pub mod peer_book;
 pub use self::peer_book::*;
 

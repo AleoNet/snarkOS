@@ -1,4 +1,4 @@
-use crate::{Connections, Handshakes, PeerBook, Pings, SyncHandler};
+use crate::{Connections, Handshakes, Network, PeerBook, Pings, SyncHandler};
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
@@ -8,6 +8,9 @@ use tokio::sync::{Mutex, RwLock};
 pub struct Context {
     /// The ip address/socket of this node.
     pub local_address: SocketAddr,
+
+    /// Network this node is running on
+    pub network: Network,
 
     /// Protocol version number
     pub version: u64,
@@ -50,6 +53,7 @@ impl Context {
     /// Construct a new network `Context`.
     pub fn new(
         local_address: SocketAddr,
+        network: Network,
         version: u64,
         connection_frequency: u64,
         memory_pool_interval: u8,
@@ -65,6 +69,7 @@ impl Context {
 
         Self {
             local_address,
+            network,
             version,
             connection_frequency,
             memory_pool_interval,
@@ -74,7 +79,7 @@ impl Context {
             bootnodes,
             connections: RwLock::new(Connections::new()),
             peer_book: RwLock::new(PeerBook::new(local_address)),
-            handshakes: RwLock::new(Handshakes::new(version)),
+            handshakes: RwLock::new(Handshakes::new(network.magic(), version)),
             pings: RwLock::new(Pings::new()),
             sync_handler: Arc::new(Mutex::new(SyncHandler::new(bootnode))),
         }

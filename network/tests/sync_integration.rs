@@ -14,6 +14,7 @@ mod sync_integration {
 
     mod increment_sync_handler {
         use super::*;
+        use snarkos_network::MAGIC_MAINNET;
 
         #[tokio::test]
         #[serial]
@@ -37,7 +38,7 @@ mod sync_integration {
             tokio::spawn(async move {
                 sync_handler
                     .increment(
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap()),
                         storage,
                     )
                     .await
@@ -77,7 +78,7 @@ mod sync_integration {
             tokio::spawn(async move {
                 sync_handler
                     .increment(
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap()),
                         storage,
                     )
                     .await

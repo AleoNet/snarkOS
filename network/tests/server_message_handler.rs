@@ -7,6 +7,7 @@ mod server_message_handler {
         message::{types::*, Channel, Message},
         test_data::*,
         PingState,
+        MAGIC_MAINNET,
     };
     use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
     use snarkos_storage::test_data::*;
@@ -45,7 +46,7 @@ mod server_message_handler {
                         tx,
                         Block::name(),
                         Block::new(hex::decode(BLOCK_1).unwrap()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -94,7 +95,7 @@ mod server_message_handler {
                         GetBlock::new(BlockHeaderHash::new(hex::decode(GENESIS_BLOCK_HEADER_HASH).unwrap()))
                             .serialize()
                             .unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -147,7 +148,7 @@ mod server_message_handler {
                         tx,
                         GetMemoryPool::name(),
                         GetMemoryPool.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -202,7 +203,7 @@ mod server_message_handler {
                         tx,
                         GetMemoryPool::name(),
                         GetMemoryPool.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -258,7 +259,7 @@ mod server_message_handler {
                         MemoryPool::new(vec![hex::decode(TRANSACTION).unwrap()])
                             .serialize()
                             .unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -313,7 +314,7 @@ mod server_message_handler {
                         tx,
                         GetPeers::name(),
                         GetPeers.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -373,7 +374,7 @@ mod server_message_handler {
                         tx,
                         Peers::name(),
                         Peers::new(addresses).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -420,7 +421,7 @@ mod server_message_handler {
                         tx,
                         Ping::name(),
                         ping_bytes,
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -469,7 +470,7 @@ mod server_message_handler {
                         tx,
                         Pong::name(),
                         Pong::new(Ping::new()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -507,7 +508,7 @@ mod server_message_handler {
 
             start_test_server(server);
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
 
             // 2. Add peer to pings
@@ -579,7 +580,7 @@ mod server_message_handler {
 
             start_test_server(server);
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
 
             // 2. Add peer to pings
@@ -654,7 +655,7 @@ mod server_message_handler {
 
             start_test_server(server);
 
-            let channel_server_side = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap());
             accept_channel(&mut bootnode_listener, server_address).await;
 
             // 2. Send SyncBlock message to server
@@ -719,7 +720,7 @@ mod server_message_handler {
                         tx,
                         Block::name(),
                         Block::new(hex::decode(BLOCK_1).unwrap()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -739,7 +740,7 @@ mod server_message_handler {
                         )])
                         .serialize()
                         .unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -783,11 +784,9 @@ mod server_message_handler {
             ]);
             let mut server_sender = server.sender.clone();
             let context = server.context.clone();
-            context
-                .connections
-                .write()
-                .await
-                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
+            context.connections.write().await.store_channel(&Arc::new(
+                Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap(),
+            ));
 
             let block_hash = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
             let block_hash_clone = block_hash.clone();
@@ -806,7 +805,7 @@ mod server_message_handler {
                         tx,
                         Sync::name(),
                         Sync::new(vec![block_hash_clone]).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -858,7 +857,7 @@ mod server_message_handler {
                         tx,
                         Transaction::name(),
                         Transaction::new(transaction_bytes_clone).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()

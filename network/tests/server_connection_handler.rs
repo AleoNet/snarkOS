@@ -7,6 +7,7 @@ mod server_connection_handler {
         },
         test_data::*,
         Channel,
+        MAGIC_MAINNET,
     };
     use snarkos_objects::Transaction;
     use snarkos_storage::test_data::*;
@@ -47,7 +48,7 @@ mod server_connection_handler {
             // 3. Check that peer received server request
 
             let (stream, _socket) = peer_listener.accept().await.unwrap();
-            let channel_peer_side = Channel::new_read_only(stream).unwrap();
+            let channel_peer_side = Channel::new_read_only(MAGIC_MAINNET, stream).unwrap();
             let (message, _bytes) = channel_peer_side.read().await.unwrap();
 
             assert_eq!(Version::name(), message);
@@ -140,9 +141,9 @@ mod server_connection_handler {
 
             // 2. Create channel between peer and server
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap());
             let (stream, _socket) = peer_listener.accept().await.unwrap();
-            let channel_peer_side = Channel::new_read_only(stream).unwrap();
+            let channel_peer_side = Channel::new_read_only(MAGIC_MAINNET, stream).unwrap();
 
             // 3. Add peer to connections
 
@@ -207,7 +208,7 @@ mod server_connection_handler {
 
             // 2. create channel between peer and server
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap());
             peer_listener.accept().await.unwrap();
 
             // 3. Add peer to server connections
@@ -405,11 +406,9 @@ mod server_connection_handler {
 
             // 2. Add sync handler to connections
 
-            context
-                .connections
-                .write()
-                .await
-                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
+            context.connections.write().await.store_channel(&Arc::new(
+                Channel::new_write_only(MAGIC_MAINNET, bootnode_address).await.unwrap(),
+            ));
 
             let channel_sync_side = accept_channel(&mut sync_node_listener, server_address).await;
 

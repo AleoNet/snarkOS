@@ -27,6 +27,7 @@ pub enum HandshakeState {
 pub struct Handshake {
     pub channel: Arc<Channel>,
     state: HandshakeState,
+    magic: u32,
     version: u64,
     height: u32,
     nonce: u64,
@@ -35,13 +36,14 @@ pub struct Handshake {
 impl Handshake {
     /// Send the initial Version message to a peer
     pub async fn send_new(
+        magic: u32,
         version: u64,
         height: u32,
         address_sender: SocketAddr,
         address_receiver: SocketAddr,
     ) -> Result<Self, HandshakeError> {
         // Create temporary write only channel
-        let channel = Arc::new(Channel::new_write_only(address_receiver).await?);
+        let channel = Arc::new(Channel::new_write_only(magic, address_receiver).await?);
 
         // Write Version request
         let message = Version::new(version, height, address_receiver, address_sender);
@@ -51,6 +53,7 @@ impl Handshake {
         Ok(Self {
             state: HandshakeState::Waiting,
             channel,
+            magic,
             version,
             height,
             nonce: message.nonce,
@@ -60,6 +63,7 @@ impl Handshake {
     /// Receive the initial Version message from a new peer.
     /// Send a Verack message + Version message
     pub async fn receive_new(
+        magic: u32,
         version: u64,
         height: u32,
         channel: Channel,
@@ -88,6 +92,7 @@ impl Handshake {
         Ok(Self {
             state: HandshakeState::Waiting,
             channel: Arc::new(channel),
+            magic,
             version,
             height,
             nonce: peer_message.nonce,
@@ -134,8 +139,9 @@ impl Handshake {
 
 #[cfg(test)]
 mod tests {
+    use crate::{message::Message, test_data::random_socket_address, MAGIC_MAINNET};
+
     use super::*;
-    use crate::{message::Message, test_data::random_socket_address};
     use serial_test::serial;
     use tokio::net::TcpListener;
 
@@ -154,12 +160,12 @@ mod tests {
 
             // 2. Server connects to peer, server sends server_hand Version
 
-            let mut server_hand = Handshake::send_new(1u64, 0u32, server_address, peer_address)
+            let mut server_hand = Handshake::send_new(MAGIC_MAINNET, 1u64, 0u32, server_address, peer_address)
                 .await
                 .unwrap();
 
             let (reader, _socket) = server_listener.accept().await.unwrap();
-            let read_channel = Channel::new_read_only(reader).unwrap();
+            let read_channel = Channel::new_read_only(MAGIC_MAINNET, reader).unwrap();
 
             server_hand.update_reader(read_channel);
 
@@ -183,13 +189,14 @@ mod tests {
         // 3. Peer accepts Server connection
 
         let (reader, _socket) = peer_listener.accept().await.unwrap();
-        let read_channel = Channel::new_read_only(reader).unwrap();
+        let read_channel = Channel::new_read_only(MAGIC_MAINNET, reader).unwrap();
         let (_name, bytes) = read_channel.read().await.unwrap();
 
         // 4. Peer receives server_handshake Version.
         // Peer sends server_handshake Verack, peer_handshake Version
 
         let mut peer_hand = Handshake::receive_new(
+            MAGIC_MAINNET,
             1u64,
             0u32,
             read_channel,

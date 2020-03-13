@@ -48,6 +48,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         consensus.clone(),
         Arc::new(Context::new(
             local_address,
+            config.network,
             1u64,
             10000, //10 seconds
             config.memory_pool_interval,

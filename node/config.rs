@@ -3,7 +3,7 @@ use crate::{
     parameters::{flag, option, subcommand, types::*},
 };
 use snarkos_errors::node::CliError;
-use snarkos_network::bootnodes::*;
+use snarkos_network::Network;
 
 use clap::ArgMatches;
 use serde::Serialize;
@@ -12,7 +12,7 @@ use serde::Serialize;
 #[derive(Clone, Debug, Serialize)]
 pub struct Config {
     // Flags
-    pub network: String,
+    pub network: Network,
     pub jsonrpc: bool,
     pub is_bootnode: bool,
     pub miner: bool,
@@ -35,24 +35,22 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        let mainnet = Network::Mainnet;
         Self {
             // Flags
-            network: "mainnet".into(),
+            network: mainnet,
             jsonrpc: true,
             is_bootnode: false,
             miner: true,
             quiet: false,
             // Options
             ip: "0.0.0.0".into(),
-            port: 4130,
+            port: mainnet.port(),
             path: "./storage_db".into(),
-            rpc_port: 3030,
-            bootnodes: MAINNET_BOOTNODES
-                .iter()
-                .map(|node| (*node).to_string())
-                .collect::<Vec<String>>(),
+            rpc_port: mainnet.rpc_port(),
+            bootnodes: mainnet.bootnodes(),
             coinbase_address: "1NpScgYSLW4WcvmZM55EY5cziEiqZx3wJu".into(),
-            genesis: "00000000000000000000000000000000000000000000000000000000000000008c8d4f393f39c063c40a617c6e2584e6726448c4c0f7da7c848bfa573e628388fbf1285e00000000ffffffffff7f00005e4401000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04010000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac".into(),
+            genesis: mainnet.genesis(),
             subcommand: None,
             memory_pool_interval: 5,
             min_peers: 2,
@@ -63,9 +61,12 @@ impl Default for Config {
 
 impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
+        if arguments.is_present("testnet") {
+            self.testnet();
+        }
+
         options.iter().for_each(|option| match *option {
             // Flags
-            "network" => self.network(arguments.is_present(option)),
             "no_jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "is_bootnode" => self.is_bootnode(arguments.is_present(option)),
             "miner" => self.miner(arguments.is_present(option)),
@@ -84,20 +85,15 @@ impl Config {
         });
     }
 
-    /// Sets `network` to the specified network, overriding its previous state.
-    fn network(&mut self, argument: bool) {
-        match argument {
-            true => {
-                self.path = "./skeleton_db_testnet".into();
-                self.port = 18080;
-                self.bootnodes = TESTNET_BOOTNODES
-                    .iter()
-                    .map(|node| (*node).to_string())
-                    .collect::<Vec<String>>();
-                self.network = "testnet".into();
-            }
-            false => self.network = "mainnet".into(),
-        };
+    /// Selects all default Testnet configuration parameters.
+    fn testnet(&mut self) {
+        let testnet = Network::Testnet;
+
+        self.network = testnet;
+        self.port = testnet.port();
+        self.rpc_port = testnet.rpc_port();
+        self.bootnodes = testnet.bootnodes();
+        self.genesis = testnet.genesis();
     }
 
     fn no_jsonrpc(&mut self, argument: bool) {
@@ -186,7 +182,7 @@ impl CLI for ConfigCli {
 
     const ABOUT: AboutType = "Start a skeleton blockchain miner (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[
-        flag::NETWORK,
+        flag::TESTNET,
         flag::NO_JSONRPC,
         flag::IS_BOOTNODE,
         flag::MINER,
@@ -210,7 +206,6 @@ impl CLI for ConfigCli {
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CliError> {
         let mut config = Config::default();
         config.parse(arguments, &[
-            "network",
             "no_jsonrpc",
             "is_bootnode",
             "miner",
@@ -231,7 +226,6 @@ impl CLI for ConfigCli {
             ("test", Some(arguments)) => {
                 config.subcommand = Some("test".into());
                 config.parse(arguments, &[
-                    "network",
                     "no_jsonrpc",
                     "is_bootnode",
                     "miner",

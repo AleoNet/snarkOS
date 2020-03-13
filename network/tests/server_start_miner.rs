@@ -1,5 +1,5 @@
 mod server_start_miner {
-    use snarkos_network::{message::types::Block as BlockMessage, test_data::*, Channel, Message};
+    use snarkos_network::{message::types::Block as BlockMessage, test_data::*, Channel, Message, MAGIC_MAINNET};
     use snarkos_objects::Block;
     use snarkos_storage::test_data::*;
 
@@ -34,9 +34,9 @@ mod server_start_miner {
 
             // 2. Create channel between peer and server
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_write_only(MAGIC_MAINNET, peer_address).await.unwrap());
             let (read_stream, _socket) = peer_listener.accept().await.unwrap();
-            let channel_peer_side = Channel::new_read_only(read_stream).unwrap();
+            let channel_peer_side = Channel::new_read_only(MAGIC_MAINNET, read_stream).unwrap();
 
             // 3. Add channel to server connections
 

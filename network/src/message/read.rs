@@ -14,7 +14,7 @@ pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) 
 
 /// Returns a message header read from an input stream.
 pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
-    let mut buffer = [0u8; 16];
+    let mut buffer = [0u8; 20];
 
     stream_read(&mut stream, &mut buffer).await?;
 
@@ -32,11 +32,12 @@ pub async fn stream_read<'a, T: AsyncRead + Unpin>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{
         message::{message::Message, types::Ping, MessageHeader},
         test_data::random_socket_address,
     };
+
+    use super::*;
     use serial_test::serial;
     use tokio::net::{TcpListener, TcpStream};
 
@@ -47,27 +48,35 @@ mod tests {
         let mut listener = TcpListener::bind(address).await.unwrap();
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
+            let header = MessageHeader::from([
+                217, 180, 190, 249, 0, 0, 0, 4, 112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]);
             let mut stream = TcpStream::connect(address).await.unwrap();
             stream.write_all(&header.serialize().unwrap()).await.unwrap();
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8]);
+            let header = MessageHeader::from([
+                217, 180, 190, 249, 0, 0, 0, 4, 112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]);
             stream.write_all(&header.serialize().unwrap()).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
-        let mut buf = [0u8; 16];
+        let mut buf = [0u8; 20];
         stream_read(&mut stream, &mut buf).await.unwrap();
 
         assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
+            MessageHeader::from([
+                217, 180, 190, 249, 0, 0, 0, 4, 112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0
+            ]),
             MessageHeader::from(buf)
         );
 
-        let mut buf = [0u8; 16];
+        let mut buf = [0u8; 20];
         stream_read(&mut stream, &mut buf).await.unwrap();
 
         assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8]),
+            MessageHeader::from([
+                217, 180, 190, 249, 0, 0, 0, 4, 112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0
+            ]),
             MessageHeader::from(buf)
         );
     }
@@ -79,7 +88,9 @@ mod tests {
         let mut listener = TcpListener::bind(address).await.unwrap();
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
+            let header = MessageHeader::from([
+                217, 180, 190, 249, 0, 0, 0, 4, 112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]);
             let mut stream = TcpStream::connect(address).await.unwrap();
             stream.write_all(&header.serialize().unwrap()).await.unwrap();
         });
@@ -89,7 +100,9 @@ mod tests {
         let header = read_header(&mut stream).await.unwrap();
 
         assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
+            MessageHeader::from([
+                217, 180, 190, 249, 0, 0, 0, 4, 112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0
+            ]),
             header
         );
     }

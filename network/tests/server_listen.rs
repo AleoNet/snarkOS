@@ -9,6 +9,8 @@ mod server_listen {
         server::Server,
         test_data::*,
         Handshakes,
+        Network,
+        MAGIC_MAINNET,
     };
     use snarkos_storage::{test_data::*, BlockStorage};
 
@@ -36,9 +38,17 @@ mod server_listen {
 
         let server = Server::new(
             consensus,
-            Arc::new(Context::new(server_address, 1u64, 10000, 5, 0, 10, is_bootnode, vec![
-                bootnode_address.to_string(),
-            ])),
+            Arc::new(Context::new(
+                server_address,
+                Network::Mainnet,
+                1u64,
+                10000,
+                5,
+                0,
+                10,
+                is_bootnode,
+                vec![bootnode_address.to_string()],
+            )),
             storage,
             memory_pool_lock,
         );
@@ -110,7 +120,7 @@ mod server_listen {
             // 4. Send handshake response from bootnode to server
 
             let version = 1u64;
-            let mut bootnode_handshakes = Handshakes::new(version);
+            let mut bootnode_handshakes = Handshakes::new(MAGIC_MAINNET, version);
             let mut bootnode_hand = bootnode_handshakes
                 .receive_any(1u32, bootnode_address, server_address, reader)
                 .await
@@ -178,7 +188,7 @@ mod server_listen {
             // 5. Send handshake response from peer to server
 
             let version = 1u64;
-            let mut peer_handshakes = Handshakes::new(version);
+            let mut peer_handshakes = Handshakes::new(MAGIC_MAINNET, version);
             peer_handshakes
                 .receive_any(1u32, peer_address, server_address, reader)
                 .await

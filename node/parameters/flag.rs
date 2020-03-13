@@ -1,6 +1,6 @@
 // Global
 
-pub const NETWORK: &str = "[network] --testnet 'Run the node on the testnet'";
+pub const TESTNET: &str = "[testnet] --testnet 'Run this node on the Aleo testnet'";
 
 pub const NO_JSONRPC: &str = "[no_jsonrpc] --no_jsonrpc 'Run the node without running the json rpc'";
 

@@ -4,6 +4,7 @@ use crate::{
     Handshake,
     HandshakeState,
     Message,
+    MAGIC_MAINNET,
 };
 use snarkos_errors::network::HandshakeError;
 
@@ -13,14 +14,16 @@ use tokio::net::TcpStream;
 /// Stores the address and latest state of peers we are handshaking with.
 #[derive(Clone, Debug)]
 pub struct Handshakes {
+    magic: u32,
     version: u64,
     addresses: HashMap<SocketAddr, Handshake>,
 }
 
 impl Handshakes {
     /// Construct a new store of connected peer `Handshakes`.
-    pub fn new(version: u64) -> Self {
+    pub fn new(magic: u32, version: u64) -> Self {
         Self {
+            magic,
             version,
             addresses: HashMap::default(),
         }
@@ -34,7 +37,7 @@ impl Handshakes {
         address_sender: SocketAddr,
         address_receiver: SocketAddr,
     ) -> Result<(), HandshakeError> {
-        let handshake = Handshake::send_new(self.version, height, address_sender, address_receiver).await?;
+        let handshake = Handshake::send_new(self.magic, self.version, height, address_sender, address_receiver).await?;
 
         self.addresses.insert(address_receiver, handshake);
         info!("Request handshake with: {:?}", address_receiver);
@@ -59,7 +62,7 @@ impl Handshakes {
         _address_receiver: SocketAddr,
         reader: TcpStream,
     ) -> Result<Handshake, HandshakeError> {
-        let channel = Channel::new_read_only(reader)?;
+        let channel = Channel::new_read_only(MAGIC_MAINNET, reader)?;
 
         // Read the first message or error
         let (name, bytes) = channel.read().await?;
@@ -73,7 +76,8 @@ impl Handshakes {
                 return Err(HandshakeError::IncompatibleVersion(self.version, peer_message.version));
             }
 
-            let handshake = Handshake::receive_new(self.version, height, channel, peer_message, address_sender).await?;
+            let handshake =
+                Handshake::receive_new(self.magic, self.version, height, channel, peer_message, address_sender).await?;
 
             self.addresses.insert(peer_address, handshake.clone());
 
@@ -147,8 +151,9 @@ impl Handshakes {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{test_data::random_socket_address, Message};
+
+    use super::*;
     use serial_test::serial;
     use tokio::net::TcpListener;
 
@@ -167,7 +172,7 @@ mod tests {
             // 2. Server sends server_handshake request
 
             let version = 1u64;
-            let mut server_handshakes = Handshakes::new(version);
+            let mut server_handshakes = Handshakes::new(MAGIC_MAINNET, version);
 
             server_handshakes
                 .send_request(0u32, server_address, peer_address)
@@ -177,7 +182,7 @@ mod tests {
             // 5. Check server handshake state
 
             let (reader, _socket) = server_listener.accept().await.unwrap();
-            let read_channel = Channel::new_read_only(reader).unwrap();
+            let read_channel = Channel::new_read_only(MAGIC_MAINNET, reader).unwrap();
 
             assert_eq!(
                 HandshakeState::Waiting,
@@ -213,7 +218,7 @@ mod tests {
         // 4. Peer sends server_handshake response, peer_handshake request
 
         let version = 1u64;
-        let mut peer_handshakes = Handshakes::new(version);
+        let mut peer_handshakes = Handshakes::new(MAGIC_MAINNET, version);
         let peer_hand = peer_handshakes
             .receive_any(0u32, peer_address, server_address, reader)
             .await
@@ -252,7 +257,7 @@ mod tests {
         tokio::spawn(async move {
             // 2. Server sends outdated server_handshake request
 
-            let mut server_handshakes = Handshakes::new(old_version);
+            let mut server_handshakes = Handshakes::new(MAGIC_MAINNET, old_version);
 
             server_handshakes
                 .send_request(0u32, server_address, peer_address)
@@ -266,7 +271,7 @@ mod tests {
 
         // 4. Peer receives outdated server_handshake request
 
-        let mut peer_handshakes = Handshakes::new(new_version);
+        let mut peer_handshakes = Handshakes::new(MAGIC_MAINNET, new_version);
         assert!(
             peer_handshakes
                 .receive_any(0u32, peer_address, server_address, reader)

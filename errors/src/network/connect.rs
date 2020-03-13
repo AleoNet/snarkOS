@@ -7,6 +7,9 @@ pub enum ConnectError {
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[fail(display = "expected network magic prefix {}. Got {}", _0, _1)]
+    InvalidMagic(u32, u32),
+
     #[fail(display = "{}", _0)]
     Message(String),
 

@@ -1,4 +1,4 @@
-use crate::{context::Context, message::Channel, server::Server};
+use crate::{context::Context, message::Channel, server::Server, Network, MAGIC_MAINNET};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_storage::BlockStorage;
 
@@ -38,6 +38,7 @@ pub fn initialize_test_server(
         consensus,
         Arc::new(Context::new(
             server_address,
+            Network::Mainnet,
             1u64,
             connection_frequency,
             5,
@@ -58,7 +59,7 @@ pub fn start_test_server(server: Server) {
 
 /// Returns a tcp channel connected to the address
 pub async fn connect_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
-    let channel = Channel::new_write_only(address).await.unwrap();
+    let channel = Channel::new_write_only(MAGIC_MAINNET, address).await.unwrap();
     let (reader, _socket) = listener.accept().await.unwrap();
 
     channel.update_reader(Arc::new(Mutex::new(reader)))
@@ -67,7 +68,7 @@ pub async fn connect_channel(listener: &mut TcpListener, address: SocketAddr) ->
 /// Returns the next tcp channel connected to the listener
 pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
     let (reader, _peer) = listener.accept().await.unwrap();
-    let channel = Channel::new_read_only(reader).unwrap();
+    let channel = Channel::new_read_only(MAGIC_MAINNET, reader).unwrap();
 
     channel.update_writer(address).await.unwrap()
 }
