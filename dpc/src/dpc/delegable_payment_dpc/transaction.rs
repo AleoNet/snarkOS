@@ -1,5 +1,5 @@
 use crate::{
-    dpc::delegable_payment_dpc::{binding_signature::BindingSignature, PaymentDPCComponents},
+    dpc::delegable_payment_dpc::{binding_signature::BindingSignature, DelegablePaymentDPCComponents},
     Transaction,
 };
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
@@ -7,11 +7,11 @@ use snarkos_models::algorithms::{CommitmentScheme, PRF, SNARK};
 
 #[derive(Derivative)]
 #[derivative(
-    Clone(bound = "C: PaymentDPCComponents"),
-    PartialEq(bound = "C: PaymentDPCComponents"),
-    Eq(bound = "C: PaymentDPCComponents")
+    Clone(bound = "C: DelegablePaymentDPCComponents"),
+    PartialEq(bound = "C: DelegablePaymentDPCComponents"),
+    Eq(bound = "C: DelegablePaymentDPCComponents")
 )]
-pub struct DPCTransaction<C: PaymentDPCComponents> {
+pub struct DPCTransaction<C: DelegablePaymentDPCComponents> {
     old_serial_numbers: Vec<<C::P as PRF>::Output>,
     new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
@@ -20,11 +20,11 @@ pub struct DPCTransaction<C: PaymentDPCComponents> {
 
 #[derive(Derivative)]
 #[derivative(
-    Clone(bound = "C: PaymentDPCComponents"),
-    PartialEq(bound = "C: PaymentDPCComponents"),
-    Eq(bound = "C: PaymentDPCComponents")
+    Clone(bound = "C: DelegablePaymentDPCComponents"),
+    PartialEq(bound = "C: DelegablePaymentDPCComponents"),
+    Eq(bound = "C: DelegablePaymentDPCComponents")
 )]
-pub struct DPCStuff<C: PaymentDPCComponents> {
+pub struct DPCStuff<C: DelegablePaymentDPCComponents> {
     pub digest: MerkleTreeDigest<C::MerkleParameters>,
     #[derivative(PartialEq = "ignore")]
     pub core_proof: <C::MainNIZK as SNARK>::Proof,
@@ -41,7 +41,7 @@ pub struct DPCStuff<C: PaymentDPCComponents> {
     pub binding_signature: BindingSignature,
 }
 
-impl<C: PaymentDPCComponents> DPCTransaction<C> {
+impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
     pub fn new(
         old_serial_numbers: Vec<<Self as Transaction>::SerialNumber>,
         new_commitments: Vec<<Self as Transaction>::Commitment>,
@@ -76,7 +76,7 @@ impl<C: PaymentDPCComponents> DPCTransaction<C> {
     }
 }
 
-impl<C: PaymentDPCComponents> Transaction for DPCTransaction<C> {
+impl<C: DelegablePaymentDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
     type SerialNumber = <C::P as PRF>::Output;

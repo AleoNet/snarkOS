@@ -1,4 +1,4 @@
-use crate::delegable_payment_dpc::PaymentDPCComponents;
+use crate::delegable_payment_dpc::DelegablePaymentDPCComponents;
 
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls12;
 use snarkos_errors::dpc::BindingSignatureError;
@@ -142,7 +142,7 @@ impl Default for BindingSignature {
     }
 }
 
-pub fn create_binding_signature<C: PaymentDPCComponents, R: Rng>(
+pub fn create_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
     parameters: &C::ValueComm,
     input_value_commitments: &Vec<[u8; 32]>,
     output_value_commitments: &Vec<[u8; 32]>,
@@ -213,7 +213,7 @@ pub fn create_binding_signature<C: PaymentDPCComponents, R: Rng>(
     BindingSignature::new(rbar.to_vec(), sbar.to_vec())
 }
 
-pub fn verify_binding_signature<C: PaymentDPCComponents>(
+pub fn verify_binding_signature<C: DelegablePaymentDPCComponents>(
     parameters: &C::ValueComm,
     input_value_commitments: &Vec<[u8; 32]>,
     output_value_commitments: &Vec<[u8; 32]>,
@@ -265,7 +265,7 @@ mod tests {
     use snarkos_models::curves::Group;
     use snarkos_utilities::rand::UniformRand;
 
-    fn generate_random_binding_signature<C: PaymentDPCComponents, R: Rng>(
+    fn generate_random_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
         value_comm_pp: &ValueComm,
         input_amounts: Vec<u64>,
         output_amounts: Vec<u64>,

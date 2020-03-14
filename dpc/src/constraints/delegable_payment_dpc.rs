@@ -6,7 +6,7 @@ use crate::{
             parameters::CommAndCRHPublicParameters,
             predicate::PrivatePredInput,
             record::DPCRecord,
-            PaymentDPCComponents,
+            DelegablePaymentDPCComponents,
         },
         Record,
     },
@@ -26,7 +26,7 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-pub fn execute_core_checks_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
+pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
     cs: &mut CS,
     // Parameters
     comm_crh_parameters: &CommAndCRHPublicParameters<C>,
@@ -135,7 +135,7 @@ fn execute_core_checks_gadget_helper<
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
-    C: PaymentDPCComponents<
+    C: DelegablePaymentDPCComponents<
         AddrC = AddrC,
         RecC = RecC,
         SnNonceH = SnNonceH,
@@ -638,7 +638,7 @@ where
     Ok(())
 }
 
-pub fn execute_proof_check_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<C::ProofCheckF>>(
+pub fn execute_proof_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::ProofCheckF>>(
     cs: &mut CS,
     // Parameters
     comm_crh_parameters: &CommAndCRHPublicParameters<C>,

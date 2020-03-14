@@ -5,8 +5,8 @@ use crate::{
         predicate::DPCPredicate,
         proof_check_circuit::*,
         transaction::DPCTransaction,
+        DelegablePaymentDPCComponents,
         LocalData as DPCLocalData,
-        PaymentDPCComponents,
         DPC,
     },
     ledger::ideal_ledger::IdealLedger,
@@ -125,7 +125,7 @@ impl Default for CommitmentMerkleParameters {
 
 pub struct Components;
 
-impl PaymentDPCComponents for Components {
+impl DelegablePaymentDPCComponents for Components {
     type AddrC = AddressComm;
     type AddrCGadget = AddressCommGadget;
     type CoreCheckF = CoreCheckF;

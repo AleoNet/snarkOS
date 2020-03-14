@@ -69,7 +69,7 @@ mod test;
 /// Trait that stores all information about the components of a Plain DPC
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
-pub trait PaymentDPCComponents: 'static + Sized {
+pub trait DelegablePaymentDPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;
     const NUM_OUTPUT_RECORDS: usize;
 
@@ -150,7 +150,7 @@ pub trait PaymentDPCComponents: 'static + Sized {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DPC<Components: PaymentDPCComponents> {
+pub struct DPC<Components: DelegablePaymentDPCComponents> {
     _components: PhantomData<Components>,
 }
 
@@ -158,7 +158,7 @@ pub struct DPC<Components: PaymentDPCComponents> {
 /// final transaction after `execute_helper` has created old serial numbers and
 /// ledger witnesses, and new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
+pub(crate) struct ExecuteContext<'a, Components: DelegablePaymentDPCComponents> {
     comm_and_crh_pp: &'a CommAndCRHPublicParameters<Components>,
     ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
 
@@ -184,7 +184,7 @@ pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
     value_balance: u64,
 }
 
-impl<Components: PaymentDPCComponents> ExecuteContext<'_, Components> {
+impl<Components: DelegablePaymentDPCComponents> ExecuteContext<'_, Components> {
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             comm_and_crh_pp: self.comm_and_crh_pp.clone(),
@@ -201,7 +201,7 @@ impl<Components: PaymentDPCComponents> ExecuteContext<'_, Components> {
 }
 
 /// Stores local data required to produce predicate proofs.
-pub struct LocalData<Components: PaymentDPCComponents> {
+pub struct LocalData<Components: DelegablePaymentDPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<Components>,
 
     // Old records and serial numbers
@@ -218,7 +218,7 @@ pub struct LocalData<Components: PaymentDPCComponents> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl<Components: PaymentDPCComponents> DPC<Components> {
+impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     pub fn generate_comm_and_crh_parameters<R: Rng>(
         rng: &mut R,
     ) -> Result<CommAndCRHPublicParameters<Components>, DPCError> {
@@ -546,7 +546,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
     }
 }
 
-impl<Components: PaymentDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
+impl<Components: DelegablePaymentDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
 where
     L: Ledger<
         Parameters = Components::MerkleParameters,

@@ -1,10 +1,10 @@
-use crate::dpc::delegable_payment_dpc::PaymentDPCComponents;
+use crate::dpc::delegable_payment_dpc::DelegablePaymentDPCComponents;
 
 use snarkos_models::algorithms::SNARK;
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
-pub struct CommAndCRHPublicParameters<C: PaymentDPCComponents> {
+#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
+pub struct CommAndCRHPublicParameters<C: DelegablePaymentDPCComponents> {
     pub addr_comm_pp: C::AddrC,
     pub rec_comm_pp: C::RecC,
     pub pred_vk_comm_pp: C::PredVkComm,
@@ -16,14 +16,14 @@ pub struct CommAndCRHPublicParameters<C: PaymentDPCComponents> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
-pub struct PredNIZKParameters<C: PaymentDPCComponents> {
+#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
+pub struct PredNIZKParameters<C: DelegablePaymentDPCComponents> {
     pub pk: <C::PredicateNIZK as SNARK>::ProvingParameters,
     pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateNIZK as SNARK>::Proof,
 }
 
-pub struct PublicParameters<C: PaymentDPCComponents> {
+pub struct PublicParameters<C: DelegablePaymentDPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
     pub pred_nizk_pp: PredNIZKParameters<C>,
     pub proof_check_nizk_pp: (
@@ -36,7 +36,7 @@ pub struct PublicParameters<C: PaymentDPCComponents> {
     ),
 }
 
-impl<C: PaymentDPCComponents> PublicParameters<C> {
+impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
     pub fn core_check_nizk_pp(
         &self,
     ) -> &(

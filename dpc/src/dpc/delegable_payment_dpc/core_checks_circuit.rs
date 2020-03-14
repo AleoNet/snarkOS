@@ -5,7 +5,7 @@ use crate::{
         binding_signature::BindingSignature,
         parameters::CommAndCRHPublicParameters,
         record::DPCRecord,
-        PaymentDPCComponents,
+        DelegablePaymentDPCComponents,
     },
     ledger::MerkleTreeParams,
 };
@@ -17,7 +17,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
-pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
+pub struct CoreChecksVerifierInput<C: DelegablePaymentDPCComponents> {
     // Commitment and CRH parameters
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
 
@@ -39,7 +39,7 @@ pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
     pub binding_signature: BindingSignature,
 }
 
-impl<C: PaymentDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
+impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
 where
     <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
@@ -103,8 +103,8 @@ where
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
-pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
+#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
+pub struct CoreChecksCircuit<C: DelegablePaymentDPCComponents> {
     // Parameters
     comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
     ledger_parameters: Option<MerkleTreeParams<C::MerkleParameters>>,
@@ -134,7 +134,7 @@ pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
     binding_signature: Option<BindingSignature>,
 }
 
-impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
+impl<C: DelegablePaymentDPCComponents> CoreChecksCircuit<C> {
     pub fn blank(
         comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
@@ -268,7 +268,7 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
     }
 }
 
-impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
+impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_core_checks_gadget::<C, CS>(
             cs,
