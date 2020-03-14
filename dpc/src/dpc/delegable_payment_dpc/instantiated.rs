@@ -45,8 +45,8 @@ pub const NUM_OUTPUT_RECORDS: usize = 2;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SnNonceWindow;
 
-// `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 + 8 + 256 bits
-const SN_NONCE_SIZE_BITS: usize = NUM_INPUT_RECORDS * 2 * 256 + 8 + 256;
+// `WINDOW_SIZE * NUM_WINDOWS` = NUM_INPUT_RECORDS * 64 + 1 + 32 = 225 bytes
+const SN_NONCE_SIZE_BITS: usize = NUM_INPUT_RECORDS * 2 * 512 + 8 + 256;
 impl PedersenSize for SnNonceWindow {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = SN_NONCE_SIZE_BITS / 8;
@@ -57,14 +57,14 @@ pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
     const NUM_WINDOWS: usize = 38;
-    const WINDOW_SIZE: usize = 400;
+    const WINDOW_SIZE: usize = 300;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LocalDataWindow;
 
 impl PedersenSize for LocalDataWindow {
-    const NUM_WINDOWS: usize = 30;
+    const NUM_WINDOWS: usize = 36;
     const WINDOW_SIZE: usize = 248;
 }
 
@@ -86,8 +86,8 @@ impl PedersenSize for RecordWindow {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct AddressWindow;
 impl PedersenSize for AddressWindow {
-    const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 128;
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 192;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

@@ -53,7 +53,7 @@ pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
     const NUM_WINDOWS: usize = 38;
-    const WINDOW_SIZE: usize = 400;
+    const WINDOW_SIZE: usize = 300;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

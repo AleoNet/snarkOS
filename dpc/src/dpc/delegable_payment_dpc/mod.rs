@@ -365,6 +365,15 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         // Construct the address public key.
         let commit_input = to_bytes![pk_sig, sk_prf, metadata]?;
         let public_key = Components::AddrC::commit(&parameters.addr_comm_pp, &commit_input, &r_pk)?;
+
+        println!("\n---OUTSIDE CIRCUIT---\n");
+        println!("commit_input pk_sig: {:?}\n", to_bytes![pk_sig].unwrap());
+        println!("sk_prf: {:?}\n", to_bytes![sk_prf].unwrap());
+        println!("metadata: {:?}\n", metadata);
+        println!("r_pk: {:?}\n", to_bytes![r_pk].unwrap());
+        println!("public_key: {:?}\n", to_bytes![public_key].unwrap());
+        println!("\n------\n");
+
         let public_key = AddressPublicKey { public_key };
 
         // Construct the address secret key.
