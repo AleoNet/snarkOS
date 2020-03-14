@@ -1,7 +1,7 @@
 use crate::{
     constraints::{delegable_payment_dpc::execute_proof_check_gadget, Assignment},
     dpc::delegable_payment_dpc::{
-        parameters::CommAndCRHPublicParameters,
+        parameters::CommCRHSigPublicParameters,
         predicate::PrivatePredInput,
         DelegablePaymentDPCComponents,
     },
@@ -17,7 +17,7 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
 pub struct ProofCheckVerifierInput<C: DelegablePaymentDPCComponents> {
-    pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
+    pub comm_crh_sig_parameters: CommCRHSigPublicParameters<C>,
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
 }
@@ -36,19 +36,33 @@ where
     fn to_field_elements(&self) -> Result<Vec<C::ProofCheckF>, ConstraintFieldError> {
         let mut v = Vec::new();
 
-        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.parameters().to_field_elements()?);
-        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_crh_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(
+            &self
+                .comm_crh_sig_parameters
+                .pred_vk_comm_pp
+                .parameters()
+                .to_field_elements()?,
+        );
+        v.extend_from_slice(
+            &self
+                .comm_crh_sig_parameters
+                .pred_vk_crh_pp
+                .parameters()
+                .to_field_elements()?,
+        );
 
-        let local_data_comm_pp_fe =
-            ToConstraintField::<C::CoreCheckF>::to_field_elements(self.comm_and_crh_pp.local_data_comm_pp.parameters())
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let local_data_comm_pp_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            self.comm_crh_sig_parameters.local_data_comm_pp.parameters(),
+        )
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.local_data_comm)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_pp_fe =
-            ToConstraintField::<C::CoreCheckF>::to_field_elements(self.comm_and_crh_pp.value_comm_pp.parameters())
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_pp_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            self.comm_crh_sig_parameters.value_comm_pp.parameters(),
+        )
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         // Then we convert these field elements into bytes
         let pred_input = [
@@ -76,7 +90,7 @@ where
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
 pub struct ProofCheckCircuit<C: DelegablePaymentDPCComponents> {
-    comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
+    comm_and_crh_parameters: Option<CommCRHSigPublicParameters<C>>,
 
     old_private_pred_inputs: Option<Vec<PrivatePredInput<C>>>,
 
@@ -89,7 +103,7 @@ pub struct ProofCheckCircuit<C: DelegablePaymentDPCComponents> {
 
 impl<C: DelegablePaymentDPCComponents> ProofCheckCircuit<C> {
     pub fn blank(
-        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
         predicate_nizk_vk_and_proof: &PrivatePredInput<C>,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
@@ -115,7 +129,7 @@ impl<C: DelegablePaymentDPCComponents> ProofCheckCircuit<C> {
     }
 
     pub fn new(
-        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
         // Private pred input = Verification key and input
         // Commitment contains commitment to hash of death predicate vk.
         old_private_pred_inputs: &[PrivatePredInput<C>],

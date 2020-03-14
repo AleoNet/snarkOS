@@ -342,7 +342,7 @@ mod tests {
 
         // Setup parameters
 
-        let comm_and_crh_pp = InstantiatedDPC::generate_comm_and_crh_parameters(rng).unwrap();
+        let comm_and_crh_pp = InstantiatedDPC::generate_comm_crh_sig_parameters(rng).unwrap();
         let value_comm_pp = comm_and_crh_pp.value_comm_pp;
 
         let input_amount: u64 = rng.gen_range(1, 100000000);
@@ -385,7 +385,7 @@ mod tests {
 
         // Setup parameters
 
-        let comm_and_crh_pp = InstantiatedDPC::generate_comm_and_crh_parameters(rng).unwrap();
+        let comm_and_crh_pp = InstantiatedDPC::generate_comm_crh_sig_parameters(rng).unwrap();
         let value_comm_pp = comm_and_crh_pp.value_comm_pp;
 
         let input_amount: u64 = rng.gen_range(1, 100000000);

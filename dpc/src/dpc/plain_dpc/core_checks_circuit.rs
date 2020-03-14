@@ -184,7 +184,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
     pub fn new(
         // Parameters
-        comm_amd_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
 
         // Digest
@@ -225,7 +225,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
         Self {
             // Parameters
-            comm_and_crh_parameters: Some(comm_amd_crh_parameters.clone()),
+            comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest

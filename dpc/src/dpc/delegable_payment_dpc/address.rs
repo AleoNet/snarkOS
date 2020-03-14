@@ -1,5 +1,5 @@
 use crate::dpc::{delegable_payment_dpc::DelegablePaymentDPCComponents, AddressKeyPair};
-use snarkos_models::algorithms::{CommitmentScheme, PRF};
+use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, PRF};
 use snarkos_utilities::bytes::ToBytes;
 
 use std::io::{Result as IoResult, Write};
@@ -23,10 +23,11 @@ impl<C: DelegablePaymentDPCComponents> ToBytes for AddressPublicKey<C> {
 #[derive(Derivative)]
 #[derivative(
     Default(bound = "C: DelegablePaymentDPCComponents"),
-    Clone(bound = "C: DelegablePaymentDPCComponents"),
-    Debug(bound = "C: DelegablePaymentDPCComponents")
+    Clone(bound = "C: DelegablePaymentDPCComponents")
 )]
 pub struct AddressSecretKey<C: DelegablePaymentDPCComponents> {
+    pub pk_sig: <C::S as SignatureScheme>::PublicKey,
+    pub sk_sig: <C::S as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::P as PRF>::Seed,
     pub metadata: [u8; 32],
     pub r_pk: <C::AddrC as CommitmentScheme>::Randomness,

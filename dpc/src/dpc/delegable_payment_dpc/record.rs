@@ -7,7 +7,7 @@ use crate::dpc::{
     },
     Record,
 };
-use snarkos_models::algorithms::{CommitmentScheme, CRH, PRF};
+use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, CRH};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use std::marker::PhantomData;
@@ -46,7 +46,7 @@ impl<C: DelegablePaymentDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecC as CommitmentScheme>::Randomness;
     type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
-    type SerialNumber = <C::P as PRF>::Output;
+    type SerialNumber = <C::S as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SnNonceH as CRH>::Output;
 
     fn address_public_key(&self) -> &Self::AddressPublicKey {

@@ -73,7 +73,7 @@ impl<C: PaymentDPCComponents> PaymentCircuit<C> {
     }
 
     pub fn new(
-        comm_amd_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
         value_commitment_randomness: &<C::ValueComm as CommitmentScheme>::Randomness,
         value_commitment: &<C::ValueComm as CommitmentScheme>::Output,
@@ -81,7 +81,7 @@ impl<C: PaymentDPCComponents> PaymentCircuit<C> {
         value: u64,
     ) -> Self {
         Self {
-            parameters: Some(comm_amd_crh_parameters.clone()),
+            parameters: Some(comm_and_crh_parameters.clone()),
             local_data_comm: Some(local_data_comm.clone()),
             value_commitment_randomness: Some(value_commitment_randomness.clone()),
 

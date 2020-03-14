@@ -3,7 +3,7 @@ use crate::{
         delegable_payment_dpc::{
             address::AddressSecretKey,
             binding_signature::BindingSignature,
-            parameters::CommAndCRHPublicParameters,
+            parameters::CommCRHSigPublicParameters,
             predicate::PrivatePredInput,
             record::DPCRecord,
             DelegablePaymentDPCComponents,
@@ -16,10 +16,16 @@ use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
     curves::to_field_vec::ToConstraintField,
     gadgets::{
-        algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SNARKVerifierGadget},
+        algorithms::{
+            CRHGadget,
+            CommitmentGadget,
+            PRFGadget,
+            SNARKVerifierGadget,
+            SignaturePublicKeyRandomizationGadget,
+        },
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
@@ -29,7 +35,7 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
     cs: &mut CS,
     // Parameters
-    comm_crh_parameters: &CommAndCRHPublicParameters<C>,
+    comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
     ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
 
     // Digest
@@ -39,7 +45,7 @@ pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
     old_address_secret_keys: &[AddressSecretKey<C>],
-    old_serial_numbers: &[<C::P as PRF>::Output],
+    old_serial_numbers: &[<C::S as SignatureScheme>::PublicKey],
 
     // New record stuff
     new_records: &[DPCRecord<C>],
@@ -55,7 +61,7 @@ pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     auxiliary: &[u8; 32],
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
-    execute_core_checks_gadget_helper::<
+    delegable_dpc_execute_gadget_helper::<
         C,
         CS,
         C::AddrC,
@@ -69,7 +75,7 @@ pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     >(
         cs,
         //
-        comm_crh_parameters,
+        comm_crh_sig_parameters,
         ledger_parameters,
         //
         ledger_digest,
@@ -93,7 +99,7 @@ pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     )
 }
 
-fn execute_core_checks_gadget_helper<
+fn delegable_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::CoreCheckF>,
     AddrC,
@@ -108,7 +114,7 @@ fn execute_core_checks_gadget_helper<
     cs: &mut CS,
 
     //
-    comm_crh_parameters: &CommAndCRHPublicParameters<C>,
+    comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
     ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
 
     //
@@ -118,7 +124,7 @@ fn execute_core_checks_gadget_helper<
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
     old_address_secret_keys: &[AddressSecretKey<C>],
-    old_serial_numbers: &[P::Output],
+    old_serial_numbers: &[<C::S as SignatureScheme>::PublicKey],
 
     //
     new_records: &[DPCRecord<C>],
@@ -170,6 +176,7 @@ where
     let mut new_death_pred_hashes = Vec::with_capacity(new_records.len());
     let mut new_birth_pred_hashes = Vec::with_capacity(new_records.len());
 
+    // TODO UPDATE/FIX the documentation for this
     // Order for allocation of input:
     // 1. addr_comm_pp.
     // 2. rec_comm_pp.
@@ -178,33 +185,38 @@ where
     // 5. ledger_digest.
     // 6. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
     // 7. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
-    let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, ledger_pp) = {
+    let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, sig_pp, ledger_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
             AddrCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Addr Comm parameters"), || {
-                Ok(comm_crh_parameters.addr_comm_pp.parameters())
+                Ok(comm_crh_sig_parameters.addr_comm_pp.parameters())
             })?;
 
         let rec_comm_pp =
             RecCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Rec Comm parameters"), || {
-                Ok(comm_crh_parameters.rec_comm_pp.parameters())
+                Ok(comm_crh_sig_parameters.rec_comm_pp.parameters())
             })?;
 
         let local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Local Data Comm parameters"),
-            || Ok(comm_crh_parameters.local_data_comm_pp.parameters()),
+            || Ok(comm_crh_sig_parameters.local_data_comm_pp.parameters()),
         )?;
 
         let pred_vk_comm_pp =
             <C::PredVkCommGadget as CommitmentGadget<_, C::CoreCheckF>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-                || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
+                || Ok(comm_crh_sig_parameters.pred_vk_comm_pp.parameters()),
             )?;
 
         let sn_nonce_crh_pp =
             SnNonceHGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SN Nonce CRH parameters"), || {
-                Ok(comm_crh_parameters.sn_nonce_crh_pp.parameters())
+                Ok(comm_crh_sig_parameters.sn_nonce_crh_pp.parameters())
             })?;
+
+        let sig_pp = <C::SGadget as SignaturePublicKeyRandomizationGadget<_, _>>::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare SIG Parameters"),
+            || Ok(&comm_crh_sig_parameters.sig_pp),
+        )?;
 
         let ledger_pp = <C::MerkleTree_HGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),
@@ -216,6 +228,7 @@ where
             pred_vk_comm_pp,
             local_data_comm_pp,
             sn_nonce_crh_pp,
+            sig_pp,
             ledger_pp,
         )
     };
@@ -322,15 +335,22 @@ where
         // pair.
         // ********************************************************************
 
-        let sk_prf = {
+        let (sk_prf, pk_sig) = {
             // Declare variables for addr_sk contents.
             let address_cs = &mut cs.ns(|| "Check address keypair");
+            let pk_sig = <C::SGadget as SignaturePublicKeyRandomizationGadget<_, _>>::PublicKeyGadget::alloc(
+                &mut address_cs.ns(|| "Declare pk_sig"),
+                || Ok(&secret_key.pk_sig),
+            )?;
+            let pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
+
             let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &secret_key.sk_prf);
             let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &secret_key.metadata)?;
             let r_pk =
                 AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || Ok(&secret_key.r_pk))?;
 
-            let mut apk_input = sk_prf.clone();
+            let mut apk_input = pk_sig_bytes.clone();
+            apk_input.extend_from_slice(&sk_prf);
             apk_input.extend_from_slice(&metadata);
 
             let candidate_apk = AddrCGadget::check_commitment_gadget(
@@ -344,7 +364,7 @@ where
                 &mut address_cs.ns(|| "Check that declared and computed pks are equal"),
                 &given_apk,
             )?;
-            sk_prf
+            (sk_prf, pk_sig)
         };
         // ********************************************************************
 
@@ -357,21 +377,31 @@ where
             let sn_nonce_bytes = sn_nonce.to_bytes(&mut sn_cs.ns(|| "Convert nonce to bytes"))?;
 
             let prf_seed = sk_prf;
-            let candidate_serial_number = PGadget::check_evaluation_gadget(
-                &mut sn_cs.ns(|| "Compute serial number"),
+            let randomizer = PGadget::check_evaluation_gadget(
+                &mut sn_cs.ns(|| "Compute pk_sig randomizer"),
                 &prf_seed,
                 &sn_nonce_bytes,
             )?;
+            let randomizer_bytes = randomizer.to_bytes(&mut sn_cs.ns(|| "Convert randomizer to bytes"))?;
 
-            let given_sn = PGadget::OutputGadget::alloc_input(&mut sn_cs.ns(|| "Declare given serial number"), || {
-                Ok(given_serial_number)
-            })?;
+            let candidate_sn = C::SGadget::check_randomization_gadget(
+                &mut sn_cs.ns(|| "Compute serial number"),
+                &sig_pp,
+                &pk_sig,
+                &randomizer_bytes,
+            )?;
 
-            candidate_serial_number.enforce_equal(
+            let given_sn = <C::SGadget as SignaturePublicKeyRandomizationGadget<_, _>>::PublicKeyGadget::alloc_input(
+                &mut sn_cs.ns(|| "Declare given serial number"),
+                || Ok(given_serial_number),
+            )?;
+
+            candidate_sn.enforce_equal(
                 &mut sn_cs.ns(|| "Check that given and computed serial numbers are equal"),
                 &given_sn,
             )?;
-            old_sns.push(candidate_serial_number);
+
+            old_sns.push(candidate_sn);
             sn_nonce_bytes
         };
         // ********************************************************************
@@ -641,7 +671,7 @@ where
 pub fn execute_proof_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::ProofCheckF>>(
     cs: &mut CS,
     // Parameters
-    comm_crh_parameters: &CommAndCRHPublicParameters<C>,
+    comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
 
     // Old record death predicate verif. keys and proofs
     old_death_pred_vk_and_pf: &[PrivatePredInput<C>],
@@ -668,12 +698,12 @@ where
         let pred_vk_comm_pp =
             <C::PredVkCommGadget as CommitmentGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-                || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
+                || Ok(comm_crh_sig_parameters.pred_vk_comm_pp.parameters()),
             )?;
 
         let pred_vk_crh_pp = <C::PredVkHGadget as CRHGadget<_, C::ProofCheckF>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
-            || Ok(comm_crh_parameters.pred_vk_crh_pp.parameters()),
+            || Ok(comm_crh_sig_parameters.pred_vk_crh_pp.parameters()),
         )?;
 
         (pred_vk_comm_pp, pred_vk_crh_pp)
@@ -685,14 +715,14 @@ where
 
     // First we convert the input for the predicates into `CoreCheckF` field elements
     let local_data_comm_pp_fe =
-        ToConstraintField::<C::CoreCheckF>::to_field_elements(comm_crh_parameters.local_data_comm_pp.parameters())
+        ToConstraintField::<C::CoreCheckF>::to_field_elements(comm_crh_sig_parameters.local_data_comm_pp.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(local_data_comm)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let value_comm_pp_fe =
-        ToConstraintField::<C::CoreCheckF>::to_field_elements(comm_crh_parameters.value_comm_pp.parameters())
+        ToConstraintField::<C::CoreCheckF>::to_field_elements(comm_crh_sig_parameters.value_comm_pp.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     // Then we convert these field elements into bytes

@@ -1,6 +1,6 @@
 use crate::{
     constraints::Assignment,
-    delegable_payment_dpc::{parameters::CommAndCRHPublicParameters, *},
+    delegable_payment_dpc::{parameters::CommCRHSigPublicParameters, *},
 };
 
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
@@ -46,7 +46,7 @@ where
 }
 
 pub struct PaymentCircuit<C: DelegablePaymentDPCComponents> {
-    pub parameters: Option<CommAndCRHPublicParameters<C>>,
+    pub parameters: Option<CommCRHSigPublicParameters<C>>,
 
     pub local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
     pub value_commitment_randomness: Option<<C::ValueComm as CommitmentScheme>::Randomness>,
@@ -57,7 +57,7 @@ pub struct PaymentCircuit<C: DelegablePaymentDPCComponents> {
 }
 
 impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
-    pub fn blank(comm_and_crh_parameters: &CommAndCRHPublicParameters<C>) -> Self {
+    pub fn blank(comm_and_crh_parameters: &CommCRHSigPublicParameters<C>) -> Self {
         let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
         let value_commitment_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
         let value_commitment = <C::ValueComm as CommitmentScheme>::Output::default();
@@ -73,7 +73,7 @@ impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
     }
 
     pub fn new(
-        comm_amd_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
         local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
         value_commitment_randomness: &<C::ValueComm as CommitmentScheme>::Randomness,
         value_commitment: &<C::ValueComm as CommitmentScheme>::Output,
@@ -81,7 +81,7 @@ impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
         value: u64,
     ) -> Self {
         Self {
-            parameters: Some(comm_amd_crh_parameters.clone()),
+            parameters: Some(comm_and_crh_parameters.clone()),
             local_data_comm: Some(local_data_comm.clone()),
             value_commitment_randomness: Some(value_commitment_randomness.clone()),
 
@@ -108,7 +108,7 @@ impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for 
 
 fn execute_payment_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
     cs: &mut CS,
-    comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
+    comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
     local_data_commitment: &<C::LocalDataComm as CommitmentScheme>::Output,
     value_commitment: &<C::ValueComm as CommitmentScheme>::Output,
     value_commitment_randomness: &<C::ValueComm as CommitmentScheme>::Randomness,
