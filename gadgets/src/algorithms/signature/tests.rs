@@ -1,6 +1,6 @@
 use crate::{algorithms::signature::*, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_algorithms::signature::SchnorrSignature;
-use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
+use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsAffine as EdwardsBls};
 use snarkos_models::{
     algorithms::SignatureScheme,
     gadgets::{

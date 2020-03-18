@@ -21,7 +21,7 @@ use snarkos_algorithms::{
 };
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
-    edwards_bls12::EdwardsProjective as EdwardsBls,
+    edwards_bls12::{EdwardsAffine, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
     sw6::SW6,
 };
@@ -170,7 +170,7 @@ pub type PredicateComm = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
-pub type AuthSignature = SchnorrSignature<EdwardsBls, Blake2sHash>;
+pub type AuthSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -197,7 +197,7 @@ pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, E
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateNIZKGadget = GM17VerifierGadget<CoreCheckPairing, ProofCheckF, PairingGadget>;
 
-pub type AuthSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsBls, CoreCheckF, EdwardsBlsGadget>;
+pub type AuthSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, CoreCheckF, EdwardsBlsGadget>;
 
 pub type MerkleTreeIdealLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;

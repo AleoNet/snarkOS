@@ -2,7 +2,7 @@ use crate::signature::SchnorrParameters;
 use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::SignatureScheme,
-    curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField, ProjectiveCurve},
+    curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
 };
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
@@ -26,47 +26,52 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
 }
 
 #[derive(Derivative)]
-#[derivative(
-    Clone(bound = "G: Group + ProjectiveCurve"),
-    Default(bound = "G: Group + ProjectiveCurve")
-)]
-pub struct SchnorrOutput<G: Group + ProjectiveCurve> {
+#[derivative(Clone(bound = "G: Group"), Default(bound = "G: Group"))]
+pub struct SchnorrOutput<G: Group> {
     pub prover_response: <G as Group>::ScalarField,
     pub verifier_challenge: <G as Group>::ScalarField,
 }
 
-#[derive(Derivative)]
-#[derivative(
-    Copy(bound = "G: Group + ProjectiveCurve"),
-    Clone(bound = "G: Group + ProjectiveCurve"),
-    PartialEq(bound = "G: Group + ProjectiveCurve"),
-    Eq(bound = "G: Group + ProjectiveCurve"),
-    Debug(bound = "G: Group + ProjectiveCurve"),
-    Hash(bound = "G: Group + ProjectiveCurve"),
-    Default(bound = "G: Group + ProjectiveCurve")
-)]
-pub struct SchnorrPublicKey<G: Group + ProjectiveCurve>(pub G);
-
-impl<G: Group + ProjectiveCurve> ToBytes for SchnorrPublicKey<G> {
+impl<G: Group> ToBytes for SchnorrOutput<G> {
     #[inline]
-    fn write<W: Write>(&self, writer: W) -> IoResult<()> {
-        self.0.into_affine().write(writer)
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.prover_response.write(&mut writer)?;
+        self.verifier_challenge.write(&mut writer)
     }
 }
 
-impl<F: Field, G: Group + ProjectiveCurve + ToConstraintField<F>> ToConstraintField<F> for SchnorrPublicKey<G> {
+#[derive(Derivative)]
+#[derivative(
+    Copy(bound = "G: Group"),
+    Clone(bound = "G: Group"),
+    PartialEq(bound = "G: Group"),
+    Eq(bound = "G: Group"),
+    Debug(bound = "G: Group"),
+    Hash(bound = "G: Group"),
+    Default(bound = "G: Group")
+)]
+pub struct SchnorrPublicKey<G: Group>(pub G);
+
+impl<G: Group> ToBytes for SchnorrPublicKey<G> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl<F: Field, G: Group + ToConstraintField<F>> ToConstraintField<F> for SchnorrPublicKey<G> {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.0.to_field_elements()
     }
 }
 
-pub struct SchnorrSignature<G: Group + ProjectiveCurve, D: Digest> {
+pub struct SchnorrSignature<G: Group, D: Digest> {
     _group: PhantomData<G>,
     _hash: PhantomData<D>,
 }
 
-impl<G: Group + Hash + ProjectiveCurve, D: Digest + Send + Sync> SignatureScheme for SchnorrSignature<G, D>
+impl<G: Group + Hash, D: Digest + Send + Sync> SignatureScheme for SchnorrSignature<G, D>
 where
     <G as Group>::ScalarField: PrimeField,
 {
