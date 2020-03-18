@@ -13,7 +13,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
-fn integration_test() {
+fn plain_integration_test() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
