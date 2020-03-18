@@ -63,17 +63,17 @@ pub trait GroupGadget<G: Group, F: Field>:
         result: &Self,
         bits: impl Iterator<Item = &'a Boolean>,
     ) -> Result<Self, SynthesisError> {
-        let mut power = self.clone();
+        let mut base = self.clone();
         let mut result = result.clone();
         for (i, bit) in bits.enumerate() {
-            let new_encoded = result.add(&mut cs.ns(|| format!("Add {}-th power", i)), &power)?;
+            let new_encoded = result.add(&mut cs.ns(|| format!("Add {}-th power", i)), &base)?;
             result = Self::conditionally_select(
                 &mut cs.ns(|| format!("Select {}", i)),
                 bit.borrow(),
                 &new_encoded,
                 &result,
             )?;
-            power.double_in_place(&mut cs.ns(|| format!("{}-th Doubling", i)))?;
+            base.double_in_place(&mut cs.ns(|| format!("{}-th Doubling", i)))?;
         }
         Ok(result)
     }

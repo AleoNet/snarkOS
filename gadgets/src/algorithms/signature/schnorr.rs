@@ -1,10 +1,10 @@
-use snarkos_algorithms::signature::{SchnorrParameters, SchnorrSignature};
+use snarkos_algorithms::signature::{SchnorrParameters, SchnorrPublicKey, SchnorrSignature};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group},
+    curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         algorithms::SignaturePublicKeyRandomizationGadget,
-        curves::GroupGadget,
+        curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
@@ -66,37 +66,45 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> Clone for SchnorrParametersGadge
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SchnorrPublicKeyGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
+pub struct SchnorrPublicKeyGadget<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> {
     public_key: GG,
     _group: PhantomData<G>,
     _engine: PhantomData<F>,
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> AllocGadget<G, F> for SchnorrPublicKeyGadget<G, F, GG> {
-    fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G>, CS: ConstraintSystem<F>>(
+impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<SchnorrPublicKey<G>, F>
+    for SchnorrPublicKeyGadget<G, F, GG>
+{
+    fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<SchnorrPublicKey<G>>, CS: ConstraintSystem<F>>(
         cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_input(cs, || f().map(|pk| *pk.borrow()))?,
+            public_key: GG::alloc_input(cs, || f().map(|pk| pk.borrow().key))?,
             _engine: PhantomData,
             _group: PhantomData,
         })
     }
 
-    fn alloc_input<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G>, CS: ConstraintSystem<F>>(
+    fn alloc_input<
+        Fn: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<SchnorrPublicKey<G>>,
+        CS: ConstraintSystem<F>,
+    >(
         cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_input(cs, || f().map(|pk| *pk.borrow()))?,
+            public_key: GG::alloc_input(cs, || f().map(|pk| pk.borrow().key))?,
             _engine: PhantomData,
             _group: PhantomData,
         })
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for SchnorrPublicKeyGadget<G, F, GG> {
+impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F>
+    for SchnorrPublicKeyGadget<G, F, GG>
+{
     #[inline]
     fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
         &self,
@@ -117,9 +125,11 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Schno
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for SchnorrPublicKeyGadget<G, F, GG> {}
+impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for SchnorrPublicKeyGadget<G, F, GG> {}
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for SchnorrPublicKeyGadget<G, F, GG> {
+impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F>
+    for SchnorrPublicKeyGadget<G, F, GG>
+{
     fn to_bytes<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
         self.public_key.to_bytes(&mut cs.ns(|| "to_bytes"))
     }
@@ -135,7 +145,7 @@ pub struct SchnorrPublicKeyRandomizationGadget<G: Group, F: Field, GG: GroupGadg
     _engine: PhantomData<*const F>,
 }
 
-impl<G: Group, GG: GroupGadget<G, F>, D: Digest + Send + Sync, F: Field>
+impl<G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, D: Digest + Send + Sync, F: Field>
     SignaturePublicKeyRandomizationGadget<SchnorrSignature<G, D>, F> for SchnorrPublicKeyRandomizationGadget<G, F, GG>
 {
     type ParametersGadget = SchnorrParametersGadget<G, F, GG>;
