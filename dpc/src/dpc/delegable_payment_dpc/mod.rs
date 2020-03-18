@@ -871,6 +871,29 @@ where
             return Ok(false);
         }
 
+        let signature_message = &to_bytes![
+            transaction.old_serial_numbers(),
+            transaction.new_commitments(),
+            transaction.memorandum(),
+            transaction.stuff.digest,
+            transaction.stuff.core_proof,
+            transaction.stuff.predicate_proof
+        ]?;
+
+        let sig_time = start_timer!(|| "Signature verification (in parallel)");
+        let sig_pp = &parameters.comm_crh_sig_pp.sig_pp;
+        for (pk, sig) in transaction
+            .old_serial_numbers()
+            .iter()
+            .zip(&transaction.stuff.signatures)
+        {
+            if !Components::S::verify(sig_pp, pk, signature_message, sig)? {
+                eprintln!("Signature didn't verify.");
+                return Ok(false);
+            }
+        }
+        end_timer!(sig_time);
+
         if !verify_binding_signature::<Components>(
             &parameters.comm_crh_sig_pp.value_comm_pp,
             &transaction.stuff.input_value_commitments,
