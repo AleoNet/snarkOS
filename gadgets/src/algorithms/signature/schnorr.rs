@@ -80,7 +80,7 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> AllocGadget<SchnorrPublicKey<G>,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_input(cs, || f().map(|pk| pk.borrow().0))?,
+            public_key: GG::alloc_checked(cs, || f().map(|pk| pk.borrow().0))?,
             _engine: PhantomData,
             _group: PhantomData,
         })
