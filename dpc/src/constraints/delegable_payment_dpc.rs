@@ -392,6 +392,7 @@ where
                 &randomizer_bytes,
             )?;
 
+            // TODO Figure out the query length derived from this alloc_input.
             let given_sn = <C::SGadget as SignaturePublicKeyRandomizationGadget<_, _>>::PublicKeyGadget::alloc_input(
                 &mut sn_cs.ns(|| "Declare given serial number"),
                 || Ok(given_serial_number),
