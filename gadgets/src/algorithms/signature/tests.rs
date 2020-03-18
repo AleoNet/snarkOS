@@ -62,14 +62,17 @@ fn test_schnorr_signature_gadget() {
 
     let candidate_randomizer = UInt8::alloc_vec(&mut cs.ns(|| "candidate_randomizer"), &random_scalar).unwrap();
 
-    let candidate_randomized_public_key_gadget =
-        <SchnorrPublicKeyRandomizationGadget::<EdwardsAffine, Fr, EdwardsBlsGadget> as SignaturePublicKeyRandomizationGadget<Schnorr, Fr>>::check_randomization_gadget(
-            &mut cs.ns(|| "candidate_randomized_public_key"),
-            &candidate_parameters_gadget,
-            &candidate_public_key_gadget,
-            &candidate_randomizer,
-        )
-        .unwrap();
+    let candidate_randomized_public_key_gadget = <SchnorrPublicKeyRandomizationGadget<
+        EdwardsAffine,
+        Fr,
+        EdwardsBlsGadget,
+    > as SignaturePublicKeyRandomizationGadget<Schnorr, Fr>>::check_randomization_gadget(
+        &mut cs.ns(|| "candidate_randomized_public_key"),
+        &candidate_parameters_gadget,
+        &candidate_public_key_gadget,
+        &candidate_randomizer,
+    )
+    .unwrap();
 
     // Circuit Schnorr randomized public key (given)
 
@@ -81,7 +84,8 @@ fn test_schnorr_signature_gadget() {
         .unwrap();
 
     candidate_randomized_public_key_gadget
-        .enforce_equal(&mut cs.ns(|| "enforce_equal"), &given_randomized_public_key_gadget).unwrap();
+        .enforce_equal(&mut cs.ns(|| "enforce_equal"), &given_randomized_public_key_gadget)
+        .unwrap();
 
     if !cs.is_satisfied() {
         println!("which is unsatisfied: {:?}", cs.which_is_unsatisfied().unwrap());
