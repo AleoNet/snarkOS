@@ -35,13 +35,9 @@ pub struct DPCStuff<C: PaymentDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
 
-    #[derivative(PartialEq = "ignore")]
     pub input_value_commitments: Vec<[u8; 32]>,
-    #[derivative(PartialEq = "ignore")]
     pub output_value_commitments: Vec<[u8; 32]>,
-    #[derivative(PartialEq = "ignore")]
     pub value_balance: u64,
-    #[derivative(PartialEq = "ignore")]
     pub binding_signature: BindingSignature,
 }
 
