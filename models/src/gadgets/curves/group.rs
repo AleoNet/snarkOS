@@ -66,6 +66,7 @@ pub trait GroupGadget<G: Group, F: Field>:
         let mut power = self.clone();
         let mut result = result.clone();
         for (i, bit) in bits.enumerate() {
+            println!("CIRCUIT {}: {:#?}", i, bit);
             let new_encoded = result.add(&mut cs.ns(|| format!("Add {}-th power", i)), &power)?;
             result = Self::conditionally_select(
                 &mut cs.ns(|| format!("Select {}", i)),

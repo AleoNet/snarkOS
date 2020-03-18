@@ -14,7 +14,7 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
     let mut bits = Vec::with_capacity(bytes.len() * 8);
     for byte in bytes {
         for i in 0..8 {
-            let bit = (*byte >> (8 - i - 1)) & 1;
+            let bit = (*byte >> i) & 1;
             bits.push(bit == 1);
         }
     }
@@ -149,8 +149,9 @@ where
         let mut randomized_pk = *public_key;
         let mut base = parameters.generator;
         let mut encoded = G::zero();
-        for bit in bytes_to_bits(randomness) {
-            if bit {
+        for (i, bit) in bytes_to_bits(randomness).iter().enumerate() {
+            println!("NATIVE {}: {:#?}", i, bit);
+            if *bit {
                 encoded += &base;
             }
             base.double_in_place();
