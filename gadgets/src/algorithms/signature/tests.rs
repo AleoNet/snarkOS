@@ -1,6 +1,6 @@
 use crate::{algorithms::signature::*, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_algorithms::signature::SchnorrSignature;
-use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsAffine as EdwardsBls};
+use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsAffine};
 use snarkos_models::{
     algorithms::SignatureScheme,
     gadgets::{
@@ -16,8 +16,8 @@ use blake2::Blake2s as Blake2sHash;
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-pub type SGadget = SchnorrPublicKeyRandomizationGadget<EdwardsBls, Fr, EdwardsBlsGadget>;
-pub type S = SchnorrSignature<EdwardsBls, Blake2sHash>;
+pub type SGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, Fr, EdwardsBlsGadget>;
+pub type S = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 #[test]
 fn test_schnorr_signature_pk() {

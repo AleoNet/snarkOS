@@ -21,7 +21,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
-fn delegated_payment_integration_test() {
+fn delegated_payment_dpc_integration_test() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
