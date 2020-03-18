@@ -343,33 +343,16 @@ where
                 || Ok(&secret_key.pk_sig),
             )?;
 
-            // TODO THIS to_bytes value is incorrect. pk_sig_bytes != direct_pk_sig_bytes, but should be equal
-            let _pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
-            let direct_pk_sig_bytes = UInt8::alloc_vec(
-                &mut address_cs.ns(|| "asdfasd"),
-                &to_bytes![&secret_key.pk_sig].unwrap(),
-            )?;
+            let pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
 
             let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &secret_key.sk_prf);
             let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &secret_key.metadata)?;
             let r_pk =
                 AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || Ok(&secret_key.r_pk))?;
 
-            //            let mut apk_input = pk_sig_bytes.clone();
-            let mut apk_input = direct_pk_sig_bytes.clone();
+            let mut apk_input = pk_sig_bytes.clone();
             apk_input.extend_from_slice(&sk_prf);
             apk_input.extend_from_slice(&metadata);
-
-            println!("\n---IN CIRCUIT---\n");
-            println!("secret_key.pk_sig: {:?}\n", to_bytes![secret_key.pk_sig].unwrap());
-            println!("secret_key.sk_prf: {:?}\n", to_bytes![secret_key.sk_prf].unwrap());
-            println!("secret_key.metadata: {:?}\n", to_bytes![secret_key.metadata].unwrap());
-            println!("secret_key.r_pk: {:?}\n", to_bytes![secret_key.r_pk].unwrap());
-            println!(
-                "public key: {:?}\n",
-                to_bytes![record.address_public_key().public_key].unwrap()
-            );
-            println!("\n------\n");
 
             let candidate_apk = AddrCGadget::check_commitment_gadget(
                 &mut address_cs.ns(|| "Compute Addr PubKey"),

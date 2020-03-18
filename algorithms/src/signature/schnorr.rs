@@ -18,7 +18,7 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
     let mut bits = Vec::with_capacity(bytes.len() * 8);
     for byte in bytes {
         for i in 0..8 {
-            let bit = (*byte >> (8 - i - 1)) & 1;
+            let bit = (*byte >> i) & 1;
             bits.push(bit == 1);
         }
     }
@@ -45,21 +45,19 @@ pub struct SchnorrOutput<G: Group + ProjectiveCurve> {
     Hash(bound = "G: Group + ProjectiveCurve"),
     Default(bound = "G: Group + ProjectiveCurve")
 )]
-pub struct SchnorrPublicKey<G: Group + ProjectiveCurve> {
-    pub key: G,
-}
+pub struct SchnorrPublicKey<G: Group + ProjectiveCurve>(pub G);
 
 impl<G: Group + ProjectiveCurve> ToBytes for SchnorrPublicKey<G> {
     #[inline]
     fn write<W: Write>(&self, writer: W) -> IoResult<()> {
-        self.key.into_affine().write(writer)
+        self.0.into_affine().write(writer)
     }
 }
 
 impl<F: Field, G: Group + ProjectiveCurve + ToConstraintField<F>> ToConstraintField<F> for SchnorrPublicKey<G> {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
-        self.key.to_field_elements()
+        self.0.to_field_elements()
     }
 }
 
@@ -102,7 +100,7 @@ where
         let public_key = parameters.generator.mul(&private_key);
 
         end_timer!(keygen_time);
-        Ok((SchnorrPublicKey { key: public_key }, private_key))
+        Ok((SchnorrPublicKey(public_key), private_key))
     }
 
     fn sign<R: Rng>(
@@ -156,7 +154,7 @@ where
             verifier_challenge,
         } = signature;
         let mut claimed_prover_commitment = parameters.generator.mul(prover_response);
-        let public_key_times_verifier_challenge = public_key.key.mul(verifier_challenge);
+        let public_key_times_verifier_challenge = public_key.0.mul(verifier_challenge);
         claimed_prover_commitment += &public_key_times_verifier_challenge;
 
         let mut hash_input = Vec::new();
@@ -182,7 +180,7 @@ where
     ) -> Result<Self::PublicKey, SignatureError> {
         let rand_pk_time = start_timer!(|| "SchnorrSig::RandomizePubKey");
 
-        let mut randomized_pk = public_key.key.clone();
+        let mut randomized_pk = public_key.0.clone();
         let mut base = parameters.generator;
         let mut encoded = <G as Group>::zero();
         for bit in bytes_to_bits(randomness) {
@@ -195,7 +193,7 @@ where
 
         end_timer!(rand_pk_time);
 
-        Ok(SchnorrPublicKey { key: randomized_pk })
+        Ok(SchnorrPublicKey(randomized_pk))
     }
 
     fn randomize_signature(

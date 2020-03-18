@@ -170,7 +170,7 @@ pub type PredicateComm = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
-type AuthSignature = SchnorrSignature<EdwardsBls, Blake2sHash>;
+pub type AuthSignature = SchnorrSignature<EdwardsBls, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
