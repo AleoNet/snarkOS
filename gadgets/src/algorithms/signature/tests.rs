@@ -108,7 +108,6 @@ fn test_schnorr_sn_generation() {
     )
     .unwrap();
 
-    // TODO Fix failing condition
     candidate_sn
         .enforce_equal(
             &mut cs.ns(|| "Check that given and computed serial numbers are equal"),
