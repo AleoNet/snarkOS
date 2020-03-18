@@ -18,6 +18,7 @@ impl Storage {
     /// Opens storage from the given path. If storage does not exists,
     /// it creates a new storage file at the given path and opens it.
     /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
+    #[allow(dead_code)]
     pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
         Ok(Self {
             storage: Arc::new(DB::open_default(path)?),

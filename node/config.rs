@@ -109,6 +109,9 @@ impl Config {
 
     fn is_bootnode(&mut self, argument: bool) {
         self.is_bootnode = argument;
+        if argument {
+            self.bootnodes = vec![];
+        }
     }
 
     fn miner(&mut self, argument: bool) {
@@ -189,7 +192,7 @@ impl CLI for ConfigCli {
         flag::MINER,
         flag::QUIET,
     ];
-    const NAME: NameType = "skeleton-node";
+    const NAME: NameType = "snarkos-node";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
         option::PORT,
@@ -239,7 +242,7 @@ impl CLI for ConfigCli {
                     "rpc_port",
                     "connect",
                     "coinbase_address",
-                    "mempool+interval",
+                    "mempool_interval",
                     "min_peers",
                     "max_peers",
                 ]);

@@ -2,7 +2,6 @@
 //!
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
-use crate::{check_for_double_spend, check_for_double_spends};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{transaction::Transaction, Outpoint, Transactions};
 use snarkos_storage::BlockStorage;
@@ -46,21 +45,18 @@ impl MemoryPool {
     pub fn from_storage(storage: &BlockStorage) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
-        match storage.get_memory_pool_transactions() {
-            Ok(serialized_transactions_option) => {
-                if let Some(serialized_transactions) = serialized_transactions_option {
-                    let transaction_bytes: Vec<Vec<u8>> = bincode::deserialize(&serialized_transactions)?;
+        if let Ok(serialized_transactions_option) = storage.get_memory_pool() {
+            if let Some(serialized_transactions) = serialized_transactions_option {
+                let transaction_bytes: Vec<Vec<u8>> = bincode::deserialize(&serialized_transactions)?;
 
-                    for tx_bytes in transaction_bytes {
-                        let transaction = Transaction::deserialize(&tx_bytes)?;
-                        let size = tx_bytes.len();
-                        let entry = Entry { transaction, size };
-                        memory_pool.insert(storage, entry)?;
-                    }
+                for tx_bytes in transaction_bytes {
+                    let transaction = Transaction::deserialize(&tx_bytes)?;
+                    let size = tx_bytes.len();
+                    let entry = Entry { transaction, size };
+                    memory_pool.insert(storage, entry)?;
                 }
             }
-            Err(_) => {}
-        };
+        }
 
         Ok(memory_pool)
     }
@@ -84,7 +80,7 @@ impl MemoryPool {
     /// Adds entry to memory pool if valid in the current blockchain.
     #[inline]
     pub fn insert(&mut self, storage: &BlockStorage, entry: Entry) -> Result<Option<Vec<u8>>, ConsensusError> {
-        match check_for_double_spend(storage, &entry.transaction.clone()) {
+        match storage.check_for_double_spend(&entry.transaction.clone()) {
             Ok(_) => {
                 let transaction_id = entry.transaction.to_transaction_id()?;
 
@@ -225,7 +221,7 @@ impl MemoryPool {
         'outer: for (_transaction_id, entry) in self.transactions.clone() {
             let mut temp_spent_outpoints: Vec<Outpoint> = spent_outpoints.clone();
             if block_size + entry.size <= max_size {
-                check_for_double_spend(storage, &entry.transaction.clone())?;
+                storage.check_for_double_spend(&entry.transaction.clone())?;
 
                 for input in entry.transaction.parameters.inputs.clone() {
                     let outpoint = Outpoint::new(input.outpoint.transaction_id, input.outpoint.index, None, None)?;
@@ -242,7 +238,7 @@ impl MemoryPool {
             }
         }
 
-        check_for_double_spends(storage, &transactions)?;
+        storage.check_for_double_spends(&transactions)?;
 
         Ok(transactions)
     }
@@ -251,7 +247,7 @@ impl MemoryPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_data::*;
+    use snarkos_storage::test_data::*;
 
     use hex;
 

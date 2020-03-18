@@ -1,17 +1,15 @@
 language: rust
-services: docker
-sudo: required
 
 before_install:
   - set -e
   - export SCCACHE_CACHE_SIZE=200M
   - export SCCACHE_DIR="$TRAVIS_HOME/.cache/sccache"
-
-install:
-  - (cargo install sccache || true)
-  - export PATH="$PATH:$TRAVIS_HOME/.cargo/bin"
+  - mkdir "$TRAVIS_HOME/.bin"
+  - wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - tar -C "$TRAVIS_HOME/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - mv $TRAVIS_HOME/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $TRAVIS_HOME/.bin/sccache
+  - export PATH="$PATH:$TRAVIS_HOME/.bin"
   - export RUSTC_WRAPPER="sccache"
-  - rustup component add rustfmt
 
 cache:
   directories:
@@ -23,20 +21,42 @@ before_cache:
   - rm -rf "$TRAVIS_HOME/.cargo/registry"
 
 after_script:
-  - sccache -s
+  - (sccache -s||true)
   - set +e
 
 matrix:
   fast_finish: true
   include:
     - rust: stable
+      env: TEST_COVERAGE=1
+      addons:
+        apt:
+          packages:
+            - libcurl4-openssl-dev
+            - libelf-dev
+            - libdw-dev
+            - cmake
+            - gcc
+            - binutils-dev
+            - libiberty-dev
       script:
-        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip integration_test
+        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc_integration_test
+      after_success: |
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+        tar xzf master.tar.gz && cd kcov-master &&
+        mkdir build && cd build && cmake .. && make && sudo make install &&
+        cd ../.. && rm -rf kcov-master &&
+        rm -rf target/debug/plain_dpc* &&
+        for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+        bash <(curl -s https://codecov.io/bash) &&
+        echo "Uploaded code coverage"
 
     - rust: nightly
+      install:
+        - rustup component add rustfmt
       script:
         - cargo fmt -- --check
-        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip integration_test
+        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc_integration_test
 
 script:
   - echo "snarkOS"

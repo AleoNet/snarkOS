@@ -74,8 +74,8 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
-        // Verify the block and insert it into the storage
-        if !self.storage.is_exist(&block.header.get_hash()) {
+        // Verify the block and insert it into the storage.
+        if !self.storage.block_hash_exists(&block.header.get_hash()) {
             let mut memory_pool = self.memory_pool_lock.lock().await;
             let inserted = self
                 .consensus
@@ -86,11 +86,11 @@ impl Server {
             let mut sync_handler = self.sync_handler_lock.lock().await;
 
             if inserted && propagate {
-                // This is a new block, send it to our peers
+                // This is a new block, send it to our peers.
 
                 propagate_block(self.context.clone(), message.data, channel.address).await?;
             } else if !propagate && sync_handler.sync_state != SyncState::Idle {
-                // We are syncing with another node, ask for the next block
+                // We are syncing with another node, ask for the next block.
 
                 if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
                     sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
@@ -103,7 +103,7 @@ impl Server {
 
     /// A peer has requested a block.
     async fn receive_get_block(&mut self, message: GetBlock, channel: Arc<Channel>) -> Result<(), ServerError> {
-        if let Ok(block) = self.storage.get_block(message.block_hash) {
+        if let Ok(block) = self.storage.get_block(&message.block_hash) {
             channel.write(&SyncBlock::new(block.serialize()?)).await?;
         }
 

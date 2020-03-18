@@ -11,7 +11,7 @@ mod miner_integration {
         TransactionParameters,
         Transactions,
     };
-    use snarkos_storage::BlockStorage;
+    use snarkos_storage::{test_data::*, BlockStorage};
 
     use futures_await_test::async_test;
     use std::{str::FromStr, sync::Arc};

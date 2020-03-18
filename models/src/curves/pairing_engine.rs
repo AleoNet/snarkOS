@@ -224,6 +224,10 @@ pub trait AffineCurve:
     /// Returns the x-coordinate of the point.
     #[must_use]
     fn to_x_coordinate(&self) -> Self::BaseField;
+
+    /// Returns the y-coordinate of the point.
+    #[must_use]
+    fn to_y_coordinate(&self) -> Self::BaseField;
 }
 
 pub trait PairingCurve: AffineCurve {

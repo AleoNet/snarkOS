@@ -18,8 +18,10 @@ pub const NUM_COLS: u32 = 8;
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
+pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
 //pub const KEY_BEST_BLOCK_HASH: &'static str = "BEST_BLOCK_HASH";
 
+/// Wrapper for which transaction outpoints are spent.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionMeta {
     pub spent: Vec<bool>,
@@ -67,12 +69,12 @@ pub enum KeyValue {
     BlockNumbers(BlockHeaderHash, u32),
     /// block_hash -> list of transaction ids
     BlockTransactions(BlockHeaderHash, Vec<Vec<u8>>),
+    /// parent_block_hash -> child_block_hash
+    ChildHashes(BlockHeaderHash, BlockHeaderHash),
     /// transaction id -> Transaction hex
     Transactions(Vec<u8>, TransactionValue),
     /// transaction id -> TransactionMeta
     TransactionMeta(Vec<u8>, TransactionMeta),
-    /// parent_block_hash -> child_block_hash
-    ChildHashes(BlockHeaderHash, BlockHeaderHash),
 }
 
 // Key
@@ -88,12 +90,12 @@ pub enum Key {
     BlockNumbers(BlockHeaderHash),
     /// block_hash
     BlockTransactions(BlockHeaderHash),
+    /// parent_block_hash
+    ChildHashes(BlockHeaderHash),
     /// transaction id
     Transactions(Vec<u8>),
     /// transaction id
     TransactionMeta(Vec<u8>),
-    /// parent_block_hash
-    ChildHashes(BlockHeaderHash),
 }
 
 impl Display for Key {
@@ -115,12 +117,12 @@ pub enum Value {
     BlockNumbers(u32),
     /// list of transactions ids
     BlockTransactions(Vec<Vec<u8>>),
+    /// child_block_hash
+    ChildHashes(BlockHeaderHash),
     /// Transaction hex
     Transactions(TransactionValue),
     /// Transaction Meta
     TransactionMeta(TransactionMeta),
-    /// child_block_hash
-    ChildHashes(BlockHeaderHash),
 }
 
 impl Value {
@@ -131,9 +133,9 @@ impl Value {
             Key::BlockHashes(_) => Value::BlockHashes(bincode::deserialize(&bytes)?),
             Key::BlockNumbers(_) => Value::BlockNumbers(bytes_to_u32(bytes.clone())),
             Key::BlockTransactions(_) => Value::BlockTransactions(bincode::deserialize(bytes)?),
+            Key::ChildHashes(_) => Value::ChildHashes(bincode::deserialize(&bytes)?),
             Key::Transactions(_) => Value::Transactions(bincode::deserialize(bytes)?),
             Key::TransactionMeta(_) => Value::TransactionMeta(bincode::deserialize(bytes)?),
-            Key::ChildHashes(_) => Value::ChildHashes(bincode::deserialize(&bytes)?),
         })
     }
 
@@ -165,9 +167,16 @@ impl Value {
         }
     }
 
-    pub fn block_transaction(self) -> Option<Vec<Vec<u8>>> {
+    pub fn block_transactions(self) -> Option<Vec<Vec<u8>>> {
         match self {
             Value::BlockTransactions(transactions) => Some(transactions),
+            _ => None,
+        }
+    }
+
+    pub fn child_hashes(self) -> Option<BlockHeaderHash> {
+        match self {
+            Value::ChildHashes(child_hash) => Some(child_hash),
             _ => None,
         }
     }
@@ -182,13 +191,6 @@ impl Value {
     pub fn transaction_meta(self) -> Option<TransactionMeta> {
         match self {
             Value::TransactionMeta(transaction_meta) => Some(transaction_meta),
-            _ => None,
-        }
-    }
-
-    pub fn child_hashes(self) -> Option<BlockHeaderHash> {
-        match self {
-            Value::ChildHashes(child_hash) => Some(child_hash),
             _ => None,
         }
     }
@@ -207,9 +209,9 @@ impl<'a> From<&'a Key> for ColKey {
             Key::BlockHashes(ref key) => (COL_BLOCK_HASHES, key.to_le_bytes().to_vec()),
             Key::BlockNumbers(ref key) => (COL_BLOCK_NUMBERS, bincode::serialize(key).unwrap()),
             Key::BlockTransactions(ref key) => (COL_BLOCK_TRANSACTIONS, bincode::serialize(key).unwrap()),
+            Key::ChildHashes(ref key) => (COL_CHILD_HASHES, bincode::serialize(key).unwrap()),
             Key::Transactions(ref key) => (COL_TRANSACTIONS, key.clone()),
             Key::TransactionMeta(ref key) => (COL_TRANSACTION_META, key.clone()),
-            Key::ChildHashes(ref key) => (COL_CHILD_HASHES, bincode::serialize(key).unwrap()),
         };
 
         Self { column, key }
@@ -246,17 +248,17 @@ impl<'a> From<&'a KeyValue> for ColKeyValue {
                 bincode::serialize(key).unwrap(),
                 bincode::serialize(value).unwrap(),
             ),
+            KeyValue::ChildHashes(ref key, ref value) => (
+                COL_CHILD_HASHES,
+                bincode::serialize(key).unwrap(),
+                bincode::serialize(value).unwrap(),
+            ),
             KeyValue::Transactions(ref key, ref value) => {
                 (COL_TRANSACTIONS, key.clone(), bincode::serialize(value).unwrap())
             }
             KeyValue::TransactionMeta(ref key, ref value) => {
                 (COL_TRANSACTION_META, key.clone(), bincode::serialize(value).unwrap())
             }
-            KeyValue::ChildHashes(ref key, ref value) => (
-                COL_CHILD_HASHES,
-                bincode::serialize(key).unwrap(),
-                bincode::serialize(value).unwrap(),
-            ),
         };
 
         Self { column, key, value }
