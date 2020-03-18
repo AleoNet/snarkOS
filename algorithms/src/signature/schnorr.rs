@@ -149,9 +149,8 @@ where
         let mut randomized_pk = *public_key;
         let mut base = parameters.generator;
         let mut encoded = G::zero();
-        for (i, bit) in bytes_to_bits(randomness).iter().enumerate() {
-            println!("NATIVE {}: {:#?}", i, bit);
-            if *bit {
+        for bit in bytes_to_bits(randomness) {
+            if bit {
                 encoded += &base;
             }
             base.double_in_place();
