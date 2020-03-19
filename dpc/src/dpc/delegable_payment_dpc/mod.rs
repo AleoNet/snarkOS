@@ -1,6 +1,7 @@
 use crate::{
     dpc::{
         delegable_payment_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
+        plain_dpc::DPCComponents,
         AddressKeyPair,
         DPCScheme,
         Predicate,
@@ -9,18 +10,11 @@ use crate::{
     },
     ledger::*,
 };
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
-    curves::PrimeField,
-    gadgets::algorithms::{
-        CRHGadget,
-        CommitmentGadget,
-        PRFGadget,
-        SNARKVerifierGadget,
-        SignaturePublicKeyRandomizationGadget,
-    },
+    gadgets::algorithms::{CommitmentGadget, SNARKVerifierGadget, SignaturePublicKeyRandomizationGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -69,47 +63,7 @@ mod test;
 /// Trait that stores all information about the components of a Plain DPC
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
-pub trait DelegablePaymentDPCComponents: 'static + Sized {
-    const NUM_INPUT_RECORDS: usize;
-    const NUM_OUTPUT_RECORDS: usize;
-
-    type CoreCheckF: PrimeField;
-    type ProofCheckF: PrimeField;
-
-    // Commitment scheme for address contents. Invoked only over `Self::CoreCheckF`.
-    type AddrC: CommitmentScheme;
-    type AddrCGadget: CommitmentGadget<Self::AddrC, Self::CoreCheckF>;
-
-    // Commitment scheme for record contents. Invoked only over `Self::CoreCheckF`.
-    type RecC: CommitmentScheme;
-    type RecCGadget: CommitmentGadget<Self::RecC, Self::CoreCheckF>;
-
-    // Ledger digest type.
-    type MerkleParameters: MerkleParameters;
-    type MerkleTree_HGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::CoreCheckF>;
-
-    // CRH for computing the serial number nonce. Invoked only over `Self::CoreCheckF`.
-    type SnNonceH: CRH;
-    type SnNonceHGadget: CRHGadget<Self::SnNonceH, Self::CoreCheckF>;
-
-    // CRH for hashes of birth and death verification keys.
-    // This is invoked only on the larger curve.
-    type PredVkH: CRH;
-    type PredVkHGadget: CRHGadget<Self::PredVkH, Self::ProofCheckF>;
-
-    // Commitment scheme for committing to hashes of birth and death verification
-    // keys
-    type PredVkComm: CommitmentScheme;
-    // Used to commit to hashes of vkeys on the smaller curve and to decommit hashes
-    // of vkeys on the larger curve
-    type PredVkCommGadget: CommitmentGadget<Self::PredVkComm, Self::CoreCheckF>
-        + CommitmentGadget<Self::PredVkComm, Self::ProofCheckF>;
-
-    // Commitment scheme for committing to predicate input. Invoked inside
-    // `Self::MainN` and every predicate SNARK.
-    type LocalDataComm: CommitmentScheme;
-    type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::CoreCheckF>;
-
+pub trait DelegablePaymentDPCComponents: DPCComponents {
     // Commitment scheme for committing to a record value
     type ValueComm: CommitmentScheme;
     type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::CoreCheckF>;
@@ -142,10 +96,6 @@ pub trait DelegablePaymentDPCComponents: 'static + Sized {
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
     // input.
     type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::ProofCheckF>;
-
-    // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
-    type P: PRF;
-    type PGadget: PRFGadget<Self::P, Self::CoreCheckF>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -1,13 +1,16 @@
 use crate::{
-    dpc::delegable_payment_dpc::{
-        core_checks_circuit::*,
-        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-        predicate::DPCPredicate,
-        proof_check_circuit::*,
-        transaction::DPCTransaction,
-        DelegablePaymentDPCComponents,
-        LocalData as DPCLocalData,
-        DPC,
+    dpc::{
+        delegable_payment_dpc::{
+            core_checks_circuit::*,
+            payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+            predicate::DPCPredicate,
+            proof_check_circuit::*,
+            transaction::DPCTransaction,
+            DelegablePaymentDPCComponents,
+            LocalData as DPCLocalData,
+            DPC,
+        },
+        plain_dpc::DPCComponents,
     },
     ledger::ideal_ledger::IdealLedger,
 };
@@ -126,12 +129,22 @@ impl Default for CommitmentMerkleParameters {
 pub struct Components;
 
 impl DelegablePaymentDPCComponents for Components {
+    type MainNIZK = CoreCheckNIZK;
+    type PredicateNIZK = PredicateNIZK<Self>;
+    type PredicateNIZKGadget = PredicateNIZKGadget;
+    type ProofCheckNIZK = ProofCheckNIZK;
+    type S = AuthSignature;
+    type SGadget = AuthSignatureGadget;
+    type ValueComm = ValueComm;
+    type ValueCommGadget = ValueCommGadget;
+}
+
+impl DPCComponents for Components {
     type AddrC = AddressComm;
     type AddrCGadget = AddressCommGadget;
     type CoreCheckF = CoreCheckF;
     type LocalDataComm = LocalDataComm;
     type LocalDataCommGadget = LocalDataCommGadget;
-    type MainNIZK = CoreCheckNIZK;
     type MerkleParameters = CommitmentMerkleParameters;
     type MerkleTree_HGadget = MerkleTreeCRHGadget;
     type P = PRF;
@@ -140,18 +153,11 @@ impl DelegablePaymentDPCComponents for Components {
     type PredVkCommGadget = PredicateCommGadget;
     type PredVkH = PredVkCRH;
     type PredVkHGadget = PredVkCRHGadget;
-    type PredicateNIZK = PredicateNIZK<Self>;
-    type PredicateNIZKGadget = PredicateNIZKGadget;
     type ProofCheckF = ProofCheckF;
-    type ProofCheckNIZK = ProofCheckNIZK;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
-    type S = AuthSignature;
-    type SGadget = AuthSignatureGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
-    type ValueComm = ValueComm;
-    type ValueCommGadget = ValueCommGadget;
 
     const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
