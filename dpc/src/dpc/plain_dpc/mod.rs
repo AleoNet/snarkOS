@@ -100,7 +100,7 @@ pub trait DPCComponents: 'static + Sized {
 
     // Ledger digest type.
     type MerkleParameters: MerkleParameters;
-    type MerkleTree_HGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::CoreCheckF>;
+    type MerkleTreeHGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::CoreCheckF>;
 
     // CRH for computing the serial number nonce. Invoked only over `Self::CoreCheckF`.
     type SnNonceH: CRH;
