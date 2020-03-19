@@ -22,18 +22,18 @@ pub struct ProofCheckVerifierInput<C: DelegablePaymentDPCComponents> {
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
 }
 
-impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::ProofCheckF> for ProofCheckVerifierInput<C>
+impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::OuterF> for ProofCheckVerifierInput<C>
 where
-    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::ProofCheckF>,
-    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::ProofCheckF>,
+    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::OuterF>,
+    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::OuterF>,
 
-    <C::PredVkH as CRH>::Parameters: ToConstraintField<C::ProofCheckF>,
+    <C::PredVkH as CRH>::Parameters: ToConstraintField<C::OuterF>,
 
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::ProofCheckF>, ConstraintFieldError> {
+    fn to_field_elements(&self) -> Result<Vec<C::OuterF>, ConstraintFieldError> {
         let mut v = Vec::new();
 
         v.extend_from_slice(
@@ -51,18 +51,17 @@ where
                 .to_field_elements()?,
         );
 
-        let local_data_comm_pp_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
+        let local_data_comm_pp_fe = ToConstraintField::<C::InnerF>::to_field_elements(
             self.comm_crh_sig_parameters.local_data_comm_pp.parameters(),
         )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let local_data_comm_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(&self.local_data_comm)
+        let local_data_comm_fe = ToConstraintField::<C::InnerF>::to_field_elements(&self.local_data_comm)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_comm_pp_fe = ToConstraintField::<C::CoreCheckF>::to_field_elements(
-            self.comm_crh_sig_parameters.value_comm_pp.parameters(),
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_comm_pp_fe =
+            ToConstraintField::<C::InnerF>::to_field_elements(self.comm_crh_sig_parameters.value_comm_pp.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         // Then we convert these field elements into bytes
         let pred_input = [
@@ -72,13 +71,13 @@ where
         ];
 
         // Then we convert them into `C::ProofCheckF::Fr` elements.
-        v.extend_from_slice(&ToConstraintField::<C::ProofCheckF>::to_field_elements(
+        v.extend_from_slice(&ToConstraintField::<C::OuterF>::to_field_elements(
             pred_input[0].as_slice(),
         )?);
-        v.extend_from_slice(&ToConstraintField::<C::ProofCheckF>::to_field_elements(
+        v.extend_from_slice(&ToConstraintField::<C::OuterF>::to_field_elements(
             pred_input[1].as_slice(),
         )?);
-        v.extend_from_slice(&ToConstraintField::<C::ProofCheckF>::to_field_elements(
+        v.extend_from_slice(&ToConstraintField::<C::OuterF>::to_field_elements(
             pred_input[2].as_slice(),
         )?);
 
@@ -163,14 +162,14 @@ impl<C: DelegablePaymentDPCComponents> ProofCheckCircuit<C> {
     }
 }
 
-impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::ProofCheckF> for ProofCheckCircuit<C>
+impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::OuterF> for ProofCheckCircuit<C>
 where
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
 {
-    fn generate_constraints<CS: ConstraintSystem<C::ProofCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<C::OuterF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_proof_check_gadget::<C, CS>(
             cs,
             self.comm_and_crh_parameters.get()?,

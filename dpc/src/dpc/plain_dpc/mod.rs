@@ -73,7 +73,7 @@ pub trait PlainDPCComponents: DPCComponents {
 
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
     // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::ProofCheckF>;
+    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterF>;
 
     // SNARK for proof-verification checks
     type ProofCheckNIZK: SNARK<
@@ -87,50 +87,50 @@ pub trait DPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;
     const NUM_OUTPUT_RECORDS: usize;
 
-    type CoreCheckF: PrimeField;
-    type ProofCheckF: PrimeField;
+    type InnerF: PrimeField;
+    type OuterF: PrimeField;
 
     // Commitment scheme for address contents. Invoked only over `Self::CoreCheckF`.
     type AddrC: CommitmentScheme;
-    type AddrCGadget: CommitmentGadget<Self::AddrC, Self::CoreCheckF>;
+    type AddrCGadget: CommitmentGadget<Self::AddrC, Self::InnerF>;
 
     // Commitment scheme for record contents. Invoked only over `Self::CoreCheckF`.
     type RecC: CommitmentScheme;
-    type RecCGadget: CommitmentGadget<Self::RecC, Self::CoreCheckF>;
+    type RecCGadget: CommitmentGadget<Self::RecC, Self::InnerF>;
 
     // Ledger digest type.
     type MerkleParameters: MerkleParameters;
-    type MerkleTreeHGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::CoreCheckF>;
+    type MerkleTreeHGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerF>;
 
     // CRH for computing the serial number nonce. Invoked only over `Self::CoreCheckF`.
     type SnNonceH: CRH;
-    type SnNonceHGadget: CRHGadget<Self::SnNonceH, Self::CoreCheckF>;
+    type SnNonceHGadget: CRHGadget<Self::SnNonceH, Self::InnerF>;
 
     // CRH for hashes of birth and death verification keys.
     // This is invoked only on the larger curve.
     type PredVkH: CRH;
-    type PredVkHGadget: CRHGadget<Self::PredVkH, Self::ProofCheckF>;
+    type PredVkHGadget: CRHGadget<Self::PredVkH, Self::OuterF>;
 
     // Commitment scheme for committing to hashes of birth and death verification
     // keys
     type PredVkComm: CommitmentScheme;
     // Used to commit to hashes of vkeys on the smaller curve and to decommit hashes
     // of vkeys on the larger curve
-    type PredVkCommGadget: CommitmentGadget<Self::PredVkComm, Self::CoreCheckF>
-        + CommitmentGadget<Self::PredVkComm, Self::ProofCheckF>;
+    type PredVkCommGadget: CommitmentGadget<Self::PredVkComm, Self::InnerF>
+        + CommitmentGadget<Self::PredVkComm, Self::OuterF>;
 
     // Commitment scheme for committing to predicate input. Invoked inside
     // `Self::MainN` and every predicate SNARK.
     type LocalDataComm: CommitmentScheme;
-    type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::CoreCheckF>;
+    type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::InnerF>;
 
     // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
     type P: PRF;
-    type PGadget: PRFGadget<Self::P, Self::CoreCheckF>;
+    type PGadget: PRFGadget<Self::P, Self::InnerF>;
 
     // Signature scheme for delegated compute
     type S: SignatureScheme;
-    type SGadget: SignaturePublicKeyRandomizationGadget<Self::S, Self::CoreCheckF>;
+    type SGadget: SignaturePublicKeyRandomizationGadget<Self::S, Self::InnerF>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

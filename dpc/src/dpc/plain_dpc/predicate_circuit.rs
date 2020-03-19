@@ -93,13 +93,13 @@ pub struct PredicateLocalData<C: PlainDPCComponents> {
 }
 
 // Convert each component to bytes and pack into field elements.
-impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for PredicateLocalData<C>
+impl<C: PlainDPCComponents> ToConstraintField<C::InnerF> for PredicateLocalData<C>
 where
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
-        let mut v = ToConstraintField::<C::CoreCheckF>::to_field_elements([self.position].as_ref())?;
+    fn to_field_elements(&self) -> Result<Vec<C::InnerF>, ConstraintFieldError> {
+        let mut v = ToConstraintField::<C::InnerF>::to_field_elements([self.position].as_ref())?;
         v.extend_from_slice(&self.local_data_comm_pp.to_field_elements()?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
         Ok(v)
@@ -142,8 +142,8 @@ impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for EmptyPredicateCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+impl<C: PlainDPCComponents> ConstraintSynthesizer<C::InnerF> for EmptyPredicateCircuit<C> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[self.position])?;
 
         let _local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(

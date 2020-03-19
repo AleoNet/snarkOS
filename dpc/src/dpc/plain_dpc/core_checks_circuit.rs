@@ -34,29 +34,29 @@ pub struct CoreChecksVerifierInput<C: DPCComponents> {
     pub memo: [u8; 32],
 }
 
-impl<C: DPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
+impl<C: DPCComponents> ToConstraintField<C::InnerF> for CoreChecksVerifierInput<C>
 where
-    <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
 
-    <C::RecC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::RecC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::RecC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::RecC as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
 
-    <C::SnNonceH as CRH>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::SnNonceH as CRH>::Parameters: ToConstraintField<C::InnerF>,
 
-    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
 
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
 
-    <C::P as PRF>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::P as PRF>::Output: ToConstraintField<C::InnerF>,
 
-    MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
-    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
-    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::CoreCheckF>,
+    MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::InnerF>,
+    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerF>,
+    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
+    fn to_field_elements(&self) -> Result<Vec<C::InnerF>, ConstraintFieldError> {
         let mut v = Vec::new();
 
         v.extend_from_slice(&self.comm_and_crh_pp.addr_comm_pp.parameters().to_field_elements()?);
@@ -84,9 +84,7 @@ where
         }
 
         v.extend_from_slice(&self.predicate_comm.to_field_elements()?);
-        v.extend_from_slice(&ToConstraintField::<C::CoreCheckF>::to_field_elements(
-            self.memo.as_ref(),
-        )?);
+        v.extend_from_slice(&ToConstraintField::<C::InnerF>::to_field_elements(self.memo.as_ref())?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
 
         Ok(v)
@@ -253,8 +251,8 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+impl<C: PlainDPCComponents> ConstraintSynthesizer<C::InnerF> for CoreChecksCircuit<C> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_core_checks_gadget::<C, CS>(
             cs,
             // Params

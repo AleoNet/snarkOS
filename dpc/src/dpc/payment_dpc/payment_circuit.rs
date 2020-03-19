@@ -24,20 +24,20 @@ pub struct PaymentPredicateLocalData<C: PaymentDPCComponents> {
 }
 
 /// Convert each component to bytes and pack into field elements.
-impl<C: PaymentDPCComponents> ToConstraintField<C::CoreCheckF> for PaymentPredicateLocalData<C>
+impl<C: PaymentDPCComponents> ToConstraintField<C::InnerF> for PaymentPredicateLocalData<C>
 where
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
-    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
-    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
-        let mut v = ToConstraintField::<C::CoreCheckF>::to_field_elements(&[self.position][..])?;
+    fn to_field_elements(&self) -> Result<Vec<C::InnerF>, ConstraintFieldError> {
+        let mut v = ToConstraintField::<C::InnerF>::to_field_elements(&[self.position][..])?;
 
         v.extend_from_slice(&self.local_data_comm_pp.to_field_elements()?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
         v.extend_from_slice(&self.value_comm_pp.to_field_elements()?);
-        v.extend(ToConstraintField::<C::CoreCheckF>::to_field_elements(
+        v.extend(ToConstraintField::<C::InnerF>::to_field_elements(
             &to_bytes![self.value_comm_randomness]?[..],
         )?);
         v.extend_from_slice(&self.value_commitment.to_field_elements()?);
@@ -92,8 +92,8 @@ impl<C: PaymentDPCComponents> PaymentCircuit<C> {
     }
 }
 
-impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for PaymentCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::InnerF> for PaymentCircuit<C> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,
             self.parameters.get()?,
@@ -106,7 +106,7 @@ impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for PaymentCi
     }
 }
 
-fn execute_payment_check_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<C::CoreCheckF>>(
+fn execute_payment_check_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<C::InnerF>>(
     cs: &mut CS,
     comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
     local_data_commitment: &<C::LocalDataComm as CommitmentScheme>::Output,

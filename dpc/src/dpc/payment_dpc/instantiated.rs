@@ -1,14 +1,16 @@
 use crate::{
-    dpc::payment_dpc::{
-        core_checks_circuit::*,
-        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-        predicate::DPCPredicate,
-        proof_check_circuit::*,
-        transaction::DPCTransaction,
-        DPCComponents,
-        LocalData as DPCLocalData,
-        PaymentDPCComponents,
-        DPC,
+    dpc::{
+        payment_dpc::{
+            core_checks_circuit::*,
+            payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+            predicate::DPCPredicate,
+            proof_check_circuit::*,
+            transaction::DPCTransaction,
+            LocalData as DPCLocalData,
+            PaymentDPCComponents,
+            DPC,
+        },
+        plain_dpc::DPCComponents,
     },
     ledger::ideal_ledger::IdealLedger,
 };
@@ -138,18 +140,18 @@ impl PaymentDPCComponents for Components {
 impl DPCComponents for Components {
     type AddrC = AddressComm;
     type AddrCGadget = AddressCommGadget;
-    type CoreCheckF = CoreCheckF;
+    type InnerF = CoreCheckF;
     type LocalDataComm = LocalDataComm;
     type LocalDataCommGadget = LocalDataCommGadget;
     type MerkleParameters = CommitmentMerkleParameters;
     type MerkleTreeHGadget = MerkleTreeCRHGadget;
+    type OuterF = ProofCheckF;
     type P = PRF;
     type PGadget = PRFGadget;
     type PredVkComm = PredicateComm;
     type PredVkCommGadget = PredicateCommGadget;
     type PredVkH = PredVkCRH;
     type PredVkHGadget = PredVkCRHGadget;
-    type ProofCheckF = ProofCheckF;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
     type S = AuthSignature;

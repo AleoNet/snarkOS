@@ -64,7 +64,7 @@ mod test;
 pub trait PaymentDPCComponents: DPCComponents {
     // Commitment scheme for committing to a record value
     type ValueComm: CommitmentScheme;
-    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::CoreCheckF>;
+    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerF>;
 
     // SNARK for non-proof-verification checks
     type MainNIZK: SNARK<
@@ -89,7 +89,7 @@ pub trait PaymentDPCComponents: DPCComponents {
 
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
     // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::ProofCheckF>;
+    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterF>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
