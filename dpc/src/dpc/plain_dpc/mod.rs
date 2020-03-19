@@ -1,4 +1,5 @@
 use crate::{
+    address::{AddressPair, AddressPublicKey, AddressSecretKey},
     dpc::{AddressKeyPair, DPCScheme, Predicate, Record, Transaction},
     ledger::*,
 };
@@ -17,9 +18,6 @@ use snarkos_utilities::{
 
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod address;
-use self::address::*;
 
 pub mod predicate;
 use self::predicate::*;

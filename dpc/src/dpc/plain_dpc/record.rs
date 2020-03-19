@@ -1,5 +1,6 @@
 use crate::dpc::{
-    plain_dpc::{address::AddressPublicKey, predicate::DPCPredicate, PlainDPCComponents},
+    address::AddressPublicKey,
+    plain_dpc::{predicate::DPCPredicate, PlainDPCComponents},
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, PRF};

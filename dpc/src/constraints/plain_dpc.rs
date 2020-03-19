@@ -1,7 +1,7 @@
 use crate::{
     dpc::{
+        address::AddressSecretKey,
         plain_dpc::{
-            address::AddressSecretKey,
             parameters::CommAndCRHPublicParameters,
             predicate::PrivatePredInput,
             record::DPCRecord,

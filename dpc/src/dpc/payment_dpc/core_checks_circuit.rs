@@ -1,11 +1,13 @@
 use crate::{
     constraints::{payment_dpc::execute_core_checks_gadget, Assignment},
-    dpc::payment_dpc::{
+    dpc::{
         address::AddressSecretKey,
-        binding_signature::BindingSignature,
-        parameters::CommAndCRHPublicParameters,
-        record::DPCRecord,
-        PaymentDPCComponents,
+        payment_dpc::{
+            binding_signature::BindingSignature,
+            parameters::CommAndCRHPublicParameters,
+            record::DPCRecord,
+            PaymentDPCComponents,
+        },
     },
     ledger::MerkleTreeParams,
 };

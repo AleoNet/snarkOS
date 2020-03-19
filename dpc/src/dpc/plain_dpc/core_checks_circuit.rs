@@ -1,11 +1,8 @@
 use crate::{
     constraints::{plain_dpc::execute_core_checks_gadget, Assignment},
-    dpc::plain_dpc::{
+    dpc::{
         address::AddressSecretKey,
-        parameters::CommAndCRHPublicParameters,
-        record::DPCRecord,
-        DPCComponents,
-        PlainDPCComponents,
+        plain_dpc::{parameters::CommAndCRHPublicParameters, record::DPCRecord, DPCComponents, PlainDPCComponents},
     },
     ledger::MerkleTreeParams,
 };

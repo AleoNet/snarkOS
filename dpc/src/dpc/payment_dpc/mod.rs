@@ -1,5 +1,6 @@
 use crate::{
     dpc::{
+        address::{AddressPair, AddressPublicKey, AddressSecretKey},
         payment_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
         plain_dpc::DPCComponents,
         AddressKeyPair,
@@ -24,9 +25,6 @@ use snarkos_utilities::{
 
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod address;
-use self::address::*;
 
 pub mod binding_signature;
 

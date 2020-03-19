@@ -1,7 +1,7 @@
 use crate::{
     dpc::{
+        address::AddressSecretKey,
         payment_dpc::{
-            address::AddressSecretKey,
             binding_signature::BindingSignature,
             parameters::CommAndCRHPublicParameters,
             predicate::PrivatePredInput,
