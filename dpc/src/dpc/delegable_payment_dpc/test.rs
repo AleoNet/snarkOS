@@ -311,7 +311,7 @@ fn test_execute_delegated_payment_constraint_systems() {
 
     if core_cs.is_satisfied() {
         println!("\n\n\n\nAll Core check constraints:");
-        //        core_cs.print_named_objects();
+        core_cs.print_named_objects();
     }
     println!("=========================================================");
     println!("=========================================================");
@@ -339,77 +339,13 @@ fn test_execute_delegated_payment_constraint_systems() {
         println!("{}", pf_check_cs.which_is_unsatisfied().unwrap());
         println!("=========================================================");
     }
-    println!("\n\n\n\nAll Proof check constraints:");
     if pf_check_cs.is_satisfied() {
-        //        pf_check_cs.print_named_objects();
+        println!("\n\n\n\nAll Proof check constraints:");
+        pf_check_cs.print_named_objects();
     }
     println!("=========================================================");
     println!("=========================================================");
     println!("=========================================================");
 
     assert!(pf_check_cs.is_satisfied());
-}
-
-#[test]
-fn test_core_input_fe_size() {
-    use crate::delegable_payment_dpc::core_checks_circuit::CoreChecksVerifierInput;
-    use snarkos_models::curves::to_field_vec::ToConstraintField;
-
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-    // Generate parameters for the ledger, commitment schemes, CRH, and the
-    // "always-accept" predicate.
-    let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
-    let comm_crh_sig_pp = InstantiatedDPC::generate_comm_crh_sig_parameters(&mut rng).unwrap();
-    let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&comm_crh_sig_pp, &mut rng).unwrap();
-    //    #[cfg(debug_assertions)]
-    //        let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.vk.clone().into();
-
-    let pred_nizk_vk_bytes =
-        to_bytes![PredVkCRH::hash(&comm_crh_sig_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap()).unwrap()]
-            .unwrap();
-
-    // Generate metadata and an address for a dummy initial, or "genesis", record.
-    let genesis_metadata = [1u8; 32];
-    let genesis_address = DPC::create_address_helper(&comm_crh_sig_pp, &genesis_metadata, &mut rng).unwrap();
-    let genesis_sn_nonce = SnNonceCRH::hash(&comm_crh_sig_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
-    let genesis_record = DPC::generate_record(
-        &comm_crh_sig_pp,
-        &genesis_sn_nonce,
-        &genesis_address.public_key,
-        true,
-        &PaymentRecordPayload::default(),
-        &Predicate::new(pred_nizk_vk_bytes.clone()),
-        &Predicate::new(pred_nizk_vk_bytes.clone()),
-        &mut rng,
-    )
-    .unwrap();
-
-    // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&comm_crh_sig_pp, &genesis_record, &genesis_address.secret_key).unwrap();
-    let genesis_memo = [0u8; 32];
-
-    // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger = MerkleTreeIdealLedger::new(
-        ledger_parameters,
-        genesis_record.commitment(),
-        genesis_sn.clone(),
-        genesis_memo,
-    );
-
-    let input = CoreChecksVerifierInput {
-        comm_crh_sig_pp,
-        ledger_pp: ledger.parameters().clone(),
-        ledger_digest: ledger.digest().unwrap(),
-        old_serial_numbers: vec![genesis_sn, genesis_sn],
-        new_commitments: vec![genesis_record.commitment(), genesis_record.commitment()],
-        memo: [1u8; 32],
-        binding_signature: BindingSignature::default(),
-        predicate_comm: <PredicateComm as CommitmentScheme>::Output::default(),
-        local_data_comm: <LocalDataComm as CommitmentScheme>::Output::default(),
-    };
-
-    let input_fe = input.to_field_elements().unwrap();
-
-    println!("length of input_fe: {:?}", input_fe.len());
-    assert_eq!(input_fe.len() + 1, 22);
 }

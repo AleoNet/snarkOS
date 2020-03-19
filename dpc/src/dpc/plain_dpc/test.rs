@@ -226,8 +226,8 @@ fn test_execute_constraint_systems() {
         println!("{}", pf_check_cs.which_is_unsatisfied().unwrap());
         println!("=========================================================");
     }
-    println!("\n\n\n\nAll Proof check constraints:");
     if pf_check_cs.is_satisfied() {
+        println!("\n\n\n\nAll Proof check constraints:");
         pf_check_cs.print_named_objects();
     }
     println!("=========================================================");

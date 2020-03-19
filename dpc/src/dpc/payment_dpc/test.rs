@@ -310,7 +310,7 @@ fn test_execute_payment_constraint_systems() {
 
     if core_cs.is_satisfied() {
         println!("\n\n\n\nAll Core check constraints:");
-        //        core_cs.print_named_objects();
+        core_cs.print_named_objects();
     }
     println!("=========================================================");
     println!("=========================================================");
@@ -338,9 +338,9 @@ fn test_execute_payment_constraint_systems() {
         println!("{}", pf_check_cs.which_is_unsatisfied().unwrap());
         println!("=========================================================");
     }
-    println!("\n\n\n\nAll Proof check constraints:");
     if pf_check_cs.is_satisfied() {
-        //        pf_check_cs.print_named_objects();
+        println!("\n\n\n\nAll Proof check constraints:");
+        pf_check_cs.print_named_objects();
     }
     println!("=========================================================");
     println!("=========================================================");
