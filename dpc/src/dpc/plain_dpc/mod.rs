@@ -6,9 +6,15 @@ use crate::{
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, PRF, SNARK},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::PrimeField,
-    gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SNARKVerifierGadget},
+    gadgets::algorithms::{
+        CRHGadget,
+        CommitmentGadget,
+        PRFGadget,
+        SNARKVerifierGadget,
+        SignaturePublicKeyRandomizationGadget,
+    },
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -121,6 +127,10 @@ pub trait DPCComponents: 'static + Sized {
     // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
     type P: PRF;
     type PGadget: PRFGadget<Self::P, Self::CoreCheckF>;
+
+    // Signature scheme for delegated compute
+    type S: SignatureScheme;
+    type SGadget: SignaturePublicKeyRandomizationGadget<Self::S, Self::CoreCheckF>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

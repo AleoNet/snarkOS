@@ -17,11 +17,12 @@ use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     merkle_tree::MerkleParameters,
     prf::Blake2s,
+    signature::SchnorrSignature,
     snark::GM17,
 };
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
-    edwards_bls12::EdwardsProjective as EdwardsBls,
+    edwards_bls12::{EdwardsAffine, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
     sw6::SW6,
 };
@@ -30,11 +31,14 @@ use snarkos_gadgets::{
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::PedersenCompressedCRHGadget,
         prf::Blake2sGadget,
+        signature::SchnorrPublicKeyRandomizationGadget,
         snark::GM17VerifierGadget,
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::algorithms::CRH;
+
+use blake2::Blake2s as Blake2sHash;
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -135,6 +139,8 @@ impl DPCComponents for Components {
     type ProofCheckF = ProofCheckF;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
+    type S = AuthSignature;
+    type SGadget = AuthSignatureGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
 
@@ -153,6 +159,8 @@ pub type AddressComm = PedersenCompressedCommitment<EdwardsBls, AddressWindow>;
 pub type RecordComm = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateComm = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
+
+pub type AuthSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -177,6 +185,8 @@ pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, E
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateNIZKGadget = GM17VerifierGadget<CoreCheckPairing, ProofCheckF, PairingGadget>;
+
+pub type AuthSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, CoreCheckF, EdwardsBlsGadget>;
 
 pub type MerkleTreeIdealLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;

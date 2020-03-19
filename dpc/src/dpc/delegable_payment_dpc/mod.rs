@@ -14,7 +14,7 @@ use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
-    gadgets::algorithms::{CommitmentGadget, SNARKVerifierGadget, SignaturePublicKeyRandomizationGadget},
+    gadgets::algorithms::{CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -67,10 +67,6 @@ pub trait DelegablePaymentDPCComponents: DPCComponents {
     // Commitment scheme for committing to a record value
     type ValueComm: CommitmentScheme;
     type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::CoreCheckF>;
-
-    // Signature scheme for delegated compute
-    type S: SignatureScheme;
-    type SGadget: SignaturePublicKeyRandomizationGadget<Self::S, Self::CoreCheckF>;
 
     // SNARK for non-proof-verification checks
     type MainNIZK: SNARK<

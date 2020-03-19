@@ -133,8 +133,6 @@ impl DelegablePaymentDPCComponents for Components {
     type PredicateNIZK = PredicateNIZK<Self>;
     type PredicateNIZKGadget = PredicateNIZKGadget;
     type ProofCheckNIZK = ProofCheckNIZK;
-    type S = AuthSignature;
-    type SGadget = AuthSignatureGadget;
     type ValueComm = ValueComm;
     type ValueCommGadget = ValueCommGadget;
 }
@@ -156,6 +154,8 @@ impl DPCComponents for Components {
     type ProofCheckF = ProofCheckF;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
+    type S = AuthSignature;
+    type SGadget = AuthSignatureGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
 
