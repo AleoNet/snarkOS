@@ -5,6 +5,7 @@ use crate::{
         predicate::DPCPredicate,
         proof_check_circuit::*,
         transaction::DPCTransaction,
+        DPCComponents,
         LocalData as DPCLocalData,
         PaymentDPCComponents,
         DPC,
@@ -122,12 +123,20 @@ impl Default for CommitmentMerkleParameters {
 pub struct Components;
 
 impl PaymentDPCComponents for Components {
+    type MainNIZK = CoreCheckNIZK;
+    type PredicateNIZK = PredicateNIZK<Self>;
+    type PredicateNIZKGadget = PredicateNIZKGadget;
+    type ProofCheckNIZK = ProofCheckNIZK;
+    type ValueComm = ValueComm;
+    type ValueCommGadget = ValueCommGadget;
+}
+
+impl DPCComponents for Components {
     type AddrC = AddressComm;
     type AddrCGadget = AddressCommGadget;
     type CoreCheckF = CoreCheckF;
     type LocalDataComm = LocalDataComm;
     type LocalDataCommGadget = LocalDataCommGadget;
-    type MainNIZK = CoreCheckNIZK;
     type MerkleParameters = CommitmentMerkleParameters;
     type MerkleTree_HGadget = MerkleTreeCRHGadget;
     type P = PRF;
@@ -136,16 +145,11 @@ impl PaymentDPCComponents for Components {
     type PredVkCommGadget = PredicateCommGadget;
     type PredVkH = PredVkCRH;
     type PredVkHGadget = PredVkCRHGadget;
-    type PredicateNIZK = PredicateNIZK<Self>;
-    type PredicateNIZKGadget = PredicateNIZKGadget;
     type ProofCheckF = ProofCheckF;
-    type ProofCheckNIZK = ProofCheckNIZK;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
-    type ValueComm = ValueComm;
-    type ValueCommGadget = ValueCommGadget;
 
     const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
