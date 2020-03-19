@@ -1,10 +1,10 @@
-use crate::dpc::plain_dpc::PlainDPCComponents;
+use crate::dpc::plain_dpc::{DPCComponents, PlainDPCComponents};
 
 use snarkos_models::algorithms::SNARK;
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct CommAndCRHPublicParameters<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: DPCComponents"))]
+pub struct CommAndCRHPublicParameters<C: DPCComponents> {
     pub addr_comm_pp: C::AddrC,
     pub rec_comm_pp: C::RecC,
     pub pred_vk_comm_pp: C::PredVkComm,

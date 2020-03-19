@@ -1,6 +1,11 @@
 use crate::{
     constraints::{plain_dpc::execute_proof_check_gadget, Assignment},
-    dpc::plain_dpc::{parameters::CommAndCRHPublicParameters, predicate::PrivatePredInput, PlainDPCComponents},
+    dpc::plain_dpc::{
+        parameters::CommAndCRHPublicParameters,
+        predicate::PrivatePredInput,
+        DPCComponents,
+        PlainDPCComponents,
+    },
 };
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
@@ -11,14 +16,14 @@ use snarkos_models::{
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct ProofCheckVerifierInput<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: DPCComponents"))]
+pub struct ProofCheckVerifierInput<C: DPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
 }
 
-impl<C: PlainDPCComponents> ToConstraintField<C::ProofCheckF> for ProofCheckVerifierInput<C>
+impl<C: DPCComponents> ToConstraintField<C::ProofCheckF> for ProofCheckVerifierInput<C>
 where
     <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::ProofCheckF>,
     <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::ProofCheckF>,

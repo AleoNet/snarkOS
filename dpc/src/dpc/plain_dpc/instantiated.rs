@@ -5,6 +5,7 @@ use crate::{
         predicate_circuit::{EmptyPredicateCircuit, PredicateLocalData},
         proof_check_circuit::*,
         transaction::DPCTransaction,
+        DPCComponents,
         LocalData as DPCLocalData,
         PlainDPCComponents,
         DPC,
@@ -111,12 +112,18 @@ impl PedersenSize for AddressWindow {
 pub struct Components;
 
 impl PlainDPCComponents for Components {
+    type MainNIZK = CoreCheckNIZK;
+    type PredicateNIZK = PredicateNIZK<Self>;
+    type PredicateNIZKGadget = PredicateNIZKGadget;
+    type ProofCheckNIZK = ProofCheckNIZK;
+}
+
+impl DPCComponents for Components {
     type AddrC = AddressComm;
     type AddrCGadget = AddressCommGadget;
     type CoreCheckF = CoreCheckF;
     type LocalDataComm = LocalDataComm;
     type LocalDataCommGadget = LocalDataCommGadget;
-    type MainNIZK = CoreCheckNIZK;
     type MerkleParameters = CommitmentMerkleParameters;
     type MerkleTree_HGadget = MerkleTreeCRHGadget;
     type P = PRF;
@@ -125,10 +132,7 @@ impl PlainDPCComponents for Components {
     type PredVkCommGadget = PredicateCommGadget;
     type PredVkH = PredVkCRH;
     type PredVkHGadget = PredVkCRHGadget;
-    type PredicateNIZK = PredicateNIZK<Self>;
-    type PredicateNIZKGadget = PredicateNIZKGadget;
     type ProofCheckF = ProofCheckF;
-    type ProofCheckNIZK = ProofCheckNIZK;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
     type SnNonceH = SnNonceCRH;

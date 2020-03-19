@@ -52,7 +52,34 @@ mod test;
 /// Trait that stores all information about the components of a Plain DPC
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
-pub trait PlainDPCComponents: 'static + Sized {
+pub trait PlainDPCComponents: DPCComponents {
+    // SNARK for non-proof-verification checks
+    type MainNIZK: SNARK<
+        Circuit = CoreChecksCircuit<Self>,
+        AssignedCircuit = CoreChecksCircuit<Self>,
+        VerifierInput = CoreChecksVerifierInput<Self>,
+    >;
+
+    // SNARK for a "dummy predicate" that does nothing with its input.
+    type PredicateNIZK: SNARK<
+        Circuit = EmptyPredicateCircuit<Self>,
+        AssignedCircuit = EmptyPredicateCircuit<Self>,
+        VerifierInput = PredicateLocalData<Self>,
+    >;
+
+    // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
+    // input.
+    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::ProofCheckF>;
+
+    // SNARK for proof-verification checks
+    type ProofCheckNIZK: SNARK<
+        Circuit = ProofCheckCircuit<Self>,
+        AssignedCircuit = ProofCheckCircuit<Self>,
+        VerifierInput = ProofCheckVerifierInput<Self>,
+    >;
+}
+
+pub trait DPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;
     const NUM_OUTPUT_RECORDS: usize;
 
@@ -92,31 +119,6 @@ pub trait PlainDPCComponents: 'static + Sized {
     // `Self::MainN` and every predicate SNARK.
     type LocalDataComm: CommitmentScheme;
     type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::CoreCheckF>;
-
-    // SNARK for non-proof-verification checks
-    type MainNIZK: SNARK<
-        Circuit = CoreChecksCircuit<Self>,
-        AssignedCircuit = CoreChecksCircuit<Self>,
-        VerifierInput = CoreChecksVerifierInput<Self>,
-    >;
-
-    // SNARK for proof-verification checks
-    type ProofCheckNIZK: SNARK<
-        Circuit = ProofCheckCircuit<Self>,
-        AssignedCircuit = ProofCheckCircuit<Self>,
-        VerifierInput = ProofCheckVerifierInput<Self>,
-    >;
-
-    // SNARK for a "dummy predicate" that does nothing with its input.
-    type PredicateNIZK: SNARK<
-        Circuit = EmptyPredicateCircuit<Self>,
-        AssignedCircuit = EmptyPredicateCircuit<Self>,
-        VerifierInput = PredicateLocalData<Self>,
-    >;
-
-    // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
-    // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::ProofCheckF>;
 
     // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
     type P: PRF;

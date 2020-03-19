@@ -4,6 +4,7 @@ use crate::{
         address::AddressSecretKey,
         parameters::CommAndCRHPublicParameters,
         record::DPCRecord,
+        DPCComponents,
         PlainDPCComponents,
     },
     ledger::MerkleTreeParams,
@@ -16,7 +17,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
-pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
+pub struct CoreChecksVerifierInput<C: DPCComponents> {
     // Commitment and CRH parameters
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
 
@@ -36,7 +37,7 @@ pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
     pub memo: [u8; 32],
 }
 
-impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
+impl<C: DPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
 where
     <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
