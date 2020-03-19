@@ -1,118 +1,90 @@
-use crate::{algorithms::signature::*, curves::edwards_bls12::EdwardsBlsGadget};
+use crate::{
+    algorithms::signature::{SchnorrParametersGadget, SchnorrPublicKeyGadget, SchnorrPublicKeyRandomizationGadget},
+    curves::edwards_bls12::EdwardsBlsGadget,
+};
 use snarkos_algorithms::signature::SchnorrSignature;
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsAffine};
 use snarkos_models::{
     algorithms::SignatureScheme,
+    curves::Group,
     gadgets::{
         algorithms::SignaturePublicKeyRandomizationGadget,
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
     },
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
-use blake2::Blake2s as Blake2sHash;
-
-use rand::{Rng, SeedableRng};
-use rand_xorshift::XorShiftRng;
-
-pub type SGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, Fr, EdwardsBlsGadget>;
-pub type S = SchnorrSignature<EdwardsAffine, Blake2sHash>;
+use blake2::Blake2s;
+use rand::{thread_rng, Rng};
 
 #[test]
-fn test_schnorr_signature_pk() {
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+fn test_schnorr_signature_gadget() {
+    type Schnorr = SchnorrSignature<EdwardsAffine, Blake2s>;
+
+    // Setup environment
+
     let mut cs = TestConstraintSystem::<Fr>::new();
+    let rng = &mut thread_rng();
 
-    // Setup native signature components
+    // Native Schnorr message
 
-    let parameters = S::setup(&mut rng).unwrap();
-    let (pk, _) = S::keygen(&parameters, &mut rng).unwrap();
+    let mut message = [0u8; 32];
+    rng.fill(&mut message);
 
-    // Allocate Circuit Inputs
+    // Native Schnorr signing
 
-    let pk_sig = <SGadget as SignaturePublicKeyRandomizationGadget<S, _>>::PublicKeyGadget::alloc(
-        &mut cs.ns(|| "Declare pk"),
-        || Ok(&pk),
-    )
-    .unwrap();
+    let parameters = Schnorr::setup::<_>(rng).unwrap();
+    let (public_key, private_key) = Schnorr::keygen(&parameters, rng).unwrap();
+    let signature = Schnorr::sign(&parameters, &private_key, &message, rng).unwrap();
+    assert!(Schnorr::verify(&parameters, &public_key, &message, &signature).unwrap());
 
-    let pk_sig_bytes = pk_sig.to_bytes(&mut cs.ns(|| "Convert pk gadget to bytes")).unwrap();
+    // Native Schnorr randomization
 
-    let direct_pk_sig_bytes = UInt8::alloc_vec(
-        &mut cs.ns(|| "Declare pk directly into bytes"),
-        &to_bytes![&pk].unwrap(),
-    )
-    .unwrap();
+    let random_scalar = to_bytes!(<EdwardsAffine as Group>::ScalarField::rand(rng)).unwrap();
+    let randomized_public_key = Schnorr::randomize_public_key(&parameters, &public_key, &random_scalar).unwrap();
+    let randomized_signature = Schnorr::randomize_signature(&parameters, &signature, &random_scalar).unwrap();
+    assert!(Schnorr::verify(&parameters, &randomized_public_key, &message, &randomized_signature).unwrap());
 
-    // Verify native and gadget to_byte conversion is correct
+    // Circuit Schnorr randomized public key (candidate)
 
-    pk_sig_bytes
-        .enforce_equal(
-            &mut cs.ns(|| "Check that the gadget and native to_bytes are equal"),
-            &direct_pk_sig_bytes,
-        )
-        .unwrap();
-
-    if !cs.is_satisfied() {
-        println!("which is unsatisfied: {:?}", cs.which_is_unsatisfied().unwrap());
-    }
-    assert!(cs.is_satisfied());
-
-    assert_eq!(pk_sig_bytes, direct_pk_sig_bytes);
-}
-
-#[test]
-fn test_schnorr_sn_generation() {
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-    let mut cs = TestConstraintSystem::<Fr>::new();
-
-    // Setup native signature components
-
-    let parameters = S::setup(&mut rng).unwrap();
-    let (pk, _) = S::keygen(&parameters, &mut rng).unwrap();
-    //    let rpk = S::randomize_public_key(&parameters, &pk, &randomness[..]).unwrap();
-
-    //    let sk_prf: [u8; 32] = rng.gen();
-    let randomness: [u8; 32] = rng.gen();
-
-    let sn = S::randomize_public_key(&parameters, &pk, &randomness[..]).unwrap();
-
-    // Allocate Circuit Values
-
-    let sig_pp = <SGadget as SignaturePublicKeyRandomizationGadget<S, _>>::ParametersGadget::alloc_input(
-        &mut cs.ns(|| "Declare SIG Parameters"),
+    let candidate_parameters_gadget = SchnorrParametersGadget::<EdwardsAffine, Fr, EdwardsBlsGadget>::alloc_input(
+        &mut cs.ns(|| "candidate_parameters"),
         || Ok(&parameters),
     )
     .unwrap();
 
-    let pk_sig = <SGadget as SignaturePublicKeyRandomizationGadget<S, _>>::PublicKeyGadget::alloc(
-        &mut cs.ns(|| "Declare pk"),
-        || Ok(&pk),
+    let candidate_public_key_gadget = SchnorrPublicKeyGadget::<EdwardsAffine, Fr, EdwardsBlsGadget>::alloc(
+        &mut cs.ns(|| "candidate_public_key"),
+        || Ok(&public_key),
     )
     .unwrap();
 
-    let randomizer_bytes = UInt8::alloc_vec(&mut cs.ns(|| "declare randomness"), &randomness).unwrap();
+    let candidate_randomizer = UInt8::alloc_vec(&mut cs.ns(|| "candidate_randomizer"), &random_scalar).unwrap();
 
-    let candidate_sn = <SGadget as SignaturePublicKeyRandomizationGadget<S, _>>::check_randomization_gadget(
-        &mut cs.ns(|| "Compute serial number"),
-        &sig_pp,
-        &pk_sig,
-        &randomizer_bytes,
+    let candidate_randomized_public_key_gadget = <SchnorrPublicKeyRandomizationGadget<
+        EdwardsAffine,
+        Fr,
+        EdwardsBlsGadget,
+    > as SignaturePublicKeyRandomizationGadget<Schnorr, Fr>>::check_randomization_gadget(
+        &mut cs.ns(|| "candidate_randomized_public_key"),
+        &candidate_parameters_gadget,
+        &candidate_public_key_gadget,
+        &candidate_randomizer,
     )
     .unwrap();
 
-    let given_sn = <SGadget as SignaturePublicKeyRandomizationGadget<S, _>>::PublicKeyGadget::alloc_input(
-        &mut cs.ns(|| "Declare given serial number"),
-        || Ok(sn),
-    )
-    .unwrap();
+    // Circuit Schnorr randomized public key (given)
 
-    candidate_sn
-        .enforce_equal(
-            &mut cs.ns(|| "Check that given and computed serial numbers are equal"),
-            &given_sn,
+    let given_randomized_public_key_gadget =
+        SchnorrPublicKeyGadget::<EdwardsAffine, Fr, EdwardsBlsGadget>::alloc_input(
+            &mut cs.ns(|| "given_randomized_public_key"),
+            || Ok(randomized_public_key),
         )
+        .unwrap();
+
+    candidate_randomized_public_key_gadget
+        .enforce_equal(&mut cs.ns(|| "enforce_equal"), &given_randomized_public_key_gadget)
         .unwrap();
 
     if !cs.is_satisfied() {
