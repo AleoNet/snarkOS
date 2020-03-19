@@ -64,7 +64,7 @@ mod test;
 pub trait PaymentDPCComponents: DPCComponents {
     // Commitment scheme for committing to a record value
     type ValueComm: CommitmentScheme;
-    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerF>;
+    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerField>;
 
     // SNARK for non-proof-verification checks
     type MainNIZK: SNARK<
@@ -89,7 +89,7 @@ pub trait PaymentDPCComponents: DPCComponents {
 
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
     // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterF>;
+    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -121,8 +121,8 @@ pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
     predicate_comm: <Components::PredVkComm as CommitmentScheme>::Output,
     predicate_rand: <Components::PredVkComm as CommitmentScheme>::Randomness,
 
-    local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 
     // Value Balance
     value_balance: u64,
@@ -156,8 +156,8 @@ pub struct LocalData<Components: PaymentDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    pub local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    pub local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -179,7 +179,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let local_data_comm_pp = Components::LocalDataComm::setup(rng);
+        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -443,9 +443,12 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
 
-        let local_data_rand = <Components::LocalDataComm as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm =
-            Components::LocalDataComm::commit(&parameters.local_data_comm_pp, &predicate_input, &local_data_rand)?;
+        let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let local_data_comm = Components::LocalDataCommitment::commit(
+            &parameters.local_data_comm_pp,
+            &predicate_input,
+            &local_data_rand,
+        )?;
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");

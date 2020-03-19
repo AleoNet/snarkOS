@@ -46,7 +46,7 @@ impl<C: DelegablePaymentDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecC as CommitmentScheme>::Randomness;
     type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
-    type SerialNumber = <C::S as SignatureScheme>::PublicKey;
+    type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SnNonceH as CRH>::Output;
 
     fn address_public_key(&self) -> &Self::AddressPublicKey {

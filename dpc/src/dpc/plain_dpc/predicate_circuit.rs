@@ -87,19 +87,19 @@ impl<C: PlainDPCComponents> ToBytes for PredicateHashInput<C> {
 }
 
 pub struct PredicateLocalData<C: PlainDPCComponents> {
-    pub local_data_comm_pp: <C::LocalDataComm as CommitmentScheme>::Parameters,
-    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub local_data_comm_pp: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
+    pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub position: u8,
 }
 
 // Convert each component to bytes and pack into field elements.
-impl<C: PlainDPCComponents> ToConstraintField<C::InnerF> for PredicateLocalData<C>
+impl<C: PlainDPCComponents> ToConstraintField<C::InnerField> for PredicateLocalData<C>
 where
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::InnerF>, ConstraintFieldError> {
-        let mut v = ToConstraintField::<C::InnerF>::to_field_elements([self.position].as_ref())?;
+    fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
+        let mut v = ToConstraintField::<C::InnerField>::to_field_elements([self.position].as_ref())?;
         v.extend_from_slice(&self.local_data_comm_pp.to_field_elements()?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
         Ok(v)
@@ -111,13 +111,13 @@ pub struct EmptyPredicateCircuit<C: PlainDPCComponents> {
     comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
 
     // Commitment to Predicate input.
-    local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
+    local_data_comm: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
     position: u8,
 }
 
 impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
     pub fn blank(comm_and_crh_parameters: &CommAndCRHPublicParameters<C>) -> Self {
-        let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
+        let local_data_comm = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
 
         Self {
             comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
@@ -128,7 +128,7 @@ impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
 
     pub fn new(
         comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
-        local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
+        local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
         position: u8,
     ) -> Self {
         Self {
@@ -142,20 +142,21 @@ impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::InnerF> for EmptyPredicateCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::InnerF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+impl<C: PlainDPCComponents> ConstraintSynthesizer<C::InnerField> for EmptyPredicateCircuit<C> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[self.position])?;
 
-        let _local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Pred Input Comm parameters"),
-            || {
-                self.comm_and_crh_parameters
-                    .get()
-                    .map(|pp| pp.local_data_comm_pp.parameters())
-            },
-        )?;
+        let _local_data_comm_pp =
+            <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare Pred Input Comm parameters"),
+                || {
+                    self.comm_and_crh_parameters
+                        .get()
+                        .map(|pp| pp.local_data_comm_pp.parameters())
+                },
+            )?;
 
-        let _local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+        let _local_data_comm = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
             cs.ns(|| "Allocate predicate commitment"),
             || self.local_data_comm.get(),
         )?;

@@ -15,8 +15,8 @@ use snarkos_models::{
 };
 
 pub struct PaymentPredicateLocalData<C: DelegablePaymentDPCComponents> {
-    pub local_data_comm_pp: <C::LocalDataComm as CommitmentScheme>::Parameters,
-    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub local_data_comm_pp: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
+    pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub value_comm_pp: <C::ValueComm as CommitmentScheme>::Parameters,
     pub value_comm_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
     pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
@@ -24,20 +24,20 @@ pub struct PaymentPredicateLocalData<C: DelegablePaymentDPCComponents> {
 }
 
 /// Convert each component to bytes and pack into field elements.
-impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerF> for PaymentPredicateLocalData<C>
+impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerField> for PaymentPredicateLocalData<C>
 where
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
-    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::InnerF>, ConstraintFieldError> {
-        let mut v = ToConstraintField::<C::InnerF>::to_field_elements(&[self.position][..])?;
+    fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
+        let mut v = ToConstraintField::<C::InnerField>::to_field_elements(&[self.position][..])?;
 
         v.extend_from_slice(&self.local_data_comm_pp.to_field_elements()?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
         v.extend_from_slice(&self.value_comm_pp.to_field_elements()?);
-        v.extend(ToConstraintField::<C::InnerF>::to_field_elements(
+        v.extend(ToConstraintField::<C::InnerField>::to_field_elements(
             &to_bytes![self.value_comm_randomness]?[..],
         )?);
         v.extend_from_slice(&self.value_commitment.to_field_elements()?);
@@ -48,7 +48,7 @@ where
 pub struct PaymentCircuit<C: DelegablePaymentDPCComponents> {
     pub parameters: Option<CommCRHSigPublicParameters<C>>,
 
-    pub local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
+    pub local_data_comm: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
     pub value_commitment_randomness: Option<<C::ValueComm as CommitmentScheme>::Randomness>,
     pub value_commitment: Option<<C::ValueComm as CommitmentScheme>::Output>,
 
@@ -58,7 +58,7 @@ pub struct PaymentCircuit<C: DelegablePaymentDPCComponents> {
 
 impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
     pub fn blank(comm_and_crh_parameters: &CommCRHSigPublicParameters<C>) -> Self {
-        let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
+        let local_data_comm = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
         let value_commitment_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
         let value_commitment = <C::ValueComm as CommitmentScheme>::Output::default();
 
@@ -74,7 +74,7 @@ impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
 
     pub fn new(
         comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
-        local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
+        local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
         value_commitment_randomness: &<C::ValueComm as CommitmentScheme>::Randomness,
         value_commitment: &<C::ValueComm as CommitmentScheme>::Output,
         position: u8,
@@ -92,8 +92,8 @@ impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
     }
 }
 
-impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::InnerF> for PaymentCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::InnerF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::InnerField> for PaymentCircuit<C> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,
             self.parameters.get()?,
@@ -106,10 +106,10 @@ impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::InnerF> for Paym
     }
 }
 
-fn execute_payment_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::InnerF>>(
+fn execute_payment_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
-    local_data_commitment: &<C::LocalDataComm as CommitmentScheme>::Output,
+    local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     value_commitment: &<C::ValueComm as CommitmentScheme>::Output,
     value_commitment_randomness: &<C::ValueComm as CommitmentScheme>::Randomness,
     position: u8,
@@ -117,12 +117,12 @@ fn execute_payment_check_gadget<C: DelegablePaymentDPCComponents, CS: Constraint
 ) -> Result<(), SynthesisError> {
     let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[position])?;
 
-    let _local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+    let _local_data_comm_pp = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
         &mut cs.ns(|| "Declare Pred Input Comm parameters"),
         || Ok(comm_and_crh_parameters.local_data_comm_pp.parameters().clone()),
     )?;
 
-    let _local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+    let _local_data_comm = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
         cs.ns(|| "Allocate local data commitment"),
         || Ok(local_data_commitment),
     )?;

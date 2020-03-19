@@ -25,7 +25,7 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-pub fn execute_core_checks_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::InnerF>>(
+pub fn execute_core_checks_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
     comm_crh_parameters: &CommAndCRHPublicParameters<C>,
@@ -48,8 +48,8 @@ pub fn execute_core_checks_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
     // Rest
     predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
     predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
-    local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
-    local_data_rand: &<C::LocalDataComm as CommitmentScheme>::Randomness,
+    local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
 ) -> Result<(), SynthesisError> {
@@ -92,7 +92,7 @@ pub fn execute_core_checks_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
 
 fn execute_core_checks_gadget_helper<
     C,
-    CS: ConstraintSystem<C::InnerF>,
+    CS: ConstraintSystem<C::InnerField>,
     AddrC,
     RecC,
     SnNonceH,
@@ -125,8 +125,8 @@ fn execute_core_checks_gadget_helper<
     //
     predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
     predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
-    local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
-    local_data_rand: &<C::LocalDataComm as CommitmentScheme>::Randomness,
+    local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
 ) -> Result<(), SynthesisError>
@@ -146,10 +146,10 @@ where
     SnNonceH: CRH,
     P: PRF,
     RecC::Output: Eq,
-    AddrCGadget: CommitmentGadget<AddrC, C::InnerF>,
-    RecCGadget: CommitmentGadget<RecC, C::InnerF>,
-    SnNonceHGadget: CRHGadget<SnNonceH, C::InnerF>,
-    PGadget: PRFGadget<P, C::InnerF>,
+    AddrCGadget: CommitmentGadget<AddrC, C::InnerField>,
+    RecCGadget: CommitmentGadget<RecC, C::InnerField>,
+    SnNonceHGadget: CRHGadget<SnNonceH, C::InnerField>,
+    PGadget: PRFGadget<P, C::InnerField>,
 {
     let mut old_sns = Vec::with_capacity(old_records.len());
     let mut old_rec_comms = Vec::with_capacity(old_records.len());
@@ -186,15 +186,17 @@ where
                 Ok(comm_crh_parameters.rec_comm_pp.parameters())
             })?;
 
-        let local_data_comm_pp = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Local Data Comm parameters"),
-            || Ok(comm_crh_parameters.local_data_comm_pp.parameters()),
-        )?;
+        let local_data_comm_pp =
+            <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare Local Data Comm parameters"),
+                || Ok(comm_crh_parameters.local_data_comm_pp.parameters()),
+            )?;
 
-        let pred_vk_comm_pp = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerF>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-            || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
-        )?;
+        let pred_vk_comm_pp =
+            <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
+                || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
+            )?;
 
         let sn_nonce_crh_pp =
             SnNonceHGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SN Nonce CRH parameters"), || {
@@ -551,22 +553,23 @@ where
             input.extend_from_slice(&new_birth_pred_hashes[j]);
         }
 
-        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerF>>::RandomnessGadget::alloc(
+        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::RandomnessGadget::alloc(
             &mut comm_cs.ns(|| "Commitment randomness"),
             || Ok(predicate_rand),
         )?;
 
-        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerF>>::OutputGadget::alloc_input(
+        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
             &mut comm_cs.ns(|| "Commitment output"),
             || Ok(predicate_comm),
         )?;
 
-        let candidate_commitment = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerF>>::check_commitment_gadget(
-            &mut comm_cs.ns(|| "Compute commitment"),
-            &pred_vk_comm_pp,
-            &input,
-            &given_comm_rand,
-        )?;
+        let candidate_commitment =
+            <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::check_commitment_gadget(
+                &mut comm_cs.ns(|| "Compute commitment"),
+                &pred_vk_comm_pp,
+                &input,
+                &given_comm_rand,
+            )?;
 
         candidate_commitment.enforce_equal(
             &mut comm_cs.ns(|| "Check that declared and computed commitments are equal"),
@@ -603,17 +606,18 @@ where
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
-        let local_data_comm_rand = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+        let local_data_comm_rand = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
             cs.ns(|| "Allocate local data commitment randomness"),
             || Ok(local_data_rand),
         )?;
 
-        let declared_local_data_comm = <C::LocalDataCommGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-            cs.ns(|| "Allocate local data commitment"),
-            || Ok(local_data_comm),
-        )?;
+        let declared_local_data_comm =
+            <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
+                cs.ns(|| "Allocate local data commitment"),
+                || Ok(local_data_comm),
+            )?;
 
-        let comm = C::LocalDataCommGadget::check_commitment_gadget(
+        let comm = C::LocalDataCommitmentGadget::check_commitment_gadget(
             cs.ns(|| "Commit to local data"),
             &local_data_comm_pp,
             &local_data_bytes,
@@ -628,7 +632,7 @@ where
     Ok(())
 }
 
-pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::OuterF>>(
+pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
     comm_crh_parameters: &CommAndCRHPublicParameters<C>,
@@ -643,22 +647,23 @@ pub fn execute_proof_check_gadget<C: PlainDPCComponents, CS: ConstraintSystem<C:
     predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
     predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
 
-    local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
+    local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
 ) -> Result<(), SynthesisError>
 where
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
     let (pred_vk_comm_pp, pred_vk_crh_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
 
-        let pred_vk_comm_pp = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterF>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-            || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
-        )?;
+        let pred_vk_comm_pp =
+            <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
+                || Ok(comm_crh_parameters.pred_vk_comm_pp.parameters()),
+            )?;
 
-        let pred_vk_crh_pp = <C::PredVkHGadget as CRHGadget<_, C::OuterF>>::ParametersGadget::alloc_input(
+        let pred_vk_crh_pp = <C::PredVkHGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
             || Ok(comm_crh_parameters.pred_vk_crh_pp.parameters()),
         )?;
@@ -672,10 +677,10 @@ where
 
     // First we convert the input for the predicates into `CoreCheckF` field elements
     let local_data_comm_pp_fe =
-        ToConstraintField::<C::InnerF>::to_field_elements(comm_crh_parameters.local_data_comm_pp.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(comm_crh_parameters.local_data_comm_pp.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let local_data_comm_fe = ToConstraintField::<C::InnerF>::to_field_elements(local_data_comm)
+    let local_data_comm_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_comm)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     // Then we convert these field elements into bytes
@@ -789,22 +794,23 @@ where
             input.extend_from_slice(&new_birth_pred_hashes[j]);
         }
 
-        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterF>>::RandomnessGadget::alloc(
+        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::RandomnessGadget::alloc(
             &mut comm_cs.ns(|| "Commitment randomness"),
             || Ok(predicate_rand),
         )?;
 
-        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterF>>::OutputGadget::alloc_input(
+        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::OutputGadget::alloc_input(
             &mut comm_cs.ns(|| "Commitment output"),
             || Ok(predicate_comm),
         )?;
 
-        let candidate_commitment = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterF>>::check_commitment_gadget(
-            &mut comm_cs.ns(|| "Compute commitment"),
-            &pred_vk_comm_pp,
-            &input,
-            &given_comm_rand,
-        )?;
+        let candidate_commitment =
+            <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::check_commitment_gadget(
+                &mut comm_cs.ns(|| "Compute commitment"),
+                &pred_vk_comm_pp,
+                &input,
+                &given_comm_rand,
+            )?;
 
         candidate_commitment.enforce_equal(
             &mut comm_cs.ns(|| "Check that declared and computed commitments are equal"),

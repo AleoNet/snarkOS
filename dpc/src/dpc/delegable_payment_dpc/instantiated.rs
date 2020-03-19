@@ -140,12 +140,12 @@ impl DelegablePaymentDPCComponents for Components {
 impl DPCComponents for Components {
     type AddrC = AddressComm;
     type AddrCGadget = AddressCommGadget;
-    type InnerF = CoreCheckF;
-    type LocalDataComm = LocalDataComm;
-    type LocalDataCommGadget = LocalDataCommGadget;
+    type InnerField = CoreCheckF;
+    type LocalDataCommitment = LocalDataComm;
+    type LocalDataCommitmentGadget = LocalDataCommGadget;
     type MerkleParameters = CommitmentMerkleParameters;
     type MerkleTreeHGadget = MerkleTreeCRHGadget;
-    type OuterF = ProofCheckF;
+    type OuterField = ProofCheckF;
     type P = PRF;
     type PGadget = PRFGadget;
     type PredVkComm = PredicateComm;
@@ -154,8 +154,8 @@ impl DPCComponents for Components {
     type PredVkHGadget = PredVkCRHGadget;
     type RecC = RecordComm;
     type RecCGadget = RecordCommGadget;
-    type S = AuthSignature;
-    type SGadget = AuthSignatureGadget;
+    type Signature = AuthSignature;
+    type SignatureGadget = AuthSignatureGadget;
     type SnNonceH = SnNonceCRH;
     type SnNonceHGadget = SnNonceCRHGadget;
 

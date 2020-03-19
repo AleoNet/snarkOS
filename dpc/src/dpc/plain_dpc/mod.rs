@@ -73,7 +73,7 @@ pub trait PlainDPCComponents: DPCComponents {
 
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
     // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterF>;
+    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterField>;
 
     // SNARK for proof-verification checks
     type ProofCheckNIZK: SNARK<
@@ -87,50 +87,50 @@ pub trait DPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;
     const NUM_OUTPUT_RECORDS: usize;
 
-    type InnerF: PrimeField;
-    type OuterF: PrimeField;
+    type InnerField: PrimeField;
+    type OuterField: PrimeField;
 
     // Commitment scheme for address contents. Invoked only over `Self::CoreCheckF`.
     type AddrC: CommitmentScheme;
-    type AddrCGadget: CommitmentGadget<Self::AddrC, Self::InnerF>;
+    type AddrCGadget: CommitmentGadget<Self::AddrC, Self::InnerField>;
 
     // Commitment scheme for record contents. Invoked only over `Self::CoreCheckF`.
     type RecC: CommitmentScheme;
-    type RecCGadget: CommitmentGadget<Self::RecC, Self::InnerF>;
+    type RecCGadget: CommitmentGadget<Self::RecC, Self::InnerField>;
 
     // Ledger digest type.
     type MerkleParameters: MerkleParameters;
-    type MerkleTreeHGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerF>;
+    type MerkleTreeHGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
 
     // CRH for computing the serial number nonce. Invoked only over `Self::CoreCheckF`.
     type SnNonceH: CRH;
-    type SnNonceHGadget: CRHGadget<Self::SnNonceH, Self::InnerF>;
+    type SnNonceHGadget: CRHGadget<Self::SnNonceH, Self::InnerField>;
 
     // CRH for hashes of birth and death verification keys.
     // This is invoked only on the larger curve.
     type PredVkH: CRH;
-    type PredVkHGadget: CRHGadget<Self::PredVkH, Self::OuterF>;
+    type PredVkHGadget: CRHGadget<Self::PredVkH, Self::OuterField>;
 
     // Commitment scheme for committing to hashes of birth and death verification
     // keys
     type PredVkComm: CommitmentScheme;
     // Used to commit to hashes of vkeys on the smaller curve and to decommit hashes
     // of vkeys on the larger curve
-    type PredVkCommGadget: CommitmentGadget<Self::PredVkComm, Self::InnerF>
-        + CommitmentGadget<Self::PredVkComm, Self::OuterF>;
+    type PredVkCommGadget: CommitmentGadget<Self::PredVkComm, Self::InnerField>
+        + CommitmentGadget<Self::PredVkComm, Self::OuterField>;
 
     // Commitment scheme for committing to predicate input. Invoked inside
     // `Self::MainN` and every predicate SNARK.
-    type LocalDataComm: CommitmentScheme;
-    type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::InnerF>;
+    type LocalDataCommitment: CommitmentScheme;
+    type LocalDataCommitmentGadget: CommitmentGadget<Self::LocalDataCommitment, Self::InnerField>;
 
     // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
     type P: PRF;
-    type PGadget: PRFGadget<Self::P, Self::InnerF>;
+    type PGadget: PRFGadget<Self::P, Self::InnerField>;
 
     // Signature scheme for delegated compute
-    type S: SignatureScheme;
-    type SGadget: SignaturePublicKeyRandomizationGadget<Self::S, Self::InnerF>;
+    type Signature: SignatureScheme;
+    type SignatureGadget: SignaturePublicKeyRandomizationGadget<Self::Signature, Self::InnerField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -162,8 +162,8 @@ pub(crate) struct ExecuteContext<'a, Components: PlainDPCComponents> {
     predicate_comm: <Components::PredVkComm as CommitmentScheme>::Output,
     predicate_rand: <Components::PredVkComm as CommitmentScheme>::Randomness,
 
-    local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 }
 
 impl<Components: PlainDPCComponents> ExecuteContext<'_, Components> {
@@ -194,8 +194,8 @@ pub struct LocalData<Components: PlainDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    pub local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    pub local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -217,7 +217,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let local_data_comm_pp = Components::LocalDataComm::setup(rng);
+        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
@@ -468,9 +468,12 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
 
-        let local_data_rand = <Components::LocalDataComm as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm =
-            Components::LocalDataComm::commit(&parameters.local_data_comm_pp, &predicate_input, &local_data_rand)?;
+        let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let local_data_comm = Components::LocalDataCommitment::commit(
+            &parameters.local_data_comm_pp,
+            &predicate_input,
+            &local_data_rand,
+        )?;
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");

@@ -66,7 +66,7 @@ mod test;
 pub trait DelegablePaymentDPCComponents: DPCComponents {
     // Commitment scheme for committing to a record value
     type ValueComm: CommitmentScheme;
-    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerF>;
+    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerField>;
 
     // SNARK for non-proof-verification checks
     type MainNIZK: SNARK<
@@ -91,7 +91,7 @@ pub trait DelegablePaymentDPCComponents: DPCComponents {
 
     // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
     // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterF>;
+    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -112,7 +112,7 @@ pub(crate) struct ExecuteContext<'a, Components: DelegablePaymentDPCComponents> 
     old_address_secret_keys: &'a [AddressSecretKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers: Vec<<Components::S as SignatureScheme>::PublicKey>,
+    old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
     old_randomizers: Vec<Vec<u8>>,
 
     // New record stuff
@@ -124,8 +124,8 @@ pub(crate) struct ExecuteContext<'a, Components: DelegablePaymentDPCComponents> 
     predicate_comm: <Components::PredVkComm as CommitmentScheme>::Output,
     predicate_rand: <Components::PredVkComm as CommitmentScheme>::Randomness,
 
-    local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 
     // Value Balance
     value_balance: u64,
@@ -153,14 +153,14 @@ pub struct LocalData<Components: DelegablePaymentDPCComponents> {
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
-    pub old_serial_numbers: Vec<<Components::S as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
 
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    pub local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    pub local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -182,7 +182,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let local_data_comm_pp = Components::LocalDataComm::setup(rng);
+        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -198,7 +198,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Signature setup");
-        let sig_pp = Components::S::setup(rng)?;
+        let sig_pp = Components::Signature::setup(rng)?;
         end_timer!(time);
 
         let comm_crh_sig_pp = CommCRHSigPublicParameters {
@@ -235,7 +235,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         params: &CommCRHSigPublicParameters<Components>,
         record: &DPCRecord<Components>,
         address_secret_key: &AddressSecretKey<Components>,
-    ) -> Result<(<Components::S as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
+    ) -> Result<(<Components::Signature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
         let sk_prf = &address_secret_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
@@ -244,8 +244,11 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
         let sig_and_pk_randomizer = to_bytes![Components::P::evaluate(&prf_seed, &prf_input)?]?;
 
-        let sn =
-            Components::S::randomize_public_key(&params.sig_pp, &address_secret_key.pk_sig, &sig_and_pk_randomizer)?;
+        let sn = Components::Signature::randomize_public_key(
+            &params.sig_pp,
+            &address_secret_key.pk_sig,
+            &sig_and_pk_randomizer,
+        )?;
         end_timer!(sn_time);
         Ok((sn, sig_and_pk_randomizer))
     }
@@ -300,7 +303,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         rng: &mut R,
     ) -> Result<AddressPair<Components>, DPCError> {
         // Sample SIG key pair.
-        let (pk_sig, sk_sig) = Components::S::keygen(&parameters.sig_pp, rng)?;
+        let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.sig_pp, rng)?;
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
         let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
@@ -348,7 +351,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         L: Ledger<
             Parameters = Components::MerkleParameters,
             Commitment = <Components::RecC as CommitmentScheme>::Output,
-            SerialNumber = <Components::S as SignatureScheme>::PublicKey,
+            SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
@@ -463,9 +466,12 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
 
-        let local_data_rand = <Components::LocalDataComm as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm =
-            Components::LocalDataComm::commit(&parameters.local_data_comm_pp, &predicate_input, &local_data_rand)?;
+        let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let local_data_comm = Components::LocalDataCommitment::commit(
+            &parameters.local_data_comm_pp,
+            &predicate_input,
+            &local_data_rand,
+        )?;
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
@@ -516,7 +522,7 @@ where
     L: Ledger<
         Parameters = Components::MerkleParameters,
         Commitment = <Components::RecC as CommitmentScheme>::Output,
-        SerialNumber = <Components::S as SignatureScheme>::PublicKey,
+        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
     >,
 {
     type AddressKeyPair = AddressPair<Components>;
@@ -731,9 +737,9 @@ where
             let sk_sig = &old_address_secret_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
-            let signature = Components::S::sign(&comm_crh_sig_pp.sig_pp, sk_sig, &signature_message, rng)?;
+            let signature = Components::Signature::sign(&comm_crh_sig_pp.sig_pp, sk_sig, &signature_message, rng)?;
             let randomized_signature =
-                Components::S::randomize_signature(&comm_crh_sig_pp.sig_pp, &signature, randomizer)?;
+                Components::Signature::randomize_signature(&comm_crh_sig_pp.sig_pp, &signature, randomizer)?;
             signatures.push(randomized_signature);
 
             end_timer!(sig_time);
@@ -833,7 +839,7 @@ where
             .iter()
             .zip(&transaction.stuff.signatures)
         {
-            if !Components::S::verify(sig_pp, pk, signature_message, sig)? {
+            if !Components::Signature::verify(sig_pp, pk, signature_message, sig)? {
                 eprintln!("Signature didn't verify.");
                 return Ok(false);
             }

@@ -30,7 +30,7 @@ pub struct DPCStuff<C: PlainDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
-    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
 
 impl<C: PlainDPCComponents> DPCTransaction<C> {
@@ -42,7 +42,7 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
         core_proof: <C::MainNIZK as SNARK>::Proof,
         predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
         predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
-        local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+        local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
     ) -> Self {
         let stuff = DPCStuff {
             digest,

@@ -12,7 +12,7 @@ use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, SNARK};
     Eq(bound = "C: DelegablePaymentDPCComponents")
 )]
 pub struct DPCTransaction<C: DelegablePaymentDPCComponents> {
-    old_serial_numbers: Vec<<C::S as SignatureScheme>::PublicKey>,
+    old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
     new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
@@ -33,7 +33,7 @@ pub struct DPCStuff<C: DelegablePaymentDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
-    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
     pub input_value_commitments: Vec<[u8; 32]>,
     pub output_value_commitments: Vec<[u8; 32]>,
@@ -41,7 +41,7 @@ pub struct DPCStuff<C: DelegablePaymentDPCComponents> {
     pub binding_signature: BindingSignature,
 
     #[derivative(PartialEq = "ignore")]
-    pub signatures: Vec<<C::S as SignatureScheme>::Output>,
+    pub signatures: Vec<<C::Signature as SignatureScheme>::Output>,
 }
 
 impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
@@ -53,12 +53,12 @@ impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
         core_proof: <C::MainNIZK as SNARK>::Proof,
         predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
         predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
-        local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+        local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
         input_value_commitments: Vec<[u8; 32]>,
         output_value_commitments: Vec<[u8; 32]>,
         value_balance: u64,
         binding_signature: BindingSignature,
-        signatures: Vec<<C::S as SignatureScheme>::Output>,
+        signatures: Vec<<C::Signature as SignatureScheme>::Output>,
     ) -> Self {
         let stuff = DPCStuff {
             digest,
@@ -84,7 +84,7 @@ impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
 impl<C: DelegablePaymentDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecC as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
-    type SerialNumber = <C::S as SignatureScheme>::PublicKey;
+    type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
     type Stuff = DPCStuff<C>;
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {

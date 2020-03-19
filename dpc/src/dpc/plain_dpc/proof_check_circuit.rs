@@ -20,30 +20,30 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 pub struct ProofCheckVerifierInput<C: DPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
-    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
 
-impl<C: DPCComponents> ToConstraintField<C::OuterF> for ProofCheckVerifierInput<C>
+impl<C: DPCComponents> ToConstraintField<C::OuterField> for ProofCheckVerifierInput<C>
 where
-    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::OuterF>,
-    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::OuterF>,
+    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
+    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
 
-    <C::PredVkH as CRH>::Parameters: ToConstraintField<C::OuterF>,
+    <C::PredVkH as CRH>::Parameters: ToConstraintField<C::OuterField>,
 
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::OuterF>, ConstraintFieldError> {
+    fn to_field_elements(&self) -> Result<Vec<C::OuterField>, ConstraintFieldError> {
         let mut v = Vec::new();
 
         v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.parameters().to_field_elements()?);
         v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_crh_pp.parameters().to_field_elements()?);
 
         let local_data_comm_pp_fe =
-            ToConstraintField::<C::InnerF>::to_field_elements(self.comm_and_crh_pp.local_data_comm_pp.parameters())
+            ToConstraintField::<C::InnerField>::to_field_elements(self.comm_and_crh_pp.local_data_comm_pp.parameters())
                 .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let local_data_comm_fe = ToConstraintField::<C::InnerF>::to_field_elements(&self.local_data_comm)
+        let local_data_comm_fe = ToConstraintField::<C::InnerField>::to_field_elements(&self.local_data_comm)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         // Then we convert these field elements into bytes
@@ -53,10 +53,10 @@ where
         ];
 
         // Then we convert them into `C::ProofCheckF::Fr` elements.
-        v.extend_from_slice(&ToConstraintField::<C::OuterF>::to_field_elements(
+        v.extend_from_slice(&ToConstraintField::<C::OuterField>::to_field_elements(
             pred_input[0].as_slice(),
         )?);
-        v.extend_from_slice(&ToConstraintField::<C::OuterF>::to_field_elements(
+        v.extend_from_slice(&ToConstraintField::<C::OuterField>::to_field_elements(
             pred_input[1].as_slice(),
         )?);
 
@@ -76,7 +76,7 @@ pub struct ProofCheckCircuit<C: PlainDPCComponents> {
 
     predicate_comm: Option<<C::PredVkComm as CommitmentScheme>::Output>,
     predicate_rand: Option<<C::PredVkComm as CommitmentScheme>::Randomness>,
-    local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
+    local_data_comm: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
 }
 
 impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
@@ -92,7 +92,7 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
 
         let predicate_comm = Some(<C::PredVkComm as CommitmentScheme>::Output::default());
         let predicate_rand = Some(<C::PredVkComm as CommitmentScheme>::Randomness::default());
-        let local_data_comm = Some(<C::LocalDataComm as CommitmentScheme>::Output::default());
+        let local_data_comm = Some(<C::LocalDataCommitment as CommitmentScheme>::Output::default());
 
         Self {
             comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
@@ -118,7 +118,7 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
 
         predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
         predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
-        local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
+        local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -141,12 +141,12 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::OuterF> for ProofCheckCircuit<C>
+impl<C: PlainDPCComponents> ConstraintSynthesizer<C::OuterField> for ProofCheckCircuit<C>
 where
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 {
-    fn generate_constraints<CS: ConstraintSystem<C::OuterF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_proof_check_gadget::<C, CS>(
             cs,
             self.comm_and_crh_parameters.get()?,

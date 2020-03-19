@@ -35,35 +35,35 @@ pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
 
     // Predicate input commitment and memo
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
-    pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
+    pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub memo: [u8; 32],
 
     pub binding_signature: BindingSignature,
 }
 
-impl<C: PaymentDPCComponents> ToConstraintField<C::InnerF> for CoreChecksVerifierInput<C>
+impl<C: PaymentDPCComponents> ToConstraintField<C::InnerField> for CoreChecksVerifierInput<C>
 where
-    <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::RecC as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::RecC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecC as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::SnNonceH as CRH>::Parameters: ToConstraintField<C::InnerF>,
+    <C::SnNonceH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
-    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerF>,
-    <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::InnerF>,
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::P as PRF>::Output: ToConstraintField<C::InnerF>,
+    <C::P as PRF>::Output: ToConstraintField<C::InnerField>,
 
-    MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::InnerF>,
-    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerF>,
-    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerF>,
+    MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
 {
-    fn to_field_elements(&self) -> Result<Vec<C::InnerF>, ConstraintFieldError> {
+    fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = Vec::new();
 
         v.extend_from_slice(&self.comm_and_crh_pp.addr_comm_pp.parameters().to_field_elements()?);
@@ -91,10 +91,12 @@ where
         }
 
         v.extend_from_slice(&self.predicate_comm.to_field_elements()?);
-        v.extend_from_slice(&ToConstraintField::<C::InnerF>::to_field_elements(self.memo.as_ref())?);
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
+            self.memo.as_ref(),
+        )?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
 
-        v.extend_from_slice(&ToConstraintField::<C::InnerF>::to_field_elements(
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
             &self.binding_signature.to_bytes()[..],
         )?);
 
@@ -126,8 +128,8 @@ pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
     predicate_comm: Option<<C::PredVkComm as CommitmentScheme>::Output>,
     predicate_rand: Option<<C::PredVkComm as CommitmentScheme>::Randomness>,
 
-    local_data_comm: Option<<C::LocalDataComm as CommitmentScheme>::Output>,
-    local_data_rand: Option<<C::LocalDataComm as CommitmentScheme>::Randomness>,
+    local_data_comm: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
+    local_data_rand: Option<<C::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
     memo: Option<[u8; 32]>,
     auxiliary: Option<[u8; 32]>,
@@ -158,8 +160,8 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
         let predicate_comm = <C::PredVkComm as CommitmentScheme>::Output::default();
         let predicate_rand = <C::PredVkComm as CommitmentScheme>::Randomness::default();
 
-        let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
-        let local_data_rand = <C::LocalDataComm as CommitmentScheme>::Randomness::default();
+        let local_data_comm = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
+        let local_data_rand = <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
 
         let binding_signature = BindingSignature::default();
 
@@ -216,8 +218,8 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
         predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
         predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
 
-        local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
-        local_data_rand: &<C::LocalDataComm as CommitmentScheme>::Randomness,
+        local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+        local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
@@ -268,8 +270,8 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
     }
 }
 
-impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::InnerF> for CoreChecksCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::InnerF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::InnerField> for CoreChecksCircuit<C> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_core_checks_gadget::<C, CS>(
             cs,
             // Params

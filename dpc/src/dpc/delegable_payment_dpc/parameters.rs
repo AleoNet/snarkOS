@@ -8,13 +8,13 @@ pub struct CommCRHSigPublicParameters<C: DelegablePaymentDPCComponents> {
     pub addr_comm_pp: C::AddrC,
     pub rec_comm_pp: C::RecC,
     pub pred_vk_comm_pp: C::PredVkComm,
-    pub local_data_comm_pp: C::LocalDataComm,
+    pub local_data_comm_pp: C::LocalDataCommitment,
     pub value_comm_pp: C::ValueComm,
 
     pub sn_nonce_crh_pp: C::SnNonceH,
     pub pred_vk_crh_pp: C::PredVkH,
 
-    pub sig_pp: <C::S as SignatureScheme>::Parameters,
+    pub sig_pp: <C::Signature as SignatureScheme>::Parameters,
 }
 
 #[derive(Derivative)]
@@ -69,7 +69,7 @@ impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
         &self.comm_crh_sig_pp.pred_vk_crh_pp
     }
 
-    pub fn local_data_comm_pp(&self) -> &C::LocalDataComm {
+    pub fn local_data_comm_pp(&self) -> &C::LocalDataCommitment {
         &self.comm_crh_sig_pp.local_data_comm_pp
     }
 
@@ -89,7 +89,7 @@ impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
         &self.comm_crh_sig_pp.value_comm_pp
     }
 
-    pub fn sig_pp(&self) -> &<C::S as SignatureScheme>::Parameters {
+    pub fn sig_pp(&self) -> &<C::Signature as SignatureScheme>::Parameters {
         &self.comm_crh_sig_pp.sig_pp
     }
 }

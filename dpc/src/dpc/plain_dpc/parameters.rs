@@ -8,7 +8,7 @@ pub struct CommAndCRHPublicParameters<C: DPCComponents> {
     pub addr_comm_pp: C::AddrC,
     pub rec_comm_pp: C::RecC,
     pub pred_vk_comm_pp: C::PredVkComm,
-    pub local_data_comm_pp: C::LocalDataComm,
+    pub local_data_comm_pp: C::LocalDataCommitment,
 
     pub sn_nonce_crh_pp: C::SnNonceH,
     pub pred_vk_crh_pp: C::PredVkH,
@@ -66,7 +66,7 @@ impl<C: PlainDPCComponents> PublicParameters<C> {
         &self.comm_and_crh_pp.pred_vk_crh_pp
     }
 
-    pub fn local_data_comm_pp(&self) -> &C::LocalDataComm {
+    pub fn local_data_comm_pp(&self) -> &C::LocalDataCommitment {
         &self.comm_and_crh_pp.local_data_comm_pp
     }
 
