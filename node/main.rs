@@ -5,6 +5,7 @@ use node::{
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::node::NodeError;
 use snarkos_network::{
+    bootnodes::*,
     context::Context,
     protocol::SyncHandler,
     server::{MinerInstance, Server},
@@ -47,7 +48,10 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    let bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
+    let bootnode = match config.bootnodes.is_empty() {
+        true => MAINNET_BOOTNODES[0].parse::<SocketAddr>()?,
+        false => config.bootnodes[0].parse::<SocketAddr>()?,
+    };
 
     let sync_handler = SyncHandler::new(bootnode);
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
