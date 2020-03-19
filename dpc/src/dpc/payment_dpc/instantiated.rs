@@ -142,7 +142,7 @@ impl DPCComponents for Components {
     type LocalDataComm = LocalDataComm;
     type LocalDataCommGadget = LocalDataCommGadget;
     type MerkleParameters = CommitmentMerkleParameters;
-    type MerkleTree_HGadget = MerkleTreeCRHGadget;
+    type MerkleTreeHGadget = MerkleTreeCRHGadget;
     type P = PRF;
     type PGadget = PRFGadget;
     type PredVkComm = PredicateComm;
