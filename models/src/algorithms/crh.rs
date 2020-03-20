@@ -1,11 +1,11 @@
 use snarkos_errors::algorithms::CRHError;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
 pub trait CRH: From<<Self as CRH>::Parameters> + Clone {
-    type Output: Debug + ToBytes + Clone + Eq + Hash + Default;
+    type Output: Debug + ToBytes + FromBytes + Clone + Eq + Hash + Default;
     type Parameters: Clone;
 
     const INPUT_SIZE_BITS: usize;
