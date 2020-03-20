@@ -1,12 +1,12 @@
 use snarkos_errors::algorithms::SNARKError;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 
 pub trait SNARK {
     type AssignedCircuit;
     type Circuit;
-    type Proof: ToBytes + Clone + Default;
+    type Proof: ToBytes + FromBytes + Clone + Default;
     type PreparedVerificationParameters: Clone + Default + From<Self::VerificationParameters>;
     type ProvingParameters: Clone;
     type VerificationParameters: Clone + Default + From<Self::PreparedVerificationParameters>;

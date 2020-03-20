@@ -3,7 +3,7 @@
 
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::pairing_engine::{PairingCurve, PairingEngine};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::io::{self, Read, Result as IoResult, Write};
 
@@ -46,6 +46,17 @@ impl<E: PairingEngine> ToBytes for Proof<E> {
         self.a.write(&mut writer)?;
         self.b.write(&mut writer)?;
         self.c.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Proof<E> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        let a: E::G1Affine = FromBytes::read(&mut reader)?;
+        let b: E::G2Affine = FromBytes::read(&mut reader)?;
+        let c: E::G1Affine = FromBytes::read(&mut reader)?;
+
+        Ok(Self { a, b, c })
     }
 }
 
