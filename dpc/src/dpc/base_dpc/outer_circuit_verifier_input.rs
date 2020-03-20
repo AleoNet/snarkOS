@@ -1,4 +1,4 @@
-use crate::dpc::delegable_payment_dpc::{parameters::CircuitParameters, DelegablePaymentDPCComponents};
+use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
@@ -7,14 +7,14 @@ use snarkos_models::{
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
-pub struct OuterCircuitVerifierInput<C: DelegablePaymentDPCComponents> {
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
+pub struct OuterCircuitVerifierInput<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
 
-impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVerifierInput<C>
+impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVerifierInput<C>
 where
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,

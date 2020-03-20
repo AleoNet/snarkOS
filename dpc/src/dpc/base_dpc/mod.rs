@@ -1,7 +1,7 @@
 use crate::{
     dpc::{
         address::{AddressPair, AddressPublicKey, AddressSecretKey},
-        delegable_payment_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
+        base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
         AddressKeyPair,
         DPCScheme,
         Predicate,
@@ -40,6 +40,9 @@ use self::transaction::*;
 pub mod inner_circuit;
 use self::inner_circuit::*;
 
+pub mod inner_circuit_gadget;
+pub use self::inner_circuit_gadget::*;
+
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
 
@@ -48,6 +51,9 @@ use self::payment_circuit::*;
 
 pub mod outer_circuit;
 use self::outer_circuit::*;
+
+pub mod outer_circuit_gadget;
+pub use self::outer_circuit_gadget::*;
 
 pub mod outer_circuit_verifier_input;
 use self::outer_circuit_verifier_input::*;
@@ -67,7 +73,7 @@ mod test;
 /// Trait that stores all information about the components of a Plain DPC
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
-pub trait DelegablePaymentDPCComponents: DPCComponents {
+pub trait BaseDPCComponents: DPCComponents {
     /// Ledger digest type.
     type MerkleParameters: MerkleParameters;
     type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
@@ -103,7 +109,7 @@ pub trait DelegablePaymentDPCComponents: DPCComponents {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DPC<Components: DelegablePaymentDPCComponents> {
+pub struct DPC<Components: BaseDPCComponents> {
     _components: PhantomData<Components>,
 }
 
@@ -111,7 +117,7 @@ pub struct DPC<Components: DelegablePaymentDPCComponents> {
 /// final transaction after `execute_helper` has created old serial numbers and
 /// ledger witnesses, and new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub(crate) struct ExecuteContext<'a, Components: DelegablePaymentDPCComponents> {
+pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
     circuit_parameters: &'a CircuitParameters<Components>,
     ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
 
@@ -138,7 +144,7 @@ pub(crate) struct ExecuteContext<'a, Components: DelegablePaymentDPCComponents> 
     value_balance: u64,
 }
 
-impl<Components: DelegablePaymentDPCComponents> ExecuteContext<'_, Components> {
+impl<Components: BaseDPCComponents> ExecuteContext<'_, Components> {
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             circuit_parameters: self.circuit_parameters.clone(),
@@ -155,7 +161,7 @@ impl<Components: DelegablePaymentDPCComponents> ExecuteContext<'_, Components> {
 }
 
 /// Stores local data required to produce predicate proofs.
-pub struct LocalData<Components: DelegablePaymentDPCComponents> {
+pub struct LocalData<Components: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<Components>,
 
     // Old records and serial numbers
@@ -172,7 +178,7 @@ pub struct LocalData<Components: DelegablePaymentDPCComponents> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
+impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_comm_crh_sig_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
         let time = start_timer!(|| "Address commitment scheme setup");
         let addr_comm_pp = Components::AddressCommitment::setup(rng);
@@ -531,7 +537,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     }
 }
 
-impl<Components: DelegablePaymentDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
+impl<Components: BaseDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
 where
     L: Ledger<
         Parameters = Components::MerkleParameters,

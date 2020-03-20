@@ -1,15 +1,16 @@
 use crate::{
-    constraints::{delegable_payment_dpc::execute_core_checks_gadget, Assignment},
     dpc::{
         address::AddressSecretKey,
-        delegable_payment_dpc::{
+        base_dpc::{
             binding_signature::BindingSignature,
+            inner_circuit_gadget::execute_inner_proof_gadget,
             parameters::CircuitParameters,
             record::DPCRecord,
-            DelegablePaymentDPCComponents,
+            BaseDPCComponents,
         },
     },
     ledger::MerkleTreeParameters,
+    Assignment,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
@@ -19,8 +20,8 @@ use snarkos_models::{
 };
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
-pub struct InnerCircuit<C: DelegablePaymentDPCComponents> {
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
+pub struct InnerCircuit<C: BaseDPCComponents> {
     // Parameters
     circuit_parameters: Option<CircuitParameters<C>>,
     ledger_parameters: Option<MerkleTreeParameters<C::MerkleParameters>>,
@@ -50,7 +51,7 @@ pub struct InnerCircuit<C: DelegablePaymentDPCComponents> {
     binding_signature: Option<BindingSignature>,
 }
 
-impl<C: DelegablePaymentDPCComponents> InnerCircuit<C> {
+impl<C: BaseDPCComponents> InnerCircuit<C> {
     pub fn blank(
         circuit_parameters: &CircuitParameters<C>,
         ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
@@ -184,9 +185,9 @@ impl<C: DelegablePaymentDPCComponents> InnerCircuit<C> {
     }
 }
 
-impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit<C> {
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        execute_core_checks_gadget::<C, CS>(
+        execute_inner_proof_gadget::<C, CS>(
             cs,
             // Params
             self.circuit_parameters.get()?,

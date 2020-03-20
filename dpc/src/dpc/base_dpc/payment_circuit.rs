@@ -1,6 +1,6 @@
 use crate::{
-    constraints::Assignment,
-    delegable_payment_dpc::{parameters::CircuitParameters, *},
+    base_dpc::{parameters::CircuitParameters, *},
+    Assignment,
 };
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
@@ -13,7 +13,7 @@ use snarkos_models::{
     },
 };
 
-pub struct PaymentPredicateLocalData<C: DelegablePaymentDPCComponents> {
+pub struct PaymentPredicateLocalData<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub value_commitment_parameters: <C::ValueCommitment as CommitmentScheme>::Parameters,
@@ -23,7 +23,7 @@ pub struct PaymentPredicateLocalData<C: DelegablePaymentDPCComponents> {
 }
 
 /// Convert each component to bytes and pack into field elements.
-impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerField> for PaymentPredicateLocalData<C>
+impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for PaymentPredicateLocalData<C>
 where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -44,7 +44,7 @@ where
     }
 }
 
-pub struct PaymentCircuit<C: DelegablePaymentDPCComponents> {
+pub struct PaymentCircuit<C: BaseDPCComponents> {
     pub circuit_parameters: Option<CircuitParameters<C>>,
 
     pub local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
@@ -55,7 +55,7 @@ pub struct PaymentCircuit<C: DelegablePaymentDPCComponents> {
     pub value: u64,
 }
 
-impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
+impl<C: BaseDPCComponents> PaymentCircuit<C> {
     pub fn blank(circuit_parameters: &CircuitParameters<C>) -> Self {
         let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
         let value_commitment_randomness = <C::ValueCommitment as CommitmentScheme>::Randomness::default();
@@ -91,7 +91,7 @@ impl<C: DelegablePaymentDPCComponents> PaymentCircuit<C> {
     }
 }
 
-impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::InnerField> for PaymentCircuit<C> {
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PaymentCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,
@@ -105,7 +105,7 @@ impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::InnerField> for 
     }
 }
 
-fn execute_payment_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::InnerField>>(
+fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     circuit_parameters: &CircuitParameters<C>,
     local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,

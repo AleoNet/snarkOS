@@ -1,10 +1,11 @@
 use crate::{
-    constraints::{delegable_payment_dpc::execute_proof_check_gadget, Assignment},
-    dpc::delegable_payment_dpc::{
+    dpc::base_dpc::{
+        outer_circuit_gadget::execute_outer_proof_gadget,
         parameters::CircuitParameters,
         predicate::PrivatePredicateInput,
-        DelegablePaymentDPCComponents,
+        BaseDPCComponents,
     },
+    Assignment,
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -14,8 +15,8 @@ use snarkos_models::{
 };
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
-pub struct OuterCircuit<C: DelegablePaymentDPCComponents> {
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
+pub struct OuterCircuit<C: BaseDPCComponents> {
     circuit_parameters: Option<CircuitParameters<C>>,
 
     old_private_predicate_inputs: Option<Vec<PrivatePredicateInput<C>>>,
@@ -26,7 +27,7 @@ pub struct OuterCircuit<C: DelegablePaymentDPCComponents> {
     local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
 }
 
-impl<C: DelegablePaymentDPCComponents> OuterCircuit<C> {
+impl<C: BaseDPCComponents> OuterCircuit<C> {
     pub fn blank(
         circuit_parameters: &CircuitParameters<C>,
         predicate_nizk_vk_and_proof: &PrivatePredicateInput<C>,
@@ -85,7 +86,7 @@ impl<C: DelegablePaymentDPCComponents> OuterCircuit<C> {
     }
 }
 
-impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::OuterField> for OuterCircuit<C>
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::OuterField> for OuterCircuit<C>
 where
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -93,7 +94,7 @@ where
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 {
     fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        execute_proof_check_gadget::<C, CS>(
+        execute_outer_proof_gadget::<C, CS>(
             cs,
             self.circuit_parameters.get()?,
             self.old_private_predicate_inputs.get()?.as_slice(),

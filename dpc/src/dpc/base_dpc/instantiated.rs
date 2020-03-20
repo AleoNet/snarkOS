@@ -1,5 +1,5 @@
 use crate::{
-    dpc::delegable_payment_dpc::{
+    dpc::base_dpc::{
         inner_circuit::InnerCircuit,
         inner_circuit_verifier_input::InnerCircuitVerifierInput,
         outer_circuit::OuterCircuit,
@@ -7,7 +7,7 @@ use crate::{
         payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
         predicate::DPCPredicate,
         transaction::DPCTransaction,
-        DelegablePaymentDPCComponents,
+        BaseDPCComponents,
         LocalData as DPCLocalData,
         DPC,
     },
@@ -151,7 +151,7 @@ impl DPCComponents for Components {
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
 }
 
-impl DelegablePaymentDPCComponents for Components {
+impl BaseDPCComponents for Components {
     type InnerSNARK = CoreCheckNIZK;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;

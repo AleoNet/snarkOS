@@ -1,12 +1,12 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
-    delegable_payment_dpc::{
+    base_dpc::{
         instantiated::*,
         payment_circuit::*,
         predicate::PrivatePredicateInput,
         record_payload::PaymentRecordPayload,
-        DelegablePaymentDPCComponents,
+        BaseDPCComponents,
         LocalData,
         DPC,
     },
@@ -21,7 +21,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
-fn delegated_payment_dpc_integration_test() {
+fn base_dpc_integration_test() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
@@ -131,9 +131,7 @@ fn delegated_payment_dpc_integration_test() {
 
             // Generate value commitment randomness
             let value_commitment_randomness =
-                <<Components as DelegablePaymentDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(
-                    &mut rng,
-                );
+                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data
@@ -198,9 +196,7 @@ fn delegated_payment_dpc_integration_test() {
 
             // Generate value commitment randomness
             let value_commitment_randomness =
-                <<Components as DelegablePaymentDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(
-                    &mut rng,
-                );
+                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
             // Generate the value commitment
             let value_commitment = local_data

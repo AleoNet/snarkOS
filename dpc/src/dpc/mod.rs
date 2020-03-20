@@ -5,7 +5,7 @@ use rand::Rng;
 use std::hash::Hash;
 
 pub mod address;
-pub mod delegable_payment_dpc;
+pub mod base_dpc;
 
 pub trait AddressKeyPair {
     type AddressPublicKey: Default;

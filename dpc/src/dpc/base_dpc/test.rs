@@ -1,9 +1,10 @@
 use super::instantiated::*;
 use crate::{
-    constraints::delegable_payment_dpc::{execute_core_checks_gadget, execute_proof_check_gadget},
     dpc::{
-        delegable_payment_dpc::{
+        base_dpc::{
             binding_signature::*,
+            execute_inner_proof_gadget,
+            execute_outer_proof_gadget,
             payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
             predicate::PrivatePredicateInput,
             record_payload::PaymentRecordPayload,
@@ -26,7 +27,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
-fn test_execute_delegated_payment_constraint_systems() {
+fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
@@ -290,7 +291,7 @@ fn test_execute_delegated_payment_constraint_systems() {
     // Check that the core check constraint system was satisfied.
     let mut core_cs = TestConstraintSystem::<Fr>::new();
 
-    execute_core_checks_gadget::<_, _>(
+    execute_inner_proof_gadget::<_, _>(
         &mut core_cs.ns(|| "Core checks"),
         &circuit_parameters,
         ledger.parameters(),
@@ -332,7 +333,7 @@ fn test_execute_delegated_payment_constraint_systems() {
     // Check that the proof check constraint system was satisfied.
     let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
 
-    execute_proof_check_gadget::<_, _>(
+    execute_outer_proof_gadget::<_, _>(
         &mut pf_check_cs.ns(|| "Check predicate proofs"),
         &circuit_parameters,
         &old_proof_and_vk,

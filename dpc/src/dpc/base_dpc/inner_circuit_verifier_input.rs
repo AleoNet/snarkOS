@@ -1,9 +1,5 @@
 use crate::{
-    dpc::delegable_payment_dpc::{
-        binding_signature::BindingSignature,
-        parameters::CircuitParameters,
-        DelegablePaymentDPCComponents,
-    },
+    dpc::base_dpc::{binding_signature::BindingSignature, parameters::CircuitParameters, BaseDPCComponents},
     ledger::MerkleTreeParameters,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTreeDigest};
@@ -13,7 +9,7 @@ use snarkos_models::{
     curves::to_field_vec::ToConstraintField,
 };
 
-pub struct InnerCircuitVerifierInput<C: DelegablePaymentDPCComponents> {
+pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Commitment, CRH, and signature parameters
     pub circuit_parameters: CircuitParameters<C>,
 
@@ -35,7 +31,7 @@ pub struct InnerCircuitVerifierInput<C: DelegablePaymentDPCComponents> {
     pub binding_signature: BindingSignature,
 }
 
-impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
+impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
 where
     <C::AddressCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AddressCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,

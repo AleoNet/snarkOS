@@ -1,10 +1,10 @@
-use crate::dpc::delegable_payment_dpc::DelegablePaymentDPCComponents;
+use crate::dpc::base_dpc::BaseDPCComponents;
 
 use snarkos_models::algorithms::{SignatureScheme, SNARK};
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
-pub struct CircuitParameters<C: DelegablePaymentDPCComponents> {
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
+pub struct CircuitParameters<C: BaseDPCComponents> {
     pub address_commitment_parameters: C::AddressCommitment,
     pub record_commitment_parameters: C::RecordCommitment,
     pub predicate_verification_key_commitment_parameters: C::PredicateVerificationKeyCommitment,
@@ -16,14 +16,14 @@ pub struct CircuitParameters<C: DelegablePaymentDPCComponents> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
-pub struct PredicateSNARKParameters<C: DelegablePaymentDPCComponents> {
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
+pub struct PredicateSNARKParameters<C: BaseDPCComponents> {
     pub proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters,
     pub verification_key: <C::PredicateSNARK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateSNARK as SNARK>::Proof,
 }
 
-pub struct PublicParameters<C: DelegablePaymentDPCComponents> {
+pub struct PublicParameters<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
     pub predicate_snark_parameters: PredicateSNARKParameters<C>,
     pub outer_snark_parameters: (
@@ -36,7 +36,7 @@ pub struct PublicParameters<C: DelegablePaymentDPCComponents> {
     ),
 }
 
-impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
+impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn address_commitment_parameters(&self) -> &C::AddressCommitment {
         &self.circuit_parameters.address_commitment_parameters
     }

@@ -43,9 +43,22 @@ extern crate snarkos_profiler;
 #[macro_use]
 extern crate derivative;
 
-pub mod constraints;
-
 pub(crate) mod dpc;
 pub use crate::dpc::*;
 
 pub mod ledger;
+
+use snarkos_errors::gadgets::SynthesisError;
+
+pub trait Assignment<T> {
+    fn get(&self) -> Result<&T, SynthesisError>;
+}
+
+impl<T> Assignment<T> for Option<T> {
+    fn get(&self) -> Result<&T, SynthesisError> {
+        match *self {
+            Some(ref v) => Ok(v),
+            None => Err(SynthesisError::AssignmentMissing),
+        }
+    }
+}

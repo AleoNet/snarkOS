@@ -1,10 +1,6 @@
 use crate::dpc::{
     address::AddressPublicKey,
-    delegable_payment_dpc::{
-        predicate::DPCPredicate,
-        record_payload::PaymentRecordPayload,
-        DelegablePaymentDPCComponents,
-    },
+    base_dpc::{predicate::DPCPredicate, record_payload::PaymentRecordPayload, BaseDPCComponents},
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, CRH};
@@ -13,11 +9,8 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use std::marker::PhantomData;
 
 #[derive(Derivative)]
-#[derivative(
-    Default(bound = "C: DelegablePaymentDPCComponents"),
-    Clone(bound = "C: DelegablePaymentDPCComponents")
-)]
-pub struct DPCRecord<C: DelegablePaymentDPCComponents> {
+#[derivative(Default(bound = "C: BaseDPCComponents"), Clone(bound = "C: BaseDPCComponents"))]
+pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) address_public_key: AddressPublicKey<C>,
 
     pub(super) is_dummy: bool,
@@ -40,7 +33,7 @@ fn default_predicate_hash<C: CRH>() -> Vec<u8> {
     to_bytes![C::Output::default()].unwrap()
 }
 
-impl<C: DelegablePaymentDPCComponents> Record for DPCRecord<C> {
+impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type AddressPublicKey = AddressPublicKey<C>;
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
