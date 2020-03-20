@@ -31,23 +31,27 @@ fn test_execute_delegated_payment_constraint_systems() {
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
     let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
-    let comm_crh_sig_pp = InstantiatedDPC::generate_comm_crh_sig_parameters(&mut rng).unwrap();
-    let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&comm_crh_sig_pp, &mut rng).unwrap();
+    let circuit_parameters = InstantiatedDPC::generate_comm_crh_sig_parameters(&mut rng).unwrap();
+    let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&circuit_parameters, &mut rng).unwrap();
     #[cfg(debug_assertions)]
-    let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.vk.clone().into();
+    let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.verification_key.clone().into();
 
     let pred_nizk_vk_bytes = to_bytes![
-        PredicateVerificationKeyHash::hash(&comm_crh_sig_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap())
-            .unwrap()
+        PredicateVerificationKeyHash::hash(
+            &circuit_parameters.predicate_verification_key_hash_parameters,
+            &to_bytes![pred_nizk_pp.verification_key].unwrap()
+        )
+        .unwrap()
     ]
     .unwrap();
 
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
-    let genesis_address = DPC::create_address_helper(&comm_crh_sig_pp, &genesis_metadata, &mut rng).unwrap();
-    let genesis_sn_nonce = SerialNumberNonce::hash(&comm_crh_sig_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
+    let genesis_address = DPC::create_address_helper(&circuit_parameters, &genesis_metadata, &mut rng).unwrap();
+    let genesis_sn_nonce =
+        SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce_parameters, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
-        &comm_crh_sig_pp,
+        &circuit_parameters,
         &genesis_sn_nonce,
         &genesis_address.public_key,
         true,
@@ -59,7 +63,7 @@ fn test_execute_delegated_payment_constraint_systems() {
     .unwrap();
 
     // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&comm_crh_sig_pp, &genesis_record, &genesis_address.secret_key).unwrap();
+    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
     let genesis_memo = [0u8; 32];
 
     // Use genesis record, serial number, and memo to initialize the ledger.
@@ -78,7 +82,7 @@ fn test_execute_delegated_payment_constraint_systems() {
 
     // Create an address for an actual new record.
     let new_metadata = [1u8; 32];
-    let new_address = DPC::create_address_helper(&comm_crh_sig_pp, &new_metadata, &mut rng).unwrap();
+    let new_address = DPC::create_address_helper(&circuit_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
     let new_payload = PaymentRecordPayload::default();
@@ -94,7 +98,7 @@ fn test_execute_delegated_payment_constraint_systems() {
     let memo = [0u8; 32];
 
     let context = DPC::execute_helper(
-        &comm_crh_sig_pp,
+        &circuit_parameters,
         &old_records,
         &old_asks,
         &new_apks,
@@ -110,7 +114,7 @@ fn test_execute_delegated_payment_constraint_systems() {
     .unwrap();
 
     let ExecuteContext {
-        comm_crh_sig_pp: _comm_crh_sig_pp,
+        circuit_parameters: _comm_crh_sig_pp,
         ledger_digest,
 
         old_records,
@@ -122,12 +126,10 @@ fn test_execute_delegated_payment_constraint_systems() {
         new_records,
         new_sn_nonce_randomness,
         new_commitments,
-
-        predicate_comm,
-        predicate_rand,
-
-        local_data_comm,
-        local_data_rand,
+        predicate_commitment: predicate_comm,
+        predicate_randomness: predicate_rand,
+        local_data_commitment: local_data_comm,
+        local_data_randomness: local_data_rand,
         value_balance,
     } = context;
 
@@ -137,19 +139,19 @@ fn test_execute_delegated_payment_constraint_systems() {
     for i in 0..NUM_INPUT_RECORDS {
         let value = old_records[i].payload.balance;
 
-        let value_commitment_randomness = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+        let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
-        let value_commitment = ValueComm::commit(
-            &comm_crh_sig_pp.value_comm_pp,
+        let value_commitment = ValueCommitment::commit(
+            &circuit_parameters.value_commitment_parameters,
             &value.to_le_bytes(),
             &value_commitment_randomness,
         )
         .unwrap();
 
         let proof = PredicateSNARK::prove(
-            &pred_nizk_pp.pk,
+            &pred_nizk_pp.proving_key,
             PaymentCircuit::new(
-                &comm_crh_sig_pp,
+                &circuit_parameters,
                 &local_data_comm,
                 &value_commitment_randomness,
                 &value_commitment,
@@ -162,17 +164,20 @@ fn test_execute_delegated_payment_constraint_systems() {
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
-                local_data_comm_pp: comm_crh_sig_pp.local_data_comm_pp.parameters().clone(),
-                local_data_comm: local_data_comm.clone(),
-                value_comm_pp: comm_crh_sig_pp.value_comm_pp.parameters().clone(),
-                value_comm_randomness: value_commitment_randomness.clone(),
+                local_data_commitment_parameters: circuit_parameters
+                    .local_data_commitment_parameters
+                    .parameters()
+                    .clone(),
+                local_data_commitment: local_data_comm.clone(),
+                value_commitment_parameters: circuit_parameters.value_commitment_parameters.parameters().clone(),
+                value_commitment_randomness: value_commitment_randomness.clone(),
                 value_commitment: value_commitment.clone(),
                 position: i as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
         let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
-            vk: pred_nizk_pp.vk.clone(),
+            verification_key: pred_nizk_pp.verification_key.clone(),
             proof,
             value_commitment,
             value_commitment_randomness,
@@ -184,19 +189,19 @@ fn test_execute_delegated_payment_constraint_systems() {
     for j in 0..NUM_OUTPUT_RECORDS {
         let value = new_records[j].payload.balance;
 
-        let value_commitment_randomness = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+        let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
-        let value_commitment = ValueComm::commit(
-            &comm_crh_sig_pp.value_comm_pp,
+        let value_commitment = ValueCommitment::commit(
+            &circuit_parameters.value_commitment_parameters,
             &value.to_le_bytes(),
             &value_commitment_randomness,
         )
         .unwrap();
 
         let proof = PredicateSNARK::prove(
-            &pred_nizk_pp.pk,
+            &pred_nizk_pp.proving_key,
             PaymentCircuit::new(
-                &comm_crh_sig_pp,
+                &circuit_parameters,
                 &local_data_comm,
                 &value_commitment_randomness,
                 &value_commitment,
@@ -210,10 +215,13 @@ fn test_execute_delegated_payment_constraint_systems() {
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
-                local_data_comm_pp: comm_crh_sig_pp.local_data_comm_pp.parameters().clone(),
-                local_data_comm: local_data_comm.clone(),
-                value_comm_pp: comm_crh_sig_pp.value_comm_pp.parameters().clone(),
-                value_comm_randomness: value_commitment_randomness.clone(),
+                local_data_commitment_parameters: circuit_parameters
+                    .local_data_commitment_parameters
+                    .parameters()
+                    .clone(),
+                local_data_commitment: local_data_comm.clone(),
+                value_commitment_parameters: circuit_parameters.value_commitment_parameters.parameters().clone(),
+                value_commitment_randomness: value_commitment_randomness.clone(),
                 value_commitment: value_commitment.clone(),
                 position: j as u8,
             };
@@ -221,7 +229,7 @@ fn test_execute_delegated_payment_constraint_systems() {
         }
 
         let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
-            vk: pred_nizk_pp.vk.clone(),
+            verification_key: pred_nizk_pp.verification_key.clone(),
             proof,
             value_commitment,
             value_commitment_randomness,
@@ -267,7 +275,7 @@ fn test_execute_delegated_payment_constraint_systems() {
     let sighash = to_bytes![local_data_comm].unwrap();
 
     let binding_signature = create_binding_signature::<Components, _>(
-        &comm_crh_sig_pp.value_comm_pp,
+        &circuit_parameters.value_commitment_parameters,
         &old_value_commits,
         &new_value_commits,
         &old_value_commit_randomness,
@@ -284,7 +292,7 @@ fn test_execute_delegated_payment_constraint_systems() {
 
     execute_core_checks_gadget::<_, _>(
         &mut core_cs.ns(|| "Core checks"),
-        &comm_crh_sig_pp,
+        &circuit_parameters,
         ledger.parameters(),
         &ledger_digest,
         &old_records,
@@ -326,7 +334,7 @@ fn test_execute_delegated_payment_constraint_systems() {
 
     execute_proof_check_gadget::<_, _>(
         &mut pf_check_cs.ns(|| "Check predicate proofs"),
-        &comm_crh_sig_pp,
+        &circuit_parameters,
         &old_proof_and_vk,
         &new_proof_and_vk,
         &predicate_comm,

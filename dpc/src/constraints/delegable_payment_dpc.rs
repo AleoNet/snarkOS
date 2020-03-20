@@ -3,14 +3,14 @@ use crate::{
         address::AddressSecretKey,
         delegable_payment_dpc::{
             binding_signature::BindingSignature,
-            parameters::CommCRHSigPublicParameters,
+            parameters::CircuitParameters,
             predicate::PrivatePredicateInput,
             record::DPCRecord,
             DelegablePaymentDPCComponents,
         },
         Record,
     },
-    ledger::MerkleTreeParams,
+    ledger::MerkleTreeParameters,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
@@ -35,8 +35,8 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
-    comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
-    ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
+    comm_crh_sig_parameters: &CircuitParameters<C>,
+    ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
 
     // Digest
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
@@ -114,8 +114,8 @@ fn delegable_dpc_execute_gadget_helper<
     cs: &mut CS,
 
     //
-    comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
-    ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
+    comm_crh_sig_parameters: &CircuitParameters<C>,
+    ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
 
     //
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
@@ -189,35 +189,35 @@ where
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
             AddrCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Addr Comm parameters"), || {
-                Ok(comm_crh_sig_parameters.addr_comm_pp.parameters())
+                Ok(comm_crh_sig_parameters.address_commitment_parameters.parameters())
             })?;
 
         let rec_comm_pp =
             RecCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Rec Comm parameters"), || {
-                Ok(comm_crh_sig_parameters.rec_comm_pp.parameters())
+                Ok(comm_crh_sig_parameters.record_commitment_parameters.parameters())
             })?;
 
         let local_data_comm_pp =
             <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Local Data Comm parameters"),
-                || Ok(comm_crh_sig_parameters.local_data_comm_pp.parameters()),
+                || Ok(comm_crh_sig_parameters.local_data_commitment_parameters.parameters()),
             )?;
 
         let pred_vk_comm_pp =
             <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-                || Ok(comm_crh_sig_parameters.pred_vk_comm_pp.parameters()),
+                || Ok(comm_crh_sig_parameters.predicate_verification_key_commitment_parameters.parameters()),
             )?;
 
         let sn_nonce_crh_pp =
             SnNonceHGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SN Nonce CRH parameters"), || {
-                Ok(comm_crh_sig_parameters.sn_nonce_crh_pp.parameters())
+                Ok(comm_crh_sig_parameters.serial_number_nonce_parameters.parameters())
             })?;
 
         let sig_pp =
             <C::SignatureGadget as SignaturePublicKeyRandomizationGadget<_, _>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare SIG Parameters"),
-                || Ok(&comm_crh_sig_parameters.sig_pp),
+                || Ok(&comm_crh_sig_parameters.signature_parameters),
             )?;
 
         let ledger_pp = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
@@ -679,7 +679,7 @@ where
 pub fn execute_proof_check_gadget<C: DelegablePaymentDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
-    comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
+    comm_crh_sig_parameters: &CircuitParameters<C>,
 
     // Old record death predicate verif. keys and proofs
     old_death_pred_vk_and_pf: &[PrivatePredicateInput<C>],
@@ -696,8 +696,8 @@ pub fn execute_proof_check_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
 where
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::ValueComm as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
-    <C::ValueComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::ValueCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
     let (pred_vk_comm_pp, pred_vk_crh_pp) = {
@@ -706,13 +706,17 @@ where
         let pred_vk_comm_pp =
             <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
-                || Ok(comm_crh_sig_parameters.pred_vk_comm_pp.parameters()),
+                || Ok(comm_crh_sig_parameters.predicate_verification_key_commitment_parameters.parameters()),
             )?;
 
         let pred_vk_crh_pp =
             <C::PredicateVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
-                || Ok(comm_crh_sig_parameters.pred_vk_crh_pp.parameters()),
+                || {
+                    Ok(comm_crh_sig_parameters
+                        .predicate_verification_key_hash_parameters
+                        .parameters())
+                },
             )?;
 
         (pred_vk_comm_pp, pred_vk_crh_pp)
@@ -723,16 +727,18 @@ where
     // ************************************************************************
 
     // First we convert the input for the predicates into `CoreCheckF` field elements
-    let local_data_comm_pp_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(comm_crh_sig_parameters.local_data_comm_pp.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let local_data_comm_pp_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+        comm_crh_sig_parameters.local_data_commitment_parameters.parameters(),
+    )
+    .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let local_data_comm_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_comm)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let value_comm_pp_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(comm_crh_sig_parameters.value_comm_pp.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let value_comm_pp_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+        comm_crh_sig_parameters.value_commitment_parameters.parameters(),
+    )
+    .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     // Then we convert these field elements into bytes
     let pred_input = [
@@ -776,7 +782,7 @@ where
 
         let death_pred_vk = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
             &mut cs.ns(|| "Allocate verification key"),
-            || Ok(&old_death_pred_vk_and_pf[i].vk),
+            || Ok(&old_death_pred_vk_and_pf[i].verification_key),
         )?;
 
         let death_pred_vk_bytes = death_pred_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
@@ -861,7 +867,7 @@ where
 
         let birth_pred_vk = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
             &mut cs.ns(|| "Allocate verification key"),
-            || Ok(&new_birth_pred_vk_and_pf[j].vk),
+            || Ok(&new_birth_pred_vk_and_pf[j].verification_key),
         )?;
 
         let birth_pred_vk_bytes = birth_pred_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;

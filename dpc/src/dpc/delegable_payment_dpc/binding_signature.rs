@@ -143,7 +143,7 @@ impl Default for BindingSignature {
 }
 
 pub fn create_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
-    parameters: &C::ValueComm,
+    parameters: &C::ValueCommitment,
     input_value_commitments: &Vec<[u8; 32]>,
     output_value_commitments: &Vec<[u8; 32]>,
     input_value_commitment_randomness: &Vec<[u8; 32]>,
@@ -153,7 +153,7 @@ pub fn create_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
     rng: &mut R,
 ) -> Result<BindingSignature, BindingSignatureError> {
     // Calculate Value balance commitment
-    let zero_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
+    let zero_randomness = <C::ValueCommitment as CommitmentScheme>::Randomness::default();
     let value_balance_commitment = to_bytes![parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?]?;
 
     // Calculate the bsk and bvk
@@ -185,7 +185,7 @@ pub fn create_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
 
     // Make sure bvk can be derived from bsk
     let zero: u64 = 0;
-    let comm_bsk: <C::ValueComm as CommitmentScheme>::Randomness = FromBytes::read(&to_bytes![bsk]?[..])?;
+    let comm_bsk: <C::ValueCommitment as CommitmentScheme>::Randomness = FromBytes::read(&to_bytes![bsk]?[..])?;
     let expected_bvk_x = to_bytes![parameters.commit(&zero.to_le_bytes(), &comm_bsk)?]?;
     let expected_bvk = recover_affine_from_x_coord(&expected_bvk_x)?;
     assert_eq!(bvk, expected_bvk);
@@ -197,7 +197,7 @@ pub fn create_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
     // Generate signature using message
 
     let r_edwards: <G as Group>::ScalarField = hash_into_field::<G>(&sig_rand[..], input);
-    let r: <C::ValueComm as CommitmentScheme>::Randomness = FromBytes::read(&to_bytes![r_edwards]?[..])?;
+    let r: <C::ValueCommitment as CommitmentScheme>::Randomness = FromBytes::read(&to_bytes![r_edwards]?[..])?;
     let r_g = parameters.commit(&zero.to_le_bytes(), &r)?;
 
     let mut rbar = [0u8; 32];
@@ -214,7 +214,7 @@ pub fn create_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
 }
 
 pub fn verify_binding_signature<C: DelegablePaymentDPCComponents>(
-    parameters: &C::ValueComm,
+    parameters: &C::ValueCommitment,
     input_value_commitments: &Vec<[u8; 32]>,
     output_value_commitments: &Vec<[u8; 32]>,
     value_balance: u64,
@@ -222,7 +222,7 @@ pub fn verify_binding_signature<C: DelegablePaymentDPCComponents>(
     signature: &BindingSignature,
 ) -> Result<bool, BindingSignatureError> {
     // Calculate Value balance commitment
-    let zero_randomness = <C::ValueComm as CommitmentScheme>::Randomness::default();
+    let zero_randomness = <C::ValueCommitment as CommitmentScheme>::Randomness::default();
     let value_balance_commitment = to_bytes![parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?]?;
 
     // Craft verifying key
@@ -246,7 +246,7 @@ pub fn verify_binding_signature<C: DelegablePaymentDPCComponents>(
     let affine_r = recover_affine_from_x_coord(&signature.rbar)?;
 
     let zero: u64 = 0;
-    let s: <C::ValueComm as CommitmentScheme>::Randomness = FromBytes::read(&signature.sbar[..])?;
+    let s: <C::ValueCommitment as CommitmentScheme>::Randomness = FromBytes::read(&signature.sbar[..])?;
     let recommit = to_bytes![parameters.commit(&zero.to_le_bytes(), &s)?]?;
     let recovered_recommit = recover_affine_from_x_coord(&recommit).unwrap();
 
@@ -266,7 +266,7 @@ mod tests {
     use snarkos_utilities::rand::UniformRand;
 
     fn generate_random_binding_signature<C: DelegablePaymentDPCComponents, R: Rng>(
-        value_comm_pp: &ValueComm,
+        value_comm_pp: &ValueCommitment,
         input_amounts: Vec<u64>,
         output_amounts: Vec<u64>,
         sighash: &Vec<u8>,
@@ -343,7 +343,7 @@ mod tests {
         // Setup parameters
 
         let comm_and_crh_pp = InstantiatedDPC::generate_comm_crh_sig_parameters(rng).unwrap();
-        let value_comm_pp = comm_and_crh_pp.value_comm_pp;
+        let value_comm_pp = comm_and_crh_pp.value_commitment_parameters;
 
         let input_amount: u64 = rng.gen_range(1, 100000000);
         let input_amount_2: u64 = rng.gen_range(1, 100000000);
@@ -386,7 +386,7 @@ mod tests {
         // Setup parameters
 
         let comm_and_crh_pp = InstantiatedDPC::generate_comm_crh_sig_parameters(rng).unwrap();
-        let value_comm_pp = comm_and_crh_pp.value_comm_pp;
+        let value_comm_pp = comm_and_crh_pp.value_commitment_parameters;
 
         let input_amount: u64 = rng.gen_range(1, 100000000);
         let input_amount_2: u64 = rng.gen_range(1, 100000000);

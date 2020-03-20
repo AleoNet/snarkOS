@@ -5,19 +5,19 @@ use snarkos_models::algorithms::{CommitmentScheme, SNARK};
 use std::marker::PhantomData;
 
 pub struct PrivatePredicateInput<C: DelegablePaymentDPCComponents> {
-    pub vk: <C::PredicateSNARK as SNARK>::VerificationParameters,
+    pub verification_key: <C::PredicateSNARK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateSNARK as SNARK>::Proof,
-    pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
-    pub value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
+    pub value_commitment: <C::ValueCommitment as CommitmentScheme>::Output,
+    pub value_commitment_randomness: <C::ValueCommitment as CommitmentScheme>::Randomness,
 }
 
 impl<C: DelegablePaymentDPCComponents> Default for PrivatePredicateInput<C> {
     fn default() -> Self {
         Self {
-            vk: <C::PredicateSNARK as SNARK>::VerificationParameters::default(),
+            verification_key: <C::PredicateSNARK as SNARK>::VerificationParameters::default(),
             proof: <C::PredicateSNARK as SNARK>::Proof::default(),
-            value_commitment: <C::ValueComm as CommitmentScheme>::Output::default(),
-            value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness::default(),
+            value_commitment: <C::ValueCommitment as CommitmentScheme>::Output::default(),
+            value_commitment_randomness: <C::ValueCommitment as CommitmentScheme>::Randomness::default(),
         }
     }
 }
@@ -25,7 +25,7 @@ impl<C: DelegablePaymentDPCComponents> Default for PrivatePredicateInput<C> {
 impl<C: DelegablePaymentDPCComponents> Clone for PrivatePredicateInput<C> {
     fn clone(&self) -> Self {
         Self {
-            vk: self.vk.clone(),
+            verification_key: self.verification_key.clone(),
             proof: self.proof.clone(),
             value_commitment: self.value_commitment.clone(),
             value_commitment_randomness: self.value_commitment_randomness.clone(),

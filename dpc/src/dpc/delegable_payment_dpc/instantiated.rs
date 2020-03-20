@@ -158,8 +158,8 @@ impl DelegablePaymentDPCComponents for Components {
     type OuterSNARK = ProofCheckNIZK;
     type PredicateSNARK = PredicateSNARK<Self>;
     type PredicateSNARKGadget = PredicateSNARKGadget;
-    type ValueComm = ValueComm;
-    type ValueCommGadget = ValueCommGadget;
+    type ValueCommitment = ValueCommitment;
+    type ValueCommitmentGadget = ValueCommitmentGadget;
 }
 
 // Native primitives
@@ -173,7 +173,7 @@ pub type AddressCommitment = PedersenCompressedCommitment<EdwardsBls, AddressWin
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
-pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
+pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
 pub type AuthSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
@@ -193,7 +193,7 @@ pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls,
 pub type AddressCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type ValueCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
 pub type SerialNumberNonceGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
