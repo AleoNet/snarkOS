@@ -8,7 +8,7 @@ use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
 pub trait CommitmentScheme: Sized + Clone {
-    type Output: ToBytes + Clone + Default + Eq + Hash + Debug;
+    type Output: ToBytes + FromBytes + Clone + Default + Eq + Hash + Debug;
     type Parameters: Clone;
     type Randomness: Clone + ToBytes + FromBytes + Default + Eq + UniformRand + Debug;
 
