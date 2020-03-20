@@ -1,5 +1,5 @@
 use snarkos_errors::algorithms::SignatureError;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::hash::Hash;
@@ -8,7 +8,7 @@ pub trait SignatureScheme {
     type Parameters: Clone + Send + Sync;
     type PublicKey: ToBytes + Hash + Eq + Clone + Default + Send + Sync;
     type PrivateKey: ToBytes + Clone + Default;
-    type Output: ToBytes + Clone + Default + Send + Sync;
+    type Output: ToBytes + FromBytes + Clone + Default + Send + Sync;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, SignatureError>;
 

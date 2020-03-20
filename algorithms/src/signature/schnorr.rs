@@ -4,13 +4,17 @@ use snarkos_models::{
     algorithms::SignatureScheme,
     curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
 };
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    rand::UniformRand,
+    to_bytes,
+};
 
 use digest::Digest;
 use rand::Rng;
 use std::{
     hash::Hash,
-    io::{Result as IoResult, Write},
+    io::{Read, Result as IoResult, Write},
     marker::PhantomData,
 };
 
@@ -37,6 +41,19 @@ impl<G: Group> ToBytes for SchnorrOutput<G> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.prover_response.write(&mut writer)?;
         self.verifier_challenge.write(&mut writer)
+    }
+}
+
+impl<G: Group> FromBytes for SchnorrOutput<G> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let prover_response = <G as Group>::ScalarField::read(&mut reader)?;
+        let verifier_challenge = <G as Group>::ScalarField::read(&mut reader)?;
+
+        Ok(Self {
+            prover_response,
+            verifier_challenge,
+        })
     }
 }
 
