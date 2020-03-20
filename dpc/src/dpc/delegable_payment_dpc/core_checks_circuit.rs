@@ -1,11 +1,13 @@
 use crate::{
     constraints::{delegable_payment_dpc::execute_core_checks_gadget, Assignment},
-    dpc::delegable_payment_dpc::{
+    dpc::{
         address::AddressSecretKey,
-        binding_signature::BindingSignature,
-        parameters::CommCRHSigPublicParameters,
-        record::DPCRecord,
-        DelegablePaymentDPCComponents,
+        delegable_payment_dpc::{
+            binding_signature::BindingSignature,
+            parameters::CommCRHSigPublicParameters,
+            record::DPCRecord,
+            DelegablePaymentDPCComponents,
+        },
     },
     ledger::MerkleTreeParams,
 };

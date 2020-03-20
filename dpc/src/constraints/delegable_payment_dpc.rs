@@ -1,7 +1,7 @@
 use crate::{
     dpc::{
+        address::AddressSecretKey,
         delegable_payment_dpc::{
-            address::AddressSecretKey,
             binding_signature::BindingSignature,
             parameters::CommCRHSigPublicParameters,
             predicate::PrivatePredInput,

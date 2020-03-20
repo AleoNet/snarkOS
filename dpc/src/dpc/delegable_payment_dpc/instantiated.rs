@@ -1,16 +1,13 @@
 use crate::{
-    dpc::{
-        delegable_payment_dpc::{
-            core_checks_circuit::*,
-            payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-            predicate::DPCPredicate,
-            proof_check_circuit::*,
-            transaction::DPCTransaction,
-            DelegablePaymentDPCComponents,
-            LocalData as DPCLocalData,
-            DPC,
-        },
-        plain_dpc::DPCComponents,
+    dpc::delegable_payment_dpc::{
+        core_checks_circuit::*,
+        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+        predicate::DPCPredicate,
+        proof_check_circuit::*,
+        transaction::DPCTransaction,
+        DelegablePaymentDPCComponents,
+        LocalData as DPCLocalData,
+        DPC,
     },
     ledger::ideal_ledger::IdealLedger,
 };
@@ -38,7 +35,7 @@ use snarkos_gadgets::{
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
-use snarkos_models::algorithms::CRH;
+use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
 
 use blake2::Blake2s as Blake2sHash;
 
@@ -130,6 +127,8 @@ pub struct Components;
 
 impl DelegablePaymentDPCComponents for Components {
     type MainNIZK = CoreCheckNIZK;
+    type MerkleHashGadget = MerkleTreeCRHGadget;
+    type MerkleParameters = CommitmentMerkleParameters;
     type PredicateNIZK = PredicateNIZK<Self>;
     type PredicateNIZKGadget = PredicateNIZKGadget;
     type ProofCheckNIZK = ProofCheckNIZK;
@@ -143,8 +142,6 @@ impl DPCComponents for Components {
     type InnerField = CoreCheckF;
     type LocalDataCommitment = LocalDataComm;
     type LocalDataCommitmentGadget = LocalDataCommGadget;
-    type MerkleHashGadget = MerkleTreeCRHGadget;
-    type MerkleParameters = CommitmentMerkleParameters;
     type OuterField = ProofCheckF;
     type PRF = PRF;
     type PRFGadget = PRFGadget;

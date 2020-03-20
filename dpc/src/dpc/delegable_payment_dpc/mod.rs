@@ -1,7 +1,7 @@
 use crate::{
     dpc::{
+        address::{AddressPair, AddressPublicKey, AddressSecretKey},
         delegable_payment_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
-        plain_dpc::DPCComponents,
         AddressKeyPair,
         DPCScheme,
         Predicate,
@@ -10,11 +10,12 @@ use crate::{
     },
     ledger::*,
 };
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
-    gadgets::algorithms::{CommitmentGadget, SNARKVerifierGadget},
+    dpc::DPCComponents,
+    gadgets::algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -24,9 +25,6 @@ use snarkos_utilities::{
 
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod address;
-use self::address::*;
 
 pub mod binding_signature;
 
@@ -64,33 +62,36 @@ mod test;
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
 pub trait DelegablePaymentDPCComponents: DPCComponents {
-    // Commitment scheme for committing to a record value
+    /// Ledger digest type.
+    type MerkleParameters: MerkleParameters;
+    type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
+
+    /// Commitment scheme for committing to a record value
     type ValueComm: CommitmentScheme;
     type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerField>;
 
-    // SNARK for non-proof-verification checks
+    /// SNARK for non-proof-verification checks
     type MainNIZK: SNARK<
         Circuit = CoreChecksCircuit<Self>,
         AssignedCircuit = CoreChecksCircuit<Self>,
         VerifierInput = CoreChecksVerifierInput<Self>,
     >;
 
-    // SNARK for proof-verification checks
+    /// SNARK for proof-verification checks
     type ProofCheckNIZK: SNARK<
         Circuit = ProofCheckCircuit<Self>,
         AssignedCircuit = ProofCheckCircuit<Self>,
         VerifierInput = ProofCheckVerifierInput<Self>,
     >;
 
-    // SNARK for a "dummy predicate" that does nothing with its input.
+    /// SNARK for a "dummy predicate" that does nothing with its input.
     type PredicateNIZK: SNARK<
         Circuit = PaymentCircuit<Self>,
         AssignedCircuit = PaymentCircuit<Self>,
         VerifierInput = PaymentPredicateLocalData<Self>,
     >;
 
-    // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
-    // input.
+    /// SNARK Verifier gadget for the "dummy predicate" that does nothing with its input.
     type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterField>;
 }
 

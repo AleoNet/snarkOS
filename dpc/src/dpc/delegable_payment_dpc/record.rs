@@ -1,6 +1,6 @@
 use crate::dpc::{
+    address::AddressPublicKey,
     delegable_payment_dpc::{
-        address::AddressPublicKey,
         predicate::DPCPredicate,
         record_payload::PaymentRecordPayload,
         DelegablePaymentDPCComponents,
