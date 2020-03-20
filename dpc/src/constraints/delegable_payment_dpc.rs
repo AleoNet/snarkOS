@@ -50,11 +50,11 @@ pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     // New record stuff
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
-    new_commitments: &[<C::RecC as CommitmentScheme>::Output],
+    new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
 
     // Rest
-    predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
-    predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
+    predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    predicate_rand: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
     local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
@@ -64,13 +64,13 @@ pub fn execute_core_checks_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     delegable_dpc_execute_gadget_helper::<
         C,
         CS,
-        C::AddrC,
-        C::RecC,
-        C::SnNonceH,
+        C::AddressCommitment,
+        C::RecordCommitment,
+        C::SerialNumberNonce,
         C::P,
-        C::AddrCGadget,
-        C::RecCGadget,
-        C::SnNonceHGadget,
+        C::AddressCommitmentGadget,
+        C::RecordCommitmentGadget,
+        C::SerialNumberNonceGadget,
         C::PGadget,
     >(
         cs,
@@ -132,8 +132,8 @@ fn delegable_dpc_execute_gadget_helper<
     new_commitments: &[RecC::Output],
 
     //
-    predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
-    predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
+    predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    predicate_rand: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
     local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
@@ -142,13 +142,13 @@ fn delegable_dpc_execute_gadget_helper<
 ) -> Result<(), SynthesisError>
 where
     C: DelegablePaymentDPCComponents<
-        AddrC = AddrC,
-        RecC = RecC,
-        SnNonceH = SnNonceH,
+        AddressCommitment = AddrC,
+        RecordCommitment = RecC,
+        SerialNumberNonce = SnNonceH,
         P = P,
-        AddrCGadget = AddrCGadget,
-        SnNonceHGadget = SnNonceHGadget,
-        RecCGadget = RecCGadget,
+        AddressCommitmentGadget = AddrCGadget,
+        SerialNumberNonceGadget = SnNonceHGadget,
+        RecordCommitmentGadget = RecCGadget,
         PGadget = PGadget,
     >,
     AddrC: CommitmentScheme,
@@ -204,7 +204,7 @@ where
             )?;
 
         let pred_vk_comm_pp =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc_input(
+            <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
                 || Ok(comm_crh_sig_parameters.pred_vk_comm_pp.parameters()),
             )?;
@@ -220,7 +220,7 @@ where
                 || Ok(&comm_crh_sig_parameters.sig_pp),
             )?;
 
-        let ledger_pp = <C::MerkleTreeHGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
+        let ledger_pp = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),
             || Ok(ledger_parameters.parameters()),
         )?;
@@ -235,7 +235,7 @@ where
         )
     };
 
-    let digest_gadget = <C::MerkleTreeHGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+    let digest_gadget = <C::MerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
         &mut cs.ns(|| "Declare ledger digest"),
         || Ok(ledger_digest),
     )?;
@@ -317,10 +317,10 @@ where
         {
             let witness_cs = &mut cs.ns(|| "Check membership witness");
 
-            let witness_gadget = MerklePathGadget::<_, C::MerkleTreeHGadget, _>::alloc(
-                &mut witness_cs.ns(|| "Declare witness"),
-                || Ok(witness),
-            )?;
+            let witness_gadget =
+                MerklePathGadget::<_, C::MerkleHashGadget, _>::alloc(&mut witness_cs.ns(|| "Declare witness"), || {
+                    Ok(witness)
+                })?;
 
             witness_gadget.conditionally_check_membership(
                 &mut witness_cs.ns(|| "Perform check"),
@@ -591,23 +591,25 @@ where
             input.extend_from_slice(&new_birth_pred_hashes[j]);
         }
 
-        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::RandomnessGadget::alloc(
+        let given_comm_rand = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::RandomnessGadget::alloc(
             &mut comm_cs.ns(|| "Commitment randomness"),
             || Ok(predicate_rand),
         )?;
 
-        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
+        let given_comm = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
             &mut comm_cs.ns(|| "Commitment output"),
             || Ok(predicate_comm),
         )?;
 
-        let candidate_commitment =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::InnerField>>::check_commitment_gadget(
-                &mut comm_cs.ns(|| "Compute commitment"),
-                &pred_vk_comm_pp,
-                &input,
-                &given_comm_rand,
-            )?;
+        let candidate_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+            _,
+            C::InnerField,
+        >>::check_commitment_gadget(
+            &mut comm_cs.ns(|| "Compute commitment"),
+            &pred_vk_comm_pp,
+            &input,
+            &given_comm_rand,
+        )?;
 
         candidate_commitment.enforce_equal(
             &mut comm_cs.ns(|| "Check that declared and computed commitments are equal"),
@@ -686,8 +688,8 @@ pub fn execute_proof_check_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     new_birth_pred_vk_and_pf: &[PrivatePredInput<C>],
 
     // Rest
-    predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
-    predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
+    predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    predicate_rand: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
     local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
 ) -> Result<(), SynthesisError>
@@ -702,15 +704,16 @@ where
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
 
         let pred_vk_comm_pp =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
+            <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare Pred Vk COMM parameters"),
                 || Ok(comm_crh_sig_parameters.pred_vk_comm_pp.parameters()),
             )?;
 
-        let pred_vk_crh_pp = <C::PredVkHGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
-            || Ok(comm_crh_sig_parameters.pred_vk_crh_pp.parameters()),
-        )?;
+        let pred_vk_crh_pp =
+            <C::PredicateVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare Pred Vk CRH parameters"),
+                || Ok(comm_crh_sig_parameters.pred_vk_crh_pp.parameters()),
+            )?;
 
         (pred_vk_comm_pp, pred_vk_crh_pp)
     };
@@ -778,7 +781,7 @@ where
 
         let death_pred_vk_bytes = death_pred_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
-        let claimed_death_pred_hash = C::PredVkHGadget::check_evaluation_gadget(
+        let claimed_death_pred_hash = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death predicate vk hash"),
             &pred_vk_crh_pp,
             &death_pred_vk_bytes,
@@ -863,7 +866,7 @@ where
 
         let birth_pred_vk_bytes = birth_pred_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
 
-        let claimed_birth_pred_hash = C::PredVkHGadget::check_evaluation_gadget(
+        let claimed_birth_pred_hash = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute birth predicate vk hash"),
             &pred_vk_crh_pp,
             &birth_pred_vk_bytes,
@@ -944,23 +947,25 @@ where
             input.extend_from_slice(&new_birth_pred_hashes[j]);
         }
 
-        let given_comm_rand = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::RandomnessGadget::alloc(
+        let given_comm_rand = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::RandomnessGadget::alloc(
             &mut comm_cs.ns(|| "Commitment randomness"),
             || Ok(predicate_rand),
         )?;
 
-        let given_comm = <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::OutputGadget::alloc_input(
+        let given_comm = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::OutputGadget::alloc_input(
             &mut comm_cs.ns(|| "Commitment output"),
             || Ok(predicate_comm),
         )?;
 
-        let candidate_commitment =
-            <C::PredVkCommGadget as CommitmentGadget<_, C::OuterField>>::check_commitment_gadget(
-                &mut comm_cs.ns(|| "Compute commitment"),
-                &pred_vk_comm_pp,
-                &input,
-                &given_comm_rand,
-            )?;
+        let candidate_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+            _,
+            C::OuterField,
+        >>::check_commitment_gadget(
+            &mut comm_cs.ns(|| "Compute commitment"),
+            &pred_vk_comm_pp,
+            &input,
+            &given_comm_rand,
+        )?;
 
         candidate_commitment.enforce_equal(
             &mut comm_cs.ns(|| "Check that declared and computed commitments are equal"),

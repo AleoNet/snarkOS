@@ -138,26 +138,26 @@ impl DelegablePaymentDPCComponents for Components {
 }
 
 impl DPCComponents for Components {
-    type AddrC = AddressComm;
-    type AddrCGadget = AddressCommGadget;
+    type AddressCommitment = AddressComm;
+    type AddressCommitmentGadget = AddressCommGadget;
     type InnerField = CoreCheckF;
     type LocalDataCommitment = LocalDataComm;
     type LocalDataCommitmentGadget = LocalDataCommGadget;
+    type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
-    type MerkleTreeHGadget = MerkleTreeCRHGadget;
     type OuterField = ProofCheckF;
     type P = PRF;
     type PGadget = PRFGadget;
-    type PredVkComm = PredicateComm;
-    type PredVkCommGadget = PredicateCommGadget;
-    type PredVkH = PredVkCRH;
-    type PredVkHGadget = PredVkCRHGadget;
-    type RecC = RecordComm;
-    type RecCGadget = RecordCommGadget;
+    type PredicateVerificationKeyCommitment = PredicateComm;
+    type PredicateVerificationKeyCommitmentGadget = PredicateCommGadget;
+    type PredicateVerificationKeyHash = PredVkCRH;
+    type PredicateVerificationKeyHashGadget = PredVkCRHGadget;
+    type RecordCommitment = RecordComm;
+    type RecordCommitmentGadget = RecordCommGadget;
+    type SerialNumberNonce = SnNonceCRH;
+    type SerialNumberNonceGadget = SnNonceCRHGadget;
     type Signature = AuthSignature;
     type SignatureGadget = AuthSignatureGadget;
-    type SnNonceH = SnNonceCRH;
-    type SnNonceHGadget = SnNonceCRHGadget;
 
     const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;

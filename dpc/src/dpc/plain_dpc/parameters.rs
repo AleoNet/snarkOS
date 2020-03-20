@@ -5,13 +5,13 @@ use snarkos_models::algorithms::SNARK;
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct CommAndCRHPublicParameters<C: DPCComponents> {
-    pub addr_comm_pp: C::AddrC,
-    pub rec_comm_pp: C::RecC,
-    pub pred_vk_comm_pp: C::PredVkComm,
+    pub addr_comm_pp: C::AddressCommitment,
+    pub rec_comm_pp: C::RecordCommitment,
+    pub pred_vk_comm_pp: C::PredicateVerificationKeyCommitment,
     pub local_data_comm_pp: C::LocalDataCommitment,
 
-    pub sn_nonce_crh_pp: C::SnNonceH,
-    pub pred_vk_crh_pp: C::PredVkH,
+    pub sn_nonce_crh_pp: C::SerialNumberNonce,
+    pub pred_vk_crh_pp: C::PredicateVerificationKeyHash,
 }
 
 #[derive(Derivative)]
@@ -58,11 +58,11 @@ impl<C: PlainDPCComponents> PublicParameters<C> {
         &self.pred_nizk_pp
     }
 
-    pub fn sn_nonce_crh_pp(&self) -> &C::SnNonceH {
+    pub fn sn_nonce_crh_pp(&self) -> &C::SerialNumberNonce {
         &self.comm_and_crh_pp.sn_nonce_crh_pp
     }
 
-    pub fn pred_vk_crh_pp(&self) -> &C::PredVkH {
+    pub fn pred_vk_crh_pp(&self) -> &C::PredicateVerificationKeyHash {
         &self.comm_and_crh_pp.pred_vk_crh_pp
     }
 
@@ -70,15 +70,15 @@ impl<C: PlainDPCComponents> PublicParameters<C> {
         &self.comm_and_crh_pp.local_data_comm_pp
     }
 
-    pub fn addr_comm_pp(&self) -> &C::AddrC {
+    pub fn addr_comm_pp(&self) -> &C::AddressCommitment {
         &self.comm_and_crh_pp.addr_comm_pp
     }
 
-    pub fn rec_comm_pp(&self) -> &C::RecC {
+    pub fn rec_comm_pp(&self) -> &C::RecordCommitment {
         &self.comm_and_crh_pp.rec_comm_pp
     }
 
-    pub fn pred_vk_comm_pp(&self) -> &C::PredVkComm {
+    pub fn pred_vk_comm_pp(&self) -> &C::PredicateVerificationKeyCommitment {
         &self.comm_and_crh_pp.pred_vk_comm_pp
     }
 }

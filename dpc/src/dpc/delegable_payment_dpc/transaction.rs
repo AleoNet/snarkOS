@@ -13,7 +13,7 @@ use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, SNARK};
 )]
 pub struct DPCTransaction<C: DelegablePaymentDPCComponents> {
     old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
-    new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
+    new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
 }
@@ -31,7 +31,7 @@ pub struct DPCStuff<C: DelegablePaymentDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
-    pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
+    pub predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
     pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
@@ -52,7 +52,7 @@ impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
         digest: MerkleTreeDigest<C::MerkleParameters>,
         core_proof: <C::MainNIZK as SNARK>::Proof,
         predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
-        predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
+        predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
         input_value_commitments: Vec<[u8; 32]>,
         output_value_commitments: Vec<[u8; 32]>,
@@ -82,7 +82,7 @@ impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
 }
 
 impl<C: DelegablePaymentDPCComponents> Transaction for DPCTransaction<C> {
-    type Commitment = <C::RecC as CommitmentScheme>::Output;
+    type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
     type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
     type Stuff = DPCStuff<C>;

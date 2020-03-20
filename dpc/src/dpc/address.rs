@@ -23,7 +23,7 @@ impl<C: DPCComponents> AddressKeyPair for AddressPair<C> {
     Debug(bound = "C: DPCComponents")
 )]
 pub struct AddressPublicKey<C: DPCComponents> {
-    pub public_key: <C::AddrC as CommitmentScheme>::Output,
+    pub public_key: <C::AddressCommitment as CommitmentScheme>::Output,
 }
 
 impl<C: DPCComponents> ToBytes for AddressPublicKey<C> {
@@ -41,5 +41,5 @@ impl<C: DPCComponents> ToBytes for AddressPublicKey<C> {
 pub struct AddressSecretKey<C: DPCComponents> {
     pub sk_prf: <C::P as PRF>::Seed,
     pub metadata: [u8; 32],
-    pub r_pk: <C::AddrC as CommitmentScheme>::Randomness,
+    pub r_pk: <C::AddressCommitment as CommitmentScheme>::Randomness,
 }

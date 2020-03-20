@@ -5,14 +5,14 @@ use snarkos_models::algorithms::{SignatureScheme, SNARK};
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
 pub struct CommCRHSigPublicParameters<C: DelegablePaymentDPCComponents> {
-    pub addr_comm_pp: C::AddrC,
-    pub rec_comm_pp: C::RecC,
-    pub pred_vk_comm_pp: C::PredVkComm,
+    pub addr_comm_pp: C::AddressCommitment,
+    pub rec_comm_pp: C::RecordCommitment,
+    pub pred_vk_comm_pp: C::PredicateVerificationKeyCommitment,
     pub local_data_comm_pp: C::LocalDataCommitment,
     pub value_comm_pp: C::ValueComm,
 
-    pub sn_nonce_crh_pp: C::SnNonceH,
-    pub pred_vk_crh_pp: C::PredVkH,
+    pub sn_nonce_crh_pp: C::SerialNumberNonce,
+    pub pred_vk_crh_pp: C::PredicateVerificationKeyHash,
 
     pub sig_pp: <C::Signature as SignatureScheme>::Parameters,
 }
@@ -61,11 +61,11 @@ impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
         &self.pred_nizk_pp
     }
 
-    pub fn sn_nonce_crh_pp(&self) -> &C::SnNonceH {
+    pub fn sn_nonce_crh_pp(&self) -> &C::SerialNumberNonce {
         &self.comm_crh_sig_pp.sn_nonce_crh_pp
     }
 
-    pub fn pred_vk_crh_pp(&self) -> &C::PredVkH {
+    pub fn pred_vk_crh_pp(&self) -> &C::PredicateVerificationKeyHash {
         &self.comm_crh_sig_pp.pred_vk_crh_pp
     }
 
@@ -73,15 +73,15 @@ impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
         &self.comm_crh_sig_pp.local_data_comm_pp
     }
 
-    pub fn addr_comm_pp(&self) -> &C::AddrC {
+    pub fn addr_comm_pp(&self) -> &C::AddressCommitment {
         &self.comm_crh_sig_pp.addr_comm_pp
     }
 
-    pub fn rec_comm_pp(&self) -> &C::RecC {
+    pub fn rec_comm_pp(&self) -> &C::RecordCommitment {
         &self.comm_crh_sig_pp.rec_comm_pp
     }
 
-    pub fn pred_vk_comm_pp(&self) -> &C::PredVkComm {
+    pub fn pred_vk_comm_pp(&self) -> &C::PredicateVerificationKeyCommitment {
         &self.comm_crh_sig_pp.pred_vk_comm_pp
     }
 

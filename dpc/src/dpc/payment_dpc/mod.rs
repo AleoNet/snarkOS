@@ -115,11 +115,11 @@ pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
     // New record stuff
     new_records: Vec<DPCRecord<Components>>,
     new_sn_nonce_randomness: Vec<[u8; 32]>,
-    new_commitments: Vec<<Components::RecC as CommitmentScheme>::Output>,
+    new_commitments: Vec<<Components::RecordCommitment as CommitmentScheme>::Output>,
 
     // Predicate and local data commitment and randomness
-    predicate_comm: <Components::PredVkComm as CommitmentScheme>::Output,
-    predicate_rand: <Components::PredVkComm as CommitmentScheme>::Randomness,
+    predicate_comm: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    predicate_rand: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
     local_data_comm: <Components::LocalDataCommitment as CommitmentScheme>::Output,
     local_data_rand: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
@@ -167,15 +167,15 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
         rng: &mut R,
     ) -> Result<CommAndCRHPublicParameters<Components>, DPCError> {
         let time = start_timer!(|| "Address commitment scheme setup");
-        let addr_comm_pp = Components::AddrC::setup(rng);
+        let addr_comm_pp = Components::AddressCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
-        let rec_comm_pp = Components::RecC::setup(rng);
+        let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
-        let pred_vk_comm_pp = Components::PredVkComm::setup(rng);
+        let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -187,11 +187,11 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SnNonceH::setup(rng);
+        let sn_nonce_crh_pp = Components::SerialNumberNonce::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredVkH::setup(rng);
+        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let comm_and_crh_pp = CommAndCRHPublicParameters {
@@ -239,7 +239,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
 
     pub fn generate_record<R: Rng>(
         parameters: &CommAndCRHPublicParameters<Components>,
-        sn_nonce: &<Components::SnNonceH as CRH>::Output,
+        sn_nonce: &<Components::SerialNumberNonce as CRH>::Output,
         address_public_key: &AddressPublicKey<Components>,
         is_dummy: bool,
         payload: &PaymentRecordPayload,
@@ -249,7 +249,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
         // Sample new commitment randomness.
-        let commitment_randomness = <Components::RecC as CommitmentScheme>::Randomness::rand(rng);
+        let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct a record commitment.
         let birth_predicate_repr = birth_predicate.into_compact_repr();
@@ -264,7 +264,8 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
             sn_nonce                       // 256 bits = 32 bytes
         ]?;
 
-        let commitment = Components::RecC::commit(&parameters.rec_comm_pp, &commitment_input, &commitment_randomness)?;
+        let commitment =
+            Components::RecordCommitment::commit(&parameters.rec_comm_pp, &commitment_input, &commitment_randomness)?;
 
         let record = DPCRecord {
             address_public_key: address_public_key.clone(),
@@ -291,11 +292,11 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
         let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
 
         // Sample randomness rpk for the commitment scheme.
-        let r_pk = <Components::AddrC as CommitmentScheme>::Randomness::rand(rng);
+        let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct the address public key.
         let commit_input = to_bytes![sk_prf, metadata]?;
-        let public_key = Components::AddrC::commit(&parameters.addr_comm_pp, &commit_input, &r_pk)?;
+        let public_key = Components::AddressCommitment::commit(&parameters.addr_comm_pp, &commit_input, &r_pk)?;
         let public_key = AddressPublicKey { public_key };
 
         // Construct the address secret key.
@@ -329,7 +330,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
     where
         L: Ledger<
             Parameters = Components::MerkleParameters,
-            Commitment = <Components::RecC as CommitmentScheme>::Output,
+            Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
             SerialNumber = <Components::P as PRF>::Output,
         >,
     {
@@ -385,7 +386,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
             let sn_randomness: [u8; 32] = rng.gen();
 
             let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
-            let sn_nonce = Components::SnNonceH::hash(&parameters.sn_nonce_crh_pp, &crh_input)?;
+            let sn_nonce = Components::SerialNumberNonce::hash(&parameters.sn_nonce_crh_pp, &crh_input)?;
 
             end_timer!(sn_nonce_time);
 
@@ -461,8 +462,13 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
             for hash in new_birth_pred_hashes {
                 input.extend_from_slice(&hash);
             }
-            let predicate_rand = <Components::PredVkComm as CommitmentScheme>::Randomness::rand(rng);
-            let predicate_comm = Components::PredVkComm::commit(&parameters.pred_vk_comm_pp, &input, &predicate_rand)?;
+            let predicate_rand =
+                <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let predicate_comm = Components::PredicateVerificationKeyCommitment::commit(
+                &parameters.pred_vk_comm_pp,
+                &input,
+                &predicate_rand,
+            )?;
             (predicate_comm, predicate_rand)
         };
         end_timer!(pred_hash_comm_timer);
@@ -497,7 +503,7 @@ impl<Components: PaymentDPCComponents, L: Ledger> DPCScheme<L> for DPC<Component
 where
     L: Ledger<
         Parameters = Components::MerkleParameters,
-        Commitment = <Components::RecC as CommitmentScheme>::Output,
+        Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         SerialNumber = <Components::P as PRF>::Output,
     >,
 {

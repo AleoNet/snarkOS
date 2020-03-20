@@ -19,16 +19,16 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct ProofCheckVerifierInput<C: DPCComponents> {
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
-    pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
+    pub predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
 
 impl<C: DPCComponents> ToConstraintField<C::OuterField> for ProofCheckVerifierInput<C>
 where
-    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
-    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
 
-    <C::PredVkH as CRH>::Parameters: ToConstraintField<C::OuterField>,
+    <C::PredicateVerificationKeyHash as CRH>::Parameters: ToConstraintField<C::OuterField>,
 
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -74,8 +74,8 @@ pub struct ProofCheckCircuit<C: PlainDPCComponents> {
 
     new_private_pred_inputs: Option<Vec<PrivatePredInput<C>>>,
 
-    predicate_comm: Option<<C::PredVkComm as CommitmentScheme>::Output>,
-    predicate_rand: Option<<C::PredVkComm as CommitmentScheme>::Randomness>,
+    predicate_comm: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
+    predicate_rand: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
     local_data_comm: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
 }
 
@@ -90,8 +90,8 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
         let old_private_pred_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_input_records]);
         let new_private_pred_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_output_records]);
 
-        let predicate_comm = Some(<C::PredVkComm as CommitmentScheme>::Output::default());
-        let predicate_rand = Some(<C::PredVkComm as CommitmentScheme>::Randomness::default());
+        let predicate_comm = Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default());
+        let predicate_rand = Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
         let local_data_comm = Some(<C::LocalDataCommitment as CommitmentScheme>::Output::default());
 
         Self {
@@ -116,8 +116,8 @@ impl<C: PlainDPCComponents> ProofCheckCircuit<C> {
         // Commitment contains commitment to hash of birth predicate vk.
         new_private_pred_inputs: &[PrivatePredInput<C>],
 
-        predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
-        predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
+        predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+        predicate_rand: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
         local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;

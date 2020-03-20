@@ -28,10 +28,10 @@ pub struct DPCRecord<C: DelegablePaymentDPCComponents> {
     #[derivative(Default(value = "default_predicate_hash::<C::PredVkH>()"))]
     pub(super) death_predicate_repr: Vec<u8>,
 
-    pub(super) serial_number_nonce: <C::SnNonceH as CRH>::Output,
+    pub(super) serial_number_nonce: <C::SerialNumberNonce as CRH>::Output,
 
-    pub(super) commitment: <C::RecC as CommitmentScheme>::Output,
-    pub(super) commitment_randomness: <C::RecC as CommitmentScheme>::Randomness,
+    pub(super) commitment: <C::RecordCommitment as CommitmentScheme>::Output,
+    pub(super) commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness,
 
     pub(super) _components: PhantomData<C>,
 }
@@ -42,12 +42,12 @@ fn default_predicate_hash<C: CRH>() -> Vec<u8> {
 
 impl<C: DelegablePaymentDPCComponents> Record for DPCRecord<C> {
     type AddressPublicKey = AddressPublicKey<C>;
-    type Commitment = <C::RecC as CommitmentScheme>::Output;
-    type CommitmentRandomness = <C::RecC as CommitmentScheme>::Randomness;
+    type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
+    type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
     type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
-    type SerialNumberNonce = <C::SnNonceH as CRH>::Output;
+    type SerialNumberNonce = <C::SerialNumberNonce as CRH>::Output;
 
     fn address_public_key(&self) -> &Self::AddressPublicKey {
         &self.address_public_key

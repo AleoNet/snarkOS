@@ -29,10 +29,10 @@ pub struct CoreChecksVerifierInput<C: DelegablePaymentDPCComponents> {
     pub old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
 
     // Output record commitments and birth predicate commitments
-    pub new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
+    pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
     // Predicate input commitment and memo
-    pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
+    pub predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub memo: [u8; 32],
 
@@ -41,16 +41,16 @@ pub struct CoreChecksVerifierInput<C: DelegablePaymentDPCComponents> {
 
 impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerField> for CoreChecksVerifierInput<C>
 where
-    <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::AddressCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AddressCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecC as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::RecC as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::SnNonceH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::SerialNumberNonce as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
-    <C::PredVkComm as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::PredVkComm as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -124,11 +124,11 @@ pub struct CoreChecksCircuit<C: DelegablePaymentDPCComponents> {
     // Inputs for new records.
     new_records: Option<Vec<DPCRecord<C>>>,
     new_sn_nonce_randomness: Option<Vec<[u8; 32]>>,
-    new_commitments: Option<Vec<<C::RecC as CommitmentScheme>::Output>>,
+    new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
 
     // Commitment to Predicates and to local data.
-    predicate_comm: Option<<C::PredVkComm as CommitmentScheme>::Output>,
-    predicate_rand: Option<<C::PredVkComm as CommitmentScheme>::Randomness>,
+    predicate_comm: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
+    predicate_rand: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
 
     local_data_comm: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
     local_data_rand: Option<<C::LocalDataCommitment as CommitmentScheme>::Randomness>,
@@ -152,15 +152,15 @@ impl<C: DelegablePaymentDPCComponents> CoreChecksCircuit<C> {
         let old_witnesses = vec![MerklePath::default(); num_input_records];
         let old_address_secret_keys = vec![AddressSecretKey::default(); num_input_records];
 
-        let new_cm = vec![<C::RecC as CommitmentScheme>::Output::default(); num_output_records];
+        let new_cm = vec![<C::RecordCommitment as CommitmentScheme>::Output::default(); num_output_records];
         let new_sn_nonce_randomness = vec![[0u8; 32]; num_output_records];
         let new_records = vec![DPCRecord::default(); num_output_records];
 
         let auxiliary = [1u8; 32];
         let memo = [0u8; 32];
 
-        let predicate_comm = <C::PredVkComm as CommitmentScheme>::Output::default();
-        let predicate_rand = <C::PredVkComm as CommitmentScheme>::Randomness::default();
+        let predicate_comm = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default();
+        let predicate_rand = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
 
         let local_data_comm = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
         let local_data_rand = <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
@@ -214,11 +214,11 @@ impl<C: DelegablePaymentDPCComponents> CoreChecksCircuit<C> {
         // New records
         new_records: &[DPCRecord<C>],
         new_sn_nonce_randomness: &[[u8; 32]],
-        new_commitments: &[<C::RecC as CommitmentScheme>::Output],
+        new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
 
         // Other stuff
-        predicate_comm: &<C::PredVkComm as CommitmentScheme>::Output,
-        predicate_rand: &<C::PredVkComm as CommitmentScheme>::Randomness,
+        predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+        predicate_rand: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
         local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
         local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,

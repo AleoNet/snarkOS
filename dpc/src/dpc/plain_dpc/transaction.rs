@@ -10,7 +10,7 @@ use snarkos_models::algorithms::{CommitmentScheme, PRF, SNARK};
 )]
 pub struct DPCTransaction<C: PlainDPCComponents> {
     old_serial_numbers: Vec<<C::P as PRF>::Output>,
-    new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
+    new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
 }
@@ -28,7 +28,7 @@ pub struct DPCStuff<C: PlainDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
-    pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
+    pub predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
     pub local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
@@ -41,7 +41,7 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
         digest: MerkleTreeDigest<C::MerkleParameters>,
         core_proof: <C::MainNIZK as SNARK>::Proof,
         predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
-        predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
+        predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
     ) -> Self {
         let stuff = DPCStuff {
@@ -61,7 +61,7 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
 }
 
 impl<C: PlainDPCComponents> Transaction for DPCTransaction<C> {
-    type Commitment = <C::RecC as CommitmentScheme>::Output;
+    type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
     type SerialNumber = <C::P as PRF>::Output;
     type Stuff = DPCStuff<C>;
