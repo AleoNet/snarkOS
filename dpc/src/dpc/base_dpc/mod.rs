@@ -179,7 +179,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
 ///////////////////////////////////////////////////////////////////////////////
 
 impl<Components: BaseDPCComponents> DPC<Components> {
-    pub fn generate_comm_crh_sig_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
+    pub fn generate_circuit_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
         let time = start_timer!(|| "Address commitment scheme setup");
         let addr_comm_pp = Components::AddressCommitment::setup(rng);
         end_timer!(time);
@@ -557,37 +557,38 @@ where
     type Transaction = DPCTransaction<Components>;
 
     fn setup<R: Rng>(
-        ledger_pp: &MerkleTreeParameters<Components::MerkleParameters>,
+        ledger_parameters: &MerkleTreeParameters<Components::MerkleParameters>,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
-        let setup_time = start_timer!(|| "PlainDPC::Setup");
-        let comm_crh_sig_pp = Self::generate_comm_crh_sig_parameters(rng)?;
+        let setup_time = start_timer!(|| "DPC::Setup");
+        let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
-        let pred_nizk_setup_time = start_timer!(|| "Dummy Predicate NIZK Setup");
-        let pred_nizk_pp = Self::generate_pred_nizk_parameters(&comm_crh_sig_pp, rng)?;
-        end_timer!(pred_nizk_setup_time);
+        let predicate_snark_setup_time = start_timer!(|| "Dummy Predicate SNARK Setup");
+        let predicate_snark_parameters = Self::generate_pred_nizk_parameters(&circuit_parameters, rng)?;
+        end_timer!(predicate_snark_setup_time);
 
         let private_pred_input = PrivatePredicateInput {
-            verification_key: pred_nizk_pp.verification_key.clone(),
-            proof: pred_nizk_pp.proof.clone(),
+            verification_key: predicate_snark_parameters.verification_key.clone(),
+            proof: predicate_snark_parameters.proof.clone(),
             value_commitment: <Components::ValueCommitment as CommitmentScheme>::Output::default(),
             value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };
 
-        let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");
-        let core_nizk_pp = Components::InnerSNARK::setup(InnerCircuit::blank(&comm_crh_sig_pp, ledger_pp), rng)?;
-        end_timer!(nizk_setup_time);
+        let snark_setup_time = start_timer!(|| "Execute Inner SNARK Setup");
+        let inner_snark_parameters =
+            Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters), rng)?;
+        end_timer!(snark_setup_time);
 
-        let nizk_setup_time = start_timer!(|| "Execute Tx Proof Checks NIZK Setup");
-        let proof_check_nizk_pp =
-            Components::OuterSNARK::setup(OuterCircuit::blank(&comm_crh_sig_pp, &private_pred_input), rng)?;
-        end_timer!(nizk_setup_time);
+        let snark_setup_time = start_timer!(|| "Execute Outer SNARK Setup");
+        let outer_snark_parameters =
+            Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
+        end_timer!(snark_setup_time);
         end_timer!(setup_time);
         Ok(PublicParameters {
-            circuit_parameters: comm_crh_sig_pp,
-            predicate_snark_parameters: pred_nizk_pp,
-            inner_snark_parameters: core_nizk_pp,
-            outer_snark_parameters: proof_check_nizk_pp,
+            circuit_parameters,
+            predicate_snark_parameters,
+            inner_snark_parameters,
+            outer_snark_parameters,
         })
     }
 
@@ -596,9 +597,9 @@ where
         metadata: &Self::Metadata,
         rng: &mut R,
     ) -> Result<Self::AddressKeyPair, DPCError> {
-        let create_addr_time = start_timer!(|| "PlainDPC::CreateAddr");
+        let time = start_timer!(|| "PlainDPC::CreateAddr");
         let result = Self::create_address_helper(&parameters.circuit_parameters, metadata, rng)?;
-        end_timer!(create_addr_time);
+        end_timer!(time);
         Ok(result)
     }
 
@@ -641,7 +642,7 @@ where
         let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data);
 
         let ExecuteContext {
-            circuit_parameters: comm_crh_sig_pp,
+            circuit_parameters,
             ledger_digest,
 
             old_records,
@@ -653,10 +654,10 @@ where
             new_records,
             new_sn_nonce_randomness,
             new_commitments,
-            predicate_commitment: predicate_comm,
-            predicate_randomness: predicate_rand,
-            local_data_commitment: local_data_comm,
-            local_data_randomness: local_data_rand,
+            predicate_commitment,
+            predicate_randomness,
+            local_data_commitment,
+            local_data_randomness,
             value_balance,
         } = context;
 
@@ -689,10 +690,10 @@ where
             new_value_commit_randomness.push(randomness);
         }
 
-        let sighash = to_bytes![local_data_comm]?;
+        let sighash = to_bytes![local_data_commitment]?;
 
         let binding_signature = create_binding_signature::<Components, _>(
-            &comm_crh_sig_pp.value_commitment_parameters,
+            &circuit_parameters.value_commitment_parameters,
             &old_value_commits,
             &new_value_commits,
             &old_value_commit_randomness,
@@ -702,7 +703,7 @@ where
             rng,
         )?;
 
-        let core_proof = {
+        let inner_proof = {
             let circuit = InnerCircuit::new(
                 &parameters.circuit_parameters,
                 ledger.parameters(),
@@ -714,10 +715,10 @@ where
                 &new_records,
                 &new_sn_nonce_randomness,
                 &new_commitments,
-                &predicate_comm,
-                &predicate_rand,
-                &local_data_comm,
-                &local_data_rand,
+                &predicate_commitment,
+                &predicate_randomness,
+                &local_data_commitment,
+                &local_data_randomness,
                 memorandum,
                 auxiliary,
                 &binding_signature,
@@ -726,14 +727,14 @@ where
             Components::InnerSNARK::prove(&parameters.inner_snark_parameters.0, circuit, rng)?
         };
 
-        let proof_checks_proof = {
+        let outer_proof = {
             let circuit = OuterCircuit::new(
                 &parameters.circuit_parameters,
                 old_death_pred_attributes.as_slice(),
                 new_birth_pred_attributes.as_slice(),
-                &predicate_comm,
-                &predicate_rand,
-                &local_data_comm,
+                &predicate_commitment,
+                &predicate_randomness,
+                &local_data_commitment,
             );
 
             Components::OuterSNARK::prove(&parameters.outer_snark_parameters.0, circuit, rng)?
@@ -744,8 +745,8 @@ where
             new_commitments,
             memorandum,
             ledger_digest,
-            core_proof,
-            proof_checks_proof
+            inner_proof,
+            outer_proof
         ]?;
 
         let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
@@ -755,10 +756,14 @@ where
             let sk_sig = &old_address_secret_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
-            let signature =
-                Components::Signature::sign(&comm_crh_sig_pp.signature_parameters, sk_sig, &signature_message, rng)?;
+            let signature = Components::Signature::sign(
+                &circuit_parameters.signature_parameters,
+                sk_sig,
+                &signature_message,
+                rng,
+            )?;
             let randomized_signature = Components::Signature::randomize_signature(
-                &comm_crh_sig_pp.signature_parameters,
+                &circuit_parameters.signature_parameters,
                 &signature,
                 randomizer,
             )?;
@@ -772,10 +777,10 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
-            core_proof,
-            proof_checks_proof,
-            predicate_comm,
-            local_data_comm,
+            inner_proof,
+            outer_proof,
+            predicate_commitment,
+            local_data_commitment,
             old_value_commits,
             new_value_commits,
             value_balance,

@@ -32,7 +32,7 @@ fn test_execute_base_dpc_constraints() {
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
     let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
-    let circuit_parameters = InstantiatedDPC::generate_comm_crh_sig_parameters(&mut rng).unwrap();
+    let circuit_parameters = InstantiatedDPC::generate_circuit_parameters(&mut rng).unwrap();
     let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&circuit_parameters, &mut rng).unwrap();
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.verification_key.clone().into();
