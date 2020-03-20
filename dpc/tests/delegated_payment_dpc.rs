@@ -4,7 +4,7 @@ use snarkos_dpc::{
     delegable_payment_dpc::{
         instantiated::*,
         payment_circuit::*,
-        predicate::PrivatePredInput,
+        predicate::PrivatePredicateInput,
         record_payload::PaymentRecordPayload,
         DelegablePaymentDPCComponents,
         LocalData,
@@ -36,9 +36,9 @@ fn delegated_payment_dpc_integration_test() {
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&parameters.comm_crh_sig_pp, &genesis_metadata, &mut rng).unwrap();
 
-    let genesis_sn_nonce = SnNonceCRH::hash(&parameters.comm_crh_sig_pp.sn_nonce_crh_pp, &[34u8; 1]).unwrap();
+    let genesis_sn_nonce = SerialNumberNonce::hash(&parameters.comm_crh_sig_pp.sn_nonce_crh_pp, &[34u8; 1]).unwrap();
     let genesis_pred_vk_bytes = to_bytes![
-        PredVkCRH::hash(
+        PredicateVerificationKeyHash::hash(
             &parameters.comm_crh_sig_pp.pred_vk_crh_pp,
             &to_bytes![parameters.pred_nizk_pp.vk].unwrap()
         )
@@ -80,7 +80,7 @@ fn delegated_payment_dpc_integration_test() {
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce =
-            SnNonceCRH::hash(&parameters.comm_crh_sig_pp.sn_nonce_crh_pp, &[64u8 + (i as u8); 1]).unwrap();
+            SerialNumberNonce::hash(&parameters.comm_crh_sig_pp.sn_nonce_crh_pp, &[64u8 + (i as u8); 1]).unwrap();
         let old_record = DPC::generate_record(
             &parameters.comm_crh_sig_pp,
             &old_sn_nonce,
@@ -160,7 +160,7 @@ fn delegated_payment_dpc_integration_test() {
                 assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
 
-            let private_input: PrivatePredInput<Components> = PrivatePredInput {
+            let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),
                 proof,
                 value_commitment,
@@ -214,7 +214,7 @@ fn delegated_payment_dpc_integration_test() {
                 };
                 assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
-            let private_input: PrivatePredInput<Components> = PrivatePredInput {
+            let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),
                 proof,
                 value_commitment,

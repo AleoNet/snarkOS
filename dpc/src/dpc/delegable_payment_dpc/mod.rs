@@ -85,8 +85,8 @@ pub trait DelegablePaymentDPCComponents: DPCComponents {
 
     /// SNARK for proof-verification checks
     type OuterSNARK: SNARK<
-        Circuit = ProofCheckCircuit<Self>,
-        AssignedCircuit = ProofCheckCircuit<Self>,
+        Circuit = OuterCircuit<Self>,
+        AssignedCircuit = OuterCircuit<Self>,
         VerifierInput = OuterCircuitVerifierInput<Self>,
     >;
 
@@ -545,7 +545,7 @@ where
     type Parameters = PublicParameters<Components>;
     type Payload = <Self::Record as Record>::Payload;
     type Predicate = DPCPredicate<Components>;
-    type PrivatePredInput = PrivatePredInput<Components>;
+    type PrivatePredInput = PrivatePredicateInput<Components>;
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
 
@@ -560,7 +560,7 @@ where
         let pred_nizk_pp = Self::generate_pred_nizk_parameters(&comm_crh_sig_pp, rng)?;
         end_timer!(pred_nizk_setup_time);
 
-        let private_pred_input = PrivatePredInput {
+        let private_pred_input = PrivatePredicateInput {
             vk: pred_nizk_pp.vk.clone(),
             proof: pred_nizk_pp.proof.clone(),
             value_commitment: <Components::ValueComm as CommitmentScheme>::Output::default(),
@@ -573,7 +573,7 @@ where
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Proof Checks NIZK Setup");
         let proof_check_nizk_pp =
-            Components::OuterSNARK::setup(ProofCheckCircuit::blank(&comm_crh_sig_pp, &private_pred_input), rng)?;
+            Components::OuterSNARK::setup(OuterCircuit::blank(&comm_crh_sig_pp, &private_pred_input), rng)?;
         end_timer!(nizk_setup_time);
         end_timer!(setup_time);
         Ok(PublicParameters {
@@ -722,7 +722,7 @@ where
         };
 
         let proof_checks_proof = {
-            let circuit = ProofCheckCircuit::new(
+            let circuit = OuterCircuit::new(
                 &parameters.comm_crh_sig_pp,
                 old_death_pred_attributes.as_slice(),
                 new_birth_pred_attributes.as_slice(),
@@ -812,8 +812,8 @@ where
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
             memo: transaction.memorandum().clone(),
-            predicate_comm: transaction.stuff.predicate_comm.clone(),
-            local_data_comm: transaction.stuff.local_data_comm.clone(),
+            predicate_comm: transaction.stuff.predicate_commitment.clone(),
+            local_data_comm: transaction.stuff.local_data_commitment.clone(),
             binding_signature: transaction.stuff.binding_signature.clone(),
         };
         if !Components::InnerSNARK::verify(&parameters.core_nizk_pp.1, &input, &transaction.stuff.inner_proof)? {
@@ -823,8 +823,8 @@ where
 
         let input = OuterCircuitVerifierInput {
             comm_crh_sig_parameters: parameters.comm_crh_sig_pp.clone(),
-            predicate_comm: transaction.stuff.predicate_comm.clone(),
-            local_data_comm: transaction.stuff.local_data_comm.clone(),
+            predicate_comm: transaction.stuff.predicate_commitment.clone(),
+            local_data_comm: transaction.stuff.local_data_commitment.clone(),
         };
 
         if !Components::OuterSNARK::verify(
@@ -864,7 +864,7 @@ where
             &transaction.stuff.input_value_commitments,
             &transaction.stuff.output_value_commitments,
             transaction.stuff.value_balance,
-            &to_bytes![transaction.stuff.local_data_comm]?,
+            &to_bytes![transaction.stuff.local_data_commitment]?,
             &transaction.stuff.binding_signature,
         )? {
             eprintln!("Binding signature didn't verify.");

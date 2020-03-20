@@ -2,7 +2,7 @@ use crate::{
     dpc::delegable_payment_dpc::{
         inner_circuit::InnerCircuit,
         inner_circuit_verifier_input::InnerCircuitVerifierInput,
-        outer_circuit::ProofCheckCircuit,
+        outer_circuit::OuterCircuit,
         outer_circuit_verifier_input::OuterCircuitVerifierInput,
         payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
         predicate::DPCPredicate,
@@ -127,6 +127,30 @@ impl Default for CommitmentMerkleParameters {
 
 pub struct Components;
 
+impl DPCComponents for Components {
+    type AddressCommitment = AddressCommitment;
+    type AddressCommitmentGadget = AddressCommitmentGadget;
+    type InnerField = InnerField;
+    type LocalDataCommitment = LocalDataComm;
+    type LocalDataCommitmentGadget = LocalDataCommGadget;
+    type OuterField = ProofCheckF;
+    type PRF = PRF;
+    type PRFGadget = PRFGadget;
+    type PredicateVerificationKeyCommitment = PredicateVerificationKeyCommitment;
+    type PredicateVerificationKeyCommitmentGadget = PredicateVerificationKeyCommitmentGadget;
+    type PredicateVerificationKeyHash = PredicateVerificationKeyHash;
+    type PredicateVerificationKeyHashGadget = PredicateVerificationKeyHashGadget;
+    type RecordCommitment = RecordCommitment;
+    type RecordCommitmentGadget = RecordCommitmentGadget;
+    type SerialNumberNonce = SerialNumberNonce;
+    type SerialNumberNonceGadget = SerialNumberNonceGadget;
+    type Signature = AuthSignature;
+    type SignatureGadget = AuthSignatureGadget;
+
+    const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
+    const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
+}
+
 impl DelegablePaymentDPCComponents for Components {
     type InnerSNARK = CoreCheckNIZK;
     type MerkleHashGadget = MerkleTreeCRHGadget;
@@ -138,30 +162,6 @@ impl DelegablePaymentDPCComponents for Components {
     type ValueCommGadget = ValueCommGadget;
 }
 
-impl DPCComponents for Components {
-    type AddressCommitment = AddressCommitment;
-    type AddressCommitmentGadget = AddressCommitmentGadget;
-    type InnerField = InnerField;
-    type LocalDataCommitment = LocalDataComm;
-    type LocalDataCommitmentGadget = LocalDataCommGadget;
-    type OuterField = ProofCheckF;
-    type PRF = PRF;
-    type PRFGadget = PRFGadget;
-    type PredicateVerificationKeyCommitment = PredicateComm;
-    type PredicateVerificationKeyCommitmentGadget = PredicateCommGadget;
-    type PredicateVerificationKeyHash = PredVkCRH;
-    type PredicateVerificationKeyHashGadget = PredVkCRHGadget;
-    type RecordCommitment = RecordComm;
-    type RecordCommitmentGadget = RecordCommGadget;
-    type SerialNumberNonce = SnNonceCRH;
-    type SerialNumberNonceGadget = SnNonceCRHGadget;
-    type Signature = AuthSignature;
-    type SignatureGadget = AuthSignatureGadget;
-
-    const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
-    const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
-}
-
 // Native primitives
 
 pub type CoreCheckPairing = Bls12_377;
@@ -170,34 +170,34 @@ pub type InnerField = Bls12_377Fr;
 pub type ProofCheckF = Bls12_377Fq;
 
 pub type AddressCommitment = PedersenCompressedCommitment<EdwardsBls, AddressWindow>;
-pub type RecordComm = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
-pub type PredicateComm = Blake2sCommitment;
+pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
+pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataComm = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueComm = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
 pub type AuthSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
-pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
-pub type PredVkCRH = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
+pub type SerialNumberNonce = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
+pub type PredicateVerificationKeyHash = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
 pub type Predicate = DPCPredicate<Components>;
 pub type CoreCheckNIZK = GM17<CoreCheckPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
-pub type ProofCheckNIZK = GM17<ProofCheckPairing, ProofCheckCircuit<Components>, OuterCircuitVerifierInput<Components>>;
+pub type ProofCheckNIZK = GM17<ProofCheckPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
 pub type PredicateSNARK<C> = GM17<CoreCheckPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
 // Gadgets
 
-pub type RecordCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type AddressCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type PredicateCommGadget = Blake2sCommitmentGadget;
+pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
-pub type SnNonceCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type SerialNumberNonceGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type PredVkCRHGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, EdwardsSWGadget>;
+pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<EdwardsSW, ProofCheckF, EdwardsSWGadget>;
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<CoreCheckPairing, ProofCheckF, PairingGadget>;

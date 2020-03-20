@@ -5,7 +5,7 @@ use crate::{
         delegable_payment_dpc::{
             binding_signature::*,
             payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-            predicate::PrivatePredInput,
+            predicate::PrivatePredicateInput,
             record_payload::PaymentRecordPayload,
             ExecuteContext,
             DPC,
@@ -36,14 +36,16 @@ fn test_execute_delegated_payment_constraint_systems() {
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.vk.clone().into();
 
-    let pred_nizk_vk_bytes =
-        to_bytes![PredVkCRH::hash(&comm_crh_sig_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap()).unwrap()]
-            .unwrap();
+    let pred_nizk_vk_bytes = to_bytes![
+        PredicateVerificationKeyHash::hash(&comm_crh_sig_pp.pred_vk_crh_pp, &to_bytes![pred_nizk_pp.vk].unwrap())
+            .unwrap()
+    ]
+    .unwrap();
 
     // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&comm_crh_sig_pp, &genesis_metadata, &mut rng).unwrap();
-    let genesis_sn_nonce = SnNonceCRH::hash(&comm_crh_sig_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
+    let genesis_sn_nonce = SerialNumberNonce::hash(&comm_crh_sig_pp.sn_nonce_crh_pp, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
         &comm_crh_sig_pp,
         &genesis_sn_nonce,
@@ -169,7 +171,7 @@ fn test_execute_delegated_payment_constraint_systems() {
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
-        let private_input: PrivatePredInput<Components> = PrivatePredInput {
+        let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
             vk: pred_nizk_pp.vk.clone(),
             proof,
             value_commitment,
@@ -218,7 +220,7 @@ fn test_execute_delegated_payment_constraint_systems() {
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
 
-        let private_input: PrivatePredInput<Components> = PrivatePredInput {
+        let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
             vk: pred_nizk_pp.vk.clone(),
             proof,
             value_commitment,

@@ -4,7 +4,7 @@ use crate::{
         delegable_payment_dpc::{
             binding_signature::BindingSignature,
             parameters::CommCRHSigPublicParameters,
-            predicate::PrivatePredInput,
+            predicate::PrivatePredicateInput,
             record::DPCRecord,
             DelegablePaymentDPCComponents,
         },
@@ -682,10 +682,10 @@ pub fn execute_proof_check_gadget<C: DelegablePaymentDPCComponents, CS: Constrai
     comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
 
     // Old record death predicate verif. keys and proofs
-    old_death_pred_vk_and_pf: &[PrivatePredInput<C>],
+    old_death_pred_vk_and_pf: &[PrivatePredicateInput<C>],
 
     // New record birth predicate verif. keys and proofs
-    new_birth_pred_vk_and_pf: &[PrivatePredInput<C>],
+    new_birth_pred_vk_and_pf: &[PrivatePredicateInput<C>],
 
     // Rest
     predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,

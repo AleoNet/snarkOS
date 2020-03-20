@@ -4,14 +4,14 @@ use snarkos_models::algorithms::{CommitmentScheme, SNARK};
 
 use std::marker::PhantomData;
 
-pub struct PrivatePredInput<C: DelegablePaymentDPCComponents> {
+pub struct PrivatePredicateInput<C: DelegablePaymentDPCComponents> {
     pub vk: <C::PredicateSNARK as SNARK>::VerificationParameters,
     pub proof: <C::PredicateSNARK as SNARK>::Proof,
     pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
     pub value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
 }
 
-impl<C: DelegablePaymentDPCComponents> Default for PrivatePredInput<C> {
+impl<C: DelegablePaymentDPCComponents> Default for PrivatePredicateInput<C> {
     fn default() -> Self {
         Self {
             vk: <C::PredicateSNARK as SNARK>::VerificationParameters::default(),
@@ -22,7 +22,7 @@ impl<C: DelegablePaymentDPCComponents> Default for PrivatePredInput<C> {
     }
 }
 
-impl<C: DelegablePaymentDPCComponents> Clone for PrivatePredInput<C> {
+impl<C: DelegablePaymentDPCComponents> Clone for PrivatePredicateInput<C> {
     fn clone(&self) -> Self {
         Self {
             vk: self.vk.clone(),
@@ -54,7 +54,7 @@ impl<C: DelegablePaymentDPCComponents> DPCPredicate<C> {
 }
 
 impl<C: DelegablePaymentDPCComponents> Predicate for DPCPredicate<C> {
-    type PrivateWitness = PrivatePredInput<C>;
+    type PrivateWitness = PrivatePredicateInput<C>;
     type PublicInput = ();
 
     fn evaluate(&self, _p: &Self::PublicInput, _w: &Self::PrivateWitness) -> bool {

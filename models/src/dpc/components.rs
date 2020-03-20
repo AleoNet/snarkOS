@@ -3,7 +3,6 @@ use crate::{
     curves::PrimeField,
     gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
 };
-use snarkos_errors::dpc::DPCError;
 
 pub trait DPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;
