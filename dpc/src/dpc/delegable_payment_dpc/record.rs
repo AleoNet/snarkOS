@@ -23,9 +23,9 @@ pub struct DPCRecord<C: DelegablePaymentDPCComponents> {
     pub(super) is_dummy: bool,
     pub(super) payload: PaymentRecordPayload,
 
-    #[derivative(Default(value = "default_predicate_hash::<C::PredVkH>()"))]
+    #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
     pub(super) birth_predicate_repr: Vec<u8>,
-    #[derivative(Default(value = "default_predicate_hash::<C::PredVkH>()"))]
+    #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
     pub(super) death_predicate_repr: Vec<u8>,
 
     pub(super) serial_number_nonce: <C::SerialNumberNonce as CRH>::Output,
