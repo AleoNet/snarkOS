@@ -39,7 +39,7 @@ impl<C: PaymentDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
-    type SerialNumber = <C::P as PRF>::Output;
+    type SerialNumber = <C::PRF as PRF>::Output;
     type SerialNumberNonce = <C::SerialNumberNonce as CRH>::Output;
 
     fn address_public_key(&self) -> &Self::AddressPublicKey {

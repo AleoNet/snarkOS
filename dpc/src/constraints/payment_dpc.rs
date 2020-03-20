@@ -39,7 +39,7 @@ pub fn execute_core_checks_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
     old_address_secret_keys: &[AddressSecretKey<C>],
-    old_serial_numbers: &[<C::P as PRF>::Output],
+    old_serial_numbers: &[<C::PRF as PRF>::Output],
 
     // New record stuff
     new_records: &[DPCRecord<C>],
@@ -61,11 +61,11 @@ pub fn execute_core_checks_gadget<C: PaymentDPCComponents, CS: ConstraintSystem<
         C::AddressCommitment,
         C::RecordCommitment,
         C::SerialNumberNonce,
-        C::P,
+        C::PRF,
         C::AddressCommitmentGadget,
         C::RecordCommitmentGadget,
         C::SerialNumberNonceGadget,
-        C::PGadget,
+        C::PRFGadget,
     >(
         cs,
         //
@@ -139,11 +139,11 @@ where
         AddressCommitment = AddrC,
         RecordCommitment = RecC,
         SerialNumberNonce = SnNonceH,
-        P = P,
+        PRF = P,
         AddressCommitmentGadget = AddrCGadget,
         SerialNumberNonceGadget = SnNonceHGadget,
         RecordCommitmentGadget = RecCGadget,
-        PGadget = PGadget,
+        PRFGadget = PGadget,
     >,
     AddrC: CommitmentScheme,
     RecC: CommitmentScheme,

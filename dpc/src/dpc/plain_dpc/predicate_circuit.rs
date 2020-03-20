@@ -23,7 +23,7 @@ pub struct PredicateHashInput<C: PlainDPCComponents> {
     pub old_payloads: Vec<<DPCRecord<C> as Record>::Payload>,
     pub old_death_pred_ids: Vec<Vec<u8>>,
     pub old_birth_pred_ids: Vec<Vec<u8>>,
-    pub old_serial_numbers: Vec<<C::P as PRF>::Output>,
+    pub old_serial_numbers: Vec<<C::PRF as PRF>::Output>,
 
     pub new_rec_comms: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     pub new_apks: Vec<<C::AddressCommitment as CommitmentScheme>::Output>,
@@ -45,7 +45,7 @@ impl<C: PlainDPCComponents> Default for PredicateHashInput<C> {
             old_payloads: vec![<DPCRecord<C> as Record>::Payload::default(); C::NUM_INPUT_RECORDS],
             old_death_pred_ids: vec![vec![0u8; 48]; C::NUM_INPUT_RECORDS],
             old_birth_pred_ids: vec![vec![0u8; 48]; C::NUM_INPUT_RECORDS],
-            old_serial_numbers: vec![<C::P as PRF>::Output::default(); C::NUM_INPUT_RECORDS],
+            old_serial_numbers: vec![<C::PRF as PRF>::Output::default(); C::NUM_INPUT_RECORDS],
 
             new_rec_comms: vec![<C::RecordCommitment as CommitmentScheme>::Output::default(); C::NUM_OUTPUT_RECORDS],
             new_apks: vec![<C::AddressCommitment as CommitmentScheme>::Output::default(); C::NUM_OUTPUT_RECORDS],

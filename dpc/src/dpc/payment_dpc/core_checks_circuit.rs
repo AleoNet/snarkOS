@@ -28,7 +28,7 @@ pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Input record serial numbers and death predicate commitments
-    pub old_serial_numbers: Vec<<C::P as PRF>::Output>,
+    pub old_serial_numbers: Vec<<C::PRF as PRF>::Output>,
 
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
@@ -57,7 +57,7 @@ where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::P as PRF>::Output: ToConstraintField<C::InnerField>,
+    <C::PRF as PRF>::Output: ToConstraintField<C::InnerField>,
 
     MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
@@ -117,7 +117,7 @@ pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
     old_records: Option<Vec<DPCRecord<C>>>,
     old_witnesses: Option<Vec<MerklePath<C::MerkleParameters>>>,
     old_address_secret_keys: Option<Vec<AddressSecretKey<C>>>,
-    old_serial_numbers: Option<Vec<<C::P as PRF>::Output>>,
+    old_serial_numbers: Option<Vec<<C::PRF as PRF>::Output>>,
 
     // Inputs for new records.
     new_records: Option<Vec<DPCRecord<C>>>,
@@ -145,7 +145,7 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
 
-        let old_sn = vec![<C::P as PRF>::Output::default(); num_input_records];
+        let old_sn = vec![<C::PRF as PRF>::Output::default(); num_input_records];
         let old_records = vec![DPCRecord::default(); num_input_records];
         let old_witnesses = vec![MerklePath::default(); num_input_records];
         let old_address_secret_keys = vec![AddressSecretKey::default(); num_input_records];
@@ -207,7 +207,7 @@ impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
         old_records: &[DPCRecord<C>],
         old_witnesses: &[MerklePath<C::MerkleParameters>],
         old_address_secret_keys: &[AddressSecretKey<C>],
-        old_serial_numbers: &[<C::P as PRF>::Output],
+        old_serial_numbers: &[<C::PRF as PRF>::Output],
 
         // New records
         new_records: &[DPCRecord<C>],

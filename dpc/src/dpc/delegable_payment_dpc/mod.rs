@@ -242,7 +242,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         // Compute the serial number.
         let prf_input = FromBytes::read(sn_nonce.as_slice())?;
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
-        let sig_and_pk_randomizer = to_bytes![Components::P::evaluate(&prf_seed, &prf_input)?]?;
+        let sig_and_pk_randomizer = to_bytes![Components::PRF::evaluate(&prf_seed, &prf_input)?]?;
 
         let sn = Components::Signature::randomize_public_key(
             &params.sig_pp,
@@ -307,7 +307,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.sig_pp, rng)?;
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
 
         // Sample randomness rpk for the commitment scheme.
         let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);

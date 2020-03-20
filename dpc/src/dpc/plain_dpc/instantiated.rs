@@ -131,8 +131,8 @@ impl DPCComponents for Components {
     type MerkleHashGadget = MerkleHashGadget;
     type MerkleParameters = CommitmentMerkleParameters;
     type OuterField = OuterField;
-    type P = PRF;
-    type PGadget = PRFGadget;
+    type PRF = PRF;
+    type PRFGadget = PRFGadget;
     type PredicateVerificationKeyCommitment = PredicateComm;
     type PredicateVerificationKeyCommitmentGadget = PredicateCommGadget;
     type PredicateVerificationKeyHash = PredVkCRH;

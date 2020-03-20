@@ -39,7 +39,7 @@ impl<C: DPCComponents> ToBytes for AddressPublicKey<C> {
     Debug(bound = "C: DPCComponents")
 )]
 pub struct AddressSecretKey<C: DPCComponents> {
-    pub sk_prf: <C::P as PRF>::Seed,
+    pub sk_prf: <C::PRF as PRF>::Seed,
     pub metadata: [u8; 32],
     pub r_pk: <C::AddressCommitment as CommitmentScheme>::Randomness,
 }

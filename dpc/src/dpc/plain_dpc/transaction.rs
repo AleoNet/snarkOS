@@ -9,7 +9,7 @@ use snarkos_models::algorithms::{CommitmentScheme, PRF, SNARK};
     Eq(bound = "C: PlainDPCComponents")
 )]
 pub struct DPCTransaction<C: PlainDPCComponents> {
-    old_serial_numbers: Vec<<C::P as PRF>::Output>,
+    old_serial_numbers: Vec<<C::PRF as PRF>::Output>,
     new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
@@ -63,7 +63,7 @@ impl<C: PlainDPCComponents> DPCTransaction<C> {
 impl<C: PlainDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
-    type SerialNumber = <C::P as PRF>::Output;
+    type SerialNumber = <C::PRF as PRF>::Output;
     type Stuff = DPCStuff<C>;
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {

@@ -110,7 +110,7 @@ pub(crate) struct ExecuteContext<'a, Components: PaymentDPCComponents> {
     old_address_secret_keys: &'a [AddressSecretKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers: Vec<<Components::P as PRF>::Output>,
+    old_serial_numbers: Vec<<Components::PRF as PRF>::Output>,
 
     // New record stuff
     new_records: Vec<DPCRecord<Components>>,
@@ -150,7 +150,7 @@ pub struct LocalData<Components: PaymentDPCComponents> {
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
-    pub old_serial_numbers: Vec<<Components::P as PRF>::Output>,
+    pub old_serial_numbers: Vec<<Components::PRF as PRF>::Output>,
 
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
@@ -225,14 +225,14 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
     pub fn generate_sn(
         record: &DPCRecord<Components>,
         address_secret_key: &AddressSecretKey<Components>,
-    ) -> Result<<Components::P as PRF>::Output, DPCError> {
+    ) -> Result<<Components::PRF as PRF>::Output, DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
         let sk_prf = &address_secret_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
         // Compute the serial number.
         let prf_input = FromBytes::read(sn_nonce.as_slice())?;
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
-        let sn = Components::P::evaluate(&prf_seed, &prf_input)?;
+        let sn = Components::PRF::evaluate(&prf_seed, &prf_input)?;
         end_timer!(sn_time);
         Ok(sn)
     }
@@ -289,7 +289,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
     ) -> Result<AddressPair<Components>, DPCError> {
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
 
         // Sample randomness rpk for the commitment scheme.
         let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -331,7 +331,7 @@ impl<Components: PaymentDPCComponents> DPC<Components> {
         L: Ledger<
             Parameters = Components::MerkleParameters,
             Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-            SerialNumber = <Components::P as PRF>::Output,
+            SerialNumber = <Components::PRF as PRF>::Output,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
@@ -504,7 +504,7 @@ where
     L: Ledger<
         Parameters = Components::MerkleParameters,
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-        SerialNumber = <Components::P as PRF>::Output,
+        SerialNumber = <Components::PRF as PRF>::Output,
     >,
 {
     type AddressKeyPair = AddressPair<Components>;

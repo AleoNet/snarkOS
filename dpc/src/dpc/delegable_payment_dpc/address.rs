@@ -28,7 +28,7 @@ impl<C: DelegablePaymentDPCComponents> ToBytes for AddressPublicKey<C> {
 pub struct AddressSecretKey<C: DelegablePaymentDPCComponents> {
     pub pk_sig: <C::Signature as SignatureScheme>::PublicKey,
     pub sk_sig: <C::Signature as SignatureScheme>::PrivateKey,
-    pub sk_prf: <C::P as PRF>::Seed,
+    pub sk_prf: <C::PRF as PRF>::Seed,
     pub metadata: [u8; 32],
     pub r_pk: <C::AddressCommitment as CommitmentScheme>::Randomness,
 }

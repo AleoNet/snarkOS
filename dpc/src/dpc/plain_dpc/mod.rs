@@ -90,44 +90,44 @@ pub trait DPCComponents: 'static + Sized {
     type InnerField: PrimeField;
     type OuterField: PrimeField;
 
-    // Commitment scheme for address contents. Invoked only over `Self::CoreCheckF`.
+    /// Commitment scheme for address contents. Invoked only over `Self::InnerField`.
     type AddressCommitment: CommitmentScheme;
     type AddressCommitmentGadget: CommitmentGadget<Self::AddressCommitment, Self::InnerField>;
 
-    // Ledger digest type.
+    /// Ledger digest type.
     type MerkleParameters: MerkleParameters;
     type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
 
-    // Commitment scheme for committing to predicate input. Invoked inside
-    // `Self::MainN` and every predicate SNARK.
+    /// Commitment scheme for committing to predicate input. Invoked inside
+    /// `Self::MainN` and every predicate SNARK.
     type LocalDataCommitment: CommitmentScheme;
     type LocalDataCommitmentGadget: CommitmentGadget<Self::LocalDataCommitment, Self::InnerField>;
 
-    // CRH for hashes of birth and death verification keys.
-    // This is invoked only on the larger curve.
+    /// CRH for hashes of birth and death verification keys.
+    /// This is invoked only on the larger curve.
     type PredicateVerificationKeyHash: CRH;
     type PredicateVerificationKeyHashGadget: CRHGadget<Self::PredicateVerificationKeyHash, Self::OuterField>;
 
-    // Commitment scheme for committing to hashes of birth and death verification keys
+    /// Commitment scheme for committing to hashes of birth and death verification keys
     type PredicateVerificationKeyCommitment: CommitmentScheme;
-    // Used to commit to hashes of vkeys on the smaller curve and to decommit hashes
-    // of vkeys on the larger curve
+    /// Used to commit to hashes of verification keys on the smaller curve and to decommit hashes
+    /// of verification keys on the larger curve
     type PredicateVerificationKeyCommitmentGadget: CommitmentGadget<Self::PredicateVerificationKeyCommitment, Self::InnerField>
         + CommitmentGadget<Self::PredicateVerificationKeyCommitment, Self::OuterField>;
 
-    // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
-    type P: PRF;
-    type PGadget: PRFGadget<Self::P, Self::InnerField>;
+    /// PRF for computing serial numbers. Invoked only over `Self::InnerField`.
+    type PRF: PRF;
+    type PRFGadget: PRFGadget<Self::PRF, Self::InnerField>;
 
-    // Commitment scheme for record contents. Invoked only over `Self::CoreCheckF`.
+    /// Commitment scheme for record contents. Invoked only over `Self::InnerField`.
     type RecordCommitment: CommitmentScheme;
     type RecordCommitmentGadget: CommitmentGadget<Self::RecordCommitment, Self::InnerField>;
 
-    // CRH for computing the serial number nonce. Invoked only over `Self::CoreCheckF`.
+    /// CRH for computing the serial number nonce. Invoked only over `Self::InnerField`.
     type SerialNumberNonce: CRH;
     type SerialNumberNonceGadget: CRHGadget<Self::SerialNumberNonce, Self::InnerField>;
 
-    // Signature scheme for delegated compute
+    /// Signature scheme for delegated compute.
     type Signature: SignatureScheme;
     type SignatureGadget: SignaturePublicKeyRandomizationGadget<Self::Signature, Self::InnerField>;
 }
@@ -150,7 +150,7 @@ pub(crate) struct ExecuteContext<'a, Components: PlainDPCComponents> {
     old_address_secret_keys: &'a [AddressSecretKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers: Vec<<Components::P as PRF>::Output>,
+    old_serial_numbers: Vec<<Components::PRF as PRF>::Output>,
 
     // New record stuff
     new_records: Vec<DPCRecord<Components>>,
@@ -187,7 +187,7 @@ pub struct LocalData<Components: PlainDPCComponents> {
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
-    pub old_serial_numbers: Vec<<Components::P as PRF>::Output>,
+    pub old_serial_numbers: Vec<<Components::PRF as PRF>::Output>,
 
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
@@ -257,14 +257,14 @@ impl<Components: PlainDPCComponents> DPC<Components> {
     pub fn generate_sn(
         record: &DPCRecord<Components>,
         address_secret_key: &AddressSecretKey<Components>,
-    ) -> Result<<Components::P as PRF>::Output, DPCError> {
+    ) -> Result<<Components::PRF as PRF>::Output, DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
         let sk_prf = &address_secret_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
         // Compute the serial number.
         let prf_input = FromBytes::read(sn_nonce.as_slice())?;
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
-        let sn = Components::P::evaluate(&prf_seed, &prf_input)?;
+        let sn = Components::PRF::evaluate(&prf_seed, &prf_input)?;
         end_timer!(sn_time);
         Ok(sn)
     }
@@ -321,7 +321,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
     ) -> Result<AddressPair<Components>, DPCError> {
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
 
         // Sample randomness rpk for the commitment scheme.
         let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -363,7 +363,7 @@ impl<Components: PlainDPCComponents> DPC<Components> {
         L: Ledger<
             Parameters = Components::MerkleParameters,
             Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-            SerialNumber = <Components::P as PRF>::Output,
+            SerialNumber = <Components::PRF as PRF>::Output,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
@@ -526,7 +526,7 @@ where
     L: Ledger<
         Parameters = Components::MerkleParameters,
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-        SerialNumber = <Components::P as PRF>::Output,
+        SerialNumber = <Components::PRF as PRF>::Output,
     >,
 {
     type AddressKeyPair = AddressPair<Components>;
