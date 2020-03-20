@@ -1,10 +1,12 @@
 use super::instantiated::*;
 use crate::{
-    constraints::plain_dpc::{execute_core_checks_gadget, execute_proof_check_gadget},
+    constraints::payment_dpc::{execute_core_checks_gadget, execute_proof_check_gadget},
     dpc::{
-        plain_dpc::{
+        payment_dpc::{
+            binding_signature::*,
+            payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
             predicate::PrivatePredInput,
-            predicate_circuit::{EmptyPredicateCircuit, PredicateLocalData},
+            record_payload::PaymentRecordPayload,
             ExecuteContext,
             DPC,
         },
@@ -18,13 +20,13 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
-fn test_execute_constraint_systems() {
+fn test_execute_payment_constraint_systems() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
@@ -47,7 +49,7 @@ fn test_execute_constraint_systems() {
         &genesis_sn_nonce,
         &genesis_address.public_key,
         true,
-        &[0u8; 32],
+        &PaymentRecordPayload::default(),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &mut rng,
@@ -77,7 +79,7 @@ fn test_execute_constraint_systems() {
     let new_address = DPC::create_address_helper(&comm_and_crh_pp, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
-    let new_payload = [1u8; 32];
+    let new_payload = PaymentRecordPayload::default();
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
@@ -123,7 +125,155 @@ fn test_execute_constraint_systems() {
 
         local_data_comm,
         local_data_rand,
+        value_balance,
     } = context;
+
+    // Generate the predicate proofs
+
+    let mut old_proof_and_vk = vec![];
+    for i in 0..NUM_INPUT_RECORDS {
+        let value = old_records[i].payload.balance;
+
+        let value_commitment_randomness = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+
+        let value_commitment = ValueComm::commit(
+            &comm_and_crh_pp.value_comm_pp,
+            &value.to_le_bytes(),
+            &value_commitment_randomness,
+        )
+        .unwrap();
+
+        let proof = PredicateNIZK::prove(
+            &pred_nizk_pp.pk,
+            PaymentCircuit::new(
+                &comm_and_crh_pp,
+                &local_data_comm,
+                &value_commitment_randomness,
+                &value_commitment,
+                i as u8,
+                value,
+            ),
+            &mut rng,
+        )
+        .expect("Proof should work");
+        #[cfg(debug_assertions)]
+        {
+            let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
+                local_data_comm: local_data_comm.clone(),
+                value_comm_pp: comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                value_comm_randomness: value_commitment_randomness.clone(),
+                value_commitment: value_commitment.clone(),
+                position: i as u8,
+            };
+            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+        }
+        let private_input: PrivatePredInput<Components> = PrivatePredInput {
+            vk: pred_nizk_pp.vk.clone(),
+            proof,
+            value_commitment,
+            value_commitment_randomness,
+        };
+        old_proof_and_vk.push(private_input);
+    }
+
+    let mut new_proof_and_vk = vec![];
+    for j in 0..NUM_OUTPUT_RECORDS {
+        let value = new_records[j].payload.balance;
+
+        let value_commitment_randomness = <ValueComm as CommitmentScheme>::Randomness::rand(&mut rng);
+
+        let value_commitment = ValueComm::commit(
+            &comm_and_crh_pp.value_comm_pp,
+            &value.to_le_bytes(),
+            &value_commitment_randomness,
+        )
+        .unwrap();
+
+        let proof = PredicateNIZK::prove(
+            &pred_nizk_pp.pk,
+            PaymentCircuit::new(
+                &comm_and_crh_pp,
+                &local_data_comm,
+                &value_commitment_randomness,
+                &value_commitment,
+                j as u8,
+                value,
+            ),
+            &mut rng,
+        )
+        .expect("Proof should work");
+
+        #[cfg(debug_assertions)]
+        {
+            let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
+                local_data_comm: local_data_comm.clone(),
+                value_comm_pp: comm_and_crh_pp.value_comm_pp.parameters().clone(),
+                value_comm_randomness: value_commitment_randomness.clone(),
+                value_commitment: value_commitment.clone(),
+                position: j as u8,
+            };
+            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+        }
+
+        let private_input: PrivatePredInput<Components> = PrivatePredInput {
+            vk: pred_nizk_pp.vk.clone(),
+            proof,
+            value_commitment,
+            value_commitment_randomness,
+        };
+        new_proof_and_vk.push(private_input);
+    }
+
+    // Generate the binding signature
+
+    let mut old_value_commits = vec![];
+    let mut old_value_commit_randomness = vec![];
+    let mut new_value_commits = vec![];
+    let mut new_value_commit_randomness = vec![];
+
+    for death_pred_attr in &old_proof_and_vk {
+        let mut commitment = [0u8; 32];
+        let mut randomness = [0u8; 32];
+
+        death_pred_attr.value_commitment.write(&mut commitment[..]).unwrap();
+        death_pred_attr
+            .value_commitment_randomness
+            .write(&mut randomness[..])
+            .unwrap();
+
+        old_value_commits.push(commitment);
+        old_value_commit_randomness.push(randomness);
+    }
+
+    for birth_pred_attr in &new_proof_and_vk {
+        let mut commitment = [0u8; 32];
+        let mut randomness = [0u8; 32];
+
+        birth_pred_attr.value_commitment.write(&mut commitment[..]).unwrap();
+        birth_pred_attr
+            .value_commitment_randomness
+            .write(&mut randomness[..])
+            .unwrap();
+
+        new_value_commits.push(commitment);
+        new_value_commit_randomness.push(randomness);
+    }
+
+    let sighash = to_bytes![local_data_comm].unwrap();
+
+    let binding_signature = create_binding_signature::<Components, _>(
+        &comm_and_crh_pp.value_comm_pp,
+        &old_value_commits,
+        &new_value_commits,
+        &old_value_commit_randomness,
+        &new_value_commit_randomness,
+        value_balance,
+        &sighash,
+        &mut rng,
+    )
+    .unwrap();
 
     //////////////////////////////////////////////////////////////////////////
     // Check that the core check constraint system was satisfied.
@@ -147,6 +297,7 @@ fn test_execute_constraint_systems() {
         &local_data_rand,
         &memo,
         &auxiliary,
+        &binding_signature,
     )
     .unwrap();
 
@@ -169,45 +320,6 @@ fn test_execute_constraint_systems() {
 
     // Check that the proof check constraint system was satisfied.
     let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
-
-    let mut old_proof_and_vk = vec![];
-    for i in 0..NUM_INPUT_RECORDS {
-        let proof = PredicateNIZK::prove(
-            &pred_nizk_pp.pk,
-            EmptyPredicateCircuit::new(&comm_and_crh_pp, &local_data_comm, i as u8),
-            &mut rng,
-        )
-        .expect("Proof should work");
-        #[cfg(debug_assertions)]
-        {
-            let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
-                local_data_comm_pp: comm_and_crh_pp.local_data_comm_pp.parameters().clone(),
-                local_data_comm: local_data_comm.clone(),
-                position: i as u8,
-            };
-            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
-        }
-        let private_input: PrivatePredInput<Components> = PrivatePredInput {
-            vk: pred_nizk_pp.vk.clone(),
-            proof,
-        };
-        old_proof_and_vk.push(private_input);
-    }
-
-    let mut new_proof_and_vk = vec![];
-    for i in 0..NUM_OUTPUT_RECORDS {
-        let proof = PredicateNIZK::prove(
-            &pred_nizk_pp.pk,
-            EmptyPredicateCircuit::new(&comm_and_crh_pp, &local_data_comm, i as u8),
-            &mut rng,
-        )
-        .expect("Proof should work");
-        let private_input: PrivatePredInput<Components> = PrivatePredInput {
-            vk: pred_nizk_pp.vk.clone(),
-            proof,
-        };
-        new_proof_and_vk.push(private_input);
-    }
 
     execute_proof_check_gadget::<_, _>(
         &mut pf_check_cs.ns(|| "Check predicate proofs"),

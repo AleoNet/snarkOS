@@ -127,13 +127,13 @@ impl<C: PlainDPCComponents> EmptyPredicateCircuit<C> {
     }
 
     pub fn new(
-        comm_amd_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         local_data_comm: &<C::LocalDataComm as CommitmentScheme>::Output,
         position: u8,
     ) -> Self {
         Self {
             // Parameters
-            comm_and_crh_parameters: Some(comm_amd_crh_parameters.clone()),
+            comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
 
             // Other stuff
             local_data_comm: Some(local_data_comm.clone()),

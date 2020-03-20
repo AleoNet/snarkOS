@@ -8,7 +8,7 @@ pub trait SignatureScheme {
     type Parameters: Clone + Send + Sync;
     type PublicKey: ToBytes + Hash + Eq + Clone + Default + Send + Sync;
     type PrivateKey: ToBytes + Clone + Default;
-    type Output: Clone + Default + Send + Sync;
+    type Output: ToBytes + Clone + Default + Send + Sync;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, SignatureError>;
 

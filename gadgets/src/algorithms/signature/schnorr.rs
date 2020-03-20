@@ -1,4 +1,4 @@
-use snarkos_algorithms::signature::{SchnorrParameters, SchnorrSignature};
+use snarkos_algorithms::signature::{SchnorrParameters, SchnorrPublicKey, SchnorrSignature};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group},
@@ -72,24 +72,30 @@ pub struct SchnorrPublicKeyGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     _engine: PhantomData<F>,
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> AllocGadget<G, F> for SchnorrPublicKeyGadget<G, F, GG> {
-    fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G>, CS: ConstraintSystem<F>>(
+impl<G: Group, F: Field, GG: GroupGadget<G, F>> AllocGadget<SchnorrPublicKey<G>, F>
+    for SchnorrPublicKeyGadget<G, F, GG>
+{
+    fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<SchnorrPublicKey<G>>, CS: ConstraintSystem<F>>(
         cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_input(cs, || f().map(|pk| *pk.borrow()))?,
+            public_key: GG::alloc_checked(cs, || f().map(|pk| pk.borrow().0))?,
             _engine: PhantomData,
             _group: PhantomData,
         })
     }
 
-    fn alloc_input<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G>, CS: ConstraintSystem<F>>(
+    fn alloc_input<
+        Fn: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<SchnorrPublicKey<G>>,
+        CS: ConstraintSystem<F>,
+    >(
         cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_input(cs, || f().map(|pk| *pk.borrow()))?,
+            public_key: GG::alloc_input(cs, || f().map(|pk| pk.borrow().0))?,
             _engine: PhantomData,
             _group: PhantomData,
         })

@@ -2362,6 +2362,7 @@ dependencies = [
 name = "snarkos-dpc"
 version = "0.8.0"
 dependencies = [
+ "blake2",
  "criterion",
  "derivative",
  "hex 0.4.2",

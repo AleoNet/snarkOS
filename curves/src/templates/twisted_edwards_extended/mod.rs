@@ -80,7 +80,7 @@ impl<P: Parameters> GroupAffine<P> {
     /// If and only if `greatest` is set will the lexicographically
     /// largest y-coordinate be selected.
     #[allow(dead_code)]
-    pub(crate) fn get_point_from_x(x: P::BaseField, greatest: bool) -> Option<Self> {
+    pub fn get_point_from_x(x: P::BaseField, greatest: bool) -> Option<Self> {
         let x2 = x.square();
         let one = P::BaseField::one();
         let numerator = P::mul_by_a(&x2) - &one;

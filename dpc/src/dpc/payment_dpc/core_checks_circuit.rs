@@ -1,10 +1,11 @@
 use crate::{
-    constraints::{plain_dpc::execute_core_checks_gadget, Assignment},
-    dpc::plain_dpc::{
+    constraints::{payment_dpc::execute_core_checks_gadget, Assignment},
+    dpc::payment_dpc::{
         address::AddressSecretKey,
+        binding_signature::BindingSignature,
         parameters::CommAndCRHPublicParameters,
         record::DPCRecord,
-        PlainDPCComponents,
+        PaymentDPCComponents,
     },
     ledger::MerkleTreeParams,
 };
@@ -16,7 +17,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
-pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
+pub struct CoreChecksVerifierInput<C: PaymentDPCComponents> {
     // Commitment and CRH parameters
     pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
 
@@ -34,9 +35,11 @@ pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
     pub memo: [u8; 32],
+
+    pub binding_signature: BindingSignature,
 }
 
-impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
+impl<C: PaymentDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
 where
     <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
@@ -91,13 +94,17 @@ where
         )?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
 
+        v.extend_from_slice(&ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            &self.binding_signature.to_bytes()[..],
+        )?);
+
         Ok(v)
     }
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct CoreChecksCircuit<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: PaymentDPCComponents"))]
+pub struct CoreChecksCircuit<C: PaymentDPCComponents> {
     // Parameters
     comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
     ledger_parameters: Option<MerkleTreeParams<C::MerkleParameters>>,
@@ -124,9 +131,10 @@ pub struct CoreChecksCircuit<C: PlainDPCComponents> {
 
     memo: Option<[u8; 32]>,
     auxiliary: Option<[u8; 32]>,
+    binding_signature: Option<BindingSignature>,
 }
 
-impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
+impl<C: PaymentDPCComponents> CoreChecksCircuit<C> {
     pub fn blank(
         comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
         ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
@@ -152,6 +160,8 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
         let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
         let local_data_rand = <C::LocalDataComm as CommitmentScheme>::Randomness::default();
+
+        let binding_signature = BindingSignature::default();
 
         Self {
             // Parameters
@@ -179,6 +189,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
             local_data_rand: Some(local_data_rand),
             memo: Some(memo),
             auxiliary: Some(auxiliary),
+            binding_signature: Some(binding_signature),
         }
     }
 
@@ -210,6 +221,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
+        binding_signature: &BindingSignature,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -251,11 +263,12 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
             memo: Some(memo.clone()),
             auxiliary: Some(auxiliary.clone()),
+            binding_signature: Some(binding_signature.clone()),
         }
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
+impl<C: PaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_core_checks_gadget::<C, CS>(
             cs,
@@ -280,6 +293,7 @@ impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksC
             self.local_data_rand.get()?,
             self.memo.get()?,
             self.auxiliary.get()?,
+            self.binding_signature.get()?,
         )?;
         Ok(())
     }

@@ -3,7 +3,11 @@ use snarkos_errors::dpc::DPCError;
 use rand::Rng;
 use std::hash::Hash;
 
+pub mod delegable_payment_dpc;
+
 pub mod plain_dpc;
+
+pub mod payment_dpc;
 
 use crate::ledger::*;
 

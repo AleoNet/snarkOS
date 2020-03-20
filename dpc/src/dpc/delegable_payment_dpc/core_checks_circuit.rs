@@ -1,31 +1,32 @@
 use crate::{
-    constraints::{plain_dpc::execute_core_checks_gadget, Assignment},
-    dpc::plain_dpc::{
+    constraints::{delegable_payment_dpc::execute_core_checks_gadget, Assignment},
+    dpc::delegable_payment_dpc::{
         address::AddressSecretKey,
-        parameters::CommAndCRHPublicParameters,
+        binding_signature::BindingSignature,
+        parameters::CommCRHSigPublicParameters,
         record::DPCRecord,
-        PlainDPCComponents,
+        DelegablePaymentDPCComponents,
     },
     ledger::MerkleTreeParams,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
-pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
+pub struct CoreChecksVerifierInput<C: DelegablePaymentDPCComponents> {
     // Commitment and CRH parameters
-    pub comm_and_crh_pp: CommAndCRHPublicParameters<C>,
+    pub comm_crh_sig_pp: CommCRHSigPublicParameters<C>,
 
     // Ledger parameters and digest
     pub ledger_pp: MerkleTreeParams<C::MerkleParameters>,
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Input record serial numbers and death predicate commitments
-    pub old_serial_numbers: Vec<<C::P as PRF>::Output>,
+    pub old_serial_numbers: Vec<<C::S as SignatureScheme>::PublicKey>,
 
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecC as CommitmentScheme>::Output>,
@@ -34,9 +35,11 @@ pub struct CoreChecksVerifierInput<C: PlainDPCComponents> {
     pub predicate_comm: <C::PredVkComm as CommitmentScheme>::Output,
     pub local_data_comm: <C::LocalDataComm as CommitmentScheme>::Output,
     pub memo: [u8; 32],
+
+    pub binding_signature: BindingSignature,
 }
 
-impl<C: PlainDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
+impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::CoreCheckF> for CoreChecksVerifierInput<C>
 where
     <C::AddrC as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::AddrC as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
@@ -52,27 +55,31 @@ where
     <C::LocalDataComm as CommitmentScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
     <C::LocalDataComm as CommitmentScheme>::Output: ToConstraintField<C::CoreCheckF>,
 
-    <C::P as PRF>::Output: ToConstraintField<C::CoreCheckF>,
+    <C::S as SignatureScheme>::Parameters: ToConstraintField<C::CoreCheckF>,
+    <C::S as SignatureScheme>::PublicKey: ToConstraintField<C::CoreCheckF>,
 
     MerkleTreeParams<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::CoreCheckF>,
+
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::CoreCheckF>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::CoreCheckF>, ConstraintFieldError> {
         let mut v = Vec::new();
 
-        v.extend_from_slice(&self.comm_and_crh_pp.addr_comm_pp.parameters().to_field_elements()?);
-        v.extend_from_slice(&self.comm_and_crh_pp.rec_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_crh_sig_pp.addr_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_crh_sig_pp.rec_comm_pp.parameters().to_field_elements()?);
         v.extend_from_slice(
             &self
-                .comm_and_crh_pp
+                .comm_crh_sig_pp
                 .local_data_comm_pp
                 .parameters()
                 .to_field_elements()?,
         );
-        v.extend_from_slice(&self.comm_and_crh_pp.pred_vk_comm_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_crh_sig_pp.pred_vk_comm_pp.parameters().to_field_elements()?);
 
-        v.extend_from_slice(&self.comm_and_crh_pp.sn_nonce_crh_pp.parameters().to_field_elements()?);
+        v.extend_from_slice(&self.comm_crh_sig_pp.sn_nonce_crh_pp.parameters().to_field_elements()?);
+
+        v.extend_from_slice(&self.comm_crh_sig_pp.sig_pp.to_field_elements()?);
 
         v.extend_from_slice(&self.ledger_pp.parameters().to_field_elements()?);
         v.extend_from_slice(&self.ledger_digest.to_field_elements()?);
@@ -91,15 +98,19 @@ where
         )?);
         v.extend_from_slice(&self.local_data_comm.to_field_elements()?);
 
+        v.extend_from_slice(&ToConstraintField::<C::CoreCheckF>::to_field_elements(
+            &self.binding_signature.to_bytes()[..],
+        )?);
+
         Ok(v)
     }
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: PlainDPCComponents"))]
-pub struct CoreChecksCircuit<C: PlainDPCComponents> {
+#[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
+pub struct CoreChecksCircuit<C: DelegablePaymentDPCComponents> {
     // Parameters
-    comm_and_crh_parameters: Option<CommAndCRHPublicParameters<C>>,
+    comm_crh_sig_parameters: Option<CommCRHSigPublicParameters<C>>,
     ledger_parameters: Option<MerkleTreeParams<C::MerkleParameters>>,
 
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
@@ -108,7 +119,7 @@ pub struct CoreChecksCircuit<C: PlainDPCComponents> {
     old_records: Option<Vec<DPCRecord<C>>>,
     old_witnesses: Option<Vec<MerklePath<C::MerkleParameters>>>,
     old_address_secret_keys: Option<Vec<AddressSecretKey<C>>>,
-    old_serial_numbers: Option<Vec<<C::P as PRF>::Output>>,
+    old_serial_numbers: Option<Vec<<C::S as SignatureScheme>::PublicKey>>,
 
     // Inputs for new records.
     new_records: Option<Vec<DPCRecord<C>>>,
@@ -124,18 +135,19 @@ pub struct CoreChecksCircuit<C: PlainDPCComponents> {
 
     memo: Option<[u8; 32]>,
     auxiliary: Option<[u8; 32]>,
+    binding_signature: Option<BindingSignature>,
 }
 
-impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
+impl<C: DelegablePaymentDPCComponents> CoreChecksCircuit<C> {
     pub fn blank(
-        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_and_crh_parameters: &CommCRHSigPublicParameters<C>,
         ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
 
-        let old_sn = vec![<C::P as PRF>::Output::default(); num_input_records];
+        let old_sn = vec![<C::S as SignatureScheme>::PublicKey::default(); num_input_records];
         let old_records = vec![DPCRecord::default(); num_input_records];
         let old_witnesses = vec![MerklePath::default(); num_input_records];
         let old_address_secret_keys = vec![AddressSecretKey::default(); num_input_records];
@@ -153,9 +165,11 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
         let local_data_comm = <C::LocalDataComm as CommitmentScheme>::Output::default();
         let local_data_rand = <C::LocalDataComm as CommitmentScheme>::Randomness::default();
 
+        let binding_signature = BindingSignature::default();
+
         Self {
             // Parameters
-            comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
+            comm_crh_sig_parameters: Some(comm_and_crh_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest
@@ -179,12 +193,13 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
             local_data_rand: Some(local_data_rand),
             memo: Some(memo),
             auxiliary: Some(auxiliary),
+            binding_signature: Some(binding_signature),
         }
     }
 
     pub fn new(
         // Parameters
-        comm_and_crh_parameters: &CommAndCRHPublicParameters<C>,
+        comm_crh_sig_parameters: &CommCRHSigPublicParameters<C>,
         ledger_parameters: &MerkleTreeParams<C::MerkleParameters>,
 
         // Digest
@@ -194,7 +209,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
         old_records: &[DPCRecord<C>],
         old_witnesses: &[MerklePath<C::MerkleParameters>],
         old_address_secret_keys: &[AddressSecretKey<C>],
-        old_serial_numbers: &[<C::P as PRF>::Output],
+        old_serial_numbers: &[<C::S as SignatureScheme>::PublicKey],
 
         // New records
         new_records: &[DPCRecord<C>],
@@ -210,6 +225,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
+        binding_signature: &BindingSignature,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -225,7 +241,7 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
         Self {
             // Parameters
-            comm_and_crh_parameters: Some(comm_and_crh_parameters.clone()),
+            comm_crh_sig_parameters: Some(comm_crh_sig_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest
@@ -251,16 +267,17 @@ impl<C: PlainDPCComponents> CoreChecksCircuit<C> {
 
             memo: Some(memo.clone()),
             auxiliary: Some(auxiliary.clone()),
+            binding_signature: Some(binding_signature.clone()),
         }
     }
 }
 
-impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
+impl<C: DelegablePaymentDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::CoreCheckF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_core_checks_gadget::<C, CS>(
             cs,
             // Params
-            self.comm_and_crh_parameters.get()?,
+            self.comm_crh_sig_parameters.get()?,
             self.ledger_parameters.get()?,
             // digest
             self.ledger_digest.get()?,
@@ -280,6 +297,7 @@ impl<C: PlainDPCComponents> ConstraintSynthesizer<C::CoreCheckF> for CoreChecksC
             self.local_data_rand.get()?,
             self.memo.get()?,
             self.auxiliary.get()?,
+            self.binding_signature.get()?,
         )?;
         Ok(())
     }
