@@ -37,8 +37,11 @@ use self::record::*;
 pub mod transaction;
 use self::transaction::*;
 
-pub mod core_checks_circuit;
-use self::core_checks_circuit::*;
+pub mod inner_circuit;
+use self::inner_circuit::*;
+
+pub mod inner_circuit_verifier;
+use self::inner_circuit_verifier::*;
 
 pub mod payment_circuit;
 use self::payment_circuit::*;
@@ -72,9 +75,9 @@ pub trait DelegablePaymentDPCComponents: DPCComponents {
 
     /// SNARK for non-proof-verification checks
     type MainNIZK: SNARK<
-        Circuit = CoreChecksCircuit<Self>,
-        AssignedCircuit = CoreChecksCircuit<Self>,
-        VerifierInput = CoreChecksVerifierInput<Self>,
+        Circuit = InnerCircuit<Self>,
+        AssignedCircuit = InnerCircuit<Self>,
+        VerifierInput = InnerCircuitVerifier<Self>,
     >;
 
     /// SNARK for proof-verification checks
@@ -562,7 +565,7 @@ where
         };
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");
-        let core_nizk_pp = Components::MainNIZK::setup(CoreChecksCircuit::blank(&comm_crh_sig_pp, ledger_pp), rng)?;
+        let core_nizk_pp = Components::MainNIZK::setup(InnerCircuit::blank(&comm_crh_sig_pp, ledger_pp), rng)?;
         end_timer!(nizk_setup_time);
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Proof Checks NIZK Setup");
@@ -692,7 +695,7 @@ where
         )?;
 
         let core_proof = {
-            let circuit = CoreChecksCircuit::new(
+            let circuit = InnerCircuit::new(
                 &parameters.comm_crh_sig_pp,
                 ledger.parameters(),
                 &ledger_digest,
@@ -799,7 +802,7 @@ where
         }
         end_timer!(ledger_time);
 
-        let input = CoreChecksVerifierInput {
+        let input = InnerCircuitVerifier {
             comm_crh_sig_pp: parameters.comm_crh_sig_pp.clone(),
             ledger_pp: ledger.parameters().clone(),
             ledger_digest: transaction.stuff.digest.clone(),

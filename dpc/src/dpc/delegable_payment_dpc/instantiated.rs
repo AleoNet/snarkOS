@@ -1,6 +1,7 @@
 use crate::{
     dpc::delegable_payment_dpc::{
-        core_checks_circuit::*,
+        inner_circuit::InnerCircuit,
+        inner_circuit_verifier::InnerCircuitVerifier,
         payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
         predicate::DPCPredicate,
         proof_check_circuit::*,
@@ -180,7 +181,7 @@ pub type SnNonceCRH = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredVkCRH = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
 pub type Predicate = DPCPredicate<Components>;
-pub type CoreCheckNIZK = GM17<CoreCheckPairing, CoreChecksCircuit<Components>, CoreChecksVerifierInput<Components>>;
+pub type CoreCheckNIZK = GM17<CoreCheckPairing, InnerCircuit<Components>, InnerCircuitVerifier<Components>>;
 pub type ProofCheckNIZK = GM17<ProofCheckPairing, ProofCheckCircuit<Components>, ProofCheckVerifierInput<Components>>;
 pub type PredicateNIZK<C> = GM17<CoreCheckPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
