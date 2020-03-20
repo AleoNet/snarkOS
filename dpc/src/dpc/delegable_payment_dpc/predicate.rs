@@ -5,8 +5,8 @@ use snarkos_models::algorithms::{CommitmentScheme, SNARK};
 use std::marker::PhantomData;
 
 pub struct PrivatePredInput<C: DelegablePaymentDPCComponents> {
-    pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
-    pub proof: <C::PredicateNIZK as SNARK>::Proof,
+    pub vk: <C::PredicateSNARK as SNARK>::VerificationParameters,
+    pub proof: <C::PredicateSNARK as SNARK>::Proof,
     pub value_commitment: <C::ValueComm as CommitmentScheme>::Output,
     pub value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness,
 }
@@ -14,8 +14,8 @@ pub struct PrivatePredInput<C: DelegablePaymentDPCComponents> {
 impl<C: DelegablePaymentDPCComponents> Default for PrivatePredInput<C> {
     fn default() -> Self {
         Self {
-            vk: <C::PredicateNIZK as SNARK>::VerificationParameters::default(),
-            proof: <C::PredicateNIZK as SNARK>::Proof::default(),
+            vk: <C::PredicateSNARK as SNARK>::VerificationParameters::default(),
+            proof: <C::PredicateSNARK as SNARK>::Proof::default(),
             value_commitment: <C::ValueComm as CommitmentScheme>::Output::default(),
             value_commitment_randomness: <C::ValueComm as CommitmentScheme>::Randomness::default(),
         }

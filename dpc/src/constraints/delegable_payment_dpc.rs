@@ -769,12 +769,12 @@ where
     for i in 0..C::NUM_INPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check death predicate for input record {}", i));
 
-        let death_pred_proof = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        let death_pred_proof = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
             &mut cs.ns(|| "Allocate proof"),
             || Ok(&old_death_pred_vk_and_pf[i].proof),
         )?;
 
-        let death_pred_vk = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+        let death_pred_vk = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
             &mut cs.ns(|| "Allocate verification key"),
             || Ok(&old_death_pred_vk_and_pf[i].vk),
         )?;
@@ -840,7 +840,7 @@ where
                 .collect::<Vec<_>>(),
         ];
 
-        C::PredicateNIZKGadget::check_verify(
+        C::PredicateSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &death_pred_vk,
             ([position].iter())
@@ -854,12 +854,12 @@ where
     for j in 0..C::NUM_OUTPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check birth predicate for output record {}", j));
 
-        let birth_pred_proof = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        let birth_pred_proof = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
             &mut cs.ns(|| "Allocate proof"),
             || Ok(&new_birth_pred_vk_and_pf[j].proof),
         )?;
 
-        let birth_pred_vk = <C::PredicateNIZKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+        let birth_pred_vk = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
             &mut cs.ns(|| "Allocate verification key"),
             || Ok(&new_birth_pred_vk_and_pf[j].vk),
         )?;
@@ -925,7 +925,7 @@ where
                 .collect::<Vec<_>>(),
         ];
 
-        C::PredicateNIZKGadget::check_verify(
+        C::PredicateSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &birth_pred_vk,
             ([position].iter())

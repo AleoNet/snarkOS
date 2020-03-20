@@ -40,14 +40,17 @@ use self::transaction::*;
 pub mod inner_circuit;
 use self::inner_circuit::*;
 
-pub mod inner_circuit_verifier;
-use self::inner_circuit_verifier::*;
+pub mod inner_circuit_verifier_input;
+use self::inner_circuit_verifier_input::*;
 
 pub mod payment_circuit;
 use self::payment_circuit::*;
 
-pub mod proof_check_circuit;
-use self::proof_check_circuit::*;
+pub mod outer_circuit;
+use self::outer_circuit::*;
+
+pub mod outer_circuit_verifier_input;
+use self::outer_circuit_verifier_input::*;
 
 pub mod parameters;
 use self::parameters::*;
@@ -74,28 +77,28 @@ pub trait DelegablePaymentDPCComponents: DPCComponents {
     type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::InnerField>;
 
     /// SNARK for non-proof-verification checks
-    type MainNIZK: SNARK<
+    type InnerSNARK: SNARK<
         Circuit = InnerCircuit<Self>,
         AssignedCircuit = InnerCircuit<Self>,
-        VerifierInput = InnerCircuitVerifier<Self>,
+        VerifierInput = InnerCircuitVerifierInput<Self>,
     >;
 
     /// SNARK for proof-verification checks
-    type ProofCheckNIZK: SNARK<
+    type OuterSNARK: SNARK<
         Circuit = ProofCheckCircuit<Self>,
         AssignedCircuit = ProofCheckCircuit<Self>,
-        VerifierInput = ProofCheckVerifierInput<Self>,
+        VerifierInput = OuterCircuitVerifierInput<Self>,
     >;
 
     /// SNARK for a "dummy predicate" that does nothing with its input.
-    type PredicateNIZK: SNARK<
+    type PredicateSNARK: SNARK<
         Circuit = PaymentCircuit<Self>,
         AssignedCircuit = PaymentCircuit<Self>,
         VerifierInput = PaymentPredicateLocalData<Self>,
     >;
 
     /// SNARK Verifier gadget for the "dummy predicate" that does nothing with its input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::OuterField>;
+    type PredicateSNARKGadget: SNARKVerifierGadget<Self::PredicateSNARK, Self::OuterField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -223,12 +226,12 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     pub fn generate_pred_nizk_parameters<R: Rng>(
         comm_crh_sig_pp: &CommCRHSigPublicParameters<Components>,
         rng: &mut R,
-    ) -> Result<PredNIZKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateNIZK::setup(PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
+    ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
+        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
 
-        let proof = Components::PredicateNIZK::prove(&pk, PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
+        let proof = Components::PredicateSNARK::prove(&pk, PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
 
-        Ok(PredNIZKParameters {
+        Ok(PredicateSNARKParameters {
             pk,
             vk: pvk.into(),
             proof,
@@ -565,12 +568,12 @@ where
         };
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");
-        let core_nizk_pp = Components::MainNIZK::setup(InnerCircuit::blank(&comm_crh_sig_pp, ledger_pp), rng)?;
+        let core_nizk_pp = Components::InnerSNARK::setup(InnerCircuit::blank(&comm_crh_sig_pp, ledger_pp), rng)?;
         end_timer!(nizk_setup_time);
 
         let nizk_setup_time = start_timer!(|| "Execute Tx Proof Checks NIZK Setup");
         let proof_check_nizk_pp =
-            Components::ProofCheckNIZK::setup(ProofCheckCircuit::blank(&comm_crh_sig_pp, &private_pred_input), rng)?;
+            Components::OuterSNARK::setup(ProofCheckCircuit::blank(&comm_crh_sig_pp, &private_pred_input), rng)?;
         end_timer!(nizk_setup_time);
         end_timer!(setup_time);
         Ok(PublicParameters {
@@ -715,7 +718,7 @@ where
                 &binding_signature,
             );
 
-            Components::MainNIZK::prove(&parameters.core_nizk_pp.0, circuit, rng)?
+            Components::InnerSNARK::prove(&parameters.core_nizk_pp.0, circuit, rng)?
         };
 
         let proof_checks_proof = {
@@ -728,7 +731,7 @@ where
                 &local_data_comm,
             );
 
-            Components::ProofCheckNIZK::prove(&parameters.proof_check_nizk_pp.0, circuit, rng)?
+            Components::OuterSNARK::prove(&parameters.proof_check_nizk_pp.0, circuit, rng)?
         };
 
         let signature_message = to_bytes![
@@ -802,7 +805,7 @@ where
         }
         end_timer!(ledger_time);
 
-        let input = InnerCircuitVerifier {
+        let input = InnerCircuitVerifierInput {
             comm_crh_sig_pp: parameters.comm_crh_sig_pp.clone(),
             ledger_pp: ledger.parameters().clone(),
             ledger_digest: transaction.stuff.digest.clone(),
@@ -813,18 +816,18 @@ where
             local_data_comm: transaction.stuff.local_data_comm.clone(),
             binding_signature: transaction.stuff.binding_signature.clone(),
         };
-        if !Components::MainNIZK::verify(&parameters.core_nizk_pp.1, &input, &transaction.stuff.core_proof)? {
+        if !Components::InnerSNARK::verify(&parameters.core_nizk_pp.1, &input, &transaction.stuff.inner_proof)? {
             eprintln!("Core NIZK didn't verify.");
             return Ok(false);
         };
 
-        let input = ProofCheckVerifierInput {
+        let input = OuterCircuitVerifierInput {
             comm_crh_sig_parameters: parameters.comm_crh_sig_pp.clone(),
             predicate_comm: transaction.stuff.predicate_comm.clone(),
             local_data_comm: transaction.stuff.local_data_comm.clone(),
         };
 
-        if !Components::ProofCheckNIZK::verify(
+        if !Components::OuterSNARK::verify(
             &parameters.proof_check_nizk_pp.1,
             &input,
             &transaction.stuff.predicate_proof,
@@ -838,7 +841,7 @@ where
             transaction.new_commitments(),
             transaction.memorandum(),
             transaction.stuff.digest,
-            transaction.stuff.core_proof,
+            transaction.stuff.inner_proof,
             transaction.stuff.predicate_proof
         ]?;
 

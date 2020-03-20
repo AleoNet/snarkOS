@@ -13,7 +13,7 @@ use snarkos_models::{
     curves::to_field_vec::ToConstraintField,
 };
 
-pub struct InnerCircuitVerifier<C: DelegablePaymentDPCComponents> {
+pub struct InnerCircuitVerifierInput<C: DelegablePaymentDPCComponents> {
     // Commitment and CRH parameters
     pub comm_crh_sig_pp: CommCRHSigPublicParameters<C>,
 
@@ -35,7 +35,7 @@ pub struct InnerCircuitVerifier<C: DelegablePaymentDPCComponents> {
     pub binding_signature: BindingSignature,
 }
 
-impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifier<C>
+impl<C: DelegablePaymentDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
 where
     <C::AddressCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AddressCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,

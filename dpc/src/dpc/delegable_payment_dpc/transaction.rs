@@ -27,9 +27,9 @@ pub struct DPCTransaction<C: DelegablePaymentDPCComponents> {
 pub struct DPCStuff<C: DelegablePaymentDPCComponents> {
     pub digest: MerkleTreeDigest<C::MerkleParameters>,
     #[derivative(PartialEq = "ignore")]
-    pub core_proof: <C::MainNIZK as SNARK>::Proof,
+    pub inner_proof: <C::InnerSNARK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
-    pub predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
+    pub predicate_proof: <C::OuterSNARK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
     pub predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
@@ -50,8 +50,8 @@ impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
         new_commitments: Vec<<Self as Transaction>::Commitment>,
         memorandum: <Self as Transaction>::Memorandum,
         digest: MerkleTreeDigest<C::MerkleParameters>,
-        core_proof: <C::MainNIZK as SNARK>::Proof,
-        predicate_proof: <C::ProofCheckNIZK as SNARK>::Proof,
+        inner_proof: <C::InnerSNARK as SNARK>::Proof,
+        predicate_proof: <C::OuterSNARK as SNARK>::Proof,
         predicate_comm: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_comm: <C::LocalDataCommitment as CommitmentScheme>::Output,
         input_value_commitments: Vec<[u8; 32]>,
@@ -62,7 +62,7 @@ impl<C: DelegablePaymentDPCComponents> DPCTransaction<C> {
     ) -> Self {
         let stuff = DPCStuff {
             digest,
-            core_proof,
+            inner_proof,
             predicate_proof,
             predicate_comm,
             local_data_comm,

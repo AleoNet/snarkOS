@@ -144,7 +144,7 @@ fn test_execute_delegated_payment_constraint_systems() {
         )
         .unwrap();
 
-        let proof = PredicateNIZK::prove(
+        let proof = PredicateSNARK::prove(
             &pred_nizk_pp.pk,
             PaymentCircuit::new(
                 &comm_crh_sig_pp,
@@ -167,7 +167,7 @@ fn test_execute_delegated_payment_constraint_systems() {
                 value_commitment: value_commitment.clone(),
                 position: i as u8,
             };
-            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+            assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
         let private_input: PrivatePredInput<Components> = PrivatePredInput {
             vk: pred_nizk_pp.vk.clone(),
@@ -191,7 +191,7 @@ fn test_execute_delegated_payment_constraint_systems() {
         )
         .unwrap();
 
-        let proof = PredicateNIZK::prove(
+        let proof = PredicateSNARK::prove(
             &pred_nizk_pp.pk,
             PaymentCircuit::new(
                 &comm_crh_sig_pp,
@@ -215,7 +215,7 @@ fn test_execute_delegated_payment_constraint_systems() {
                 value_commitment: value_commitment.clone(),
                 position: j as u8,
             };
-            assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+            assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
         }
 
         let private_input: PrivatePredInput<Components> = PrivatePredInput {

@@ -2,7 +2,6 @@ use crate::{
     constraints::Assignment,
     delegable_payment_dpc::{parameters::CommCRHSigPublicParameters, *},
 };
-
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::CommitmentScheme,

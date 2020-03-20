@@ -145,7 +145,7 @@ fn delegated_payment_dpc_integration_test() {
             );
 
             // Generate the predicate proof
-            let proof = PredicateNIZK::prove(&parameters.pred_nizk_pp.pk, death_predicate_circuit, &mut rng)
+            let proof = PredicateSNARK::prove(&parameters.pred_nizk_pp.pk, death_predicate_circuit, &mut rng)
                 .expect("Proving should work");
             #[cfg(debug_assertions)]
             {
@@ -157,7 +157,7 @@ fn delegated_payment_dpc_integration_test() {
                     value_commitment: value_commitment.clone(),
                     position: i as u8,
                 };
-                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
 
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
@@ -200,7 +200,7 @@ fn delegated_payment_dpc_integration_test() {
             );
 
             // Generate the predicate proof
-            let proof = PredicateNIZK::prove(&parameters.pred_nizk_pp.pk, birth_predicate_circuit, &mut rng)
+            let proof = PredicateSNARK::prove(&parameters.pred_nizk_pp.pk, birth_predicate_circuit, &mut rng)
                 .expect("Proving should work");
             #[cfg(debug_assertions)]
             {
@@ -212,7 +212,7 @@ fn delegated_payment_dpc_integration_test() {
                     value_commitment: value_commitment.clone(),
                     position: j as u8,
                 };
-                assert!(PredicateNIZK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
             }
             let private_input: PrivatePredInput<Components> = PrivatePredInput {
                 vk: parameters.pred_nizk_pp.vk.clone(),

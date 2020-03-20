@@ -19,22 +19,22 @@ pub struct CommCRHSigPublicParameters<C: DelegablePaymentDPCComponents> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DelegablePaymentDPCComponents"))]
-pub struct PredNIZKParameters<C: DelegablePaymentDPCComponents> {
-    pub pk: <C::PredicateNIZK as SNARK>::ProvingParameters,
-    pub vk: <C::PredicateNIZK as SNARK>::VerificationParameters,
-    pub proof: <C::PredicateNIZK as SNARK>::Proof,
+pub struct PredicateSNARKParameters<C: DelegablePaymentDPCComponents> {
+    pub pk: <C::PredicateSNARK as SNARK>::ProvingParameters,
+    pub vk: <C::PredicateSNARK as SNARK>::VerificationParameters,
+    pub proof: <C::PredicateSNARK as SNARK>::Proof,
 }
 
 pub struct PublicParameters<C: DelegablePaymentDPCComponents> {
     pub comm_crh_sig_pp: CommCRHSigPublicParameters<C>,
-    pub pred_nizk_pp: PredNIZKParameters<C>,
+    pub pred_nizk_pp: PredicateSNARKParameters<C>,
     pub proof_check_nizk_pp: (
-        <C::ProofCheckNIZK as SNARK>::ProvingParameters,
-        <C::ProofCheckNIZK as SNARK>::PreparedVerificationParameters,
+        <C::OuterSNARK as SNARK>::ProvingParameters,
+        <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
     ),
     pub core_nizk_pp: (
-        <C::MainNIZK as SNARK>::ProvingParameters,
-        <C::MainNIZK as SNARK>::PreparedVerificationParameters,
+        <C::InnerSNARK as SNARK>::ProvingParameters,
+        <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
     ),
 }
 
@@ -42,8 +42,8 @@ impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
     pub fn core_check_nizk_pp(
         &self,
     ) -> &(
-        <C::MainNIZK as SNARK>::ProvingParameters,
-        <C::MainNIZK as SNARK>::PreparedVerificationParameters,
+        <C::InnerSNARK as SNARK>::ProvingParameters,
+        <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
     ) {
         &self.core_nizk_pp
     }
@@ -51,13 +51,13 @@ impl<C: DelegablePaymentDPCComponents> PublicParameters<C> {
     pub fn proof_check_nizk_pp(
         &self,
     ) -> &(
-        <C::ProofCheckNIZK as SNARK>::ProvingParameters,
-        <C::ProofCheckNIZK as SNARK>::PreparedVerificationParameters,
+        <C::OuterSNARK as SNARK>::ProvingParameters,
+        <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
     ) {
         &self.proof_check_nizk_pp
     }
 
-    pub fn pred_nizk_pp(&self) -> &PredNIZKParameters<C> {
+    pub fn pred_nizk_pp(&self) -> &PredicateSNARKParameters<C> {
         &self.pred_nizk_pp
     }
 
