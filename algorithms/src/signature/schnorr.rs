@@ -76,6 +76,13 @@ impl<G: Group> ToBytes for SchnorrPublicKey<G> {
     }
 }
 
+impl<G: Group> FromBytes for SchnorrPublicKey<G> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Ok(Self(G::read(&mut reader)?))
+    }
+}
+
 impl<F: Field, G: Group + ToConstraintField<F>> ToConstraintField<F> for SchnorrPublicKey<G> {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {

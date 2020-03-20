@@ -6,7 +6,7 @@ use std::hash::Hash;
 
 pub trait SignatureScheme {
     type Parameters: Clone + Send + Sync;
-    type PublicKey: ToBytes + Hash + Eq + Clone + Default + Send + Sync;
+    type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Default + Send + Sync;
     type PrivateKey: ToBytes + Clone + Default;
     type Output: ToBytes + FromBytes + Clone + Default + Send + Sync;
 
