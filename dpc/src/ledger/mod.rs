@@ -7,7 +7,7 @@ use rand::Rng;
 pub mod ideal_ledger;
 pub use self::ideal_ledger::*;
 
-pub type MerkleTreeParams<P> = <P as MerkleParameters>::H;
+pub type MerkleTreeParameters<P> = <P as MerkleParameters>::H;
 
 pub trait Ledger {
     type Parameters: MerkleParameters;
@@ -18,11 +18,11 @@ pub trait Ledger {
 
     type Transaction: Transaction;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParams<Self::Parameters>, LedgerError>;
+    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParameters<Self::Parameters>, LedgerError>;
 
     /// Creates an empty ledger
     fn new(
-        parameters: MerkleTreeParams<Self::Parameters>,
+        parameters: MerkleTreeParameters<Self::Parameters>,
         dummy_cm: Self::Commitment,
         dummy_sn: Self::SerialNumber,
         dummy_memo: Self::Memo,
@@ -32,7 +32,7 @@ pub trait Ledger {
     fn len(&self) -> usize;
 
     /// Return the parameters used to construct the ledger data structure.
-    fn parameters(&self) -> &MerkleTreeParams<Self::Parameters>;
+    fn parameters(&self) -> &MerkleTreeParameters<Self::Parameters>;
 
     /// Append a (valid) transaction tx to the ledger.
     fn push(&mut self, transaction: Self::Transaction) -> Result<(), LedgerError>;
@@ -53,21 +53,21 @@ pub trait Ledger {
     fn prove_memo(&self, memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, LedgerError>;
 
     fn verify_cm(
-        parameters: &MerkleTreeParams<Self::Parameters>,
+        parameters: &MerkleTreeParameters<Self::Parameters>,
         digest: &MerkleTreeDigest<Self::Parameters>,
         cm: &Self::Commitment,
         witness: &MerklePath<Self::Parameters>,
     ) -> bool;
 
     fn verify_sn(
-        parameters: &MerkleTreeParams<Self::Parameters>,
+        parameters: &MerkleTreeParameters<Self::Parameters>,
         digest: &MerkleTreeDigest<Self::Parameters>,
         sn: &Self::SerialNumber,
         witness: &MerklePath<Self::Parameters>,
     ) -> bool;
 
     fn verify_memo(
-        parameters: &MerkleTreeParams<Self::Parameters>,
+        parameters: &MerkleTreeParameters<Self::Parameters>,
         digest: &MerkleTreeDigest<Self::Parameters>,
         memo: &Self::Memo,
         witness: &MerklePath<Self::Parameters>,

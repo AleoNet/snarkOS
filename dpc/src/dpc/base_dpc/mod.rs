@@ -1,6 +1,7 @@
 use crate::{
     dpc::{
-        delegable_payment_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
+        address::{AddressPair, AddressPublicKey, AddressSecretKey},
+        base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
         AddressKeyPair,
         DPCScheme,
         Predicate,
@@ -13,14 +14,8 @@ use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDi
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
-    curves::PrimeField,
-    gadgets::algorithms::{
-        CRHGadget,
-        CommitmentGadget,
-        PRFGadget,
-        SNARKVerifierGadget,
-        SignaturePublicKeyRandomizationGadget,
-    },
+    dpc::DPCComponents,
+    gadgets::algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -30,9 +25,6 @@ use snarkos_utilities::{
 
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod address;
-use self::address::*;
 
 pub mod binding_signature;
 
@@ -45,14 +37,26 @@ use self::record::*;
 pub mod transaction;
 use self::transaction::*;
 
-pub mod core_checks_circuit;
-use self::core_checks_circuit::*;
+pub mod inner_circuit;
+use self::inner_circuit::*;
+
+pub mod inner_circuit_gadget;
+pub use self::inner_circuit_gadget::*;
+
+pub mod inner_circuit_verifier_input;
+use self::inner_circuit_verifier_input::*;
 
 pub mod payment_circuit;
 use self::payment_circuit::*;
 
-pub mod proof_check_circuit;
-use self::proof_check_circuit::*;
+pub mod outer_circuit;
+use self::outer_circuit::*;
+
+pub mod outer_circuit_gadget;
+pub use self::outer_circuit_gadget::*;
+
+pub mod outer_circuit_verifier_input;
+use self::outer_circuit_verifier_input::*;
 
 pub mod parameters;
 use self::parameters::*;
@@ -69,88 +73,43 @@ mod test;
 /// Trait that stores all information about the components of a Plain DPC
 /// scheme. Simplifies the interface of Plain DPC by wrapping all these into
 /// one.
-pub trait DelegablePaymentDPCComponents: 'static + Sized {
-    const NUM_INPUT_RECORDS: usize;
-    const NUM_OUTPUT_RECORDS: usize;
-
-    type CoreCheckF: PrimeField;
-    type ProofCheckF: PrimeField;
-
-    // Commitment scheme for address contents. Invoked only over `Self::CoreCheckF`.
-    type AddrC: CommitmentScheme;
-    type AddrCGadget: CommitmentGadget<Self::AddrC, Self::CoreCheckF>;
-
-    // Commitment scheme for record contents. Invoked only over `Self::CoreCheckF`.
-    type RecC: CommitmentScheme;
-    type RecCGadget: CommitmentGadget<Self::RecC, Self::CoreCheckF>;
-
-    // Ledger digest type.
+pub trait BaseDPCComponents: DPCComponents {
+    /// Ledger digest type.
     type MerkleParameters: MerkleParameters;
-    type MerkleTree_HGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::CoreCheckF>;
+    type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
 
-    // CRH for computing the serial number nonce. Invoked only over `Self::CoreCheckF`.
-    type SnNonceH: CRH;
-    type SnNonceHGadget: CRHGadget<Self::SnNonceH, Self::CoreCheckF>;
+    /// Commitment scheme for committing to a record value
+    type ValueCommitment: CommitmentScheme;
+    type ValueCommitmentGadget: CommitmentGadget<Self::ValueCommitment, Self::InnerField>;
 
-    // CRH for hashes of birth and death verification keys.
-    // This is invoked only on the larger curve.
-    type PredVkH: CRH;
-    type PredVkHGadget: CRHGadget<Self::PredVkH, Self::ProofCheckF>;
-
-    // Commitment scheme for committing to hashes of birth and death verification
-    // keys
-    type PredVkComm: CommitmentScheme;
-    // Used to commit to hashes of vkeys on the smaller curve and to decommit hashes
-    // of vkeys on the larger curve
-    type PredVkCommGadget: CommitmentGadget<Self::PredVkComm, Self::CoreCheckF>
-        + CommitmentGadget<Self::PredVkComm, Self::ProofCheckF>;
-
-    // Commitment scheme for committing to predicate input. Invoked inside
-    // `Self::MainN` and every predicate SNARK.
-    type LocalDataComm: CommitmentScheme;
-    type LocalDataCommGadget: CommitmentGadget<Self::LocalDataComm, Self::CoreCheckF>;
-
-    // Commitment scheme for committing to a record value
-    type ValueComm: CommitmentScheme;
-    type ValueCommGadget: CommitmentGadget<Self::ValueComm, Self::CoreCheckF>;
-
-    // Signature scheme for delegated compute
-    type S: SignatureScheme;
-    type SGadget: SignaturePublicKeyRandomizationGadget<Self::S, Self::CoreCheckF>;
-
-    // SNARK for non-proof-verification checks
-    type MainNIZK: SNARK<
-        Circuit = CoreChecksCircuit<Self>,
-        AssignedCircuit = CoreChecksCircuit<Self>,
-        VerifierInput = CoreChecksVerifierInput<Self>,
+    /// SNARK for non-proof-verification checks
+    type InnerSNARK: SNARK<
+        Circuit = InnerCircuit<Self>,
+        AssignedCircuit = InnerCircuit<Self>,
+        VerifierInput = InnerCircuitVerifierInput<Self>,
     >;
 
-    // SNARK for proof-verification checks
-    type ProofCheckNIZK: SNARK<
-        Circuit = ProofCheckCircuit<Self>,
-        AssignedCircuit = ProofCheckCircuit<Self>,
-        VerifierInput = ProofCheckVerifierInput<Self>,
+    /// SNARK for proof-verification checks
+    type OuterSNARK: SNARK<
+        Circuit = OuterCircuit<Self>,
+        AssignedCircuit = OuterCircuit<Self>,
+        VerifierInput = OuterCircuitVerifierInput<Self>,
     >;
 
-    // SNARK for a "dummy predicate" that does nothing with its input.
-    type PredicateNIZK: SNARK<
+    /// SNARK for a "dummy predicate" that does nothing with its input.
+    type PredicateSNARK: SNARK<
         Circuit = PaymentCircuit<Self>,
         AssignedCircuit = PaymentCircuit<Self>,
         VerifierInput = PaymentPredicateLocalData<Self>,
     >;
 
-    // SNARK Verifier gadget for the "dummy predicate" that does nothing with its
-    // input.
-    type PredicateNIZKGadget: SNARKVerifierGadget<Self::PredicateNIZK, Self::ProofCheckF>;
-
-    // PRF for computing serial numbers. Invoked only over `Self::CoreCheckF`.
-    type P: PRF;
-    type PGadget: PRFGadget<Self::P, Self::CoreCheckF>;
+    /// SNARK Verifier gadget for the "dummy predicate" that does nothing with its input.
+    type PredicateSNARKGadget: SNARKVerifierGadget<Self::PredicateSNARK, Self::OuterField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DPC<Components: DelegablePaymentDPCComponents> {
+pub struct DPC<Components: BaseDPCComponents> {
     _components: PhantomData<Components>,
 }
 
@@ -158,155 +117,155 @@ pub struct DPC<Components: DelegablePaymentDPCComponents> {
 /// final transaction after `execute_helper` has created old serial numbers and
 /// ledger witnesses, and new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub(crate) struct ExecuteContext<'a, Components: DelegablePaymentDPCComponents> {
-    comm_crh_sig_pp: &'a CommCRHSigPublicParameters<Components>,
+pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
+    circuit_parameters: &'a CircuitParameters<Components>,
     ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
 
     // Old record stuff
     old_address_secret_keys: &'a [AddressSecretKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers: Vec<<Components::S as SignatureScheme>::PublicKey>,
+    old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
     old_randomizers: Vec<Vec<u8>>,
 
     // New record stuff
     new_records: Vec<DPCRecord<Components>>,
     new_sn_nonce_randomness: Vec<[u8; 32]>,
-    new_commitments: Vec<<Components::RecC as CommitmentScheme>::Output>,
+    new_commitments: Vec<<Components::RecordCommitment as CommitmentScheme>::Output>,
 
     // Predicate and local data commitment and randomness
-    predicate_comm: <Components::PredVkComm as CommitmentScheme>::Output,
-    predicate_rand: <Components::PredVkComm as CommitmentScheme>::Randomness,
+    predicate_commitment: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    predicate_randomness: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    local_data_commitment: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 
     // Value Balance
     value_balance: u64,
 }
 
-impl<Components: DelegablePaymentDPCComponents> ExecuteContext<'_, Components> {
+impl<Components: BaseDPCComponents> ExecuteContext<'_, Components> {
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
-            comm_crh_sig_pp: self.comm_crh_sig_pp.clone(),
+            circuit_parameters: self.circuit_parameters.clone(),
 
             old_records: self.old_records.to_vec(),
             old_serial_numbers: self.old_serial_numbers.to_vec(),
 
             new_records: self.new_records.to_vec(),
 
-            local_data_comm: self.local_data_comm.clone(),
-            local_data_rand: self.local_data_rand.clone(),
+            local_data_commitment: self.local_data_commitment.clone(),
+            local_data_randomness: self.local_data_randomness.clone(),
         }
     }
 }
 
 /// Stores local data required to produce predicate proofs.
-pub struct LocalData<Components: DelegablePaymentDPCComponents> {
-    pub comm_crh_sig_pp: CommCRHSigPublicParameters<Components>,
+pub struct LocalData<Components: BaseDPCComponents> {
+    pub circuit_parameters: CircuitParameters<Components>,
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
-    pub old_serial_numbers: Vec<<Components::S as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
 
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_comm: <Components::LocalDataComm as CommitmentScheme>::Output,
-    pub local_data_rand: <Components::LocalDataComm as CommitmentScheme>::Randomness,
+    pub local_data_commitment: <Components::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
-    pub fn generate_comm_crh_sig_parameters<R: Rng>(
-        rng: &mut R,
-    ) -> Result<CommCRHSigPublicParameters<Components>, DPCError> {
+impl<Components: BaseDPCComponents> DPC<Components> {
+    pub fn generate_circuit_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
         let time = start_timer!(|| "Address commitment scheme setup");
-        let addr_comm_pp = Components::AddrC::setup(rng);
+        let addr_comm_pp = Components::AddressCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
-        let rec_comm_pp = Components::RecC::setup(rng);
+        let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
-        let pred_vk_comm_pp = Components::PredVkComm::setup(rng);
+        let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let local_data_comm_pp = Components::LocalDataComm::setup(rng);
+        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let value_comm_pp = Components::ValueComm::setup(rng);
+        let value_comm_pp = Components::ValueCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SnNonceH::setup(rng);
+        let sn_nonce_crh_pp = Components::SerialNumberNonce::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredVkH::setup(rng);
+        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Signature setup");
-        let sig_pp = Components::S::setup(rng)?;
+        let sig_pp = Components::Signature::setup(rng)?;
         end_timer!(time);
 
-        let comm_crh_sig_pp = CommCRHSigPublicParameters {
-            addr_comm_pp,
-            rec_comm_pp,
-            pred_vk_comm_pp,
-            local_data_comm_pp,
-            value_comm_pp,
+        let comm_crh_sig_pp = CircuitParameters {
+            address_commitment_parameters: addr_comm_pp,
+            record_commitment_parameters: rec_comm_pp,
+            predicate_verification_key_commitment_parameters: pred_vk_comm_pp,
+            local_data_commitment_parameters: local_data_comm_pp,
+            value_commitment_parameters: value_comm_pp,
 
-            sn_nonce_crh_pp,
-            pred_vk_crh_pp,
+            serial_number_nonce_parameters: sn_nonce_crh_pp,
+            predicate_verification_key_hash_parameters: pred_vk_crh_pp,
 
-            sig_pp,
+            signature_parameters: sig_pp,
         };
         Ok(comm_crh_sig_pp)
     }
 
     pub fn generate_pred_nizk_parameters<R: Rng>(
-        comm_crh_sig_pp: &CommCRHSigPublicParameters<Components>,
+        comm_crh_sig_pp: &CircuitParameters<Components>,
         rng: &mut R,
-    ) -> Result<PredNIZKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateNIZK::setup(PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
+    ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
+        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
+        let proof = Components::PredicateSNARK::prove(&pk, PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
 
-        let proof = Components::PredicateNIZK::prove(&pk, PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
-
-        Ok(PredNIZKParameters {
-            pk,
-            vk: pvk.into(),
+        Ok(PredicateSNARKParameters {
+            proving_key: pk,
+            verification_key: pvk.into(),
             proof,
         })
     }
 
     pub fn generate_sn(
-        params: &CommCRHSigPublicParameters<Components>,
+        params: &CircuitParameters<Components>,
         record: &DPCRecord<Components>,
         address_secret_key: &AddressSecretKey<Components>,
-    ) -> Result<(<Components::S as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
+    ) -> Result<(<Components::Signature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
         let sk_prf = &address_secret_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
         // Compute the serial number.
         let prf_input = FromBytes::read(sn_nonce.as_slice())?;
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
-        let sig_and_pk_randomizer = to_bytes![Components::P::evaluate(&prf_seed, &prf_input)?]?;
+        let sig_and_pk_randomizer = to_bytes![Components::PRF::evaluate(&prf_seed, &prf_input)?]?;
 
-        let sn =
-            Components::S::randomize_public_key(&params.sig_pp, &address_secret_key.pk_sig, &sig_and_pk_randomizer)?;
+        let sn = Components::Signature::randomize_public_key(
+            &params.signature_parameters,
+            &address_secret_key.pk_sig,
+            &sig_and_pk_randomizer,
+        )?;
         end_timer!(sn_time);
         Ok((sn, sig_and_pk_randomizer))
     }
 
     pub fn generate_record<R: Rng>(
-        parameters: &CommCRHSigPublicParameters<Components>,
-        sn_nonce: &<Components::SnNonceH as CRH>::Output,
+        parameters: &CircuitParameters<Components>,
+        sn_nonce: &<Components::SerialNumberNonce as CRH>::Output,
         address_public_key: &AddressPublicKey<Components>,
         is_dummy: bool,
         payload: &PaymentRecordPayload,
@@ -316,7 +275,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
         // Sample new commitment randomness.
-        let commitment_randomness = <Components::RecC as CommitmentScheme>::Randomness::rand(rng);
+        let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct a record commitment.
         let birth_predicate_repr = birth_predicate.into_compact_repr();
@@ -331,7 +290,11 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
             sn_nonce                       // 256 bits = 32 bytes
         ]?;
 
-        let commitment = Components::RecC::commit(&parameters.rec_comm_pp, &commitment_input, &commitment_randomness)?;
+        let commitment = Components::RecordCommitment::commit(
+            &parameters.record_commitment_parameters,
+            &commitment_input,
+            &commitment_randomness,
+        )?;
 
         let record = DPCRecord {
             address_public_key: address_public_key.clone(),
@@ -349,22 +312,23 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     }
 
     pub fn create_address_helper<R: Rng>(
-        parameters: &CommCRHSigPublicParameters<Components>,
+        parameters: &CircuitParameters<Components>,
         metadata: &[u8; 32],
         rng: &mut R,
     ) -> Result<AddressPair<Components>, DPCError> {
         // Sample SIG key pair.
-        let (pk_sig, sk_sig) = Components::S::keygen(&parameters.sig_pp, rng)?;
+        let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.signature_parameters, rng)?;
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::P as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
 
         // Sample randomness rpk for the commitment scheme.
-        let r_pk = <Components::AddrC as CommitmentScheme>::Randomness::rand(rng);
+        let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct the address public key.
         let commit_input = to_bytes![pk_sig, sk_prf, metadata]?;
-        let public_key = Components::AddrC::commit(&parameters.addr_comm_pp, &commit_input, &r_pk)?;
+        let public_key =
+            Components::AddressCommitment::commit(&parameters.address_commitment_parameters, &commit_input, &r_pk)?;
 
         let public_key = AddressPublicKey { public_key };
 
@@ -381,7 +345,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     }
 
     pub(crate) fn execute_helper<'a, L, R: Rng>(
-        parameters: &'a CommCRHSigPublicParameters<Components>,
+        parameters: &'a CircuitParameters<Components>,
 
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_address_secret_keys: &'a [AddressSecretKey<Components>],
@@ -401,8 +365,8 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     where
         L: Ledger<
             Parameters = Components::MerkleParameters,
-            Commitment = <Components::RecC as CommitmentScheme>::Output,
-            SerialNumber = <Components::S as SignatureScheme>::PublicKey,
+            Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+            SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
@@ -459,7 +423,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
             let sn_randomness: [u8; 32] = rng.gen();
 
             let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
-            let sn_nonce = Components::SnNonceH::hash(&parameters.sn_nonce_crh_pp, &crh_input)?;
+            let sn_nonce = Components::SerialNumberNonce::hash(&parameters.serial_number_nonce_parameters, &crh_input)?;
 
             end_timer!(sn_nonce_time);
 
@@ -517,9 +481,12 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
 
-        let local_data_rand = <Components::LocalDataComm as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm =
-            Components::LocalDataComm::commit(&parameters.local_data_comm_pp, &predicate_input, &local_data_rand)?;
+        let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let local_data_comm = Components::LocalDataCommitment::commit(
+            &parameters.local_data_commitment_parameters,
+            &predicate_input,
+            &local_data_rand,
+        )?;
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
@@ -532,8 +499,13 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
             for hash in new_birth_pred_hashes {
                 input.extend_from_slice(&hash);
             }
-            let predicate_rand = <Components::PredVkComm as CommitmentScheme>::Randomness::rand(rng);
-            let predicate_comm = Components::PredVkComm::commit(&parameters.pred_vk_comm_pp, &input, &predicate_rand)?;
+            let predicate_rand =
+                <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let predicate_comm = Components::PredicateVerificationKeyCommitment::commit(
+                &parameters.predicate_verification_key_commitment_parameters,
+                &input,
+                &predicate_rand,
+            )?;
             (predicate_comm, predicate_rand)
         };
         end_timer!(pred_hash_comm_timer);
@@ -541,7 +513,7 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
         let ledger_digest = ledger.digest().expect("could not get digest");
 
         let context = ExecuteContext {
-            comm_crh_sig_pp: parameters,
+            circuit_parameters: parameters,
             ledger_digest,
 
             old_records,
@@ -554,10 +526,10 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
             new_sn_nonce_randomness,
             new_commitments,
 
-            predicate_comm,
-            predicate_rand,
-            local_data_comm,
-            local_data_rand,
+            predicate_commitment: predicate_comm,
+            predicate_randomness: predicate_rand,
+            local_data_commitment: local_data_comm,
+            local_data_randomness: local_data_rand,
 
             value_balance,
         };
@@ -565,12 +537,12 @@ impl<Components: DelegablePaymentDPCComponents> DPC<Components> {
     }
 }
 
-impl<Components: DelegablePaymentDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
+impl<Components: BaseDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
 where
     L: Ledger<
         Parameters = Components::MerkleParameters,
-        Commitment = <Components::RecC as CommitmentScheme>::Output,
-        SerialNumber = <Components::S as SignatureScheme>::PublicKey,
+        Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
     >,
 {
     type AddressKeyPair = AddressPair<Components>;
@@ -580,42 +552,43 @@ where
     type Parameters = PublicParameters<Components>;
     type Payload = <Self::Record as Record>::Payload;
     type Predicate = DPCPredicate<Components>;
-    type PrivatePredInput = PrivatePredInput<Components>;
+    type PrivatePredInput = PrivatePredicateInput<Components>;
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
 
     fn setup<R: Rng>(
-        ledger_pp: &MerkleTreeParams<Components::MerkleParameters>,
+        ledger_parameters: &MerkleTreeParameters<Components::MerkleParameters>,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
-        let setup_time = start_timer!(|| "PlainDPC::Setup");
-        let comm_crh_sig_pp = Self::generate_comm_crh_sig_parameters(rng)?;
+        let setup_time = start_timer!(|| "DPC::Setup");
+        let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
-        let pred_nizk_setup_time = start_timer!(|| "Dummy Predicate NIZK Setup");
-        let pred_nizk_pp = Self::generate_pred_nizk_parameters(&comm_crh_sig_pp, rng)?;
-        end_timer!(pred_nizk_setup_time);
+        let predicate_snark_setup_time = start_timer!(|| "Dummy Predicate SNARK Setup");
+        let predicate_snark_parameters = Self::generate_pred_nizk_parameters(&circuit_parameters, rng)?;
+        end_timer!(predicate_snark_setup_time);
 
-        let private_pred_input = PrivatePredInput {
-            vk: pred_nizk_pp.vk.clone(),
-            proof: pred_nizk_pp.proof.clone(),
-            value_commitment: <Components::ValueComm as CommitmentScheme>::Output::default(),
-            value_commitment_randomness: <Components::ValueComm as CommitmentScheme>::Randomness::default(),
+        let private_pred_input = PrivatePredicateInput {
+            verification_key: predicate_snark_parameters.verification_key.clone(),
+            proof: predicate_snark_parameters.proof.clone(),
+            value_commitment: <Components::ValueCommitment as CommitmentScheme>::Output::default(),
+            value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };
 
-        let nizk_setup_time = start_timer!(|| "Execute Tx Core Checks NIZK Setup");
-        let core_nizk_pp = Components::MainNIZK::setup(CoreChecksCircuit::blank(&comm_crh_sig_pp, ledger_pp), rng)?;
-        end_timer!(nizk_setup_time);
+        let snark_setup_time = start_timer!(|| "Execute Inner SNARK Setup");
+        let inner_snark_parameters =
+            Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters), rng)?;
+        end_timer!(snark_setup_time);
 
-        let nizk_setup_time = start_timer!(|| "Execute Tx Proof Checks NIZK Setup");
-        let proof_check_nizk_pp =
-            Components::ProofCheckNIZK::setup(ProofCheckCircuit::blank(&comm_crh_sig_pp, &private_pred_input), rng)?;
-        end_timer!(nizk_setup_time);
+        let snark_setup_time = start_timer!(|| "Execute Outer SNARK Setup");
+        let outer_snark_parameters =
+            Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
+        end_timer!(snark_setup_time);
         end_timer!(setup_time);
         Ok(PublicParameters {
-            comm_crh_sig_pp,
-            pred_nizk_pp,
-            core_nizk_pp,
-            proof_check_nizk_pp,
+            circuit_parameters,
+            predicate_snark_parameters,
+            inner_snark_parameters,
+            outer_snark_parameters,
         })
     }
 
@@ -624,9 +597,9 @@ where
         metadata: &Self::Metadata,
         rng: &mut R,
     ) -> Result<Self::AddressKeyPair, DPCError> {
-        let create_addr_time = start_timer!(|| "PlainDPC::CreateAddr");
-        let result = Self::create_address_helper(&parameters.comm_crh_sig_pp, metadata, rng)?;
-        end_timer!(create_addr_time);
+        let time = start_timer!(|| "PlainDPC::CreateAddr");
+        let result = Self::create_address_helper(&parameters.circuit_parameters, metadata, rng)?;
+        end_timer!(time);
         Ok(result)
     }
 
@@ -650,7 +623,7 @@ where
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
         let exec_time = start_timer!(|| "PlainDPC::Exec");
         let context = Self::execute_helper(
-            &parameters.comm_crh_sig_pp,
+            &parameters.circuit_parameters,
             old_records,
             old_address_secret_keys,
             new_address_public_keys,
@@ -669,7 +642,7 @@ where
         let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data);
 
         let ExecuteContext {
-            comm_crh_sig_pp,
+            circuit_parameters,
             ledger_digest,
 
             old_records,
@@ -681,12 +654,10 @@ where
             new_records,
             new_sn_nonce_randomness,
             new_commitments,
-
-            predicate_comm,
-            predicate_rand,
-
-            local_data_comm,
-            local_data_rand,
+            predicate_commitment,
+            predicate_randomness,
+            local_data_commitment,
+            local_data_randomness,
             value_balance,
         } = context;
 
@@ -719,10 +690,10 @@ where
             new_value_commit_randomness.push(randomness);
         }
 
-        let sighash = to_bytes![local_data_comm]?;
+        let sighash = to_bytes![local_data_commitment]?;
 
         let binding_signature = create_binding_signature::<Components, _>(
-            &comm_crh_sig_pp.value_comm_pp,
+            &circuit_parameters.value_commitment_parameters,
             &old_value_commits,
             &new_value_commits,
             &old_value_commit_randomness,
@@ -732,9 +703,9 @@ where
             rng,
         )?;
 
-        let core_proof = {
-            let circuit = CoreChecksCircuit::new(
-                &parameters.comm_crh_sig_pp,
+        let inner_proof = {
+            let circuit = InnerCircuit::new(
+                &parameters.circuit_parameters,
                 ledger.parameters(),
                 &ledger_digest,
                 old_records,
@@ -744,29 +715,29 @@ where
                 &new_records,
                 &new_sn_nonce_randomness,
                 &new_commitments,
-                &predicate_comm,
-                &predicate_rand,
-                &local_data_comm,
-                &local_data_rand,
+                &predicate_commitment,
+                &predicate_randomness,
+                &local_data_commitment,
+                &local_data_randomness,
                 memorandum,
                 auxiliary,
                 &binding_signature,
             );
 
-            Components::MainNIZK::prove(&parameters.core_nizk_pp.0, circuit, rng)?
+            Components::InnerSNARK::prove(&parameters.inner_snark_parameters.0, circuit, rng)?
         };
 
-        let proof_checks_proof = {
-            let circuit = ProofCheckCircuit::new(
-                &parameters.comm_crh_sig_pp,
+        let outer_proof = {
+            let circuit = OuterCircuit::new(
+                &parameters.circuit_parameters,
                 old_death_pred_attributes.as_slice(),
                 new_birth_pred_attributes.as_slice(),
-                &predicate_comm,
-                &predicate_rand,
-                &local_data_comm,
+                &predicate_commitment,
+                &predicate_randomness,
+                &local_data_commitment,
             );
 
-            Components::ProofCheckNIZK::prove(&parameters.proof_check_nizk_pp.0, circuit, rng)?
+            Components::OuterSNARK::prove(&parameters.outer_snark_parameters.0, circuit, rng)?
         };
 
         let signature_message = to_bytes![
@@ -774,8 +745,8 @@ where
             new_commitments,
             memorandum,
             ledger_digest,
-            core_proof,
-            proof_checks_proof
+            inner_proof,
+            outer_proof
         ]?;
 
         let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
@@ -785,9 +756,17 @@ where
             let sk_sig = &old_address_secret_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
-            let signature = Components::S::sign(&comm_crh_sig_pp.sig_pp, sk_sig, &signature_message, rng)?;
-            let randomized_signature =
-                Components::S::randomize_signature(&comm_crh_sig_pp.sig_pp, &signature, randomizer)?;
+            let signature = Components::Signature::sign(
+                &circuit_parameters.signature_parameters,
+                sk_sig,
+                &signature_message,
+                rng,
+            )?;
+            let randomized_signature = Components::Signature::randomize_signature(
+                &circuit_parameters.signature_parameters,
+                &signature,
+                randomizer,
+            )?;
             signatures.push(randomized_signature);
 
             end_timer!(sig_time);
@@ -798,10 +777,10 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
-            core_proof,
-            proof_checks_proof,
-            predicate_comm,
-            local_data_comm,
+            inner_proof,
+            outer_proof,
+            predicate_commitment,
+            local_data_commitment,
             old_value_commits,
             new_value_commits,
             value_balance,
@@ -840,30 +819,34 @@ where
         }
         end_timer!(ledger_time);
 
-        let input = CoreChecksVerifierInput {
-            comm_crh_sig_pp: parameters.comm_crh_sig_pp.clone(),
-            ledger_pp: ledger.parameters().clone(),
+        let input = InnerCircuitVerifierInput {
+            circuit_parameters: parameters.circuit_parameters.clone(),
+            ledger_parameters: ledger.parameters().clone(),
             ledger_digest: transaction.stuff.digest.clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
             memo: transaction.memorandum().clone(),
-            predicate_comm: transaction.stuff.predicate_comm.clone(),
-            local_data_comm: transaction.stuff.local_data_comm.clone(),
+            predicate_commitment: transaction.stuff.predicate_commitment.clone(),
+            local_data_commitment: transaction.stuff.local_data_commitment.clone(),
             binding_signature: transaction.stuff.binding_signature.clone(),
         };
-        if !Components::MainNIZK::verify(&parameters.core_nizk_pp.1, &input, &transaction.stuff.core_proof)? {
+        if !Components::InnerSNARK::verify(
+            &parameters.inner_snark_parameters.1,
+            &input,
+            &transaction.stuff.inner_proof,
+        )? {
             eprintln!("Core NIZK didn't verify.");
             return Ok(false);
         };
 
-        let input = ProofCheckVerifierInput {
-            comm_crh_sig_parameters: parameters.comm_crh_sig_pp.clone(),
-            predicate_comm: transaction.stuff.predicate_comm.clone(),
-            local_data_comm: transaction.stuff.local_data_comm.clone(),
+        let input = OuterCircuitVerifierInput {
+            circuit_parameters: parameters.circuit_parameters.clone(),
+            predicate_commitment: transaction.stuff.predicate_commitment.clone(),
+            local_data_commitment: transaction.stuff.local_data_commitment.clone(),
         };
 
-        if !Components::ProofCheckNIZK::verify(
-            &parameters.proof_check_nizk_pp.1,
+        if !Components::OuterSNARK::verify(
+            &parameters.outer_snark_parameters.1,
             &input,
             &transaction.stuff.predicate_proof,
         )? {
@@ -876,18 +859,18 @@ where
             transaction.new_commitments(),
             transaction.memorandum(),
             transaction.stuff.digest,
-            transaction.stuff.core_proof,
+            transaction.stuff.inner_proof,
             transaction.stuff.predicate_proof
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
-        let sig_pp = &parameters.comm_crh_sig_pp.sig_pp;
+        let sig_pp = &parameters.circuit_parameters.signature_parameters;
         for (pk, sig) in transaction
             .old_serial_numbers()
             .iter()
             .zip(&transaction.stuff.signatures)
         {
-            if !Components::S::verify(sig_pp, pk, signature_message, sig)? {
+            if !Components::Signature::verify(sig_pp, pk, signature_message, sig)? {
                 eprintln!("Signature didn't verify.");
                 return Ok(false);
             }
@@ -895,11 +878,11 @@ where
         end_timer!(sig_time);
 
         if !verify_binding_signature::<Components>(
-            &parameters.comm_crh_sig_pp.value_comm_pp,
+            &parameters.circuit_parameters.value_commitment_parameters,
             &transaction.stuff.input_value_commitments,
             &transaction.stuff.output_value_commitments,
             transaction.stuff.value_balance,
-            &to_bytes![transaction.stuff.local_data_comm]?,
+            &to_bytes![transaction.stuff.local_data_commitment]?,
             &transaction.stuff.binding_signature,
         )? {
             eprintln!("Binding signature didn't verify.");
