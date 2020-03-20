@@ -25,7 +25,7 @@ snarkos-profiler = { path = "../profiler" }
 snarkos-utilities = { path = "../utilities" }
 
 blake2 = { version = "0.7" }
-derivative = { version = "1" }
+derivative = { version = "2" }
 digest = { version = "0.7" }
 rand = { version = "0.7" }
 rayon = { version = "1" }

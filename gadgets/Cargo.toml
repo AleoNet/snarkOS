@@ -18,7 +18,7 @@ snarkos-errors = { path = "../errors" }
 snarkos-models = { path = "../models" }
 snarkos-utilities = { path = "../utilities" }
 
-derivative = { version = "1" }
+derivative = { version = "2" }
 digest = { version = "0.7" }
 
 [dev-dependencies]

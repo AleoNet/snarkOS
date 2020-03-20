@@ -27,7 +27,7 @@ snarkos-utilities = { path = "../utilities"}
 blake2 = { version = "0.7.1" }
 hex = { version = "0.4.2" }
 rand = { version = "0.7" }
-derivative = { version = "1" }
+derivative = { version = "2" }
 
 [dev-dependencies]
 criterion = "0.3.1"
