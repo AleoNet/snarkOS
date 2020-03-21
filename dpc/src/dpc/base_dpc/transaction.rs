@@ -3,12 +3,15 @@ use crate::{
     Transaction,
 };
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
+use snarkos_errors::objects::TransactionError;
 use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, SNARK};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    to_bytes,
     variable_length_integer::{read_variable_length_integer, variable_length_integer},
 };
 
+use blake2::{digest::Digest, Blake2s as b2s};
 use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Derivative)]
@@ -236,5 +239,18 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
             binding_signature,
             signatures,
         })
+    }
+}
+
+impl<C: BaseDPCComponents> DPCTransaction<C> {
+    pub fn to_transaction_id(&self) -> Result<Vec<u8>, TransactionError> {
+        let transaction_bytes = to_bytes![self]?;
+
+        let mut h = b2s::new();
+        h.input(&transaction_bytes);
+
+        let mut result = [0u8; 32];
+        result.copy_from_slice(&h.result());
+        Ok(result.to_vec())
     }
 }

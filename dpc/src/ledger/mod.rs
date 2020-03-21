@@ -4,8 +4,14 @@ use snarkos_errors::dpc::LedgerError;
 
 use rand::Rng;
 
+pub mod block;
+pub use self::block::*;
+
 pub mod ideal_ledger;
 pub use self::ideal_ledger::*;
+
+pub mod transactions;
+pub use self::transactions::*;
 
 pub type MerkleTreeParameters<P> = <P as MerkleParameters>::H;
 

@@ -2454,6 +2454,7 @@ dependencies = [
  "sha2",
  "snarkos-algorithms",
  "snarkos-errors",
+ "snarkos-utilities",
  "wagyu-bitcoin",
  "wagyu-model",
 ]
