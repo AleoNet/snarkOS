@@ -168,15 +168,18 @@ where
     let mut new_death_pred_hashes = Vec::with_capacity(new_records.len());
     let mut new_birth_pred_hashes = Vec::with_capacity(new_records.len());
 
-    // TODO UPDATE/FIX the documentation for this
     // Order for allocation of input:
     // 1. addr_comm_pp.
     // 2. rec_comm_pp.
     // 3. crh_pp.
-    // 4. ledger_parameters.
-    // 5. ledger_digest.
-    // 6. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
-    // 7. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
+    // 4. sig_pp.
+    // 5. ledger_parameters.
+    // 6. ledger_digest.
+    // 7. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
+    // 8. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
+    // 9. predicate_comm.
+    // 10. local_data_comm.
+    // 11. binding_signature.
     let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, sig_pp, ledger_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
@@ -386,7 +389,6 @@ where
                 &randomizer_bytes,
             )?;
 
-            // TODO Figure out the query length derived from this alloc_input.
             let given_sn =
                 <C::SignatureGadget as SignaturePublicKeyRandomizationGadget<_, _>>::PublicKeyGadget::alloc_input(
                     &mut sn_cs.ns(|| "Declare given serial number"),
