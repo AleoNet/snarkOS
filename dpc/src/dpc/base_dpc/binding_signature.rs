@@ -241,7 +241,7 @@ pub fn verify_binding_signature<C: BaseDPCComponents>(
     let recovered_value_balance_commitment = recover_affine_from_x_coord(&value_balance_commitment)?;
     bvk = bvk.add(&recovered_value_balance_commitment.neg());
 
-    //Verify the signature
+    // Verify the signature
     let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
     let affine_r = recover_affine_from_x_coord(&signature.rbar)?;
 

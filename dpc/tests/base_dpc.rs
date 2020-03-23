@@ -127,7 +127,11 @@ fn base_dpc_integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut old_proof_and_vk = vec![];
         for i in 0..NUM_INPUT_RECORDS {
-            let input_value = local_data.old_records[i].payload().balance;
+            // If the record is a dummy, then the value should be 0
+            let input_value = match local_data.old_records[i].is_dummy() {
+                true => 0,
+                false => local_data.old_records[i].payload().balance,
+            };
 
             // Generate value commitment randomness
             let value_commitment_randomness =
@@ -192,7 +196,11 @@ fn base_dpc_integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut new_proof_and_vk = vec![];
         for j in 0..NUM_OUTPUT_RECORDS {
-            let output_value = local_data.new_records[j].payload().balance;
+            // If the record is a dummy, then the value should be 0
+            let output_value = match local_data.new_records[j].is_dummy() {
+                true => 0,
+                false => local_data.new_records[j].payload().balance,
+            };
 
             // Generate value commitment randomness
             let value_commitment_randomness =
