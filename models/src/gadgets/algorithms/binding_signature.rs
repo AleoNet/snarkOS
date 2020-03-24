@@ -25,7 +25,7 @@ pub trait BindingSignatureGadget<C: CommitmentScheme, F: Field> {
         cs: CS,
         parameters: &Self::ParametersGadget,
         partial_bvk: &Self::OutputGadget,
-        value_balance_comm: &Self::OutputGadget,
+        value_balance: u64,
         c: &Self::RandomnessGadget,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,

@@ -45,11 +45,19 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize>
         mut cs: CS,
         parameters: &Self::ParametersGadget,
         partial_bvk: &Self::OutputGadget,
-        value_balance_comm: &Self::OutputGadget,
+        value_balance: u64,
         c: &Self::RandomnessGadget,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,
     ) -> Result<(), SynthesisError> {
+        let value_balance_bytes = UInt8::alloc_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes())?;
+
+        let value_balance_comm = Self::check_value_balance_commitment_gadget(
+            &mut cs.ns(|| "value_balance_commitment"),
+            &parameters,
+            &value_balance_bytes,
+        )?;
+
         let bvk = partial_bvk.sub(cs.ns(|| "construct_bvk"), &value_balance_comm)?;
 
         let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
@@ -61,7 +69,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize>
             .add(cs.ns(|| "add_affine_r"), &affine_r)?
             .sub(cs.ns(|| "sub_recommit"), &recommit)?;
 
-        result.enforce_equal(&mut cs.ns(|| "Check the binding signature verifies"), &zero)?;
+        result.enforce_equal(&mut cs.ns(|| "Check that the binding signature verifies"), &zero)?;
 
         Ok(())
     }
