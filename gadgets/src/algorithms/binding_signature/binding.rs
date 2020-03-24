@@ -8,7 +8,7 @@ use snarkos_models::{
         algorithms::{BindingSignatureGadget, CommitmentGadget},
         curves::GroupGadget,
         r1cs::ConstraintSystem,
-        utilities::uint8::UInt8,
+        utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
 
@@ -27,13 +27,17 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize>
     type ParametersGadget = PedersenCommitmentParametersGadget<G, S, F>;
     type RandomnessGadget = PedersenRandomnessGadget<G>;
 
-    fn check_commitment_gadget<CS: ConstraintSystem<F>>(
-        cs: CS,
+    fn check_value_balance_commitment_gadget<CS: ConstraintSystem<F>>(
+        mut cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
-        randomness: &Self::RandomnessGadget,
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        let output = PedersenCommitmentGadget::<G, F, GG>::check_commitment_gadget(cs, parameters, input, randomness)?;
+        let default_randomness = Self::RandomnessGadget::alloc(&mut cs.ns(|| "default_randomness"), || {
+            Ok(<G as Group>::ScalarField::default())
+        })?;
+
+        let output =
+            PedersenCommitmentGadget::<G, F, GG>::check_commitment_gadget(cs, parameters, input, &default_randomness)?;
         Ok(output)
     }
 
@@ -41,21 +45,24 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize>
         mut cs: CS,
         parameters: &Self::ParametersGadget,
         partial_bvk: &Self::OutputGadget,
+        value_balance_comm: &Self::OutputGadget,
         c: &Self::RandomnessGadget,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,
-    ) -> Result<bool, SynthesisError> {
+    ) -> Result<(), SynthesisError> {
+        let bvk = partial_bvk.sub(cs.ns(|| "construct_bvk"), &value_balance_comm)?;
+
         let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
 
-        let result = zero.mul_bits(cs.ns(|| "mul_bits"), &partial_bvk, c_bits.iter())?;
+        let result = bvk.mul_bits(cs.ns(|| "mul_bits"), &zero, c_bits.iter())?;
 
         let result = result
             .add(cs.ns(|| "add_affine_r"), &affine_r)?
-            .add(cs.ns(|| "add_recommit"), &recommit)?;
+            .sub(cs.ns(|| "sub_recommit"), &recommit)?;
 
         result.enforce_equal(&mut cs.ns(|| "Check the binding signature verifies"), &zero)?;
 
-        Ok(true)
+        Ok(())
     }
 }

@@ -269,6 +269,7 @@ pub fn gadget_verification_setup<C: CommitmentScheme>(
         <G as ProjectiveCurve>::Affine,
         <G as ProjectiveCurve>::Affine,
         <G as ProjectiveCurve>::Affine,
+        <G as ProjectiveCurve>::Affine,
     ),
     BindingSignatureError,
 > {
@@ -289,6 +290,8 @@ pub fn gadget_verification_setup<C: CommitmentScheme>(
         partial_bvk = partial_bvk.add(&recovered_output_value_commitment.neg());
     }
 
+    let recovered_value_balance_commitment = recover_affine_from_x_coord(&value_balance_commitment)?;
+
     let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
     let affine_r = recover_affine_from_x_coord(&signature.rbar)?;
 
@@ -297,7 +300,13 @@ pub fn gadget_verification_setup<C: CommitmentScheme>(
     let recommit = to_bytes![parameters.commit(&zero.to_le_bytes(), &s)?]?;
     let recovered_recommit = recover_affine_from_x_coord(&recommit).unwrap();
 
-    Ok((c, partial_bvk, affine_r, recovered_recommit))
+    Ok((
+        c,
+        partial_bvk,
+        recovered_value_balance_commitment,
+        affine_r,
+        recovered_recommit,
+    ))
 }
 
 #[cfg(test)]
@@ -519,15 +528,16 @@ mod tests {
         )
         .unwrap();
 
-        let (c, partial_bvk, affine_r, recommit) = gadget_verification_setup::<ValueCommitment>(
-            &value_comm_pp,
-            &input_value_commitments,
-            &output_value_commitments,
-            value_balance,
-            &sighash,
-            &binding_signature,
-        )
-        .unwrap();
+        let (c, partial_bvk, recovered_value_balance_commitment, affine_r, recommit) =
+            gadget_verification_setup::<ValueCommitment>(
+                &value_comm_pp,
+                &input_value_commitments,
+                &output_value_commitments,
+                value_balance,
+                &sighash,
+                &binding_signature,
+            )
+            .unwrap();
 
         println!("binding signature verified: {:?}", verified);
 
@@ -568,18 +578,33 @@ mod tests {
             )
             .unwrap();
 
-        let signature_verified = <VerificationGadget as BindingSignatureGadget<_, _>>::check_binding_signature_gadget(
+        //        let value_balance_commitment =  <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::check_commitment_gadget(
+        //            &mut cs.ns(|| "partial_bvk_gadget"),
+        //            || Ok(partial_bvk),
+        //        )
+        //            .unwrap();
+
+        let value_balance_commitment_gadget =
+            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+                &mut cs.ns(|| "value_balance_commiment"),
+                || Ok(recovered_value_balance_commitment),
+            )
+            .unwrap();
+
+        <VerificationGadget as BindingSignatureGadget<_, _>>::check_binding_signature_gadget(
             &mut cs.ns(|| "verify_binding_signature"),
             &parameters_gadget,
             &partial_bvk_gadget,
+            &value_balance_commitment_gadget,
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,
         )
         .unwrap();
 
-        println!("binding signature gadget verified: {:?}", signature_verified);
-
-        assert!(signature_verified);
+        if !cs.is_satisfied() {
+            println!("which is unsatisfied: {:?}", cs.which_is_unsatisfied().unwrap());
+        }
+        assert!(cs.is_satisfied());
     }
 }
