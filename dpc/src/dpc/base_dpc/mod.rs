@@ -692,7 +692,7 @@ where
 
         let sighash = to_bytes![local_data_commitment]?;
 
-        let binding_signature = create_binding_signature::<Components, _>(
+        let binding_signature = create_binding_signature::<Components::ValueCommitment, _>(
             &circuit_parameters.value_commitment_parameters,
             &old_value_commits,
             &new_value_commits,
@@ -877,7 +877,7 @@ where
         }
         end_timer!(sig_time);
 
-        if !verify_binding_signature::<Components>(
+        if !verify_binding_signature::<Components::ValueCommitment>(
             &parameters.circuit_parameters.value_commitment_parameters,
             &transaction.stuff.input_value_commitments,
             &transaction.stuff.output_value_commitments,
