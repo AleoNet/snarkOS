@@ -58,11 +58,15 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         CS,
         C::AddressCommitment,
         C::RecordCommitment,
+        C::LocalDataCommitment,
         C::SerialNumberNonce,
+        C::Signature,
         C::PRF,
         C::AddressCommitmentGadget,
         C::RecordCommitmentGadget,
+        C::LocalDataCommitmentGadget,
         C::SerialNumberNonceGadget,
+        C::SignatureGadget,
         C::PRFGadget,
     >(
         cs,
@@ -96,11 +100,15 @@ fn base_dpc_execute_gadget_helper<
     CS: ConstraintSystem<C::InnerField>,
     AddrC,
     RecC,
+    LocalDataC,
     SnNonceH,
+    SignatureS,
     P,
     AddrCGadget,
     RecCGadget,
+    LocalDataCGadget,
     SnNonceHGadget,
+    SignatureSGadget,
     PGadget,
 >(
     cs: &mut CS,
@@ -116,7 +124,7 @@ fn base_dpc_execute_gadget_helper<
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
     old_address_secret_keys: &[AddressSecretKey<C>],
-    old_serial_numbers: &[<C::Signature as SignatureScheme>::PublicKey],
+    old_serial_numbers: &[SignatureS::PublicKey],
 
     //
     new_records: &[DPCRecord<C>],
@@ -126,8 +134,8 @@ fn base_dpc_execute_gadget_helper<
     //
     predicate_comm: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_rand: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_comm: &<C::LocalDataCommitment as CommitmentScheme>::Output,
-    local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
+    local_data_comm: &LocalDataC::Output,
+    local_data_rand: &LocalDataC::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
     binding_signature: &BindingSignature,
@@ -136,21 +144,29 @@ where
     C: BaseDPCComponents<
         AddressCommitment = AddrC,
         RecordCommitment = RecC,
+        LocalDataCommitment = LocalDataC,
         SerialNumberNonce = SnNonceH,
+        Signature = SignatureS,
         PRF = P,
         AddressCommitmentGadget = AddrCGadget,
-        SerialNumberNonceGadget = SnNonceHGadget,
         RecordCommitmentGadget = RecCGadget,
+        LocalDataCommitmentGadget = LocalDataCGadget,
+        SerialNumberNonceGadget = SnNonceHGadget,
+        SignatureGadget = SignatureSGadget,
         PRFGadget = PGadget,
     >,
     AddrC: CommitmentScheme,
     RecC: CommitmentScheme,
+    LocalDataC: CommitmentScheme,
     SnNonceH: CRH,
+    SignatureS: SignatureScheme,
     P: PRF,
     RecC::Output: Eq,
     AddrCGadget: CommitmentGadget<AddrC, C::InnerField>,
     RecCGadget: CommitmentGadget<RecC, C::InnerField>,
+    LocalDataCGadget: CommitmentGadget<LocalDataC, C::InnerField>,
     SnNonceHGadget: CRHGadget<SnNonceH, C::InnerField>,
+    SignatureSGadget: SignaturePublicKeyRandomizationGadget<SignatureS, C::InnerField>,
     PGadget: PRFGadget<P, C::InnerField>,
 {
     let mut old_sns = Vec::with_capacity(old_records.len());
@@ -171,15 +187,17 @@ where
     // Order for allocation of input:
     // 1. addr_comm_pp.
     // 2. rec_comm_pp.
-    // 3. crh_pp.
-    // 4. sig_pp.
-    // 5. ledger_parameters.
-    // 6. ledger_digest.
-    // 7. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
-    // 8. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
-    // 9. predicate_comm.
-    // 10. local_data_comm.
-    // 11. binding_signature.
+    // 3. local_data_comm_pp
+    // 4. pred_vk_comm_pp
+    // 5. sn_nonce_crh_pp.
+    // 6. sig_pp.
+    // 7. ledger_parameters.
+    // 8. ledger_digest.
+    // 9. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
+    // 10. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
+    // 11. predicate_comm.
+    // 12. local_data_comm.
+    // 13. binding_signature.
     let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, sig_pp, ledger_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
@@ -192,11 +210,10 @@ where
                 Ok(comm_crh_sig_parameters.record_commitment_parameters.parameters())
             })?;
 
-        let local_data_comm_pp =
-            <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare Local Data Comm parameters"),
-                || Ok(comm_crh_sig_parameters.local_data_commitment_parameters.parameters()),
-            )?;
+        let local_data_comm_pp = LocalDataCGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare Local Data Comm parameters"),
+            || Ok(comm_crh_sig_parameters.local_data_commitment_parameters.parameters()),
+        )?;
 
         let pred_vk_comm_pp =
             <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc_input(
@@ -209,11 +226,9 @@ where
                 Ok(comm_crh_sig_parameters.serial_number_nonce_parameters.parameters())
             })?;
 
-        let sig_pp =
-            <C::SignatureGadget as SignaturePublicKeyRandomizationGadget<_, _>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare SIG Parameters"),
-                || Ok(&comm_crh_sig_parameters.signature_parameters),
-            )?;
+        let sig_pp = SignatureSGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SIG Parameters"), || {
+            Ok(&comm_crh_sig_parameters.signature_parameters)
+        })?;
 
         let ledger_pp = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),
@@ -335,10 +350,9 @@ where
         let (sk_prf, pk_sig) = {
             // Declare variables for addr_sk contents.
             let address_cs = &mut cs.ns(|| "Check address keypair");
-            let pk_sig = <C::SignatureGadget as SignaturePublicKeyRandomizationGadget<_, _>>::PublicKeyGadget::alloc(
-                &mut address_cs.ns(|| "Declare pk_sig"),
-                || Ok(&secret_key.pk_sig),
-            )?;
+            let pk_sig = SignatureSGadget::PublicKeyGadget::alloc(&mut address_cs.ns(|| "Declare pk_sig"), || {
+                Ok(&secret_key.pk_sig)
+            })?;
 
             let pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
 
@@ -382,18 +396,17 @@ where
             )?;
             let randomizer_bytes = randomizer.to_bytes(&mut sn_cs.ns(|| "Convert randomizer to bytes"))?;
 
-            let candidate_sn = C::SignatureGadget::check_randomization_gadget(
+            let candidate_sn = SignatureSGadget::check_randomization_gadget(
                 &mut sn_cs.ns(|| "Compute serial number"),
                 &sig_pp,
                 &pk_sig,
                 &randomizer_bytes,
             )?;
 
-            let given_sn =
-                <C::SignatureGadget as SignaturePublicKeyRandomizationGadget<_, _>>::PublicKeyGadget::alloc_input(
-                    &mut sn_cs.ns(|| "Declare given serial number"),
-                    || Ok(given_serial_number),
-                )?;
+            let given_sn = SignatureSGadget::PublicKeyGadget::alloc_input(
+                &mut sn_cs.ns(|| "Declare given serial number"),
+                || Ok(given_serial_number),
+            )?;
 
             candidate_sn.enforce_equal(
                 &mut sn_cs.ns(|| "Check that given and computed serial numbers are equal"),
@@ -640,18 +653,17 @@ where
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
-        let local_data_comm_rand = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-            cs.ns(|| "Allocate local data commitment randomness"),
-            || Ok(local_data_rand),
-        )?;
+        let local_data_comm_rand =
+            LocalDataCGadget::RandomnessGadget::alloc(cs.ns(|| "Allocate local data commitment randomness"), || {
+                Ok(local_data_rand)
+            })?;
 
         let declared_local_data_comm =
-            <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-                cs.ns(|| "Allocate local data commitment"),
-                || Ok(local_data_comm),
-            )?;
+            LocalDataCGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
+                Ok(local_data_comm)
+            })?;
 
-        let comm = C::LocalDataCommitmentGadget::check_commitment_gadget(
+        let comm = LocalDataCGadget::check_commitment_gadget(
             cs.ns(|| "Commit to local data"),
             &local_data_comm_pp,
             &local_data_bytes,

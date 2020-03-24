@@ -535,7 +535,6 @@ mod tests {
 
         // Allocate gadget values
 
-        //        let parameters_gadget = <VerificationGadget as BindingSignatureGadget<ValueCommitment, _>>::ParametersGadget::alloc(
         let parameters_gadget = <VerificationGadget as BindingSignatureGadget<_, _>>::ParametersGadget::alloc(
             &mut cs.ns(|| "parameters_gadget"),
             || Ok(value_comm_pp.parameters),
