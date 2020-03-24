@@ -663,6 +663,7 @@ where
             &declared_local_data_comm,
         )?;
 
+        // TODO Handle binding signature verification in the inner circuit
         let _binding_signature = UInt8::alloc_input_vec(&mut cs.ns(|| "Declare binding signature"), &to_bytes![
             binding_signature
         ]?)?;

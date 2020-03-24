@@ -65,7 +65,7 @@ impl<G: Group, S: PedersenSize, F: PrimeField> AllocGadget<PedersenCommitmentPar
 }
 
 #[derive(Clone, Debug)]
-pub struct PedersenRandomnessGadget<G: Group>(Vec<UInt8>, PhantomData<G>);
+pub struct PedersenRandomnessGadget<G: Group>(pub Vec<UInt8>, PhantomData<G>);
 
 impl<G: Group, F: PrimeField> AllocGadget<G::ScalarField, F> for PedersenRandomnessGadget<G> {
     fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G::ScalarField>, CS: ConstraintSystem<F>>(

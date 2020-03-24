@@ -21,4 +21,13 @@ pub trait BindingSignatureGadget<C: CommitmentScheme, F: Field> {
         input: &[UInt8],
         r: &Self::RandomnessGadget,
     ) -> Result<Self::OutputGadget, SynthesisError>;
+
+    fn check_binding_signature_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        partial_bvk: &Self::OutputGadget,
+        c: &Self::RandomnessGadget,
+        affine_r: &Self::OutputGadget,
+        recommit: &Self::OutputGadget,
+    ) -> Result<bool, SynthesisError>;
 }

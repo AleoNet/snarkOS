@@ -139,6 +139,7 @@ impl Default for BindingSignature {
         }
     }
 }
+// TODO (raychu86) wrap these functions into the binding signature impl
 
 pub fn create_binding_signature<C: CommitmentScheme, R: Rng>(
     parameters: &C,
@@ -255,12 +256,73 @@ pub fn verify_binding_signature<C: CommitmentScheme>(
     ))
 }
 
+pub fn gadget_verification_setup<C: CommitmentScheme>(
+    parameters: &C,
+    input_value_commitments: &Vec<[u8; 32]>,
+    output_value_commitments: &Vec<[u8; 32]>,
+    value_balance: u64,
+    input: &Vec<u8>,
+    signature: &BindingSignature,
+) -> Result<
+    (
+        <G as Group>::ScalarField,
+        <G as ProjectiveCurve>::Affine,
+        <G as ProjectiveCurve>::Affine,
+        <G as ProjectiveCurve>::Affine,
+    ),
+    BindingSignatureError,
+> {
+    // Calculate Value balance commitment
+    let zero_randomness = C::Randomness::default();
+    let value_balance_commitment = to_bytes![parameters.commit(&value_balance.to_le_bytes(), &zero_randomness)?]?;
+
+    // Craft verifying key
+    let mut partial_bvk = <G as ProjectiveCurve>::Affine::default();
+
+    for vc_input in input_value_commitments {
+        let recovered_input_value_commitment = recover_affine_from_x_coord(&vc_input[..])?;
+        partial_bvk = partial_bvk.add(&recovered_input_value_commitment);
+    }
+
+    for vc_output in output_value_commitments {
+        let recovered_output_value_commitment = recover_affine_from_x_coord(&vc_output[..])?;
+        partial_bvk = partial_bvk.add(&recovered_output_value_commitment.neg());
+    }
+
+    let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
+    let affine_r = recover_affine_from_x_coord(&signature.rbar)?;
+
+    let zero: u64 = 0;
+    let s: C::Randomness = FromBytes::read(&signature.sbar[..])?;
+    let recommit = to_bytes![parameters.commit(&zero.to_le_bytes(), &s)?]?;
+    let recovered_recommit = recover_affine_from_x_coord(&recommit).unwrap();
+
+    Ok((c, partial_bvk, affine_r, recovered_recommit))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use snarkos_algorithms::{commitment::PedersenCompressedCommitment, crh::PedersenSize};
-    use snarkos_models::curves::Group;
+    use snarkos_algorithms::{
+        commitment::{PedersenCommitment, PedersenCompressedCommitment},
+        crh::PedersenSize,
+    };
+    use snarkos_curves::bls12_377::fr::Fr;
+    use snarkos_gadgets::{
+        algorithms::binding_signature::BindingSignatureVerificationGadget,
+        curves::edwards_bls12::EdwardsBlsGadget,
+    };
+
+    use snarkos_models::{
+        curves::Group,
+        gadgets::{
+            algorithms::BindingSignatureGadget,
+            r1cs::{ConstraintSystem, TestConstraintSystem},
+            utilities::alloc::AllocGadget,
+        },
+    };
+
     use snarkos_utilities::rand::UniformRand;
 
     #[derive(Clone, PartialEq, Eq, Hash)]
@@ -272,6 +334,8 @@ mod tests {
     }
 
     type ValueCommitment = PedersenCompressedCommitment<EdwardsBls12, ValueWindow>;
+    type TestValueCommitment = PedersenCommitment<EdwardsBls12, ValueWindow>;
+    type VerificationGadget = BindingSignatureVerificationGadget<EdwardsBls12, Fr, EdwardsBlsGadget>;
 
     fn generate_random_binding_signature<C: CommitmentScheme, R: Rng>(
         value_comm_pp: &ValueCommitment,
@@ -414,5 +478,109 @@ mod tests {
         let reconstructed_binding_signature: BindingSignature = FromBytes::read(&binding_signature_bytes[..]).unwrap();
 
         assert_eq!(binding_signature, reconstructed_binding_signature);
+    }
+
+    #[test]
+    fn test_binding_signature_gadget() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
+
+        let rng = &mut rand::thread_rng();
+
+        // Setup parameters
+
+        let value_comm_pp = ValueCommitment::setup(rng);
+
+        let input_amount: u64 = rng.gen_range(1, 100000000);
+        let input_amount_2: u64 = rng.gen_range(1, 100000000);
+        let output_amount: u64 = rng.gen_range(0, input_amount);
+        let output_amount_2: u64 = rng.gen_range(0, input_amount_2);
+
+        let sighash = [1u8; 64].to_vec();
+
+        let (input_value_commitments, output_value_commitments, value_balance, binding_signature) =
+            generate_random_binding_signature::<ValueCommitment, _>(
+                &value_comm_pp,
+                vec![input_amount, input_amount_2],
+                vec![output_amount, output_amount_2],
+                &sighash,
+                rng,
+            )
+            .unwrap();
+
+        // Verify the binding signature
+
+        let verified = verify_binding_signature::<ValueCommitment>(
+            &value_comm_pp,
+            &input_value_commitments,
+            &output_value_commitments,
+            value_balance,
+            &sighash,
+            &binding_signature,
+        )
+        .unwrap();
+
+        let (c, partial_bvk, affine_r, recommit) = gadget_verification_setup::<ValueCommitment>(
+            &value_comm_pp,
+            &input_value_commitments,
+            &output_value_commitments,
+            value_balance,
+            &sighash,
+            &binding_signature,
+        )
+        .unwrap();
+
+        println!("binding signature verified: {:?}", verified);
+
+        assert!(verified);
+
+        // Allocate gadget values
+
+        //        let parameters_gadget = <VerificationGadget as BindingSignatureGadget<ValueCommitment, _>>::ParametersGadget::alloc(
+        let parameters_gadget = <VerificationGadget as BindingSignatureGadget<_, _>>::ParametersGadget::alloc(
+            &mut cs.ns(|| "parameters_gadget"),
+            || Ok(value_comm_pp.parameters),
+        )
+        .unwrap();
+
+        let c_gadget = <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::RandomnessGadget::alloc(
+            &mut cs.ns(|| "c_gadget"),
+            || Ok(&c),
+        )
+        .unwrap();
+
+        let partial_bvk_gadget =
+            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+                &mut cs.ns(|| "partial_bvk_gadget"),
+                || Ok(partial_bvk),
+            )
+            .unwrap();
+
+        let affine_r_gadget =
+            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+                &mut cs.ns(|| "affine_r_gadget"),
+                || Ok(affine_r),
+            )
+            .unwrap();
+
+        let recommit_gadget =
+            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+                &mut cs.ns(|| "recommit_gadget"),
+                || Ok(recommit),
+            )
+            .unwrap();
+
+        let signature_verified = <VerificationGadget as BindingSignatureGadget<_, _>>::check_binding_signature_gadget(
+            &mut cs.ns(|| "verify_binding_signature"),
+            &parameters_gadget,
+            &partial_bvk_gadget,
+            &c_gadget,
+            &affine_r_gadget,
+            &recommit_gadget,
+        )
+        .unwrap();
+
+        println!("binding signature gadget verified: {:?}", signature_verified);
+
+        assert!(signature_verified);
     }
 }
