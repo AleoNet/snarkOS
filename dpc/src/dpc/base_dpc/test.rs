@@ -8,6 +8,7 @@ use crate::{
             payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
             predicate::PrivatePredicateInput,
             record_payload::PaymentRecordPayload,
+            BaseDPCComponents,
             ExecuteContext,
             DPC,
         },
@@ -283,7 +284,7 @@ fn test_execute_base_dpc_constraints() {
 
     let sighash = to_bytes![local_data_comm].unwrap();
 
-    let binding_signature = create_binding_signature::<Components, _>(
+    let binding_signature = create_binding_signature::<<Components as BaseDPCComponents>::ValueCommitment, _>(
         &circuit_parameters.value_commitment_parameters,
         &old_value_commits,
         &new_value_commits,
@@ -367,4 +368,16 @@ fn test_execute_base_dpc_constraints() {
     println!("=========================================================");
 
     assert!(pf_check_cs.is_satisfied());
+
+    let verify_binding_signature = verify_binding_signature::<<Components as BaseDPCComponents>::ValueCommitment>(
+        &circuit_parameters.value_commitment_parameters,
+        &old_value_commits,
+        &new_value_commits,
+        value_balance,
+        &sighash,
+        &binding_signature,
+    )
+    .unwrap();
+
+    assert!(verify_binding_signature);
 }
