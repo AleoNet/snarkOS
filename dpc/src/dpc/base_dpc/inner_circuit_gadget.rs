@@ -2,7 +2,7 @@ use crate::{
     dpc::{
         address::AddressSecretKey,
         base_dpc::{
-            binding_signature::BindingSignature,
+            binding_signature::{gadget_verification_setup, BindingSignature},
             parameters::CircuitParameters,
             record::DPCRecord,
             BaseDPCComponents,
@@ -17,7 +17,13 @@ use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
     gadgets::{
-        algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
+        algorithms::{
+            BindingSignatureGadget,
+            CRHGadget,
+            CommitmentGadget,
+            PRFGadget,
+            SignaturePublicKeyRandomizationGadget,
+        },
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
@@ -208,7 +214,16 @@ where
     // 12. predicate_comm.
     // 13. local_data_comm.
     // 14. binding_signature.
-    let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, sig_pp, ledger_pp) = {
+    let (
+        addr_comm_pp,
+        rec_comm_pp,
+        pred_vk_comm_pp,
+        local_data_comm_pp,
+        sn_nonce_crh_pp,
+        sig_pp,
+        value_commitment_pp,
+        ledger_pp,
+    ) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
             AddrCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Addr Comm parameters"), || {
@@ -240,10 +255,15 @@ where
             Ok(&comm_crh_sig_parameters.signature_parameters)
         })?;
 
-        //        // TODO CHANGE THIS TO ALLOC_INPUT
-        //        let value_commitment_pp = <C::BindingSignatureGadget as BindingSignatureGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "Declare value commitment parameters"), || {
-        //            Ok(comm_crh_sig_parameters.value_commitment_parameters.parameters())
-        //        })?;
+        // TODO CHANGE THIS TO ALLOC_INPUT
+        let value_commitment_pp = <C::BindingSignatureGadget as BindingSignatureGadget<
+            _,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::ParametersGadget::alloc(
+            &mut cs.ns(|| "Declare value commitment parameters"),
+            || Ok(comm_crh_sig_parameters.value_commitment_parameters.parameters()),
+        )?;
 
         let ledger_pp = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),
@@ -256,6 +276,7 @@ where
             local_data_comm_pp,
             sn_nonce_crh_pp,
             sig_pp,
+            value_commitment_pp,
             ledger_pp,
         )
     };
@@ -692,51 +713,50 @@ where
 
         // Check the binding signature verification
 
-        //        let (c, partial_bvk, affine_r, recommit) = gadget_verification_setup::<C::ValueCommitment>(
-        //            &comm_crh_sig_parameters.value_commitment_parameters,
-        //            &input_value_commitments,
-        //            &output_value_commitments,
-        //            &to_bytes![local_data_comm]?,
-        //            &binding_signature,
-        //        ).unwrap();
+        let (c, partial_bvk, affine_r, recommit) =
+            gadget_verification_setup::<C::ValueCommitment, C::BindingSignatureGroup>(
+                &comm_crh_sig_parameters.value_commitment_parameters,
+                &input_value_commitments,
+                &output_value_commitments,
+                &to_bytes![local_data_comm]?,
+                &binding_signature,
+            )
+            .unwrap();
 
-        //        let c_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<_, C::InnerField>>::RandomnessGadget::alloc(
-        //            &mut cs.ns(|| "c_gadget"),
-        //            || Ok(c),
-        //        )
-        //            .unwrap();
+        let c_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
+            _,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::RandomnessGadget::alloc(&mut cs.ns(|| "c_gadget"), || Ok(c))?;
 
-        //        let partial_bvk_gadget =
-        //            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
-        //                &mut cs.ns(|| "partial_bvk_gadget"),
-        //                || Ok(partial_bvk),
-        //            )
-        //                .unwrap();
-        //
-        //        let affine_r_gadget =
-        //            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
-        //                &mut cs.ns(|| "affine_r_gadget"),
-        //                || Ok(affine_r),
-        //            )
-        //                .unwrap();
-        //
-        //        let recommit_gadget =
-        //            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
-        //                &mut cs.ns(|| "recommit_gadget"),
-        //                || Ok(recommit),
-        //            )
-        //                .unwrap();
-        //
-        //        <VerificationGadget as BindingSignatureGadget<_, _>>::check_binding_signature_gadget(
-        //            &mut cs.ns(|| "verify_binding_signature"),
-        //            &parameters_gadget,
-        //            &partial_bvk_gadget,
-        //            value_balance,
-        //            &c_gadget,
-        //            &affine_r_gadget,
-        //            &recommit_gadget,
-        //        )
-        //            .unwrap();
+        let partial_bvk_gadget =
+            <C::BindingSignatureGadget as BindingSignatureGadget<
+                C::ValueCommitment,
+                C::InnerField,
+                C::BindingSignatureGroup,
+            >>::OutputGadget::alloc(&mut cs.ns(|| "partial_bvk_gadget"), || Ok(partial_bvk))?;
+
+        let affine_r_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
+            C::ValueCommitment,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::OutputGadget::alloc(&mut cs.ns(|| "affine_r_gadget"), || Ok(affine_r))?;
+
+        let recommit_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
+            C::ValueCommitment,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::OutputGadget::alloc(&mut cs.ns(|| "recommit_gadget"), || Ok(recommit))?;
+
+        <C::BindingSignatureGadget as BindingSignatureGadget<_, C::InnerField, C::BindingSignatureGroup>>::check_binding_signature_gadget(
+            &mut cs.ns(|| "verify_binding_signature"),
+            &value_commitment_pp,
+            &partial_bvk_gadget,
+            value_balance,
+            &c_gadget,
+            &affine_r_gadget,
+            &recommit_gadget,
+        )?;
 
         // TODO Handle binding signature verification in the inner circuit
         let _binding_signature = UInt8::alloc_input_vec(&mut cs.ns(|| "Declare binding signature"), &to_bytes![

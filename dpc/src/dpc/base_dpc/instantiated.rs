@@ -153,7 +153,6 @@ impl DPCComponents for Components {
 }
 
 impl BaseDPCComponents for Components {
-    type BindingSignatureCommitment = BindingSignatureCommitment;
     type BindingSignatureGadget = BindingSignatureGadget;
     type BindingSignatureGroup = EdwardsBls;
     type InnerSNARK = CoreCheckNIZK;
@@ -179,7 +178,6 @@ pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
-pub type BindingSignatureCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 pub type Signature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;

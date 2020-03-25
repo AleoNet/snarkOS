@@ -84,10 +84,9 @@ pub trait BaseDPCComponents: DPCComponents {
     type ValueCommitmentGadget: CommitmentGadget<Self::ValueCommitment, Self::InnerField>;
 
     /// Gadget for verifying the binding signature
-    type BindingSignatureCommitment: CommitmentScheme; // TODO remove this commitment scheme and use ValueCommitment
     type BindingSignatureGroup: Group + ProjectiveCurve;
     type BindingSignatureGadget: BindingSignatureGadget<
-        Self::BindingSignatureCommitment,
+        Self::ValueCommitment,
         Self::InnerField,
         Self::BindingSignatureGroup,
     >;
@@ -702,16 +701,17 @@ where
 
         let sighash = to_bytes![local_data_commitment]?;
 
-        let binding_signature = create_binding_signature::<Components::ValueCommitment, _>(
-            &circuit_parameters.value_commitment_parameters,
-            &old_value_commits,
-            &new_value_commits,
-            &old_value_commit_randomness,
-            &new_value_commit_randomness,
-            value_balance,
-            &sighash,
-            rng,
-        )?;
+        let binding_signature =
+            create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
+                &circuit_parameters.value_commitment_parameters,
+                &old_value_commits,
+                &new_value_commits,
+                &old_value_commit_randomness,
+                &new_value_commit_randomness,
+                value_balance,
+                &sighash,
+                rng,
+            )?;
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
@@ -890,7 +890,7 @@ where
         }
         end_timer!(sig_time);
 
-        if !verify_binding_signature::<Components::ValueCommitment>(
+        if !verify_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup>(
             &parameters.circuit_parameters.value_commitment_parameters,
             &transaction.stuff.input_value_commitments,
             &transaction.stuff.output_value_commitments,

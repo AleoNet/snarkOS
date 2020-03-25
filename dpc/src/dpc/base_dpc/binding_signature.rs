@@ -274,15 +274,7 @@ pub fn gadget_verification_setup<C: CommitmentScheme, G: Group + ProjectiveCurve
     output_value_commitments: &[[u8; 32]],
     input: &Vec<u8>,
     signature: &BindingSignature,
-) -> Result<
-    (
-        C::Randomness,
-        <G as ProjectiveCurve>::Affine,
-        <G as ProjectiveCurve>::Affine,
-        <G as ProjectiveCurve>::Affine,
-    ),
-    BindingSignatureError,
-> {
+) -> Result<(C::Randomness, G, G, G), BindingSignatureError> {
     // Craft the partial verifying key
     let mut partial_bvk = <G as ProjectiveCurve>::Affine::default();
 
@@ -307,6 +299,10 @@ pub fn gadget_verification_setup<C: CommitmentScheme, G: Group + ProjectiveCurve
     let s: C::Randomness = FromBytes::read(&signature.sbar[..])?;
     let recommit = to_bytes![parameters.commit(&zero.to_le_bytes(), &s)?]?;
     let recovered_recommit = recover_affine_from_x_coord::<G>(&recommit).unwrap();
+
+    let partial_bvk: G = FromBytes::read(&to_bytes![partial_bvk.into_projective()]?[..])?;
+    let affine_r: G = FromBytes::read(&to_bytes![affine_r.into_projective()]?[..])?;
+    let recovered_recommit: G = FromBytes::read(&to_bytes![recovered_recommit.into_projective()]?[..])?;
 
     Ok((c, partial_bvk, affine_r, recovered_recommit))
 }
