@@ -15,7 +15,7 @@ use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     dpc::DPCComponents,
-    gadgets::algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
+    gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -81,6 +81,10 @@ pub trait BaseDPCComponents: DPCComponents {
     /// Commitment scheme for committing to a record value
     type ValueCommitment: CommitmentScheme;
     type ValueCommitmentGadget: CommitmentGadget<Self::ValueCommitment, Self::InnerField>;
+
+    /// Gadget for verifying the binding signature
+    type BindingSignatureCommitment: CommitmentScheme; // TODO remove this commitment scheme and use ValueCommitment
+    type BindingSignatureGadget: BindingSignatureGadget<Self::BindingSignatureCommitment, Self::InnerField>;
 
     /// SNARK for non-proof-verification checks
     type InnerSNARK: SNARK<

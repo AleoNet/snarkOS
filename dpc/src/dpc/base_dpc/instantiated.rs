@@ -14,7 +14,7 @@ use crate::{
     ledger::ideal_ledger::IdealLedger,
 };
 use snarkos_algorithms::{
-    commitment::{Blake2sCommitment, PedersenCompressedCommitment},
+    commitment::{Blake2sCommitment, PedersenCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
     merkle_tree::MerkleParameters,
     prf::Blake2s,
@@ -29,6 +29,7 @@ use snarkos_curves::{
 };
 use snarkos_gadgets::{
     algorithms::{
+        binding_signature::BindingSignatureVerificationGadget,
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::PedersenCompressedCRHGadget,
         prf::Blake2sGadget,
@@ -152,6 +153,8 @@ impl DPCComponents for Components {
 }
 
 impl BaseDPCComponents for Components {
+    type BindingSignatureCommitment = BindingSignatureCommitment;
+    type BindingSignatureGadget = BindingSignatureGadget;
     type InnerSNARK = CoreCheckNIZK;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
@@ -175,6 +178,7 @@ pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
+pub type BindingSignatureCommitment = PedersenCommitment<EdwardsBls, ValueWindow>;
 pub type Signature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
@@ -195,6 +199,7 @@ pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
+pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
