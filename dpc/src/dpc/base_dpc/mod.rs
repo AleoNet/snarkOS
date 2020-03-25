@@ -841,7 +841,7 @@ where
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.stuff.predicate_commitment.clone(),
             local_data_commitment: transaction.stuff.local_data_commitment.clone(),
-            binding_signature: transaction.stuff.binding_signature.clone(),
+            value_balance: transaction.stuff.value_balance,
         };
         if !Components::InnerSNARK::verify(
             &parameters.inner_snark_parameters.1,

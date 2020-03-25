@@ -747,7 +747,8 @@ where
             C::BindingSignatureGroup,
         >>::OutputGadget::alloc(&mut cs.ns(|| "recommit_gadget"), || Ok(recommit))?;
 
-        let value_balance_bytes = UInt8::alloc_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes())?;
+        let value_balance_bytes =
+            UInt8::alloc_input_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes())?;
 
         let value_balance_comm = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
@@ -767,11 +768,6 @@ where
             &affine_r_gadget,
             &recommit_gadget,
         )?;
-
-        // TODO Handle binding signature verification in the inner circuit
-        let _binding_signature = UInt8::alloc_input_vec(&mut cs.ns(|| "Declare binding signature"), &to_bytes![
-            binding_signature
-        ]?)?;
     }
     Ok(())
 }

@@ -1,5 +1,5 @@
 use crate::{
-    dpc::base_dpc::{binding_signature::BindingSignature, parameters::CircuitParameters, BaseDPCComponents},
+    dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents},
     ledger::MerkleTreeParameters,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTreeDigest};
@@ -28,7 +28,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub memo: [u8; 32],
 
-    pub binding_signature: BindingSignature,
+    pub value_balance: u64,
 }
 
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
@@ -125,7 +125,7 @@ where
         v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
 
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &self.binding_signature.to_bytes()[..],
+            &self.value_balance.to_le_bytes()[..],
         )?);
 
         Ok(v)
