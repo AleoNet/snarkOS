@@ -794,10 +794,7 @@ where
             outer_proof,
             predicate_commitment,
             local_data_commitment,
-            old_value_commits,
-            new_value_commits,
             value_balance,
-            binding_signature,
             signatures,
         );
 
@@ -889,18 +886,6 @@ where
             }
         }
         end_timer!(sig_time);
-
-        if !verify_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup>(
-            &parameters.circuit_parameters.value_commitment_parameters,
-            &transaction.stuff.input_value_commitments,
-            &transaction.stuff.output_value_commitments,
-            transaction.stuff.value_balance,
-            &to_bytes![transaction.stuff.local_data_commitment]?,
-            &transaction.stuff.binding_signature,
-        )? {
-            eprintln!("Binding signature didn't verify.");
-            return Ok(false);
-        }
 
         end_timer!(verify_time);
         Ok(true)
