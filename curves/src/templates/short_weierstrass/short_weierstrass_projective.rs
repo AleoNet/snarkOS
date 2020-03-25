@@ -123,7 +123,7 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         self.infinity
     }
 
-    fn add(self, other: &Self) -> Self {
+    fn add(self, _other: &Self) -> Self {
         unimplemented!()
     }
 
