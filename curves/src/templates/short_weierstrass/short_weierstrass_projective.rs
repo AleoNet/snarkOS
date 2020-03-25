@@ -123,6 +123,10 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         self.infinity
     }
 
+    fn add(self, _other: &Self) -> Self {
+        unimplemented!()
+    }
+
     fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, by: S) -> GroupProjective<P> {
         let bits = BitIterator::new(by.into());
         self.mul_bits(bits)

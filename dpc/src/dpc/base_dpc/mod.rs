@@ -14,8 +14,9 @@ use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDi
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
+    curves::{Group, ProjectiveCurve},
     dpc::DPCComponents,
-    gadgets::algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
+    gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -81,6 +82,14 @@ pub trait BaseDPCComponents: DPCComponents {
     /// Commitment scheme for committing to a record value
     type ValueCommitment: CommitmentScheme;
     type ValueCommitmentGadget: CommitmentGadget<Self::ValueCommitment, Self::InnerField>;
+
+    /// Gadget for verifying the binding signature
+    type BindingSignatureGroup: Group + ProjectiveCurve;
+    type BindingSignatureGadget: BindingSignatureGadget<
+        Self::ValueCommitment,
+        Self::InnerField,
+        Self::BindingSignatureGroup,
+    >;
 
     /// SNARK for non-proof-verification checks
     type InnerSNARK: SNARK<
@@ -196,7 +205,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Local Data Commitment setup");
+        let time = start_timer!(|| "Value Commitment setup");
         let value_comm_pp = Components::ValueCommitment::setup(rng);
         end_timer!(time);
 
@@ -692,16 +701,17 @@ where
 
         let sighash = to_bytes![local_data_commitment]?;
 
-        let binding_signature = create_binding_signature::<Components, _>(
-            &circuit_parameters.value_commitment_parameters,
-            &old_value_commits,
-            &new_value_commits,
-            &old_value_commit_randomness,
-            &new_value_commit_randomness,
-            value_balance,
-            &sighash,
-            rng,
-        )?;
+        let binding_signature =
+            create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
+                &circuit_parameters.value_commitment_parameters,
+                &old_value_commits,
+                &new_value_commits,
+                &old_value_commit_randomness,
+                &new_value_commit_randomness,
+                value_balance,
+                &sighash,
+                rng,
+            )?;
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
@@ -721,6 +731,9 @@ where
                 &local_data_randomness,
                 memorandum,
                 auxiliary,
+                &old_value_commits,
+                &new_value_commits,
+                value_balance,
                 &binding_signature,
             );
 
@@ -781,10 +794,7 @@ where
             outer_proof,
             predicate_commitment,
             local_data_commitment,
-            old_value_commits,
-            new_value_commits,
             value_balance,
-            binding_signature,
             signatures,
         );
 
@@ -828,7 +838,7 @@ where
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.stuff.predicate_commitment.clone(),
             local_data_commitment: transaction.stuff.local_data_commitment.clone(),
-            binding_signature: transaction.stuff.binding_signature.clone(),
+            value_balance: transaction.stuff.value_balance,
         };
         if !Components::InnerSNARK::verify(
             &parameters.inner_snark_parameters.1,
@@ -876,18 +886,6 @@ where
             }
         }
         end_timer!(sig_time);
-
-        if !verify_binding_signature::<Components>(
-            &parameters.circuit_parameters.value_commitment_parameters,
-            &transaction.stuff.input_value_commitments,
-            &transaction.stuff.output_value_commitments,
-            transaction.stuff.value_balance,
-            &to_bytes![transaction.stuff.local_data_commitment]?,
-            &transaction.stuff.binding_signature,
-        )? {
-            eprintln!("Binding signature didn't verify.");
-            return Ok(false);
-        }
 
         end_timer!(verify_time);
         Ok(true)

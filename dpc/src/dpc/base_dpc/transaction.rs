@@ -1,7 +1,4 @@
-use crate::{
-    dpc::base_dpc::{binding_signature::BindingSignature, BaseDPCComponents},
-    Transaction,
-};
+use crate::{dpc::base_dpc::BaseDPCComponents, Transaction};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, SNARK};
@@ -44,10 +41,7 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
-    pub input_value_commitments: Vec<[u8; 32]>,
-    pub output_value_commitments: Vec<[u8; 32]>,
     pub value_balance: u64,
-    pub binding_signature: BindingSignature,
 
     #[derivative(PartialEq = "ignore")]
     pub signatures: Vec<<C::Signature as SignatureScheme>::Output>,
@@ -63,10 +57,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         predicate_proof: <C::OuterSNARK as SNARK>::Proof,
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
-        input_value_commitments: Vec<[u8; 32]>,
-        output_value_commitments: Vec<[u8; 32]>,
         value_balance: u64,
-        binding_signature: BindingSignature,
         signatures: Vec<<C::Signature as SignatureScheme>::Output>,
     ) -> Self {
         let stuff = DPCStuff {
@@ -75,10 +66,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             predicate_proof,
             predicate_commitment,
             local_data_commitment,
-            input_value_commitments,
-            output_value_commitments,
             value_balance,
-            binding_signature,
             signatures,
         };
         DPCTransaction {

@@ -200,6 +200,8 @@ pub trait AffineCurve:
     #[must_use]
     fn is_zero(&self) -> bool;
 
+    fn add(self, other: &Self) -> Self;
+
     /// Performs scalar multiplication of this element with mixed addition.
     #[must_use]
     fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, other: S) -> Self::Projective;
