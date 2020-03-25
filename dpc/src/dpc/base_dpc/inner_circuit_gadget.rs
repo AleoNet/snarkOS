@@ -255,12 +255,11 @@ where
             Ok(&comm_crh_sig_parameters.signature_parameters)
         })?;
 
-        // TODO CHANGE THIS TO ALLOC_INPUT
         let value_commitment_pp = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
             C::InnerField,
             C::BindingSignatureGroup,
-        >>::ParametersGadget::alloc(
+        >>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare value commitment parameters"),
             || Ok(comm_crh_sig_parameters.value_commitment_parameters.parameters()),
         )?;

@@ -50,6 +50,8 @@ where
     <C::Signature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::Signature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
+    <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+
     MerkleTreeParameters<C::MerkleParameters>: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
@@ -96,6 +98,14 @@ where
         );
 
         v.extend_from_slice(&self.circuit_parameters.signature_parameters.to_field_elements()?);
+
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .value_commitment_parameters
+                .parameters()
+                .to_field_elements()?,
+        );
 
         v.extend_from_slice(&self.ledger_parameters.parameters().to_field_elements()?);
         v.extend_from_slice(&self.ledger_digest.to_field_elements()?);
