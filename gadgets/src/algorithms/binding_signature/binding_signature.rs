@@ -1,12 +1,12 @@
 use crate::algorithms::commitment::pedersen::*;
 
-use snarkos_algorithms::{commitment::PedersenCommitment, crh::PedersenSize};
+use snarkos_algorithms::{commitment::PedersenCompressedCommitment, crh::PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group, PrimeField},
+    curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
         algorithms::{BindingSignatureGadget, CommitmentGadget},
-        curves::GroupGadget,
+        curves::CompressedGroupGadget,
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
@@ -14,15 +14,16 @@ use snarkos_models::{
 
 use std::marker::PhantomData;
 
-pub struct BindingSignatureVerificationGadget<G: Group, F: Field, GG: GroupGadget<G, F>>(
+pub struct BindingSignatureVerificationGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>>(
     PhantomData<G>,
     PhantomData<GG>,
     PhantomData<F>,
 );
 
-impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize>
-    BindingSignatureGadget<PedersenCommitment<G, S>, F> for BindingSignatureVerificationGadget<G, F, GG>
+impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    BindingSignatureGadget<PedersenCompressedCommitment<G, S>, F, G> for BindingSignatureVerificationGadget<G, F, GG>
 {
+    type CompressedOutputGadget = GG::BaseFieldGadget;
     type OutputGadget = GG;
     type ParametersGadget = PedersenCommitmentParametersGadget<G, S, F>;
     type RandomnessGadget = PedersenRandomnessGadget<G>;

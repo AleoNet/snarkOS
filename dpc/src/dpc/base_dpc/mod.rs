@@ -14,6 +14,7 @@ use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDi
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
+    curves::{Group, ProjectiveCurve},
     dpc::DPCComponents,
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
@@ -84,7 +85,12 @@ pub trait BaseDPCComponents: DPCComponents {
 
     /// Gadget for verifying the binding signature
     type BindingSignatureCommitment: CommitmentScheme; // TODO remove this commitment scheme and use ValueCommitment
-    type BindingSignatureGadget: BindingSignatureGadget<Self::BindingSignatureCommitment, Self::InnerField>;
+    type BindingSignatureGroup: Group + ProjectiveCurve;
+    type BindingSignatureGadget: BindingSignatureGadget<
+        Self::BindingSignatureCommitment,
+        Self::InnerField,
+        Self::BindingSignatureGroup,
+    >;
 
     /// SNARK for non-proof-verification checks
     type InnerSNARK: SNARK<
@@ -200,7 +206,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Local Data Commitment setup");
+        let time = start_timer!(|| "Value Commitment setup");
         let value_comm_pp = Components::ValueCommitment::setup(rng);
         end_timer!(time);
 

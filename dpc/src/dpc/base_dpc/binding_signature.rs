@@ -258,13 +258,13 @@ pub fn verify_binding_signature<C: CommitmentScheme>(
 
 pub fn gadget_verification_setup<C: CommitmentScheme>(
     parameters: &C,
-    input_value_commitments: &Vec<[u8; 32]>,
-    output_value_commitments: &Vec<[u8; 32]>,
+    input_value_commitments: &[[u8; 32]],
+    output_value_commitments: &[[u8; 32]],
     input: &Vec<u8>,
     signature: &BindingSignature,
 ) -> Result<
     (
-        <G as Group>::ScalarField,
+        C::Randomness,
         <G as ProjectiveCurve>::Affine,
         <G as ProjectiveCurve>::Affine,
         <G as ProjectiveCurve>::Affine,
@@ -284,7 +284,9 @@ pub fn gadget_verification_setup<C: CommitmentScheme>(
         partial_bvk = partial_bvk.add(&recovered_output_value_commitment.neg());
     }
 
-    let c: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
+    let c_field: <G as Group>::ScalarField = hash_into_field::<G>(&signature.rbar[..], input);
+    let c: C::Randomness = FromBytes::read(&to_bytes![c_field]?[..])?;
+
     let affine_r = recover_affine_from_x_coord(&signature.rbar)?;
 
     let zero: u64 = 0;
@@ -299,10 +301,7 @@ pub fn gadget_verification_setup<C: CommitmentScheme>(
 mod tests {
     use super::*;
 
-    use snarkos_algorithms::{
-        commitment::{PedersenCommitment, PedersenCompressedCommitment},
-        crh::PedersenSize,
-    };
+    use snarkos_algorithms::{commitment::PedersenCompressedCommitment, crh::PedersenSize};
     use snarkos_curves::bls12_377::fr::Fr;
     use snarkos_gadgets::{
         algorithms::binding_signature::BindingSignatureVerificationGadget,
@@ -329,7 +328,6 @@ mod tests {
     }
 
     type ValueCommitment = PedersenCompressedCommitment<EdwardsBls12, ValueWindow>;
-    type TestValueCommitment = PedersenCommitment<EdwardsBls12, ValueWindow>;
     type VerificationGadget = BindingSignatureVerificationGadget<EdwardsBls12, Fr, EdwardsBlsGadget>;
 
     fn generate_random_binding_signature<C: CommitmentScheme, R: Rng>(
@@ -526,40 +524,40 @@ mod tests {
 
         // Allocate gadget values
 
-        let parameters_gadget = <VerificationGadget as BindingSignatureGadget<_, _>>::ParametersGadget::alloc(
+        let parameters_gadget = <VerificationGadget as BindingSignatureGadget<_, _, _>>::ParametersGadget::alloc(
             &mut cs.ns(|| "parameters_gadget"),
             || Ok(value_comm_pp.parameters),
         )
         .unwrap();
 
-        let c_gadget = <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::RandomnessGadget::alloc(
+        let c_gadget = <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, _>>::RandomnessGadget::alloc(
             &mut cs.ns(|| "c_gadget"),
             || Ok(&c),
         )
         .unwrap();
 
         let partial_bvk_gadget =
-            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+            <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, _>>::OutputGadget::alloc(
                 &mut cs.ns(|| "partial_bvk_gadget"),
                 || Ok(partial_bvk),
             )
             .unwrap();
 
         let affine_r_gadget =
-            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+            <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, _>>::OutputGadget::alloc(
                 &mut cs.ns(|| "affine_r_gadget"),
                 || Ok(affine_r),
             )
             .unwrap();
 
         let recommit_gadget =
-            <VerificationGadget as BindingSignatureGadget<TestValueCommitment, _>>::OutputGadget::alloc(
+            <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, _>>::OutputGadget::alloc(
                 &mut cs.ns(|| "recommit_gadget"),
                 || Ok(recommit),
             )
             .unwrap();
 
-        <VerificationGadget as BindingSignatureGadget<_, _>>::check_binding_signature_gadget(
+        <VerificationGadget as BindingSignatureGadget<_, _, _>>::check_binding_signature_gadget(
             &mut cs.ns(|| "verify_binding_signature"),
             &parameters_gadget,
             &partial_bvk_gadget,

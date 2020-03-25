@@ -318,6 +318,9 @@ fn test_execute_base_dpc_constraints() {
         &local_data_rand,
         &memo,
         &auxiliary,
+        &old_value_commits,
+        &new_value_commits,
+        value_balance,
         &binding_signature,
     )
     .unwrap();
