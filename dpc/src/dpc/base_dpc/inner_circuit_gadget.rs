@@ -747,11 +747,22 @@ where
             C::BindingSignatureGroup,
         >>::OutputGadget::alloc(&mut cs.ns(|| "recommit_gadget"), || Ok(recommit))?;
 
+        let value_balance_bytes = UInt8::alloc_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes())?;
+
+        let value_balance_comm = <C::BindingSignatureGadget as BindingSignatureGadget<
+            _,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::check_value_balance_commitment_gadget(
+            &mut cs.ns(|| "value_balance_commitment"),
+            &value_commitment_pp,
+            &value_balance_bytes,
+        )?;
+
         <C::BindingSignatureGadget as BindingSignatureGadget<_, C::InnerField, C::BindingSignatureGroup>>::check_binding_signature_gadget(
             &mut cs.ns(|| "verify_binding_signature"),
-            &value_commitment_pp,
             &partial_bvk_gadget,
-            value_balance,
+            &value_balance_comm,
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,

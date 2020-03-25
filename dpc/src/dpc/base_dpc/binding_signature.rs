@@ -323,7 +323,7 @@ mod tests {
         gadgets::{
             algorithms::BindingSignatureGadget,
             r1cs::{ConstraintSystem, TestConstraintSystem},
-            utilities::alloc::AllocGadget,
+            utilities::{alloc::AllocGadget, uint8::UInt8},
         },
     };
 
@@ -569,11 +569,19 @@ mod tests {
             )
             .unwrap();
 
-        <VerificationGadget as BindingSignatureGadget<_, _, _>>::check_binding_signature_gadget(
-            &mut cs.ns(|| "verify_binding_signature"),
+        let value_balance_bytes =
+            UInt8::alloc_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes()).unwrap();
+
+        let value_balance_comm = <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, G>>::check_value_balance_commitment_gadget(
+            &mut cs.ns(|| "value_balance_commitment"),
             &parameters_gadget,
+            &value_balance_bytes,
+        ).unwrap();
+
+        <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, G>>::check_binding_signature_gadget(
+            &mut cs.ns(|| "verify_binding_signature"),
             &partial_bvk_gadget,
-            value_balance,
+            &value_balance_comm,
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,
