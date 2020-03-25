@@ -725,6 +725,9 @@ where
                 &local_data_randomness,
                 memorandum,
                 auxiliary,
+                &old_value_commits,
+                &new_value_commits,
+                value_balance,
                 &binding_signature,
             );
 

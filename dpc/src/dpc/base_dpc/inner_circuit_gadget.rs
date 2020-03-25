@@ -51,6 +51,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_rand: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
+    input_value_commitments: &[[u8; 32]],
+    output_value_commitments: &[[u8; 32]],
+    value_balance: u64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
@@ -91,6 +94,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         local_data_rand,
         memo,
         auxiliary,
+        input_value_commitments,
+        output_value_commitments,
+        value_balance,
         binding_signature,
     )
 }
@@ -138,6 +144,9 @@ fn base_dpc_execute_gadget_helper<
     local_data_rand: &LocalDataC::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
+    input_value_commitments: &[[u8; 32]],
+    output_value_commitments: &[[u8; 32]],
+    value_balance: u64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
@@ -191,13 +200,14 @@ where
     // 4. pred_vk_comm_pp
     // 5. sn_nonce_crh_pp.
     // 6. sig_pp.
-    // 7. ledger_parameters.
-    // 8. ledger_digest.
-    // 9. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
-    // 10. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
-    // 11. predicate_comm.
-    // 12. local_data_comm.
-    // 13. binding_signature.
+    // 7. value_commitment_pp.
+    // 8. ledger_parameters.
+    // 9. ledger_digest.
+    // 10. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i].
+    // 11. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i].
+    // 12. predicate_comm.
+    // 13. local_data_comm.
+    // 14. binding_signature.
     let (addr_comm_pp, rec_comm_pp, pred_vk_comm_pp, local_data_comm_pp, sn_nonce_crh_pp, sig_pp, ledger_pp) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
         let addr_comm_pp =
@@ -229,6 +239,11 @@ where
         let sig_pp = SignatureSGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SIG Parameters"), || {
             Ok(&comm_crh_sig_parameters.signature_parameters)
         })?;
+        //
+        //        // TODO CHANGE THIS TO ALLOC_INPUT
+        //        let value_commitment_pp = <C::ValueCommitmentGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc(&mut cs.ns(|| "Declare value commitment parameters"), || {
+        //            Ok(&comm_crh_sig_parameters.value_commitment_parameters)
+        //        })?;
 
         let ledger_pp = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Ledger Parameters"),

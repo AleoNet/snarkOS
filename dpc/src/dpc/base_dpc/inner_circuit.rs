@@ -48,6 +48,10 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 
     memo: Option<[u8; 32]>,
     auxiliary: Option<[u8; 32]>,
+
+    input_value_commitments: Option<Vec<[u8; 32]>>,
+    output_value_commitments: Option<Vec<[u8; 32]>>,
+    value_balance: Option<u64>,
     binding_signature: Option<BindingSignature>,
 }
 
@@ -78,6 +82,9 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
         let local_data_randomness = <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
 
+        let input_value_commitments = vec![[0u8; 32]; num_input_records];
+        let output_value_commitments = vec![[0u8; 32]; num_output_records];
+        let value_balance: u64 = 0;
         let binding_signature = BindingSignature::default();
 
         Self {
@@ -106,6 +113,10 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             local_data_randomness: Some(local_data_randomness),
             memo: Some(memo),
             auxiliary: Some(auxiliary),
+
+            input_value_commitments: Some(input_value_commitments),
+            output_value_commitments: Some(output_value_commitments),
+            value_balance: Some(value_balance),
             binding_signature: Some(binding_signature),
         }
     }
@@ -138,6 +149,10 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
+
+        input_value_commitments: &[[u8; 32]],
+        output_value_commitments: &[[u8; 32]],
+        value_balance: u64,
         binding_signature: &BindingSignature,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
@@ -180,6 +195,10 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
             memo: Some(memo.clone()),
             auxiliary: Some(auxiliary.clone()),
+
+            input_value_commitments: Some(input_value_commitments.to_vec()),
+            output_value_commitments: Some(output_value_commitments.to_vec()),
+            value_balance: Some(value_balance),
             binding_signature: Some(binding_signature.clone()),
         }
     }
@@ -210,6 +229,9 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.local_data_randomness.get()?,
             self.memo.get()?,
             self.auxiliary.get()?,
+            self.input_value_commitments.get()?,
+            self.output_value_commitments.get()?,
+            *self.value_balance.get()?,
             self.binding_signature.get()?,
         )?;
         Ok(())
