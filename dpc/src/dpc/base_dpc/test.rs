@@ -284,7 +284,11 @@ fn test_execute_base_dpc_constraints() {
 
     let sighash = to_bytes![local_data_comm].unwrap();
 
-    let binding_signature = create_binding_signature::<<Components as BaseDPCComponents>::ValueCommitment, _>(
+    let binding_signature = create_binding_signature::<
+        <Components as BaseDPCComponents>::ValueCommitment,
+        <Components as BaseDPCComponents>::BindingSignatureGroup,
+        _,
+    >(
         &circuit_parameters.value_commitment_parameters,
         &old_value_commits,
         &new_value_commits,
@@ -372,7 +376,10 @@ fn test_execute_base_dpc_constraints() {
 
     assert!(pf_check_cs.is_satisfied());
 
-    let verify_binding_signature = verify_binding_signature::<<Components as BaseDPCComponents>::ValueCommitment>(
+    let verify_binding_signature = verify_binding_signature::<
+        <Components as BaseDPCComponents>::ValueCommitment,
+        <Components as BaseDPCComponents>::BindingSignatureGroup,
+    >(
         &circuit_parameters.value_commitment_parameters,
         &old_value_commits,
         &new_value_commits,
