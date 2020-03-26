@@ -43,9 +43,7 @@ pub struct Proof<E: PairingEngine> {
 impl<E: PairingEngine> ToBytes for Proof<E> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        self.a.write(&mut writer)?;
-        self.b.write(&mut writer)?;
-        self.c.write(&mut writer)
+        self.write(&mut writer)
     }
 }
 
@@ -79,15 +77,19 @@ impl<E: PairingEngine> Default for Proof<E> {
 impl<E: PairingEngine> Proof<E> {
     /// Serialize the proof into bytes, for storage on disk or transmission
     /// over the network.
-    pub fn write<W: Write>(&self, mut _writer: W) -> io::Result<()> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        self.a.write(&mut writer)?;
+        self.b.write(&mut writer)?;
+        self.c.write(&mut writer)
     }
 
     /// Deserialize the proof from bytes.
-    pub fn read<R: Read>(mut _reader: R) -> io::Result<Self> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        let a: E::G1Affine = FromBytes::read(&mut reader)?;
+        let b: E::G2Affine = FromBytes::read(&mut reader)?;
+        let c: E::G1Affine = FromBytes::read(&mut reader)?;
+
+        Ok(Self { a, b, c })
     }
 }
 
