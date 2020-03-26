@@ -157,19 +157,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCStuff<C> {
         self.predicate_proof.write(&mut writer)?;
         self.predicate_commitment.write(&mut writer)?;
         self.local_data_commitment.write(&mut writer)?;
-
-        variable_length_integer(self.input_value_commitments.len() as u64).write(&mut writer)?;
-        for input_value_commitment in &self.input_value_commitments {
-            input_value_commitment.write(&mut writer)?;
-        }
-
-        variable_length_integer(self.output_value_commitments.len() as u64).write(&mut writer)?;
-        for output_value_commitment in &self.output_value_commitments {
-            output_value_commitment.write(&mut writer)?;
-        }
-
         self.value_balance.write(&mut writer)?;
-        self.binding_signature.write(&mut writer)?;
 
         variable_length_integer(self.signatures.len() as u64).write(&mut writer)?;
         for signature in &self.signatures {
@@ -190,23 +178,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
             FromBytes::read(&mut reader)?;
         let local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
 
-        let num_input_value_commitments = read_variable_length_integer(&mut reader)?;
-        let mut input_value_commitments = vec![];
-        for _ in 0..num_input_value_commitments {
-            let input_value_commitment: [u8; 32] = FromBytes::read(&mut reader)?;
-            input_value_commitments.push(input_value_commitment);
-        }
-
-        let num_output_value_commitments = read_variable_length_integer(&mut reader)?;
-        let mut output_value_commitments = vec![];
-        for _ in 0..num_output_value_commitments {
-            let output_value_commitment: [u8; 32] = FromBytes::read(&mut reader)?;
-            output_value_commitments.push(output_value_commitment);
-        }
-
         let value_balance: u64 = FromBytes::read(&mut reader)?;
-
-        let binding_signature: BindingSignature = FromBytes::read(&mut reader)?;
 
         let num_signatures = read_variable_length_integer(&mut reader)?;
         let mut signatures = vec![];
@@ -221,10 +193,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
             predicate_proof,
             predicate_commitment,
             local_data_commitment,
-            input_value_commitments,
-            output_value_commitments,
             value_balance,
-            binding_signature,
             signatures,
         })
     }

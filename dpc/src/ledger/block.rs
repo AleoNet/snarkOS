@@ -1,19 +1,16 @@
-use crate::{
-    base_dpc::{transaction::DPCTransaction, BaseDPCComponents},
-    ledger::Transactions,
-};
+use crate::{base_dpc::BaseDPCComponents, ledger::Transactions};
 
 use snarkos_errors::objects::BlockError;
 use snarkos_objects::BlockHeader;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
-    variable_length_integer::{read_variable_length_integer, variable_length_integer},
+    variable_length_integer::variable_length_integer,
 };
 
 use std::io::{Read, Result as IoResult, Write};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Block<C: BaseDPCComponents> {
     /// First 84 bytes of the block as defined by the encoding used by
     /// "block" messages.
@@ -60,7 +57,7 @@ impl<C: BaseDPCComponents> Block<C> {
         header_array.copy_from_slice(&header_bytes[0..84]);
         let header = BlockHeader::deserialize(&header_array);
 
-        let transactions = Transactions::deserialize(transactions_bytes)?;
+        let transactions: Transactions<C> = FromBytes::read(transactions_bytes)?;
 
         Ok(Block { header, transactions })
     }

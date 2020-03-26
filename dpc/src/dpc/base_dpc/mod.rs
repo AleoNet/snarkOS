@@ -329,7 +329,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.signature_parameters, rng)?;
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
 
         // Sample randomness rpk for the commitment scheme.
         let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);

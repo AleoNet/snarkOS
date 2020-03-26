@@ -119,9 +119,7 @@ where
         }
 
         v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);
-        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            self.memo.as_ref(),
-        )?);
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(&self.memo)?);
         v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
 
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
