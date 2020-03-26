@@ -2,8 +2,11 @@
 //! [GM17]: https://eprint.iacr.org/2017/540
 
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::curves::pairing_engine::{PairingCurve, PairingEngine};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use std::io::{self, Read, Result as IoResult, Write};
 
@@ -33,7 +36,7 @@ pub use self::verifier::*;
 mod test;
 
 /// A proof in the GM17 SNARK.
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct Proof<E: PairingEngine> {
     pub a: E::G1Affine,
     pub b: E::G2Affine,
@@ -111,10 +114,38 @@ impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
         self.h_beta_g2.write(&mut writer)?;
         self.g_gamma_g1.write(&mut writer)?;
         self.h_gamma_g2.write(&mut writer)?;
+        (self.query.len() as u32).to_le_bytes().write(&mut writer)?;
         for q in &self.query {
             q.write(&mut writer)?;
         }
         Ok(())
+    }
+}
+//
+impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        let h_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_alpha_g1: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_beta_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_gamma_g1: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_gamma_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+
+        let query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut query: Vec<E::G1Affine> = vec![];
+        for _ in 0..query_len {
+            let query_element: E::G1Affine = FromBytes::read(&mut reader)?;
+            query.push(query_element);
+        }
+
+        Ok(Self {
+            h_g2,
+            g_alpha_g1,
+            h_beta_g2,
+            g_gamma_g1,
+            h_gamma_g2,
+            query,
+        })
     }
 }
 
@@ -189,9 +220,43 @@ impl<E: PairingEngine> PartialEq for Parameters<E> {
 
 impl<E: PairingEngine> Parameters<E> {
     /// Serialize the parameters to bytes.
-    pub fn write<W: Write>(&self, mut _writer: W) -> io::Result<()> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        self.vk.write(&mut writer)?;
+
+        (self.a_query.len() as u32).to_le_bytes().write(&mut writer)?;
+        for g in &self.a_query[..] {
+            writer.write(&to_bytes![g.into_projective()]?)?;
+        }
+
+        (self.b_query.len() as u32).to_le_bytes().write(&mut writer)?;
+        for g in &self.b_query[..] {
+            writer.write(&to_bytes![g.into_projective()]?)?;
+        }
+
+        (self.c_query_1.len() as u32).to_le_bytes().write(&mut writer)?;
+        for g in &self.c_query_1[..] {
+            writer.write(&to_bytes![g.into_projective()]?)?;
+        }
+
+        (self.c_query_2.len() as u32).to_le_bytes().write(&mut writer)?;
+        for g in &self.c_query_2[..] {
+            writer.write(&to_bytes![g.into_projective()]?)?;
+        }
+
+        self.g_gamma_z.write(&mut writer)?;
+
+        self.h_gamma_z.write(&mut writer)?;
+
+        self.g_ab_gamma_z.write(&mut writer)?;
+
+        self.g_gamma2_z2.write(&mut writer)?;
+
+        (self.g_gamma2_z_t.len() as u32).to_le_bytes().write(&mut writer)?;
+        for g in &self.g_gamma2_z_t[..] {
+            writer.write(&to_bytes![g.into_projective()]?)?;
+        }
+
+        Ok(())
     }
 
     /// Deserialize the public parameters from bytes.
