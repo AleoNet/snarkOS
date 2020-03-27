@@ -4,8 +4,10 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{
+    fs::File,
     io::{Read, Result as IoResult, Write},
     marker::PhantomData,
+    path::PathBuf,
 };
 
 pub trait PedersenSize: Clone {
@@ -41,6 +43,7 @@ impl<G: Group, S: PedersenSize> FromBytes for PedersenCRHParameters<G, S> {
         let num_bases: u32 = FromBytes::read(&mut reader)?;
         for _ in 0..num_bases {
             let mut base = vec![];
+
             let base_len: u32 = FromBytes::read(&mut reader)?;
             for _ in 0..base_len {
                 let g: G = FromBytes::read(&mut reader)?;
@@ -80,6 +83,24 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
             base.double_in_place();
         }
         powers
+    }
+
+    /// Store the CRH parameters to a file at the given path.
+    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the CRH parameters from a file at the given path.
+    pub fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
     }
 }
 

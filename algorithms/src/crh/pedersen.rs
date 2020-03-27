@@ -4,9 +4,14 @@ use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, Field, Group},
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use rayon::prelude::*;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
     let mut bits = Vec::with_capacity(bytes.len() * 8);
@@ -22,6 +27,23 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCRH<G: Group, S: PedersenSize> {
     pub parameters: PedersenCRHParameters<G, S>,
+}
+
+impl<G: Group, S: PedersenSize> ToBytes for PedersenCRH<G, S> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.parameters.write(&mut writer)?;
+
+        Ok(())
+    }
+}
+
+impl<G: Group, S: PedersenSize> FromBytes for PedersenCRH<G, S> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let parameters: PedersenCRHParameters<G, S> = FromBytes::read(&mut reader)?;
+
+        Ok(Self { parameters })
+    }
 }
 
 impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
@@ -102,5 +124,19 @@ impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintFie
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.parameters.to_field_elements()
+    }
+}
+
+impl<G: Group, S: PedersenSize> PedersenCRH<G, S> {
+    /// Store the CRH parameters to a file at the given path.
+    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.parameters.store(path)
+    }
+
+    /// Load the CRH parameters from a file at the given path.
+    pub fn load(path: &PathBuf) -> IoResult<Self> {
+        let parameters = PedersenCRHParameters::<G, S>::load(path)?;
+
+        Ok(Self { parameters })
     }
 }
