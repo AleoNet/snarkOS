@@ -34,7 +34,7 @@ pub mod verifier;
 pub use self::verifier::*;
 
 #[cfg(test)]
-mod test;
+mod tests;
 
 /// A proof in the GM17 SNARK.
 #[derive(Clone, Debug, Eq)]

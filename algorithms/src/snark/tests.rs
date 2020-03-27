@@ -30,8 +30,6 @@ impl<F: Field> ConstraintSynthesizer<F> for MySillyCircuit<F> {
     }
 }
 
-// TODO Add Read and Write tests for Parameters and Verifying Keys
-
 mod bls12_377 {
     use super::*;
     use crate::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
