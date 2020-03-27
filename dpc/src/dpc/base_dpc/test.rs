@@ -8,6 +8,7 @@ use crate::{
             payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
             predicate::PrivatePredicateInput,
             record_payload::PaymentRecordPayload,
+            BaseDPCComponents,
             ExecuteContext,
             DPC,
         },
@@ -138,7 +139,11 @@ fn test_execute_base_dpc_constraints() {
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {
-        let value = old_records[i].payload.balance;
+        // If the record is a dummy, then the value should be 0
+        let value = match new_records[i].is_dummy() {
+            true => 0,
+            false => old_records[i].payload().balance,
+        };
 
         let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
@@ -188,7 +193,11 @@ fn test_execute_base_dpc_constraints() {
 
     let mut new_proof_and_vk = vec![];
     for j in 0..NUM_OUTPUT_RECORDS {
-        let value = new_records[j].payload.balance;
+        // If the record is a dummy, then the value should be 0
+        let value = match new_records[j].is_dummy() {
+            true => 0,
+            false => new_records[j].payload().balance,
+        };
 
         let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
@@ -275,7 +284,11 @@ fn test_execute_base_dpc_constraints() {
 
     let sighash = to_bytes![local_data_comm].unwrap();
 
-    let binding_signature = create_binding_signature::<Components, _>(
+    let binding_signature = create_binding_signature::<
+        <Components as BaseDPCComponents>::ValueCommitment,
+        <Components as BaseDPCComponents>::BindingSignatureGroup,
+        _,
+    >(
         &circuit_parameters.value_commitment_parameters,
         &old_value_commits,
         &new_value_commits,
@@ -309,6 +322,9 @@ fn test_execute_base_dpc_constraints() {
         &local_data_rand,
         &memo,
         &auxiliary,
+        &old_value_commits,
+        &new_value_commits,
+        value_balance,
         &binding_signature,
     )
     .unwrap();
@@ -359,4 +375,19 @@ fn test_execute_base_dpc_constraints() {
     println!("=========================================================");
 
     assert!(pf_check_cs.is_satisfied());
+
+    let verify_binding_signature = verify_binding_signature::<
+        <Components as BaseDPCComponents>::ValueCommitment,
+        <Components as BaseDPCComponents>::BindingSignatureGroup,
+    >(
+        &circuit_parameters.value_commitment_parameters,
+        &old_value_commits,
+        &new_value_commits,
+        value_balance,
+        &sighash,
+        &binding_signature,
+    )
+    .unwrap();
+
+    assert!(verify_binding_signature);
 }

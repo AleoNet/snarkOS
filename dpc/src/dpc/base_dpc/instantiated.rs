@@ -29,6 +29,7 @@ use snarkos_curves::{
 };
 use snarkos_gadgets::{
     algorithms::{
+        binding_signature::BindingSignatureVerificationGadget,
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::PedersenCompressedCRHGadget,
         prf::Blake2sGadget,
@@ -152,6 +153,8 @@ impl DPCComponents for Components {
 }
 
 impl BaseDPCComponents for Components {
+    type BindingSignatureGadget = BindingSignatureGadget;
+    type BindingSignatureGroup = EdwardsBls;
     type InnerSNARK = CoreCheckNIZK;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
@@ -195,6 +198,7 @@ pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
+pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
