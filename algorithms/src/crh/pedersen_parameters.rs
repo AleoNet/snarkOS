@@ -85,7 +85,7 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
         powers
     }
 
-    /// Store the CRH parameters to a file at the given path.
+    /// Store the Pedersen CRH parameters to a file at the given path.
     pub fn store(&self, path: &PathBuf) -> IoResult<()> {
         let mut file = File::create(path)?;
         let mut parameter_bytes = vec![];
@@ -97,7 +97,7 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
         Ok(())
     }
 
-    /// Load the CRH parameters from a file at the given path.
+    /// Load the Pedersen CRH parameters from a file at the given path.
     pub fn load(path: &PathBuf) -> IoResult<Self> {
         let mut file = File::open(path)?;
         Ok(Self::read(&mut file)?)

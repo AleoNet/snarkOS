@@ -31,9 +31,7 @@ pub struct PedersenCRH<G: Group, S: PedersenSize> {
 
 impl<G: Group, S: PedersenSize> ToBytes for PedersenCRH<G, S> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.parameters.write(&mut writer)?;
-
-        Ok(())
+        self.parameters.write(&mut writer)
     }
 }
 
