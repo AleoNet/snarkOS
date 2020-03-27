@@ -53,11 +53,7 @@ impl<E: PairingEngine> ToBytes for Proof<E> {
 impl<E: PairingEngine> FromBytes for Proof<E> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> io::Result<Self> {
-        let a: E::G1Affine = FromBytes::read(&mut reader)?;
-        let b: E::G2Affine = FromBytes::read(&mut reader)?;
-        let c: E::G1Affine = FromBytes::read(&mut reader)?;
-
-        Ok(Self { a, b, c })
+        Self::read(&mut reader)
     }
 }
 
@@ -109,43 +105,14 @@ pub struct VerifyingKey<E: PairingEngine> {
 
 impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.h_g2.write(&mut writer)?;
-        self.g_alpha_g1.write(&mut writer)?;
-        self.h_beta_g2.write(&mut writer)?;
-        self.g_gamma_g1.write(&mut writer)?;
-        self.h_gamma_g2.write(&mut writer)?;
-        (self.query.len() as u32).to_le_bytes().write(&mut writer)?;
-        for q in &self.query {
-            q.write(&mut writer)?;
-        }
-        Ok(())
+        self.write(&mut writer)
     }
 }
 //
 impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> io::Result<Self> {
-        let h_g2: E::G2Affine = FromBytes::read(&mut reader)?;
-        let g_alpha_g1: E::G1Affine = FromBytes::read(&mut reader)?;
-        let h_beta_g2: E::G2Affine = FromBytes::read(&mut reader)?;
-        let g_gamma_g1: E::G1Affine = FromBytes::read(&mut reader)?;
-        let h_gamma_g2: E::G2Affine = FromBytes::read(&mut reader)?;
-
-        let query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut query: Vec<E::G1Affine> = vec![];
-        for _ in 0..query_len {
-            let query_element: E::G1Affine = FromBytes::read(&mut reader)?;
-            query.push(query_element);
-        }
-
-        Ok(Self {
-            h_g2,
-            g_alpha_g1,
-            h_beta_g2,
-            g_gamma_g1,
-            h_gamma_g2,
-            query,
-        })
+        Self::read(&mut reader)
     }
 }
 
@@ -176,15 +143,42 @@ impl<E: PairingEngine> PartialEq for VerifyingKey<E> {
 impl<E: PairingEngine> VerifyingKey<E> {
     /// Serialize the verification key into bytes, for storage on disk
     /// or transmission over the network.
-    pub fn write<W: Write>(&self, mut _writer: W) -> io::Result<()> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        self.h_g2.write(&mut writer)?;
+        self.g_alpha_g1.write(&mut writer)?;
+        self.h_beta_g2.write(&mut writer)?;
+        self.g_gamma_g1.write(&mut writer)?;
+        self.h_gamma_g2.write(&mut writer)?;
+        (self.query.len() as u32).to_le_bytes().write(&mut writer)?;
+        for q in &self.query {
+            q.write(&mut writer)?;
+        }
+        Ok(())
     }
 
     /// Deserialize the verification key from bytes.
-    pub fn read<R: Read>(mut _reader: R) -> io::Result<Self> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        let h_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_alpha_g1: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_beta_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_gamma_g1: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_gamma_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+
+        let query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut query: Vec<E::G1Affine> = vec![];
+        for _ in 0..query_len {
+            let query_element: E::G1Affine = FromBytes::read(&mut reader)?;
+            query.push(query_element);
+        }
+
+        Ok(Self {
+            h_g2,
+            g_alpha_g1,
+            h_beta_g2,
+            g_gamma_g1,
+            h_gamma_g2,
+            query,
+        })
     }
 }
 
