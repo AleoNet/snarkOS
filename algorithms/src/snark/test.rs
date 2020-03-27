@@ -147,3 +147,72 @@ mod gm17 {
         assert!(result);
     }
 }
+
+mod serialization {
+    use super::*;
+    use crate::snark::{create_random_proof, generate_random_parameters, Parameters, Proof, VerifyingKey};
+
+    use snarkos_curves::bls12_377::{Bls12_377, Fr};
+    use snarkos_utilities::{
+        bytes::{FromBytes, ToBytes},
+        rand::UniformRand,
+        to_bytes,
+    };
+
+    use rand::thread_rng;
+
+    const TEST_PARAMETERS_PATH: &str = "./snark.params";
+
+    #[test]
+    fn proof_serialization() {
+        let rng = &mut thread_rng();
+
+        let parameters =
+            generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+
+        let a = Fr::rand(rng);
+        let b = Fr::rand(rng);
+
+        let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &parameters, rng).unwrap();
+
+        let proof_bytes = to_bytes![proof].unwrap();
+        let recovered_proof: Proof<Bls12_377> = FromBytes::read(&proof_bytes[..]).unwrap();
+
+        assert_eq!(proof, recovered_proof);
+    }
+
+    #[test]
+    fn parameter_serialization() {
+        let rng = &mut thread_rng();
+
+        let parameters =
+            generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        let vk = parameters.vk.clone();
+
+        let parameter_bytes = to_bytes![&parameters].unwrap();
+        let vk_bytes = to_bytes![&vk].unwrap();
+
+        let recovered_parameters: Parameters<Bls12_377> = FromBytes::read(&parameter_bytes[..]).unwrap();
+        let recovered_vk: VerifyingKey<Bls12_377> = FromBytes::read(&vk_bytes[..]).unwrap();
+
+        assert_eq!(parameters, recovered_parameters);
+        assert_eq!(vk, recovered_vk);
+    }
+
+    #[test]
+    fn parameter_storage() {
+        let rng = &mut thread_rng();
+        let mut path = std::env::current_dir().unwrap();
+        path.push(TEST_PARAMETERS_PATH);
+
+        let parameters =
+            generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        parameters.store(&path).unwrap();
+
+        let recovered_parameters = Parameters::<Bls12_377>::load(&path).unwrap();
+
+        assert_eq!(parameters, recovered_parameters);
+
+        std::fs::remove_file(&path).unwrap();
+    }
+}

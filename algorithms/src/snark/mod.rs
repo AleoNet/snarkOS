@@ -5,7 +5,11 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::io::{self, Read, Result as IoResult, Write};
+use std::{
+    fs::File,
+    io::{self, Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[macro_use]
 pub mod macros;
@@ -33,7 +37,7 @@ pub use self::verifier::*;
 mod test;
 
 /// A proof in the GM17 SNARK.
-#[derive(Clone, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct Proof<E: PairingEngine> {
     pub a: E::G1Affine,
     pub b: E::G2Affine,
@@ -90,7 +94,7 @@ impl<E: PairingEngine> Proof<E> {
 }
 
 /// A verification key in the GM17 SNARK.
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq)]
 pub struct VerifyingKey<E: PairingEngine> {
     pub h_g2: E::G2Affine,
     pub g_alpha_g1: E::G1Affine,
@@ -105,7 +109,7 @@ impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
         self.write(&mut writer)
     }
 }
-//
+
 impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> io::Result<Self> {
@@ -146,7 +150,7 @@ impl<E: PairingEngine> VerifyingKey<E> {
         self.h_beta_g2.write(&mut writer)?;
         self.g_gamma_g1.write(&mut writer)?;
         self.h_gamma_g2.write(&mut writer)?;
-        (self.query.len() as u32).to_le_bytes().write(&mut writer)?;
+        (self.query.len() as u32).write(&mut writer)?;
         for q in &self.query {
             q.write(&mut writer)?;
         }
@@ -180,7 +184,7 @@ impl<E: PairingEngine> VerifyingKey<E> {
 }
 
 /// Full public (prover and verifier) parameters for the GM17 zkSNARK.
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq)]
 pub struct Parameters<E: PairingEngine> {
     pub vk: VerifyingKey<E>,
     pub a_query: Vec<E::G1Affine>,
@@ -209,27 +213,40 @@ impl<E: PairingEngine> PartialEq for Parameters<E> {
     }
 }
 
+impl<E: PairingEngine> ToBytes for Parameters<E> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Parameters<E> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        Self::read(&mut reader, false)
+    }
+}
+
 impl<E: PairingEngine> Parameters<E> {
     /// Serialize the parameters to bytes.
     pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
         self.vk.write(&mut writer)?;
 
-        (self.a_query.len() as u32).to_le_bytes().write(&mut writer)?;
+        (self.a_query.len() as u32).write(&mut writer)?;
         for g in &self.a_query[..] {
             g.write(&mut writer)?;
         }
 
-        (self.b_query.len() as u32).to_le_bytes().write(&mut writer)?;
+        (self.b_query.len() as u32).write(&mut writer)?;
         for g in &self.b_query[..] {
             g.write(&mut writer)?;
         }
 
-        (self.c_query_1.len() as u32).to_le_bytes().write(&mut writer)?;
+        (self.c_query_1.len() as u32).write(&mut writer)?;
         for g in &self.c_query_1[..] {
             g.write(&mut writer)?;
         }
 
-        (self.c_query_2.len() as u32).to_le_bytes().write(&mut writer)?;
+        (self.c_query_2.len() as u32).write(&mut writer)?;
         for g in &self.c_query_2[..] {
             g.write(&mut writer)?;
         }
@@ -242,7 +259,7 @@ impl<E: PairingEngine> Parameters<E> {
 
         self.g_gamma2_z2.write(&mut writer)?;
 
-        (self.g_gamma2_z_t.len() as u32).to_le_bytes().write(&mut writer)?;
+        (self.g_gamma2_z_t.len() as u32).write(&mut writer)?;
         for g in &self.g_gamma2_z_t[..] {
             g.write(&mut writer)?;
         }
@@ -328,6 +345,24 @@ impl<E: PairingEngine> Parameters<E> {
             g_gamma2_z2,
             g_gamma2_z_t,
         })
+    }
+
+    /// Store the parameters to a file at the given path.
+    pub fn store(&self, path: &PathBuf) -> io::Result<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the parameters from a file at the given path.
+    pub fn load(path: &PathBuf) -> io::Result<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file, false)?)
     }
 }
 
