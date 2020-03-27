@@ -3,10 +3,7 @@
 
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::io::{self, Read, Result as IoResult, Write};
 
@@ -219,22 +216,22 @@ impl<E: PairingEngine> Parameters<E> {
 
         (self.a_query.len() as u32).to_le_bytes().write(&mut writer)?;
         for g in &self.a_query[..] {
-            writer.write(&to_bytes![g.into_projective()]?)?;
+            g.write(&mut writer)?;
         }
 
         (self.b_query.len() as u32).to_le_bytes().write(&mut writer)?;
         for g in &self.b_query[..] {
-            writer.write(&to_bytes![g.into_projective()]?)?;
+            g.write(&mut writer)?;
         }
 
         (self.c_query_1.len() as u32).to_le_bytes().write(&mut writer)?;
         for g in &self.c_query_1[..] {
-            writer.write(&to_bytes![g.into_projective()]?)?;
+            g.write(&mut writer)?;
         }
 
         (self.c_query_2.len() as u32).to_le_bytes().write(&mut writer)?;
         for g in &self.c_query_2[..] {
-            writer.write(&to_bytes![g.into_projective()]?)?;
+            g.write(&mut writer)?;
         }
 
         self.g_gamma_z.write(&mut writer)?;
@@ -247,16 +244,90 @@ impl<E: PairingEngine> Parameters<E> {
 
         (self.g_gamma2_z_t.len() as u32).to_le_bytes().write(&mut writer)?;
         for g in &self.g_gamma2_z_t[..] {
-            writer.write(&to_bytes![g.into_projective()]?)?;
+            g.write(&mut writer)?;
         }
 
         Ok(())
     }
 
     /// Deserialize the public parameters from bytes.
-    pub fn read<R: Read>(mut _reader: R, _checked: bool) -> io::Result<Self> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn read<R: Read>(mut reader: R, checked: bool) -> io::Result<Self> {
+        let read_g1_affine = |mut reader: &mut R| -> io::Result<E::G1Affine> {
+            let g1_affine: E::G1Affine = FromBytes::read(&mut reader)?;
+
+            if checked && !g1_affine.is_in_correct_subgroup_assuming_on_curve() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "point is not in the correct subgroup",
+                ));
+            }
+
+            Ok(g1_affine)
+        };
+
+        let read_g2_affine = |mut reader: &mut R| -> io::Result<E::G2Affine> {
+            let g2_affine: E::G2Affine = FromBytes::read(&mut reader)?;
+
+            if checked && !g2_affine.is_in_correct_subgroup_assuming_on_curve() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "point is not in the correct subgroup",
+                ));
+            }
+
+            Ok(g2_affine)
+        };
+
+        let vk = VerifyingKey::<E>::read(&mut reader)?;
+
+        let mut a_query: Vec<E::G1Affine> = vec![];
+        let mut b_query: Vec<E::G2Affine> = vec![];
+        let mut c_query_1: Vec<E::G1Affine> = vec![];
+        let mut c_query_2: Vec<E::G1Affine> = vec![];
+        let mut g_gamma2_z_t: Vec<E::G1Affine> = vec![];
+
+        let a_query_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..a_query_len {
+            a_query.push(read_g1_affine(&mut reader)?);
+        }
+
+        let b_query_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..b_query_len {
+            b_query.push(read_g2_affine(&mut reader)?);
+        }
+
+        let c_query_1_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..c_query_1_len {
+            c_query_1.push(read_g1_affine(&mut reader)?);
+        }
+
+        let c_query_2_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..c_query_2_len {
+            c_query_2.push(read_g1_affine(&mut reader)?);
+        }
+
+        let g_gamma_z: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_gamma_z: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_ab_gamma_z: E::G1Affine = FromBytes::read(&mut reader)?;
+        let g_gamma2_z2: E::G1Affine = FromBytes::read(&mut reader)?;
+
+        let g_gamma2_z_t_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..g_gamma2_z_t_len {
+            g_gamma2_z_t.push(read_g1_affine(&mut reader)?);
+        }
+
+        Ok(Self {
+            vk,
+            a_query,
+            b_query,
+            c_query_1,
+            c_query_2,
+            g_gamma_z,
+            h_gamma_z,
+            g_ab_gamma_z,
+            g_gamma2_z2,
+            g_gamma2_z_t,
+        })
     }
 }
 
