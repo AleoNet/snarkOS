@@ -19,7 +19,7 @@ impl PedersenSize for Size {
 
 type TestCommitment = PedersenCommitment<EdwardsProjective, Size>;
 
-const TEST_COMMITMENT_PARAMETERS_PATH: &str = "./snark.params";
+const TEST_COMMITMENT_PARAMETERS_PATH: &str = "./pedersen_commitment.params";
 
 #[test]
 fn commitment_parameter_serialization() {
@@ -42,9 +42,9 @@ fn commitment_parameter_storage() {
     let commitment = TestCommitment::setup(rng);
     commitment.store(&path).unwrap();
 
-    let recovered_commitment_parameters = TestCommitment::load(&path).unwrap();
+    let recovered_commitment = TestCommitment::load(&path).unwrap();
 
-    assert_eq!(commitment, recovered_commitment_parameters);
+    assert_eq!(commitment, recovered_commitment);
 
     std::fs::remove_file(&path).unwrap();
 }
