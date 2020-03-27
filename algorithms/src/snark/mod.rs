@@ -46,14 +46,14 @@ pub struct Proof<E: PairingEngine> {
 
 impl<E: PairingEngine> ToBytes for Proof<E> {
     #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.write(&mut writer)
     }
 }
 
 impl<E: PairingEngine> FromBytes for Proof<E> {
     #[inline]
-    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         Self::read(&mut reader)
     }
 }
@@ -77,14 +77,14 @@ impl<E: PairingEngine> Default for Proof<E> {
 impl<E: PairingEngine> Proof<E> {
     /// Serialize the proof into bytes, for storage on disk or transmission
     /// over the network.
-    pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.a.write(&mut writer)?;
         self.b.write(&mut writer)?;
         self.c.write(&mut writer)
     }
 
     /// Deserialize the proof from bytes.
-    pub fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+    pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let a: E::G1Affine = FromBytes::read(&mut reader)?;
         let b: E::G2Affine = FromBytes::read(&mut reader)?;
         let c: E::G1Affine = FromBytes::read(&mut reader)?;
@@ -112,7 +112,7 @@ impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
 
 impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
     #[inline]
-    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         Self::read(&mut reader)
     }
 }
@@ -144,7 +144,7 @@ impl<E: PairingEngine> PartialEq for VerifyingKey<E> {
 impl<E: PairingEngine> VerifyingKey<E> {
     /// Serialize the verification key into bytes, for storage on disk
     /// or transmission over the network.
-    pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.h_g2.write(&mut writer)?;
         self.g_alpha_g1.write(&mut writer)?;
         self.h_beta_g2.write(&mut writer)?;
@@ -158,7 +158,7 @@ impl<E: PairingEngine> VerifyingKey<E> {
     }
 
     /// Deserialize the verification key from bytes.
-    pub fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+    pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let h_g2: E::G2Affine = FromBytes::read(&mut reader)?;
         let g_alpha_g1: E::G1Affine = FromBytes::read(&mut reader)?;
         let h_beta_g2: E::G2Affine = FromBytes::read(&mut reader)?;
@@ -221,14 +221,14 @@ impl<E: PairingEngine> ToBytes for Parameters<E> {
 
 impl<E: PairingEngine> FromBytes for Parameters<E> {
     #[inline]
-    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         Self::read(&mut reader, false)
     }
 }
 
 impl<E: PairingEngine> Parameters<E> {
     /// Serialize the parameters to bytes.
-    pub fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.vk.write(&mut writer)?;
 
         (self.a_query.len() as u32).write(&mut writer)?;
@@ -268,8 +268,8 @@ impl<E: PairingEngine> Parameters<E> {
     }
 
     /// Deserialize the public parameters from bytes.
-    pub fn read<R: Read>(mut reader: R, checked: bool) -> io::Result<Self> {
-        let read_g1_affine = |mut reader: &mut R| -> io::Result<E::G1Affine> {
+    pub fn read<R: Read>(mut reader: R, checked: bool) -> IoResult<Self> {
+        let read_g1_affine = |mut reader: &mut R| -> IoResult<E::G1Affine> {
             let g1_affine: E::G1Affine = FromBytes::read(&mut reader)?;
 
             if checked && !g1_affine.is_in_correct_subgroup_assuming_on_curve() {
@@ -282,7 +282,7 @@ impl<E: PairingEngine> Parameters<E> {
             Ok(g1_affine)
         };
 
-        let read_g2_affine = |mut reader: &mut R| -> io::Result<E::G2Affine> {
+        let read_g2_affine = |mut reader: &mut R| -> IoResult<E::G2Affine> {
             let g2_affine: E::G2Affine = FromBytes::read(&mut reader)?;
 
             if checked && !g2_affine.is_in_correct_subgroup_assuming_on_curve() {
@@ -348,7 +348,7 @@ impl<E: PairingEngine> Parameters<E> {
     }
 
     /// Store the parameters to a file at the given path.
-    pub fn store(&self, path: &PathBuf) -> io::Result<()> {
+    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
         let mut file = File::create(path)?;
         let mut parameter_bytes = vec![];
 
@@ -360,7 +360,7 @@ impl<E: PairingEngine> Parameters<E> {
     }
 
     /// Load the parameters from a file at the given path.
-    pub fn load(path: &PathBuf) -> io::Result<Self> {
+    pub fn load(path: &PathBuf) -> IoResult<Self> {
         let mut file = File::open(path)?;
         Ok(Self::read(&mut file, false)?)
     }
