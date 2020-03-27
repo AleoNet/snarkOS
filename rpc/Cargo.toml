@@ -35,7 +35,7 @@ jsonrpc-derive = { version = "14.0.5" }
 jsonrpc-http-server = { version = "14.0.5" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2", features = ["full"] }
-wagyu-bitcoin = { version = "0.6.1" }
+wagyu-bitcoin = { version = "0.6.2" }
 wagyu-model = { version = "0.6.1" }
 
 [dev-dependencies]
