@@ -4,13 +4,34 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{Group, PrimeField},
 };
-use snarkos_utilities::bititerator::BitIterator;
+use snarkos_utilities::{
+    bititerator::BitIterator,
+    bytes::{FromBytes, ToBytes},
+};
 
 use rand::Rng;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCommitment<G: Group, S: PedersenSize> {
     pub parameters: PedersenCommitmentParameters<G, S>,
+}
+
+impl<G: Group, S: PedersenSize> ToBytes for PedersenCommitment<G, S> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.parameters.write(&mut writer)
+    }
+}
+
+impl<G: Group, S: PedersenSize> FromBytes for PedersenCommitment<G, S> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let parameters: PedersenCommitmentParameters<G, S> = FromBytes::read(&mut reader)?;
+        Ok(Self { parameters })
+    }
 }
 
 impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
@@ -47,5 +68,19 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
+    }
+}
+
+impl<G: Group, S: PedersenSize> PedersenCommitment<G, S> {
+    /// Store the Pedersen commitment parameters to a file at the given path.
+    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.parameters.store(path)
+    }
+
+    /// Load the Pedersen commitment parameters from a file at the given path.
+    pub fn load(path: &PathBuf) -> IoResult<Self> {
+        let parameters = PedersenCommitmentParameters::<G, S>::load(path)?;
+
+        Ok(Self { parameters })
     }
 }
