@@ -347,7 +347,7 @@ impl<E: PairingEngine> Parameters<E> {
         })
     }
 
-    /// Store the parameters to a file at the given path.
+    /// Store the SNARK parameters to a file at the given path.
     pub fn store(&self, path: &PathBuf) -> IoResult<()> {
         let mut file = File::create(path)?;
         let mut parameter_bytes = vec![];
@@ -359,7 +359,7 @@ impl<E: PairingEngine> Parameters<E> {
         Ok(())
     }
 
-    /// Load the parameters from a file at the given path.
+    /// Load the SNARK parameters from a file at the given path.
     pub fn load(path: &PathBuf) -> IoResult<Self> {
         let mut file = File::open(path)?;
         Ok(Self::read(&mut file, false)?)
