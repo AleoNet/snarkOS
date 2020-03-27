@@ -22,4 +22,4 @@ parking_lot = { version = "0.10.0" }
 rocksdb = { version = "0.13.0" }
 serde = { version = "1.0", features = ["derive"] }
 wagyu-bitcoin = { version = "0.6.1" }
-wagyu-model = { version = "0.6.1" }
+wagyu-model = { version = "0.6.3" }

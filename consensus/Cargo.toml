@@ -24,7 +24,7 @@ rand = { version = "0.7.3" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2", features = ["full"] }
 wagyu-bitcoin = { version = "0.6.1" }
-wagyu-model = { version = "0.6.1" }
+wagyu-model = { version = "0.6.3" }
 
 [dev-dependencies]
 futures-await-test = { version = "0.3.0" }
