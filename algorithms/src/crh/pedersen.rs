@@ -4,7 +4,10 @@ use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, Field, Group},
 };
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use rand::Rng;
 use rayon::prelude::*;
@@ -110,16 +113,18 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
     }
+}
 
+impl<G: Group, S: PedersenSize> Storage for PedersenCRH<G, S> {
     /// Store the Pedersen CRH parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> Result<(), CRHError> {
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
         self.parameters.store(path)?;
 
         Ok(())
     }
 
     /// Load the Pedersen CRH parameters from a file at the given path.
-    fn load(path: &PathBuf) -> Result<Self, CRHError> {
+    fn load(path: &PathBuf) -> IoResult<Self> {
         let parameters = PedersenCRHParameters::<G, S>::load(path)?;
 
         Ok(Self { parameters })

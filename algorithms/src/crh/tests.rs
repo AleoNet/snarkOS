@@ -4,6 +4,7 @@ use snarkos_curves::edwards_bls12::EdwardsProjective;
 use snarkos_models::algorithms::CRH;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    storage::Storage,
     to_bytes,
 };
 

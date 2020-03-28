@@ -4,9 +4,10 @@ use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, Group, ProjectiveCurve},
 };
+use snarkos_utilities::storage::Storage;
 
 use rand::Rng;
-use std::path::PathBuf;
+use std::{io::Result as IoResult, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCompressedCRH<G: Group + ProjectiveCurve, S: PedersenSize> {
@@ -40,16 +41,18 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CRH for PedersenCompressedCRH<
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
     }
+}
 
+impl<G: Group + ProjectiveCurve, S: PedersenSize> Storage for PedersenCompressedCRH<G, S> {
     /// Store the Pedersen compressed CRH parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> Result<(), CRHError> {
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
         self.parameters.store(path)?;
 
         Ok(())
     }
 
     /// Load the Pedersen Compressed CRH parameters from a file at the given path.
-    fn load(path: &PathBuf) -> Result<Self, CRHError> {
+    fn load(path: &PathBuf) -> IoResult<Self> {
         let parameters = PedersenCRHParameters::<G, S>::load(path)?;
 
         Ok(Self { parameters })
