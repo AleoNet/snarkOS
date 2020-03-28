@@ -4,13 +4,15 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 use rand::Rng;
 use std::{hash::Hash, path::PathBuf};
 
-pub trait SignatureScheme: Sized {
+pub trait SignatureScheme: Sized + Clone {
     type Parameters: Clone + ToBytes + FromBytes + Send + Sync;
     type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Default + Send + Sync;
     type PrivateKey: ToBytes + Clone + Default;
     type Output: ToBytes + FromBytes + Clone + Default + Send + Sync;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError>;
+
+    fn parameters(&self) -> &Self::Parameters;
 
     fn keygen<R: Rng>(&self, rng: &mut R) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError>;
 

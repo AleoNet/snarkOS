@@ -97,7 +97,13 @@ where
                 .to_field_elements()?,
         );
 
-        v.extend_from_slice(&self.circuit_parameters.signature_parameters.to_field_elements()?);
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .signature_parameters
+                .parameters()
+                .to_field_elements()?,
+        );
 
         v.extend_from_slice(
             &self

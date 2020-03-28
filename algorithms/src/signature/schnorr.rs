@@ -144,6 +144,10 @@ where
         Ok(Self { parameters })
     }
 
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
+    }
+
     fn keygen<R: Rng>(&self, rng: &mut R) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError> {
         let keygen_time = start_timer!(|| "SchnorrSig::KeyGen");
 

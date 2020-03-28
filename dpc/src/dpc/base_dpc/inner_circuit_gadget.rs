@@ -252,7 +252,7 @@ where
             })?;
 
         let sig_pp = SignatureSGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SIG Parameters"), || {
-            Ok(&comm_crh_sig_parameters.signature_parameters)
+            Ok(comm_crh_sig_parameters.signature_parameters.parameters())
         })?;
 
         let value_commitment_pp = <C::BindingSignatureGadget as BindingSignatureGadget<

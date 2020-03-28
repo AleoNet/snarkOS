@@ -1,6 +1,6 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
 
-use snarkos_models::algorithms::{SignatureScheme, SNARK};
+use snarkos_models::algorithms::SNARK;
 
 use std::io::Result as IoResult;
 
@@ -14,7 +14,7 @@ pub struct CircuitParameters<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: C::LocalDataCommitment,
     pub value_commitment_parameters: C::ValueCommitment,
     pub serial_number_nonce_parameters: C::SerialNumberNonce,
-    pub signature_parameters: <C::Signature as SignatureScheme>::Parameters,
+    pub signature_parameters: C::Signature,
 }
 
 #[derive(Derivative)]
@@ -85,7 +85,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.circuit_parameters.serial_number_nonce_parameters
     }
 
-    pub fn signature_parameters(&self) -> &<C::Signature as SignatureScheme>::Parameters {
+    pub fn signature_parameters(&self) -> &C::Signature {
         &self.circuit_parameters.signature_parameters
     }
 
@@ -94,6 +94,16 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn store(&self) -> IoResult<()> {
+        //        let mut address_commitment_pp_path = std::env::current_dir()?;
+        //        let mut record_commitment_pp_path = std::env::current_dir()?;
+        //        let mut predicate_vk_commitment_pp_path = std::env::current_dir()?;
+        //        let mut predicate_vk_crh_pp_path = std::env::current_dir()?;
+        //        let mut local_data_commitment_pp_path = std::env::current_dir()?;
+        //        let mut local_data_commitment_pp_path = std::env::current_dir()?;
+        //        let mut value_commitment_pp_path = std::env::current_dir()?;
+        //        let mut serial_number_commitment_pp_path = std::env::current_dir()?;
+        //        let mut signature_pp_path = std::env::current_dir()?;
+
         Ok(())
     }
 }
