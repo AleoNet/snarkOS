@@ -7,6 +7,7 @@ use snarkos_models::{
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    storage::Storage,
     to_bytes,
 };
 
@@ -273,17 +274,19 @@ where
         end_timer!(rand_signature_time);
         Ok(new_sig)
     }
+}
 
+impl<G: Group, D: Digest> Storage for SchnorrSignature<G, D> {
     /// Store the Schnorr signature parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> Result<(), SignatureError> {
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
         self.parameters.store(path)?;
 
         Ok(())
     }
 
     /// Load the Schnorr signature parameters from a file at the given path.
-    fn load(path: &PathBuf) -> Result<Self, SignatureError> {
-        let parameters = Self::Parameters::load(path)?;
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let parameters = SchnorrParameters::<G, D>::load(path)?;
 
         Ok(Self { parameters })
     }

@@ -4,6 +4,7 @@ use snarkos_models::{algorithms::SignatureScheme, curves::Group};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    storage::Storage,
     to_bytes,
 };
 

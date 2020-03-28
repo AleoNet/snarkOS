@@ -1,10 +1,13 @@
 use snarkos_errors::algorithms::SignatureError;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use rand::Rng;
-use std::{hash::Hash, path::PathBuf};
+use std::hash::Hash;
 
-pub trait SignatureScheme: Sized + Clone {
+pub trait SignatureScheme: Sized + Clone + Storage {
     type Parameters: Clone + ToBytes + FromBytes + Send + Sync;
     type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Default + Send + Sync;
     type PrivateKey: ToBytes + Clone + Default;
@@ -37,8 +40,4 @@ pub trait SignatureScheme: Sized + Clone {
     ) -> Result<Self::PublicKey, SignatureError>;
 
     fn randomize_signature(&self, signature: &Self::Output, randomness: &[u8]) -> Result<Self::Output, SignatureError>;
-
-    fn store(&self, path: &PathBuf) -> Result<(), SignatureError>;
-
-    fn load(path: &PathBuf) -> Result<Self, SignatureError>;
 }
