@@ -69,16 +69,15 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
     }
-}
 
-impl<G: Group, S: PedersenSize> PedersenCommitment<G, S> {
     /// Store the Pedersen commitment parameters to a file at the given path.
-    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.parameters.store(path)
+    fn store(&self, path: &PathBuf) -> Result<(), CommitmentError> {
+        self.parameters.store(path)?;
+        Ok(())
     }
 
     /// Load the Pedersen commitment parameters from a file at the given path.
-    pub fn load(path: &PathBuf) -> IoResult<Self> {
+    fn load(path: &PathBuf) -> Result<Self, CommitmentError> {
         let parameters = PedersenCommitmentParameters::<G, S>::load(path)?;
 
         Ok(Self { parameters })

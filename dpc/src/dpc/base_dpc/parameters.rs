@@ -2,6 +2,8 @@ use crate::dpc::base_dpc::BaseDPCComponents;
 
 use snarkos_models::algorithms::{SignatureScheme, SNARK};
 
+use std::io::Result as IoResult;
+
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct CircuitParameters<C: BaseDPCComponents> {
@@ -89,5 +91,9 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn value_commitment_parameters(&self) -> &C::ValueCommitment {
         &self.circuit_parameters.value_commitment_parameters
+    }
+
+    pub fn store(&self) -> IoResult<()> {
+        Ok(())
     }
 }

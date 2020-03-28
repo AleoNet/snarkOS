@@ -17,3 +17,9 @@ impl From<CRHError> for CommitmentError {
         CommitmentError::CRHError(error)
     }
 }
+
+impl From<std::io::Error> for CommitmentError {
+    fn from(error: std::io::Error) -> Self {
+        CommitmentError::Crate("std::io", format!("{:?}", error))
+    }
+}

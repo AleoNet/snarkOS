@@ -110,6 +110,13 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
     }
+
+    //    /// Store the CRH parameters to a file at the given path.
+    //    fn store(&self, path: &PathBuf) -> Result<(), CRHError> {
+    //        self.parameters.store(path)?;
+    //
+    //        Ok(())
+    //    }
 }
 
 impl<G: Group, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCRH<G, S> {
@@ -126,7 +133,6 @@ impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintFie
 }
 
 impl<G: Group, S: PedersenSize> PedersenCRH<G, S> {
-    /// Store the CRH parameters to a file at the given path.
     pub fn store(&self, path: &PathBuf) -> IoResult<()> {
         self.parameters.store(path)
     }

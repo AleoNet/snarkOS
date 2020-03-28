@@ -4,6 +4,7 @@ use snarkos_models::algorithms::CommitmentScheme;
 use blake2::Blake2s as b2s;
 use digest::Digest;
 use rand::Rng;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Blake2sCommitment;
@@ -29,5 +30,13 @@ impl CommitmentScheme for Blake2sCommitment {
 
     fn parameters(&self) -> &Self::Parameters {
         &()
+    }
+
+    fn store(&self, _path: &PathBuf) -> Result<(), CommitmentError> {
+        Ok(())
+    }
+
+    fn load(_path: &PathBuf) -> Result<Self, CommitmentError> {
+        Ok(Self)
     }
 }
