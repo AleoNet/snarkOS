@@ -19,6 +19,7 @@ pub mod bititerator;
 #[macro_use]
 pub mod bytes;
 pub mod rand;
+pub mod storage;
 pub mod variable_length_integer;
 
 #[cfg(not(feature = "std"))]
