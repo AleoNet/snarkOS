@@ -565,6 +565,7 @@ where
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
 
+    // TODO (raychu86) add logic to load parameters from stored files
     fn setup<R: Rng>(
         ledger_parameters: &MerkleTreeParameters<Components::MerkleParameters>,
         rng: &mut R,

@@ -77,6 +77,26 @@ impl<E: PairingEngine> Default for Proof<E> {
     }
 }
 
+impl<E: PairingEngine> Storage for Proof<E> {
+    /// Store the SNARK proof to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the SNARK proof from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
+    }
+}
+
 impl<E: PairingEngine> Proof<E> {
     /// Serialize the proof into bytes, for storage on disk or transmission
     /// over the network.
@@ -246,6 +266,18 @@ impl<E: PairingEngine> Storage for Parameters<E> {
     fn load(path: &PathBuf) -> IoResult<Self> {
         let mut file = File::open(path)?;
         Ok(Self::read(&mut file, false)?)
+    }
+}
+
+impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        other.vk
+    }
+}
+
+impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        prepare_verifying_key(&other.vk)
     }
 }
 

@@ -9,10 +9,16 @@ use rand::Rng;
 pub trait SNARK {
     type AssignedCircuit;
     type Circuit;
-    type Proof: ToBytes + FromBytes + Clone + Default;
-    type PreparedVerificationParameters: Clone + Default + From<Self::VerificationParameters>;
+    type Proof: ToBytes + FromBytes + Clone + Default + Storage;
+    type PreparedVerificationParameters: Clone
+        + Default
+        + From<Self::VerificationParameters>
+        + From<Self::ProvingParameters>;
     type ProvingParameters: Clone + Storage;
-    type VerificationParameters: Clone + Default + From<Self::PreparedVerificationParameters>;
+    type VerificationParameters: Clone
+        + Default
+        + From<Self::PreparedVerificationParameters>
+        + From<Self::ProvingParameters>;
     type VerifierInput: ?Sized;
 
     fn setup<R: Rng>(
