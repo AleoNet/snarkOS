@@ -3,7 +3,10 @@
 
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use std::{
     fs::File,
@@ -226,6 +229,26 @@ impl<E: PairingEngine> FromBytes for Parameters<E> {
     }
 }
 
+impl<E: PairingEngine> Storage for Parameters<E> {
+    /// Store the SNARK parameters to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the SNARK parameters from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file, false)?)
+    }
+}
+
 impl<E: PairingEngine> Parameters<E> {
     /// Serialize the parameters to bytes.
     pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
@@ -345,24 +368,6 @@ impl<E: PairingEngine> Parameters<E> {
             g_gamma2_z2,
             g_gamma2_z_t,
         })
-    }
-
-    /// Store the SNARK parameters to a file at the given path.
-    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
-        let mut file = File::create(path)?;
-        let mut parameter_bytes = vec![];
-
-        self.write(&mut parameter_bytes)?;
-        file.write_all(&parameter_bytes)?;
-        drop(file);
-
-        Ok(())
-    }
-
-    /// Load the SNARK parameters from a file at the given path.
-    pub fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
-        Ok(Self::read(&mut file, false)?)
     }
 }
 

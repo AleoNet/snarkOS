@@ -154,6 +154,7 @@ mod serialization {
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         rand::UniformRand,
+        storage::Storage,
         to_bytes,
     };
 
