@@ -2,7 +2,7 @@ use snarkos_errors::algorithms::CRHError;
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, path::PathBuf};
 
 pub trait CRH: From<<Self as CRH>::Parameters> + Clone {
     type Output: Debug + ToBytes + FromBytes + Clone + Eq + Hash + Default;
@@ -15,4 +15,8 @@ pub trait CRH: From<<Self as CRH>::Parameters> + Clone {
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError>;
 
     fn parameters(&self) -> &Self::Parameters;
+
+    fn store(&self, path: &PathBuf) -> Result<(), CRHError>;
+
+    fn load(path: &PathBuf) -> Result<Self, CRHError>;
 }

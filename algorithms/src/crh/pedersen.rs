@@ -111,12 +111,19 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
         &self.parameters
     }
 
-    //    /// Store the CRH parameters to a file at the given path.
-    //    fn store(&self, path: &PathBuf) -> Result<(), CRHError> {
-    //        self.parameters.store(path)?;
-    //
-    //        Ok(())
-    //    }
+    /// Store the Pedersen CRH parameters to a file at the given path.
+    fn store(&self, path: &PathBuf) -> Result<(), CRHError> {
+        self.parameters.store(path)?;
+
+        Ok(())
+    }
+
+    /// Load the Pedersen CRH parameters from a file at the given path.
+    fn load(path: &PathBuf) -> Result<Self, CRHError> {
+        let parameters = PedersenCRHParameters::<G, S>::load(path)?;
+
+        Ok(Self { parameters })
+    }
 }
 
 impl<G: Group, S: PedersenSize> From<PedersenCRHParameters<G, S>> for PedersenCRH<G, S> {
@@ -129,18 +136,5 @@ impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintFie
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.parameters.to_field_elements()
-    }
-}
-
-impl<G: Group, S: PedersenSize> PedersenCRH<G, S> {
-    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.parameters.store(path)
-    }
-
-    /// Load the CRH parameters from a file at the given path.
-    pub fn load(path: &PathBuf) -> IoResult<Self> {
-        let parameters = PedersenCRHParameters::<G, S>::load(path)?;
-
-        Ok(Self { parameters })
     }
 }

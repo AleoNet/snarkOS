@@ -6,6 +6,7 @@ use snarkos_models::{
 };
 
 use rand::Rng;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCompressedCRH<G: Group + ProjectiveCurve, S: PedersenSize> {
@@ -38,6 +39,20 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CRH for PedersenCompressedCRH<
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
+    }
+
+    /// Store the Pedersen compressed CRH parameters to a file at the given path.
+    fn store(&self, path: &PathBuf) -> Result<(), CRHError> {
+        self.parameters.store(path)?;
+
+        Ok(())
+    }
+
+    /// Load the Pedersen Compressed CRH parameters from a file at the given path.
+    fn load(path: &PathBuf) -> Result<Self, CRHError> {
+        let parameters = PedersenCRHParameters::<G, S>::load(path)?;
+
+        Ok(Self { parameters })
     }
 }
 
