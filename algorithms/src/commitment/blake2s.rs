@@ -1,10 +1,11 @@
 use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::algorithms::CommitmentScheme;
+use snarkos_utilities::storage::Storage;
 
 use blake2::Blake2s as b2s;
 use digest::Digest;
 use rand::Rng;
-use std::path::PathBuf;
+use std::{io::Result as IoResult, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Blake2sCommitment;
@@ -31,12 +32,14 @@ impl CommitmentScheme for Blake2sCommitment {
     fn parameters(&self) -> &Self::Parameters {
         &()
     }
+}
 
-    fn store(&self, _path: &PathBuf) -> Result<(), CommitmentError> {
+impl Storage for Blake2sCommitment {
+    fn store(&self, _path: &PathBuf) -> IoResult<()> {
         Ok(())
     }
 
-    fn load(_path: &PathBuf) -> Result<Self, CommitmentError> {
+    fn load(_path: &PathBuf) -> IoResult<Self> {
         Ok(Self)
     }
 }

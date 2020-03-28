@@ -7,9 +7,10 @@ use snarkos_models::{
     algorithms::CommitmentScheme,
     curves::{AffineCurve, Group, ProjectiveCurve},
 };
+use snarkos_utilities::storage::Storage;
 
 use rand::Rng;
-use std::path::PathBuf;
+use std::{io::Result as IoResult, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCompressedCommitment<G: Group + ProjectiveCurve, S: PedersenSize> {
@@ -42,15 +43,17 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
     }
+}
 
+impl<G: Group + ProjectiveCurve, S: PedersenSize> Storage for PedersenCompressedCommitment<G, S> {
     /// Store the Pedersen compressed commitment parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> Result<(), CommitmentError> {
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
         self.parameters.store(path)?;
         Ok(())
     }
 
     /// Load the Pedersen compressed commitment parameters from a file at the given path.
-    fn load(path: &PathBuf) -> Result<Self, CommitmentError> {
+    fn load(path: &PathBuf) -> IoResult<Self> {
         let parameters = PedersenCommitmentParameters::<G, S>::load(path)?;
 
         Ok(Self { parameters })
