@@ -164,6 +164,26 @@ impl<E: PairingEngine> PartialEq for VerifyingKey<E> {
     }
 }
 
+impl<E: PairingEngine> Storage for VerifyingKey<E> {
+    /// Store the SNARK verifying key to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the SNARK verifying key from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
+    }
+}
+
 impl<E: PairingEngine> VerifyingKey<E> {
     /// Serialize the verification key into bytes, for storage on disk
     /// or transmission over the network.

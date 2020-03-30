@@ -17,6 +17,7 @@ pub trait SNARK {
     type ProvingParameters: Clone + Storage;
     type VerificationParameters: Clone
         + Default
+        + Storage
         + From<Self::PreparedVerificationParameters>
         + From<Self::ProvingParameters>;
     type VerifierInput: ?Sized;
