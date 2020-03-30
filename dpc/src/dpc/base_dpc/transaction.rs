@@ -99,6 +99,17 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     fn stuff(&self) -> &Self::Stuff {
         &self.stuff
     }
+
+    fn transaction_id(&self) -> Result<Vec<u8>, TransactionError> {
+        let transaction_bytes = to_bytes![self]?;
+
+        let mut h = b2s::new();
+        h.input(&transaction_bytes);
+
+        let mut result = [0u8; 32];
+        result.copy_from_slice(&h.result());
+        Ok(result.to_vec())
+    }
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
@@ -196,18 +207,5 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
             value_balance,
             signatures,
         })
-    }
-}
-
-impl<C: BaseDPCComponents> DPCTransaction<C> {
-    pub fn to_transaction_id(&self) -> Result<Vec<u8>, TransactionError> {
-        let transaction_bytes = to_bytes![self]?;
-
-        let mut h = b2s::new();
-        h.input(&transaction_bytes);
-
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&h.result());
-        Ok(result.to_vec())
     }
 }

@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{transaction::DPCTransaction, BaseDPCComponents};
+use crate::dpc::Transaction;
 
 use snarkos_errors::objects::TransactionError;
 use snarkos_utilities::{
@@ -13,16 +13,16 @@ use std::{
 };
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct Transactions<C: BaseDPCComponents>(pub Vec<DPCTransaction<C>>);
+pub struct Transactions<T: Transaction>(pub Vec<T>);
 
-impl<C: BaseDPCComponents> Transactions<C> {
+impl<T: Transaction> Transactions<T> {
     /// Initializes an empty list of transactions.
     pub fn new() -> Self {
         Self(vec![])
     }
 
     /// Initializes from a given list of transactions.
-    pub fn from(transactions: &[DPCTransaction<C>]) -> Self {
+    pub fn from(transactions: &[T]) -> Self {
         Self(transactions.to_vec())
     }
 
@@ -30,7 +30,7 @@ impl<C: BaseDPCComponents> Transactions<C> {
     pub fn to_transaction_ids(&self) -> Result<Vec<Vec<u8>>, TransactionError> {
         self.0
             .iter()
-            .map(|transaction| -> Result<Vec<u8>, TransactionError> { transaction.to_transaction_id() })
+            .map(|transaction| -> Result<Vec<u8>, TransactionError> { transaction.transaction_id() })
             .collect::<Result<Vec<Vec<u8>>, TransactionError>>()
     }
 
@@ -43,7 +43,7 @@ impl<C: BaseDPCComponents> Transactions<C> {
     }
 }
 
-impl<C: BaseDPCComponents> ToBytes for Transactions<C> {
+impl<T: Transaction> ToBytes for Transactions<T> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         variable_length_integer(self.0.len() as u64).write(&mut writer)?;
@@ -56,13 +56,13 @@ impl<C: BaseDPCComponents> ToBytes for Transactions<C> {
     }
 }
 
-impl<C: BaseDPCComponents> FromBytes for Transactions<C> {
+impl<T: Transaction> FromBytes for Transactions<T> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_transactions = read_variable_length_integer(&mut reader)?;
         let mut transactions = vec![];
         for _ in 0..num_transactions {
-            let transaction: DPCTransaction<C> = FromBytes::read(&mut reader)?;
+            let transaction: T = FromBytes::read(&mut reader)?;
             transactions.push(transaction);
         }
 
@@ -70,22 +70,22 @@ impl<C: BaseDPCComponents> FromBytes for Transactions<C> {
     }
 }
 
-impl<C: BaseDPCComponents> Default for Transactions<C> {
+impl<T: Transaction> Default for Transactions<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<C: BaseDPCComponents> Deref for Transactions<C> {
-    type Target = Vec<DPCTransaction<C>>;
+impl<T: Transaction> Deref for Transactions<T> {
+    type Target = Vec<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<C: BaseDPCComponents> DerefMut for Transactions<C> {
-    fn deref_mut(&mut self) -> &mut Vec<DPCTransaction<C>> {
+impl<T: Transaction> DerefMut for Transactions<T> {
+    fn deref_mut(&mut self) -> &mut Vec<T> {
         &mut self.0
     }
 }

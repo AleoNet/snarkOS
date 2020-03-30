@@ -1,5 +1,6 @@
 use crate::ledger::*;
-use snarkos_errors::dpc::DPCError;
+use snarkos_errors::{dpc::DPCError, objects::TransactionError};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::hash::Hash;
@@ -56,7 +57,7 @@ pub trait Record: Default {
     fn commitment_randomness(&self) -> Self::CommitmentRandomness;
 }
 
-pub trait Transaction {
+pub trait Transaction: Clone + FromBytes + ToBytes {
     type SerialNumber: Eq + Hash;
     type Commitment: Eq + Hash;
     type Memorandum: Eq;
@@ -73,6 +74,9 @@ pub trait Transaction {
 
     /// Returns the stuff field.
     fn stuff(&self) -> &Self::Stuff;
+
+    /// Returns the transaction identifier.
+    fn transaction_id(&self) -> Result<Vec<u8>, TransactionError>;
 }
 
 pub trait DPCScheme<L: Ledger> {

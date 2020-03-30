@@ -1,4 +1,4 @@
-use crate::{base_dpc::BaseDPCComponents, ledger::Transactions};
+use crate::{dpc::Transaction, ledger::Transactions};
 
 use snarkos_errors::objects::BlockError;
 use snarkos_objects::BlockHeader;
@@ -11,15 +11,15 @@ use snarkos_utilities::{
 use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct Block<C: BaseDPCComponents> {
+pub struct Block<T: Transaction> {
     /// First 84 bytes of the block as defined by the encoding used by
     /// "block" messages.
     pub header: BlockHeader,
     /// The block transactions.
-    pub transactions: Transactions<C>,
+    pub transactions: Transactions<T>,
 }
 
-impl<C: BaseDPCComponents> ToBytes for Block<C> {
+impl<T: Transaction> ToBytes for Block<T> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.header.write(&mut writer)?;
@@ -27,17 +27,17 @@ impl<C: BaseDPCComponents> ToBytes for Block<C> {
     }
 }
 
-impl<C: BaseDPCComponents> FromBytes for Block<C> {
+impl<T: Transaction> FromBytes for Block<T> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let header: BlockHeader = FromBytes::read(&mut reader)?;
-        let transactions: Transactions<C> = FromBytes::read(&mut reader)?;
+        let transactions: Transactions<T> = FromBytes::read(&mut reader)?;
 
         Ok(Self { header, transactions })
     }
 }
 
-impl<C: BaseDPCComponents> Block<C> {
+impl<T: Transaction> Block<T> {
     pub fn serialize(&self) -> Result<Vec<u8>, BlockError> {
         let mut serialization = vec![];
         serialization.extend(&self.header.serialize().to_vec());
@@ -57,7 +57,7 @@ impl<C: BaseDPCComponents> Block<C> {
         header_array.copy_from_slice(&header_bytes[0..84]);
         let header = BlockHeader::deserialize(&header_array);
 
-        let transactions: Transactions<C> = FromBytes::read(transactions_bytes)?;
+        let transactions: Transactions<T> = FromBytes::read(transactions_bytes)?;
 
         Ok(Block { header, transactions })
     }
