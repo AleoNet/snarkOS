@@ -94,10 +94,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.circuit_parameters.value_commitment_parameters
     }
 
-    pub fn store(&self) -> IoResult<()> {
-        let mut parameter_dir = std::env::current_dir()?;
-        parameter_dir.push("../parameters/");
-
+    pub fn store(&self, parameter_dir: &PathBuf) -> IoResult<()> {
         let circuit_dir = parameter_dir.join("circuit/");
 
         // Circuit Parameters
@@ -136,27 +133,47 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             .store(serial_number_comm_pp_path)?;
         circuit_parameters.signature_parameters.store(signature_pp_path)?;
 
-        // Snark Parameters
+        // Predicate SNARK Parameters
 
         let predicate_snark_pp_path = &parameter_dir.join("predicate_snark.params");
+        let predicate_snark_vk_pp_path = &parameter_dir.join("predicate_snark_vk.params");
         let predicate_snark_proof_path = &parameter_dir.join("predicate_snark.proof");
-        let outer_snark_path = &parameter_dir.join("outer_snark.params");
-        let inner_snark_pp_path = &parameter_dir.join("inner_snark.params");
 
         self.predicate_snark_parameters
             .proving_key
             .store(predicate_snark_pp_path)?;
         self.predicate_snark_parameters
+            .verification_key
+            .store(predicate_snark_vk_pp_path)?;
+        self.predicate_snark_parameters
             .proof
             .store(predicate_snark_proof_path)?;
+
+        // Outer SNARK parameters
+
+        let outer_snark_path = &parameter_dir.join("outer_snark.params");
+        let outer_snark_vk_path = &parameter_dir.join("outer_snark_vk.params");
+        let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
+            self.outer_snark_parameters.0.clone().into();
+
         self.outer_snark_parameters.0.store(outer_snark_path)?;
+        outer_snark_vk.store(outer_snark_vk_path)?;
+
+        // Inner SNARK parameters
+
+        let inner_snark_pp_path = &parameter_dir.join("inner_snark.params");
+        let inner_snark_vk_path = &parameter_dir.join("inner_snark_vk.params");
+        let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
+            self.inner_snark_parameters.0.clone().into();
+
         self.inner_snark_parameters.0.store(inner_snark_pp_path)?;
+        inner_snark_vk.store(inner_snark_vk_path)?;
 
         Ok(())
     }
 
     pub fn load(dir_path: &PathBuf) -> IoResult<Self> {
-        let circuit_dir = dir_path.join("/circuit/");
+        let circuit_dir = dir_path.join("circuit/");
 
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {

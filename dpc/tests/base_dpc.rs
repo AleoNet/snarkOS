@@ -1,5 +1,5 @@
 #[cfg(debug_assertions)]
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::{merkle_tree::MerkleParameters, snark::PreparedVerifyingKey};
 use snarkos_dpc::{
     base_dpc::{
         instantiated::*,
@@ -15,7 +15,7 @@ use snarkos_dpc::{
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, storage::Storage, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
@@ -23,12 +23,44 @@ use rand_xorshift::XorShiftRng;
 #[test]
 fn base_dpc_integration_test() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
-    // Generate parameters for the ledger, commitment schemes, CRH, and the
-    // "always-accept" predicate.
-    let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
 
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
-        .expect("DPC setup failed");
+    let mut path = std::env::current_dir().unwrap();
+    path.push("src/parameters/");
+    let ledger_parameter_path = path.join("ledger.params");
+
+    // Generate or load parameters for the ledger, commitment schemes, CRH, and the
+    // "always-accept" predicate.
+    let (ledger_parameters, parameters) =
+        match <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H::load(&ledger_parameter_path)
+        {
+            Ok(ledger_parameters) => {
+                let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::Parameters::load(&path) {
+                    Ok(parameters) => parameters,
+                    Err(_) => {
+                        println!("Parameter Setup");
+                        <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
+                            .expect("DPC setup failed")
+                    }
+                };
+
+                (ledger_parameters, parameters)
+            }
+            Err(_) => {
+                println!("Ledger parameter Setup");
+                let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
+
+                println!("Parameter Setup");
+                let parameters =
+                    <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
+                        .expect("DPC setup failed");
+
+                (ledger_parameters, parameters)
+            }
+        };
+
+    // Store parameters
+    //    ledger_parameters.store(&ledger_parameter_path).unwrap();
+    //    parameters.store(&path).unwrap();
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();

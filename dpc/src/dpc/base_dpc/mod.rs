@@ -233,6 +233,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             signature_parameters: sig_pp,
         };
+
         Ok(comm_crh_sig_pp)
     }
 
@@ -565,7 +566,6 @@ where
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
 
-    // TODO (raychu86) add logic to load parameters from stored files
     fn setup<R: Rng>(
         ledger_parameters: &MerkleTreeParameters<Components::MerkleParameters>,
         rng: &mut R,
