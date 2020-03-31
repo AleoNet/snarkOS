@@ -92,6 +92,7 @@ pub trait DPCScheme<L: Ledger> {
         Predicate = Self::Predicate,
     >;
     type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
+    type Block;
     type LocalData;
 
     /// Returns public parameters for the DPC.
@@ -132,4 +133,7 @@ pub trait DPCScheme<L: Ledger> {
 
     /// Returns true iff the transaction is valid according to the ledger.
     fn verify(parameters: &Self::Parameters, transaction: &Self::Transaction, ledger: &L) -> Result<bool, DPCError>;
+
+    /// Returns true iff all the transactions in the block are valid according to the ledger.
+    fn verify_block(parameters: &Self::Parameters, block: &Self::Block, ledger: &L) -> Result<bool, DPCError>;
 }

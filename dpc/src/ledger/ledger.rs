@@ -17,6 +17,7 @@ where
 {
     crh_params: Rc<P::H>,
     transactions: Vec<T>,
+    blocks: Vec<Block<T>>,
     cm_merkle_tree: MerkleTree<P>,
     cur_cm_index: usize,
     cur_sn_index: usize,
@@ -29,6 +30,16 @@ where
     genesis_cm: T::Commitment,
     genesis_sn: T::SerialNumber,
     genesis_memo: T::Memorandum,
+}
+
+/// Check if an iterator has duplicate elements
+pub fn has_duplicates<T>(iter: T) -> bool
+where
+    T: IntoIterator,
+    T::Item: Eq + Hash,
+{
+    let mut uniq = HashSet::new();
+    !iter.into_iter().all(move |x| uniq.insert(x))
 }
 
 impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P>
@@ -68,6 +79,7 @@ where
 
         IdealLedger {
             crh_params: params,
+            blocks: Vec::new(),
             transactions: Vec::new(),
             cm_merkle_tree,
             cur_cm_index,
@@ -86,7 +98,7 @@ where
     }
 
     fn len(&self) -> usize {
-        self.transactions.len()
+        self.blocks.len()
     }
 
     fn parameters(&self) -> &MerkleTreeParameters<Self::Parameters> {
@@ -207,5 +219,25 @@ where
         _witness: &MerklePath<Self::Parameters>,
     ) -> bool {
         true
+    }
+}
+
+impl<T: Transaction, P: MerkleParameters> IdealLedger<T, P>
+where
+    T: Eq,
+    T::Commitment: ToBytes + Clone,
+    T::SerialNumber: ToBytes + Clone,
+    T::Memorandum: Hash + Clone,
+{
+    pub fn push_block(&mut self, block: Block<T>) -> Result<(), LedgerError> {
+        //        let mut cur_sn_index = self.cur_sn_index;
+        //
+        //        for transaction in &block.transactions.0 {
+        //
+        //        }
+
+        self.blocks.push(block);
+
+        Ok(())
     }
 }

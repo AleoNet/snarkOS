@@ -5,6 +5,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
+// TODO: Add coinbase transaction, block verification, block selection, etc.
+
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConsensusParameters {
@@ -108,7 +110,6 @@ impl ConsensusParameters {
         //            let parent_block = storage.get_latest_block()?;
         //            self.verify_header(&block.header, &parent_block.header, merkle_root_hash)?;
         //        }
-
         Ok(())
     }
 

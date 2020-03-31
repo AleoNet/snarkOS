@@ -557,6 +557,7 @@ where
 {
     type AddressKeyPair = AddressPair<Components>;
     type Auxiliary = [u8; 32];
+    type Block = Block<Self::Transaction>;
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
@@ -889,6 +890,17 @@ where
         end_timer!(sig_time);
 
         end_timer!(verify_time);
+        Ok(true)
+    }
+
+    /// Returns true iff all the transactions in the block are valid according to the ledger.
+    fn verify_block(parameters: &Self::Parameters, block: &Self::Block, ledger: &L) -> Result<bool, DPCError> {
+        for transaction in &block.transactions.0 {
+            if !Self::verify(parameters, transaction, ledger)? {
+                return Ok(false);
+            }
+        }
+
         Ok(true)
     }
 }
