@@ -1,4 +1,4 @@
-use crate::algorithms::MerkleError;
+use crate::{algorithms::MerkleError, objects::TransactionError};
 
 #[derive(Debug, Fail)]
 pub enum LedgerError {
@@ -22,10 +22,19 @@ pub enum LedgerError {
 
     #[fail(display = "{}", _0)]
     Message(String),
+
+    #[fail(display = "{}", _0)]
+    TransactionError(TransactionError),
 }
 
 impl From<MerkleError> for LedgerError {
     fn from(error: MerkleError) -> Self {
         LedgerError::MerkleError(error)
+    }
+}
+
+impl From<TransactionError> for LedgerError {
+    fn from(error: TransactionError) -> Self {
+        LedgerError::TransactionError(error)
     }
 }

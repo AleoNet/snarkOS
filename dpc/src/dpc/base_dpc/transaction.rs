@@ -100,7 +100,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         &self.stuff
     }
 
-    fn transaction_id(&self) -> Result<Vec<u8>, TransactionError> {
+    fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
         let transaction_bytes = to_bytes![self]?;
 
         let mut h = b2s::new();
@@ -108,7 +108,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
 
         let mut result = [0u8; 32];
         result.copy_from_slice(&h.result());
-        Ok(result.to_vec())
+        Ok(result)
     }
 }
 

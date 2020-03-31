@@ -27,11 +27,11 @@ impl<T: Transaction> Transactions<T> {
     }
 
     /// Returns the transaction ids.
-    pub fn to_transaction_ids(&self) -> Result<Vec<Vec<u8>>, TransactionError> {
+    pub fn to_transaction_ids(&self) -> Result<Vec<[u8; 32]>, TransactionError> {
         self.0
             .iter()
-            .map(|transaction| -> Result<Vec<u8>, TransactionError> { transaction.transaction_id() })
-            .collect::<Result<Vec<Vec<u8>>, TransactionError>>()
+            .map(|transaction| -> Result<[u8; 32], TransactionError> { transaction.transaction_id() })
+            .collect::<Result<Vec<[u8; 32]>, TransactionError>>()
     }
 
     /// Serializes the transactions into byte vectors.

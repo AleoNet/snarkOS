@@ -76,7 +76,7 @@ pub trait Transaction: Clone + FromBytes + ToBytes {
     fn stuff(&self) -> &Self::Stuff;
 
     /// Returns the transaction identifier.
-    fn transaction_id(&self) -> Result<Vec<u8>, TransactionError>;
+    fn transaction_id(&self) -> Result<[u8; 32], TransactionError>;
 }
 
 pub trait DPCScheme<L: Ledger> {

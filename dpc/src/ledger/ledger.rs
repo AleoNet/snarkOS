@@ -229,12 +229,88 @@ where
     T::SerialNumber: ToBytes + Clone,
     T::Memorandum: Hash + Clone,
 {
+    pub fn process_transaction(&mut self, transaction: &T) -> Result<(), LedgerError> {
+        let mut cur_sn_index = self.cur_sn_index;
+        for sn in transaction.old_serial_numbers() {
+            if sn != &self.genesis_sn {
+                if self.sn_to_index.contains_key(sn) {
+                    return Err(LedgerError::DuplicateSn);
+                }
+                self.sn_to_index.insert(sn.clone(), cur_sn_index);
+                cur_sn_index += 1;
+            }
+        }
+        self.cur_sn_index = cur_sn_index;
+
+        let mut cur_cm_index = self.cur_cm_index;
+        for cm in transaction.new_commitments() {
+            if cm == &self.genesis_cm || self.comm_to_index.contains_key(cm) {
+                return Err(LedgerError::InvalidCm);
+            }
+            self.comm_to_index.insert(cm.clone(), cur_cm_index);
+            cur_cm_index += 1;
+        }
+        self.cur_cm_index = cur_cm_index;
+
+        if transaction.memorandum() != &self.genesis_memo {
+            if self.memo_to_index.contains_key(transaction.memorandum()) {
+                return Err(LedgerError::DuplicateMemo);
+            } else {
+                self.memo_to_index
+                    .insert(transaction.memorandum().clone(), self.cur_memo_index);
+                self.cur_memo_index += 1;
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn push_block(&mut self, block: Block<T>) -> Result<(), LedgerError> {
-        //        let mut cur_sn_index = self.cur_sn_index;
-        //
-        //        for transaction in &block.transactions.0 {
-        //
-        //        }
+        let mut transaction_serial_numbers = vec![];
+        let mut transaction_commitments = vec![];
+        let mut transaction_memos = vec![];
+
+        for transaction in &block.transactions.0 {
+            transaction_serial_numbers.push(transaction.transaction_id()?);
+            transaction_commitments.push(transaction.new_commitments());
+            transaction_memos.push(transaction.memorandum());
+        }
+
+        // Check if the transactions in the block have duplicate serial numbers
+        if has_duplicates(transaction_serial_numbers) {
+            return Err(LedgerError::DuplicateSn);
+        }
+
+        // Check if the transactions in the block have duplicate commitments
+        if has_duplicates(transaction_commitments) {
+            return Err(LedgerError::InvalidCm);
+        }
+
+        // Check if the transactions in the block have duplicate memos
+        if has_duplicates(transaction_memos) {
+            return Err(LedgerError::DuplicateMemo);
+        }
+
+        // Process the transactions
+
+        for transaction in &block.transactions.0 {
+            self.process_transaction(transaction)?;
+        }
+
+        // Rebuild the tree.
+        let mut cm_and_indices = self.comm_to_index.iter().collect::<Vec<_>>();
+        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(j));
+        let commitments = cm_and_indices
+            .into_iter()
+            .map(|(cm, _)| cm)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(commitments[0] == self.genesis_cm);
+        self.cm_merkle_tree = MerkleTree::new(&commitments)?;
+
+        let new_digest = self.cm_merkle_tree.root();
+        self.past_digests.insert(new_digest.clone());
+        self.current_digest = Some(new_digest);
 
         self.blocks.push(block);
 
