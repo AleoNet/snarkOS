@@ -341,7 +341,7 @@ mod tests {
         gadgets::{
             algorithms::BindingSignatureGadget,
             r1cs::{ConstraintSystem, TestConstraintSystem},
-            utilities::{alloc::AllocGadget, uint8::UInt8},
+            utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
         },
     };
 
@@ -587,8 +587,16 @@ mod tests {
             )
             .unwrap();
 
-        let value_balance_bytes =
-            UInt8::alloc_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes()).unwrap();
+        let value_balance_bytes = UInt8::alloc_vec(
+            cs.ns(|| "value_balance_bytes"),
+            &(value_balance.abs() as u64).to_le_bytes(),
+        )
+        .unwrap();
+
+        let is_negative = Boolean::alloc(&mut cs.ns(|| "value_balance_is_negative"), || {
+            Ok(value_balance.is_negative())
+        })
+        .unwrap();
 
         let value_balance_comm = <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, G>>::check_value_balance_commitment_gadget(
             &mut cs.ns(|| "value_balance_commitment"),
@@ -600,6 +608,7 @@ mod tests {
             &mut cs.ns(|| "verify_binding_signature"),
             &partial_bvk_gadget,
             &value_balance_comm,
+            &is_negative,
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,

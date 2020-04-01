@@ -8,7 +8,7 @@ use snarkos_models::{
         algorithms::{BindingSignatureGadget, CommitmentGadget},
         curves::CompressedGroupGadget,
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, uint8::UInt8},
+        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
     },
 };
 
@@ -46,11 +46,18 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
         mut cs: CS,
         partial_bvk: &Self::OutputGadget,
         value_balance_comm: &Self::OutputGadget,
+        is_negative: &Boolean,
         c: &Self::RandomnessGadget,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,
     ) -> Result<(), SynthesisError> {
-        let bvk = partial_bvk.sub(cs.ns(|| "construct_bvk"), &value_balance_comm)?;
+        let bvk = match is_negative.get_value() {
+            Some(is_negative) => match is_negative {
+                true => partial_bvk.add(cs.ns(|| "construct_bvk"), &value_balance_comm)?,
+                false => partial_bvk.sub(cs.ns(|| "construct_bvk"), &value_balance_comm)?,
+            },
+            None => partial_bvk.sub(cs.ns(|| "construct_bvk"), &value_balance_comm)?,
+        };
 
         let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
