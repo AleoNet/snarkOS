@@ -13,14 +13,15 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::bytes::ToBytes;
+use std::ops::{Shl, Shr};
 
 /// Represents an interpretation of 32 `Boolean` objects as an
 /// unsigned integer.
 #[derive(Clone, Debug)]
 pub struct UInt32 {
     // Least significant bit_gadget first
-    bits: Vec<Boolean>,
-    value: Option<u32>,
+    pub bits: Vec<Boolean>,
+    pub value: Option<u32>,
 }
 
 impl UInt32 {
@@ -121,6 +122,17 @@ impl UInt32 {
         Self { value, bits }
     }
 
+    pub fn not(&self) -> Self {
+        let value = match self.value {
+            Some(a) => Some(!a),
+            _ => None,
+        };
+
+        let bits = self.bits.iter().map(|a| a.not()).collect();
+
+        UInt32 { bits, value }
+    }
+
     pub fn rotr(&self, by: usize) -> Self {
         let by = by % 32;
 
@@ -137,6 +149,63 @@ impl UInt32 {
             bits: new_bits,
             value: self.value.map(|v| v.rotate_right(by as u32)),
         }
+    }
+
+    /// Shifts left without checking most significant bit. TODO: implement a checking shl
+    pub fn shl(&self, by: usize) -> Self {
+        let by = by % 32;
+        let zero = UInt32::constant(0);
+
+        let new_bits = self
+            .bits
+            .iter()
+            .skip(by)
+            .chain(zero.bits.iter())
+            .take(32)
+            .cloned()
+            .collect();
+
+        UInt32 {
+            bits: new_bits,
+            value: self.value.map(|v| v.shl(by as u32)),
+        }
+    }
+
+    /// Shifts right without checking the least significant bit. TODO: implement a checking shr
+    pub fn shr(&self, by: usize) -> Self {
+        let by = by % 32;
+        let zero = UInt32::constant(0);
+
+        let new_bits = self
+            .bits
+            .iter()
+            .take(32 - by)
+            .chain(zero.bits.iter())
+            .take(32)
+            .cloned()
+            .collect();
+
+        UInt32 {
+            bits: new_bits,
+            value: self.value.map(|v| v.shr(by as u32)),
+        }
+    }
+
+    pub fn and<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+        let value = match (self.value, other.value) {
+            (Some(a), Some(b)) => Some(a & b),
+            _ => None,
+        };
+
+        let bits = self
+            .bits
+            .iter()
+            .zip(other.bits.iter())
+            .enumerate()
+            .map(|(i, (a, b))| Boolean::and(cs.ns(|| format!("and of bit gadget {}", i)), a, b))
+            .collect::<Result<_, _>>()?;
+
+        Ok(UInt32 { bits, value })
     }
 
     /// XOR this `UInt32` with another `UInt32`
@@ -159,6 +228,85 @@ impl UInt32 {
             .collect::<Result<_, _>>()?;
 
         Ok(UInt32 { bits, value: new_value })
+    }
+
+    /// Recursive bitwise addition
+    pub fn add<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+        let uncommon_bits = self.xor(
+            cs.ns(|| format!("{} ^ {}", self.value.unwrap(), other.value.unwrap())),
+            &other,
+        )?;
+        let common_bits = self.and(
+            cs.ns(|| format!("{} & {}", self.value.unwrap(), other.value.unwrap())),
+            &other,
+        )?;
+
+        if common_bits.value == Some(0) {
+            return Ok(uncommon_bits);
+        }
+        let shifted_common_bits = common_bits.shl(1);
+
+        return uncommon_bits.add(
+            cs.ns(|| {
+                format!(
+                    "recursive add {} + {}",
+                    uncommon_bits.value.unwrap(),
+                    shifted_common_bits.value.unwrap()
+                )
+            }),
+            &shifted_common_bits,
+        );
+    }
+
+    /// Recursive bitwise subtraction
+    pub fn sub<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+        if other.value == Some(0) {
+            return Ok(self.clone());
+        }
+
+        let difference = self.xor(
+            cs.ns(|| format!("{} ^ {}", self.value.unwrap(), other.value.unwrap())),
+            &other,
+        )?;
+        let mut borrow = self.not();
+        borrow = borrow.and(
+            cs.ns(|| format!("{} && {}", self.value.unwrap(), other.value.unwrap())),
+            &other,
+        )?;
+        borrow = borrow.shl(1);
+
+        return difference.sub(
+            cs.ns(|| format!("recursive {} - {}", difference.value.unwrap(), borrow.value.unwrap())),
+            &borrow,
+        );
+    }
+
+    /// Bitwise multiplication
+    pub fn mul<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+        let mut result = UInt32::constant(0);
+        other.bits.iter().enumerate().for_each(|(i, bit)| {
+            if bit.get_value() == Some(true) {
+                let shifted = self.shl(i);
+                result = result.add(cs.ns(|| format!("add shifted {}", i)), &shifted).unwrap();
+            }
+        });
+
+        Ok(result)
+    }
+
+    /// Bitwise division
+    pub fn div<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+        let mut result = self.clone();
+        other.bits.iter().enumerate().for_each(|(i, bit)| {
+            if bit.get_value() == Some(true) {
+                let shifted = self.shr(i);
+                result = result
+                    .sub(cs.ns(|| format!("subtract shifted {}", i)), &shifted)
+                    .unwrap();
+            }
+        });
+
+        Ok(result)
     }
 
     /// Perform modular addition of several `UInt32` objects.
