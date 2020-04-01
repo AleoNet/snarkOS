@@ -126,4 +126,7 @@ impl ConsensusParameters {
     ) -> Result<u32, ConsensusError> {
         Ok(0)
     }
+
+    // TODO:
+    // Coinbase transaction (make sure the sum of block's value balances = -block_reward).
 }

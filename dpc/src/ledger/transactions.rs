@@ -26,6 +26,11 @@ impl<T: Transaction> Transactions<T> {
         Self(transactions.to_vec())
     }
 
+    /// Initializes an empty list of transactions.
+    pub fn push(&mut self, transaction: T) {
+        self.0.push(transaction);
+    }
+
     /// Returns the transaction ids.
     pub fn to_transaction_ids(&self) -> Result<Vec<[u8; 32]>, TransactionError> {
         self.0

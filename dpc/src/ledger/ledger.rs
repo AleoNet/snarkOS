@@ -2,6 +2,7 @@ use crate::{dpc::Transaction, ledger::*};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
 use snarkos_errors::dpc::LedgerError;
 use snarkos_models::algorithms::CRH;
+use snarkos_objects::{BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_utilities::bytes::ToBytes;
 
 use rand::Rng;
@@ -9,15 +10,16 @@ use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-pub struct IdealLedger<T: Transaction, P: MerkleParameters>
+pub struct BasicLedger<T: Transaction, P: MerkleParameters>
 where
     T::Commitment: ToBytes,
 {
     crh_params: Rc<P::H>,
     transactions: Vec<T>,
-    blocks: Vec<Block<T>>,
+    pub blocks: Vec<Block<T>>,
     cm_merkle_tree: MerkleTree<P>,
     cur_cm_index: usize,
     cur_sn_index: usize,
@@ -42,7 +44,7 @@ where
     !iter.into_iter().all(move |x| uniq.insert(x))
 }
 
-impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P>
+impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P>
 where
     T: Eq,
     T::Commitment: ToBytes + Clone,
@@ -77,9 +79,27 @@ where
         let mut past_digests = HashSet::new();
         past_digests.insert(root.clone());
 
-        IdealLedger {
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as i64;
+
+        let header = BlockHeader {
+            previous_block_hash: BlockHeaderHash([0u8; 32]),
+            merkle_root_hash: MerkleRootHash([0u8; 32]),
+            time,
+            difficulty_target: 0,
+            nonce: 0,
+        };
+
+        let genesis_block = Block::<T> {
+            header,
+            transactions: Transactions::new(),
+        };
+
+        Self {
             crh_params: params,
-            blocks: Vec::new(),
+            blocks: vec![genesis_block],
             transactions: Vec::new(),
             cm_merkle_tree,
             cur_cm_index,
@@ -222,7 +242,7 @@ where
     }
 }
 
-impl<T: Transaction, P: MerkleParameters> IdealLedger<T, P>
+impl<T: Transaction, P: MerkleParameters> BasicLedger<T, P>
 where
     T: Eq,
     T::Commitment: ToBytes + Clone,
