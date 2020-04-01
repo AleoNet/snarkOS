@@ -439,10 +439,10 @@ mod tests {
 
         let value_comm_pp = ValueCommitment::setup(rng);
 
-        let input_amount: u64 = rng.gen_range(1, 100000000);
-        let input_amount_2: u64 = rng.gen_range(1, 100000000);
-        let output_amount: u64 = rng.gen_range(0, input_amount);
-        let output_amount_2: u64 = rng.gen_range(0, input_amount_2);
+        let input_amount: u64 = rng.gen_range(0, 100000000);
+        let input_amount_2: u64 = rng.gen_range(0, 100000000);
+        let output_amount: u64 = rng.gen_range(0, 100000000);
+        let output_amount_2: u64 = rng.gen_range(0, 100000000);
 
         let sighash = [1u8; 64].to_vec();
 
@@ -481,10 +481,10 @@ mod tests {
 
         let value_comm_pp = ValueCommitment::setup(rng);
 
-        let input_amount: u64 = rng.gen_range(1, 100000000);
-        let input_amount_2: u64 = rng.gen_range(1, 100000000);
-        let output_amount: u64 = rng.gen_range(0, input_amount);
-        let output_amount_2: u64 = rng.gen_range(0, input_amount_2);
+        let input_amount: u64 = rng.gen_range(0, 100000000);
+        let input_amount_2: u64 = rng.gen_range(0, 100000000);
+        let output_amount: u64 = rng.gen_range(0, 100000000);
+        let output_amount_2: u64 = rng.gen_range(0, 100000000);
 
         let sighash = [1u8; 64].to_vec();
 
@@ -512,10 +512,10 @@ mod tests {
 
         let value_comm_pp = ValueCommitment::setup(rng);
 
-        let input_amount: u64 = rng.gen_range(1, 100000000);
-        let input_amount_2: u64 = rng.gen_range(1, 100000000);
-        let output_amount: u64 = rng.gen_range(0, input_amount);
-        let output_amount_2: u64 = rng.gen_range(0, input_amount_2);
+        let input_amount: u64 = rng.gen_range(0, 100000000);
+        let input_amount_2: u64 = rng.gen_range(0, 100000000);
+        let output_amount: u64 = rng.gen_range(0, 100000000);
+        let output_amount_2: u64 = rng.gen_range(0, 100000000);
 
         let sighash = [1u8; 64].to_vec();
 
