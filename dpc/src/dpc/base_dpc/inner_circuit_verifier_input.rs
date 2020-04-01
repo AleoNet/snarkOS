@@ -28,7 +28,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub memo: [u8; 32],
 
-    pub value_balance: u64,
+    pub value_balance: i64,
 }
 
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
@@ -128,8 +128,18 @@ where
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(&self.memo)?);
         v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
 
+        let value_balance_as_u64 = self.value_balance.abs() as u64;
+
+        println!("value_balance_as_u64: {:?}", value_balance_as_u64);
+
+        let is_negative: bool = self.value_balance.is_negative();
+
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &self.value_balance.to_le_bytes()[..],
+            &value_balance_as_u64.to_le_bytes()[..],
+        )?);
+
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
+            &[is_negative as u8][..],
         )?);
 
         Ok(v)

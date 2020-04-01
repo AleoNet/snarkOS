@@ -150,7 +150,7 @@ pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
     local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 
     // Value Balance
-    value_balance: u64,
+    value_balance: i64,
 }
 
 impl<Components: BaseDPCComponents> ExecuteContext<'_, Components> {
@@ -394,7 +394,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let mut joint_serial_numbers = Vec::new();
         let mut old_death_pred_hashes = Vec::new();
 
-        let mut value_balance: u64 = 0;
+        let mut value_balance: i64 = 0;
 
         // Compute the ledger membership witness and serial number from the old records.
         for (i, record) in old_records.iter().enumerate() {
@@ -407,7 +407,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 let witness = ledger.prove_cm(comm)?;
                 old_witnesses.push(witness);
 
-                value_balance += record.payload.balance;
+                value_balance += record.payload.balance as i64;
             }
 
             let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_address_secret_keys[i])?;
@@ -449,7 +449,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             )?;
 
             if !record.is_dummy {
-                value_balance -= record.payload.balance;
+                value_balance -= record.payload.balance as i64;
             }
 
             new_commitments.push(record.commitment.clone());

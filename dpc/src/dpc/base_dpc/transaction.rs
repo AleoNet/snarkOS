@@ -41,7 +41,7 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
-    pub value_balance: u64,
+    pub value_balance: i64,
 
     #[derivative(PartialEq = "ignore")]
     pub signatures: Vec<<C::Signature as SignatureScheme>::Output>,
@@ -57,7 +57,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         predicate_proof: <C::OuterSNARK as SNARK>::Proof,
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
-        value_balance: u64,
+        value_balance: i64,
         signatures: Vec<<C::Signature as SignatureScheme>::Output>,
     ) -> Self {
         let stuff = DPCStuff {
@@ -189,7 +189,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
             FromBytes::read(&mut reader)?;
         let local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
 
-        let value_balance: u64 = FromBytes::read(&mut reader)?;
+        let value_balance: i64 = FromBytes::read(&mut reader)?;
 
         let num_signatures = read_variable_length_integer(&mut reader)?;
         let mut signatures = vec![];

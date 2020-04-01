@@ -11,7 +11,7 @@ use crate::{
         LocalData as DPCLocalData,
         DPC,
     },
-    ledger::ideal_ledger::IdealLedger,
+    ledger::ledger::BasicLedger,
 };
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
@@ -208,7 +208,7 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
 
-pub type MerkleTreeIdealLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeIdealLedger = BasicLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;

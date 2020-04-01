@@ -10,15 +10,17 @@ use snarkos_dpc::{
         LocalData,
         DPC,
     },
-    ledger::Ledger,
+    ledger::{transactions::Transactions, Block, Ledger},
     DPCScheme,
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
+use snarkos_objects::{merkle_root, BlockHeader, MerkleRootHash};
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, storage::Storage, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn base_dpc_integration_test() {
@@ -143,6 +145,11 @@ fn base_dpc_integration_test() {
 
     // Create a payload.
     let new_payload = PaymentRecordPayload::default();
+    //    let new_payload = PaymentRecordPayload {
+    //        balance: 10,
+    //        lock: 0,
+    //    };
+
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
 
@@ -311,8 +318,40 @@ fn base_dpc_integration_test() {
     )
     .unwrap();
 
-    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
+    // Craft the block
 
-    ledger.push(transaction).unwrap();
-    assert_eq!(ledger.len(), 1);
+    let previous_block = ledger.blocks.last().unwrap();
+
+    let mut transactions = Transactions::new();
+    transactions.push(transaction);
+
+    let transaction_ids: Vec<Vec<u8>> = transactions
+        .to_transaction_ids()
+        .unwrap()
+        .iter()
+        .map(|id| id.to_vec())
+        .collect();
+
+    let mut merkle_root_bytes = [0u8; 32];
+    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i64;
+
+    let header = BlockHeader {
+        previous_block_hash: previous_block.header.get_hash(),
+        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        time,
+        difficulty_target: previous_block.header.difficulty_target,
+        nonce: 0,
+    };
+
+    let block = Block { header, transactions };
+
+    assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
+
+    ledger.push_block(block).unwrap();
+    assert_eq!(ledger.len(), 2);
 }

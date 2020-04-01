@@ -59,7 +59,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     auxiliary: &[u8; 32],
     input_value_commitments: &[[u8; 32]],
     output_value_commitments: &[[u8; 32]],
-    value_balance: u64,
+    value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
@@ -152,7 +152,7 @@ fn base_dpc_execute_gadget_helper<
     auxiliary: &[u8; 32],
     input_value_commitments: &[[u8; 32]],
     output_value_commitments: &[[u8; 32]],
-    value_balance: u64,
+    value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
@@ -747,8 +747,14 @@ where
             C::BindingSignatureGroup,
         >>::OutputGadget::alloc(&mut cs.ns(|| "recommit_gadget"), || Ok(recommit))?;
 
-        let value_balance_bytes =
-            UInt8::alloc_input_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes())?;
+        let value_balance_bytes = UInt8::alloc_input_vec(
+            cs.ns(|| "value_balance_bytes"),
+            &(value_balance.abs() as u64).to_le_bytes(),
+        )?;
+
+        let is_negative = Boolean::alloc_input(&mut cs.ns(|| "value_balance_is_negative"), || {
+            Ok(value_balance.is_negative())
+        })?;
 
         let value_balance_comm = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
@@ -764,6 +770,7 @@ where
             &mut cs.ns(|| "verify_binding_signature"),
             &partial_bvk_gadget,
             &value_balance_comm,
+            &is_negative,
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,
