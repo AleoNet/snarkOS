@@ -32,7 +32,7 @@ fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
-    let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
+    let ledger_parameters = MerkleTreeLedger::setup(&mut rng).expect("Ledger setup failed");
     let circuit_parameters = InstantiatedDPC::generate_circuit_parameters(&mut rng).unwrap();
     let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&circuit_parameters, &mut rng).unwrap();
     #[cfg(debug_assertions)]
@@ -69,7 +69,7 @@ fn test_execute_base_dpc_constraints() {
     let genesis_memo = [0u8; 32];
 
     // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger = MerkleTreeIdealLedger::new(
+    let ledger = MerkleTreeLedger::new(
         ledger_parameters,
         genesis_record.commitment(),
         genesis_sn.clone(),

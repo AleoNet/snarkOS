@@ -208,7 +208,7 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
 
-pub type MerkleTreeIdealLedger = BasicLedger<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = BasicLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;
