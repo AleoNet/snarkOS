@@ -893,7 +893,7 @@ dependencies = [
  "indexmap",
  "log",
  "slab",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "tokio-util",
 ]
 
@@ -1054,7 +1054,7 @@ dependencies = [
  "net2",
  "pin-project",
  "time",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "tower-service",
  "want 0.3.0",
 ]
@@ -1068,7 +1068,7 @@ dependencies = [
  "bytes 0.5.4",
  "hyper 0.13.2",
  "native-tls",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "tokio-tls",
 ]
 
@@ -1998,7 +1998,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "time",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "tokio-tls",
  "url 2.1.1",
  "wasm-bindgen",
@@ -2268,7 +2268,7 @@ dependencies = [
  "snarkos-objects",
  "snarkos-rpc",
  "snarkos-storage",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "wagyu-bitcoin",
 ]
 
@@ -2329,7 +2329,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-objects",
  "snarkos-storage",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "wagyu-bitcoin",
  "wagyu-model",
 ]
@@ -2343,7 +2343,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "tokio 0.2.13",
+ "tokio 0.2.14",
 ]
 
 [[package]]
@@ -2437,7 +2437,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-objects",
  "snarkos-storage",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "tokio-test",
  "wagyu-bitcoin",
 ]
@@ -2483,7 +2483,7 @@ dependencies = [
  "snarkos-network",
  "snarkos-objects",
  "snarkos-storage",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "wagyu-bitcoin",
  "wagyu-model",
 ]
@@ -2682,9 +2682,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa5e81d6bc4e67fe889d5783bd2a128ab2e0cfa487e0be16b6a8d177b101616"
+checksum = "2751672f9da075d045c67fdb0068be9850ab7b231fa77bb51d6fd35da9c0bb0d"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -2830,7 +2830,7 @@ checksum = "09cf9705471976fa5fc6817d3fbc9c4ff9696a6647af0e5c1870c81ca7445b05"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
- "tokio 0.2.13",
+ "tokio 0.2.14",
 ]
 
 [[package]]
@@ -2869,7 +2869,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bde02a3a5291395f59b06ec6945a3077602fac2b07eeeaf0dee2122f3619828"
 dependencies = [
  "native-tls",
- "tokio 0.2.13",
+ "tokio 0.2.14",
 ]
 
 [[package]]
@@ -2916,7 +2916,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
- "tokio 0.2.13",
+ "tokio 0.2.14",
 ]
 
 [[package]]
