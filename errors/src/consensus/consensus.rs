@@ -1,4 +1,5 @@
 use crate::{
+    dpc::DPCError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
@@ -17,8 +18,14 @@ pub enum ConsensusError {
     #[fail(display = "Block is too large: {}. Exceeds {} maximum", _0, _1)]
     BlockTooLarge(usize, usize),
 
+    #[fail(display = "A coinbase transaction already exists in the block")]
+    CoinbaseTransactionAlreadyExists(),
+
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[fail(display = "{}", _0)]
+    DPCError(DPCError),
 
     #[fail(display = "timestamp more than 2 hours into the future {:?} actual {:?}", _0, _1)]
     FuturisticTimestamp(i64, i64),
@@ -60,6 +67,12 @@ pub enum ConsensusError {
 impl From<BlockError> for ConsensusError {
     fn from(error: BlockError) -> Self {
         ConsensusError::BlockError(error)
+    }
+}
+
+impl From<DPCError> for ConsensusError {
+    fn from(error: DPCError) -> Self {
+        ConsensusError::DPCError(error)
     }
 }
 
