@@ -116,14 +116,14 @@ pub trait DPCScheme<L: Ledger> {
 
         old_records: &[Self::Record],
         old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
-        old_private_pred_input: impl FnMut(&Self::LocalData) -> Vec<Self::PrivatePredInput>,
+        old_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
         new_death_predicates: &[Self::Predicate],
-        new_private_pred_input: impl FnMut(&Self::LocalData) -> Vec<Self::PrivatePredInput>,
+        new_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,

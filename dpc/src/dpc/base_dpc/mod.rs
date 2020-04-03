@@ -618,14 +618,14 @@ where
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
         old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
-        mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Vec<Self::PrivatePredInput>,
+        mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
         new_death_predicates: &[Self::Predicate],
-        mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Vec<Self::PrivatePredInput>,
+        mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
@@ -649,8 +649,8 @@ where
         )?;
 
         let local_data = context.into_local_data();
-        let old_death_pred_attributes = old_death_pred_proof_generator(&local_data);
-        let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data);
+        let old_death_pred_attributes = old_death_pred_proof_generator(&local_data)?;
+        let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data)?;
 
         let ExecuteContext {
             circuit_parameters,

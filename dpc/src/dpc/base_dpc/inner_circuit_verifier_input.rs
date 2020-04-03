@@ -130,8 +130,6 @@ where
 
         let value_balance_as_u64 = self.value_balance.abs() as u64;
 
-        println!("value_balance_as_u64: {:?}", value_balance_as_u64);
-
         let is_negative: bool = self.value_balance.is_negative();
 
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(

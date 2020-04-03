@@ -87,7 +87,8 @@ fn test_execute_base_dpc_constraints() {
     let new_address = DPC::create_address_helper(&circuit_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
-    let new_payload = PaymentRecordPayload::default();
+    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
