@@ -240,6 +240,10 @@ where
     ) -> bool {
         true
     }
+
+    fn blocks(&self) -> &Vec<Block<Self::Transaction>> {
+        &self.blocks
+    }
 }
 
 impl<T: Transaction, P: MerkleParameters> BasicLedger<T, P>

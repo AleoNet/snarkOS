@@ -208,4 +208,8 @@ where
     ) -> bool {
         true
     }
+
+    fn blocks(&self) -> &Vec<Block<Self::Transaction>> {
+        unimplemented!()
+    }
 }

@@ -27,16 +27,13 @@ use snarkos_objects::{merkle_root, BlockHeader, BlockHeaderHash, MerkleRootHash}
 use snarkos_utilities::rand::UniformRand;
 
 use rand::{thread_rng, Rng};
-use std::{
-    marker::PhantomData,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ConsensusParameters<L: Ledger> {
+pub struct ConsensusParameters {
     /// Maximum block size in bytes
     pub max_block_size: usize,
 
@@ -45,10 +42,8 @@ pub struct ConsensusParameters<L: Ledger> {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
-
     // /// mainnet or testnet
     //    network: Network
-    _ledger: PhantomData<L>,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -56,7 +51,7 @@ pub fn block_reward(block_num: u32) -> u64 {
     100_000_000u64 / (2_u64.pow(block_num / 1000))
 }
 
-impl<L: Ledger> ConsensusParameters<L> {
+impl ConsensusParameters {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
     pub fn get_block_difficulty(&self, prev_header: &BlockHeader, _block_timestamp: i64) -> u64 {
         //        bitcoin_retarget(
@@ -121,24 +116,62 @@ impl<L: Ledger> ConsensusParameters<L> {
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         block: &Block<Tx>,
-        ledger: &L,
+        ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        //        if let Err(_) = self.verify_header() {
-        //            return Ok(false);
-        //        }
+        let previous_block = match ledger.blocks().last() {
+            Some(block) => block,
+            None => return Ok(false),
+        };
 
-        // Verify block amounts and check that there is a single coinbase
+        let transaction_ids: Vec<Vec<u8>> = block
+            .transactions
+            .to_transaction_ids()
+            .unwrap()
+            .iter()
+            .map(|id| id.to_vec())
+            .collect();
 
-        for transaction in block.transactions.iter() {
-            // run dpc verify
-            let _x = transaction.stuff();
+        let mut merkle_root_bytes = [0u8; 32];
+        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+        // Verify the block header
+
+        if let Err(_) = self.verify_header(
+            &block.header,
+            &previous_block.header,
+            &MerkleRootHash(merkle_root_bytes),
+        ) {
+            return Ok(false);
         }
 
-        // Verify that the transactions are valid in the ledger
-        //
-        //        Ok(InstantiatedDPC::verify_block(parameters, block, ledger)?)
+        // Verify block amounts and check that there is a single coinbase transaction
 
-        Ok(true)
+        let mut coinbase_transaction_count = 0;
+        let mut total_value_balance = 0;
+
+        for transaction in block.transactions.iter() {
+            let value_balance = transaction.stuff().value_balance;
+
+            if value_balance.is_negative() {
+                coinbase_transaction_count += 1;
+            }
+
+            total_value_balance += value_balance;
+        }
+
+        // Check that there is only 1 coinbase transaction
+        if coinbase_transaction_count != 1 {
+            return Ok(false);
+        }
+
+        // Check that the block value balances are correct
+        let expected_block_reward = block_reward(ledger.blocks().len() as u32) as i64;
+        if total_value_balance - expected_block_reward != 0 {
+            return Ok(false);
+        }
+
+        // Check that all the transction proofs verify
+        Ok(InstantiatedDPC::verify_block(parameters, block, ledger)?)
     }
 
     /// Verifies that the block header is valid.

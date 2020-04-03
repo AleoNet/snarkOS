@@ -49,6 +49,9 @@ pub enum ConsensusError {
     #[fail(display = "all nonces have been tried for the current block header")]
     NonceLimitError,
 
+    #[fail(display = "Missing genesis block")]
+    NoGenesisBlock,
+
     #[fail(display = "expected {:?} actual {:?}", _0, _1)]
     NoParent(String, String),
 

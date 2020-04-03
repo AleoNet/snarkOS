@@ -84,4 +84,6 @@ pub trait Ledger {
         memo: &Self::Memo,
         witness: &MerklePath<Self::Parameters>,
     ) -> bool;
+
+    fn blocks(&self) -> &Vec<Block<Self::Transaction>>;
 }
