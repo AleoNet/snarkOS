@@ -1,4 +1,5 @@
 use crate::{
+    algorithms::CRHError,
     dpc::DPCError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
@@ -23,6 +24,9 @@ pub enum ConsensusError {
 
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[fail(display = "{}", _0)]
+    CRHError(CRHError),
 
     #[fail(display = "{}", _0)]
     DPCError(DPCError),
@@ -67,6 +71,12 @@ pub enum ConsensusError {
 impl From<BlockError> for ConsensusError {
     fn from(error: BlockError) -> Self {
         ConsensusError::BlockError(error)
+    }
+}
+
+impl From<CRHError> for ConsensusError {
+    fn from(error: CRHError) -> Self {
+        ConsensusError::CRHError(error)
     }
 }
 

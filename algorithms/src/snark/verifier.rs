@@ -22,9 +22,6 @@ pub fn verify_proof<E: PairingEngine>(
     proof: &Proof<E>,
     public_inputs: &[E::Fr],
 ) -> Result<bool, SynthesisError> {
-    println!("public_inputs.len() + 1: {:?}", public_inputs.len() + 1);
-    println!("pvk.query.len(): {:?}", pvk.query.len());
-
     if (public_inputs.len() + 1) != pvk.query.len() {
         return Err(SynthesisError::MalformedVerifyingKey);
     }

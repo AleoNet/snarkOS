@@ -10,12 +10,12 @@ use snarkos_dpc::{
         LocalData,
         DPC,
     },
-    ledger::{transactions::Transactions, Block, Ledger},
+    ledger::{transactions::Transactions, Block, ConsensusParameters, Ledger},
     DPCScheme,
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
-use snarkos_objects::{merkle_root, BlockHeader, MerkleRootHash};
+use snarkos_objects::{merkle_root, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, storage::Storage, to_bytes};
 
 use rand::SeedableRng;
@@ -36,11 +36,11 @@ fn base_dpc_integration_test() {
         match <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H::load(&ledger_parameter_path)
         {
             Ok(ledger_parameters) => {
-                let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::Parameters::load(&path) {
+                let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path) {
                     Ok(parameters) => parameters,
                     Err(_) => {
                         println!("Parameter Setup");
-                        <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
+                        <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, &mut rng)
                             .expect("DPC setup failed")
                     }
                 };
@@ -49,12 +49,11 @@ fn base_dpc_integration_test() {
             }
             Err(_) => {
                 println!("Ledger parameter Setup");
-                let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
+                let ledger_parameters = MerkleTreeLedger::setup(&mut rng).expect("Ledger setup failed");
 
                 println!("Parameter Setup");
-                let parameters =
-                    <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
-                        .expect("DPC setup failed");
+                let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, &mut rng)
+                    .expect("DPC setup failed");
 
                 (ledger_parameters, parameters)
             }
@@ -107,7 +106,7 @@ fn base_dpc_integration_test() {
     let genesis_memo = [1u8; 32];
 
     // Use genesis record, serial number, and memo to initialize the ledger.
-    let mut ledger = MerkleTreeIdealLedger::new(
+    let mut ledger = MerkleTreeLedger::new(
         ledger_parameters,
         genesis_record.commitment(),
         genesis_sn.clone(),
@@ -144,11 +143,7 @@ fn base_dpc_integration_test() {
     let new_address = DPC::create_address_helper(&parameters.circuit_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
-    let new_payload = PaymentRecordPayload::default();
-    //    let new_payload = PaymentRecordPayload {
-    //        balance: 10,
-    //        lock: 0,
-    //    };
+    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
 
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
@@ -229,7 +224,7 @@ fn base_dpc_integration_test() {
             };
             old_proof_and_vk.push(private_input);
         }
-        old_proof_and_vk
+        Ok(old_proof_and_vk)
     };
     let new_birth_vk_and_proof_generator = |local_data: &LocalData<Components>| {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
@@ -297,7 +292,7 @@ fn base_dpc_integration_test() {
             };
             new_proof_and_vk.push(private_input);
         }
-        new_proof_and_vk
+        Ok(new_proof_and_vk)
     };
 
     let (_new_records, transaction) = InstantiatedDPC::execute(
@@ -313,6 +308,346 @@ fn base_dpc_integration_test() {
         &new_birth_vk_and_proof_generator,
         &auxiliary,
         &memo,
+        &ledger,
+        &mut rng,
+    )
+    .unwrap();
+
+    // Craft the block
+
+    let previous_block = ledger.blocks.last().unwrap();
+
+    let mut transactions = Transactions::new();
+    transactions.push(transaction);
+
+    let transaction_ids: Vec<Vec<u8>> = transactions
+        .to_transaction_ids()
+        .unwrap()
+        .iter()
+        .map(|id| id.to_vec())
+        .collect();
+
+    let mut merkle_root_bytes = [0u8; 32];
+    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i64;
+
+    let header = BlockHeader {
+        previous_block_hash: previous_block.header.get_hash(),
+        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        time,
+        difficulty_target: previous_block.header.difficulty_target,
+        nonce: 0,
+    };
+
+    let block = Block { header, transactions };
+
+    assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
+
+    ledger.push_block(block).unwrap();
+    assert_eq!(ledger.len(), 2);
+}
+
+#[test]
+fn base_dpc_genesis_block() {
+    let mut rng = XorShiftRng::seed_from_u64(23472342u64);
+
+    //    let consensus = ConsensusParameters {
+    //        max_block_size: 1_000_000_000usize,
+    //        max_nonce: u32::max_value(),
+    //        target_block_time: 10i64,
+    //    };
+
+    let mut path = std::env::current_dir().unwrap();
+    path.push("src/parameters/");
+    let ledger_parameter_path = path.join("ledger.params");
+
+    // Generate or load parameters for the ledger, commitment schemes, CRH, and the
+    // "always-accept" predicate.
+    let (ledger_parameters, parameters) =
+        match <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H::load(&ledger_parameter_path)
+        {
+            Ok(ledger_parameters) => {
+                let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path) {
+                    Ok(parameters) => parameters,
+                    Err(_) => {
+                        println!("Parameter Setup");
+                        <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, &mut rng)
+                            .expect("DPC setup failed")
+                    }
+                };
+
+                (ledger_parameters, parameters)
+            }
+            Err(_) => {
+                println!("Ledger parameter Setup");
+                let ledger_parameters = MerkleTreeLedger::setup(&mut rng).expect("Ledger setup failed");
+
+                println!("Parameter Setup");
+                let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, &mut rng)
+                    .expect("DPC setup failed");
+
+                (ledger_parameters, parameters)
+            }
+        };
+
+    // Store parameters
+    //    ledger_parameters.store(&ledger_parameter_path).unwrap();
+    //    parameters.store(&path).unwrap();
+
+    // Generate metadata and an address for a dummy initial, or "genesis", record.
+    let genesis_metadata = [1u8; 32];
+    let genesis_address =
+        DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
+
+    let genesis_sn_nonce = SerialNumberNonce::hash(
+        &parameters.circuit_parameters.serial_number_nonce_parameters,
+        &[34u8; 1],
+    )
+    .unwrap();
+    let genesis_pred_vk_bytes = to_bytes![
+        PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash_parameters,
+            &to_bytes![parameters.predicate_snark_parameters.verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let genesis_record = DPC::generate_record(
+        &parameters.circuit_parameters,
+        &genesis_sn_nonce,
+        &genesis_address.public_key,
+        true, // The inital record should be dummy
+        &PaymentRecordPayload::default(),
+        &Predicate::new(genesis_pred_vk_bytes.clone()),
+        &Predicate::new(genesis_pred_vk_bytes.clone()),
+        &mut rng,
+    )
+    .unwrap();
+
+    // Generate serial number for the genesis record.
+    let (genesis_sn, _) = DPC::generate_sn(
+        &parameters.circuit_parameters,
+        &genesis_record,
+        &genesis_address.secret_key,
+    )
+    .unwrap();
+    let genesis_memo = [1u8; 32];
+
+    // Use genesis record, serial number, and memo to initialize the ledger.
+    let mut ledger = MerkleTreeLedger::new(
+        ledger_parameters,
+        genesis_record.commitment(),
+        genesis_sn.clone(),
+        genesis_memo,
+    );
+
+    let mut transactions = Transactions::new();
+
+    // Create an address for an actual new record.
+    let new_metadata = [2u8; 32];
+    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &new_metadata, &mut rng).unwrap();
+    let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
+
+    let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+
+    let (_new_records, transaction) = ConsensusParameters::<MerkleTreeLedger>::create_coinbase_transaction(
+        ledger.blocks.len() as u32,
+        &transactions,
+        &parameters,
+        &genesis_pred_vk_bytes,
+        new_birth_predicates,
+        new_death_predicates,
+        genesis_address,
+        miner_address.public_key,
+        &ledger,
+        &mut rng,
+    )
+    .unwrap();
+
+    transactions.push(transaction);
+
+    let transaction_ids: Vec<Vec<u8>> = transactions
+        .to_transaction_ids()
+        .unwrap()
+        .iter()
+        .map(|id| id.to_vec())
+        .collect();
+
+    let mut merkle_root_bytes = [0u8; 32];
+    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i64;
+
+    let header = BlockHeader {
+        previous_block_hash: BlockHeaderHash([0u8; 32]),
+        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        time,
+        difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+        nonce: 0,
+    };
+
+    let block = Block { header, transactions };
+
+    assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
+
+    ledger.push_block(block).unwrap();
+    assert_eq!(ledger.len(), 2);
+}
+
+#[test]
+fn test_create_transaction() {
+    let mut rng = XorShiftRng::seed_from_u64(23472342u64);
+
+    let mut path = std::env::current_dir().unwrap();
+    path.push("src/parameters/");
+    let ledger_parameter_path = path.join("ledger.params");
+
+    // Generate or load parameters for the ledger, commitment schemes, CRH, and the
+    // "always-accept" predicate.
+    let (ledger_parameters, parameters) =
+        match <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H::load(&ledger_parameter_path)
+        {
+            Ok(ledger_parameters) => {
+                let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path) {
+                    Ok(parameters) => parameters,
+                    Err(_) => {
+                        println!("Parameter Setup");
+                        <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, &mut rng)
+                            .expect("DPC setup failed")
+                    }
+                };
+
+                (ledger_parameters, parameters)
+            }
+            Err(_) => {
+                println!("Ledger parameter Setup");
+                let ledger_parameters = MerkleTreeLedger::setup(&mut rng).expect("Ledger setup failed");
+
+                println!("Parameter Setup");
+                let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, &mut rng)
+                    .expect("DPC setup failed");
+
+                (ledger_parameters, parameters)
+            }
+        };
+
+    // Store parameters
+    //    ledger_parameters.store(&ledger_parameter_path).unwrap();
+    //    parameters.store(&path).unwrap();
+
+    // Generate metadata and an address for a dummy initial, or "genesis", record.
+    let genesis_metadata = [1u8; 32];
+    let genesis_address =
+        DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
+
+    let genesis_sn_nonce = SerialNumberNonce::hash(
+        &parameters.circuit_parameters.serial_number_nonce_parameters,
+        &[34u8; 1],
+    )
+    .unwrap();
+    let genesis_pred_vk_bytes = to_bytes![
+        PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash_parameters,
+            &to_bytes![parameters.predicate_snark_parameters.verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let genesis_record = DPC::generate_record(
+        &parameters.circuit_parameters,
+        &genesis_sn_nonce,
+        &genesis_address.public_key,
+        true, // The inital record should be dummy
+        &PaymentRecordPayload::default(),
+        &Predicate::new(genesis_pred_vk_bytes.clone()),
+        &Predicate::new(genesis_pred_vk_bytes.clone()),
+        &mut rng,
+    )
+    .unwrap();
+
+    // Generate serial number for the genesis record.
+    let (genesis_sn, _) = DPC::generate_sn(
+        &parameters.circuit_parameters,
+        &genesis_record,
+        &genesis_address.secret_key,
+    )
+    .unwrap();
+    let genesis_memo = [1u8; 32];
+
+    // Use genesis record, serial number, and memo to initialize the ledger.
+    let mut ledger = MerkleTreeLedger::new(
+        ledger_parameters,
+        genesis_record.commitment(),
+        genesis_sn.clone(),
+        genesis_memo,
+    );
+
+    // Generate dummy input records having as address the genesis address.
+    let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let mut old_records = vec![];
+    for i in 0..NUM_INPUT_RECORDS {
+        let old_sn_nonce = SerialNumberNonce::hash(
+            &parameters.circuit_parameters.serial_number_nonce_parameters,
+            &[64u8 + (i as u8); 1],
+        )
+        .unwrap();
+        let old_record = DPC::generate_record(
+            &parameters.circuit_parameters,
+            &old_sn_nonce,
+            &genesis_address.public_key,
+            true, // The input record is dummy
+            &PaymentRecordPayload::default(),
+            &Predicate::new(genesis_pred_vk_bytes.clone()),
+            &Predicate::new(genesis_pred_vk_bytes.clone()),
+            &mut rng,
+        )
+        .unwrap();
+        old_records.push(old_record);
+    }
+
+    // Construct new records.
+
+    // Create an address for an actual new record.
+    let new_metadata = [2u8; 32];
+    let new_address = DPC::create_address_helper(&parameters.circuit_parameters, &new_metadata, &mut rng).unwrap();
+
+    // Create a payload.
+    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+
+    // Set the new records' predicate to be the "always-accept" predicate.
+    // TODO integrate the predicate with actual payment record
+    let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
+
+    let new_apks = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+
+    let auxiliary = [3u8; 32];
+    let memo = [4u8; 32];
+
+    let (_, transaction) = ConsensusParameters::<MerkleTreeLedger>::create_transaction(
+        &parameters,
+        old_records,
+        old_asks,
+        new_apks,
+        new_birth_predicates,
+        new_death_predicates,
+        new_dummy_flags,
+        new_payloads,
+        auxiliary,
+        memo,
         &ledger,
         &mut rng,
     )
