@@ -12,7 +12,7 @@ use crate::{
         address::{AddressPair, AddressPublicKey, AddressSecretKey},
         Transaction,
     },
-    ledger::{block::Block, transactions::Transactions},
+    ledger::{block::Block, transactions::Transactions, Ledger},
     DPCScheme,
     Record,
 };
@@ -27,13 +27,16 @@ use snarkos_objects::{merkle_root, BlockHeader, BlockHeaderHash, MerkleRootHash}
 use snarkos_utilities::rand::UniformRand;
 
 use rand::{thread_rng, Rng};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    marker::PhantomData,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ConsensusParameters {
+pub struct ConsensusParameters<L: Ledger> {
     /// Maximum block size in bytes
     pub max_block_size: usize,
 
@@ -42,8 +45,10 @@ pub struct ConsensusParameters {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
+
     // /// mainnet or testnet
     //    network: Network
+    _ledger: PhantomData<L>,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -51,7 +56,7 @@ pub fn block_reward(block_num: u32) -> u64 {
     100_000_000u64 / (2_u64.pow(block_num / 1000))
 }
 
-impl ConsensusParameters {
+impl<L: Ledger> ConsensusParameters<L> {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
     pub fn get_block_difficulty(&self, prev_header: &BlockHeader, _block_timestamp: i64) -> u64 {
         //        bitcoin_retarget(
@@ -110,18 +115,30 @@ impl ConsensusParameters {
         }
     }
 
-    /// Verify that a block's transactions are valid.
+    /// Check if the block is valid
     /// Check all outpoints, verify signatures, and calculate transaction fees.
-    pub fn verify_transactions(
+    pub fn valid_block(
         &self,
-        //        storage: &BlockStorage,
-        transactions: &Transactions<Tx>,
-    ) -> Result<(), ConsensusError> {
-        for transaction in transactions.iter() {
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        block: &Block<Tx>,
+        ledger: &L,
+    ) -> Result<bool, ConsensusError> {
+        //        if let Err(_) = self.verify_header() {
+        //            return Ok(false);
+        //        }
+
+        // Verify block amounts and check that there is a single coinbase
+
+        for transaction in block.transactions.iter() {
             // run dpc verify
             let _x = transaction.stuff();
         }
-        Ok(())
+
+        // Verify that the transactions are valid in the ledger
+        //
+        //        Ok(InstantiatedDPC::verify_block(parameters, block, ledger)?)
+
+        Ok(true)
     }
 
     /// Verifies that the block header is valid.
@@ -159,8 +176,9 @@ impl ConsensusParameters {
 
     pub fn create_coinbase_transaction<R: Rng>(
         block_num: u32,
-        transactions: Transactions<Tx>,
+        transactions: &Transactions<Tx>,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        genesis_pred_vk_bytes: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         genesis_address: AddressPair<Components>,
@@ -170,6 +188,7 @@ impl ConsensusParameters {
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         let mut total_value_balance = block_reward(block_num);
+
         for transaction in transactions.iter() {
             let tx_value_balance = transaction.stuff.value_balance;
 
@@ -187,8 +206,8 @@ impl ConsensusParameters {
             let old_sn_nonce = SerialNumberNonce::hash(
                 &parameters.circuit_parameters.serial_number_nonce_parameters,
                 &[64u8 + (i as u8); 1],
-            )
-            .unwrap();
+            )?;
+
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,
                 &old_sn_nonce,
@@ -196,11 +215,11 @@ impl ConsensusParameters {
                 true, // The input record is dummy
                 &PaymentRecordPayload::default(),
                 // Filler predicate input
-                &Predicate::new([0u8; 32].to_vec()),
-                &Predicate::new([0u8; 32].to_vec()),
+                &Predicate::new(genesis_pred_vk_bytes.clone()),
+                &Predicate::new(genesis_pred_vk_bytes.clone()),
                 rng,
-            )
-            .unwrap();
+            )?;
+
             old_records.push(old_record);
         }
 
@@ -211,7 +230,7 @@ impl ConsensusParameters {
         let dummy_payload = PaymentRecordPayload { balance: 0, lock: 0 };
 
         let new_apks = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_dummy_flags = [vec![true], vec![false; Components::NUM_OUTPUT_RECORDS - 1]].concat();
+        let new_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_payloads = [vec![new_payload], vec![
             dummy_payload;
             Components::NUM_OUTPUT_RECORDS - 1
@@ -276,8 +295,7 @@ impl ConsensusParameters {
                 let value_commitment = local_data
                     .circuit_parameters
                     .value_commitment_parameters
-                    .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
-                    .unwrap();
+                    .commit(&input_value.to_le_bytes(), &value_commitment_randomness)?;
 
                 // Instantiate death predicate circuit
                 let death_predicate_circuit = PaymentCircuit::new(
@@ -327,7 +345,8 @@ impl ConsensusParameters {
                 };
                 old_proof_and_vk.push(private_input);
             }
-            old_proof_and_vk
+
+            Ok(old_proof_and_vk)
         };
 
         let new_birth_vk_and_proof_generator = |local_data: &LocalData<Components>| {
@@ -400,7 +419,8 @@ impl ConsensusParameters {
                 };
                 new_proof_and_vk.push(private_input);
             }
-            new_proof_and_vk
+
+            Ok(new_proof_and_vk)
         };
 
         let (new_records, transaction) = InstantiatedDPC::execute(
