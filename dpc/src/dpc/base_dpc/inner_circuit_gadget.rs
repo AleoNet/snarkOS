@@ -372,8 +372,16 @@ where
                 &ledger_pp,
                 &digest_gadget,
                 &given_commitment,
-                &given_is_dummy.not(),
+                &Boolean::Constant(false),
             )?;
+            //
+            //            witness_gadget.conditionally_check_membership(
+            //                &mut witness_cs.ns(|| "Perform check"),
+            //                &ledger_pp,
+            //                &digest_gadget,
+            //                &given_commitment,
+            //                &given_is_dummy.not(),
+            //            )?;
         }
         // ********************************************************************
 

@@ -47,25 +47,49 @@ pub struct ConsensusParameters {
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
-pub fn block_reward(block_num: u32) -> u64 {
+pub fn get_block_reward(block_num: u32) -> u64 {
     100_000_000u64 / (2_u64.pow(block_num / 1000))
+}
+
+/// Bitcoin difficulty retarget algorithm.
+pub fn bitcoin_retarget(
+    block_timestamp: i64,
+    parent_timestamp: i64,
+    target_block_time: i64,
+    parent_difficulty: u64,
+) -> u64 {
+    let mut time_elapsed = block_timestamp - parent_timestamp;
+
+    // Limit difficulty adjustment by factor of 2
+    if time_elapsed < target_block_time / 2 {
+        time_elapsed = target_block_time / 2
+    } else if time_elapsed > target_block_time * 2 {
+        time_elapsed = target_block_time * 2
+    }
+
+    let mut x: u64;
+    x = parent_difficulty;
+
+    x *= time_elapsed as u64;
+    x /= target_block_time as u64;
+
+    x
 }
 
 impl ConsensusParameters {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
-    pub fn get_block_difficulty(&self, prev_header: &BlockHeader, _block_timestamp: i64) -> u64 {
+    pub fn get_block_difficulty(&self, _prev_header: &BlockHeader, _block_timestamp: i64) -> u64 {
         //        bitcoin_retarget(
         //            block_timestamp,
         //            prev_header.time,
         //            self.target_block_time,
         //            prev_header.difficulty_target,
         //        )
-
-        prev_header.difficulty_target
+        u64::max_value()
     }
 
-    pub fn is_genesis(block: &Block<Tx>) -> bool {
-        block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
+    pub fn is_genesis(block_header: &BlockHeader) -> bool {
+        block_header.previous_block_hash == BlockHeaderHash([0u8; 32])
     }
 
     /// Verify all fields in a block header.
@@ -78,9 +102,19 @@ impl ConsensusParameters {
     pub fn verify_header(
         &self,
         header: &BlockHeader,
-        parent_header: &BlockHeader,
         merkle_root_hash: &MerkleRootHash,
+        ledger: &MerkleTreeLedger,
     ) -> Result<(), ConsensusError> {
+        let parent_header = match ledger.blocks().last() {
+            Some(block) => block.header.clone(),
+            None => {
+                return match Self::is_genesis(header) {
+                    true => Ok(()),
+                    false => Err(ConsensusError::NoGenesisBlock),
+                };
+            }
+        };
+
         let hash_result = header.to_difficulty_hash();
 
         let since_the_epoch = SystemTime::now()
@@ -112,21 +146,15 @@ impl ConsensusParameters {
 
     /// Check if the block is valid
     /// Check all outpoints, verify signatures, and calculate transaction fees.
-    pub fn valid_block(
+    pub fn verify_block(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         block: &Block<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        let previous_block = match ledger.blocks().last() {
-            Some(block) => block,
-            None => return Ok(false),
-        };
-
         let transaction_ids: Vec<Vec<u8>> = block
             .transactions
-            .to_transaction_ids()
-            .unwrap()
+            .to_transaction_ids()?
             .iter()
             .map(|id| id.to_vec())
             .collect();
@@ -136,11 +164,8 @@ impl ConsensusParameters {
 
         // Verify the block header
 
-        if let Err(_) = self.verify_header(
-            &block.header,
-            &previous_block.header,
-            &MerkleRootHash(merkle_root_bytes),
-        ) {
+        if let Err(err) = self.verify_header(&block.header, &MerkleRootHash(merkle_root_bytes), ledger) {
+            println!("header failed to verify: {:?}", err);
             return Ok(false);
         }
 
@@ -160,35 +185,22 @@ impl ConsensusParameters {
         }
 
         // Check that there is only 1 coinbase transaction
-        if coinbase_transaction_count != 1 {
+        if coinbase_transaction_count > 1 {
+            println!("multiple coinbase error");
             return Ok(false);
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = block_reward(ledger.blocks().len() as u32) as i64;
-        if total_value_balance - expected_block_reward != 0 {
+        let expected_block_reward = get_block_reward(ledger.blocks().len() as u32) as i64;
+        if total_value_balance + expected_block_reward != 0 {
+            println!("total_value_balance: {:?}", total_value_balance);
+            println!("expected_block_reward: {:?}", expected_block_reward);
+
             return Ok(false);
         }
 
         // Check that all the transction proofs verify
         Ok(InstantiatedDPC::verify_block(parameters, block, ledger)?)
-    }
-
-    /// Verifies that the block header is valid.
-    pub fn valid_block_header(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
-        let mut merkle_root_slice = [0u8; 32];
-        merkle_root_slice.copy_from_slice(&merkle_root(&block.transactions.to_transaction_ids()?));
-        let _merkle_root_hash = &MerkleRootHash(merkle_root_slice);
-
-        // Do not verify headers of genesis blocks
-        //        if !Self::is_genesis(block) {
-        //            let parent_block = storage.get_latest_block()?;
-        //            self.verify_header(&block.header, &parent_block.header, merkle_root_hash)?;
-        //        }
-
-        // Check not genesis
-        // Add
-        Ok(())
     }
 
     /// Return whether or not the given block is valid and insert it.
@@ -202,8 +214,6 @@ impl ConsensusParameters {
         //        memory_pool: &mut MemoryPool,
         _block: &Block<Tx>,
     ) -> Result<u32, ConsensusError> {
-        //        let total_balance = 0;
-
         Ok(0)
     }
 
@@ -216,11 +226,10 @@ impl ConsensusParameters {
         new_death_predicates: Vec<DPCPredicate<Components>>,
         genesis_address: AddressPair<Components>,
         recipient: AddressPublicKey<Components>,
-
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
-        let mut total_value_balance = block_reward(block_num);
+        let mut total_value_balance = get_block_reward(block_num);
 
         for transaction in transactions.iter() {
             let tx_value_balance = transaction.stuff.value_balance;
@@ -235,10 +244,12 @@ impl ConsensusParameters {
         // Generate dummy input records having as address the genesis address.
         let old_asks = vec![genesis_address.secret_key.clone(); Components::NUM_INPUT_RECORDS];
         let mut old_records = vec![];
-        for i in 0..Components::NUM_INPUT_RECORDS {
+        for _ in 0..Components::NUM_INPUT_RECORDS {
+            let sn_nonce_input: [u8; 4] = rng.gen();
+
             let old_sn_nonce = SerialNumberNonce::hash(
                 &parameters.circuit_parameters.serial_number_nonce_parameters,
-                &[64u8 + (i as u8); 1],
+                &sn_nonce_input,
             )?;
 
             let old_record = InstantiatedDPC::generate_record(
@@ -258,7 +269,7 @@ impl ConsensusParameters {
 
         let new_payload = PaymentRecordPayload {
             balance: total_value_balance,
-            lock: block_num,
+            lock: 0,
         };
         let dummy_payload = PaymentRecordPayload { balance: 0, lock: 0 };
 
@@ -402,8 +413,7 @@ impl ConsensusParameters {
                 let value_commitment = local_data
                     .circuit_parameters
                     .value_commitment_parameters
-                    .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
-                    .unwrap();
+                    .commit(&output_value.to_le_bytes(), &value_commitment_randomness)?;
 
                 // Instantiate birth predicate circuit
                 let birth_predicate_circuit = PaymentCircuit::new(

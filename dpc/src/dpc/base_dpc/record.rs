@@ -9,7 +9,11 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use std::marker::PhantomData;
 
 #[derive(Derivative)]
-#[derivative(Default(bound = "C: BaseDPCComponents"), Clone(bound = "C: BaseDPCComponents"))]
+#[derivative(
+    Default(bound = "C: BaseDPCComponents"),
+    Debug(bound = "C: BaseDPCComponents"),
+    Clone(bound = "C: BaseDPCComponents")
+)]
 pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) address_public_key: AddressPublicKey<C>,
 

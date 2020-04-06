@@ -88,7 +88,7 @@ where
             previous_block_hash: BlockHeaderHash([0u8; 32]),
             merkle_root_hash: MerkleRootHash([0u8; 32]),
             time,
-            difficulty_target: 0,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
         };
 
