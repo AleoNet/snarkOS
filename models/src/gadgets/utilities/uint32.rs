@@ -151,16 +151,16 @@ impl UInt32 {
         }
     }
 
-    /// Shifts left without checking most significant bit. TODO: implement a checking shl
+    /// Shifts out by higher order bits. TODO: implement a checking shl
     pub fn shl(&self, by: usize) -> Self {
         let by = by % 32;
         let zero = UInt32::constant(0);
 
-        let new_bits = self
+        let new_bits = zero
             .bits
             .iter()
-            .skip(by)
-            .chain(zero.bits.iter())
+            .take(by)
+            .chain(self.bits.iter())
             .take(32)
             .cloned()
             .collect();
@@ -171,7 +171,7 @@ impl UInt32 {
         }
     }
 
-    /// Shifts right without checking the least significant bit. TODO: implement a checking shr
+    /// Shifts out by lower order bits. TODO: implement a checking shr
     pub fn shr(&self, by: usize) -> Self {
         let by = by % 32;
         let zero = UInt32::constant(0);
@@ -179,7 +179,7 @@ impl UInt32 {
         let new_bits = self
             .bits
             .iter()
-            .take(32 - by)
+            .skip(by)
             .chain(zero.bits.iter())
             .take(32)
             .cloned()
@@ -230,64 +230,18 @@ impl UInt32 {
         Ok(UInt32 { bits, value: new_value })
     }
 
-    /// Recursive bitwise addition
-    pub fn add<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
-        let uncommon_bits = self.xor(
-            cs.ns(|| format!("{} ^ {}", self.value.unwrap(), other.value.unwrap())),
-            &other,
-        )?;
-        let common_bits = self.and(
-            cs.ns(|| format!("{} & {}", self.value.unwrap(), other.value.unwrap())),
-            &other,
-        )?;
-
-        if common_bits.value == Some(0) {
-            return Ok(uncommon_bits);
-        }
-        let shifted_common_bits = common_bits.shl(1);
-
-        return uncommon_bits.add(
-            cs.ns(|| {
-                format!(
-                    "recursive add {} + {}",
-                    uncommon_bits.value.unwrap(),
-                    shifted_common_bits.value.unwrap()
-                )
-            }),
-            &shifted_common_bits,
-        );
-    }
-
-    /// Recursive bitwise subtraction
-    pub fn sub<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
-        if other.value == Some(0) {
-            return Ok(self.clone());
-        }
-
-        let difference = self.xor(
-            cs.ns(|| format!("{} ^ {}", self.value.unwrap(), other.value.unwrap())),
-            &other,
-        )?;
-        let mut borrow = self.not();
-        borrow = borrow.and(
-            cs.ns(|| format!("{} && {}", self.value.unwrap(), other.value.unwrap())),
-            &other,
-        )?;
-        borrow = borrow.shl(1);
-
-        return difference.sub(
-            cs.ns(|| format!("recursive {} - {}", difference.value.unwrap(), borrow.value.unwrap())),
-            &borrow,
-        );
-    }
-
     /// Bitwise multiplication
-    pub fn mul<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+    pub fn mul<F: Field + PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
         let mut result = UInt32::constant(0);
         other.bits.iter().enumerate().for_each(|(i, bit)| {
             if bit.get_value() == Some(true) {
+                let previous = result.clone();
                 let shifted = self.shl(i);
-                result = result.add(cs.ns(|| format!("add shifted {}", i)), &shifted).unwrap();
+                result = UInt32::addmany(cs.ns(|| format!("add shifted {}", i)), &[previous, shifted]).unwrap();
             }
         });
 
@@ -295,11 +249,18 @@ impl UInt32 {
     }
 
     /// Bitwise division
-    pub fn div<F: Field, CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError> {
+    pub fn div<F: Field + PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
         let mut result = self.clone();
         other.bits.iter().enumerate().for_each(|(i, bit)| {
             if bit.get_value() == Some(true) {
-                let shifted = self.shr(i);
+                println!("i {}", i);
+                println!("result {}", result.value.unwrap());
+                let shifted = self.shr(i + 1);
+                println!("shifted {}", shifted.value.unwrap());
                 result = result
                     .sub(cs.ns(|| format!("subtract shifted {}", i)), &shifted)
                     .unwrap();
@@ -307,6 +268,159 @@ impl UInt32 {
         });
 
         Ok(result)
+    }
+
+    /// Bitwise exponentiation
+    pub fn pow<F: Field + PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        let mut power = self.clone();
+        let mut result = UInt32::constant(1);
+
+        other.bits.iter().enumerate().for_each(|(i, bit)| {
+            if bit.get_value() == Some(true) {
+                result = result
+                    .mul(cs.ns(|| format!("multiply by power {}", i)), &power)
+                    .unwrap();
+            }
+            power = power.mul(cs.ns(|| format!("next power {}", i)), &power).unwrap();
+        });
+
+        Ok(result)
+    }
+
+    /// Perform modular subtraction of several `UInt32` objects.
+    pub fn sub<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // Make some arbitrary bounds for ourselves to avoid overflows
+        // in the scalar field
+        assert!(F::Params::MODULUS_BITS >= 64);
+
+        // Compute the maximum value of the sum so we allocate enough bits for
+        // the result
+        let mut max_value = u64::from(u32::max_value());
+
+        // Evalue the self value
+        let mut result_value = match self.value {
+            Some(value) => Some(u64::from(value)),
+            None => None,
+        };
+
+        // This is a linear combination that we will enforce to be "zero"
+        let mut lc = LinearCombination::zero();
+
+        let mut constant = true;
+
+        // Evaluate the other value
+        match other.value {
+            Some(value) => {
+                // Perform subtraction. If there is overflow this will fail.
+                result_value.as_mut().map(|v| *v -= u64::from(value));
+            }
+            None => {
+                result_value = None;
+            }
+        }
+
+        // Iterate over each bit_gadget of self and add self to the linear combination
+        let mut coeff = F::one();
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * bit gadget
+                    lc = lc + (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    lc = lc + (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc + (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // Iterate over each bit_gadget of other and subtract other from the linear combination
+        let mut coeff = F::one();
+        for bit in &other.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Subtract coeff * bit_gadget
+                    lc = lc + (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Subtact coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    lc = lc - (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc - (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // The value of the actual result is moduluo 2^32
+        let modular_value = result_value.map(|v| v as u32);
+
+        if constant && modular_value.is_some() {
+            // Return constant
+
+            return Ok(UInt32::constant(modular_value.unwrap()));
+        }
+
+        // Storage for resulting bits
+        let mut result_bits = vec![];
+
+        // Allocate each bit gadget of the result
+        let mut coeff = F::one();
+        let mut i = 0;
+        while max_value != 0 {
+            // Allocate the bit_gadget
+            let b = AllocatedBit::alloc(cs.ns(|| format!("subtraction result bit gadget {}", i)), || {
+                result_value.map(|v| (v >> i) & 1 == 1).get()
+            })?;
+
+            // Subtract this bit_gadget from the linear combination to ensure the sums
+            // balance out
+            lc = lc - (coeff, b.get_variable());
+
+            result_bits.push(b.into());
+
+            max_value >>= 1;
+            i += 1;
+            coeff.double_in_place();
+        }
+
+        // Enforce that the linear combination equals zero
+        cs.enforce(|| "modular subtraction", |lc| lc, |lc| lc, |_| lc);
+
+        // Discard carry bits (probably unnecessary for subtraction
+        result_bits.truncate(32);
+
+        Ok(UInt32 {
+            bits: result_bits,
+            value: modular_value,
+        })
     }
 
     /// Perform modular addition of several `UInt32` objects.
@@ -675,4 +789,44 @@ mod test {
             num = num.rotate_right(1);
         }
     }
+    //
+    // #[test]
+    // fn test_shift_left() {
+    //     let mut cs = TestConstraintSystem::<Fr>::new();
+    //
+    //     let one = UInt32::constant(1u32);
+    //     let result = one.shl(1);
+    //     let two = UInt32::constant(2u32);
+    //
+    //     assert_eq!(result.bits.to_vec(), two.bits.to_vec());
+    // }
+
+    #[test]
+    fn test_not() {
+        // let mut cs = TestConstraintSystem::<Fr>::new();
+        //
+        // let one = UInt32::constant(1u32);
+        // let one_not = one.not();
+
+        println!("one_not: {:?}", 1u32 - 2u32);
+
+        // assert_eq!(result.bits.to_vec(), two.bits.to_vec());
+    }
+
+    // #[test]
+    // fn test_add() {
+    //     let mut cs = TestConstraintSystem::<Fr>::new();
+    //
+    //     let five = UInt32::constant(5u32);
+    //     let three = UInt32::alloc(cs.ns(||format!("alloc")), Some(3u32)).unwrap();
+    //
+    //     let result = five.add(cs.ns(||format!("add")), &three).unwrap();
+    //
+    //     let eight = UInt32::alloc(cs.ns(||format!("eight")), Some(8u32)).unwrap();
+    //
+    //     println!("result {:#?}", result.bits);
+    //     println!("eight {:#?}", eight.bits);
+    //
+    //     // assert_eq!(result.bits, eight.bits);
+    // }
 }

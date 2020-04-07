@@ -252,11 +252,13 @@ impl<F: Field> AllocGadget<bool, F> for AllocatedBit {
         Fn: FnOnce() -> Result<T, SynthesisError>,
         T: Borrow<bool>,
     {
-        let mut value = None;
+        // let mut value = None;
+        let value = Some(*value_gen()?.borrow());
+
         let var = cs.alloc(
             || "boolean",
             || {
-                value = Some(*value_gen()?.borrow());
+                // value = Some(*value_gen()?.borrow());
                 if value.get()? { Ok(F::one()) } else { Ok(F::zero()) }
             },
         )?;
@@ -278,11 +280,13 @@ impl<F: Field> AllocGadget<bool, F> for AllocatedBit {
         Fn: FnOnce() -> Result<T, SynthesisError>,
         T: Borrow<bool>,
     {
-        let mut value = None;
+        // let mut value = None;
+        let value = Some(*value_gen()?.borrow());
+
         let var = cs.alloc_input(
             || "boolean",
             || {
-                value = Some(*value_gen()?.borrow());
+                // value = Some(*value_gen()?.borrow());
                 if value.get()? { Ok(F::one()) } else { Ok(F::zero()) }
             },
         )?;
