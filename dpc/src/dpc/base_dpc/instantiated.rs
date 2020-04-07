@@ -11,7 +11,7 @@ use crate::{
         LocalData as DPCLocalData,
         DPC,
     },
-    ledger::ideal_ledger::IdealLedger,
+    ledger::ledger::BasicLedger,
 };
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
@@ -39,8 +39,11 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
+use snarkos_utilities::storage::Storage;
 
 use blake2::Blake2s as Blake2sHash;
+use rand::Rng;
+use std::{io::Result as IoResult, path::PathBuf};
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -114,8 +117,28 @@ impl MerkleParameters for CommitmentMerkleParameters {
 
     const HEIGHT: usize = 32;
 
+    fn setup<R: Rng>(rng: &mut R) -> Self {
+        Self(H::setup(rng))
+    }
+
     fn crh(&self) -> &Self::H {
         &self.0
+    }
+
+    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
+        self.crh().parameters()
+    }
+}
+
+impl Storage for CommitmentMerkleParameters {
+    /// Store the SNARK proof to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.0.store(path)
+    }
+
+    /// Load the SNARK proof from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        Ok(Self(H::load(path)?))
     }
 }
 
@@ -208,7 +231,7 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
 
-pub type MerkleTreeLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = BasicLedger<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;

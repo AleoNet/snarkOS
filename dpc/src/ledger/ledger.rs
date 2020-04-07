@@ -1,7 +1,7 @@
 use crate::{dpc::Transaction, ledger::*};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
 use snarkos_errors::dpc::LedgerError;
-use snarkos_models::algorithms::CRH;
+//use snarkos_models::algorithms::CRH;
 use snarkos_objects::{BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_utilities::bytes::ToBytes;
 
@@ -17,7 +17,7 @@ pub struct BasicLedger<T: Transaction, P: MerkleParameters>
 where
     T::Commitment: ToBytes,
 {
-    crh_params: Rc<P::H>,
+    crh_params: Rc<P>,
     pub transactions: Vec<T>,
     pub blocks: Vec<Block<T>>,
     cm_merkle_tree: MerkleTree<P>,
@@ -58,17 +58,16 @@ where
     type Transaction = T;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParameters<Self::Parameters>, LedgerError> {
-        Ok(P::H::setup(rng))
+        Ok(P::setup(rng))
     }
 
     fn new(
-        parameters: P::H,
+        parameters: Self::Parameters,
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
     ) -> Self {
-        let params = Rc::new(parameters);
-        let cm_merkle_tree = MerkleTree::<P>::new(&[genesis_cm.clone()]).unwrap();
+        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()]).unwrap();
 
         let mut cur_cm_index = 0;
         let mut comm_to_index = HashMap::new();
@@ -98,7 +97,7 @@ where
         };
 
         Self {
-            crh_params: params,
+            crh_params: Rc::new(parameters),
             blocks: vec![genesis_block],
             transactions: Vec::new(),
             cm_merkle_tree,
@@ -167,7 +166,7 @@ where
             .cloned()
             .collect::<Vec<_>>();
         assert!(commitments[0] == self.genesis_cm);
-        self.cm_merkle_tree = MerkleTree::new(&commitments)?;
+        self.cm_merkle_tree = MerkleTree::new(self.parameters(), &commitments)?;
 
         let new_digest = self.cm_merkle_tree.root();
         self.past_digests.insert(new_digest.clone());
@@ -330,7 +329,7 @@ where
             .cloned()
             .collect::<Vec<_>>();
         assert!(commitments[0] == self.genesis_cm);
-        self.cm_merkle_tree = MerkleTree::new(&commitments)?;
+        self.cm_merkle_tree = MerkleTree::new(self.parameters(), &commitments)?;
 
         let new_digest = self.cm_merkle_tree.root();
         self.past_digests.insert(new_digest.clone());

@@ -11,7 +11,7 @@ use crate::{
     },
     ledger::MerkleTreeParameters,
 };
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
@@ -366,14 +366,6 @@ where
                 MerklePathGadget::<_, C::MerkleHashGadget, _>::alloc(&mut witness_cs.ns(|| "Declare witness"), || {
                     Ok(witness)
                 })?;
-
-            //            witness_gadget.conditionally_check_membership(
-            //                &mut witness_cs.ns(|| "Perform check"),
-            //                &ledger_pp,
-            //                &digest_gadget,
-            //                &given_commitment,
-            //                &Boolean::Constant(false),
-            //            )?;
 
             witness_gadget.conditionally_check_membership(
                 &mut witness_cs.ns(|| "Perform check"),

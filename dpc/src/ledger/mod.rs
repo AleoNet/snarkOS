@@ -19,7 +19,7 @@ pub use self::ledger::*;
 pub mod transactions;
 pub use self::transactions::*;
 
-pub type MerkleTreeParameters<P> = <P as MerkleParameters>::H;
+pub type MerkleTreeParameters<P> = P;
 
 pub trait Ledger {
     type Parameters: MerkleParameters;

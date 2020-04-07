@@ -28,7 +28,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn setup_or_load_parameters<R: Rng>(
     rng: &mut R,
 ) -> (
-    <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H,
+    <Components as BaseDPCComponents>::MerkleParameters,
     <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
 ) {
     let mut path = std::env::current_dir().unwrap();
@@ -36,8 +36,7 @@ fn setup_or_load_parameters<R: Rng>(
     let ledger_parameter_path = path.join("ledger.params");
 
     let (ledger_parameters, parameters) =
-        match <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H::load(&ledger_parameter_path)
-        {
+        match <Components as BaseDPCComponents>::MerkleParameters::load(&ledger_parameter_path) {
             Ok(ledger_parameters) => {
                 let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path) {
                     Ok(parameters) => parameters,
@@ -71,7 +70,7 @@ fn setup_or_load_parameters<R: Rng>(
 
 fn setup_ledger<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-    ledger_parameters: <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H,
+    ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
     genesis_address: &AddressPair<Components>,
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
@@ -121,67 +120,67 @@ fn setup_ledger<R: Rng>(
     (ledger, genesis_pred_vk_bytes)
 }
 
-//fn create_block_with_coinbase_transaction<R: Rng>(
-//    transactions: &mut Transactions<Tx>,
-//    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-//    genesis_pred_vk_bytes: &Vec<u8>,
-//    new_birth_predicates: Vec<DPCPredicate<Components>>,
-//    new_death_predicates: Vec<DPCPredicate<Components>>,
-//    genesis_address: AddressPair<Components>,
-//    recipient: AddressPublicKey<Components>,
-//    consensus: &ConsensusParameters,
-//    ledger: &mut MerkleTreeLedger,
-//    rng: &mut R,
-//) -> (Vec<DPCRecord<Components>>, Block<Tx>) {
-//    let (new_coinbase_records, transaction) = ConsensusParameters::create_coinbase_transaction(
-//        ledger.blocks.len() as u32,
-//        &transactions,
-//        &parameters,
-//        &genesis_pred_vk_bytes,
-//        new_birth_predicates,
-//        new_death_predicates,
-//        genesis_address,
-//        recipient,
-//        &ledger,
-//        rng,
-//    )
-//    .unwrap();
-//
-//    transactions.push(transaction);
-//
-//    let transaction_ids: Vec<Vec<u8>> = transactions
-//        .to_transaction_ids()
-//        .unwrap()
-//        .iter()
-//        .map(|id| id.to_vec())
-//        .collect();
-//
-//    let mut merkle_root_bytes = [0u8; 32];
-//    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
-//
-//    let time = SystemTime::now()
-//        .duration_since(UNIX_EPOCH)
-//        .expect("Time went backwards")
-//        .as_secs() as i64;
-//
-//    let previous_block = ledger.blocks.last().unwrap();
-//
-//    // Pseudo mining
-//    let header = BlockHeader {
-//        previous_block_hash: previous_block.header.get_hash(),
-//        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
-//        time,
-//        difficulty_target: consensus.get_block_difficulty(&previous_block.header, time),
-//        nonce: 0,
-//    };
-//
-//    let block = Block {
-//        header,
-//        transactions: transactions.clone(),
-//    };
-//
-//    (new_coinbase_records, block)
-//}
+fn create_block_with_coinbase_transaction<R: Rng>(
+    transactions: &mut Transactions<Tx>,
+    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    genesis_pred_vk_bytes: &Vec<u8>,
+    new_birth_predicates: Vec<DPCPredicate<Components>>,
+    new_death_predicates: Vec<DPCPredicate<Components>>,
+    genesis_address: AddressPair<Components>,
+    recipient: AddressPublicKey<Components>,
+    consensus: &ConsensusParameters,
+    ledger: &mut MerkleTreeLedger,
+    rng: &mut R,
+) -> (Vec<DPCRecord<Components>>, Block<Tx>) {
+    let (new_coinbase_records, transaction) = ConsensusParameters::create_coinbase_transaction(
+        ledger.blocks.len() as u32,
+        &transactions,
+        &parameters,
+        &genesis_pred_vk_bytes,
+        new_birth_predicates,
+        new_death_predicates,
+        genesis_address,
+        recipient,
+        &ledger,
+        rng,
+    )
+    .unwrap();
+
+    transactions.push(transaction);
+
+    let transaction_ids: Vec<Vec<u8>> = transactions
+        .to_transaction_ids()
+        .unwrap()
+        .iter()
+        .map(|id| id.to_vec())
+        .collect();
+
+    let mut merkle_root_bytes = [0u8; 32];
+    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i64;
+
+    let previous_block = ledger.blocks.last().unwrap();
+
+    // Pseudo mining
+    let header = BlockHeader {
+        previous_block_hash: previous_block.header.get_hash(),
+        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        time,
+        difficulty_target: consensus.get_block_difficulty(&previous_block.header, time),
+        nonce: 0,
+    };
+
+    let block = Block {
+        header,
+        transactions: transactions.clone(),
+    };
+
+    (new_coinbase_records, block)
+}
 
 #[test]
 fn base_dpc_integration_test() {
@@ -493,174 +492,171 @@ fn base_dpc_integration_test() {
     //    assert_eq!(ledger.len(), 2);
 }
 
-//#[test]
-//fn multiple_transactions() {
-//    let mut rng = XorShiftRng::seed_from_u64(23472342u64);
-//
-//    let consensus = ConsensusParameters {
-//        max_block_size: 1_000_000_000usize,
-//        max_nonce: u32::max_value(),
-//        target_block_time: 10i64,
-//    };
-//
-//    // Generate or load parameters for the ledger, commitment schemes, and CRH
-//    let (ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
-//
-//    // Generate metadata and an address for a dummy initial, or "genesis", record.
-//    let genesis_metadata = [1u8; 32];
-//    let genesis_address =
-//        DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
-//
-//    // Setup the ledger
-//    let (mut ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
-//
-//    // Create an address for an actual new record.
-//    let new_metadata = [2u8; 32];
-//    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &new_metadata, &mut rng).unwrap();
-//    let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
-//
-//    let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-//    let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-//
-//    let mut transactions = Transactions::<Tx>::new();
-//
-//    println!("Creating block with coinbase transaction");
-//
-//    let (coinbase_records, block) = create_block_with_coinbase_transaction(
-//        &mut transactions,
-//        &parameters,
-//        &genesis_pred_vk_bytes,
-//        new_birth_predicates.clone(),
-//        new_death_predicates.clone(),
-//        genesis_address.clone(),
-//        miner_address.public_key.clone(),
-//        &consensus,
-//        &mut ledger,
-//        &mut rng,
-//    );
-//
-//    assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
-//
-//    let block_reward = get_block_reward(ledger.blocks.len() as u32);
-//
-//    assert_eq!(coinbase_records.len(), 2);
-//    assert!(!coinbase_records[0].is_dummy());
-//    assert!(coinbase_records[1].is_dummy());
-//    assert_eq!(coinbase_records[0].payload().balance, block_reward);
-//    assert_eq!(coinbase_records[1].payload().balance, 0);
-//
-//    println!("Verifying the block");
-//
-//    assert!(consensus.verify_block(&parameters, &block, &ledger).unwrap());
-//
-//    assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
-//
-//    ledger.push(block.transactions[0].clone()).unwrap();
-//
-////    ledger.push_block(block).unwrap();
-//
-////    assert_eq!(ledger.len(), 2);
-//
-//    // Add new block spending records from the previous block
-//
-//    let newer_metadata = [4u8; 32];
-//    let new_recipient = DPC::create_address_helper(&parameters.circuit_parameters, &newer_metadata, &mut rng).unwrap();
-//
-//    let spend_asks = vec![miner_address.secret_key.clone(); NUM_INPUT_RECORDS];
-//    let newer_apks = vec![new_recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
-//
-//    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
-//    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
-//
-//    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
-//
-//    let auxiliary = [5u8; 32];
-//    let memo = [6u8; 32];
-//
-////    let mut transactions = Transactions::new();
-//
-//    let sn_nonce_input: [u8; 4] = rng.gen();
-//
-//    let new_sn_nonce = SerialNumberNonce::hash(
-//        &parameters.circuit_parameters.serial_number_nonce_parameters,
-//        &sn_nonce_input,
-//    )
-//    .unwrap();
-//
-//    let new_dummy_record = InstantiatedDPC::generate_record(
-//        &parameters.circuit_parameters,
-//        &new_sn_nonce,
-//        &miner_address.public_key,
-//        true, // The input record is dummy
-//        &PaymentRecordPayload::default(),
-//        // Filler predicate input
-//        &Predicate::new(genesis_pred_vk_bytes.clone()),
-//        &Predicate::new(genesis_pred_vk_bytes.clone()),
-//        &mut rng,
-//    )
-//    .unwrap();
-//
-//    let new_records = vec![coinbase_records[0].clone(), new_dummy_record];
-//
-//    let (spend_records, transaction) = ConsensusParameters::create_transaction(
-//        &parameters,
-//        new_records,
-//        spend_asks,
-//        newer_apks,
-//        new_birth_predicates.clone(),
-//        new_death_predicates.clone(),
-//        new_dummy_flags,
-//        new_payloads,
-//        auxiliary,
-//        memo,
-//        &ledger,
-//        &mut rng,
-//    )
-//    .unwrap();
-//
-//    assert_eq!(spend_records.len(), 2);
-//    assert!(!spend_records[0].is_dummy());
-//    assert!(!spend_records[1].is_dummy());
-//    assert_eq!(spend_records[0].payload().balance, 10);
-//    assert_eq!(spend_records[1].payload().balance, 10);
-//    assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
-//
-//    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap()); // TODO Fix this. CoreNIZK verification is failing
-//
-//    ledger.push(transaction.clone()).unwrap();
-//
-////    transactions.push(transaction);
-////
-////    println!("Create a new block with the above payment transaction");
-////
-////    let (new_coinbase_records, new_block) = create_block_with_coinbase_transaction(
-////        &mut transactions,
-////        &parameters,
-////        &genesis_pred_vk_bytes,
-////        new_birth_predicates,
-////        new_death_predicates,
-////        genesis_address,
-////        new_recipient.public_key,
-////        &consensus,
-////        &mut ledger,
-////        &mut rng,
-////    );
-////
-////    let new_block_reward = get_block_reward(ledger.blocks.len() as u32);
-////
-////    assert_eq!(new_coinbase_records.len(), 2);
-////    assert!(!new_coinbase_records[0].is_dummy());
-////    assert!(new_coinbase_records[1].is_dummy());
-////    assert_eq!(
-////        new_coinbase_records[0].payload().balance,
-////        new_block_reward + block_reward - 20
-////    );
-////    assert_eq!(new_coinbase_records[1].payload().balance, 0);
-////
-////    println!("Verify the block with the new payment transaction");
-////
-////    assert!(consensus.verify_block(&parameters, &new_block, &ledger).unwrap());
-////
-////    ledger.push_block(new_block).unwrap();
-////    assert_eq!(ledger.len(), 3);
-//}
+#[test]
+fn multiple_transactions() {
+    let mut rng = XorShiftRng::seed_from_u64(23472342u64);
+
+    let consensus = ConsensusParameters {
+        max_block_size: 1_000_000_000usize,
+        max_nonce: u32::max_value(),
+        target_block_time: 10i64,
+    };
+
+    // Generate or load parameters for the ledger, commitment schemes, and CRH
+    let (ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
+
+    // Generate metadata and an address for a dummy initial, or "genesis", record.
+    let genesis_metadata = [1u8; 32];
+    let genesis_address =
+        DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
+
+    // Setup the ledger
+    let (mut ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
+
+    // Create an address for an actual new record.
+    let new_metadata = [2u8; 32];
+    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &new_metadata, &mut rng).unwrap();
+    let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
+
+    let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+
+    let mut transactions = Transactions::<Tx>::new();
+
+    println!("Creating block with coinbase transaction");
+
+    let (coinbase_records, block) = create_block_with_coinbase_transaction(
+        &mut transactions,
+        &parameters,
+        &genesis_pred_vk_bytes,
+        new_birth_predicates.clone(),
+        new_death_predicates.clone(),
+        genesis_address.clone(),
+        miner_address.public_key.clone(),
+        &consensus,
+        &mut ledger,
+        &mut rng,
+    );
+
+    assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
+
+    let block_reward = get_block_reward(ledger.blocks.len() as u32);
+
+    assert_eq!(coinbase_records.len(), 2);
+    assert!(!coinbase_records[0].is_dummy());
+    assert!(coinbase_records[1].is_dummy());
+    assert_eq!(coinbase_records[0].payload().balance, block_reward);
+    assert_eq!(coinbase_records[1].payload().balance, 0);
+
+    println!("Verifying the block");
+
+    assert!(consensus.verify_block(&parameters, &block, &ledger).unwrap());
+
+    assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
+
+    ledger.push_block(block).unwrap();
+    assert_eq!(ledger.len(), 2);
+
+    // Add new block spending records from the previous block
+
+    let newer_metadata = [4u8; 32];
+    let new_recipient = DPC::create_address_helper(&parameters.circuit_parameters, &newer_metadata, &mut rng).unwrap();
+
+    let spend_asks = vec![miner_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let newer_apks = vec![new_recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+
+    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+
+    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+
+    let auxiliary = [5u8; 32];
+    let memo = [6u8; 32];
+
+    let mut transactions = Transactions::new();
+    //
+    //    let sn_nonce_input: [u8; 4] = rng.gen();
+    //
+    //    let new_sn_nonce = SerialNumberNonce::hash(
+    //        &parameters.circuit_parameters.serial_number_nonce_parameters,
+    //        &sn_nonce_input,
+    //    )
+    //    .unwrap();
+    //
+    //    let new_dummy_record = InstantiatedDPC::generate_record(
+    //        &parameters.circuit_parameters,
+    //        &new_sn_nonce,
+    //        &miner_address.public_key,
+    //        true, // The input record is dummy
+    //        &PaymentRecordPayload::default(),
+    //        // Filler predicate input
+    //        &Predicate::new(genesis_pred_vk_bytes.clone()),
+    //        &Predicate::new(genesis_pred_vk_bytes.clone()),
+    //        &mut rng,
+    //    )
+    //    .unwrap();
+    //
+    //    let new_records = vec![coinbase_records[0].clone(), new_dummy_record];
+    //
+    let (spend_records, transaction) = ConsensusParameters::create_transaction(
+        &parameters,
+        coinbase_records,
+        spend_asks,
+        newer_apks,
+        new_birth_predicates.clone(),
+        new_death_predicates.clone(),
+        new_dummy_flags,
+        new_payloads,
+        auxiliary,
+        memo,
+        &ledger,
+        &mut rng,
+    )
+    .unwrap();
+
+    assert_eq!(spend_records.len(), 2);
+    assert!(!spend_records[0].is_dummy());
+    assert!(!spend_records[1].is_dummy());
+    assert_eq!(spend_records[0].payload().balance, 10);
+    assert_eq!(spend_records[1].payload().balance, 10);
+    assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
+
+    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap()); // TODO Fix this. CoreNIZK verification is failing
+
+    //    ledger.push(transaction.clone()).unwrap();
+
+    //    transactions.push(transaction);
+    //
+    println!("Create a new block with the above payment transaction");
+
+    let (new_coinbase_records, new_block) = create_block_with_coinbase_transaction(
+        &mut transactions,
+        &parameters,
+        &genesis_pred_vk_bytes,
+        new_birth_predicates,
+        new_death_predicates,
+        genesis_address,
+        new_recipient.public_key,
+        &consensus,
+        &mut ledger,
+        &mut rng,
+    );
+
+    let new_block_reward = get_block_reward(ledger.blocks.len() as u32);
+
+    assert_eq!(new_coinbase_records.len(), 2);
+    assert!(!new_coinbase_records[0].is_dummy());
+    assert!(new_coinbase_records[1].is_dummy());
+    assert_eq!(
+        new_coinbase_records[0].payload().balance,
+        new_block_reward + block_reward - 20
+    );
+    assert_eq!(new_coinbase_records[1].payload().balance, 0);
+
+    println!("Verify the block with the new payment transaction");
+
+    assert!(consensus.verify_block(&parameters, &new_block, &ledger).unwrap());
+
+    ledger.push_block(new_block).unwrap();
+    assert_eq!(ledger.len(), 3);
+}

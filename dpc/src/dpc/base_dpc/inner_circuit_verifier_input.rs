@@ -52,7 +52,7 @@ where
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
-    MerkleTreeParameters<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+    <MerkleTreeParameters<C::MerkleParameters> as MerkleParameters>::H: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
