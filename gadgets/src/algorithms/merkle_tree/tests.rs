@@ -15,10 +15,11 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
+use snarkos_utilities::storage::Storage;
 
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use std::rc::Rc;
+use std::{io::Result as IoResult, path::PathBuf, rc::Rc};
 
 #[derive(Clone)]
 pub(super) struct Size;
@@ -37,8 +38,28 @@ impl MerkleParameters for EdwardsMerkleParameters {
 
     const HEIGHT: usize = 32;
 
+    fn setup<R: Rng>(rng: &mut R) -> Self {
+        Self(H::setup(rng))
+    }
+
     fn crh(&self) -> &Self::H {
         &self.0
+    }
+
+    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
+        self.crh().parameters()
+    }
+}
+
+impl Storage for EdwardsMerkleParameters {
+    /// Store the SNARK proof to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.0.store(path)
+    }
+
+    /// Load the SNARK proof from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        Ok(Self(H::load(path)?))
     }
 }
 impl Default for EdwardsMerkleParameters {
@@ -53,9 +74,9 @@ type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
-    let crh = Rc::new(H::setup(&mut rng));
-    let crh_parameters = crh.parameters.clone();
-    let tree = EdwardsMerkleTree::new(leaves).unwrap();
+    let parameters = EdwardsMerkleParameters::setup(&mut rng);
+    let crh = Rc::new(parameters.0);
+    let tree = EdwardsMerkleTree::new(&parameters, leaves).unwrap();
     let root = tree.root();
     let mut satisfied = true;
     for (i, leaf) in leaves.iter().enumerate() {
