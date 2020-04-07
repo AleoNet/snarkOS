@@ -382,8 +382,6 @@ fn base_dpc_integration_test() {
         Ok(new_proof_and_vk)
     };
 
-    println!("first transaction");
-
     let (new_records, transaction) = InstantiatedDPC::execute(
         &parameters,
         &old_records,
@@ -402,98 +400,46 @@ fn base_dpc_integration_test() {
     )
     .unwrap();
 
-    println!("verify first transaction");
-    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
+    // Craft the block
 
-    ledger.push(transaction).unwrap();
-    assert_eq!(ledger.len(), 1);
+    let previous_block = ledger.blocks.last().unwrap();
 
-    println!("second transaction");
+    let mut transactions = Transactions::new();
+    transactions.push(transaction);
 
-    let new_asks = vec![new_address.secret_key; NUM_OUTPUT_RECORDS];
+    let transaction_ids: Vec<Vec<u8>> = transactions
+        .to_transaction_ids()
+        .unwrap()
+        .iter()
+        .map(|id| id.to_vec())
+        .collect();
 
-    let new_auxiliary = [8u8; 32];
-    let new_memo = [9u8; 32];
+    let mut merkle_root_bytes = [0u8; 32];
+    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
 
-    let newer_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i64;
 
-    let new_payloads = vec![newer_payload.clone(); NUM_OUTPUT_RECORDS];
+    let header = BlockHeader {
+        previous_block_hash: previous_block.header.get_hash(),
+        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        time,
+        difficulty_target: previous_block.header.difficulty_target,
+        nonce: 0,
+    };
 
-    let newer_metadata = [4u8; 32];
-    let newer_address = DPC::create_address_helper(&parameters.circuit_parameters, &newer_metadata, &mut rng).unwrap();
-    let newer_apks = vec![newer_address.public_key; NUM_OUTPUT_RECORDS];
+    let block = Block { header, transactions };
 
-    let (newer_records, new_transaction) = InstantiatedDPC::execute(
-        &parameters,
-        &new_records,
-        &new_asks,
-        &old_death_vk_and_proof_generator,
-        &newer_apks,
-        &new_dummy_flags,
-        &new_payloads,
-        &new_birth_predicates,
-        &new_death_predicates,
-        &new_birth_vk_and_proof_generator,
-        &new_auxiliary,
-        &new_memo,
-        &ledger,
-        &mut rng,
-    )
-    .unwrap();
+    assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
 
-    println!("newer_records 0 is dummy: {:?}", newer_records[0].is_dummy());
-    println!("newer_records 1 is dummy: {:?}", newer_records[1].is_dummy());
-
-    println!(
-        "new transactions value balance: {:?}",
-        new_transaction.stuff.value_balance
-    );
-
-    assert!(InstantiatedDPC::verify(&parameters, &new_transaction, &ledger).unwrap());
-
-    ledger.push(new_transaction).unwrap();
+    ledger.push_block(block).unwrap();
     assert_eq!(ledger.len(), 2);
-    //
-    //    // Craft the block
-    //
-    //    let previous_block = ledger.blocks.last().unwrap();
-    //
-    //    let mut transactions = Transactions::new();
-    //    transactions.push(transaction);
-    //
-    //    let transaction_ids: Vec<Vec<u8>> = transactions
-    //        .to_transaction_ids()
-    //        .unwrap()
-    //        .iter()
-    //        .map(|id| id.to_vec())
-    //        .collect();
-    //
-    //    let mut merkle_root_bytes = [0u8; 32];
-    //    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
-    //
-    //    let time = SystemTime::now()
-    //        .duration_since(UNIX_EPOCH)
-    //        .expect("Time went backwards")
-    //        .as_secs() as i64;
-    //
-    //    let header = BlockHeader {
-    //        previous_block_hash: previous_block.header.get_hash(),
-    //        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
-    //        time,
-    //        difficulty_target: previous_block.header.difficulty_target,
-    //        nonce: 0,
-    //    };
-    //
-    //    let block = Block { header, transactions };
-    //
-    //    assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
-    //
-    //    ledger.push_block(block).unwrap();
-    //    assert_eq!(ledger.len(), 2);
 }
 
 #[test]
-fn multiple_transactions() {
+fn base_dpc_multiple_transactions() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
 
     let consensus = ConsensusParameters {
@@ -574,30 +520,7 @@ fn multiple_transactions() {
     let memo = [6u8; 32];
 
     let mut transactions = Transactions::new();
-    //
-    //    let sn_nonce_input: [u8; 4] = rng.gen();
-    //
-    //    let new_sn_nonce = SerialNumberNonce::hash(
-    //        &parameters.circuit_parameters.serial_number_nonce_parameters,
-    //        &sn_nonce_input,
-    //    )
-    //    .unwrap();
-    //
-    //    let new_dummy_record = InstantiatedDPC::generate_record(
-    //        &parameters.circuit_parameters,
-    //        &new_sn_nonce,
-    //        &miner_address.public_key,
-    //        true, // The input record is dummy
-    //        &PaymentRecordPayload::default(),
-    //        // Filler predicate input
-    //        &Predicate::new(genesis_pred_vk_bytes.clone()),
-    //        &Predicate::new(genesis_pred_vk_bytes.clone()),
-    //        &mut rng,
-    //    )
-    //    .unwrap();
-    //
-    //    let new_records = vec![coinbase_records[0].clone(), new_dummy_record];
-    //
+
     let (spend_records, transaction) = ConsensusParameters::create_transaction(
         &parameters,
         coinbase_records,
@@ -621,12 +544,10 @@ fn multiple_transactions() {
     assert_eq!(spend_records[1].payload().balance, 10);
     assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
 
-    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap()); // TODO Fix this. CoreNIZK verification is failing
+    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
 
-    //    ledger.push(transaction.clone()).unwrap();
+    transactions.push(transaction);
 
-    //    transactions.push(transaction);
-    //
     println!("Create a new block with the above payment transaction");
 
     let (new_coinbase_records, new_block) = create_block_with_coinbase_transaction(
