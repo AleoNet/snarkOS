@@ -44,7 +44,7 @@ where
     type SerialNumber = T::SerialNumber;
     type Transaction = T;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<MerkleTreeParameters<Self::Parameters>, LedgerError> {
+    fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, LedgerError> {
         Ok(P::setup(rng))
     }
 
@@ -88,7 +88,7 @@ where
         self.transactions.len()
     }
 
-    fn parameters(&self) -> &MerkleTreeParameters<Self::Parameters> {
+    fn parameters(&self) -> &Self::Parameters {
         &self.crh_params
     }
 
@@ -182,7 +182,7 @@ where
     }
 
     fn verify_cm(
-        _parameters: &MerkleTreeParameters<Self::Parameters>,
+        _parameters: &Self::Parameters,
         digest: &MerkleTreeDigest<Self::Parameters>,
         cm: &Self::Commitment,
         witness: &MerklePath<Self::Parameters>,
@@ -191,7 +191,7 @@ where
     }
 
     fn verify_sn(
-        _parameters: &MerkleTreeParameters<Self::Parameters>,
+        _parameters: &Self::Parameters,
         _digest: &MerkleTreeDigest<Self::Parameters>,
         _sn: &Self::SerialNumber,
         _witness: &MerklePath<Self::Parameters>,
@@ -200,7 +200,7 @@ where
     }
 
     fn verify_memo(
-        _parameters: &MerkleTreeParameters<Self::Parameters>,
+        _parameters: &Self::Parameters,
         _digest: &MerkleTreeDigest<Self::Parameters>,
         _memo: &Self::Memo,
         _witness: &MerklePath<Self::Parameters>,

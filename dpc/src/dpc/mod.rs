@@ -96,10 +96,7 @@ pub trait DPCScheme<L: Ledger> {
     type LocalData;
 
     /// Returns public parameters for the DPC.
-    fn setup<R: Rng>(
-        ledger_parameters: &MerkleTreeParameters<L::Parameters>,
-        rng: &mut R,
-    ) -> Result<Self::Parameters, DPCError>;
+    fn setup<R: Rng>(ledger_parameters: &L::Parameters, rng: &mut R) -> Result<Self::Parameters, DPCError>;
 
     /// Returns an address key pair, given public parameters, metadata, and an
     /// rng.

@@ -1,7 +1,4 @@
-use crate::{
-    dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents},
-    ledger::MerkleTreeParameters,
-};
+use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTreeDigest};
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
@@ -14,7 +11,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
 
     // Ledger parameters and digest
-    pub ledger_parameters: MerkleTreeParameters<C::MerkleParameters>,
+    pub ledger_parameters: C::MerkleParameters,
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Input record serial numbers and death predicate commitments
@@ -52,7 +49,7 @@ where
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
-    <MerkleTreeParameters<C::MerkleParameters> as MerkleParameters>::H: ToConstraintField<C::InnerField>,
+    <C::MerkleParameters as MerkleParameters>::H: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,

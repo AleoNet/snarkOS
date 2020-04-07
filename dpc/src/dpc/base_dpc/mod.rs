@@ -568,7 +568,7 @@ where
     type Transaction = DPCTransaction<Components>;
 
     fn setup<R: Rng>(
-        ledger_parameters: &MerkleTreeParameters<Components::MerkleParameters>,
+        ledger_parameters: &Components::MerkleParameters,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
         let setup_time = start_timer!(|| "DPC::Setup");

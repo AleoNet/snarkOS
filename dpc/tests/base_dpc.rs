@@ -1,5 +1,5 @@
 #[cfg(debug_assertions)]
-use snarkos_algorithms::{merkle_tree::MerkleParameters, snark::PreparedVerifyingKey};
+use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
     address::{AddressPair, AddressPublicKey},
     base_dpc::{
@@ -15,7 +15,6 @@ use snarkos_dpc::{
     ledger::{get_block_reward, transactions::Transactions, Block, ConsensusParameters, Ledger},
     DPCScheme,
     Record,
-    Transaction,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
 use snarkos_objects::{merkle_root, BlockHeader, MerkleRootHash};
@@ -382,7 +381,7 @@ fn base_dpc_integration_test() {
         Ok(new_proof_and_vk)
     };
 
-    let (new_records, transaction) = InstantiatedDPC::execute(
+    let (_new_records, transaction) = InstantiatedDPC::execute(
         &parameters,
         &old_records,
         &old_asks,

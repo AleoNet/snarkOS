@@ -1,15 +1,12 @@
-use crate::{
-    dpc::{
-        address::AddressSecretKey,
-        base_dpc::{
-            binding_signature::{gadget_verification_setup, BindingSignature},
-            parameters::CircuitParameters,
-            record::DPCRecord,
-            BaseDPCComponents,
-        },
-        Record,
+use crate::dpc::{
+    address::AddressSecretKey,
+    base_dpc::{
+        binding_signature::{gadget_verification_setup, BindingSignature},
+        parameters::CircuitParameters,
+        record::DPCRecord,
+        BaseDPCComponents,
     },
-    ledger::MerkleTreeParameters,
+    Record,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
@@ -34,7 +31,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     cs: &mut CS,
     // Parameters
     comm_crh_sig_parameters: &CircuitParameters<C>,
-    ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
+    ledger_parameters: &C::MerkleParameters,
 
     // Digest
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
@@ -127,7 +124,7 @@ fn base_dpc_execute_gadget_helper<
 
     //
     comm_crh_sig_parameters: &CircuitParameters<C>,
-    ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
+    ledger_parameters: &C::MerkleParameters,
 
     //
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,

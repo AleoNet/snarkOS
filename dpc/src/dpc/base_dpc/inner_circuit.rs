@@ -9,7 +9,6 @@ use crate::{
             BaseDPCComponents,
         },
     },
-    ledger::MerkleTreeParameters,
     Assignment,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
@@ -24,7 +23,7 @@ use snarkos_models::{
 pub struct InnerCircuit<C: BaseDPCComponents> {
     // Parameters
     circuit_parameters: Option<CircuitParameters<C>>,
-    ledger_parameters: Option<MerkleTreeParameters<C::MerkleParameters>>,
+    ledger_parameters: Option<C::MerkleParameters>,
 
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
 
@@ -56,10 +55,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
-    pub fn blank(
-        circuit_parameters: &CircuitParameters<C>,
-        ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
-    ) -> Self {
+    pub fn blank(circuit_parameters: &CircuitParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
@@ -124,7 +120,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
     pub fn new(
         // Parameters
         circuit_parameters: &CircuitParameters<C>,
-        ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
+        ledger_parameters: &C::MerkleParameters,
 
         // Digest
         ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
