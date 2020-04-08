@@ -19,7 +19,7 @@ use snarkos_utilities::storage::Storage;
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use std::{io::Result as IoResult, path::PathBuf, rc::Rc};
+use std::{io::Result as IoResult, path::PathBuf};
 
 #[derive(Clone)]
 pub(super) struct Size;
@@ -75,7 +75,6 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
     let parameters = EdwardsMerkleParameters::setup(&mut rng);
-    let crh = Rc::new(parameters.0);
     let tree = EdwardsMerkleTree::new(&parameters, leaves).unwrap();
     let root = tree.root();
     let mut satisfied = true;
@@ -100,7 +99,7 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
         // Allocate Parameters for CRH
         let crh_parameters =
             <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| format!("new_parameters_{}", i)), || {
-                Ok(crh_parameters.clone())
+                Ok(parameters.parameters())
             })
             .unwrap();
 

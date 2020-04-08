@@ -1,20 +1,14 @@
 use crate::{dpc::Transaction, ledger::*};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
 use snarkos_errors::dpc::LedgerError;
-//use snarkos_models::algorithms::CRH;
-use snarkos_utilities::bytes::ToBytes;
 
 use rand::Rng;
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
     rc::Rc,
 };
 
-pub struct IdealLedger<T: Transaction, P: MerkleParameters>
-where
-    T::Commitment: ToBytes,
-{
+pub struct IdealLedger<T: Transaction, P: MerkleParameters> {
     crh_params: Rc<P>,
     transactions: Vec<T>,
     cm_merkle_tree: MerkleTree<P>,
@@ -31,13 +25,7 @@ where
     genesis_memo: T::Memorandum,
 }
 
-impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P>
-where
-    T: Eq,
-    T::Commitment: ToBytes + Clone,
-    T::SerialNumber: ToBytes + Clone,
-    T::Memorandum: Hash + Clone,
-{
+impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;
     type Parameters = P;

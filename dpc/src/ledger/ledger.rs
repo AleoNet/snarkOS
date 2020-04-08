@@ -1,9 +1,7 @@
 use crate::{dpc::Transaction, ledger::*};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
 use snarkos_errors::dpc::LedgerError;
-//use snarkos_models::algorithms::CRH;
 use snarkos_objects::{BlockHeader, BlockHeaderHash, MerkleRootHash};
-use snarkos_utilities::bytes::ToBytes;
 
 use rand::Rng;
 use std::{
@@ -13,10 +11,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub struct BasicLedger<T: Transaction, P: MerkleParameters>
-where
-    T::Commitment: ToBytes,
-{
+pub struct BasicLedger<T: Transaction, P: MerkleParameters> {
     crh_params: Rc<P>,
     transactions: Vec<T>,
     blocks: Vec<Block<T>>,
@@ -44,13 +39,7 @@ where
     !iter.into_iter().all(move |x| uniq.insert(x))
 }
 
-impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P>
-where
-    T: Eq,
-    T::Commitment: ToBytes + Clone,
-    T::SerialNumber: ToBytes + Clone,
-    T::Memorandum: Hash + Clone,
-{
+impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P> {
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;
     type Parameters = P;
@@ -245,13 +234,7 @@ where
     }
 }
 
-impl<T: Transaction, P: MerkleParameters> BasicLedger<T, P>
-where
-    T: Eq,
-    T::Commitment: ToBytes + Clone,
-    T::SerialNumber: ToBytes + Clone,
-    T::Memorandum: Hash + Clone,
-{
+impl<T: Transaction, P: MerkleParameters> BasicLedger<T, P> {
     pub fn process_transaction(&mut self, transaction: &T) -> Result<(), LedgerError> {
         let mut cur_sn_index = self.cur_sn_index;
         for sn in transaction.old_serial_numbers() {

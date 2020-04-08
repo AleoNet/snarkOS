@@ -132,7 +132,7 @@ fn create_block_with_coinbase_transaction<R: Rng>(
     rng: &mut R,
 ) -> (Vec<DPCRecord<Components>>, Block<Tx>) {
     let (new_coinbase_records, transaction) = ConsensusParameters::create_coinbase_transaction(
-        ledger.blocks.len() as u32,
+        ledger.blocks().len() as u32,
         &transactions,
         &parameters,
         &genesis_pred_vk_bytes,
@@ -162,7 +162,7 @@ fn create_block_with_coinbase_transaction<R: Rng>(
         .expect("Time went backwards")
         .as_secs() as i64;
 
-    let previous_block = ledger.blocks.last().unwrap();
+    let previous_block = ledger.blocks().last().unwrap();
 
     // Pseudo mining
     let header = BlockHeader {
@@ -401,7 +401,7 @@ fn base_dpc_integration_test() {
 
     // Craft the block
 
-    let previous_block = ledger.blocks.last().unwrap();
+    let previous_block = ledger.blocks().last().unwrap();
 
     let mut transactions = Transactions::new();
     transactions.push(transaction);
@@ -485,7 +485,7 @@ fn base_dpc_multiple_transactions() {
 
     assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
 
-    let block_reward = get_block_reward(ledger.blocks.len() as u32);
+    let block_reward = get_block_reward(ledger.blocks().len() as u32);
 
     assert_eq!(coinbase_records.len(), 2);
     assert!(!coinbase_records[0].is_dummy());
@@ -562,7 +562,7 @@ fn base_dpc_multiple_transactions() {
         &mut rng,
     );
 
-    let new_block_reward = get_block_reward(ledger.blocks.len() as u32);
+    let new_block_reward = get_block_reward(ledger.blocks().len() as u32);
 
     assert_eq!(new_coinbase_records.len(), 2);
     assert!(!new_coinbase_records[0].is_dummy());

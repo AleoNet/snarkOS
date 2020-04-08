@@ -30,7 +30,7 @@ pub trait Record: Default {
     type Payload;
     type Predicate;
     type SerialNumberNonce;
-    type SerialNumber: Eq + Hash + FromBytes + ToBytes;
+    type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
 
     /// Returns the address public key.
     fn address_public_key(&self) -> &Self::AddressPublicKey;
@@ -57,10 +57,10 @@ pub trait Record: Default {
     fn commitment_randomness(&self) -> Self::CommitmentRandomness;
 }
 
-pub trait Transaction: Clone + FromBytes + ToBytes {
-    type SerialNumber: Eq + Hash + FromBytes + ToBytes;
-    type Commitment: Eq + Hash + FromBytes + ToBytes;
-    type Memorandum: Eq + FromBytes + ToBytes;
+pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
+    type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
+    type Commitment: Clone + Eq + Hash + FromBytes + ToBytes;
+    type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
     type Stuff;
 
     /// Returns the old serial numbers.
