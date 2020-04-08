@@ -49,10 +49,8 @@ where
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
-    <C::MerkleParameters as MerkleParameters>::H: ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
-
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = Vec::new();

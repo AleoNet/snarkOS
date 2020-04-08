@@ -18,8 +18,8 @@ where
     T::Commitment: ToBytes,
 {
     crh_params: Rc<P>,
-    pub transactions: Vec<T>,
-    pub blocks: Vec<Block<T>>,
+    transactions: Vec<T>,
+    blocks: Vec<Block<T>>,
     cm_merkle_tree: MerkleTree<P>,
     cur_cm_index: usize,
     cur_sn_index: usize,
