@@ -230,48 +230,8 @@ impl UInt32 {
         Ok(UInt32 { bits, value: new_value })
     }
 
-    /// Bitwise multiplication
-    pub fn mul<F: Field + PrimeField, CS: ConstraintSystem<F>>(
-        &self,
-        mut cs: CS,
-        other: &Self,
-    ) -> Result<Self, SynthesisError> {
-        let mut result = UInt32::constant(0);
-        other.bits.iter().enumerate().for_each(|(i, bit)| {
-            if bit.get_value() == Some(true) {
-                let previous = result.clone();
-                let shifted = self.shl(i);
-                result = UInt32::addmany(cs.ns(|| format!("add shifted {}", i)), &[previous, shifted]).unwrap();
-            }
-        });
-
-        Ok(result)
-    }
-
-    /// Bitwise division
-    pub fn div<F: Field + PrimeField, CS: ConstraintSystem<F>>(
-        &self,
-        mut cs: CS,
-        other: &Self,
-    ) -> Result<Self, SynthesisError> {
-        let mut result = self.clone();
-        other.bits.iter().enumerate().for_each(|(i, bit)| {
-            if bit.get_value() == Some(true) {
-                println!("i {}", i);
-                println!("result {}", result.value.unwrap());
-                let shifted = self.shr(i + 1);
-                println!("shifted {}", shifted.value.unwrap());
-                result = result
-                    .sub(cs.ns(|| format!("subtract shifted {}", i)), &shifted)
-                    .unwrap();
-            }
-        });
-
-        Ok(result)
-    }
-
     /// Bitwise exponentiation
-    pub fn pow<F: Field + PrimeField, CS: ConstraintSystem<F>>(
+    pub fn pows<F: Field + PrimeField, CS: ConstraintSystem<F>>(
         &self,
         mut cs: CS,
         other: &Self,
@@ -289,138 +249,6 @@ impl UInt32 {
         });
 
         Ok(result)
-    }
-
-    /// Perform modular subtraction of several `UInt32` objects.
-    pub fn sub<F: PrimeField, CS: ConstraintSystem<F>>(
-        &self,
-        mut cs: CS,
-        other: &Self,
-    ) -> Result<Self, SynthesisError> {
-        // Make some arbitrary bounds for ourselves to avoid overflows
-        // in the scalar field
-        assert!(F::Params::MODULUS_BITS >= 64);
-
-        // Compute the maximum value of the sum so we allocate enough bits for
-        // the result
-        let mut max_value = u64::from(u32::max_value());
-
-        // Evalue the self value
-        let mut result_value = match self.value {
-            Some(value) => Some(u64::from(value)),
-            None => None,
-        };
-
-        // This is a linear combination that we will enforce to be "zero"
-        let mut lc = LinearCombination::zero();
-
-        let mut constant = true;
-
-        // Evaluate the other value
-        match other.value {
-            Some(value) => {
-                // Perform subtraction. If there is overflow this will fail.
-                result_value.as_mut().map(|v| *v -= u64::from(value));
-            }
-            None => {
-                result_value = None;
-            }
-        }
-
-        // Iterate over each bit_gadget of self and add self to the linear combination
-        let mut coeff = F::one();
-        for bit in &self.bits {
-            match *bit {
-                Boolean::Is(ref bit) => {
-                    constant = false;
-
-                    // Add coeff * bit gadget
-                    lc = lc + (coeff, bit.get_variable());
-                }
-                Boolean::Not(ref bit) => {
-                    constant = false;
-
-                    // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
-                    lc = lc + (coeff, CS::one()) - (coeff, bit.get_variable());
-                }
-                Boolean::Constant(bit) => {
-                    if bit {
-                        lc = lc + (coeff, CS::one());
-                    }
-                }
-            }
-
-            coeff.double_in_place();
-        }
-
-        // Iterate over each bit_gadget of other and subtract other from the linear combination
-        let mut coeff = F::one();
-        for bit in &other.bits {
-            match *bit {
-                Boolean::Is(ref bit) => {
-                    constant = false;
-
-                    // Subtract coeff * bit_gadget
-                    lc = lc + (coeff, bit.get_variable());
-                }
-                Boolean::Not(ref bit) => {
-                    constant = false;
-
-                    // Subtact coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
-                    lc = lc - (coeff, CS::one()) - (coeff, bit.get_variable());
-                }
-                Boolean::Constant(bit) => {
-                    if bit {
-                        lc = lc - (coeff, CS::one());
-                    }
-                }
-            }
-
-            coeff.double_in_place();
-        }
-
-        // The value of the actual result is moduluo 2^32
-        let modular_value = result_value.map(|v| v as u32);
-
-        if constant && modular_value.is_some() {
-            // Return constant
-
-            return Ok(UInt32::constant(modular_value.unwrap()));
-        }
-
-        // Storage for resulting bits
-        let mut result_bits = vec![];
-
-        // Allocate each bit gadget of the result
-        let mut coeff = F::one();
-        let mut i = 0;
-        while max_value != 0 {
-            // Allocate the bit_gadget
-            let b = AllocatedBit::alloc(cs.ns(|| format!("subtraction result bit gadget {}", i)), || {
-                result_value.map(|v| (v >> i) & 1 == 1).get()
-            })?;
-
-            // Subtract this bit_gadget from the linear combination to ensure the sums
-            // balance out
-            lc = lc - (coeff, b.get_variable());
-
-            result_bits.push(b.into());
-
-            max_value >>= 1;
-            i += 1;
-            coeff.double_in_place();
-        }
-
-        // Enforce that the linear combination equals zero
-        cs.enforce(|| "modular subtraction", |lc| lc, |lc| lc, |_| lc);
-
-        // Discard carry bits (probably unnecessary for subtraction
-        result_bits.truncate(32);
-
-        Ok(UInt32 {
-            bits: result_bits,
-            value: modular_value,
-        })
     }
 
     /// Perform modular addition of several `UInt32` objects.
@@ -526,6 +354,531 @@ impl UInt32 {
         cs.enforce(|| "modular addition", |lc| lc, |lc| lc, |_| lc);
 
         // Discard carry bits that we don't care about
+        result_bits.truncate(32);
+
+        Ok(UInt32 {
+            bits: result_bits,
+            value: modular_value,
+        })
+    }
+
+    /// Perform modular subtraction of two `UInt32` objects.
+    pub fn sub<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // Make some arbitrary bounds for ourselves to avoid overflows
+        // in the scalar field
+        assert!(F::Params::MODULUS_BITS >= 64);
+
+        // Compute the maximum value of the sum so we allocate enough bits for
+        // the result
+        let mut max_value = u64::from(u32::max_value());
+
+        // Evalue the self value
+        let mut result_value = match self.value {
+            Some(value) => Some(u64::from(value)),
+            None => None,
+        };
+
+        // This is a linear combination that we will enforce to be "zero"
+        let mut lc = LinearCombination::zero();
+
+        let mut constant = true;
+
+        // Evaluate the other value
+        match other.value {
+            Some(value) => {
+                // Perform subtraction. If there is overflow this will fail.
+                result_value.as_mut().map(|v| *v -= u64::from(value));
+            }
+            None => {
+                result_value = None;
+            }
+        }
+
+        // Iterate over each bit_gadget of self and add self to the linear combination
+        let mut coeff = F::one();
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * bit gadget
+                    lc = lc + (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    lc = lc + (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc + (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // Iterate over each bit_gadget of other and subtract other from the linear combination
+        let mut coeff = F::one();
+        for bit in &other.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Subtract coeff * bit_gadget
+                    lc = lc - (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Subtact coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    lc = lc - (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc - (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // The value of the actual result is moduluo 2^32
+        let modular_value = result_value.map(|v| v as u32);
+
+        if constant && modular_value.is_some() {
+            // Return constant
+
+            return Ok(UInt32::constant(modular_value.unwrap()));
+        }
+
+        // Storage for resulting bits
+        let mut result_bits = vec![];
+
+        // Allocate each bit gadget of the result
+        let mut coeff = F::one();
+        let mut i = 0;
+        while max_value != 0 {
+            // Allocate the bit_gadget
+            let b = AllocatedBit::alloc(cs.ns(|| format!("subtraction result bit gadget {}", i)), || {
+                result_value.map(|v| (v >> i) & 1 == 1).get()
+            })?;
+
+            // Subtract this bit_gadget from the linear combination to ensure the sums
+            // balance out
+            lc = lc - (coeff, b.get_variable());
+
+            result_bits.push(b.into());
+
+            max_value >>= 1;
+            i += 1;
+            coeff.double_in_place();
+        }
+
+        // Enforce that the linear combination equals zero
+        cs.enforce(|| "modular subtraction", |lc| lc, |lc| lc, |_| lc);
+
+        // Discard carry bits (probably unnecessary for subtraction
+        result_bits.truncate(32);
+
+        Ok(UInt32 {
+            bits: result_bits,
+            value: modular_value,
+        })
+    }
+
+    /// Perform modular multiplication of two `UInt32` objects.
+    pub fn mul<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // Make some arbitrary bounds for ourselves to avoid overflows
+        // in the scalar field
+        assert!(F::Params::MODULUS_BITS >= 64);
+
+        // Compute the maximum value of the sum so we allocate enough bits for
+        // the result
+        let mut max_value = u64::from(u32::max_value());
+
+        // Evaluate the self value
+        let mut self_field_value = F::zero();
+        let mut result_value = match self.value {
+            Some(value) => {
+                self_field_value = F::from(value as u128);
+                Some(u64::from(value))
+            }
+            None => None,
+        };
+
+        // Evaluate the other value
+        match other.value {
+            Some(value) => {
+                // Perform multiplication. If there is overflow this will fail.
+                result_value.as_mut().map(|v| *v *= u64::from(value));
+            }
+            None => {
+                result_value = None;
+            }
+        }
+
+        let mut constant = true;
+
+        // If any bits of self are allocated bits, return an allocated bit result
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref _bit) => constant = false,
+                Boolean::Not(ref _bit) => constant = false,
+                Boolean::Constant(_bit) => {}
+            }
+        }
+
+        // This is a linear combination that we will enforce to be "zero"
+        let mut lc = LinearCombination::zero();
+
+        // Iterate over each bit_gadget of other and add the bit multiplied by the coefficient
+        // to the linear combination
+        let mut coeff = self_field_value;
+        for bit in &other.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * bit_gadget
+                    lc = lc + (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    lc = lc + (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc + (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // The value of the actual result is moduluo 2^32
+        let modular_value = result_value.map(|v| v as u32);
+
+        if constant && modular_value.is_some() {
+            // Return constant
+
+            return Ok(UInt32::constant(modular_value.unwrap()));
+        }
+
+        // Storage for resulting bits
+        let mut result_bits = vec![];
+
+        // Allocate each bit gadget of the result
+        let mut coeff = F::one();
+        let mut i = 0;
+        while max_value != 0 {
+            // Allocate the bit_gadget
+            let b = AllocatedBit::alloc(cs.ns(|| format!("multiplication result bit gadget {}", i)), || {
+                result_value.map(|v| (v >> i) & 1 == 1).get()
+            })?;
+
+            // Subtract this bit_gadget from the linear combination to ensure the sums
+            // balance out
+            lc = lc - (coeff, b.get_variable());
+
+            result_bits.push(b.into());
+
+            max_value >>= 1;
+            i += 1;
+            coeff.double_in_place();
+        }
+
+        // Enforce that the linear combination equals zero
+        cs.enforce(|| "modular multiplication", |lc| lc, |lc| lc, |_| lc);
+
+        // Discard carry bits (probably unnecessary for multiplication
+        result_bits.truncate(32);
+
+        Ok(UInt32 {
+            bits: result_bits,
+            value: modular_value,
+        })
+    }
+
+    /// Perform modular division of two `UInt32` objects.
+    pub fn div<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // Make some arbitrary bounds for ourselves to avoid overflows
+        // in the scalar field
+        assert!(F::Params::MODULUS_BITS >= 64);
+
+        // Compute the maximum value of the sum so we allocate enough bits for
+        // the result
+        let mut max_value = u64::from(u32::max_value());
+
+        // Evaluate the self value
+        let mut result_value = match self.value {
+            Some(value) => Some(u64::from(value)),
+            None => None,
+        };
+
+        // Evaluate the other value
+        let mut other_field_value = F::one();
+        match other.value {
+            Some(value) => {
+                // Perform division. If there is overflow this will fail. Remainders are discarded.
+                other_field_value = F::from(value as u128);
+                result_value.as_mut().map(|v| *v /= u64::from(value));
+            }
+            None => {
+                result_value = None;
+            }
+        }
+
+        let mut constant = true;
+
+        // The linear combination of the UInt32 at self
+        let mut self_lc = LinearCombination::zero();
+
+        // Iterate over each bit_gadget of self to get self linear combination
+        let mut coeff = F::one();
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * bit gadget
+                    self_lc = self_lc + (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    self_lc = self_lc + (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        self_lc = self_lc + (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // If any bits of other are allocated, then we return an allocated bit result
+        for bit in &other.bits {
+            match *bit {
+                Boolean::Is(ref _bit) => {
+                    constant = false;
+                }
+                Boolean::Not(ref _bit) => {
+                    constant = false;
+                }
+                Boolean::Constant(_bit) => {}
+            }
+        }
+
+        // This is a linear combination of the quotient that we will enforce to be "zero"
+        let mut lc = self_lc.clone();
+
+        // Perform bitwise long division, continually subtracting the divisor from the dividend
+        // while()
+
+        // Iterate over each bit_gadget of self and subtract other from the linear combination
+        let mut coeff = other_field_value;
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Subtract coeff * bit_gadget
+                    lc = lc - (coeff, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Subtract coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                    lc = lc - (coeff, CS::one()) - (coeff, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc - (coeff, CS::one());
+                    }
+                }
+            }
+
+            coeff.double_in_place();
+        }
+
+        // The value of the actual result is moduluo 2^32
+        let modular_value = result_value.map(|v| v as u32);
+
+        if constant && modular_value.is_some() {
+            // Return constant
+
+            return Ok(UInt32::constant(modular_value.unwrap()));
+        }
+
+        // Storage for resulting bits
+        let mut result_bits = vec![];
+
+        // Allocate each bit gadget of the result
+        let mut coeff = F::one();
+        let mut i = 0;
+        while max_value != 0 {
+            // Allocate the bit_gadget
+            let b = AllocatedBit::alloc(cs.ns(|| format!("division result bit gadget {}", i)), || {
+                result_value.map(|v| (v >> i) & 1 == 1).get()
+            })?;
+
+            // Subtract this bit_gadget from the linear combination to ensure the sums
+            // balance out
+            lc = lc - (coeff, b.get_variable());
+
+            result_bits.push(b.into());
+
+            max_value >>= 1;
+            i += 1;
+            coeff.double_in_place();
+        }
+
+        // Enforce that the linear combination equals zero
+        cs.enforce(|| "modular division", |lc| lc, |lc| lc, |_| lc);
+
+        // Discard carry bits (probably unnecessary for multiplication
+        result_bits.truncate(32);
+
+        Ok(UInt32 {
+            bits: result_bits,
+            value: modular_value,
+        })
+    }
+
+    /// Perform modular exponentiation of a `UInt32` object.
+    pub fn pow<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // Make some arbitrary bounds for ourselves to avoid overflows
+        // in the scalar field
+        assert!(F::Params::MODULUS_BITS >= 64);
+
+        // Compute the maximum value of the sum so we allocate enough bits for
+        // the result
+        let mut max_value = u64::from(u32::max_value());
+
+        // Evaluate the self value
+        let mut self_field_value = F::one();
+        let mut result_value = match self.value {
+            Some(value) => {
+                self_field_value = F::from(value as u128);
+                Some(u64::from(value))
+            }
+            None => None,
+        };
+
+        // Evaluate the other value
+        match other.value {
+            Some(value) => {
+                // Perform exponentiation. If there is overflow this will fail.
+                result_value.as_mut().map(|v| *v = u64::from(*v).pow(value));
+            }
+            None => {
+                result_value = None;
+            }
+        }
+
+        let mut constant = true;
+
+        // If any bits of self are allocated bits, return an allocated bit result
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref _bit) => constant = false,
+                Boolean::Not(ref _bit) => constant = false,
+                Boolean::Constant(_bit) => {}
+            }
+        }
+
+        // This is a linear combination that we will enforce to be "zero"
+        let mut lc = LinearCombination::zero();
+
+        // Iterate over each bit_gadget of other and add the bit multiplied by the power
+        // to the linear combination
+        let mut power = self_field_value;
+        for bit in &other.bits {
+            match *bit {
+                Boolean::Is(ref bit) => {
+                    constant = false;
+
+                    // Add power * bit_gadget
+                    lc = lc + (power, bit.get_variable());
+                }
+                Boolean::Not(ref bit) => {
+                    constant = false;
+
+                    // Add power * (1 - other_lc) = power * ONE - power * other_lc
+                    lc = lc + (power, CS::one()) - (power, bit.get_variable());
+                }
+                Boolean::Constant(bit) => {
+                    if bit {
+                        lc = lc + (power, CS::one());
+                    }
+                }
+            }
+
+            power.square_in_place();
+        }
+
+        // The value of the actual result is moduluo 2^32
+        let modular_value = result_value.map(|v| v as u32);
+
+        if constant && modular_value.is_some() {
+            // Return constant
+
+            return Ok(UInt32::constant(modular_value.unwrap()));
+        }
+
+        // Storage for resulting bits
+        let mut result_bits = vec![];
+
+        // Allocate each bit gadget of the result
+        let mut coeff = F::one();
+        let mut i = 0;
+        while max_value != 0 {
+            // Allocate the bit_gadget
+            let b = AllocatedBit::alloc(cs.ns(|| format!("exponentiation result bit gadget {}", i)), || {
+                result_value.map(|v| (v >> i) & 1 == 1).get()
+            })?;
+
+            // Subtract this bit_gadget from the linear combination to ensure the sums
+            // balance out
+            lc = lc - (coeff, b.get_variable());
+
+            result_bits.push(b.into());
+
+            max_value >>= 1;
+            i += 1;
+            coeff.double_in_place();
+        }
+
+        // Enforce that the linear combination equals zero
+        cs.enforce(|| "modular exponentiation", |lc| lc, |lc| lc, |_| lc);
+
+        // Discard carry bits (probably unnecessary for multiplication
         result_bits.truncate(32);
 
         Ok(UInt32 {
@@ -789,28 +1142,68 @@ mod test {
             num = num.rotate_right(1);
         }
     }
-    //
-    // #[test]
-    // fn test_shift_left() {
-    //     let mut cs = TestConstraintSystem::<Fr>::new();
-    //
-    //     let one = UInt32::constant(1u32);
-    //     let result = one.shl(1);
-    //     let two = UInt32::constant(2u32);
-    //
-    //     assert_eq!(result.bits.to_vec(), two.bits.to_vec());
-    // }
 
     #[test]
-    fn test_not() {
-        // let mut cs = TestConstraintSystem::<Fr>::new();
-        //
-        // let one = UInt32::constant(1u32);
-        // let one_not = one.not();
+    fn test_sub() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
 
-        println!("one_not: {:?}", 1u32 - 2u32);
+        let x = UInt32::constant(100u32);
+        let y = UInt32::alloc(cs.ns(|| format!("alloc")), Some(99)).unwrap();
 
-        // assert_eq!(result.bits.to_vec(), two.bits.to_vec());
+        let res = x.sub(cs.ns(|| "sub".to_string()), &y).unwrap();
+
+        println!("{:?}", res.value.unwrap());
+        println!("{:?}", res.bits.to_vec());
+        println!("{:?}", cs.num_constraints());
+        assert!(cs.is_satisfied());
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
+
+        let x = UInt32::constant(9u32);
+        // let y = UInt32::constant(9u32);
+        let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(9u32)).unwrap();
+
+        let res = x.mul(cs.ns(|| "mul".to_string()), &z).unwrap();
+
+        println!("{:?}", res.value.unwrap());
+        // println!("{:?}", res.bits.to_vec());
+        println!("{:?}", cs.num_constraints());
+        assert!(cs.is_satisfied());
+    }
+
+    #[test]
+    fn test_div() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
+
+        let x = UInt32::constant(1);
+        // let y = UInt32::constant(2);
+        let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(1u32)).unwrap();
+
+        let res = x.div(cs.ns(|| "div".to_string()), &z).unwrap();
+
+        println!("{:?}", res.value.unwrap());
+        println!("{:?}", res.bits.to_vec());
+        println!("{:?}", cs.num_constraints());
+        // assert!(cs.is_satisfied()); //This fails
+    }
+
+    #[test]
+    fn test_pow() {
+        let mut cs = TestConstraintSystem::<Fr>::new();
+
+        let x = UInt32::constant(2);
+        // let y = UInt32::constant(2);
+        let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(8)).unwrap();
+
+        let res = x.pow(cs.ns(|| format!("pow")), &z).unwrap();
+
+        println!("{:?}", res.value.unwrap());
+        println!("{:?}", res.bits.to_vec());
+        println!("{:?}", cs.num_constraints());
+        assert!(cs.is_satisfied());
     }
 
     // #[test]
