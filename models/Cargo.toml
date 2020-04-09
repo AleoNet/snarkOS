@@ -19,4 +19,4 @@ derivative = { version = "1" }
 failure = { version = "0.1" }
 rand = { version = "0.7" }
 rand_xorshift = { version = "0.2" }
-smallvec = { version = "1.2" }
+smallvec = { version = "1.3" }
