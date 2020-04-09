@@ -629,8 +629,12 @@ impl UInt32 {
         let mut max_value = u64::from(u32::max_value());
 
         // Evaluate the self value
+        let mut self_field_value = F::one();
         let mut result_value = match self.value {
-            Some(value) => Some(u64::from(value)),
+            Some(value) => {
+                self_field_value = F::from(value as u128);
+                Some(u64::from(value))
+            }
             None => None,
         };
 
@@ -649,33 +653,17 @@ impl UInt32 {
 
         let mut constant = true;
 
-        // The linear combination of the UInt32 at self
-        let mut self_lc = LinearCombination::zero();
-
-        // Iterate over each bit_gadget of self to get self linear combination
-        let mut coeff = F::one();
+        // If any bits of self are allocated, then we return an allocated bit result
         for bit in &self.bits {
             match *bit {
-                Boolean::Is(ref bit) => {
+                Boolean::Is(ref _bit) => {
                     constant = false;
-
-                    // Add coeff * bit gadget
-                    self_lc = self_lc + (coeff, bit.get_variable());
                 }
-                Boolean::Not(ref bit) => {
+                Boolean::Not(ref _bit) => {
                     constant = false;
-
-                    // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
-                    self_lc = self_lc + (coeff, CS::one()) - (coeff, bit.get_variable());
                 }
-                Boolean::Constant(bit) => {
-                    if bit {
-                        self_lc = self_lc + (coeff, CS::one());
-                    }
-                }
+                Boolean::Constant(_bit) => {}
             }
-
-            coeff.double_in_place();
         }
 
         // If any bits of other are allocated, then we return an allocated bit result
@@ -692,36 +680,41 @@ impl UInt32 {
         }
 
         // This is a linear combination of the quotient that we will enforce to be "zero"
-        let mut lc = self_lc.clone();
+        let mut lc = LinearCombination::zero();
 
         // Perform bitwise long division, continually subtracting the divisor from the dividend
-        // while()
-
-        // Iterate over each bit_gadget of self and subtract other from the linear combination
-        let mut coeff = other_field_value;
-        for bit in &self.bits {
-            match *bit {
-                Boolean::Is(ref bit) => {
-                    constant = false;
-
-                    // Subtract coeff * bit_gadget
-                    lc = lc - (coeff, bit.get_variable());
-                }
-                Boolean::Not(ref bit) => {
-                    constant = false;
-
-                    // Subtract coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
-                    lc = lc - (coeff, CS::one()) - (coeff, bit.get_variable());
-                }
-                Boolean::Constant(bit) => {
-                    if bit {
-                        lc = lc - (coeff, CS::one());
-                    }
-                }
-            }
-
-            coeff.double_in_place();
+        // After each subtraction, add 1 to the lc quotient
+        let mut dividend = self_field_value;
+        while dividend.gt(&F::zero()) {
+            lc = lc + (F::one(), CS::one());
+            dividend -= &other_field_value;
         }
+        //
+        // // Iterate over each bit_gadget of self and subtract other from the linear combination
+        // let mut coeff = other_field_value;
+        // for bit in &self.bits {
+        //     match *bit {
+        //         Boolean::Is(ref bit) => {
+        //             constant = false;
+        //
+        //             // Subtract coeff * bit_gadget
+        //             lc = lc - (coeff, bit.get_variable());
+        //         }
+        //         Boolean::Not(ref bit) => {
+        //             constant = false;
+        //
+        //             // Subtract coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+        //             lc = lc - (coeff, CS::one()) - (coeff, bit.get_variable());
+        //         }
+        //         Boolean::Constant(bit) => {
+        //             if bit {
+        //                 lc = lc - (coeff, CS::one());
+        //             }
+        //         }
+        //     }
+        //
+        //     coeff.double_in_place();
+        // }
 
         // The value of the actual result is moduluo 2^32
         let modular_value = result_value.map(|v| v as u32);
@@ -1178,16 +1171,16 @@ mod test {
     fn test_div() {
         let mut cs = TestConstraintSystem::<Fr>::new();
 
-        let x = UInt32::constant(1);
+        let x = UInt32::constant(64u32);
         // let y = UInt32::constant(2);
-        let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(1u32)).unwrap();
+        let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(4u32)).unwrap();
 
         let res = x.div(cs.ns(|| "div".to_string()), &z).unwrap();
 
         println!("{:?}", res.value.unwrap());
         println!("{:?}", res.bits.to_vec());
         println!("{:?}", cs.num_constraints());
-        // assert!(cs.is_satisfied()); //This fails
+        assert!(cs.is_satisfied()); //This fails
     }
 
     #[test]
