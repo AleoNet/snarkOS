@@ -1,0 +1,140 @@
+use crate::{bytes_to_u32, Storage, KEY_BEST_BLOCK_NUMBER, KEY_MEMORY_POOL, KEY_PEER_BOOK, NUM_COLS};
+use snarkos_errors::storage::StorageError;
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkos_utilities::unwrap_option_or_error;
+
+use parking_lot::RwLock;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+pub struct BlockStorage {
+    pub latest_block_height: RwLock<u32>,
+    pub storage: Arc<Storage>,
+}
+
+impl BlockStorage {
+    /// Create a new blockchain storage.
+    pub fn new() -> Result<Arc<Self>, StorageError> {
+        let mut path = std::env::current_dir()?;
+        path.push("../../db");
+
+        let genesis = "00000000000000000000000000000000000000000000000000000000000000008c8d4f393f39c063c40a617c6e2584e6726448c4c0f7da7c848bfa573e628388fbf1285e00000000ffffffffff7f00005e4401000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04010000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac".into();
+
+        BlockStorage::open_at_path(path, genesis)
+    }
+
+    /// Open the blockchain storage at a particular path.
+    pub fn open_at_path<P: AsRef<Path>>(path: P, genesis: String) -> Result<Arc<Self>, StorageError> {
+        fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
+
+        match Storage::open_cf(path, NUM_COLS) {
+            Ok(storage) => Self::get_latest_state(storage, genesis),
+            Err(err) => return Err(err),
+        }
+    }
+
+    /// Get the latest state of the storage.
+    pub fn get_latest_state(storage: Storage, genesis: String) -> Result<Arc<Self>, StorageError> {
+        //        let value = storage.get(&Key::Meta(KEY_BEST_BLOCK_NUMBER))?;
+        //
+        //        match value {
+        //            Some(val) => Ok(Arc::new(Self {
+        //                latest_block_height: RwLock::new(bytes_to_u32(val)),
+        //                storage: Arc::new(storage),
+        //            })),
+        //            None => {
+        //                // Add genesis block to database
+        //
+        //                let block_storage = Self {
+        //                    latest_block_height: RwLock::new(0),
+        //                    storage: Arc::new(storage),
+        //                };
+        //
+        //                let genesis_block = Block::deserialize(&hex::decode(genesis)?).unwrap();
+        //
+        //                block_storage.insert_and_commit(genesis_block)?;
+        //
+        //                Ok(Arc::new(block_storage))
+        //            }
+        //        }
+        unimplemented!()
+    }
+
+    /// Get the latest block height of the chain.
+    pub fn get_latest_block_height(&self) -> u32 {
+        *self.latest_block_height.read()
+    }
+
+    /// Get the latest number of blocks in the chain.
+    pub fn get_block_count(&self) -> u32 {
+        *self.latest_block_height.read() + 1
+    }
+
+    /// Destroy the storage given a path.
+    pub fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {
+        Storage::destroy_storage(path)
+    }
+
+    /// Retrieve a value given a key.
+    pub fn get(&self, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
+        match self.storage.get(key)? {
+            Some(data) => Ok(data),
+            None => Err(StorageError::MissingValue("".to_string())),
+        }
+    }
+
+    // KEY VALUE GETTERS ===========================================================================
+
+    /// Get the stored memory pool transactions.
+    pub fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        unimplemented!()
+    }
+
+    /// Store the memory pool transactions.
+    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+        unimplemented!()
+    }
+
+    /// Get the stored old connected peers.
+    pub fn get_peer_book(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        unimplemented!()
+    }
+
+    /// Store the connected peers.
+    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+        unimplemented!()
+    }
+
+    /// Get a block header given the block hash.
+    pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
+        unimplemented!()
+    }
+
+    /// Get the block hash given a block number.
+    pub fn get_block_hash(&self, block_num: u32) -> Result<BlockHeaderHash, StorageError> {
+        unimplemented!()
+    }
+
+    /// Get the block num given a block hash.
+    pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
+        unimplemented!()
+    }
+
+    /// Get the list of transaction ids given a block hash.
+    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Vec<Vec<u8>>, StorageError> {
+        unimplemented!()
+    }
+
+    /// Find the potential child block given a parent block header.
+    pub fn get_child_hash(&self, parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
+        unimplemented!()
+    }
+
+    /// Get a transaction given the transaction id.
+    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Option<Vec<u8>> {
+        unimplemented!()
+    }
+}
