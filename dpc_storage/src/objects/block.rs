@@ -2,7 +2,7 @@ use crate::{BlockStorage, KEY_BEST_BLOCK_NUMBER};
 use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, Transactions};
 
-use std::collections::HashMap;
+//use std::collections::HashMap;
 
 impl BlockStorage {
     /// Get a block given the block hash.
@@ -64,7 +64,7 @@ impl BlockStorage {
     }
 
     /// Remove a block and it's related data from the storage.
-    pub fn remove_block(&self, block_hash: BlockHeaderHash) -> Result<(), StorageError> {
+    pub fn remove_block(&self, _block_hash: BlockHeaderHash) -> Result<(), StorageError> {
         unimplemented!()
     }
 

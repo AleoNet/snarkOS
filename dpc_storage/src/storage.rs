@@ -1,6 +1,7 @@
+use crate::{DatabaseTransaction, Op};
 use snarkos_errors::storage::StorageError;
 
-use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, Options, DB};
+use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, Options, WriteBatch, DB};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -38,7 +39,7 @@ impl Storage {
             let mut cf_opts = Options::default();
             cf_opts.set_max_write_buffer_number(16);
 
-            cfs.push(ColumnFamilyDescriptor::new(column_name.clone(), cf_opts));
+            cfs.push(ColumnFamilyDescriptor::new(&column_name, cf_opts));
             cf_names.push(column_name);
         }
 
@@ -54,63 +55,39 @@ impl Storage {
 
     /// Returns the column family reference from a given index.
     /// If the given index does not exist, returns [None](std::option::Option).
-    pub(crate) fn get_cf_ref(&self, index: usize) -> Option<&ColumnFamily> {
-        self.storage.cf_handle(&self.cf_names[index])
+    pub(crate) fn get_cf_ref(&self, index: u32) -> &ColumnFamily {
+        self.storage
+            .cf_handle(&self.cf_names[index as usize])
+            .expect("the column family exists")
     }
 
-    /// Returns the value from a given key.
+    /// Returns the value from a given key and col.
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub(crate) fn get(&self, key: &Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
-        //        let col_key = ColKey::from(key);
-
-        //        let val = match self.get_cf_ref(col_key.column as usize) {
-        //            Some(cf) => self.storage.get_cf(cf, col_key.key)?,
-        //            None => return Err(StorageError::InvalidColumnFamily(col_key.column)),
-        //        };
-        //
-        //        Ok(val)
-        unimplemented!()
+    pub(crate) fn get(&self, col: u32, key: &Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
+        Ok(self.storage.get_cf(self.get_cf_ref(col), key)?)
     }
 
-    /// Returns `Ok(())` after storing a given [KeyValue](snarkos_storage::key_value::KeyValue).
-    /// If the column does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub(crate) fn insert(&self, key: Vec<u8>, value: Vec<u8>) -> Result<(), StorageError> {
-        //        let col_key_value = ColKeyValue::from(&key_value);
-        //
-        //        match self.get_cf_ref(col_key_value.column as usize) {
-        //            Some(cf) => self.storage.put_cf(cf, col_key_value.key, col_key_value.value)?,
-        //            None => return Err(StorageError::InvalidColumnFamily(col_key_value.column)),
-        //        }
-        //
-        //        Ok(())
-        unimplemented!()
-    }
+    /// Returns `Ok(())` after executing a database transaction
+    /// If the any of the operations fail, returns [StorageError](snarkos_errors::storage::StorageError).
+    pub(crate) fn write(&self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
+        let mut batch = WriteBatch::default();
 
-    /// Returns `Ok(())` after storing a given list of [KeyValue](snarkos_storage::key_value::KeyValue).
-    /// If any column does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub(crate) fn insert_batch(&self, _key: &Vec<u8>, _values: &Vec<u8>) -> Result<(), StorageError> {
-        unimplemented!()
-    }
+        for operation in transaction.0 {
+            match operation {
+                Op::Insert { col, key, value } => {
+                    let cf = self.get_cf_ref(col);
+                    batch.put_cf(cf, key, value)?;
+                }
+                Op::Delete { col, key } => {
+                    let cf = self.get_cf_ref(col);
+                    batch.delete_cf(cf, key)?;
+                }
+            };
+        }
 
-    /// Returns `Ok(())` after removing a given [Key](snarkos_storage::key_value::Key).
-    /// If the column does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub(crate) fn remove(&self, _key: &Vec<u8>) -> Result<(), StorageError> {
-        //        let col_key = ColKey::from(key);
-        //
-        //        match self.get_cf_ref(col_key.column as usize) {
-        //            Some(cf) => self.storage.delete_cf(cf, col_key.key)?,
-        //            None => return Err(StorageError::InvalidColumnFamily(col_key.column)),
-        //        };
-        //
-        //        Ok(())
+        self.storage.write(batch)?;
 
-        unimplemented!()
-    }
-
-    /// Returns `Ok(())` after removing a given list of [Key](snarkos_storage::key_value::Key).
-    /// If any column does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub fn remove_batch(&self, keys: Vec<Vec<u8>>) -> Result<(), StorageError> {
-        unimplemented!()
+        Ok(())
     }
 
     /// Returns `Ok(())` after destroying the storage of the given path.

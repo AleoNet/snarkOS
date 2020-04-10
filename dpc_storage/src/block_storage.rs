@@ -37,7 +37,7 @@ impl BlockStorage {
     }
 
     /// Get the latest state of the storage.
-    pub fn get_latest_state(storage: Storage, genesis: String) -> Result<Arc<Self>, StorageError> {
+    pub fn get_latest_state(_storage: Storage, _genesis: String) -> Result<Arc<Self>, StorageError> {
         //        let value = storage.get(&Key::Meta(KEY_BEST_BLOCK_NUMBER))?;
         //
         //        match value {
@@ -79,10 +79,10 @@ impl BlockStorage {
     }
 
     /// Retrieve a value given a key.
-    pub fn get(&self, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(key)? {
+    pub fn get(&self, col: u32, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
+        match self.storage.get(col, key)? {
             Some(data) => Ok(data),
-            None => Err(StorageError::MissingValue("".to_string())),
+            None => Err(StorageError::MissingValue(hex::encode(key))),
         }
     }
 
@@ -94,7 +94,7 @@ impl BlockStorage {
     }
 
     /// Store the memory pool transactions.
-    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn store_to_memory_pool(&self, _transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
         unimplemented!()
     }
 
@@ -104,37 +104,37 @@ impl BlockStorage {
     }
 
     /// Store the connected peers.
-    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn store_to_peer_book(&self, _peers_serialized: Vec<u8>) -> Result<(), StorageError> {
         unimplemented!()
     }
 
     /// Get a block header given the block hash.
-    pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
+    pub fn get_block_header(&self, _block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
         unimplemented!()
     }
 
     /// Get the block hash given a block number.
-    pub fn get_block_hash(&self, block_num: u32) -> Result<BlockHeaderHash, StorageError> {
+    pub fn get_block_hash(&self, _block_num: u32) -> Result<BlockHeaderHash, StorageError> {
         unimplemented!()
     }
 
     /// Get the block num given a block hash.
-    pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
+    pub fn get_block_num(&self, _block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
         unimplemented!()
     }
 
     /// Get the list of transaction ids given a block hash.
-    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Vec<Vec<u8>>, StorageError> {
+    pub fn get_block_transactions(&self, _block_hash: &BlockHeaderHash) -> Result<Vec<Vec<u8>>, StorageError> {
         unimplemented!()
     }
 
     /// Find the potential child block given a parent block header.
-    pub fn get_child_hash(&self, parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
+    pub fn get_child_hash(&self, _parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
         unimplemented!()
     }
 
     /// Get a transaction given the transaction id.
-    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Option<Vec<u8>> {
+    pub fn get_transaction(&self, _transaction_id: &Vec<u8>) -> Option<Vec<u8>> {
         unimplemented!()
     }
 }
