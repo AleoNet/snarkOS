@@ -27,6 +27,7 @@ members = [
     "profiler",
     "rpc",
     "storage",
+    "dpc_storage",
     "utilities"
 ]
 
@@ -45,6 +46,7 @@ snarkos-network = { path = "./network" }
 snarkos-objects = { path = "objects" }
 snarkos-rpc = { path = "./rpc" }
 snarkos-storage = { path = "./storage" }
+snarkos-dpc-storage = { path = "./dpc_storage" }
 
 clap = { version = "2.33.0" }
 env_logger = { version = "0.7.1" }

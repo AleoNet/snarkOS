@@ -1,12 +1,16 @@
 use crate::BlockStorage;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkos_objects::{
+    dpc::{Block, Transaction},
+    BlockHeader,
+    BlockHeaderHash,
+};
 
 //use std::collections::HashMap;
 
-impl BlockStorage {
+impl<T: Transaction> BlockStorage<T> {
     /// Get a block given the block hash.
-    pub fn get_block(&self, _block_hash: &BlockHeaderHash) -> Result<Block, StorageError> {
+    pub fn get_block(&self, _block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
         //        let block_transactions = self.get_block_transactions(block_hash)?;
         //        let mut transactions = vec![];
         //        for block_transaction_id in block_transactions.0 {
@@ -21,7 +25,7 @@ impl BlockStorage {
     }
 
     /// Get a block given the block number.
-    pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block, StorageError> {
+    pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block<T>, StorageError> {
         if block_num > self.get_latest_block_height() {
             return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_num)));
         }
@@ -32,7 +36,7 @@ impl BlockStorage {
     }
 
     /// Get the latest block in the chain.
-    pub fn get_latest_block(&self) -> Result<Block, StorageError> {
+    pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
         self.get_block_from_block_num(self.get_latest_block_height())
     }
 
@@ -42,12 +46,12 @@ impl BlockStorage {
     }
 
     /// Find the potential parent block given a block header.
-    pub fn find_parent_block(&self, block_header: &BlockHeader) -> Result<Block, StorageError> {
+    pub fn find_parent_block(&self, block_header: &BlockHeader) -> Result<Block<T>, StorageError> {
         self.get_block(&block_header.previous_block_hash)
     }
 
     /// Returns the block number of a conflicting block that has already been mined.
-    pub fn already_mined(&self, block: &Block) -> Result<Option<u32>, StorageError> {
+    pub fn already_mined(&self, block: &Block<T>) -> Result<Option<u32>, StorageError> {
         // look up new block's previous block by hash
         // if the block after previous_block_number exists, then someone has already mined this new block
         let previous_block_number = self.get_block_num(&block.header.previous_block_hash)?;

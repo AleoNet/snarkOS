@@ -13,9 +13,9 @@ use std::{
 };
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct Transactions<T: Transaction>(pub Vec<T>);
+pub struct DPCTransactions<T: Transaction>(pub Vec<T>);
 
-impl<T: Transaction> Transactions<T> {
+impl<T: Transaction> DPCTransactions<T> {
     /// Initializes an empty list of transactions.
     pub fn new() -> Self {
         Self(vec![])
@@ -50,7 +50,7 @@ impl<T: Transaction> Transactions<T> {
     }
 }
 
-impl<T: Transaction> ToBytes for Transactions<T> {
+impl<T: Transaction> ToBytes for DPCTransactions<T> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         variable_length_integer(self.0.len() as u64).write(&mut writer)?;
@@ -63,7 +63,7 @@ impl<T: Transaction> ToBytes for Transactions<T> {
     }
 }
 
-impl<T: Transaction> FromBytes for Transactions<T> {
+impl<T: Transaction> FromBytes for DPCTransactions<T> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_transactions = read_variable_length_integer(&mut reader)?;
@@ -77,13 +77,13 @@ impl<T: Transaction> FromBytes for Transactions<T> {
     }
 }
 
-impl<T: Transaction> Default for Transactions<T> {
+impl<T: Transaction> Default for DPCTransactions<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Transaction> Deref for Transactions<T> {
+impl<T: Transaction> Deref for DPCTransactions<T> {
     type Target = Vec<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -91,7 +91,7 @@ impl<T: Transaction> Deref for Transactions<T> {
     }
 }
 
-impl<T: Transaction> DerefMut for Transactions<T> {
+impl<T: Transaction> DerefMut for DPCTransactions<T> {
     fn deref_mut(&mut self) -> &mut Vec<T> {
         &mut self.0
     }

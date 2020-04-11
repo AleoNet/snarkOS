@@ -12,7 +12,7 @@ use snarkos_dpc::{
         LocalData,
         DPC,
     },
-    ledger::{get_block_reward, transactions::Transactions, Block, ConsensusParameters, Ledger},
+    ledger::{get_block_reward, transactions::DPCTransactions, Block, ConsensusParameters, Ledger},
     DPCScheme,
     Record,
 };
@@ -120,7 +120,7 @@ fn setup_ledger<R: Rng>(
 }
 
 fn create_block_with_coinbase_transaction<R: Rng>(
-    transactions: &mut Transactions<Tx>,
+    transactions: &mut DPCTransactions<Tx>,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     genesis_pred_vk_bytes: &Vec<u8>,
     new_birth_predicates: Vec<DPCPredicate<Components>>,
@@ -403,7 +403,7 @@ fn base_dpc_integration_test() {
 
     let previous_block = ledger.blocks().last().unwrap();
 
-    let mut transactions = Transactions::new();
+    let mut transactions = DPCTransactions::new();
     transactions.push(transaction);
 
     let transaction_ids: Vec<Vec<u8>> = transactions
@@ -466,7 +466,7 @@ fn base_dpc_multiple_transactions() {
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
-    let mut transactions = Transactions::<Tx>::new();
+    let mut transactions = DPCTransactions::<Tx>::new();
 
     println!("Creating block with coinbase transaction");
 
@@ -518,7 +518,7 @@ fn base_dpc_multiple_transactions() {
     let auxiliary = [5u8; 32];
     let memo = [6u8; 32];
 
-    let mut transactions = Transactions::new();
+    let mut transactions = DPCTransactions::new();
 
     let (spend_records, transaction) = ConsensusParameters::create_transaction(
         &parameters,

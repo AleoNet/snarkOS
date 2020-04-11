@@ -1,8 +1,11 @@
 use crate::BlockStorage;
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{
+    dpc::{Block, Transaction},
+    BlockHeaderHash,
+};
 
-impl BlockStorage {
+impl<T: Transaction> BlockStorage<T> {
     /// Returns true if the block for the given block header hash exists.
     pub fn block_hash_exists(&self, block_hash: &BlockHeaderHash) -> bool {
         if self.is_empty() {
@@ -16,7 +19,7 @@ impl BlockStorage {
     }
 
     /// Returns true if the block corresponding to this block's previous_block_hash exists.
-    pub fn previous_block_hash_exists(&self, block: &Block) -> bool {
+    pub fn previous_block_hash_exists(&self, block: &Block<T>) -> bool {
         self.block_hash_exists(&block.header.previous_block_hash)
     }
 

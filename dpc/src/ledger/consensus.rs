@@ -8,11 +8,8 @@ use crate::{
         BaseDPCComponents,
         LocalData,
     },
-    dpc::{
-        address::{AddressPair, AddressPublicKey, AddressSecretKey},
-        Transaction,
-    },
-    ledger::{block::Block, transactions::Transactions, Ledger},
+    dpc::address::{AddressPair, AddressPublicKey, AddressSecretKey},
+    ledger::Ledger,
     DPCScheme,
     Record,
 };
@@ -23,7 +20,13 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::DPCComponents,
 };
-use snarkos_objects::{merkle_root, BlockHeader, BlockHeaderHash, MerkleRootHash};
+use snarkos_objects::{
+    dpc::{Block, DPCTransactions, Transaction},
+    merkle_root,
+    BlockHeader,
+    BlockHeaderHash,
+    MerkleRootHash,
+};
 use snarkos_utilities::rand::UniformRand;
 
 use rand::{thread_rng, Rng};
@@ -219,7 +222,7 @@ impl ConsensusParameters {
 
     pub fn create_coinbase_transaction<R: Rng>(
         block_num: u32,
-        transactions: &Transactions<Tx>,
+        transactions: &DPCTransactions<Tx>,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         genesis_pred_vk_bytes: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,

@@ -1,22 +1,28 @@
 use crate::*;
 
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{BlockHeader, BlockHeaderHash, Transactions};
+use snarkos_objects::{
+    dpc::{DPCTransactions, Transaction},
+    BlockHeader,
+    BlockHeaderHash,
+};
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
 use std::{
     fs,
+    marker::PhantomData,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-pub struct BlockStorage {
+pub struct BlockStorage<T: Transaction> {
     pub latest_block_height: RwLock<u32>,
     pub storage: Arc<Storage>,
+    _transaction: PhantomData<T>,
 }
 
-impl BlockStorage {
+impl<T: Transaction> BlockStorage<T> {
     /// Create a new blockchain storage.
     pub fn new() -> Result<Arc<Self>, StorageError> {
         let mut path = std::env::current_dir()?;
@@ -149,9 +155,9 @@ impl BlockStorage {
     }
 
     /// Get the list of transaction ids given a block hash.
-    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Transactions, StorageError> {
+    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<DPCTransactions<T>, StorageError> {
         match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0)? {
-            Some(encoded_block_transactions) => Ok(Transactions::read(&encoded_block_transactions[..])?),
+            Some(encoded_block_transactions) => Ok(DPCTransactions::read(&encoded_block_transactions[..])?),
             None => Err(StorageError::MissingBlockTransactions(block_hash.to_string())),
         }
     }
@@ -162,15 +168,13 @@ impl BlockStorage {
     }
 
     /// Get a transaction given the transaction id.
-    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
+    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Result<Option<T>, StorageError> {
         match self.storage.get(COL_TRANSACTION_LOCATION, &transaction_id)? {
             Some(transaction_locator) => {
                 let transaction_location = TransactionLocation::read(&transaction_locator[..])?;
                 let block_transactions =
                     self.get_block_transactions(&BlockHeaderHash(transaction_location.block_hash))?;
-                Ok(Some(
-                    block_transactions.0[transaction_location.index as usize].serialize()?,
-                ))
+                Ok(Some(block_transactions.0[transaction_location.index as usize].clone()))
             }
             None => Ok(None),
         }

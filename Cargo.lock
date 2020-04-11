@@ -2263,6 +2263,7 @@ dependencies = [
  "rusty-hook",
  "serde",
  "snarkos-consensus",
+ "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-network",
  "snarkos-objects",
@@ -2376,6 +2377,22 @@ dependencies = [
  "snarkos-objects",
  "snarkos-profiler",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-dpc-storage"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "hex 0.4.2",
+ "parking_lot 0.10.0",
+ "rocksdb",
+ "serde",
+ "snarkos-errors",
+ "snarkos-objects",
+ "snarkos-utilities",
+ "wagyu-bitcoin",
+ "wagyu-model",
 ]
 
 [[package]]

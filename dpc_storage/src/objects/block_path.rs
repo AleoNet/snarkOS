@@ -1,6 +1,6 @@
 use crate::BlockStorage;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{BlockHeader, BlockHeaderHash};
+use snarkos_objects::{dpc::Transaction, BlockHeader, BlockHeaderHash};
 
 #[derive(Clone, Debug)]
 pub enum BlockPath {
@@ -21,7 +21,7 @@ pub struct SideChainPath {
     pub path: Vec<BlockHeaderHash>,
 }
 
-impl BlockStorage {
+impl<T: Transaction> BlockStorage<T> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();

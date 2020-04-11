@@ -1,11 +1,14 @@
 use crate::{BlockStorage, SideChainPath};
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{
+    dpc::{Block, Transaction},
+    BlockHeaderHash,
+};
 
 //use std::collections::HashMap;
 
-impl BlockStorage {
-    pub fn insert_only(&self, _block: Block) -> Result<(), StorageError> {
+impl<T: Transaction> BlockStorage<T> {
+    pub fn insert_only(&self, _block: Block<T>) -> Result<(), StorageError> {
         unimplemented!()
     }
 
@@ -15,7 +18,7 @@ impl BlockStorage {
     }
 
     /// Insert a block into the storage and commit as part of the longest chain.
-    pub fn insert_and_commit(&self, _block: Block) -> Result<(), StorageError> {
+    pub fn insert_and_commit(&self, _block: Block<T>) -> Result<(), StorageError> {
         unimplemented!()
     }
 
@@ -25,7 +28,7 @@ impl BlockStorage {
     }
 
     /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.
-    pub fn is_previous_block_canon(&self, _block: &Block) -> bool {
+    pub fn is_previous_block_canon(&self, _block: Block<T>) -> bool {
         unimplemented!()
     }
 

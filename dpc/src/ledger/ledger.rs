@@ -1,7 +1,12 @@
-use crate::{dpc::Transaction, ledger::*};
+use crate::ledger::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
 use snarkos_errors::dpc::LedgerError;
-use snarkos_objects::{BlockHeader, BlockHeaderHash, MerkleRootHash};
+use snarkos_objects::{
+    dpc::{Block, DPCTransactions, Transaction},
+    BlockHeader,
+    BlockHeaderHash,
+    MerkleRootHash,
+};
 
 use rand::Rng;
 use std::{
@@ -13,7 +18,6 @@ use std::{
 
 pub struct BasicLedger<T: Transaction, P: MerkleParameters> {
     crh_params: Rc<P>,
-    transactions: Vec<T>,
     blocks: Vec<Block<T>>,
     cm_merkle_tree: MerkleTree<P>,
     cur_cm_index: usize,
@@ -82,13 +86,12 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P> {
 
         let genesis_block = Block::<T> {
             header,
-            transactions: Transactions::new(),
+            transactions: DPCTransactions::new(),
         };
 
         Self {
             crh_params: Rc::new(parameters),
             blocks: vec![genesis_block],
-            transactions: Vec::new(),
             cm_merkle_tree,
             cur_cm_index,
             cur_sn_index: 0,
@@ -161,7 +164,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P> {
         self.past_digests.insert(new_digest.clone());
         self.current_digest = Some(new_digest);
 
-        self.transactions.push(transaction);
+        //        self.transactions.push(transaction);
 
         Ok(())
     }

@@ -18,6 +18,7 @@ use snarkos_models::{
     dpc::DPCComponents,
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
+use snarkos_objects::dpc::Block;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
