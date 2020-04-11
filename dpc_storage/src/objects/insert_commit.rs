@@ -1,4 +1,4 @@
-use crate::{BlockStorage, SideChainPath, KEY_BEST_BLOCK_NUMBER};
+use crate::{BlockStorage, SideChainPath};
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::{Block, BlockHeaderHash};
 

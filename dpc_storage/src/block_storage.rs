@@ -1,7 +1,8 @@
-use crate::{bytes_to_u32, Storage, KEY_BEST_BLOCK_NUMBER, KEY_MEMORY_POOL, KEY_PEER_BOOK, NUM_COLS};
+use crate::*;
+
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
-use snarkos_utilities::unwrap_option_or_error;
+use snarkos_objects::{BlockHeader, BlockHeaderHash, Transactions};
+use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
 use std::{
@@ -79,7 +80,7 @@ impl BlockStorage {
     }
 
     /// Retrieve a value given a key.
-    pub fn get(&self, col: u32, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
+    pub(crate) fn get(&self, col: u32, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(col, key)? {
             Some(data) => Ok(data),
             None => Err(StorageError::MissingValue(hex::encode(key))),
@@ -89,43 +90,70 @@ impl BlockStorage {
     // KEY VALUE GETTERS ===========================================================================
 
     /// Get the stored memory pool transactions.
-    pub fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
-        unimplemented!()
+    pub fn get_memory_pool(&self) -> Result<Vec<u8>, StorageError> {
+        Ok(self.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())?)
     }
 
     /// Store the memory pool transactions.
-    pub fn store_to_memory_pool(&self, _transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
-        unimplemented!()
+    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+        let op = Op::Insert {
+            col: COL_META,
+            key: KEY_MEMORY_POOL.as_bytes().to_vec(),
+            value: transactions_serialized,
+        };
+        self.storage.write(DatabaseTransaction(vec![op]))
     }
 
     /// Get the stored old connected peers.
-    pub fn get_peer_book(&self) -> Result<Option<Vec<u8>>, StorageError> {
-        unimplemented!()
+    pub fn get_peer_book(&self) -> Result<Vec<u8>, StorageError> {
+        Ok(self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())?)
     }
 
     /// Store the connected peers.
-    pub fn store_to_peer_book(&self, _peers_serialized: Vec<u8>) -> Result<(), StorageError> {
-        unimplemented!()
+    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+        let op = Op::Insert {
+            col: COL_META,
+            key: KEY_PEER_BOOK.as_bytes().to_vec(),
+            value: peers_serialized,
+        };
+        self.storage.write(DatabaseTransaction(vec![op]))
     }
 
     /// Get a block header given the block hash.
-    pub fn get_block_header(&self, _block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
-        unimplemented!()
+    pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
+        match self.storage.get(COL_BLOCK_HEADER, &block_hash.0)? {
+            Some(block_header_bytes) => Ok(BlockHeader::read(&block_header_bytes[..])?),
+            None => Err(StorageError::MissingBlockHeader(block_hash.to_string())),
+        }
     }
 
     /// Get the block hash given a block number.
-    pub fn get_block_hash(&self, _block_num: u32) -> Result<BlockHeaderHash, StorageError> {
-        unimplemented!()
+    pub fn get_block_hash(&self, block_num: u32) -> Result<BlockHeaderHash, StorageError> {
+        match self.storage.get(COL_BLOCK_LOCATOR, &block_num.to_le_bytes())? {
+            Some(block_header_hash) => Ok(BlockHeaderHash::new(block_header_hash)),
+            None => Err(StorageError::MissingBlockHash(block_num)),
+        }
     }
 
     /// Get the block num given a block hash.
-    pub fn get_block_num(&self, _block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
-        unimplemented!()
+    pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
+        match self.storage.get(COL_BLOCK_LOCATOR, &block_hash.0)? {
+            Some(block_num_bytes) => {
+                let mut block_num = [0u8; 4];
+                block_num.copy_from_slice(&block_num_bytes[0..4]);
+
+                Ok(u32::from_le_bytes(block_num))
+            }
+            None => Err(StorageError::MissingBlockNumber(block_hash.to_string())),
+        }
     }
 
     /// Get the list of transaction ids given a block hash.
-    pub fn get_block_transactions(&self, _block_hash: &BlockHeaderHash) -> Result<Vec<Vec<u8>>, StorageError> {
-        unimplemented!()
+    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Transactions, StorageError> {
+        match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0)? {
+            Some(encoded_block_transactions) => Ok(Transactions::read(&encoded_block_transactions[..])?),
+            None => Err(StorageError::MissingBlockTransactions(block_hash.to_string())),
+        }
     }
 
     /// Find the potential child block given a parent block header.
@@ -134,7 +162,17 @@ impl BlockStorage {
     }
 
     /// Get a transaction given the transaction id.
-    pub fn get_transaction(&self, _transaction_id: &Vec<u8>) -> Option<Vec<u8>> {
-        unimplemented!()
+    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
+        match self.storage.get(COL_TRANSACTION_LOCATION, &transaction_id)? {
+            Some(transaction_locator) => {
+                let transaction_location = TransactionLocation::read(&transaction_locator[..])?;
+                let block_transactions =
+                    self.get_block_transactions(&BlockHeaderHash(transaction_location.block_hash))?;
+                Ok(Some(
+                    block_transactions.0[transaction_location.index as usize].serialize()?,
+                ))
+            }
+            None => Ok(None),
+        }
     }
 }

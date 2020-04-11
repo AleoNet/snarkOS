@@ -15,16 +15,16 @@ pub struct Storage {
 }
 
 impl Storage {
-    /// Opens storage from the given path. If storage does not exists,
-    /// it creates a new storage file at the given path and opens it.
-    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
-    #[allow(dead_code)]
-    pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
-        Ok(Self {
-            storage: Arc::new(DB::open_default(path)?),
-            cf_names: vec![],
-        })
-    }
+    //    /// Opens storage from the given path. If storage does not exists,
+    //    /// it creates a new storage file at the given path and opens it.
+    //    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
+    //    #[allow(dead_code)]
+    //    pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
+    //        Ok(Self {
+    //            storage: Arc::new(DB::open_default(path)?),
+    //            cf_names: vec![],
+    //        })
+    //    }
 
     /// Opens storage from the given path with its given names. If storage does not exists,
     /// it creates a new storage file at the given path with its given names, and opens it.
@@ -63,7 +63,7 @@ impl Storage {
 
     /// Returns the value from a given key and col.
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub(crate) fn get(&self, col: u32, key: &Vec<u8>) -> Result<Option<Vec<u8>>, StorageError> {
+    pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
         Ok(self.storage.get_cf(self.get_cf_ref(col), key)?)
     }
 
@@ -76,11 +76,11 @@ impl Storage {
             match operation {
                 Op::Insert { col, key, value } => {
                     let cf = self.get_cf_ref(col);
-                    batch.put_cf(cf, key, value)?;
+                    batch.put_cf(cf, &key, value)?;
                 }
                 Op::Delete { col, key } => {
                     let cf = self.get_cf_ref(col);
-                    batch.delete_cf(cf, key)?;
+                    batch.delete_cf(cf, &key)?;
                 }
             };
         }

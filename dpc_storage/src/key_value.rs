@@ -1,18 +1,59 @@
-pub const COL_META: u32 = 0;
-pub const COL_BLOCK: u32 = 1;
-pub const COL_BLOCK_HASHES: u32 = 2;
-pub const COL_BLOCK_NUMBERS: u32 = 3;
-pub const COL_BLOCK_TRANSACTIONS: u32 = 4;
-pub const COL_TRANSACTIONS: u32 = 5;
-pub const COL_TRANSACTION_META: u32 = 6;
-pub const COL_CHILD_HASHES: u32 = 7;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-pub const NUM_COLS: u32 = 8;
+use std::io::{Read, Result as IoResult, Write};
+
+pub const COL_META: u32 = 0; // MISC Values
+pub const COL_BLOCK_HEADER: u32 = 1; // Block hash -> block header
+pub const COL_BLOCK_TRANSACTIONS: u32 = 1; // Block hash -> block transactions
+pub const COL_BLOCK_LOCATOR: u32 = 3; // Block num -> block hash && block hash -> block num
+pub const COL_TRANSACTION_LOCATION: u32 = 4; // Transaction Hash -> (block hash and index)
+pub const COL_COMMITMENT: u32 = 5; // Commitment -> index
+pub const COL_SERIAL_NUMBER: u32 = 6; // SN -> index
+pub const COL_MEMO: u32 = 7; // Memo -> index
+pub const COL_DIGEST: u32 = 8; // Ledger digest -> index
+
+pub const NUM_COLS: u32 = 9;
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
 pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
-//pub const KEY_BEST_BLOCK_HASH: &'static str = "BEST_BLOCK_HASH";
+
+pub const KEY_GENESIS_CM: &str = "GENESIS_CM";
+pub const KEY_GENESIS_SN: &str = "GENESIS_SN";
+pub const KEY_GENESIS_MEMO: &str = "GENESIS_MEMO";
+
+pub const KEY_CURR_CM_INDEX: &str = "CURRENT_CM_INDEX";
+pub const KEY_CURR_SN_INDEX: &str = "CURRENT_SN_INDEX";
+pub const KEY_CURR_MEMO_INDEX: &str = "CURRENT_MEMO_INDEX";
+pub const KEY_CURR_DIGEST: &str = "CURRENT_DIGEST";
+
+/// Represents address of certain transaction within block
+#[derive(Debug, PartialEq, Clone)]
+pub struct TransactionLocation {
+    /// Transaction index within the block
+    pub index: u32,
+    /// Block hash
+    pub block_hash: [u8; 32],
+}
+
+impl ToBytes for TransactionLocation {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.index.write(&mut writer)?;
+        self.block_hash.write(&mut writer)
+    }
+}
+
+impl FromBytes for TransactionLocation {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let index: u32 = FromBytes::read(&mut reader)?;
+
+        let block_hash: [u8; 32] = FromBytes::read(&mut reader)?;
+
+        Ok(Self { index, block_hash })
+    }
+}
 
 /// Database operation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

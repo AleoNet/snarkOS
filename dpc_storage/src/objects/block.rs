@@ -1,23 +1,23 @@
-use crate::{BlockStorage, KEY_BEST_BLOCK_NUMBER};
+use crate::BlockStorage;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, Transactions};
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 
 //use std::collections::HashMap;
 
 impl BlockStorage {
     /// Get a block given the block hash.
-    pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block, StorageError> {
-        let block_transactions = self.get_block_transactions(block_hash)?;
-
-        let mut transactions = vec![];
-        for block_transaction_id in block_transactions {
-            transactions.push(self.get_transaction_bytes(&block_transaction_id)?);
-        }
-
-        Ok(Block {
-            header: self.get_block_header(&block_hash)?,
-            transactions: Transactions::from(&transactions),
-        })
+    pub fn get_block(&self, _block_hash: &BlockHeaderHash) -> Result<Block, StorageError> {
+        //        let block_transactions = self.get_block_transactions(block_hash)?;
+        //        let mut transactions = vec![];
+        //        for block_transaction_id in block_transactions.0 {
+        //            transactions.push(self.get_transaction_bytes(&block_transaction_id)?);
+        //        }
+        //
+        //        Ok(Block {
+        //            header: self.get_block_header(&block_hash)?,
+        //            transactions: Transactions::from(&transactions),
+        //        })
+        unimplemented!()
     }
 
     /// Get a block given the block number.

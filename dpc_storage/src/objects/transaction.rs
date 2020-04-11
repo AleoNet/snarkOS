@@ -6,7 +6,7 @@ use snarkos_objects::{Transaction, Transactions};
 impl BlockStorage {
     /// Get a transaction bytes given the transaction id.
     pub fn get_transaction_bytes(&self, transaction_id: &Vec<u8>) -> Result<Transaction, StorageError> {
-        match self.get_transaction(&transaction_id.clone()) {
+        match self.get_transaction(&transaction_id.clone())? {
             Some(transaction) => Ok(Transaction::deserialize(&transaction)?),
             None => Err(StorageError::InvalidTransactionId(hex::encode(&transaction_id))),
         }

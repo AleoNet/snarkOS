@@ -1,10 +1,17 @@
 use crate::transaction::{Transaction, TransactionParameters, Vector};
 use snarkos_errors::objects::TransactionError;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    variable_length_integer::{read_variable_length_integer, variable_length_integer},
+};
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    ops::{Deref, DerefMut},
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Transactions(Vec<Transaction>);
+pub struct Transactions(pub Vec<Transaction>);
 
 impl Transactions {
     /// Initializes an empty list of transactions.
@@ -43,6 +50,35 @@ impl Transactions {
                 })
                 .collect::<Vec<Transaction>>(),
         ))
+    }
+}
+
+impl ToBytes for Transactions {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        variable_length_integer(self.0.len() as u64).write(&mut writer)?;
+
+        for transaction in &self.0 {
+            transaction.serialize().unwrap().write(&mut writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl FromBytes for Transactions {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let num_transactions = read_variable_length_integer(&mut reader)?;
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let parameters: TransactionParameters = TransactionParameters::read(&mut reader).unwrap();
+
+            let transaction = Transaction { parameters };
+            transactions.push(transaction);
+        }
+
+        Ok(Self(transactions))
     }
 }
 
