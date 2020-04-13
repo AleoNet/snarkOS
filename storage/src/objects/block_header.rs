@@ -1,6 +1,6 @@
 use crate::BlockStorage;
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{block::Block, BlockHeaderHash};
 
 impl BlockStorage {
     /// Returns true if the block for the given block header hash exists.

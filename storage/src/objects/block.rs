@@ -1,6 +1,6 @@
 use crate::{BlockStorage, Key, KeyValue, TransactionMeta, KEY_BEST_BLOCK_NUMBER};
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, Transactions};
+use snarkos_objects::{block::Block, BlockHeader, BlockHeaderHash, Transactions};
 
 use std::collections::HashMap;
 

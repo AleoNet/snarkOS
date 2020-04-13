@@ -12,7 +12,7 @@ use crate::{
     NUM_COLS,
 };
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkos_objects::{block::Block, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::unwrap_option_or_error;
 
 use parking_lot::RwLock;

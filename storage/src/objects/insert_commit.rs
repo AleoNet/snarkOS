@@ -3,7 +3,7 @@ use snarkos_errors::{
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{block::Block, BlockHeaderHash};
 
 use std::collections::HashMap;
 

@@ -1,6 +1,6 @@
 use crate::{BlockStorage, Key, KeyValue};
 use snarkos_errors::{objects::transaction::TransactionError, storage::StorageError};
-use snarkos_objects::{create_script_pub_key, BlockHeaderHash, Outpoint, Transaction, Transactions};
+use snarkos_objects::{create_script_pub_key, transaction::Transaction, BlockHeaderHash, Outpoint, Transactions};
 use snarkos_utilities::{unwrap_option_or_continue, unwrap_result_or_continue};
 
 use wagyu_bitcoin::{BitcoinAddress, Mainnet};
