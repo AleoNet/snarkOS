@@ -101,6 +101,16 @@ impl DatabaseTransaction {
     pub fn delete(&mut self, col: u32, key: &[u8]) {
         self.0.push(Op::Delete { col, key: key.to_vec() })
     }
+
+    /// Add an operation.
+    pub fn push(&mut self, op: Op) {
+        self.0.push(op)
+    }
+
+    /// Add a vector of operations.
+    pub fn push_vec(&mut self, ops: Vec<Op>) {
+        self.0.extend(ops)
+    }
 }
 
 pub fn bytes_to_u32(bytes: Vec<u8>) -> u32 {

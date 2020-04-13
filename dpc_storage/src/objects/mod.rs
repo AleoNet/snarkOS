@@ -10,6 +10,9 @@ pub use self::block_header::*;
 pub mod block_path;
 pub use self::block_path::*;
 
+pub mod dpc_state;
+pub use self::dpc_state::*;
+
 pub mod insert_commit;
 pub use self::insert_commit::*;
 
