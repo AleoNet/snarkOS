@@ -3,7 +3,7 @@ use snarkos_consensus::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
-use snarkos_objects::Block;
+use snarkos_objects::block::Block;
 use snarkos_storage::BlockStorage;
 
 use std::sync::Arc;

@@ -14,7 +14,7 @@ use crate::{
 };
 use snarkos_consensus::miner::{Entry, MemoryPool as MemoryPoolStruct};
 use snarkos_errors::network::SendError;
-use snarkos_objects::Transaction as TransactionStruct;
+use snarkos_objects::transaction::Transaction as TransactionStruct;
 use snarkos_storage::BlockStorage;
 
 use std::{net::SocketAddr, sync::Arc};

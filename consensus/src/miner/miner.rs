@@ -1,6 +1,6 @@
 use crate::{block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{merkle_root, Block, BlockHeader, MerkleRootHash, Transaction, Transactions};
+use snarkos_objects::{block::Block, merkle_root, transaction::Transaction, BlockHeader, MerkleRootHash, Transactions};
 use snarkos_storage::BlockStorage;
 
 use chrono::Utc;

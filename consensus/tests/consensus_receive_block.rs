@@ -1,6 +1,6 @@
 mod consensus_receive_block {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_objects::Block;
+    use snarkos_objects::block::Block;
     use snarkos_storage::test_data::*;
 
     // Receive two new blocks in order.

@@ -8,7 +8,7 @@ use crate::{
 };
 use snarkos_consensus::miner::Entry;
 use snarkos_errors::network::ServerError;
-use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
+use snarkos_objects::{block::Block as BlockStruct, transaction::Transaction as TransactionStruct, BlockHeaderHash};
 
 use chrono::Utc;
 use std::sync::Arc;

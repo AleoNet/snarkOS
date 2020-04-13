@@ -1,6 +1,6 @@
 mod consensus_sidechain {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_objects::Block;
+    use snarkos_objects::block::Block;
     use snarkos_storage::test_data::*;
 
     // Receive two blocks that reference the same parent.

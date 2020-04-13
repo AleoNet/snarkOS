@@ -8,7 +8,11 @@ mod server_message_handler {
         test_data::*,
         PingState,
     };
-    use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
+    use snarkos_objects::{
+        block::Block as BlockStruct,
+        transaction::Transaction as TransactionStruct,
+        BlockHeaderHash,
+    };
     use snarkos_storage::test_data::*;
 
     use chrono::{DateTime, Utc};

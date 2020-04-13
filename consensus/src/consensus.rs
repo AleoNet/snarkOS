@@ -1,6 +1,6 @@
 use crate::{bitcoin_retarget, miner::MemoryPool};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash, Transactions};
+use snarkos_objects::{block::Block, merkle_root, BlockHeader, BlockHeaderHash, MerkleRootHash, Transactions};
 use snarkos_storage::{BlockPath, BlockStorage};
 
 use chrono::Utc;
