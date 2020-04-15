@@ -1,7 +1,7 @@
 use crate::{DatabaseTransaction, Op};
 use snarkos_errors::storage::StorageError;
 
-use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, Options, WriteBatch, DB};
+use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DBIterator, IteratorMode, Options, WriteBatch, DB};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -65,6 +65,12 @@ impl Storage {
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
         Ok(self.storage.get_cf(self.get_cf_ref(col), key)?)
+    }
+
+    /// Returns the iterator from a given col.
+    /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
+    pub(crate) fn get_iter(&self, col: u32) -> Result<DBIterator, StorageError> {
+        Ok(self.storage.iterator_cf(self.get_cf_ref(col), IteratorMode::Start)?)
     }
 
     /// Returns `Ok(())` after executing a database transaction
