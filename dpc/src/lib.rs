@@ -46,8 +46,6 @@ extern crate derivative;
 pub(crate) mod dpc;
 pub use crate::dpc::*;
 
-pub mod ledger;
-
 use snarkos_errors::gadgets::SynthesisError;
 
 pub trait Assignment<T> {

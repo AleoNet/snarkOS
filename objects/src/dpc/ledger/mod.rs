@@ -1,11 +1,9 @@
+use crate::dpc::{Block, Transaction};
+
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::LedgerError;
-use snarkos_objects::dpc::{Block, Transaction};
 
 use rand::Rng;
-
-pub mod consensus;
-pub use self::consensus::*;
 
 pub mod ideal_ledger;
 pub use self::ideal_ledger::*;

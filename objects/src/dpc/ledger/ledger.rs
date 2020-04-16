@@ -1,12 +1,13 @@
-use crate::ledger::*;
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
-use snarkos_errors::dpc::LedgerError;
-use snarkos_objects::{
+use crate::{
     dpc::{Block, DPCTransactions, Transaction},
+    ledger::*,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
 };
+
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
+use snarkos_errors::dpc::LedgerError;
 
 use rand::Rng;
 use std::{

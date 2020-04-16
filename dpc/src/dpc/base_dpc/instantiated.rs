@@ -1,17 +1,14 @@
-use crate::{
-    dpc::base_dpc::{
-        inner_circuit::InnerCircuit,
-        inner_circuit_verifier_input::InnerCircuitVerifierInput,
-        outer_circuit::OuterCircuit,
-        outer_circuit_verifier_input::OuterCircuitVerifierInput,
-        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-        predicate::DPCPredicate,
-        transaction::DPCTransaction,
-        BaseDPCComponents,
-        LocalData as DPCLocalData,
-        DPC,
-    },
-    ledger::ledger::BasicLedger,
+use crate::dpc::base_dpc::{
+    inner_circuit::InnerCircuit,
+    inner_circuit_verifier_input::InnerCircuitVerifierInput,
+    outer_circuit::OuterCircuit,
+    outer_circuit_verifier_input::OuterCircuitVerifierInput,
+    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    predicate::DPCPredicate,
+    transaction::DPCTransaction,
+    BaseDPCComponents,
+    LocalData as DPCLocalData,
+    DPC,
 };
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
@@ -39,6 +36,7 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
+use snarkos_objects::ledger::BasicLedger;
 use snarkos_utilities::storage::Storage;
 
 use blake2::Blake2s as Blake2sHash;

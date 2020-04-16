@@ -12,12 +12,18 @@ use snarkos_dpc::{
         LocalData,
         DPC,
     },
-    ledger::{get_block_reward, transactions::DPCTransactions, Block, ConsensusParameters, Ledger},
+    consensus::{get_block_reward, ConsensusParameters},
     DPCScheme,
     Record,
 };
 use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
-use snarkos_objects::{merkle_root, BlockHeader, MerkleRootHash};
+use snarkos_objects::{
+    dpc::{transactions::DPCTransactions, Block},
+    ledger::Ledger,
+    merkle_root,
+    BlockHeader,
+    MerkleRootHash,
+};
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, storage::Storage, to_bytes};
 
 use rand::{Rng, SeedableRng};

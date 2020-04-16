@@ -1,14 +1,11 @@
-use crate::{
-    dpc::{
-        address::{AddressPair, AddressPublicKey, AddressSecretKey},
-        base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
-        AddressKeyPair,
-        DPCScheme,
-        Predicate,
-        Record,
-        Transaction,
-    },
-    ledger::*,
+use crate::dpc::{
+    address::{AddressPair, AddressPublicKey, AddressSecretKey},
+    base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
+    AddressKeyPair,
+    DPCScheme,
+    Predicate,
+    Record,
+    Transaction,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
@@ -18,7 +15,7 @@ use snarkos_models::{
     dpc::DPCComponents,
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
-use snarkos_objects::dpc::Block;
+use snarkos_objects::{dpc::Block, ledger::*};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,

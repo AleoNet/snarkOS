@@ -1,6 +1,5 @@
-use crate::ledger::*;
 use snarkos_errors::dpc::DPCError;
-use snarkos_objects::dpc::Transaction;
+use snarkos_objects::{dpc::Transaction, ledger::*};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
@@ -8,6 +7,7 @@ use std::hash::Hash;
 
 pub mod address;
 pub mod base_dpc;
+pub mod consensus;
 
 pub trait AddressKeyPair {
     type AddressPublicKey: Default;

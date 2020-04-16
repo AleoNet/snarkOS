@@ -9,7 +9,6 @@ use crate::{
         LocalData,
     },
     dpc::address::{AddressPair, AddressPublicKey, AddressSecretKey},
-    ledger::Ledger,
     DPCScheme,
     Record,
 };
@@ -22,6 +21,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
+    ledger::Ledger,
     merkle_root,
     BlockHeader,
     BlockHeaderHash,
