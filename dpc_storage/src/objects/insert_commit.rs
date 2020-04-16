@@ -1,12 +1,15 @@
 use crate::*;
 
-use snarkos_algorithms::merkle_tree::MerkleParameters;
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::{
     dpc::{Block, Transaction},
     BlockHeaderHash,
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use std::{collections::HashSet, hash::Hash};
 
@@ -192,12 +195,40 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
             value: block.header.get_hash().0.to_vec(),
         });
 
-        // Dont need to rebuild the tree here because we use an in-memory ledger state for the tree
+        // Rebuild the new commitment merkle tree
 
-        // create the new digest and insert into new_digest and past_digests
+        let mut cm_and_indices = transaction_cms;
 
-        // TODO:
-        //      CURRENT_DIGEST
+        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {
+            let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
+            let mut index_bytes = [0u8; 4];
+            index_bytes.copy_from_slice(&index_value);
+            let index = u32::from_le_bytes(index_bytes) as usize;
+
+            cm_and_indices.push((commitment, index));
+        }
+
+        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+        assert!(commitments[0] == self.genesis_cm()?);
+
+        let new_merkle_tree = MerkleTree::new(&self.parameters, &commitments)?;
+
+        let new_digest = new_merkle_tree.root();
+
+        database_transaction.push(Op::Insert {
+            col: COL_DIGEST,
+            key: to_bytes![new_digest]?.to_vec(),
+            value: new_best_block_number.to_le_bytes().to_vec(),
+        });
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_DIGEST.as_bytes().to_vec(),
+            value: to_bytes![new_digest]?.to_vec(),
+        });
+
+        let mut cm_merkle_tree = self.cm_merkle_tree.write();
+        *cm_merkle_tree = new_merkle_tree;
 
         Ok(())
     }

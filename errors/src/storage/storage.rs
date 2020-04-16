@@ -1,4 +1,7 @@
-use crate::objects::{BlockError, TransactionError};
+use crate::{
+    algorithms::MerkleError,
+    objects::{BlockError, TransactionError},
+};
 
 use bincode;
 use rocksdb;
@@ -55,6 +58,9 @@ pub enum StorageError {
     BlockError(BlockError),
 
     #[fail(display = "{}", _0)]
+    MerkleError(MerkleError),
+
+    #[fail(display = "{}", _0)]
     TransactionError(TransactionError),
 }
 
@@ -103,6 +109,12 @@ impl From<StorageError> for Box<dyn std::error::Error> {
 impl From<BlockError> for StorageError {
     fn from(error: BlockError) -> Self {
         StorageError::BlockError(error)
+    }
+}
+
+impl From<MerkleError> for StorageError {
+    fn from(error: MerkleError) -> Self {
+        StorageError::MerkleError(error)
     }
 }
 
