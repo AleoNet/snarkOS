@@ -11,7 +11,7 @@ pub use self::ideal_ledger::*;
 pub mod ledger;
 pub use self::ledger::*;
 
-pub trait Ledger {
+pub trait Ledger: Sized {
     type Parameters: MerkleParameters;
 
     type Commitment;
@@ -28,7 +28,7 @@ pub trait Ledger {
         dummy_cm: Self::Commitment,
         dummy_sn: Self::SerialNumber,
         dummy_memo: Self::Memo,
-    ) -> Self;
+    ) -> Result<Self, LedgerError>;
 
     /// Return the current number of transactions on the ledger.
     fn len(&self) -> usize;

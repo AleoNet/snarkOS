@@ -96,6 +96,14 @@ impl Storage {
         Ok(())
     }
 
+    /// Returns true if a value exists for a key and col pair.
+    pub fn exists(&self, col: u32, key: &[u8]) -> bool {
+        match self.storage.get_cf(self.get_cf_ref(col), key) {
+            Ok(val) => val.is_some(),
+            Err(_) => false,
+        }
+    }
+
     /// Returns `Ok(())` after destroying the storage of the given path.
     /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {

@@ -83,8 +83,6 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     }
 
     pub fn insert_block(&self, block: Block<T>) -> Result<(), StorageError> {
-        let latest_block_height = self.get_latest_block_height();
-
         let mut database_transaction = DatabaseTransaction::new();
 
         let mut transaction_serial_numbers = vec![];
@@ -201,9 +199,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
         for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
-            let mut index_bytes = [0u8; 4];
-            index_bytes.copy_from_slice(&index_value);
-            let index = u32::from_le_bytes(index_bytes) as usize;
+            let index = bytes_to_u32(index_value.to_vec()) as usize;
 
             cm_and_indices.push((commitment, index));
         }
@@ -229,6 +225,12 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
         let mut cm_merkle_tree = self.cm_merkle_tree.write();
         *cm_merkle_tree = new_merkle_tree;
+
+        self.storage.write(database_transaction)?;
+
+        if !is_genesis {
+            *height += 1;
+        }
 
         Ok(())
     }

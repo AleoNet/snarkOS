@@ -22,7 +22,7 @@ pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
     pub parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
     pub storage: Arc<Storage>,
-    _transaction: PhantomData<T>,
+    pub _transaction: PhantomData<T>,
 }
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
@@ -31,46 +31,59 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         let mut path = std::env::current_dir()?;
         path.push("../../db");
 
-        let genesis = "00000000000000000000000000000000000000000000000000000000000000008c8d4f393f39c063c40a617c6e2584e6726448c4c0f7da7c848bfa573e628388fbf1285e00000000ffffffffff7f00005e4401000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04010000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac".into();
-
-        BlockStorage::open_at_path(path, genesis)
+        BlockStorage::open_at_path(path)
     }
 
     /// Open the blockchain storage at a particular path.
-    pub fn open_at_path<PATH: AsRef<Path>>(path: PATH, genesis: String) -> Result<Arc<Self>, StorageError> {
+    pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Arc<Self>, StorageError> {
         fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
 
         match Storage::open_cf(path, NUM_COLS) {
-            Ok(storage) => Self::get_latest_state(storage, genesis),
+            Ok(storage) => Self::get_latest_state(storage),
             Err(err) => return Err(err),
         }
     }
 
     /// Get the latest state of the storage.
-    pub fn get_latest_state(_storage: Storage, _genesis: String) -> Result<Arc<Self>, StorageError> {
-        //        let value = storage.get(&Key::Meta(KEY_BEST_BLOCK_NUMBER))?;
-        //
-        //        match value {
-        //            Some(val) => Ok(Arc::new(Self {
-        //                latest_block_height: RwLock::new(bytes_to_u32(val)),
-        //                storage: Arc::new(storage),
-        //            })),
-        //            None => {
-        //                // Add genesis block to database
-        //
-        //                let block_storage = Self {
-        //                    latest_block_height: RwLock::new(0),
-        //                    storage: Arc::new(storage),
-        //                };
-        //
-        //                let genesis_block = Block::deserialize(&hex::decode(genesis)?).unwrap();
-        //
-        //                block_storage.insert_and_commit(genesis_block)?;
-        //
-        //                Ok(Arc::new(block_storage))
-        //            }
-        //        }
-        unimplemented!()
+    pub fn get_latest_state(storage: Storage) -> Result<Arc<Self>, StorageError> {
+        let latest_block_number = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?;
+
+        let mut path = std::env::current_dir()?;
+        path.push("../dpc/src/parameters/");
+        let ledger_parameter_path = path.join("ledger.params");
+
+        let parameters = P::load(&ledger_parameter_path)?;
+
+        let mut cm_and_indices = vec![];
+        for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
+            let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
+            let index = bytes_to_u32(index_value.to_vec()) as usize;
+
+            cm_and_indices.push((commitment, index));
+        }
+
+        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+
+        let genesis_cm: T::Commitment = match storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
+            Some(cm_bytes) => FromBytes::read(&cm_bytes[..])?,
+            None => return Err(StorageError::Message("Missing genesis cm".to_string())),
+        };
+
+        assert!(commitments[0] == genesis_cm);
+
+        let merkle_tree = MerkleTree::new(&parameters, &commitments)?;
+
+        match latest_block_number {
+            Some(val) => Ok(Arc::new(Self {
+                latest_block_height: RwLock::new(bytes_to_u32(val)),
+                storage: Arc::new(storage),
+                cm_merkle_tree: RwLock::new(merkle_tree),
+                parameters,
+                _transaction: PhantomData,
+            })),
+            None => return Err(StorageError::Message("Missing genesis block creation".to_string())),
+        }
     }
 
     /// Get the latest block height of the chain.
@@ -147,12 +160,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get the block num given a block hash.
     pub fn get_block_num(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
         match self.storage.get(COL_BLOCK_LOCATOR, &block_hash.0)? {
-            Some(block_num_bytes) => {
-                let mut block_num = [0u8; 4];
-                block_num.copy_from_slice(&block_num_bytes[0..4]);
-
-                Ok(u32::from_le_bytes(block_num))
-            }
+            Some(block_num_bytes) => Ok(bytes_to_u32(block_num_bytes)),
             None => Err(StorageError::MissingBlockNumber(block_hash.to_string())),
         }
     }

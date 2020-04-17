@@ -3,17 +3,25 @@ use crate::*;
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
 use snarkos_objects::{
-    dpc::{Block, Transaction},
+    dpc::{Block, DPCTransactions, Transaction},
     ledger::Ledger,
+    BlockHeader,
     BlockHeaderHash,
+    MerkleRootHash,
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
+use parking_lot::RwLock;
 use rand::Rng;
-use std::{collections::HashSet, hash::Hash};
+use std::{
+    fs,
+    marker::PhantomData,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
     type Commitment = T::Commitment;
@@ -31,95 +39,134 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
-    ) -> Self {
-        //        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()]).unwrap();
-        //
-        //        let mut cur_cm_index = 0;
-        //        let mut comm_to_index = HashMap::new();
-        //        comm_to_index.insert(genesis_cm.clone(), cur_cm_index);
-        //        cur_cm_index += 1;
-        //
-        //        let root = cm_merkle_tree.root();
-        //        let mut past_digests = HashSet::new();
-        //        past_digests.insert(root.clone());
-        //
-        //        let time = SystemTime::now()
-        //            .duration_since(UNIX_EPOCH)
-        //            .expect("Time went backwards")
-        //            .as_secs() as i64;
-        //
-        //        let header = BlockHeader {
-        //            previous_block_hash: BlockHeaderHash([0u8; 32]),
-        //            merkle_root_hash: MerkleRootHash([0u8; 32]),
-        //            time,
-        //            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
-        //            nonce: 0,
-        //        };
-        //
-        //        let genesis_block = Block::<T> {
-        //            header,
-        //            transactions: DPCTransactions::new(),
-        //        };
-        //
-        //        Self {
-        //            crh_params: Rc::new(parameters),
-        //            blocks: vec![genesis_block],
-        //            cm_merkle_tree,
-        //            cur_cm_index,
-        //            cur_sn_index: 0,
-        //            cur_memo_index: 0,
-        //
-        //            comm_to_index,
-        //            sn_to_index: HashMap::new(),
-        //            memo_to_index: HashMap::new(),
-        //            current_digest: Some(root),
-        //            past_digests,
-        //            genesis_cm,
-        //            genesis_sn,
-        //            genesis_memo,
-        //        }
-        unimplemented!()
+    ) -> Result<Self, LedgerError> {
+        let mut path = std::env::current_dir()?;
+        path.push("../../db");
+
+        fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
+
+        let storage = match Storage::open_cf(path, NUM_COLS) {
+            Ok(storage) => storage,
+            Err(err) => return Err(LedgerError::StorageError(err)),
+        };
+
+        if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
+            if bytes_to_u32(block_num) != 0 {
+                return Err(LedgerError::Message("Existing database".into()));
+            }
+        }
+
+        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()]).unwrap();
+
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as i64;
+
+        let header = BlockHeader {
+            previous_block_hash: BlockHeaderHash([0u8; 32]),
+            merkle_root_hash: MerkleRootHash([0u8; 32]),
+            time,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+            nonce: 0,
+        };
+
+        let genesis_block = Block::<T> {
+            header,
+            transactions: DPCTransactions::new(),
+        };
+
+        let mut database_transaction = DatabaseTransaction::new();
+
+        database_transaction.push(Op::Insert {
+            col: COL_COMMITMENT,
+            key: to_bytes![genesis_cm]?.to_vec(),
+            value: (0 as u32).to_le_bytes().to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
+            value: (1 as u32).to_le_bytes().to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_DIGEST,
+            key: to_bytes![cm_merkle_tree.root()]?.to_vec(),
+            value: (0 as u32).to_le_bytes().to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_GENESIS_CM.as_bytes().to_vec(),
+            value: to_bytes![genesis_cm]?.to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_GENESIS_SN.as_bytes().to_vec(),
+            value: to_bytes![genesis_sn]?.to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_GENESIS_MEMO.as_bytes().to_vec(),
+            value: to_bytes![genesis_memo]?.to_vec(),
+        });
+
+        let block_storage = Self {
+            latest_block_height: RwLock::new(0),
+            storage: Arc::new(storage),
+            cm_merkle_tree: RwLock::new(cm_merkle_tree),
+            parameters,
+            _transaction: PhantomData,
+        };
+
+        block_storage.storage.write(database_transaction)?;
+        block_storage.insert_block(genesis_block)?;
+
+        Ok(block_storage)
     }
 
     fn len(&self) -> usize {
-        unimplemented!()
+        self.get_latest_block_height() as usize
     }
 
     fn parameters(&self) -> &Self::Parameters {
-        unimplemented!()
+        &self.parameters
     }
 
-    fn push(&mut self, transaction: Self::Transaction) -> Result<(), LedgerError> {
+    fn push(&mut self, _transaction: Self::Transaction) -> Result<(), LedgerError> {
         unimplemented!()
     }
 
     fn digest(&self) -> Option<MerkleTreeDigest<Self::Parameters>> {
-        unimplemented!()
+        let digest: MerkleTreeDigest<Self::Parameters> = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
+
+        Some(digest)
     }
 
     fn validate_digest(&self, digest: &MerkleTreeDigest<Self::Parameters>) -> bool {
-        unimplemented!()
+        self.storage.exists(COL_DIGEST, &to_bytes![digest].unwrap())
     }
 
     fn contains_cm(&self, cm: &Self::Commitment) -> bool {
-        unimplemented!()
+        self.storage.exists(COL_COMMITMENT, &to_bytes![cm].unwrap())
     }
 
     fn contains_sn(&self, sn: &Self::SerialNumber) -> bool {
-        unimplemented!()
+        self.storage.exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap()) && sn != &self.genesis_sn().unwrap()
     }
 
     fn contains_memo(&self, memo: &Self::Memo) -> bool {
-        unimplemented!()
+        self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
     }
 
     fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, LedgerError> {
-        //        let cm_index = self.comm_to_index.get(cm).ok_or(LedgerError::InvalidCmIndex)?;
-        //
-        //        let result = self.cm_merkle_tree.generate_proof(*cm_index, cm)?;
-        //
-        //        Ok(result)
-        unimplemented!()
+        let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
+        let result = self.cm_merkle_tree.read().generate_proof(cm_index, cm)?;
+
+        Ok(result)
     }
 
     fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, LedgerError> {

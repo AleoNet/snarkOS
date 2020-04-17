@@ -44,8 +44,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
-    ) -> Self {
-        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()]).unwrap();
+    ) -> Result<Self, LedgerError> {
+        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()])?;
 
         let mut cur_cm_index = 0;
         let mut comm_to_index = HashMap::new();
@@ -56,7 +56,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
         let mut past_digests = HashSet::new();
         past_digests.insert(root.clone());
 
-        IdealLedger {
+        Ok(IdealLedger {
             crh_params: Rc::new(parameters),
             transactions: Vec::new(),
             cm_merkle_tree,
@@ -72,7 +72,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
             genesis_cm,
             genesis_sn,
             genesis_memo,
-        }
+        })
     }
 
     fn len(&self) -> usize {

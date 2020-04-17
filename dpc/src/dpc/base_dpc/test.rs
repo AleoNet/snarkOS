@@ -72,7 +72,8 @@ fn test_execute_base_dpc_constraints() {
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
-    );
+    )
+    .unwrap();
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
