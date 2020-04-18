@@ -12,18 +12,11 @@ use snarkos_objects::{
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get a block given the block hash.
-    pub fn get_block(&self, _block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
-        //        let block_transactions = self.get_block_transactions(block_hash)?;
-        //        let mut transactions = vec![];
-        //        for block_transaction_id in block_transactions.0 {
-        //            transactions.push(self.get_transaction_bytes(&block_transaction_id)?);
-        //        }
-        //
-        //        Ok(Block {
-        //            header: self.get_block_header(&block_hash)?,
-        //            transactions: Transactions::from(&transactions),
-        //        })
-        unimplemented!()
+    pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
+        Ok(Block {
+            header: self.get_block_header(block_hash)?,
+            transactions: self.get_block_transactions(block_hash)?,
+        })
     }
 
     /// Get a block given the block number.

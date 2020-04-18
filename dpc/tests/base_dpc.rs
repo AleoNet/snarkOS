@@ -16,6 +16,7 @@ use snarkos_dpc::{
     DPCScheme,
     Record,
 };
+use snarkos_dpc_storage::BlockStorage;
 use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
 use snarkos_objects::{
     dpc::{transactions::DPCTransactions, Block},
@@ -135,11 +136,11 @@ fn create_block_with_coinbase_transaction<R: Rng>(
     genesis_address: AddressPair<Components>,
     recipient: AddressPublicKey<Components>,
     consensus: &ConsensusParameters,
-    ledger: &mut MerkleTreeLedger,
+    ledger: &MerkleTreeLedger,
     rng: &mut R,
 ) -> (Vec<DPCRecord<Components>>, Block<Tx>) {
     let (new_coinbase_records, transaction) = ConsensusParameters::create_coinbase_transaction(
-        ledger.blocks().len() as u32,
+        ledger.len() as u32,
         &transactions,
         &parameters,
         &genesis_pred_vk_bytes,
@@ -169,7 +170,7 @@ fn create_block_with_coinbase_transaction<R: Rng>(
         .expect("Time went backwards")
         .as_secs() as i64;
 
-    let previous_block = ledger.blocks().last().unwrap();
+    let previous_block = ledger.get_latest_block().unwrap();
 
     // Pseudo mining
     let header = BlockHeader {
@@ -201,7 +202,7 @@ fn base_dpc_integration_test() {
         DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
 
     // Setup the ledger
-    let (mut ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
+    let (ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
@@ -408,7 +409,7 @@ fn base_dpc_integration_test() {
 
     // Craft the block
 
-    let previous_block = ledger.blocks().last().unwrap();
+    let previous_block = ledger.get_latest_block().unwrap();
 
     let mut transactions = DPCTransactions::new();
     transactions.push(transaction);
@@ -440,8 +441,12 @@ fn base_dpc_integration_test() {
 
     assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
 
-    ledger.push_block(block).unwrap();
+    ledger.insert_block(block).unwrap();
     assert_eq!(ledger.len(), 2);
+
+    let path = ledger.storage.storage.path().to_owned();
+    drop(ledger);
+    BlockStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
 }
 
 #[test]
@@ -463,7 +468,7 @@ fn base_dpc_multiple_transactions() {
         DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
 
     // Setup the ledger
-    let (mut ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
+    let (ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
 
     // Create an address for an actual new record.
     let new_metadata = [2u8; 32];
@@ -486,13 +491,13 @@ fn base_dpc_multiple_transactions() {
         genesis_address.clone(),
         miner_address.public_key.clone(),
         &consensus,
-        &mut ledger,
+        &ledger,
         &mut rng,
     );
 
     assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
 
-    let block_reward = get_block_reward(ledger.blocks().len() as u32);
+    let block_reward = get_block_reward(ledger.len() as u32);
 
     assert_eq!(coinbase_records.len(), 2);
     assert!(!coinbase_records[0].is_dummy());
@@ -506,7 +511,7 @@ fn base_dpc_multiple_transactions() {
 
     assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
 
-    ledger.push_block(block).unwrap();
+    ledger.insert_block(block).unwrap();
     assert_eq!(ledger.len(), 2);
 
     // Add new block spending records from the previous block
@@ -565,11 +570,11 @@ fn base_dpc_multiple_transactions() {
         genesis_address,
         new_recipient.public_key,
         &consensus,
-        &mut ledger,
+        &ledger,
         &mut rng,
     );
 
-    let new_block_reward = get_block_reward(ledger.blocks().len() as u32);
+    let new_block_reward = get_block_reward(ledger.len() as u32);
 
     assert_eq!(new_coinbase_records.len(), 2);
     assert!(!new_coinbase_records[0].is_dummy());
@@ -584,6 +589,10 @@ fn base_dpc_multiple_transactions() {
 
     assert!(consensus.verify_block(&parameters, &new_block, &ledger).unwrap());
 
-    ledger.push_block(new_block).unwrap();
+    ledger.insert_block(new_block).unwrap();
     assert_eq!(ledger.len(), 3);
+
+    let path = ledger.storage.storage.path().to_owned();
+    drop(ledger);
+    BlockStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
 }

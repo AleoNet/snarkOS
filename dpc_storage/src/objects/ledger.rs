@@ -41,7 +41,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         genesis_memo: Self::Memo,
     ) -> Result<Self, LedgerError> {
         let mut path = std::env::current_dir()?;
-        path.push("../../db");
+        path.push("../db");
 
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
 
@@ -91,6 +91,18 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         });
 
         database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_SN_INDEX.as_bytes().to_vec(),
+            value: (0 as u32).to_le_bytes().to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
+            value: (0 as u32).to_le_bytes().to_vec(),
+        });
+
+        database_transaction.push(Op::Insert {
             col: COL_DIGEST,
             key: to_bytes![cm_merkle_tree.root()]?.to_vec(),
             value: (0 as u32).to_le_bytes().to_vec(),
@@ -128,8 +140,9 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         Ok(block_storage)
     }
 
+    // Number of blocks including the genesis block
     fn len(&self) -> usize {
-        self.get_latest_block_height() as usize
+        self.get_latest_block_height() as usize + 1
     }
 
     fn parameters(&self) -> &Self::Parameters {

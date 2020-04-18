@@ -4,7 +4,7 @@ use std::io::{Read, Result as IoResult, Write};
 
 pub const COL_META: u32 = 0; // MISC Values
 pub const COL_BLOCK_HEADER: u32 = 1; // Block hash -> block header
-pub const COL_BLOCK_TRANSACTIONS: u32 = 1; // Block hash -> block transactions
+pub const COL_BLOCK_TRANSACTIONS: u32 = 2; // Block hash -> block transactions
 pub const COL_BLOCK_LOCATOR: u32 = 3; // Block num -> block hash && block hash -> block num
 pub const COL_TRANSACTION_LOCATION: u32 = 4; // Transaction Hash -> (block hash and index)
 pub const COL_COMMITMENT: u32 = 5; // Commitment -> index

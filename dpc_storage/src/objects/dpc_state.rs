@@ -48,12 +48,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get the current serial number index
     pub fn current_sn_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
-            Some(sn_index_bytes) => {
-                let mut curr_sn_index = [0u8; 4];
-                curr_sn_index.copy_from_slice(&sn_index_bytes[0..4]);
-
-                Ok(u32::from_le_bytes(curr_sn_index) as usize)
-            }
+            Some(sn_index_bytes) => Ok(bytes_to_u32(sn_index_bytes) as usize),
             None => Err(StorageError::Message("Missing current sn index".to_string())),
         }
     }
@@ -61,19 +56,14 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get the current memo index
     pub fn current_memo_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_MEMO_INDEX.as_bytes())? {
-            Some(memo_index_bytes) => {
-                let mut curr_memo_index = [0u8; 4];
-                curr_memo_index.copy_from_slice(&memo_index_bytes[0..4]);
-
-                Ok(u32::from_le_bytes(curr_memo_index) as usize)
-            }
+            Some(memo_index_bytes) => Ok(bytes_to_u32(memo_index_bytes) as usize),
             None => Err(StorageError::Message("Missing current memo index".to_string())),
         }
     }
 
     /// Get the current ledger digest
     pub fn current_digest(&self) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
+        match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
             Some(current_digest) => Ok(current_digest),
             None => Err(StorageError::Message("Missing current digest".to_string())),
         }

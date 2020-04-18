@@ -3,9 +3,9 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, PRF},
     dpc::DPCComponents,
 };
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::io::{Result as IoResult, Write};
+use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DPCComponents"))]
@@ -32,6 +32,15 @@ pub struct AddressPublicKey<C: DPCComponents> {
 impl<C: DPCComponents> ToBytes for AddressPublicKey<C> {
     fn write<W: Write>(&self, writer: W) -> IoResult<()> {
         self.public_key.write(writer)
+    }
+}
+
+impl<C: DPCComponents> FromBytes for AddressPublicKey<C> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let public_key: <C::AddressCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
+
+        Ok(Self { public_key })
     }
 }
 

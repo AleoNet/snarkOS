@@ -24,6 +24,7 @@ use snarkos_curves::{
     edwards_sw6::EdwardsProjective as EdwardsSW,
     sw6::SW6,
 };
+use snarkos_dpc_storage::BlockStorage;
 use snarkos_gadgets::{
     algorithms::{
         binding_signature::BindingSignatureVerificationGadget,
@@ -36,7 +37,6 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
-use snarkos_objects::ledger::BasicLedger;
 use snarkos_utilities::storage::Storage;
 
 use blake2::Blake2s as Blake2sHash;
@@ -229,7 +229,7 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
 
-pub type MerkleTreeLedger = BasicLedger<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;

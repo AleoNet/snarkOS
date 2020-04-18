@@ -104,6 +104,14 @@ impl Storage {
         }
     }
 
+    /// Returns `Ok(())` after destroying the storage
+    /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
+    pub fn destroy(&self) -> Result<(), StorageError> {
+        let path = self.storage.path();
+        drop(&self.storage);
+        Self::destroy_storage(path.into())
+    }
+
     /// Returns `Ok(())` after destroying the storage of the given path.
     /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {

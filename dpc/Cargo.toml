@@ -17,6 +17,7 @@ print-trace = [ "snarkos-profiler/print-trace" ]
 [dependencies]
 snarkos-algorithms = { path = "../algorithms" }
 snarkos-curves = { path = "../curves"}
+snarkos-dpc-storage = { path = "../dpc_storage" }
 snarkos-errors = { path = "../errors" }
 snarkos-gadgets = { path = "../gadgets"}
 snarkos-models = { path = "../models"}

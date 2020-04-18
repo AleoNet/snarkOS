@@ -2,7 +2,7 @@ use snarkos_dpc_storage::BlockStorage;
 
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
-    merkle_tree::{MerkleParameters, MerkleTree},
+    merkle_tree::MerkleParameters,
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
@@ -126,7 +126,7 @@ pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {
 
     Store::destroy_storage(path.clone()).unwrap();
 
-    let blockchain = Store::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
+    let blockchain = Store::open_at_path(path.clone()).unwrap();
 
     (blockchain, path)
 }

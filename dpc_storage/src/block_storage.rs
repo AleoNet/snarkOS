@@ -27,7 +27,7 @@ pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Create a new blockchain storage.
-    pub fn new() -> Result<Arc<Self>, StorageError> {
+    pub fn open() -> Result<Arc<Self>, StorageError> {
         let mut path = std::env::current_dir()?;
         path.push("../../db");
 

@@ -108,9 +108,9 @@ impl ConsensusParameters {
         merkle_root_hash: &MerkleRootHash,
         ledger: &MerkleTreeLedger,
     ) -> Result<(), ConsensusError> {
-        let parent_header = match ledger.blocks().last() {
-            Some(block) => block.header.clone(),
-            None => {
+        let parent_header = match ledger.get_latest_block() {
+            Ok(block) => block.header.clone(),
+            Err(_) => {
                 return match Self::is_genesis(header) {
                     true => Ok(()),
                     false => Err(ConsensusError::NoGenesisBlock),
@@ -194,7 +194,7 @@ impl ConsensusParameters {
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = get_block_reward(ledger.blocks().len() as u32) as i64;
+        let expected_block_reward = get_block_reward(ledger.len() as u32) as i64;
         if total_value_balance + expected_block_reward != 0 {
             println!("total_value_balance: {:?}", total_value_balance);
             println!("expected_block_reward: {:?}", expected_block_reward);

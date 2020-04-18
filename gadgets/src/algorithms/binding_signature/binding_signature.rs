@@ -54,7 +54,7 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
         // TODO make this circuit more efficient
 
         let negative_bvk = partial_bvk.add(cs.ns(|| "construct_negative_bvk"), &value_balance_comm)?;
-        let positive_bvk = partial_bvk.sub(cs.ns(|| "construct_negative_bvk"), &value_balance_comm)?;
+        let positive_bvk = partial_bvk.sub(cs.ns(|| "construct_positive_bvk"), &value_balance_comm)?;
 
         let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();

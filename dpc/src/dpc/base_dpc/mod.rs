@@ -5,7 +5,6 @@ use crate::dpc::{
     DPCScheme,
     Predicate,
     Record,
-    Transaction,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
@@ -15,7 +14,10 @@ use snarkos_models::{
     dpc::DPCComponents,
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
-use snarkos_objects::{dpc::Block, ledger::*};
+use snarkos_objects::{
+    dpc::{Block, Transaction},
+    ledger::*,
+};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
