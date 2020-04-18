@@ -10,14 +10,13 @@ use crate::{
     },
     dpc::address::{AddressPair, AddressPublicKey, AddressSecretKey},
     DPCScheme,
-    Record,
 };
 
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::DPCComponents,
+    dpc::{DPCComponents, Record},
 };
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},

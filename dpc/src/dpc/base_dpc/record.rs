@@ -1,12 +1,21 @@
 use crate::dpc::{
     address::AddressPublicKey,
     base_dpc::{predicate::DPCPredicate, record_payload::PaymentRecordPayload, BaseDPCComponents},
-    Record,
 };
-use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, CRH};
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_models::{
+    algorithms::{CommitmentScheme, SignatureScheme, CRH},
+    dpc::Record,
+};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+    variable_length_integer::*,
+};
 
-use std::marker::PhantomData;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    marker::PhantomData,
+};
 
 #[derive(Derivative)]
 #[derivative(
@@ -76,5 +85,68 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
 
     fn commitment_randomness(&self) -> Self::CommitmentRandomness {
         self.commitment_randomness.clone()
+    }
+}
+
+impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.address_public_key.write(&mut writer)?;
+
+        self.is_dummy.write(&mut writer)?;
+        self.payload.write(&mut writer)?;
+
+        variable_length_integer(self.birth_predicate_repr.len() as u64).write(&mut writer)?;
+        self.birth_predicate_repr.write(&mut writer)?;
+
+        variable_length_integer(self.death_predicate_repr.len() as u64).write(&mut writer)?;
+        self.death_predicate_repr.write(&mut writer)?;
+
+        self.serial_number_nonce.write(&mut writer)?;
+        self.commitment.write(&mut writer)?;
+        self.commitment_randomness.write(&mut writer)
+    }
+}
+
+impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let address_public_key: AddressPublicKey<C> = FromBytes::read(&mut reader)?;
+        let is_dummy: bool = FromBytes::read(&mut reader)?;
+        let payload: PaymentRecordPayload = FromBytes::read(&mut reader)?;
+
+        let birth_pred_repr_size: usize = read_variable_length_integer(&mut reader)?;
+
+        let mut birth_pred_repr = vec![];
+        for _ in 0..birth_pred_repr_size {
+            let byte: u8 = FromBytes::read(&mut reader)?;
+            birth_pred_repr.push(byte);
+        }
+
+        let death_pred_repr_size: usize = read_variable_length_integer(&mut reader)?;
+
+        let mut death_pred_repr = vec![];
+        for _ in 0..death_pred_repr_size {
+            let byte: u8 = FromBytes::read(&mut reader)?;
+            death_pred_repr.push(byte);
+        }
+
+        let serial_number_nonce: <C::SerialNumberNonce as CRH>::Output = FromBytes::read(&mut reader)?;
+
+        let commitment: <C::RecordCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
+        let commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness =
+            FromBytes::read(&mut reader)?;
+
+        Ok(Self {
+            address_public_key,
+            is_dummy,
+            payload,
+            birth_predicate_repr: birth_pred_repr.to_vec(),
+            death_predicate_repr: death_pred_repr.to_vec(),
+            serial_number_nonce,
+            commitment,
+            commitment_randomness,
+            _components: PhantomData,
+        })
     }
 }

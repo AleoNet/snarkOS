@@ -3,15 +3,13 @@ use crate::dpc::{
     base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
     AddressKeyPair,
     DPCScheme,
-    Predicate,
-    Record,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
-    dpc::DPCComponents,
+    dpc::{DPCComponents, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_objects::{
