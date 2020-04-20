@@ -1,7 +1,6 @@
-use crate::dpc::AddressKeyPair;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, PRF},
-    dpc::DPCComponents,
+    dpc::{AddressKeyPair, DPCComponents},
 };
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 

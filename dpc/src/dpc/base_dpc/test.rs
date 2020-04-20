@@ -1,22 +1,20 @@
 use super::instantiated::*;
-use crate::dpc::{
-    base_dpc::{
-        binding_signature::*,
-        execute_inner_proof_gadget,
-        execute_outer_proof_gadget,
-        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-        predicate::PrivatePredicateInput,
-        record_payload::PaymentRecordPayload,
-        BaseDPCComponents,
-        ExecuteContext,
-        DPC,
-    },
-    Record,
+use crate::dpc::base_dpc::{
+    binding_signature::*,
+    execute_inner_proof_gadget,
+    execute_outer_proof_gadget,
+    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    predicate::PrivatePredicateInput,
+    record_payload::PaymentRecordPayload,
+    BaseDPCComponents,
+    ExecuteContext,
+    DPC,
 };
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
+    dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
 };
 use snarkos_objects::ledger::Ledger;

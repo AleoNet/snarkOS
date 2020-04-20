@@ -22,7 +22,7 @@ pub trait Predicate: Clone {
 
 pub trait Record: Default + FromBytes + ToBytes {
     type AddressPublicKey;
-    type Commitment;
+    type Commitment: FromBytes + ToBytes;
     type CommitmentRandomness;
     type Payload;
     type Predicate;

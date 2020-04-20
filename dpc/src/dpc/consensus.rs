@@ -487,9 +487,4 @@ impl ConsensusParameters {
 
         Ok((new_records, transaction))
     }
-
-    // TODO:
-    // Coinbase transaction (make sure the sum of block's value balances = -block_reward).
-    // Block selection/ confirmation
-    //   - Make sure sum of vb adds up. Make sure the nonce is correct.
 }

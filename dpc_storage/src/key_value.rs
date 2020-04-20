@@ -12,7 +12,9 @@ pub const COL_SERIAL_NUMBER: u32 = 6; // SN -> index
 pub const COL_MEMO: u32 = 7; // Memo -> index
 pub const COL_DIGEST: u32 = 8; // Ledger digest -> index
 
-pub const NUM_COLS: u32 = 9;
+pub const COL_RECORDS: u32 = 9; // commitment -> record bytes
+
+pub const NUM_COLS: u32 = 10;
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";

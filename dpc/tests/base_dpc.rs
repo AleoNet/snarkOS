@@ -14,10 +14,12 @@ use snarkos_dpc::{
     },
     consensus::{get_block_reward, ConsensusParameters},
     DPCScheme,
-    Record,
 };
 use snarkos_dpc_storage::BlockStorage;
-use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
+use snarkos_models::{
+    algorithms::{CommitmentScheme, CRH, SNARK},
+    dpc::Record,
+};
 use snarkos_objects::{
     dpc::{transactions::DPCTransactions, Block},
     ledger::Ledger,
@@ -591,6 +593,19 @@ fn base_dpc_multiple_transactions() {
 
     ledger.insert_block(new_block).unwrap();
     assert_eq!(ledger.len(), 3);
+
+    for record in &new_coinbase_records {
+        ledger.store_record(record).unwrap();
+
+        let reconstruct_record: Option<DPCRecord<Components>> = ledger
+            .get_record(&to_bytes![record.commitment()].unwrap().to_vec())
+            .unwrap();
+
+        assert_eq!(
+            to_bytes![reconstruct_record.unwrap()].unwrap(),
+            to_bytes![record].unwrap()
+        );
+    }
 
     let path = ledger.storage.storage.path().to_owned();
     drop(ledger);

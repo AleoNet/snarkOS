@@ -4,7 +4,6 @@ use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::dpc::{DPCTransactions, Transaction};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
-//use snarkos_utilities::{unwrap_option_or_continue, unwrap_result_or_continue};
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get a transaction bytes given the transaction id.
