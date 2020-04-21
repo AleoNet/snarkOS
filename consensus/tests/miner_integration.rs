@@ -4,8 +4,8 @@ mod miner_integration {
         test_data::*,
     };
     use snarkos_objects::{
-        Block,
-        Transaction,
+        block::Block,
+        transaction::Transaction,
         TransactionInput,
         TransactionOutput,
         TransactionParameters,
