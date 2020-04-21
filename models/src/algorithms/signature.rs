@@ -10,7 +10,7 @@ use std::hash::Hash;
 pub trait SignatureScheme: Sized + Clone + Storage {
     type Parameters: Clone + ToBytes + FromBytes + Send + Sync;
     type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Default + Send + Sync;
-    type PrivateKey: ToBytes + Clone + Default;
+    type PrivateKey: ToBytes + FromBytes + Clone + Default;
     type Output: ToBytes + FromBytes + Clone + Default + Send + Sync;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError>;
