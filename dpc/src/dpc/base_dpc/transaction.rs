@@ -111,6 +111,12 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         result.copy_from_slice(&h.result());
         Ok(result)
     }
+
+    fn size(&self) -> usize {
+        let transaction_bytes = to_bytes![self].unwrap();
+
+        transaction_bytes.len()
+    }
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {

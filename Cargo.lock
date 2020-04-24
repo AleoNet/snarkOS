@@ -2263,6 +2263,7 @@ dependencies = [
  "rusty-hook",
  "serde",
  "snarkos-consensus",
+ "snarkos-dpc-consensus",
  "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-network",
@@ -2378,6 +2379,29 @@ dependencies = [
  "snarkos-objects",
  "snarkos-profiler",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-dpc-consensus"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "futures-await-test",
+ "hex 0.4.2",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "snarkos-algorithms",
+ "snarkos-dpc",
+ "snarkos-dpc-storage",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-utilities",
+ "tokio 0.2.13",
+ "wagyu-bitcoin",
+ "wagyu-model",
 ]
 
 [[package]]

@@ -43,7 +43,7 @@ extern crate snarkos_profiler;
 #[macro_use]
 extern crate derivative;
 
-pub(crate) mod dpc;
+pub mod dpc;
 pub use crate::dpc::*;
 
 #[allow(dead_code)]

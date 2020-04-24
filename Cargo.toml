@@ -28,6 +28,7 @@ members = [
     "rpc",
     "storage",
     "dpc_storage",
+    "dpc_consensus",
     "utilities"
 ]
 
@@ -41,6 +42,7 @@ path = "node/main.rs"
 
 [dependencies]
 snarkos-consensus = { path = "./consensus" }
+snarkos-dpc-consensus = { path = "./dpc_consensus" }
 snarkos-errors = { path = "./errors" }
 snarkos-network = { path = "./network" }
 snarkos-objects = { path = "objects" }

@@ -6,7 +6,6 @@ use rand::Rng;
 
 pub mod address;
 pub mod base_dpc;
-pub mod consensus;
 
 pub trait DPCScheme<L: Ledger> {
     type AddressKeyPair: AddressKeyPair;

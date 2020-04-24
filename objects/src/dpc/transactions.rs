@@ -8,9 +8,21 @@ use snarkos_utilities::{
 };
 
 use std::{
+    collections::HashSet,
+    hash::Hash,
     io::{Read, Result as IoResult, Write},
     ops::{Deref, DerefMut},
 };
+
+/// Check if an iterator has duplicate elements
+pub fn has_duplicates<T>(iter: T) -> bool
+where
+    T: IntoIterator,
+    T::Item: Eq + Hash,
+{
+    let mut uniq = HashSet::new();
+    !iter.into_iter().all(move |x| uniq.insert(x))
+}
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct DPCTransactions<T: Transaction>(pub Vec<T>);
@@ -47,6 +59,50 @@ impl<T: Transaction> DPCTransactions<T> {
             .iter()
             .map(|transaction| -> Result<Vec<u8>, TransactionError> { Ok(to_bytes![transaction]?) })
             .collect::<Result<Vec<Vec<u8>>, TransactionError>>()
+    }
+
+    pub fn conflicts(&self, transaction: &T) -> bool {
+        let mut holding_serial_numbers = vec![];
+        let mut holding_commitments = vec![];
+        let mut holding_memos = vec![];
+
+        for tx in &self.0 {
+            holding_serial_numbers.extend(tx.old_serial_numbers());
+            holding_commitments.extend(tx.new_commitments());
+            holding_memos.push(tx.memorandum());
+        }
+
+        let transaction_serial_numbers = transaction.old_serial_numbers();
+        let transaction_commitments = transaction.new_commitments();
+        let transaction_memo = transaction.memorandum();
+
+        // Check if the transactions in the block have duplicate serial numbers
+        if has_duplicates(transaction_serial_numbers) {
+            return true;
+        }
+
+        // Check if the transactions in the block have duplicate commitments
+        if has_duplicates(transaction_commitments) {
+            return true;
+        }
+
+        if holding_memos.contains(&transaction_memo) {
+            return true;
+        }
+
+        for sn in transaction_serial_numbers {
+            if holding_serial_numbers.contains(&sn) {
+                return true;
+            }
+        }
+
+        for cm in transaction_commitments {
+            if holding_commitments.contains(&cm) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 

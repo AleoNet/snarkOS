@@ -1,35 +1,14 @@
 use crate::{
-    address::{AddressPair, AddressPublicKey},
-    base_dpc::{
-        instantiated::*,
-        predicate::DPCPredicate,
-        record::DPCRecord,
-        record_payload::PaymentRecordPayload,
-        BaseDPCComponents,
-        DPC,
-    },
-    consensus::ConsensusParameters,
+    address::AddressPair,
+    base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
     DPCScheme,
 };
 
 use snarkos_models::{algorithms::CRH, dpc::Record};
-use snarkos_objects::{
-    dpc::{transactions::DPCTransactions, Block},
-    ledger::Ledger,
-    merkle_root,
-    BlockHeader,
-    MerkleRootHash,
-};
+use snarkos_objects::ledger::Ledger;
 use snarkos_utilities::{bytes::ToBytes, storage::Storage, to_bytes};
 
 use rand::Rng;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
-    max_block_size: 1_000_000_000usize,
-    max_nonce: u32::max_value(),
-    target_block_time: 10i64, //unix seconds
-};
 
 pub struct Wallet {
     pub secret_key: &'static str,
@@ -43,7 +22,7 @@ pub fn setup_or_load_parameters<R: Rng>(
     <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
 ) {
     let mut path = std::env::current_dir().unwrap();
-    path.push("src/parameters/");
+    path.push("../dpc/src/parameters/");
     let ledger_parameter_path = path.join("ledger.params");
 
     let (ledger_parameters, parameters) =
@@ -72,7 +51,7 @@ pub fn setup_or_load_parameters<R: Rng>(
             }
         };
 
-    // Store parameters
+    // Store parameters - Uncomment this to store parameters to the specified paths
     //    ledger_parameters.store(&ledger_parameter_path).unwrap();
     //    parameters.store(&path).unwrap();
 
@@ -147,66 +126,4 @@ pub fn setup_ledger<R: Rng>(
     .unwrap();
 
     (ledger, genesis_pred_vk_bytes)
-}
-
-pub fn create_block_with_coinbase_transaction<R: Rng>(
-    transactions: &mut DPCTransactions<Tx>,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-    genesis_pred_vk_bytes: &Vec<u8>,
-    new_birth_predicates: Vec<DPCPredicate<Components>>,
-    new_death_predicates: Vec<DPCPredicate<Components>>,
-    genesis_address: AddressPair<Components>,
-    recipient: AddressPublicKey<Components>,
-    consensus: &ConsensusParameters,
-    ledger: &MerkleTreeLedger,
-    rng: &mut R,
-) -> (Vec<DPCRecord<Components>>, Block<Tx>) {
-    let (new_coinbase_records, transaction) = ConsensusParameters::create_coinbase_transaction(
-        ledger.len() as u32,
-        &transactions,
-        &parameters,
-        &genesis_pred_vk_bytes,
-        new_birth_predicates,
-        new_death_predicates,
-        genesis_address,
-        recipient,
-        &ledger,
-        rng,
-    )
-    .unwrap();
-
-    transactions.push(transaction);
-
-    let transaction_ids: Vec<Vec<u8>> = transactions
-        .to_transaction_ids()
-        .unwrap()
-        .iter()
-        .map(|id| id.to_vec())
-        .collect();
-
-    let mut merkle_root_bytes = [0u8; 32];
-    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
-
-    let time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs() as i64;
-
-    let previous_block = ledger.get_latest_block().unwrap();
-
-    // Pseudo mining
-    let header = BlockHeader {
-        previous_block_hash: previous_block.header.get_hash(),
-        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
-        time,
-        difficulty_target: consensus.get_block_difficulty(&previous_block.header, time),
-        nonce: 0,
-    };
-
-    let block = Block {
-        header,
-        transactions: transactions.clone(),
-    };
-
-    (new_coinbase_records, block)
 }

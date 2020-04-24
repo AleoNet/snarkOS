@@ -52,6 +52,10 @@ impl Transaction for TestTx {
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
         Ok([0u8; 32])
     }
+
+    fn size(&self) -> usize {
+        0
+    }
 }
 
 impl ToBytes for TestTx {

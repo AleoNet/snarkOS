@@ -40,6 +40,9 @@ pub enum ConsensusError {
     #[fail(display = "block transactions do not hash to merkle root {:?}", _0)]
     MerkleRoot(String),
 
+    #[fail(display = "{}", _0)]
+    Message(String),
+
     #[fail(display = "the block has multiple coinbase transactions: {:?}", _0)]
     MultipleCoinbaseTransactions(u32),
 
@@ -104,6 +107,12 @@ impl From<TransactionError> for ConsensusError {
 impl From<bincode::Error> for ConsensusError {
     fn from(error: bincode::Error) -> Self {
         ConsensusError::Crate("bincode", format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for ConsensusError {
+    fn from(error: std::io::Error) -> Self {
+        ConsensusError::Crate("std::io", format!("{:?}", error))
     }
 }
 

@@ -32,4 +32,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
 
     /// Returns the transaction identifier.
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError>;
+
+    /// Returns the transaction size in bytes
+    fn size(&self) -> usize;
 }

@@ -11,18 +11,6 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use std::{collections::HashSet, hash::Hash};
-
-/// Check if an iterator has duplicate elements
-pub fn has_duplicates<T>(iter: T) -> bool
-where
-    T: IntoIterator,
-    T::Item: Eq + Hash,
-{
-    let mut uniq = HashSet::new();
-    !iter.into_iter().all(move |x| uniq.insert(x))
-}
-
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub(crate) fn process_transaction(
         &self,
