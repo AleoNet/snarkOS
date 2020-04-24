@@ -46,7 +46,7 @@ impl UInt32 {
         }
     }
 
-    /// Allocate a `UInt32` in the constraint system
+    /// Allocate a private `UInt32` in the constraint system
     pub fn alloc<F, CS>(mut cs: CS, value: Option<u32>) -> Result<Self, SynthesisError>
     where
         F: Field,
@@ -71,6 +71,40 @@ impl UInt32 {
             .enumerate()
             .map(|(i, v)| {
                 Ok(Boolean::from(AllocatedBit::alloc(
+                    cs.ns(|| format!("allocated bit_gadget {}", i)),
+                    || v.get(),
+                )?))
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+        Ok(UInt32 { bits, value })
+    }
+
+    /// Allocate a public `UInt32` in the constraint system
+    pub fn alloc_input<F, CS>(mut cs: CS, value: Option<u32>) -> Result<Self, SynthesisError>
+    where
+        F: Field,
+        CS: ConstraintSystem<F>,
+    {
+        let values = match value {
+            Some(mut val) => {
+                let mut v = Vec::with_capacity(32);
+
+                for _ in 0..32 {
+                    v.push(Some(val & 1 == 1));
+                    val >>= 1;
+                }
+
+                v
+            }
+            None => vec![None; 32],
+        };
+
+        let bits = values
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| {
+                Ok(Boolean::from(AllocatedBit::alloc_input(
                     cs.ns(|| format!("allocated bit_gadget {}", i)),
                     || v.get(),
                 )?))
@@ -656,12 +690,8 @@ impl UInt32 {
         // If any bits of self are allocated, then we return an allocated bit result
         for bit in &self.bits {
             match *bit {
-                Boolean::Is(ref _bit) => {
-                    constant = false;
-                }
-                Boolean::Not(ref _bit) => {
-                    constant = false;
-                }
+                Boolean::Is(ref _bit) => constant = false,
+                Boolean::Not(ref _bit) => constant = false,
                 Boolean::Constant(_bit) => {}
             }
         }
@@ -669,12 +699,8 @@ impl UInt32 {
         // If any bits of other are allocated, then we return an allocated bit result
         for bit in &other.bits {
             match *bit {
-                Boolean::Is(ref _bit) => {
-                    constant = false;
-                }
-                Boolean::Not(ref _bit) => {
-                    constant = false;
-                }
+                Boolean::Is(ref _bit) => constant = false,
+                Boolean::Not(ref _bit) => constant = false,
                 Boolean::Constant(_bit) => {}
             }
         }
