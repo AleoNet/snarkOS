@@ -122,6 +122,8 @@ pub fn setup_ledger<R: Rng>(
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
+        genesis_pred_vk_bytes.to_vec(),
+        to_bytes![genesis_address].unwrap().to_vec(),
     )
     .unwrap();
 

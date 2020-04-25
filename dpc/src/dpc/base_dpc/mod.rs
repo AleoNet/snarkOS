@@ -12,10 +12,7 @@ use snarkos_models::{
     dpc::{DPCComponents, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
-use snarkos_objects::{
-    dpc::{Block, Transaction},
-    ledger::*,
-};
+use snarkos_objects::{dpc::Transaction, ledger::*};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
@@ -555,7 +552,6 @@ where
 {
     type AddressKeyPair = AddressPair<Components>;
     type Auxiliary = [u8; 32];
-    type Block = Block<Self::Transaction>;
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
@@ -892,8 +888,12 @@ where
     }
 
     /// Returns true iff all the transactions in the block are valid according to the ledger.
-    fn verify_block(parameters: &Self::Parameters, block: &Self::Block, ledger: &L) -> Result<bool, DPCError> {
-        for transaction in &block.transactions.0 {
+    fn verify_transactions(
+        parameters: &Self::Parameters,
+        transactions: &Vec<Self::Transaction>,
+        ledger: &L,
+    ) -> Result<bool, DPCError> {
+        for transaction in transactions {
             if !Self::verify(parameters, transaction, ledger)? {
                 return Ok(false);
             }

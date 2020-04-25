@@ -56,6 +56,10 @@ impl Transaction for TestTx {
     fn size(&self) -> usize {
         0
     }
+
+    fn value_balance(&self) -> i64 {
+        0
+    }
 }
 
 impl ToBytes for TestTx {

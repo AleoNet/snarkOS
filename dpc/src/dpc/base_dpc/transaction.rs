@@ -117,6 +117,10 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
 
         transaction_bytes.len()
     }
+
+    fn value_balance(&self) -> i64 {
+        self.stuff().value_balance
+    }
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {

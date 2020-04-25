@@ -275,7 +275,7 @@ fn base_dpc_integration_test() {
 
     let block = Block { header, transactions };
 
-    assert!(InstantiatedDPC::verify_block(&parameters, &block, &ledger).unwrap());
+    assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());
 
     ledger.insert_block(block).unwrap();
     assert_eq!(ledger.len(), 2);

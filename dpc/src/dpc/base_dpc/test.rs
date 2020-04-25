@@ -64,18 +64,16 @@ fn test_execute_base_dpc_constraints() {
     let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
     let genesis_memo = [0u8; 32];
 
-    println!("4");
-
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger = MerkleTreeLedger::new(
         ledger_parameters,
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
+        pred_nizk_vk_bytes.to_vec(),
+        to_bytes![genesis_address].unwrap().to_vec(),
     )
     .unwrap();
-
-    println!("5: {:?}", ledger.len());
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];

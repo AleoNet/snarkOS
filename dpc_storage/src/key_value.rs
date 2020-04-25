@@ -23,6 +23,8 @@ pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
 pub const KEY_GENESIS_CM: &str = "GENESIS_CM";
 pub const KEY_GENESIS_SN: &str = "GENESIS_SN";
 pub const KEY_GENESIS_MEMO: &str = "GENESIS_MEMO";
+pub const KEY_GENESIS_PRED_VK: &str = "GENESIS_PREDICATE_VK";
+pub const KEY_GENESIS_ADDRESS_PAIR: &str = "GENESIS_ADDRESS_PAIR";
 
 pub const KEY_CURR_CM_INDEX: &str = "CURRENT_CM_INDEX";
 pub const KEY_CURR_SN_INDEX: &str = "CURRENT_SN_INDEX";

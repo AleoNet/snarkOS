@@ -196,7 +196,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
         assert!(commitments[0] == self.genesis_cm()?);
 
-        let new_merkle_tree = MerkleTree::new(&self.parameters, &commitments)?;
+        let new_merkle_tree = MerkleTree::new(&self.ledger_parameters, &commitments)?;
 
         let new_digest = new_merkle_tree.root();
 

@@ -32,6 +32,22 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         }
     }
 
+    /// Get the genesis predicate vk bytes
+    pub fn genesis_pred_vk_bytes(&self) -> Result<Vec<u8>, StorageError> {
+        match self.storage.get(COL_META, KEY_GENESIS_PRED_VK.as_bytes())? {
+            Some(genesis_pred_vk_bytes) => Ok(genesis_pred_vk_bytes),
+            None => Err(StorageError::Message("Missing genesis predicate vk".to_string())),
+        }
+    }
+
+    /// Get the genesis address pair bytes
+    pub fn genesis_address_pair_bytes(&self) -> Result<Vec<u8>, StorageError> {
+        match self.storage.get(COL_META, KEY_GENESIS_ADDRESS_PAIR.as_bytes())? {
+            Some(genesis_address_pair_bytes) => Ok(genesis_address_pair_bytes),
+            None => Err(StorageError::Message("Missing genesis address pair".to_string())),
+        }
+    }
+
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {

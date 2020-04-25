@@ -202,7 +202,11 @@ impl ConsensusParameters {
         }
 
         // Check that all the transction proofs verify
-        Ok(InstantiatedDPC::verify_block(parameters, block, ledger)?)
+        Ok(InstantiatedDPC::verify_transactions(
+            parameters,
+            &block.transactions.0,
+            ledger,
+        )?)
     }
 
     /// Return whether or not the given block is valid and insert it.

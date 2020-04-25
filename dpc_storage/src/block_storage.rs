@@ -19,7 +19,7 @@ use std::{
 
 pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
-    pub parameters: P,
+    pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
     pub storage: Arc<Storage>,
     pub _transaction: PhantomData<T>,
@@ -79,7 +79,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
                 latest_block_height: RwLock::new(bytes_to_u32(val)),
                 storage: Arc::new(storage),
                 cm_merkle_tree: RwLock::new(merkle_tree),
-                parameters,
+                ledger_parameters: parameters,
                 _transaction: PhantomData,
             })),
             None => return Err(StorageError::Message("Missing genesis block creation".to_string())),

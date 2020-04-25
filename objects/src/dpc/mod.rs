@@ -35,4 +35,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
 
     /// Returns the transaction size in bytes
     fn size(&self) -> usize;
+
+    /// Returns the value balance of the transaction
+    fn value_balance(&self) -> i64;
 }

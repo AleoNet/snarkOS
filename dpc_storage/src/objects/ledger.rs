@@ -39,6 +39,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
+        genesis_predicate_vk_bytes: Vec<u8>,
+        genesis_address_pair_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError> {
         let mut path = std::env::current_dir()?;
         path.push("../db");
@@ -126,11 +128,23 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             value: to_bytes![genesis_memo]?.to_vec(),
         });
 
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_GENESIS_PRED_VK.as_bytes().to_vec(),
+            value: genesis_predicate_vk_bytes,
+        });
+
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_GENESIS_ADDRESS_PAIR.as_bytes().to_vec(),
+            value: genesis_address_pair_bytes,
+        });
+
         let block_storage = Self {
             latest_block_height: RwLock::new(0),
             storage: Arc::new(storage),
             cm_merkle_tree: RwLock::new(cm_merkle_tree),
-            parameters,
+            ledger_parameters: parameters,
             _transaction: PhantomData,
         };
 
@@ -146,7 +160,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
     }
 
     fn parameters(&self) -> &Self::Parameters {
-        &self.parameters
+        &self.ledger_parameters
     }
 
     fn push(&mut self, _transaction: Self::Transaction) -> Result<(), LedgerError> {

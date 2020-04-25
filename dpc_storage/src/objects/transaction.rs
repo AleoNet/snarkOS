@@ -49,7 +49,18 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     }
 
     /// Calculate the miner transaction fees from transactions.
-    pub fn calculate_transaction_fees(&self, _transactions: &DPCTransactions<T>) -> Result<u64, StorageError> {
-        unimplemented!()
+    pub fn calculate_transaction_fees(&self, transactions: &DPCTransactions<T>) -> Result<u64, StorageError> {
+        let mut balance = 0;
+
+        for transaction in transactions.iter() {
+            let value_balance = transaction.value_balance();
+
+            // Only add to the transaction fee if the transaction is not a coinbase transaction
+            if !value_balance.is_negative() {
+                balance += value_balance as u64;
+            }
+        }
+
+        Ok(balance)
     }
 }
