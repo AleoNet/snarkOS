@@ -82,13 +82,15 @@ pub fn bitcoin_retarget(
 
 impl ConsensusParameters {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
+    /// TODO use retargeting algorithm
     pub fn get_block_difficulty(&self, prev_header: &BlockHeader, block_timestamp: i64) -> u64 {
-        bitcoin_retarget(
-            block_timestamp,
-            prev_header.time,
-            self.target_block_time,
-            prev_header.difficulty_target,
-        )
+        //        bitcoin_retarget(
+        //            block_timestamp,
+        //            prev_header.time,
+        //            self.target_block_time,
+        //            prev_header.difficulty_target,
+        //        )
+        u64::max_value()
     }
 
     pub fn is_genesis(block_header: &BlockHeader) -> bool {

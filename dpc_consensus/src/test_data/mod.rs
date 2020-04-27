@@ -17,6 +17,12 @@ use snarkos_objects::{
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
+    max_block_size: 1_000_000usize,
+    max_nonce: u32::max_value(),
+    target_block_time: 2i64, //unix seconds
+};
+
 pub fn create_block_with_coinbase_transaction<R: Rng>(
     transactions: &mut DPCTransactions<Tx>,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
@@ -68,7 +74,7 @@ pub fn create_block_with_coinbase_transaction<R: Rng>(
         merkle_root_hash: MerkleRootHash(merkle_root_bytes),
         time,
         difficulty_target: consensus.get_block_difficulty(&previous_block.header, time),
-        nonce: 0,
+        nonce: 0, // TODO integrate with actual miner nonce generation
     };
 
     let block = Block {

@@ -2264,6 +2264,7 @@ dependencies = [
  "serde",
  "snarkos-consensus",
  "snarkos-dpc-consensus",
+ "snarkos-dpc-network",
  "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-network",
@@ -2402,6 +2403,30 @@ dependencies = [
  "tokio 0.2.13",
  "wagyu-bitcoin",
  "wagyu-model",
+]
+
+[[package]]
+name = "snarkos-dpc-network"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "byteorder",
+ "chrono",
+ "hex 0.4.2",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "serial_test",
+ "snarkos-algorithms",
+ "snarkos-dpc",
+ "snarkos-dpc-consensus",
+ "snarkos-dpc-storage",
+ "snarkos-errors",
+ "snarkos-objects",
+ "snarkos-utilities",
+ "tokio 0.2.13",
+ "tokio-test",
+ "wagyu-bitcoin",
 ]
 
 [[package]]

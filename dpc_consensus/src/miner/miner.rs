@@ -18,7 +18,7 @@ use snarkos_objects::{
 use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use snarkos_dpc::dpc::base_dpc::record::DPCRecord;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -42,7 +42,7 @@ impl Miner {
 
     /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions<T: Transaction, P: MerkleParameters>(
-        storage: &BlockStorage<T, P>,
+        storage: &Arc<BlockStorage<T, P>>,
         memory_pool: &Arc<Mutex<MemoryPool<T>>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
@@ -82,13 +82,13 @@ impl Miner {
     }
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
-    pub async fn establish_block<R: Rng>(
+    pub async fn establish_block(
         &self,
         parameters: &PublicParameters<Components>,
         storage: &MerkleTreeLedger,
         transactions: &DPCTransactions<Tx>,
-        rng: &mut R,
     ) -> Result<(BlockHeader, DPCTransactions<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
+        let rng = &mut thread_rng();
         let mut transactions = transactions.clone();
         let coinbase_records = self.add_coinbase_transaction(parameters, &storage, &mut transactions, rng)?;
 
@@ -136,18 +136,17 @@ impl Miner {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block<R: Rng>(
+    pub async fn mine_block(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
+        storage: &Arc<MerkleTreeLedger>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-        rng: &mut R,
     ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
         let mut candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
 
         let (previous_block_header, transactions, coinbase_records) = self
-            .establish_block(parameters, storage, &mut candidate_transactions, rng)
+            .establish_block(parameters, storage, &mut candidate_transactions)
             .await?;
 
         let header = self.find_block(&transactions, &previous_block_header)?;

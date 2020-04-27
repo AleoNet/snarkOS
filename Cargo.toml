@@ -29,6 +29,7 @@ members = [
     "storage",
     "dpc_storage",
     "dpc_consensus",
+    "dpc_network",
     "utilities"
 ]
 
@@ -45,6 +46,7 @@ snarkos-consensus = { path = "./consensus" }
 snarkos-dpc-consensus = { path = "./dpc_consensus" }
 snarkos-errors = { path = "./errors" }
 snarkos-network = { path = "./network" }
+snarkos-dpc-network = { path = "./dpc_network" }
 snarkos-objects = { path = "objects" }
 snarkos-rpc = { path = "./rpc" }
 snarkos-storage = { path = "./storage" }
