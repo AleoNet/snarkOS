@@ -29,19 +29,19 @@ impl Message for MemoryPool {
         Ok(bincode::serialize(&self.transactions)?)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use snarkos_consensus::test_data::TRANSACTION;
-
-    #[test]
-    fn test_memory_pool() {
-        let message = MemoryPool::new(vec![hex::decode(TRANSACTION).unwrap()]);
-
-        let serialized = message.serialize().unwrap();
-        let deserialized = MemoryPool::deserialize(serialized).unwrap();
-
-        assert_eq!(message, deserialized);
-    }
-}
+//
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use snarkos_consensus::test_data::TRANSACTION;
+//
+//     #[test]
+//     fn test_memory_pool() {
+//         let message = MemoryPool::new(vec![hex::decode(TRANSACTION).unwrap()]);
+//
+//         let serialized = message.serialize().unwrap();
+//         let deserialized = MemoryPool::deserialize(serialized).unwrap();
+//
+//         assert_eq!(message, deserialized);
+//     }
+// }
