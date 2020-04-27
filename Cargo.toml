@@ -34,12 +34,12 @@ members = [
 ]
 
 [lib]
-name = "node"
-path = "node/lib.rs"
+name = "dpc_node"
+path = "dpc_node/lib.rs"
 
 [[bin]]
 name = "snarkos"
-path = "node/main.rs"
+path = "dpc_node/main.rs"
 
 [dependencies]
 snarkos-consensus = { path = "./consensus" }
