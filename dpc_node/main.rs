@@ -2,19 +2,23 @@ use dpc_node::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
-use snarkos_errors::node::NodeError;
-use snarkos_network::{
+use snarkos_dpc::base_dpc::{
+    instantiated::{Components, MerkleTreeLedger},
+    parameters::PublicParameters,
+    DPC,
+};
+use snarkos_dpc_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_dpc_network::{
     context::Context,
     protocol::SyncHandler,
     server::{MinerInstance, Server},
 };
-use snarkos_rpc::start_rpc_server;
-use snarkos_storage::BlockStorage;
+use snarkos_errors::node::NodeError;
+//use snarkos_rpc::start_rpc_server;
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use rand::thread_rng;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
-use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
 /// Builds a node from configuration parameters.
 /// 1. Creates consensus parameters.
@@ -34,15 +38,19 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let socket_address = address.parse::<SocketAddr>()?;
 
     let consensus = ConsensusParameters {
-        max_block_size: 1_000_000usize,
+        max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        transaction_size: 366usize,
     };
 
     let mut path = std::env::current_dir()?;
     path.push(&config.path);
-    let storage = BlockStorage::open_at_path(path, config.genesis)?;
+    let storage = MerkleTreeLedger::open_at_path(path)?;
+
+    let mut parameters_path = std::env::current_dir()?;
+    parameters_path.push("dpc/src/parameters");
+
+    let parameters = PublicParameters::<Components>::load(&parameters_path)?;
 
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
@@ -63,6 +71,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         ),
         consensus.clone(),
         storage.clone(),
+        parameters.clone(),
         memory_pool_lock.clone(),
         sync_handler_lock.clone(),
         10000, // 10 seconds
@@ -70,25 +79,29 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start rpc thread
 
-    if config.jsonrpc {
-        start_rpc_server(
-            config.rpc_port,
-            storage.clone(),
-            server.context.clone(),
-            consensus.clone(),
-            memory_pool_lock.clone(),
-        )
-        .await?;
-    }
+    //    if config.jsonrpc {
+    //        start_rpc_server(
+    //            config.rpc_port,
+    //            storage.clone(),
+    //            server.context.clone(),
+    //            consensus.clone(),
+    //            memory_pool_lock.clone(),
+    //        )
+    //        .await?;
+    //    }
 
     // Start miner thread
 
-    let coinbase_address = BitcoinAddress::<Mainnet>::from_str(&config.coinbase_address).unwrap();
+    // TODO make this a permanently stored miner address
+    let rng = &mut thread_rng();
+    let miner_metadata = [0u8; 32];
+    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &miner_metadata, rng).unwrap();
 
     if config.miner {
         MinerInstance::new(
-            coinbase_address,
+            miner_address.public_key,
             consensus.clone(),
+            parameters,
             storage.clone(),
             memory_pool_lock.clone(),
             server.context.clone(),

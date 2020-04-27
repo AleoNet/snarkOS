@@ -43,6 +43,7 @@ path = "dpc_node/main.rs"
 
 [dependencies]
 snarkos-consensus = { path = "./consensus" }
+snarkos-dpc = { path = "./dpc" }
 snarkos-dpc-consensus = { path = "./dpc_consensus" }
 snarkos-errors = { path = "./errors" }
 snarkos-network = { path = "./network" }
@@ -51,11 +52,13 @@ snarkos-objects = { path = "objects" }
 snarkos-rpc = { path = "./rpc" }
 snarkos-storage = { path = "./storage" }
 snarkos-dpc-storage = { path = "./dpc_storage" }
+snarkos-utilities = { path = "./utilities" }
 
 clap = { version = "2.33.0" }
 env_logger = { version = "0.7.1" }
 hex = { version = "0.4.1" }
 log = { version = "0.4.8" }
+rand = { version = "0.7" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2", features = ["full"] }
 wagyu-bitcoin = { version = "0.6.1" }

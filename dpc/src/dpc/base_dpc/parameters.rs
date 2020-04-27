@@ -26,6 +26,8 @@ pub struct PredicateSNARKParameters<C: BaseDPCComponents> {
     pub proof: <C::PredicateSNARK as SNARK>::Proof,
 }
 
+#[derive(Derivative)]
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct PublicParameters<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
     pub predicate_snark_parameters: PredicateSNARKParameters<C>,
