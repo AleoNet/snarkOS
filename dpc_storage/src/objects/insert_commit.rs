@@ -70,7 +70,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         Ok((ops, cms))
     }
 
-    pub fn insert_block(&self, block: Block<T>) -> Result<(), StorageError> {
+    pub fn insert_block(&self, block: &Block<T>) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         let mut transaction_serial_numbers = vec![];

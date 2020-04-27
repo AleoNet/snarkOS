@@ -273,11 +273,11 @@ fn base_dpc_integration_test() {
         nonce: 0,
     };
 
-    let block = Block { header, transactions };
-
     assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());
 
-    ledger.insert_block(block).unwrap();
+    let block = Block { header, transactions };
+
+    ledger.insert_block(&block).unwrap();
     assert_eq!(ledger.len(), 2);
 
     let path = ledger.storage.storage.path().to_owned();

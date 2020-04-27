@@ -67,7 +67,7 @@ fn base_dpc_multiple_transactions() {
 
     assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
 
-    ledger.insert_block(block).unwrap();
+    ledger.insert_block(&block).unwrap();
     assert_eq!(ledger.len(), 2);
 
     // Add new block spending records from the previous block
@@ -144,7 +144,7 @@ fn base_dpc_multiple_transactions() {
 
     assert!(consensus.verify_block(&parameters, &new_block, &ledger).unwrap());
 
-    ledger.insert_block(new_block).unwrap();
+    ledger.insert_block(&new_block).unwrap();
     assert_eq!(ledger.len(), 3);
 
     for record in &new_coinbase_records {

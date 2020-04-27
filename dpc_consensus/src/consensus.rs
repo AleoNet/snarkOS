@@ -1,6 +1,10 @@
+use crate::miner::MemoryPool;
+
+use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
     base_dpc::{
         instantiated::*,
+        parameters::PublicParameters,
         payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
         predicate::{DPCPredicate, PrivatePredicateInput},
         record::DPCRecord,
@@ -11,8 +15,6 @@ use snarkos_dpc::{
     dpc::address::{AddressPair, AddressPublicKey, AddressSecretKey},
     DPCScheme,
 };
-
-use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
@@ -80,14 +82,13 @@ pub fn bitcoin_retarget(
 
 impl ConsensusParameters {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
-    pub fn get_block_difficulty(&self, _prev_header: &BlockHeader, _block_timestamp: i64) -> u64 {
-        //        bitcoin_retarget(
-        //            block_timestamp,
-        //            prev_header.time,
-        //            self.target_block_time,
-        //            prev_header.difficulty_target,
-        //        )
-        u64::max_value()
+    pub fn get_block_difficulty(&self, prev_header: &BlockHeader, block_timestamp: i64) -> u64 {
+        bitcoin_retarget(
+            block_timestamp,
+            prev_header.time,
+            self.target_block_time,
+            prev_header.difficulty_target,
+        )
     }
 
     pub fn is_genesis(block_header: &BlockHeader) -> bool {
@@ -213,20 +214,51 @@ impl ConsensusParameters {
     /// 1. Verify that the block header is valid.
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
-    /// 4. Check cached blocks to insert/canonize.
+    /// TODO 4. Check cached blocks to insert/canonize.
     pub fn process_block(
         &self,
-        //        storage: &BlockStorage,
-        //        memory_pool: &mut MemoryPool,
-        _block: &Block<Tx>,
-    ) -> Result<u32, ConsensusError> {
-        Ok(0)
+        parameters: &PublicParameters<Components>,
+        storage: &MerkleTreeLedger,
+        memory_pool: &mut MemoryPool<Tx>,
+        block: &Block<Tx>,
+    ) -> Result<(), ConsensusError> {
+        // 1. verify that the block valid
+        self.verify_block(parameters, block, storage)?;
+
+        // 2. Insert/canonize block
+        storage.insert_block(block)?;
+
+        // 3. Remove transactions from the mempool
+        for transaction_id in block.transactions.to_transaction_ids()? {
+            memory_pool.remove_by_hash(&transaction_id)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn receive_block(
+        &self,
+        parameters: &PublicParameters<Components>,
+        storage: &MerkleTreeLedger,
+        memory_pool: &mut MemoryPool<Tx>,
+        block: &Block<Tx>,
+    ) -> Result<(), ConsensusError> {
+        let block_size = block.serialize()?.len();
+        if block_size > self.max_block_size {
+            return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
+        }
+
+        if storage.block_hash_exists(&block.header.previous_block_hash) {
+            self.process_block(parameters, &storage, memory_pool, &block)?;
+        }
+
+        Ok(())
     }
 
     pub fn create_coinbase_transaction<R: Rng>(
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &PublicParameters<Components>,
         genesis_pred_vk_bytes: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,

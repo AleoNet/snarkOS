@@ -149,7 +149,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         };
 
         block_storage.storage.write(database_transaction)?;
-        block_storage.insert_block(genesis_block)?;
+        block_storage.insert_block(&genesis_block)?;
 
         Ok(block_storage)
     }
