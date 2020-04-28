@@ -114,6 +114,11 @@ impl DatabaseTransaction {
     pub fn push_vec(&mut self, ops: Vec<Op>) {
         self.0.extend(ops)
     }
+
+    /// Add another database transaction.
+    pub fn extend(&mut self, database_transaction: DatabaseTransaction) {
+        self.0.extend(database_transaction.0)
+    }
 }
 
 pub fn bytes_to_u32(bytes: Vec<u8>) -> u32 {

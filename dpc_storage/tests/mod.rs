@@ -238,29 +238,25 @@ mod tests {
 
             let latest_block = blockchain.get_latest_block().unwrap();
 
-            println!("1");
             assert!(blockchain.insert_block(&latest_block).is_err());
-            println!("2");
 
             kill_storage_sync(blockchain, path);
         }
 
-        // TODO impl remove_latest_block
-        //        #[test]
-        //        pub fn test_invalid_block_removal() {
-        //            let mut path = std::env::current_dir().unwrap();
-        //            path.push(random_storage_path());
-        //
-        //            Store::destroy_storage(path.clone()).unwrap();
-        //
-        //            let blockchain = Store::open_at_path(path.clone()).unwrap();
-        //
-        //
-        //            assert!(blockchain.remove_latest_block().is_err());
-        //            assert!(blockchain.remove_latest_blocks(5).is_err());
-        //
-        //            kill_storage_sync(blockchain, path);
-        //        }
+        #[test]
+        pub fn test_invalid_block_removal() {
+            let mut path = std::env::current_dir().unwrap();
+            path.push(random_storage_path());
+
+            Store::destroy_storage(path.clone()).unwrap();
+
+            let blockchain = Store::open_at_path(path.clone()).unwrap();
+
+            assert!(blockchain.remove_latest_block().is_err());
+            assert!(blockchain.remove_latest_blocks(5).is_err());
+
+            kill_storage_sync(blockchain, path);
+        }
 
         #[test]
         pub fn test_invalid_block_retrieval() {
