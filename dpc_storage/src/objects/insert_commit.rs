@@ -1,15 +1,12 @@
 use crate::*;
 
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
+use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_objects::{
     dpc::{Block, Transaction},
     BlockHeaderHash,
 };
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub(crate) fn process_transaction(
@@ -188,22 +185,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         });
 
         // Rebuild the new commitment merkle tree
-
-        let mut cm_and_indices = transaction_cms;
-
-        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {
-            let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
-            let index = bytes_to_u32(index_value.to_vec()) as usize;
-
-            cm_and_indices.push((commitment, index));
-        }
-
-        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
-        assert!(commitments[0] == self.genesis_cm()?);
-
-        let new_merkle_tree = MerkleTree::new(&self.ledger_parameters, &commitments)?;
-
+        let new_merkle_tree = self.build_merkle_tree(transaction_cms)?;
         let new_digest = new_merkle_tree.root();
 
         database_transaction.push(Op::Insert {

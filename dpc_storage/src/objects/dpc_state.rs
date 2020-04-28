@@ -1,6 +1,6 @@
 use crate::*;
 
-use snarkos_algorithms::merkle_tree::MerkleParameters;
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::dpc::Transaction;
 use snarkos_utilities::bytes::FromBytes;
@@ -132,5 +132,26 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
             }
             None => Ok(None),
         }
+    }
+
+    /// Get memo index
+    pub fn build_merkle_tree(
+        &self,
+        additional_cms: Vec<(T::Commitment, usize)>,
+    ) -> Result<MerkleTree<P>, StorageError> {
+        let mut cm_and_indices = additional_cms;
+
+        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {
+            let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
+            let index = bytes_to_u32(index_value.to_vec()) as usize;
+
+            cm_and_indices.push((commitment, index));
+        }
+
+        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+        assert!(commitments[0] == self.genesis_cm()?);
+
+        Ok(MerkleTree::new(&self.ledger_parameters, &commitments)?)
     }
 }
