@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-dpc-storage"
+name = "snarkos-storage"
 version = "0.8.0"
 authors = ["The Aleo Team <hello@aleo.org"]
 description = "Storage for a decentralized record system"

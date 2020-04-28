@@ -1,4 +1,4 @@
-use snarkos_dpc_storage::BlockStorage;
+use snarkos_storage::BlockStorage;
 
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
@@ -8,7 +8,6 @@ use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::algorithms::CRH;
 use snarkos_objects::dpc::Transaction;
-
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     storage::Storage,

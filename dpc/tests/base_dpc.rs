@@ -13,7 +13,6 @@ use snarkos_dpc::{
     test_data::*,
     DPCScheme,
 };
-use snarkos_dpc_storage::BlockStorage;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::Record,
@@ -25,6 +24,7 @@ use snarkos_objects::{
     BlockHeader,
     MerkleRootHash,
 };
+use snarkos_storage::BlockStorage;
 use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;

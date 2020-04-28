@@ -3,9 +3,9 @@ use crate::message::{
     Channel,
 };
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_dpc_storage::BlockStorage;
 use snarkos_errors::network::SendError;
 use snarkos_objects::{dpc::Transaction, BlockHeaderHash};
+use snarkos_storage::BlockStorage;
 
 use chrono::{DateTime, Utc};
 use std::{net::SocketAddr, sync::Arc};

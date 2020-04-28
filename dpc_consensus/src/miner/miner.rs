@@ -5,7 +5,6 @@ use snarkos_dpc::{
     base_dpc::{instantiated::*, parameters::PublicParameters},
     DPCScheme,
 };
-use snarkos_dpc_storage::BlockStorage;
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
@@ -13,6 +12,7 @@ use snarkos_objects::{
     BlockHeader,
     MerkleRootHash,
 };
+use snarkos_storage::BlockStorage;
 use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;

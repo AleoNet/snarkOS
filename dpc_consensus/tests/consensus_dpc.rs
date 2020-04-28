@@ -4,9 +4,9 @@ use snarkos_dpc::{
     DPCScheme,
 };
 use snarkos_dpc_consensus::{get_block_reward, test_data::*, ConsensusParameters};
-use snarkos_dpc_storage::BlockStorage;
 use snarkos_models::dpc::Record;
 use snarkos_objects::{dpc::DPCTransactions, ledger::Ledger};
+use snarkos_storage::BlockStorage;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;

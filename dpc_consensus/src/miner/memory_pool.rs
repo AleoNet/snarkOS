@@ -3,12 +3,12 @@
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_dpc_storage::{has_duplicates, BlockStorage};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{
     dpc::{DPCTransactions, Transaction},
     Ledger,
 };
+use snarkos_storage::{has_duplicates, BlockStorage};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

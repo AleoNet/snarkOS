@@ -1703,9 +1703,9 @@ dependencies = [
  "snarkos-dpc",
  "snarkos-dpc-consensus",
  "snarkos-dpc-network",
- "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-objects",
+ "snarkos-storage",
  "snarkos-utilities",
  "tokio",
 ]
@@ -1789,12 +1789,12 @@ dependencies = [
  "rand_xorshift",
  "snarkos-algorithms",
  "snarkos-curves",
- "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-gadgets",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-profiler",
+ "snarkos-storage",
  "snarkos-utilities",
 ]
 
@@ -1811,10 +1811,10 @@ dependencies = [
  "serde",
  "snarkos-algorithms",
  "snarkos-dpc",
- "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-storage",
  "snarkos-utilities",
  "tokio",
 ]
@@ -1834,30 +1834,12 @@ dependencies = [
  "snarkos-algorithms",
  "snarkos-dpc",
  "snarkos-dpc-consensus",
- "snarkos-dpc-storage",
  "snarkos-errors",
  "snarkos-objects",
+ "snarkos-storage",
  "snarkos-utilities",
  "tokio",
  "tokio-test",
-]
-
-[[package]]
-name = "snarkos-dpc-storage"
-version = "0.8.0"
-dependencies = [
- "bincode",
- "hex",
- "parking_lot",
- "rand",
- "rocksdb",
- "serde",
- "snarkos-algorithms",
- "snarkos-curves",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-objects",
- "snarkos-utilities",
 ]
 
 [[package]]
@@ -1920,6 +1902,24 @@ name = "snarkos-profiler"
 version = "0.8.0"
 dependencies = [
  "colored",
+]
+
+[[package]]
+name = "snarkos-storage"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "hex",
+ "parking_lot",
+ "rand",
+ "rocksdb",
+ "serde",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-utilities",
 ]
 
 [[package]]
