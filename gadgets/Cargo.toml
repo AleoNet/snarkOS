@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false, features = ["commitment", "prf", "signature", "snark"] }
-snarkos-curves = { path = "../curves" }
+snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false, features = ["edwards_sw6"] }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities" }

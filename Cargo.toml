@@ -38,14 +38,14 @@ name = "snarkos"
 path = "dpc_node/main.rs"
 
 [dependencies]
-snarkos-dpc = { path = "./dpc" }
-snarkos-dpc-consensus = { path = "./dpc_consensus" }
+snarkos-dpc = { path = "./dpc", version = "0.8.0", default-features = false }
+snarkos-dpc-consensus = { path = "./dpc_consensus", version = "0.8.0", default-features = false }
 snarkos-errors = { path = "./errors", version = "0.8.0", default-features = false, features = ["node"] }
-snarkos-dpc-network = { path = "./dpc_network" }
-snarkos-objects = { path = "objects" }
-#snarkos-rpc = { path = "./rpc" }
-snarkos-dpc-storage = { path = "./dpc_storage" }
-snarkos-utilities = { path = "./utilities" }
+snarkos-dpc-network = { path = "./dpc_network", version = "0.8.0", default-features = false }
+snarkos-objects = { path = "objects", version = "0.8.0", default-features = false }
+#snarkos-rpc = { path = "./rpc", version = "0.8.0", default-features = false }
+snarkos-dpc-storage = { path = "./dpc_storage", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "./utilities", version = "0.8.0", default-features = false }
 
 clap = { version = "2.33.0" }
 env_logger = { version = "0.7.1" }

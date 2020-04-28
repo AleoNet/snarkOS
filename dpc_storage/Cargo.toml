@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms" }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["dpc"] }
-snarkos-objects = { path = "../objects" }
-snarkos-utilities = { path = "../utilities" }
+snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
 bincode = { version = "1.2.0" }
 hex = { version = "0.4.2" }
@@ -26,4 +26,4 @@ rocksdb = { version = "0.13.0" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-snarkos-curves = { path = "../curves" }
+snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false, features = ["edwards_bls12"] }

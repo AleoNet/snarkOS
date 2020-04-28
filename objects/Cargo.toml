@@ -14,7 +14,7 @@ edition = "2018"
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false, features = ["crh", "merkle_tree"] }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["dpc", "objects"] }
-snarkos-utilities = { path = "../utilities"}
+snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
 base58 = { version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }

@@ -46,8 +46,8 @@ pub struct ConsensusParameters {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
-    // /// mainnet or testnet
-    //    network: Network
+    // /// Mainnet or testnet
+    // network: Network
 }
 
 /// Calculate a block reward that halves every 1000 blocks.

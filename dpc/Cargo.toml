@@ -12,15 +12,15 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms" }
-snarkos-curves = { path = "../curves"}
-snarkos-dpc-storage = { path = "../dpc_storage" }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
+snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
+snarkos-dpc-storage = { path = "../dpc_storage", version = "0.8.0", default-features = false }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-gadgets = { path = "../gadgets"}
+snarkos-gadgets = { path = "../gadgets", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-objects = { path = "../objects" }
-snarkos-profiler = { path = "../profiler" }
-snarkos-utilities = { path = "../utilities"}
+snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
+snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
 blake2 = { version = "0.7.1" }
 hex = { version = "0.4.2" }
@@ -28,7 +28,7 @@ rand = { version = "0.7" }
 derivative = { version = "1" }
 
 [dev-dependencies]
-criterion = "0.3.1"
+criterion = { version = "0.3.1" }
 rand_xorshift = { version = "0.2" }
 
 [features]

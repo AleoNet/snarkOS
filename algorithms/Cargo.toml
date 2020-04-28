@@ -17,7 +17,7 @@ path = "examples/snark/gm17.rs"
 
 [dependencies]
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["algorithms", "gadgets"] }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
