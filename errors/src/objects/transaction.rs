@@ -72,18 +72,6 @@ impl From<std::str::ParseBoolError> for TransactionError {
     }
 }
 
-impl From<wagyu_model::AddressError> for TransactionError {
-    fn from(error: wagyu_model::AddressError) -> Self {
-        TransactionError::Crate("wagyu_model", format!("{:?}", error))
-    }
-}
-
-impl From<wagyu_model::PublicKeyError> for TransactionError {
-    fn from(error: wagyu_model::PublicKeyError) -> Self {
-        TransactionError::Crate("wagyu_model", format!("{:?}", error))
-    }
-}
-
 impl From<()> for TransactionError {
     fn from(_error: ()) -> Self {
         TransactionError::NullError(())
