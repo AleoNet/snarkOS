@@ -40,7 +40,7 @@ path = "dpc_node/main.rs"
 [dependencies]
 snarkos-dpc = { path = "./dpc" }
 snarkos-dpc-consensus = { path = "./dpc_consensus" }
-snarkos-errors = { path = "./errors" }
+snarkos-errors = { path = "./errors", version = "0.8.0", default-features = false, features = ["node"] }
 snarkos-dpc-network = { path = "./dpc_network" }
 snarkos-objects = { path = "objects" }
 #snarkos-rpc = { path = "./rpc" }
@@ -58,25 +58,25 @@ tokio = { version = "0.2", features = ["full"] }
 [dev-dependencies]
 rusty-hook = { version = "0.10.3" }
 
-[profile.release]
-opt-level = 3
-lto = "thin"
-incremental = true
+#[profile.release]
+#opt-level = 3
+#lto = "thin"
+#incremental = true
+#
+#[profile.bench]
+#opt-level = 3
+#debug = false
+#rpath = false
+#lto = "thin"
+#incremental = true
+#debug-assertions = false
+#
+#[profile.dev]
+#opt-level = 0
 
-[profile.bench]
-opt-level = 3
-debug = false
-rpath = false
-lto = "thin"
-incremental = true
-debug-assertions = false
-
-[profile.dev]
-opt-level = 0
-
-[profile.test]
-opt-level = 3
-lto = "thin"
-incremental = true
-debug-assertions = true
-debug = true
+#[profile.test]
+#opt-level = 3
+#lto = "thin"
+#incremental = true
+#debug-assertions = true
+#debug = true

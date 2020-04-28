@@ -19,7 +19,7 @@ path = "examples/snark/gm17.rs"
 print-trace = [ "snarkos-profiler/print-trace" ]
 
 [dependencies]
-snarkos-errors = { path = "../errors" }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models" }
 snarkos-profiler = { path = "../profiler" }
 snarkos-utilities = { path = "../utilities" }

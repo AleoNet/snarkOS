@@ -1864,7 +1864,6 @@ dependencies = [
 name = "snarkos-errors"
 version = "0.8.0"
 dependencies = [
- "base58",
  "bincode",
  "failure",
  "hex",

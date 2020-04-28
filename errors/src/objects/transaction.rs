@@ -42,12 +42,6 @@ pub enum TransactionError {
     NullError(()),
 }
 
-impl From<base58::FromBase58Error> for TransactionError {
-    fn from(error: base58::FromBase58Error) -> Self {
-        TransactionError::Crate("base58", format!("{:?}", error))
-    }
-}
-
 impl From<hex::FromHexError> for TransactionError {
     fn from(error: hex::FromHexError) -> Self {
         TransactionError::Crate("hex", format!("{:?}", error))

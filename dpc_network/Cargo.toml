@@ -16,7 +16,7 @@ snarkos-algorithms = { path = "../algorithms" }
 snarkos-dpc = { path = "../dpc" }
 snarkos-dpc-consensus = { path = "../dpc_consensus" }
 snarkos-dpc-storage = { path = "../dpc_storage" }
-snarkos-errors = { path = "../errors" }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["network"] }
 snarkos-objects = { path = "../objects" }
 snarkos-utilities = { path = "../utilities" }
 

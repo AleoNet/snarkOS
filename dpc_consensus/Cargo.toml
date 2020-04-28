@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms" }
-snarkos-errors = { path = "../errors" }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["consensus"] }
 snarkos-objects = { path= "../objects" }
 snarkos-dpc = { path= "../dpc" }
 snarkos-dpc-storage = { path = "../dpc_storage" }

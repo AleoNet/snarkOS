@@ -22,7 +22,7 @@ edition = "2018"
 
 [dependencies]
 snarkos-consensus = { path = "../consensus" }
-snarkos-errors = { path = "../errors" }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-network = { path = "../network" }
 snarkos-objects = { path = "../objects" }
 snarkos-storage = { path = "../storage" }

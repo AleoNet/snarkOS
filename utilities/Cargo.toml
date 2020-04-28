@@ -11,12 +11,12 @@ include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
 
-[features]
-default = ["std"]
-std = []
-
 [dependencies]
 rand = { version = "0.7", default-features = false }
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2" }
+
+[features]
+default = ["std"]
+std = []
