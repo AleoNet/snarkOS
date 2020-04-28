@@ -12,8 +12,8 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, optional = true }
+snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false, optional = true }
 
 derivative = { version = "1" }
 failure = { version = "0.1" }
@@ -30,7 +30,7 @@ smallvec = { version = "1.2", optional = true }
 #
 [features]
 default = []
-algorithms = []
+algorithms = ["snarkos-errors/algorithms", "snarkos-utilities"]
 curves = ["rand", "rand_xorshift"]
 dpc = ["gadgets"]
 gadgets = ["algorithms", "curves", "rand_xorshift", "smallvec"]
