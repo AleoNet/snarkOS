@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-algorithms"
 version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+authors = ["The Aleo Team <hello@aleo.org"]
 description = "Algorithms for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
@@ -20,7 +20,7 @@ print-trace = [ "snarkos-profiler/print-trace" ]
 
 [dependencies]
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models" }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["algorithms", "curves", "gadgets"] }
 snarkos-profiler = { path = "../profiler" }
 snarkos-utilities = { path = "../utilities" }
 

@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-errors"
 version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+authors = ["The Aleo Team <hello@aleo.org"]
 description = "Errors for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
@@ -22,8 +22,8 @@ rocksdb = { version = "0.13.0", optional = true }
 # Each module in `snarkos-errors` is guarded by a feature flag to minimize compilation resources.
 # To include any one of the modules in `snarkos-errors`, simply include its corresponding feature flag.
 #
-# For example, to include errors for `snarkos-algorithms`, add the "algorithm" feature as follows:
-# snarkos-errors = { version = "x.x.x", default-features = false, features = ["algorithm"] }
+# For example, to include errors for `snarkos-algorithms`, add the "algorithms" feature as follows:
+# snarkos-errors = { version = "x.x.x", default-features = false, features = ["algorithms"] }
 #
 [features]
 default = []

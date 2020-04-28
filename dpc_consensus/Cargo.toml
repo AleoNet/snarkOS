@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-dpc-consensus"
 version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+authors = ["The Aleo Team <hello@aleo.org"]
 description = "Consensus for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
@@ -17,7 +17,7 @@ snarkos-errors = { path = "../errors", version = "0.8.0", default-features = fal
 snarkos-objects = { path= "../objects" }
 snarkos-dpc = { path= "../dpc" }
 snarkos-dpc-storage = { path = "../dpc_storage" }
-snarkos-models = { path = "../models" }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities" }
 
 bincode = { version="1.2.0" }
