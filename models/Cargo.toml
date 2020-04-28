@@ -20,3 +20,17 @@ failure = { version = "0.1" }
 rand = { version = "0.7" }
 rand_xorshift = { version = "0.2" }
 smallvec = { version = "1.2" }
+
+#
+# Each module in `snarkos-models` is guarded by a feature flag to minimize compilation resources.
+# To include any one of the modules in `snarkos-models`, simply include its corresponding feature flag.
+#
+# For example, to include models for `snarkos-algorithms`, add the "algorithm" feature as follows:
+# snarkos-models = { version = "x.x.x", default-features = false, features = ["algorithms"] }
+#
+[features]
+default = []
+algorithms = []
+curves = []
+dpc = []
+gadgets = []

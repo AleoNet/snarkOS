@@ -20,7 +20,7 @@ harness = false
 snarkos-algorithms = { path = "../algorithms" }
 snarkos-curves = { path = "../curves" }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models" }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-profiler = { path = "../profiler" }
 snarkos-utilities = { path = "../utilities" }
 

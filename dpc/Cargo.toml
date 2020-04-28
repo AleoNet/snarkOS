@@ -20,7 +20,7 @@ snarkos-curves = { path = "../curves"}
 snarkos-dpc-storage = { path = "../dpc_storage" }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-gadgets = { path = "../gadgets"}
-snarkos-models = { path = "../models"}
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-objects = { path = "../objects" }
 snarkos-profiler = { path = "../profiler" }
 snarkos-utilities = { path = "../utilities"}
