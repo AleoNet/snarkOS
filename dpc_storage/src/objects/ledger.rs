@@ -19,6 +19,7 @@ use rand::Rng;
 use std::{
     fs,
     marker::PhantomData,
+    path::PathBuf,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -35,6 +36,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
     }
 
     fn new(
+        path: &PathBuf,
         parameters: Self::Parameters,
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
@@ -42,11 +44,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         genesis_predicate_vk_bytes: Vec<u8>,
         genesis_address_pair_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError> {
-        let mut path = std::env::current_dir()?;
-        path.push("../db");
-
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-
         let storage = match Storage::open_cf(path, NUM_COLS) {
             Ok(storage) => storage,
             Err(err) => return Err(LedgerError::StorageError(err)),
@@ -69,7 +67,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             previous_block_hash: BlockHeaderHash([0u8; 32]),
             merkle_root_hash: MerkleRootHash([0u8; 32]),
             time,
-            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+            difficulty_target: 0xFFFF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
         };
 

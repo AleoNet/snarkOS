@@ -1,7 +1,7 @@
 use crate::*;
 
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
-use snarkos_errors::storage::StorageError;
+use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_objects::{
     dpc::{Block, Transaction},
     BlockHeaderHash,
@@ -71,6 +71,12 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     }
 
     pub fn insert_block(&self, block: &Block<T>) -> Result<(), StorageError> {
+        if self.block_hash_exists(&block.header.get_hash()) {
+            return Err(StorageError::BlockError(BlockError::BlockExists(
+                block.header.get_hash().to_string(),
+            )));
+        }
+
         let mut database_transaction = DatabaseTransaction::new();
 
         let mut transaction_serial_numbers = vec![];

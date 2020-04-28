@@ -64,8 +64,12 @@ fn test_execute_base_dpc_constraints() {
     let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
     let genesis_memo = [0u8; 32];
 
+    let mut path = std::env::current_dir()?;
+    path.push("../db");
+
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger = MerkleTreeLedger::new(
+        &path,
         ledger_parameters,
         genesis_record.commitment(),
         genesis_sn.clone(),

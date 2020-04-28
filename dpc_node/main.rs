@@ -2,10 +2,13 @@ use dpc_node::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, MerkleTreeLedger},
-    parameters::PublicParameters,
-    DPC,
+use snarkos_dpc::{
+    base_dpc::{
+        instantiated::{Components, MerkleTreeLedger},
+        parameters::PublicParameters,
+        DPC,
+    },
+    dpc::address::AddressPublicKey,
 };
 use snarkos_dpc_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_dpc_network::{
@@ -14,9 +17,9 @@ use snarkos_dpc_network::{
     server::{MinerInstance, Server},
 };
 use snarkos_errors::node::NodeError;
+use snarkos_utilities::bytes::FromBytes;
 //use snarkos_rpc::start_rpc_server;
 
-use rand::thread_rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -45,10 +48,10 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let mut path = std::env::current_dir()?;
     path.push(&config.path);
+
     let storage = MerkleTreeLedger::open_at_path(path)?;
 
     let mut parameters_path = std::env::current_dir()?;
-    parameters_path.push("dpc/src/parameters");
 
     let parameters = PublicParameters::<Components>::load(&parameters_path)?;
 
@@ -93,13 +96,15 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     // Start miner thread
 
     // TODO make this a permanently stored miner address
-    let rng = &mut thread_rng();
-    let miner_metadata = [0u8; 32];
-    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &miner_metadata, rng).unwrap();
+    //    let rng = &mut thread_rng();
+    //    let miner_metadata = [0u8; 32];
+    //    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &miner_metadata, rng).unwrap();
+
+    let miner_address: AddressPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
 
     if config.miner {
         MinerInstance::new(
-            miner_address.public_key,
+            miner_address,
             consensus.clone(),
             parameters,
             storage.clone(),
