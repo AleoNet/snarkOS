@@ -4,6 +4,7 @@ use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDi
 use snarkos_errors::dpc::LedgerError;
 
 use rand::Rng;
+use std::path::PathBuf;
 
 pub mod ideal_ledger;
 pub use self::ideal_ledger::*;
@@ -24,6 +25,7 @@ pub trait Ledger: Sized {
 
     /// Creates an empty ledger
     fn new(
+        path: &PathBuf,
         parameters: Self::Parameters,
         dummy_cm: Self::Commitment,
         dummy_sn: Self::SerialNumber,

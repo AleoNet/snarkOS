@@ -8,6 +8,7 @@ use snarkos_errors::dpc::LedgerError;
 use rand::Rng;
 use std::{
     collections::{HashMap, HashSet},
+    path::PathBuf,
     rc::Rc,
 };
 
@@ -40,6 +41,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
     }
 
     fn new(
+        _path: &PathBuf,
         parameters: Self::Parameters,
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,

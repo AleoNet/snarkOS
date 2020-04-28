@@ -13,6 +13,7 @@ use rand::Rng;
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
+    path::PathBuf,
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -56,6 +57,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P> {
     }
 
     fn new(
+        _path: &PathBuf,
         parameters: Self::Parameters,
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,

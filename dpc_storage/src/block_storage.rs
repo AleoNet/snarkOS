@@ -4,6 +4,7 @@ use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::{
     dpc::{DPCTransactions, Transaction},
+    ledger::Ledger,
     BlockHeader,
     BlockHeaderHash,
 };
@@ -38,51 +39,70 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Arc<Self>, StorageError> {
         fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
 
-        match Storage::open_cf(path.as_ref(), NUM_COLS) {
-            Ok(storage) => Self::get_latest_state(path, storage),
-            Err(err) => return Err(err),
-        }
+        Self::get_latest_state(path)
     }
 
     /// Get the latest state of the storage.
-    pub fn get_latest_state<PATH: AsRef<Path>>(path: PATH, storage: Storage) -> Result<Arc<Self>, StorageError> {
-        let latest_block_number = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?;
+    pub fn get_latest_state<PATH: AsRef<Path>>(path: PATH) -> Result<Arc<Self>, StorageError> {
+        let latest_block_number = {
+            let storage = Storage::open_cf(path.as_ref(), NUM_COLS)?;
+            storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
+        };
 
-        let mut path = path.as_ref().join("../dpc/src/parameters/");
+        let parameter_path = path.as_ref().join("../dpc/src/parameters/");
 
-        let ledger_parameter_path = path.join("ledger.params");
+        let ledger_parameter_path = parameter_path.join("ledger.params");
 
         let parameters = P::load(&ledger_parameter_path)?;
 
-        let mut cm_and_indices = vec![];
-        for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
-            let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
-            let index = bytes_to_u32(index_value.to_vec()) as usize;
-
-            cm_and_indices.push((commitment, index));
-        }
-
-        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
-
-        let genesis_cm: T::Commitment = match storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
-            Some(cm_bytes) => FromBytes::read(&cm_bytes[..])?,
-            None => return Err(StorageError::Message("Missing genesis cm".to_string())),
-        };
-
-        assert!(commitments[0] == genesis_cm);
-
-        let merkle_tree = MerkleTree::new(&parameters, &commitments)?;
-
         match latest_block_number {
-            Some(val) => Ok(Arc::new(Self {
-                latest_block_height: RwLock::new(bytes_to_u32(val)),
-                storage: Arc::new(storage),
-                cm_merkle_tree: RwLock::new(merkle_tree),
-                ledger_parameters: parameters,
-                _transaction: PhantomData,
-            })),
-            None => return Err(StorageError::Message("Missing genesis block creation".to_string())),
+            Some(val) => {
+                let storage = Storage::open_cf(path.as_ref(), NUM_COLS)?;
+
+                let mut cm_and_indices = vec![];
+                for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
+                    let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
+                    let index = bytes_to_u32(index_value.to_vec()) as usize;
+
+                    cm_and_indices.push((commitment, index));
+                }
+
+                cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+
+                let genesis_cm: T::Commitment = match storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
+                    Some(cm_bytes) => FromBytes::read(&cm_bytes[..])?,
+                    None => return Err(StorageError::Message("Missing genesis cm".to_string())),
+                };
+
+                assert!(commitments[0] == genesis_cm);
+
+                let merkle_tree = MerkleTree::new(&parameters, &commitments)?;
+
+                Ok(Arc::new(Self {
+                    latest_block_height: RwLock::new(bytes_to_u32(val)),
+                    storage: Arc::new(storage),
+                    cm_merkle_tree: RwLock::new(merkle_tree),
+                    ledger_parameters: parameters,
+                    _transaction: PhantomData,
+                }))
+            }
+            None => {
+                // Add genesis block to database
+
+                let block_storage = Self::new(
+                    &path.as_ref().to_path_buf(),
+                    parameters,
+                    FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
+                    FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
+                    FromBytes::read(&GENESIS_MEMO[..])?,
+                    GENESIS_PRED_VK_BYTES.to_vec(),
+                    GENESIS_ADDRESS_PAIR.to_vec(),
+                )
+                .unwrap(); // TODO handle this unwrap. merge storage and ledger error
+
+                Ok(Arc::new(block_storage))
+            }
         }
     }
 
@@ -191,201 +211,3 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         }
     }
 }
-
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//
-//    use crate::test_data::initialize_test_blockchain;
-//    use hex;
-//    use std::str::FromStr;
-//    use wagyu_bitcoin::{BitcoinAddress, Mainnet};
-//
-//    const TEST_DB_PATH: &str = "../test_db";
-//
-//    pub struct Wallet {
-//        pub private_key: &'static str,
-//        pub address: &'static str,
-//    }
-//
-//    const TEST_WALLETS: [Wallet; 5] = [
-//        Wallet {
-//            private_key: "KzW6KyJ1s4mp3CFDUzCXFh4r2xzyd2rkMwcbeP5T2T2iMvepkAwS",
-//            address: "1NpScgYSLW4WcvmZM55EY5cziEiqZx3wJu",
-//        },
-//        Wallet {
-//            private_key: "L2tBggaVMYPghRB6LR2ThY5Er1Rc284T3vgiK274JpaFsj1tVSsT",
-//            address: "167CPx9Ae96iVQCrwoq17jwKmmvr9RTyM7",
-//        },
-//        Wallet {
-//            private_key: "KwrJGqYZVj3m2WyimxdLBNrdwQZBVnHhw78c73xuLSWkjFBiqq3P",
-//            address: "1Dy6XpKrNRDw9SewppvYpGHSMbBExVmZsU",
-//        },
-//        Wallet {
-//            private_key: "KwwZ97gYoBBf6cGLp33qD8v4pEKj89Yir65vUA3N5Y1AtWbLzqED",
-//            address: "1CL1zq3kLK3TFNLdTk4HtuguT7JMdD5vi5",
-//        },
-//        Wallet {
-//            private_key: "L4cR7BQfvj6CPdbaTvRKHJXB4LjaUHJxtrDqNzkkyRXqrqUxLQTS",
-//            address: "1Hz8RzEXYPF6z8o7z5SHVnjzmhqS5At5kU",
-//        },
-//    ];
-//
-//    const GENESIS_BLOCK: &str = "0000000000000000000000000000000000000000000000000000000000000000b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee35592ec145e00000000ffffffffff7f000030d901000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04080000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac";
-//
-//    pub fn random_storage_path() -> String {
-//        let ptr = Box::into_raw(Box::new(123));
-//        format!("{}{}", TEST_DB_PATH, ptr as usize)
-//    }
-//
-//    pub fn kill_storage(storage: Arc<BlockStorage>, path: PathBuf) {
-//        drop(storage);
-//        BlockStorage::destroy_storage(path).unwrap();
-//    }
-//
-//    #[test]
-//    pub fn test_initialize_blockchain() {
-//        let mut path = std::env::current_dir().unwrap();
-//        path.push(random_storage_path());
-//
-//        BlockStorage::destroy_storage(path.clone()).unwrap();
-//
-//        let blockchain = BlockStorage::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
-//
-//        assert_eq!(blockchain.get_latest_block_height(), 0);
-//
-//        let latest_block = blockchain.get_latest_block().unwrap();
-//
-//        let genesis_block = Block::deserialize(&hex::decode(&GENESIS_BLOCK).unwrap()).unwrap();
-//
-//        assert_eq!(genesis_block, latest_block);
-//
-//        let address = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[0].address).unwrap();
-//
-//        assert_eq!(blockchain.get_balance(&address), 100000000);
-//        assert!(blockchain.remove_latest_block().is_err());
-//
-//        kill_storage(blockchain, path);
-//    }
-//
-//    #[test]
-//    pub fn test_storage() {
-//        let mut path = std::env::current_dir().unwrap();
-//        path.push(random_storage_path());
-//
-//        let blockchain = BlockStorage::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
-//
-//        blockchain.storage.storage.put(b"my key", b"my value").unwrap();
-//
-//        match blockchain.storage.storage.get(b"my key") {
-//            Ok(Some(value)) => println!("retrieved value {}", String::from_utf8(value).unwrap()),
-//            Ok(None) => println!("value not found"),
-//            Err(e) => println!("operational problem encountered: {}", e),
-//        }
-//
-//        assert!(blockchain.storage.storage.get(b"my key").is_ok());
-//
-//        kill_storage(blockchain, path);
-//    }
-//
-//    #[test]
-//    pub fn test_storage_memory_pool() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let transactions_serialized = vec![0u8];
-//
-//        assert!(storage.store_to_memory_pool(transactions_serialized.clone()).is_ok());
-//        assert!(storage.get_memory_pool().is_ok());
-//        assert!(storage.get_memory_pool().unwrap().is_some());
-//        assert_eq!(transactions_serialized, storage.get_memory_pool().unwrap().unwrap());
-//
-//        kill_storage(storage, path);
-//    }
-//
-//    #[test]
-//    pub fn test_storage_peer_book() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let peers_serialized = vec![0u8];
-//
-//        assert!(storage.store_to_peer_book(peers_serialized.clone()).is_ok());
-//        assert!(storage.get_peer_book().is_ok());
-//        assert!(storage.get_peer_book().unwrap().is_some());
-//        assert_eq!(peers_serialized, storage.get_peer_book().unwrap().unwrap());
-//
-//        kill_storage(storage, path);
-//    }
-//
-//    #[test]
-//    pub fn test_destroy_storage() {
-//        let mut path = std::env::current_dir().unwrap();
-//        path.push(random_storage_path());
-//
-//        BlockStorage::destroy_storage(path).unwrap();
-//    }
-//
-//    mod test_invalid {
-//        use super::*;
-//        use snarkos_objects::{BlockHeader, MerkleRootHash, Transactions};
-//
-//        #[test]
-//        pub fn test_invalid_block_addition() {
-//            let mut path = std::env::current_dir().unwrap();
-//            path.push(random_storage_path());
-//
-//            BlockStorage::destroy_storage(path.clone()).unwrap();
-//
-//            let blockchain = BlockStorage::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
-//
-//            let random_block_header = BlockHeader {
-//                previous_block_hash: BlockHeaderHash([0u8; 32]),
-//                merkle_root_hash: MerkleRootHash([0u8; 32]),
-//                time: 0,
-//                difficulty_target: u64::max_value(),
-//                nonce: 0,
-//            };
-//
-//            let random_block = Block {
-//                header: random_block_header,
-//                transactions: Transactions::new(),
-//            };
-//
-//            assert!(blockchain.insert_and_commit(random_block.clone()).is_err());
-//
-//            kill_storage(blockchain, path);
-//        }
-//
-//        #[test]
-//        pub fn test_invalid_block_removal() {
-//            let mut path = std::env::current_dir().unwrap();
-//            path.push(random_storage_path());
-//
-//            BlockStorage::destroy_storage(path.clone()).unwrap();
-//
-//            let blockchain = BlockStorage::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
-//
-//            assert!(blockchain.remove_latest_block().is_err());
-//            assert!(blockchain.remove_latest_blocks(5).is_err());
-//
-//            kill_storage(blockchain, path);
-//        }
-//
-//        #[test]
-//        pub fn test_invalid_block_retrieval() {
-//            let mut path = std::env::current_dir().unwrap();
-//            path.push(random_storage_path());
-//
-//            BlockStorage::destroy_storage(path.clone()).unwrap();
-//
-//            let blockchain = BlockStorage::open_at_path(path.clone(), GENESIS_BLOCK.into()).unwrap();
-//
-//            assert_eq!(
-//                blockchain.get_latest_block().unwrap(),
-//                blockchain.get_block_from_block_num(0).unwrap()
-//            );
-//
-//            assert!(blockchain.get_block_from_block_num(2).is_err());
-//            assert!(blockchain.get_block_from_block_num(10).is_err());
-//
-//            kill_storage(blockchain, path);
-//        }
-//    }
-//}
