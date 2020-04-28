@@ -13,7 +13,6 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms" }
-#snarkos-dpc = { path = "../dpc" }
 snarkos-errors = { path = "../errors" }
 snarkos-models = { path = "../models" }
 snarkos-objects = { path = "../objects" }

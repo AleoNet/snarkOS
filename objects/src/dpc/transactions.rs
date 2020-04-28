@@ -24,7 +24,7 @@ where
     !iter.into_iter().all(move |x| uniq.insert(x))
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DPCTransactions<T: Transaction>(pub Vec<T>);
 
 impl<T: Transaction> DPCTransactions<T> {

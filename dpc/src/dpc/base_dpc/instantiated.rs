@@ -211,6 +211,12 @@ pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCirc
 pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
+pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
+pub type Tx = DPCTransaction<Components>;
+
+pub type InstantiatedDPC = DPC<Components>;
+pub type LocalData = DPCLocalData<Components>;
+
 // Gadgets
 
 pub type AddressCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
@@ -228,9 +234,3 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
-
-pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
-pub type Tx = DPCTransaction<Components>;
-
-pub type InstantiatedDPC = DPC<Components>;
-pub type LocalData = DPCLocalData<Components>;

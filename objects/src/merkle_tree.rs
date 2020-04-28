@@ -1,27 +1,7 @@
-use crate::transactions::Transactions;
 use snarkos_algorithms::crh::double_sha256;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MerkleTreeRootHash([u8; 32]);
-
-/// A binary hash tree of SHA256d (two rounds of SHA256) hashes for
-/// miner values.
-#[derive(Default)]
-pub struct MerkleTree {
-    leaves: Transactions,
-}
-
-impl MerkleTree {
-    // TODO (howardwu): Resolve unwrap().
-    pub fn transaction_merkle_root(&self) -> MerkleTreeRootHash {
-        let transaction_ids: Vec<Vec<u8>> = self.leaves.to_transaction_ids().unwrap();
-
-        let mut root = [0u8; 32];
-        root.copy_from_slice(&merkle_root(&transaction_ids));
-
-        MerkleTreeRootHash(root)
-    }
-}
 
 /// Calculates the root of the Merkle tree
 pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
