@@ -1,12 +1,15 @@
 use snarkos_dpc::{
-    address::AddressPair,
+    address::{AddressPair, AddressPublicKey, AddressSecretKey},
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
     test_data::*,
     DPCScheme,
 };
-use snarkos_dpc_consensus::{get_block_reward, test_data::*, ConsensusParameters};
+use snarkos_dpc_consensus::{get_block_reward, miner::Miner, test_data::*, ConsensusParameters};
 use snarkos_models::dpc::Record;
-use snarkos_objects::{dpc::DPCTransactions, ledger::Ledger};
+use snarkos_objects::{
+    dpc::{Block, DPCTransactions},
+    ledger::Ledger,
+};
 use snarkos_storage::{BlockStorage, GENESIS_ADDRESS_PAIR, GENESIS_PRED_VK_BYTES};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -24,37 +27,39 @@ fn base_dpc_multiple_transactions() {
     // Generate or load parameters for the ledger, commitment schemes, and CRH
     let (_ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
 
-    // Generate addresses
-    let [miner_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
+    // Initialize addresses
+    let miner_sk: AddressSecretKey<Components> =
+        FromBytes::read(&hex::decode(TEST_WALLETS[1].private_key).unwrap()[..]).unwrap();
+    let miner_pk: AddressPublicKey<Components> =
+        FromBytes::read(&hex::decode(TEST_WALLETS[1].address).unwrap()[..]).unwrap();
 
-    let genesis_address: AddressPair<Components> = FromBytes::read(&GENESIS_ADDRESS_PAIR[..]).unwrap();
+    let recipient_sk: AddressSecretKey<Components> =
+        FromBytes::read(&hex::decode(TEST_WALLETS[2].private_key).unwrap()[..]).unwrap();
+    let recipient_pk: AddressPublicKey<Components> =
+        FromBytes::read(&hex::decode(TEST_WALLETS[2].address).unwrap()[..]).unwrap();
+
+    let miner = Miner::new(miner_pk, consensus.clone());
 
     // Open the ledger
     let mut path = std::env::current_dir().unwrap();
     path.push("../db");
-    let genesis_pred_vk_bytes = GENESIS_PRED_VK_BYTES.to_vec();
     let ledger = MerkleTreeLedger::open_at_path(path).unwrap();
 
-    let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
-    let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+    // Initialize the predicate values
+    let new_predicate = Predicate::new(GENESIS_PRED_VK_BYTES.to_vec());
+    let new_birth_predicates = vec![new_predicate.clone(); NUM_INPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
-    let mut transactions = DPCTransactions::<Tx>::new();
+    let transactions = DPCTransactions::<Tx>::new();
 
     println!("Creating block with coinbase transaction");
 
-    let (coinbase_records, block) = create_block_with_coinbase_transaction(
-        &mut transactions,
-        &parameters,
-        &genesis_pred_vk_bytes,
-        new_birth_predicates.clone(),
-        new_death_predicates.clone(),
-        genesis_address.clone(),
-        miner_address.public_key.clone(),
-        &consensus,
-        &ledger,
-        &mut rng,
-    );
+    let (previous_block_header, transactions, coinbase_records) =
+        miner.establish_block(&parameters, &ledger, &transactions).unwrap();
+
+    let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+
+    let block = Block { header, transactions };
 
     assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
 
@@ -70,15 +75,13 @@ fn base_dpc_multiple_transactions() {
 
     assert!(consensus.verify_block(&parameters, &block, &ledger).unwrap());
 
-    assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
-
     ledger.insert_block(&block).unwrap();
     assert_eq!(ledger.len(), 2);
 
     // Add new block spending records from the previous block
 
-    let spend_asks = vec![miner_address.secret_key.clone(); NUM_INPUT_RECORDS];
-    let newer_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let spend_asks = vec![miner_sk.clone(); NUM_INPUT_RECORDS];
+    let newer_apks = vec![recipient_pk.clone(); NUM_OUTPUT_RECORDS];
 
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
@@ -121,18 +124,12 @@ fn base_dpc_multiple_transactions() {
 
     println!("Create a new block with the payment transaction");
 
-    let (new_coinbase_records, new_block) = create_block_with_coinbase_transaction(
-        &mut transactions,
-        &parameters,
-        &genesis_pred_vk_bytes,
-        new_birth_predicates,
-        new_death_predicates,
-        genesis_address,
-        recipient.public_key,
-        &consensus,
-        &ledger,
-        &mut rng,
-    );
+    let (previous_block_header, transactions, new_coinbase_records) =
+        miner.establish_block(&parameters, &ledger, &transactions).unwrap();
+
+    let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+
+    let new_block = Block { header, transactions };
 
     let new_block_reward = get_block_reward(ledger.len() as u32);
 

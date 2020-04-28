@@ -80,7 +80,7 @@ impl Miner {
     }
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
-    pub async fn establish_block(
+    pub fn establish_block(
         &self,
         parameters: &PublicParameters<Components>,
         storage: &MerkleTreeLedger,
@@ -143,9 +143,8 @@ impl Miner {
         let mut candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
 
-        let (previous_block_header, transactions, coinbase_records) = self
-            .establish_block(parameters, storage, &mut candidate_transactions)
-            .await?;
+        let (previous_block_header, transactions, coinbase_records) =
+            self.establish_block(parameters, storage, &mut candidate_transactions)?;
 
         let header = self.find_block(&transactions, &previous_block_header)?;
 

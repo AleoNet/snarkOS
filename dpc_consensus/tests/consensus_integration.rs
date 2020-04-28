@@ -147,34 +147,39 @@
 //            });
 //    }
 //
-//    #[test]
-//    fn transaction_double_spend() {
-//        let (mut blockchain, path) = initialize_test_blockchain();
-//        let mut memory_pool = MemoryPool::new();
-//
-//        let consensus = TEST_CONSENSUS;
-//        let miner_address = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[4].address).unwrap();
-//        let miner = Miner::new(miner_address, consensus.clone());
-//
-//        let previous_block = &blockchain.get_latest_block().unwrap();
-//
-//        let transactions = Transactions::from(&[
-//            previous_block.transactions[0].clone(),
-//            previous_block.transactions[0].clone(),
-//        ]);
-//
-//        assert!(blockchain.check_block_transactions(&transactions).is_err());
-//
-//        let header = miner.find_block(&transactions, &previous_block.header).unwrap();
-//
-//        let test_block = Block { header, transactions };
-//
-//        assert!(
-//            consensus
-//                .process_block(&mut blockchain, &mut memory_pool, &test_block)
-//                .is_err()
-//        );
-//
-//        kill_storage_sync(blockchain, path);
-//    }
+////    #[test]
+////    fn transaction_double_spend() {
+////        let (mut blockchain, path) = initialize_test_blockchain();
+////        let mut memory_pool = MemoryPool::new();
+////
+////        let consensus = TEST_CONSENSUS;
+////        let miner_address = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[4].address).unwrap();
+////        let miner = Miner::new(miner_address, consensus.clone());
+////
+//////        let mut parameters_path = std::env::current_dir()?;
+//////        parameters_path.push("dpc/src/parameters/");
+//////
+//////        let parameters = PublicParameters::<Components>::load(&parameters_path)?;
+////
+////        let previous_block = &blockchain.get_latest_block().unwrap();
+////
+////        let transactions = Transactions::from(&[
+////            previous_block.transactions[0].clone(),
+////            previous_block.transactions[0].clone(),
+////        ]);
+////
+////        assert!(blockchain.check_block_transactions(&transactions).is_err());
+////
+////        let header = miner.find_block(&transactions, &previous_block.header).unwrap();
+////
+////        let test_block = Block { header, transactions };
+////
+////        assert!(
+////            consensus
+////                .process_block(&mut blockchain, &mut memory_pool, &test_block)
+////                .is_err()
+////        );
+////
+////        kill_storage_sync(blockchain, path);
+////    }
 //}
