@@ -6,7 +6,7 @@ use snarkos_dpc::{
 use snarkos_dpc_consensus::{get_block_reward, test_data::*, ConsensusParameters};
 use snarkos_models::dpc::Record;
 use snarkos_objects::{dpc::DPCTransactions, ledger::Ledger};
-use snarkos_storage::{BlockStorage, GENESIS_PRED_VK_BYTES};
+use snarkos_storage::BlockStorage;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;
