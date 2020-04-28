@@ -5,11 +5,12 @@ use snarkos_utilities::{
 };
 
 use rand::Rng;
+use std::fmt::Debug;
 
 pub trait SNARK {
     type AssignedCircuit;
     type Circuit;
-    type Proof: ToBytes + FromBytes + Clone + Default + Storage;
+    type Proof: ToBytes + FromBytes + Clone + Debug + Default + Storage;
     type PreparedVerificationParameters: Clone
         + Default
         + From<Self::VerificationParameters>

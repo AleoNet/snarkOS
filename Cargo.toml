@@ -15,18 +15,14 @@ edition = "2018"
 members = [
     "algorithms",
     "benchmarks",
-    "consensus",
     "console",
     "curves",
     "dpc",
     "errors",
     "gadgets",
     "models",
-    "network",
     "objects",
     "profiler",
-    "rpc",
-    "storage",
     "dpc_storage",
     "dpc_consensus",
     "dpc_network",
@@ -42,15 +38,12 @@ name = "snarkos"
 path = "dpc_node/main.rs"
 
 [dependencies]
-snarkos-consensus = { path = "./consensus" }
 snarkos-dpc = { path = "./dpc" }
 snarkos-dpc-consensus = { path = "./dpc_consensus" }
 snarkos-errors = { path = "./errors" }
-snarkos-network = { path = "./network" }
 snarkos-dpc-network = { path = "./dpc_network" }
 snarkos-objects = { path = "objects" }
-snarkos-rpc = { path = "./rpc" }
-snarkos-storage = { path = "./storage" }
+#snarkos-rpc = { path = "./rpc" }
 snarkos-dpc-storage = { path = "./dpc_storage" }
 snarkos-utilities = { path = "./utilities" }
 

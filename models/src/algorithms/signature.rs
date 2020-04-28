@@ -5,13 +5,13 @@ use snarkos_utilities::{
 };
 
 use rand::Rng;
-use std::hash::Hash;
+use std::{fmt::Debug, hash::Hash};
 
 pub trait SignatureScheme: Sized + Clone + Storage {
     type Parameters: Clone + ToBytes + FromBytes + Send + Sync;
-    type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Default + Send + Sync;
+    type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Debug + Default + Send + Sync;
     type PrivateKey: ToBytes + FromBytes + Clone + Default;
-    type Output: ToBytes + FromBytes + Clone + Default + Send + Sync;
+    type Output: ToBytes + FromBytes + Clone + Debug + Default + Send + Sync;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError>;
 

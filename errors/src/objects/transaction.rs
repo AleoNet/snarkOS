@@ -54,12 +54,6 @@ impl From<hex::FromHexError> for TransactionError {
     }
 }
 
-impl From<secp256k1::Error> for TransactionError {
-    fn from(error: secp256k1::Error) -> Self {
-        TransactionError::Crate("secp256k1", format!("{:?}", error))
-    }
-}
-
 impl From<std::io::Error> for TransactionError {
     fn from(error: std::io::Error) -> Self {
         TransactionError::Crate("std::io", format!("{:?}", error))

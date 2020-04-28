@@ -12,7 +12,7 @@ use snarkos_utilities::{
 
 use std::io::{Read, Result as IoResult, Write};
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Block<T: Transaction> {
     /// First 84 bytes of the block as defined by the encoding used by
     /// "block" messages.

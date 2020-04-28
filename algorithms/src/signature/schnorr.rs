@@ -32,7 +32,7 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "G: Group"), Default(bound = "G: Group"))]
+#[derivative(Clone(bound = "G: Group"), Debug(bound = "G: Group"), Default(bound = "G: Group"))]
 pub struct SchnorrOutput<G: Group> {
     pub prover_response: <G as Group>::ScalarField,
     pub verifier_challenge: <G as Group>::ScalarField,

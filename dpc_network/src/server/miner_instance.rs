@@ -60,7 +60,7 @@ impl MinerInstance {
 
                 info!(
                     "Block found!           {:?}",
-                    Block::deserialize(&block_serialized).unwrap()
+                    Block::<Tx>::deserialize(&block_serialized).unwrap()
                 );
 
                 propagate_block(context.clone(), block_serialized, local_address)
