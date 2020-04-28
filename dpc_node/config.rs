@@ -45,13 +45,13 @@ impl Default for Config {
             // Options
             ip: "0.0.0.0".into(),
             port: 4130,
-            path: "./storage_db".into(),
+            path: "storage_db".into(),
             rpc_port: 3030,
             bootnodes: MAINNET_BOOTNODES
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
-            coinbase_address: "1NpScgYSLW4WcvmZM55EY5cziEiqZx3wJu".into(),
+            coinbase_address: "ff4dcceb9f3003ea59df2770ed4a61409dceb87d244c1be394c52787817ec511".into(),
             genesis: "00000000000000000000000000000000000000000000000000000000000000008c8d4f393f39c063c40a617c6e2584e6726448c4c0f7da7c848bfa573e628388fbf1285e00000000ffffffffff7f00005e4401000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04010000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac".into(),
             subcommand: None,
             mempool_interval: 5,

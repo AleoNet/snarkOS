@@ -29,7 +29,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Create a new blockchain storage.
     pub fn open() -> Result<Arc<Self>, StorageError> {
         let mut path = std::env::current_dir()?;
-        path.push("../../db");
+        path.push("../db");
 
         BlockStorage::open_at_path(path)
     }
@@ -38,18 +38,18 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Arc<Self>, StorageError> {
         fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
 
-        match Storage::open_cf(path, NUM_COLS) {
-            Ok(storage) => Self::get_latest_state(storage),
+        match Storage::open_cf(path.as_ref(), NUM_COLS) {
+            Ok(storage) => Self::get_latest_state(path, storage),
             Err(err) => return Err(err),
         }
     }
 
     /// Get the latest state of the storage.
-    pub fn get_latest_state(storage: Storage) -> Result<Arc<Self>, StorageError> {
+    pub fn get_latest_state<PATH: AsRef<Path>>(path: PATH, storage: Storage) -> Result<Arc<Self>, StorageError> {
         let latest_block_number = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?;
 
-        let mut path = std::env::current_dir()?;
-        path.push("../dpc/src/parameters/");
+        let mut path = path.as_ref().join("../dpc/src/parameters/");
+
         let ledger_parameter_path = path.join("ledger.params");
 
         let parameters = P::load(&ledger_parameter_path)?;

@@ -33,6 +33,12 @@ impl From<ConsensusError> for NodeError {
     }
 }
 
+impl From<hex::FromHexError> for NodeError {
+    fn from(error: hex::FromHexError) -> Self {
+        NodeError::Crate("hex", format!("{:?}", error))
+    }
+}
+
 impl From<ServerError> for NodeError {
     fn from(error: ServerError) -> Self {
         NodeError::ServerError(error)
