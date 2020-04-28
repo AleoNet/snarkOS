@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-benchmarks"
 version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+authors = ["The Aleo Team <hello@aleo.org"]
 description = "Benchmarks for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
