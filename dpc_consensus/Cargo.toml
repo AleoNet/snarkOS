@@ -13,12 +13,12 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["consensus"] }
 snarkos-objects = { path= "../objects", version = "0.8.0", default-features = false }
 snarkos-dpc = { path= "../dpc", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 bincode = { version="1.2.0" }
 chrono = { version = "0.4", features = ["serde"] }

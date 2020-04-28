@@ -16,7 +16,7 @@ snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-featur
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["dpc"] }
 snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 bincode = { version = "1.2.0" }
 hex = { version = "0.4.2" }

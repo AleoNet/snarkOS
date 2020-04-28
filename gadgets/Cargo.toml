@@ -16,7 +16,7 @@ snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-featur
 snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false, features = ["edwards_bls12", "edwards_sw6"] }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities" }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 derivative = { version = "1" }
 digest = { version = "0.7" }

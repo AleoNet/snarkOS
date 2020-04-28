@@ -45,7 +45,7 @@ snarkos-dpc-network = { path = "./dpc_network", version = "0.8.0", default-featu
 snarkos-objects = { path = "objects", version = "0.8.0", default-features = false }
 #snarkos-rpc = { path = "./rpc", version = "0.8.0", default-features = false }
 snarkos-storage = { path = "storage", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "./utilities", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
 clap = { version = "2.33.0" }
 env_logger = { version = "0.7.1" }

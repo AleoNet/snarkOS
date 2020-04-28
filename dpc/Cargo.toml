@@ -20,7 +20,7 @@ snarkos-models = { path = "../models", version = "0.8.0", default-features = fal
 snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
 snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
 snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 blake2 = { version = "0.7.1" }
 hex = { version = "0.4.2" }

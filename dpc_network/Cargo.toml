@@ -18,7 +18,7 @@ snarkos-dpc-consensus = { path = "../dpc_consensus", version = "0.8.0", default-
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["network"] }
 snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
 snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 bincode = { version = "1.2.0" }
 byteorder = { version = "1" }
