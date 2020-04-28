@@ -116,7 +116,7 @@ pub fn setup_ledger<R: Rng>(
     .unwrap();
     let genesis_memo = [0u8; 32];
 
-    let mut path = std::env::current_dir()?;
+    let mut path = std::env::current_dir().unwrap();
     path.push("../db");
 
     // Use genesis record, serial number, and memo to initialize the ledger.
