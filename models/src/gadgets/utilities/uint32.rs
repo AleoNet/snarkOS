@@ -1169,11 +1169,11 @@ mod test {
         let x = UInt32::constant(100u32);
         let y = UInt32::alloc(cs.ns(|| format!("alloc")), Some(99)).unwrap();
 
-        let res = x.sub(cs.ns(|| "sub".to_string()), &y).unwrap();
+        let _res = x.sub(cs.ns(|| "sub".to_string()), &y).unwrap();
 
-        println!("{:?}", res.value.unwrap());
-        println!("{:?}", res.bits.to_vec());
-        println!("{:?}", cs.num_constraints());
+        // println!("{:?}", res.value.unwrap());
+        // println!("{:?}", res.bits.to_vec());
+        // println!("{:?}", cs.num_constraints());
         assert!(cs.is_satisfied());
     }
 
@@ -1185,11 +1185,11 @@ mod test {
         // let y = UInt32::constant(9u32);
         let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(9u32)).unwrap();
 
-        let res = x.mul(cs.ns(|| "mul".to_string()), &z).unwrap();
+        let _res = x.mul(cs.ns(|| "mul".to_string()), &z).unwrap();
 
-        println!("{:?}", res.value.unwrap());
+        // println!("{:?}", res.value.unwrap());
         // println!("{:?}", res.bits.to_vec());
-        println!("{:?}", cs.num_constraints());
+        // println!("{:?}", cs.num_constraints());
         assert!(cs.is_satisfied());
     }
 
@@ -1201,11 +1201,11 @@ mod test {
         // let y = UInt32::constant(2);
         let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(4u32)).unwrap();
 
-        let res = x.div(cs.ns(|| "div".to_string()), &z).unwrap();
+        let _res = x.div(cs.ns(|| "div".to_string()), &z).unwrap();
 
-        println!("{:?}", res.value.unwrap());
-        println!("{:?}", res.bits.to_vec());
-        println!("{:?}", cs.num_constraints());
+        // println!("{:?}", res.value.unwrap());
+        // println!("{:?}", res.bits.to_vec());
+        // println!("{:?}", cs.num_constraints());
         assert!(cs.is_satisfied()); //This fails
     }
 
@@ -1217,28 +1217,11 @@ mod test {
         // let y = UInt32::constant(2);
         let z = UInt32::alloc(cs.ns(|| format!("alloc")), Some(8)).unwrap();
 
-        let res = x.pow(cs.ns(|| format!("pow")), &z).unwrap();
+        let _res = x.pow(cs.ns(|| format!("pow")), &z).unwrap();
 
-        println!("{:?}", res.value.unwrap());
-        println!("{:?}", res.bits.to_vec());
-        println!("{:?}", cs.num_constraints());
+        // println!("{:?}", res.value.unwrap());
+        // println!("{:?}", res.bits.to_vec());
+        // println!("{:?}", cs.num_constraints());
         assert!(cs.is_satisfied());
     }
-
-    // #[test]
-    // fn test_add() {
-    //     let mut cs = TestConstraintSystem::<Fr>::new();
-    //
-    //     let five = UInt32::constant(5u32);
-    //     let three = UInt32::alloc(cs.ns(||format!("alloc")), Some(3u32)).unwrap();
-    //
-    //     let result = five.add(cs.ns(||format!("add")), &three).unwrap();
-    //
-    //     let eight = UInt32::alloc(cs.ns(||format!("eight")), Some(8u32)).unwrap();
-    //
-    //     println!("result {:#?}", result.bits);
-    //     println!("eight {:#?}", eight.bits);
-    //
-    //     // assert_eq!(result.bits, eight.bits);
-    // }
 }
