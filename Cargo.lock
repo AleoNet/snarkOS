@@ -142,12 +142,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
-name = "bitvec"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a993f74b4c99c1908d156b8d2e0fb6277736b0ecbd833982fd1241d39b2766a6"
-
-[[package]]
 name = "blake2"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -885,16 +879,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
 
 [[package]]
-name = "hmac"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dcb5e64cda4c23119ab41ba960d1e170a774c8e4b9d9e6a9bc18aabf5e59695"
-dependencies = [
- "crypto-mac 0.7.0",
- "digest 0.8.1",
-]
-
-[[package]]
 name = "http"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1347,17 +1331,6 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "winapi 0.3.8",
-]
-
-[[package]]
-name = "pbkdf2"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "006c038a43a45995a9670da19e67600114740e8511d4333bf97a56e66a7542d9"
-dependencies = [
- "byteorder",
- "crypto-mac 0.7.0",
- "rayon",
 ]
 
 [[package]]
@@ -2005,7 +1978,6 @@ dependencies = [
  "snarkos-objects",
  "snarkos-utilities",
  "tokio",
- "wagyu-bitcoin",
 ]
 
 [[package]]
@@ -2115,8 +2087,6 @@ dependencies = [
  "snarkos-objects",
  "snarkos-utilities",
  "tokio",
- "wagyu-bitcoin",
- "wagyu-model",
 ]
 
 [[package]]
@@ -2140,7 +2110,6 @@ dependencies = [
  "snarkos-utilities",
  "tokio",
  "tokio-test",
- "wagyu-bitcoin",
 ]
 
 [[package]]
@@ -2159,8 +2128,6 @@ dependencies = [
  "snarkos-models",
  "snarkos-objects",
  "snarkos-utilities",
- "wagyu-bitcoin",
- "wagyu-model",
 ]
 
 [[package]]
@@ -2213,14 +2180,11 @@ dependencies = [
  "chrono",
  "hex 0.4.2",
  "rand 0.7.3",
- "secp256k1",
  "serde",
  "sha2",
  "snarkos-algorithms",
  "snarkos-errors",
  "snarkos-utilities",
- "wagyu-bitcoin",
- "wagyu-model",
 ]
 
 [[package]]
@@ -2567,30 +2531,6 @@ name = "version_check"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "078775d0255232fb988e6fccf26ddc9d1ac274299aaedcedce21c6f72cc533ce"
-
-[[package]]
-name = "wagyu-bitcoin"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad84357e4cceec3743b73eb8cb33d264e48770c3290816f5eb28061f757ceb7d"
-dependencies = [
- "base58",
- "bech32",
- "bitvec",
- "digest 0.8.1",
- "failure",
- "hex 0.3.2",
- "hmac",
- "pbkdf2",
- "rand 0.7.3",
- "ripemd160",
- "secp256k1",
- "serde",
- "serde_json",
- "sha2",
- "tiny-keccak",
- "wagyu-model",
-]
 
 [[package]]
 name = "wagyu-model"
