@@ -11,9 +11,6 @@ include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
 
-[features]
-print-trace = [ "snarkos-profiler/print-trace" ]
-
 [dependencies]
 snarkos-algorithms = { path = "../algorithms" }
 snarkos-curves = { path = "../curves"}
@@ -33,3 +30,6 @@ derivative = { version = "1" }
 [dev-dependencies]
 criterion = "0.3.1"
 rand_xorshift = { version = "0.2" }
+
+[features]
+print-trace = [ "snarkos-profiler/print-trace" ]
