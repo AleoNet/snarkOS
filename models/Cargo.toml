@@ -31,6 +31,6 @@ smallvec = { version = "1.2", optional = true }
 [features]
 default = []
 algorithms = []
-curves = ["rand", "rand_xorshift"]
+curves = ["rand", "rand_xorshift", "snarkos-errors/curves"]
 dpc = ["gadgets"]
 gadgets = ["algorithms", "curves", "rand_xorshift", "smallvec"]
