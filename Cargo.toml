@@ -54,7 +54,6 @@ log = { version = "0.4.8" }
 rand = { version = "0.7" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2", features = ["full"] }
-wagyu-bitcoin = { version = "0.6.1" }
 
 [dev-dependencies]
 rusty-hook = { version = "0.10.3" }

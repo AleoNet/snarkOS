@@ -1,11 +1,9 @@
 use crate::ConsensusParameters;
-
 use snarkos_dpc::{
     address::{AddressPair, AddressPublicKey},
     base_dpc::{instantiated::*, predicate::DPCPredicate, record::DPCRecord},
     DPCScheme,
 };
-
 use snarkos_objects::{
     dpc::{transactions::DPCTransactions, Block},
     ledger::Ledger,

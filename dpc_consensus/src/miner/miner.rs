@@ -1,5 +1,4 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
-
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::{
     address::AddressPublicKey,
@@ -7,7 +6,6 @@ use snarkos_dpc::{
     DPCScheme,
 };
 use snarkos_dpc_storage::BlockStorage;
-
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
