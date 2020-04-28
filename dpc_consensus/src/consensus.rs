@@ -107,19 +107,9 @@ impl ConsensusParameters {
     pub fn verify_header(
         &self,
         header: &BlockHeader,
+        parent_header: &BlockHeader,
         merkle_root_hash: &MerkleRootHash,
-        ledger: &MerkleTreeLedger,
     ) -> Result<(), ConsensusError> {
-        let parent_header = match ledger.get_latest_block() {
-            Ok(block) => block.header.clone(),
-            Err(_) => {
-                return match Self::is_genesis(header) {
-                    true => Ok(()),
-                    false => Err(ConsensusError::NoGenesisBlock),
-                };
-            }
-        };
-
         let hash_result = header.to_difficulty_hash();
 
         let since_the_epoch = SystemTime::now()
@@ -169,11 +159,15 @@ impl ConsensusParameters {
 
         // Verify the block header
 
-        if let Err(err) = self.verify_header(&block.header, &MerkleRootHash(merkle_root_bytes), ledger) {
-            println!("header failed to verify: {:?}", err);
-            return Ok(false);
+        if !Self::is_genesis(&block.header) {
+            let parent_block = ledger.get_latest_block()?;
+            if let Err(err) =
+                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes))
+            {
+                println!("header failed to verify: {:?}", err);
+                return Ok(false);
+            }
         }
-
         // Verify block amounts and check that there is a single coinbase transaction
 
         let mut coinbase_transaction_count = 0;

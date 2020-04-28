@@ -1,30 +1,29 @@
 //mod consensus_integration {
+//    use snarkos_dpc::{address::AddressPublicKey, dpc::base_dpc::instantiated::{Components, Tx}};
+//
 //    use snarkos_dpc_consensus::{
 //        miner::{MemoryPool, Miner},
 //        test_data::*,
 //    };
 //    use snarkos_objects::{
-//        block::Block,
-//        transaction::Transaction,
+//        dpc::{Block, DPCTransactions, Transaction},
 //        BlockHeader,
 //        BlockHeaderHash,
 //        MerkleRootHash,
-//        Transactions,
 //    };
-//    use snarkos_dpc_storage::test_data::*;
+//    use snarkos_utilities::bytes::FromBytes;
 //
 //    use std::str::FromStr;
-//    use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 //
 //    fn test_find_block(
-//        transactions: &Transactions,
+//        transactions: &DPCTransactions<Tx>,
 //        parent_header: &BlockHeader,
 //        expected_previous_block_hash: &BlockHeaderHash,
 //        expected_merkle_root_hash: &MerkleRootHash,
 //    ) {
 //        let consensus = TEST_CONSENSUS;
-//        let miner_address = BitcoinAddress::<Mainnet>::from_str(TEST_WALLETS[4].address).unwrap();
-////        let miner = Miner::new(miner_address, consensus);
+//        let miner_address: AddressPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
+//        let miner = Miner::new(miner_address, consensus);
 //
 //        let header = miner.find_block(transactions, parent_header).unwrap();
 //        assert_eq!(header.previous_block_hash, *expected_previous_block_hash);
@@ -146,7 +145,7 @@
 //                test_verify_header(parent_header, child_header, expected_merkle_root_hash);
 //            });
 //    }
-//
+
 //    #[test]
 //    fn transaction_double_spend() {
 //        let (mut blockchain, path) = initialize_test_blockchain();

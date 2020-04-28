@@ -13,13 +13,35 @@ use snarkos_objects::{
 };
 
 use rand::Rng;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
 };
+
+pub const TEST_DB_PATH: &str = "../test_db";
+
+pub fn random_storage_path() -> String {
+    let ptr = Box::into_raw(Box::new(123));
+    format!("{}{}", TEST_DB_PATH, ptr as usize)
+}
+
+pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
+    let mut path = std::env::current_dir().unwrap();
+    path.push(random_storage_path());
+
+    MerkleTreeLedger::destroy_storage(path.clone()).unwrap();
+
+    let blockchain = Store::open_at_path(path.clone()).unwrap();
+
+    (blockchain, path)
+}
 
 pub struct Wallet {
     pub private_key: &'static str,

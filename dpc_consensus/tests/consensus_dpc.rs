@@ -4,7 +4,7 @@ use snarkos_dpc::{
     DPCScheme,
 };
 use snarkos_dpc_consensus::{get_block_reward, test_data::*, ConsensusParameters};
-use snarkos_dpc_storage::BlockStorage;
+use snarkos_dpc_storage::{BlockStorage, GENESIS_PRED_VK_BYTES};
 use snarkos_models::dpc::Record;
 use snarkos_objects::{dpc::DPCTransactions, ledger::Ledger};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -27,7 +27,12 @@ fn base_dpc_multiple_transactions() {
     // Generate addresses
     let [genesis_address, miner_address, recipient] = generate_test_addresses(&parameters, &mut rng);
 
-    // Setup the ledger
+    // Open the ledger
+    //    let mut path = std::env::current_dir().unwrap();
+    //    path.push("../db");
+    //    let genesis_pred_vk_bytes = GENESIS_PRED_VK_BYTES.to_vec();
+    //    let ledger = MerkleTreeLedger::open_at_path(path).unwrap();
+
     let (ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
 
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
