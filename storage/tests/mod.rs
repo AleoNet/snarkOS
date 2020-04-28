@@ -132,7 +132,7 @@ pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {
 
     Store::destroy_storage(path.clone()).unwrap();
 
-    let blockchain = Store::open_at_path(path.clone()).unwrap();
+    let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
 
     (blockchain, path)
 }
@@ -162,7 +162,7 @@ mod tests {
 
         Store::destroy_storage(path.clone()).unwrap();
 
-        let blockchain = BlockStorage::open_at_path(path.clone()).unwrap();
+        let blockchain = Arc::new(BlockStorage::open_at_path(path.clone()).unwrap());
 
         assert_eq!(blockchain.get_latest_block_height(), 0);
 
@@ -176,7 +176,7 @@ mod tests {
         let mut path = std::env::current_dir().unwrap();
         path.push(random_storage_path());
 
-        let blockchain = Store::open_at_path(path.clone()).unwrap();
+        let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
 
         blockchain.storage.storage.put(b"my key", b"my value").unwrap();
 
@@ -233,7 +233,7 @@ mod tests {
 
             Store::destroy_storage(path.clone()).unwrap();
 
-            let blockchain = Store::open_at_path(path.clone()).unwrap();
+            let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
 
             let latest_block = blockchain.get_latest_block().unwrap();
 
@@ -249,7 +249,7 @@ mod tests {
 
             Store::destroy_storage(path.clone()).unwrap();
 
-            let blockchain = Store::open_at_path(path.clone()).unwrap();
+            let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
 
             assert!(blockchain.remove_latest_block().is_err());
             assert!(blockchain.remove_latest_blocks(5).is_err());
@@ -264,7 +264,7 @@ mod tests {
 
             Store::destroy_storage(path.clone()).unwrap();
 
-            let blockchain = Store::open_at_path(path.clone()).unwrap();
+            let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
 
             assert!(blockchain.get_block_from_block_num(2).is_err());
             assert!(blockchain.get_block_from_block_num(10).is_err());

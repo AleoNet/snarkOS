@@ -49,9 +49,10 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let mut path = std::env::current_dir()?;
     path.push(&config.path);
 
-    let storage = MerkleTreeLedger::open_at_path(path)?;
+    let storage = Arc::new(MerkleTreeLedger::open_at_path(path)?);
 
     let mut parameters_path = std::env::current_dir()?;
+    parameters_path.push("dpc/src/parameters/");
 
     let parameters = PublicParameters::<Components>::load(&parameters_path)?;
 

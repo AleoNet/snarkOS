@@ -28,22 +28,22 @@ pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Create a new blockchain storage.
-    pub fn open() -> Result<Arc<Self>, StorageError> {
+    pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;
         path.push("../db");
 
-        BlockStorage::open_at_path(path)
+        Self::open_at_path(path)
     }
 
     /// Open the blockchain storage at a particular path.
-    pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Arc<Self>, StorageError> {
+    pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Self, StorageError> {
         fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
 
         Self::get_latest_state(path)
     }
 
     /// Get the latest state of the storage.
-    pub fn get_latest_state<PATH: AsRef<Path>>(path: PATH) -> Result<Arc<Self>, StorageError> {
+    pub fn get_latest_state<PATH: AsRef<Path>>(path: PATH) -> Result<Self, StorageError> {
         let latest_block_number = {
             let storage = Storage::open_cf(path.as_ref(), NUM_COLS)?;
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
@@ -80,13 +80,13 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
                 let merkle_tree = MerkleTree::new(&parameters, &commitments)?;
 
-                Ok(Arc::new(Self {
+                Ok(Self {
                     latest_block_height: RwLock::new(bytes_to_u32(val)),
                     storage: Arc::new(storage),
                     cm_merkle_tree: RwLock::new(merkle_tree),
                     ledger_parameters: parameters,
                     _transaction: PhantomData,
-                }))
+                })
             }
             None => {
                 // Add genesis block to database
@@ -102,7 +102,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
                 )
                 .unwrap(); // TODO handle this unwrap. merge storage and ledger error
 
-                Ok(Arc::new(block_storage))
+                Ok(block_storage)
             }
         }
     }

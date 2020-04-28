@@ -38,7 +38,7 @@ pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
 
     MerkleTreeLedger::destroy_storage(path.clone()).unwrap();
 
-    let blockchain = MerkleTreeLedger::open_at_path(path.clone()).unwrap();
+    let blockchain = Arc::new(MerkleTreeLedger::open_at_path(path.clone()).unwrap());
 
     (blockchain, path)
 }

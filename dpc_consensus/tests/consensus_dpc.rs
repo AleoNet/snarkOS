@@ -1,4 +1,5 @@
 use snarkos_dpc::{
+    address::AddressPair,
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
     test_data::*,
     DPCScheme,
@@ -6,8 +7,11 @@ use snarkos_dpc::{
 use snarkos_dpc_consensus::{get_block_reward, test_data::*, ConsensusParameters};
 use snarkos_models::dpc::Record;
 use snarkos_objects::{dpc::DPCTransactions, ledger::Ledger};
-use snarkos_storage::BlockStorage;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_storage::{BlockStorage, GENESIS_ADDRESS_PAIR, GENESIS_PRED_VK_BYTES};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use rand::thread_rng;
 
@@ -15,25 +19,21 @@ use rand::thread_rng;
 fn base_dpc_multiple_transactions() {
     let mut rng = thread_rng();
 
-    let consensus = ConsensusParameters {
-        max_block_size: 1_000_000_000usize,
-        max_nonce: u32::max_value(),
-        target_block_time: 10i64,
-    };
+    let consensus = TEST_CONSENSUS;
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
+    let (_ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
 
     // Generate addresses
-    let [genesis_address, miner_address, recipient] = generate_test_addresses(&parameters, &mut rng);
+    let [miner_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
+
+    let genesis_address: AddressPair<Components> = FromBytes::read(&GENESIS_ADDRESS_PAIR[..]).unwrap();
 
     // Open the ledger
-    //    let mut path = std::env::current_dir().unwrap();
-    //    path.push("../db");
-    //    let genesis_pred_vk_bytes = GENESIS_PRED_VK_BYTES.to_vec();
-    //    let ledger = MerkleTreeLedger::open_at_path(path).unwrap();
-
-    let (ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
+    let mut path = std::env::current_dir().unwrap();
+    path.push("../db");
+    let genesis_pred_vk_bytes = GENESIS_PRED_VK_BYTES.to_vec();
+    let ledger = MerkleTreeLedger::open_at_path(path).unwrap();
 
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];

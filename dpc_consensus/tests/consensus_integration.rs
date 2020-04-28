@@ -11,6 +11,7 @@
 //        BlockHeaderHash,
 //        MerkleRootHash,
 //    };
+//    use snarkos_storage::genesis::*;
 //    use snarkos_utilities::bytes::FromBytes;
 //
 //    use std::str::FromStr;
@@ -22,7 +23,7 @@
 //        expected_merkle_root_hash: &MerkleRootHash,
 //    ) {
 //        let consensus = TEST_CONSENSUS;
-//        let miner_address: AddressPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
+//        let miner_address: AddressPublicKey<Components> = FromBytes::read(&GENESIS_ADDRESS_PAIR[..])?;
 //        let miner = Miner::new(miner_address, consensus);
 //
 //        let header = miner.find_block(transactions, parent_header).unwrap();
@@ -145,7 +146,7 @@
 //                test_verify_header(parent_header, child_header, expected_merkle_root_hash);
 //            });
 //    }
-
+//
 //    #[test]
 //    fn transaction_double_spend() {
 //        let (mut blockchain, path) = initialize_test_blockchain();
