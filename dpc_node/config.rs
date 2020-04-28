@@ -24,7 +24,7 @@ pub struct Config {
     pub rpc_port: u16,
     pub bootnodes: Vec<String>,
     pub coinbase_address: String,
-    pub genesis: String,
+    //    pub genesis: String,
     pub mempool_interval: u8,
     pub min_peers: u16,
     pub max_peers: u16,
@@ -51,8 +51,8 @@ impl Default for Config {
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
-            coinbase_address: "ff4dcceb9f3003ea59df2770ed4a61409dceb87d244c1be394c52787817ec511".into(),
-            genesis: "00000000000000000000000000000000000000000000000000000000000000008c8d4f393f39c063c40a617c6e2584e6726448c4c0f7da7c848bfa573e628388fbf1285e00000000ffffffffff7f00005e4401000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff04010000000100e1f505000000001976a914ef5392fc02643be8b98f6aaca5c1ffaab238916a88ac".into(),
+            coinbase_address: "90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900".into(),
+            //            genesis: "".into(),
             subcommand: None,
             mempool_interval: 5,
             min_peers: 2,

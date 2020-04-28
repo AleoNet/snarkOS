@@ -1,4 +1,5 @@
 // Block Storage genesis components
+// NOTE: These values must be updated if parameters are changed
 
 pub const GENESIS_RECORD_COMMITMENT: [u8; 32] = [
     160, 221, 22, 193, 143, 182, 235, 71, 152, 194, 179, 165, 201, 99, 57, 66, 94, 157, 191, 24, 120, 92, 254, 89, 142,

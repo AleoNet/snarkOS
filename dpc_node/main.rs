@@ -115,6 +115,8 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         .spawn();
     }
 
+    println!("7");
+
     // Start server thread
 
     server.listen().await?;
