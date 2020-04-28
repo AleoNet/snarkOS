@@ -17,9 +17,9 @@ snarkos-utilities = { path = "../utilities" }
 
 derivative = { version = "1" }
 failure = { version = "0.1" }
-rand = { version = "0.7" }
-rand_xorshift = { version = "0.2" }
-smallvec = { version = "1.2" }
+rand = { version = "0.7", default-features = false, optional = true }
+rand_xorshift = { version = "0.2", default-features = false, optional = true }
+smallvec = { version = "1.2", optional = true }
 
 #
 # Each module in `snarkos-models` is guarded by a feature flag to minimize compilation resources.
@@ -31,6 +31,6 @@ smallvec = { version = "1.2" }
 [features]
 default = []
 algorithms = []
-curves = []
+curves = ["rand", "rand_xorshift"]
 dpc = []
-gadgets = []
+gadgets = ["rand_xorshift", "smallvec"]

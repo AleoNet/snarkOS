@@ -15,7 +15,7 @@ edition = "2018"
 rand = { version = "0.7", default-features = false }
 
 [dev-dependencies]
-rand_xorshift = { version = "0.2" }
+rand_xorshift = { version = "0.2", default-features = false }
 
 [features]
 default = ["std"]
