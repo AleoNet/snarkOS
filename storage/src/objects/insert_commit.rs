@@ -223,7 +223,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
     /// Returns true if the block exists in the canon chain.
     pub fn is_canon(&self, _block_hash: &BlockHeaderHash) -> bool {
-        unimplemented!()
+        true //TODO implement syncs
     }
 
     /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.

@@ -338,7 +338,7 @@ mod server_connection_handler {
 
         {
             println!("test memory pool interval");
-            memory_pool_interval(parameters.clone());
+            memory_pool_interval(parameters);
         }
     }
 }
