@@ -47,12 +47,11 @@ pub fn bitcoin_retarget(
 
     // new_difficulty = old_difficulty * (time_elapsed / target_block_time)
     let mut x: u64;
-    x = parent_difficulty;
-    //
-    //        println!("x is {:?}", x);
-    //        println!("time elapsed is: {:?}", time_elapsed);
+    x = match parent_difficulty.checked_mul(time_elapsed as u64) {
+        Some(x) => x,
+        None => u64::max_value(),
+    };
 
-    x *= time_elapsed as u64;
     x /= target_block_time as u64;
 
     //        if x > self.pow_limit {

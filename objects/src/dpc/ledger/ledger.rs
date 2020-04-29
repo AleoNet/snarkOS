@@ -15,7 +15,6 @@ use std::{
     hash::Hash,
     path::PathBuf,
     rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 pub struct BasicLedger<T: Transaction, P: MerkleParameters> {
@@ -76,15 +75,10 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P> {
         let mut past_digests = HashSet::new();
         past_digests.insert(root.clone());
 
-        let time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs() as i64;
-
         let header = BlockHeader {
             previous_block_hash: BlockHeaderHash([0u8; 32]),
             merkle_root_hash: MerkleRootHash([0u8; 32]),
-            time,
+            time: 0,
             difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
         };

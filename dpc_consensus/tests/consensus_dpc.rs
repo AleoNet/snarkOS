@@ -1,5 +1,5 @@
 use snarkos_dpc::{
-    address::{AddressPair, AddressPublicKey, AddressSecretKey},
+    address::{AddressPublicKey, AddressSecretKey},
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
     test_data::*,
     DPCScheme,
@@ -10,7 +10,7 @@ use snarkos_objects::{
     dpc::{Block, DPCTransactions},
     ledger::Ledger,
 };
-use snarkos_storage::{BlockStorage, GENESIS_ADDRESS_PAIR, GENESIS_PRED_VK_BYTES};
+use snarkos_storage::{BlockStorage, GENESIS_PRED_VK_BYTES};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -33,8 +33,6 @@ fn base_dpc_multiple_transactions() {
     let miner_pk: AddressPublicKey<Components> =
         FromBytes::read(&hex::decode(TEST_WALLETS[1].address).unwrap()[..]).unwrap();
 
-    let recipient_sk: AddressSecretKey<Components> =
-        FromBytes::read(&hex::decode(TEST_WALLETS[2].private_key).unwrap()[..]).unwrap();
     let recipient_pk: AddressPublicKey<Components> =
         FromBytes::read(&hex::decode(TEST_WALLETS[2].address).unwrap()[..]).unwrap();
 

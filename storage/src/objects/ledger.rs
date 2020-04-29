@@ -16,13 +16,7 @@ use snarkos_utilities::{
 
 use parking_lot::RwLock;
 use rand::Rng;
-use std::{
-    fs,
-    marker::PhantomData,
-    path::PathBuf,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
 impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
     type Commitment = T::Commitment;
@@ -58,16 +52,11 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
 
         let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()]).unwrap();
 
-        let time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs() as i64;
-
         let header = BlockHeader {
             previous_block_hash: BlockHeaderHash([0u8; 32]),
             merkle_root_hash: MerkleRootHash([0u8; 32]),
-            time,
-            difficulty_target: 0xFFFF_FFFF_FFFF_FFFF_u64,
+            time: 0,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
         };
 
