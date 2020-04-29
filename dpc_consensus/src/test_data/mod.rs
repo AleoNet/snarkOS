@@ -28,6 +28,10 @@ pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
     (blockchain, path)
 }
 
+pub fn kill_storage_async(path: PathBuf) {
+    MerkleTreeLedger::destroy_storage(path).unwrap();
+}
+
 pub fn kill_storage_sync(storage: Arc<MerkleTreeLedger>, path: PathBuf) {
     drop(storage);
     MerkleTreeLedger::destroy_storage(path).unwrap();

@@ -7,5 +7,5 @@ pub trait Storage: Sized {
     fn store(&self, path: &PathBuf) -> IoResult<()>;
 
     /// Stores `self` from the `path`
-    fn load(_path: &PathBuf) -> IoResult<Self>;
+    fn load(path: &PathBuf) -> IoResult<Self>;
 }
