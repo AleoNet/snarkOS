@@ -1,4 +1,4 @@
-use dpc_node::{
+use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };

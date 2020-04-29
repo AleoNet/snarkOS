@@ -30,12 +30,12 @@ members = [
 ]
 
 [lib]
-name = "dpc_node"
-path = "dpc_node/lib.rs"
+name = "snarkos"
+path = "snarkOS/lib.rs"
 
 [[bin]]
 name = "snarkos"
-path = "dpc_node/main.rs"
+path = "snarkOS/main.rs"
 
 [dependencies]
 snarkos-dpc = { path = "./dpc", version = "0.8.0", default-features = false }
