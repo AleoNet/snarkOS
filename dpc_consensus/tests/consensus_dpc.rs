@@ -1,5 +1,4 @@
 use snarkos_dpc::{
-    address::{AddressPublicKey, AddressSecretKey},
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
     test_data::*,
     DPCScheme,
@@ -10,11 +9,8 @@ use snarkos_objects::{
     dpc::{Block, DPCTransactions},
     ledger::Ledger,
 };
-use snarkos_storage::{BlockStorage, GENESIS_PRED_VK_BYTES};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_storage::BlockStorage;
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;
 
@@ -25,26 +21,23 @@ fn base_dpc_multiple_transactions() {
     let consensus = TEST_CONSENSUS;
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (_ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
+    let (ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
 
-    // Initialize addresses
-    let miner_sk: AddressSecretKey<Components> =
-        FromBytes::read(&hex::decode(TEST_WALLETS[1].private_key).unwrap()[..]).unwrap();
-    let miner_pk: AddressPublicKey<Components> =
-        FromBytes::read(&hex::decode(TEST_WALLETS[1].address).unwrap()[..]).unwrap();
+    // Generate addresses
+    let [genesis_address, miner_address, recipient] = generate_test_addresses(&parameters, &mut rng);
 
-    let recipient_pk: AddressPublicKey<Components> =
-        FromBytes::read(&hex::decode(TEST_WALLETS[2].address).unwrap()[..]).unwrap();
+    let (ledger, genesis_pred_vk_bytes) = setup_ledger(
+        "test_multiple_transations_db".to_string(),
+        &parameters,
+        ledger_parameters,
+        &genesis_address,
+        &mut rng,
+    );
 
-    let miner = Miner::new(miner_pk, consensus.clone());
-
-    // Open the ledger
-    let mut path = std::env::current_dir().unwrap();
-    path.push("../db");
-    let ledger = MerkleTreeLedger::open_at_path(path).unwrap();
+    let miner = Miner::new(miner_address.public_key, consensus.clone());
 
     // Initialize the predicate values
-    let new_predicate = Predicate::new(GENESIS_PRED_VK_BYTES.to_vec());
+    let new_predicate = Predicate::new(genesis_pred_vk_bytes);
     let new_birth_predicates = vec![new_predicate.clone(); NUM_INPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
@@ -78,8 +71,8 @@ fn base_dpc_multiple_transactions() {
 
     // Add new block spending records from the previous block
 
-    let spend_asks = vec![miner_sk.clone(); NUM_INPUT_RECORDS];
-    let newer_apks = vec![recipient_pk.clone(); NUM_OUTPUT_RECORDS];
+    let spend_asks = vec![miner_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let newer_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
 
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };

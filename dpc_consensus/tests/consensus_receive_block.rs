@@ -1,20 +1,16 @@
 mod consensus_receive_block {
-    use snarkos_dpc::base_dpc::{
-        instantiated::{Components, Tx},
-        parameters::PublicParameters,
-    };
+    use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::setup_or_load_parameters};
     use snarkos_dpc_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_objects::Block;
+
+    use rand::thread_rng;
 
     // Receive two new blocks in order.
     #[test]
     fn new_in_order() {
         let (mut blockchain, path) = initialize_test_blockchain();
 
-        let mut parameters_path = std::env::current_dir().unwrap();
-        parameters_path.push("../dpc/src/parameters/");
-
-        let parameters = PublicParameters::<Components>::load(&parameters_path).unwrap();
+        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
 
         let mut memory_pool = MemoryPool::new();
 

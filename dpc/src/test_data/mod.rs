@@ -32,8 +32,12 @@ pub fn setup_or_load_parameters<R: Rng>(
                     Ok(parameters) => parameters,
                     Err(_) => {
                         println!("Parameter Setup");
-                        <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
-                            .expect("DPC setup failed")
+                        let parameters =
+                            <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
+                                .expect("DPC setup failed");
+
+                        parameters.store(&path).unwrap();
+                        parameters
                     }
                 };
 
@@ -46,6 +50,9 @@ pub fn setup_or_load_parameters<R: Rng>(
                 println!("Parameter Setup");
                 let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
                     .expect("DPC setup failed");
+
+                ledger_parameters.store(&ledger_parameter_path).unwrap();
+                parameters.store(&path).unwrap();
 
                 (ledger_parameters, parameters)
             }
@@ -71,11 +78,11 @@ pub fn generate_test_addresses<R: Rng>(
     let metadata_2 = [3u8; 32];
     let address_2 = DPC::create_address_helper(&parameters.circuit_parameters, &metadata_2, rng).unwrap();
 
-    // TODO Setup permanent test addresses. Note: addresses must be regenerated if circuit parameters change
     [genesis_address, address_1, address_2]
 }
 
 pub fn setup_ledger<R: Rng>(
+    db_name: String,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
     genesis_address: &AddressPair<Components>,
@@ -117,7 +124,7 @@ pub fn setup_ledger<R: Rng>(
     let genesis_memo = [0u8; 32];
 
     let mut path = std::env::current_dir().unwrap();
-    path.push("../db");
+    path.push(db_name);
 
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger = MerkleTreeLedger::new(

@@ -1,7 +1,10 @@
 mod server_listen {
-    use snarkos_dpc::base_dpc::{
-        instantiated::{Components, MerkleTreeLedger},
-        parameters::PublicParameters,
+    use snarkos_dpc::{
+        base_dpc::{
+            instantiated::{Components, MerkleTreeLedger},
+            parameters::PublicParameters,
+        },
+        test_data::setup_or_load_parameters,
     };
     use snarkos_dpc_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_dpc_network::{
@@ -17,6 +20,7 @@ mod server_listen {
     };
 
     use chrono::{DateTime, Utc};
+    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{
@@ -199,10 +203,7 @@ mod server_listen {
     #[test]
     #[serial]
     fn test_server_listen() {
-        let mut parameters_path = std::env::current_dir().unwrap();
-        parameters_path.push("../dpc/src/parameters/");
-
-        let parameters = PublicParameters::<Components>::load(&parameters_path).unwrap();
+        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
 
         {
             println!("test bind to port");

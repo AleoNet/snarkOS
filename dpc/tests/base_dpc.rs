@@ -42,7 +42,13 @@ fn base_dpc_integration_test() {
     let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
 
     // Setup the ledger
-    let (ledger, genesis_pred_vk_bytes) = setup_ledger(&parameters, ledger_parameters, &genesis_address, &mut rng);
+    let (ledger, genesis_pred_vk_bytes) = setup_ledger(
+        "test_dpc_integration_db".to_string(),
+        &parameters,
+        ledger_parameters,
+        &genesis_address,
+        &mut rng,
+    );
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();

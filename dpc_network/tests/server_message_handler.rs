@@ -1,7 +1,10 @@
 mod server_message_handler {
-    use snarkos_dpc::base_dpc::{
-        instantiated::{Components, Tx},
-        parameters::PublicParameters,
+    use snarkos_dpc::{
+        base_dpc::{
+            instantiated::{Components, Tx},
+            parameters::PublicParameters,
+        },
+        test_data::*,
     };
     use snarkos_dpc_consensus::{miner::Entry, test_data::*};
     use snarkos_dpc_network::{
@@ -16,6 +19,7 @@ mod server_message_handler {
     };
 
     use chrono::{DateTime, Utc};
+    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{net::TcpListener, runtime::Runtime, sync::oneshot};
@@ -940,11 +944,7 @@ mod server_message_handler {
     #[test]
     #[serial]
     fn test_message_handler_structs() {
-        let mut parameters_path = std::env::current_dir().unwrap();
-        parameters_path.push("../dpc/src/parameters/");
-
-        let parameters = PublicParameters::<Components>::load(&parameters_path).unwrap();
-
+        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
         {
             println!("test receive block message");
             receive_block_message(parameters.clone());
@@ -979,11 +979,7 @@ mod server_message_handler {
     #[test]
     #[serial]
     fn test_message_handler_misc() {
-        let mut parameters_path = std::env::current_dir().unwrap();
-        parameters_path.push("../dpc/src/parameters/");
-
-        let parameters = PublicParameters::<Components>::load(&parameters_path).unwrap();
-
+        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
         {
             println!("test receive get empty memory pool");
             receive_get_memory_pool_empty(parameters.clone());

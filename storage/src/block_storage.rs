@@ -11,6 +11,7 @@ use snarkos_objects::{
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
+use rand::thread_rng;
 use std::{
     fs,
     marker::PhantomData,
@@ -53,7 +54,10 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
         let ledger_parameter_path = parameter_path.join("ledger.params");
 
-        let parameters = P::load(&ledger_parameter_path)?;
+        let parameters = match P::load(&ledger_parameter_path) {
+            Ok(parameters) => parameters,
+            Err(_) => P::setup(&mut thread_rng()),
+        };
 
         match latest_block_number {
             Some(val) => {
