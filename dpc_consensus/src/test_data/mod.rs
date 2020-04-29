@@ -28,6 +28,11 @@ pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
     (blockchain, path)
 }
 
+pub fn kill_storage_sync(storage: Arc<MerkleTreeLedger>, path: PathBuf) {
+    drop(storage);
+    MerkleTreeLedger::destroy_storage(path).unwrap();
+}
+
 pub struct Wallet {
     pub private_key: &'static str,
     pub address: &'static str,

@@ -239,7 +239,7 @@ impl ConsensusParameters {
             return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
         }
 
-        if storage.block_hash_exists(&block.header.previous_block_hash) {
+        if !storage.block_hash_exists(&block.header.get_hash()) {
             self.process_block(parameters, &storage, memory_pool, &block)?;
         }
 
