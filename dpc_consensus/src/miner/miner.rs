@@ -143,10 +143,16 @@ impl Miner {
         let mut candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
 
+        println!("Miner creating block");
+
         let (previous_block_header, transactions, coinbase_records) =
             self.establish_block(parameters, storage, &mut candidate_transactions)?;
 
+        println!("Miner generated coinbase transaction");
+
         let header = self.find_block(&transactions, &previous_block_header)?;
+
+        println!("Miner found block block");
 
         let block = Block { header, transactions };
 

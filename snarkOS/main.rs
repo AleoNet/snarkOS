@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
@@ -51,18 +54,23 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let storage = Arc::new(MerkleTreeLedger::open_at_path(path)?);
 
-    let mut parameters_path = std::env::current_dir()?;
-    parameters_path.push("dpc/src/parameters/");
-
-    let parameters = PublicParameters::<Components>::load(&parameters_path)?;
-
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    let bootnode = config.bootnodes[0].parse::<SocketAddr>()?;
+    let bootnode = match config.bootnodes.len() {
+        0 => socket_address,
+        _ => config.bootnodes[0].parse::<SocketAddr>()?,
+    };
 
     let sync_handler = SyncHandler::new(bootnode);
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
+
+    let mut parameters_path = std::env::current_dir()?;
+    parameters_path.push("dpc/src/parameters/");
+
+    info!("Loading Parameters");
+    let parameters = PublicParameters::<Components>::load(&parameters_path)?;
+    info!("Parameters Loaded");
 
     let server = Server::new(
         Context::new(
@@ -96,11 +104,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    // TODO make this a permanently stored miner address
-    //    let rng = &mut thread_rng();
-    //    let miner_metadata = [0u8; 32];
-    //    let miner_address = DPC::create_address_helper(&parameters.circuit_parameters, &miner_metadata, rng).unwrap();
-
     let miner_address: AddressPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
 
     if config.miner {
@@ -114,8 +117,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         )
         .spawn();
     }
-
-    println!("7");
 
     // Start server thread
 

@@ -53,6 +53,8 @@ impl MinerInstance {
             let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone());
 
             loop {
+                info!("Mining new block");
+
                 let (block_serialized, _coinbase_records) = miner
                     .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
                     .await
