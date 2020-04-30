@@ -32,6 +32,7 @@ impl Default for ConsoleConfig {
     }
 }
 
+// TODO Update RPC console calls to reflect new RPC IMPL
 impl ConsoleConfig {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {

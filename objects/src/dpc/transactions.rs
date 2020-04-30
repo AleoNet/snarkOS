@@ -61,6 +61,14 @@ impl<T: Transaction> DPCTransactions<T> {
             .collect::<Result<Vec<Vec<u8>>, TransactionError>>()
     }
 
+    /// Serializes the transactions into strings.
+    pub fn serialize_as_str(&self) -> Result<Vec<String>, TransactionError> {
+        self.0
+            .iter()
+            .map(|transaction| -> Result<String, TransactionError> { Ok(hex::encode(to_bytes![transaction]?)) })
+            .collect::<Result<Vec<String>, TransactionError>>()
+    }
+
     pub fn conflicts(&self, transaction: &T) -> bool {
         let mut holding_serial_numbers = vec![];
         let mut holding_commitments = vec![];
