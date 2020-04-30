@@ -215,10 +215,8 @@ impl UInt32 {
         })
     }
 
-    /// Returns a new UInt32 which represents the inverse of self
+    /// Returns the inverse UInt32
     pub fn negate(&self) -> Self {
-        // let bits = self.bits.iter().map(|a| a.not()).collect();
-
         UInt32 {
             bits: self.bits.clone(),
             negated: true,
@@ -289,7 +287,6 @@ impl UInt32 {
         // in the scalar field
         assert!(F::Params::MODULUS_BITS >= 64);
         assert!(operands.len() >= 2); // Weird trivial cases that should never happen
-        // assert!(operands.len() <= 10);
 
         // Compute the maximum value of the sum so we allocate enough bits for
         // the result
@@ -314,7 +311,7 @@ impl UInt32 {
                     if op.negated {
                         if let Some(result) = result_value {
                             if result < u64::from(val) {
-                                // TODO: this is a subtract with overflow. Instead of erroring, return 0.
+                                // this is a subtract with overflow. Instead of erroring, return 0.
                                 overflow = true;
                                 result_value.as_mut().map(|v| *v = 0u64);
                             } else {
@@ -574,7 +571,7 @@ impl UInt32 {
             //   (R == D) || (R > D)
             //
             //  (R > D) checks subtraction overflow before evaluation
-            //  We instead evaluate subtraction and check for overflowed after:
+            //  We instead evaluate subtraction and check for overflow after:
             //    (R != D) && ((R - D) != 0)
             //
             //  Final conditional:
@@ -798,6 +795,36 @@ mod test {
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
+    fn check_all_constant_bits(mut expected: u32, actual: UInt32) {
+        for b in actual.bits.iter() {
+            match b {
+                &Boolean::Is(_) => panic!(),
+                &Boolean::Not(_) => panic!(),
+                &Boolean::Constant(b) => {
+                    assert!(b == (expected & 1 == 1));
+                }
+            }
+
+            expected >>= 1;
+        }
+    }
+
+    fn check_all_allocated_bits(mut expected: u32, actual: UInt32) {
+        for b in actual.bits.iter() {
+            match b {
+                &Boolean::Is(ref b) => {
+                    assert!(b.get_value().unwrap() == (expected & 1 == 1));
+                }
+                &Boolean::Not(ref b) => {
+                    assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+                }
+                &Boolean::Constant(_) => unreachable!(),
+            }
+
+            expected >>= 1;
+        }
+    }
+
     #[test]
     fn test_uint32_from_bits() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -832,42 +859,42 @@ mod test {
     fn test_uint32_xor() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
-        // for _ in 0..1000 {
-        let mut cs = TestConstraintSystem::<Fr>::new();
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
 
-        let a: u32 = rng.gen();
-        let b: u32 = rng.gen();
-        let c: u32 = rng.gen();
+            let a: u32 = rng.gen();
+            let b: u32 = rng.gen();
+            let c: u32 = rng.gen();
 
-        let mut expected = a ^ b ^ c;
+            let mut expected = a ^ b ^ c;
 
-        let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
-        let b_bit = UInt32::constant(b);
-        let c_bit = UInt32::alloc(cs.ns(|| "c_bit"), Some(c)).unwrap();
+            let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
+            let b_bit = UInt32::constant(b);
+            let c_bit = UInt32::alloc(cs.ns(|| "c_bit"), Some(c)).unwrap();
 
-        let r = a_bit.xor(cs.ns(|| "first xor"), &b_bit).unwrap();
-        let r = r.xor(cs.ns(|| "second xor"), &c_bit).unwrap();
+            let r = a_bit.xor(cs.ns(|| "first xor"), &b_bit).unwrap();
+            let r = r.xor(cs.ns(|| "second xor"), &c_bit).unwrap();
 
-        assert!(cs.is_satisfied());
+            assert!(cs.is_satisfied());
 
-        assert!(r.value == Some(expected));
+            assert!(r.value == Some(expected));
 
-        for b in r.bits.iter() {
-            match b {
-                &Boolean::Is(ref b) => {
-                    assert!(b.get_value().unwrap() == (expected & 1 == 1));
+            for b in r.bits.iter() {
+                match b {
+                    &Boolean::Is(ref b) => {
+                        assert!(b.get_value().unwrap() == (expected & 1 == 1));
+                    }
+                    &Boolean::Not(ref b) => {
+                        assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+                    }
+                    &Boolean::Constant(b) => {
+                        assert!(b == (expected & 1 == 1));
+                    }
                 }
-                &Boolean::Not(ref b) => {
-                    assert!(!b.get_value().unwrap() == (expected & 1 == 1));
-                }
-                &Boolean::Constant(b) => {
-                    assert!(b == (expected & 1 == 1));
-                }
+
+                expected >>= 1;
             }
-
-            expected >>= 1;
         }
-        //     }
     }
 
     #[test]
@@ -914,23 +941,13 @@ mod test {
             let b_bit = UInt32::constant(b);
             let c_bit = UInt32::constant(c);
 
-            let mut expected = a.wrapping_add(b).wrapping_add(c);
+            let expected = a.wrapping_add(b).wrapping_add(c);
 
             let r = UInt32::addmany(cs.ns(|| "addition"), &[a_bit, b_bit, c_bit]).unwrap();
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(_) => panic!(),
-                    &Boolean::Not(_) => panic!(),
-                    &Boolean::Constant(b) => {
-                        assert!(b == (expected & 1 == 1));
-                    }
-                }
-
-                expected >>= 1;
-            }
+            check_all_constant_bits(expected, r);
         }
     }
 
@@ -946,7 +963,7 @@ mod test {
             let c: u32 = rng.gen();
             let d: u32 = rng.gen();
 
-            let mut expected = (a ^ b).wrapping_add(c).wrapping_add(d);
+            let expected = (a ^ b).wrapping_add(c).wrapping_add(d);
 
             let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
             let b_bit = UInt32::constant(b);
@@ -960,19 +977,7 @@ mod test {
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(ref b) => {
-                        assert!(b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Not(ref b) => {
-                        assert!(!b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Constant(_) => unreachable!(),
-                }
-
-                expected >>= 1;
-            }
+            check_all_allocated_bits(expected, r);
 
             // Flip a bit_gadget and see if the addition constraint still works
             if cs.get("addition/result bit_gadget 0/boolean").is_zero() {
@@ -998,23 +1003,13 @@ mod test {
             let a_bit = UInt32::constant(a);
             let b_bit = UInt32::constant(b);
 
-            let mut expected = a.wrapping_sub(b);
+            let expected = a.wrapping_sub(b);
 
             let r = a_bit.sub(cs.ns(|| "subtraction"), &b_bit).unwrap();
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(_) => panic!(),
-                    &Boolean::Not(_) => panic!(),
-                    &Boolean::Constant(b) => {
-                        assert!(b == (expected & 1 == 1));
-                    }
-                }
-
-                expected >>= 1;
-            }
+            check_all_constant_bits(expected, r);
         }
     }
 
@@ -1028,10 +1023,14 @@ mod test {
             let a: u32 = rng.gen_range(u32::max_value() / 2u32, u32::max_value());
             let b: u32 = rng.gen_range(0u32, u32::max_value() / 2u32);
 
-            let mut expected = a.wrapping_sub(b);
+            let expected = a.wrapping_sub(b);
 
             let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
-            let b_bit = UInt32::constant(b);
+            let b_bit = if b > u32::max_value() / 4 {
+                UInt32::constant(b)
+            } else {
+                UInt32::alloc(cs.ns(|| "b_bit"), Some(b)).unwrap()
+            };
 
             let r = a_bit.sub(cs.ns(|| "subtraction"), &b_bit).unwrap();
 
@@ -1039,19 +1038,7 @@ mod test {
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(ref b) => {
-                        assert!(b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Not(ref b) => {
-                        assert!(!b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Constant(_) => unreachable!(),
-                }
-
-                expected >>= 1;
-            }
+            check_all_allocated_bits(expected, r);
 
             // Flip a bit_gadget and see if the subtraction constraint still works
             if cs.get("subtraction/add_not/result bit_gadget 0/boolean").is_zero() {
@@ -1077,23 +1064,13 @@ mod test {
             let a_bit = UInt32::constant(a);
             let b_bit = UInt32::constant(b);
 
-            let mut expected = a.wrapping_mul(b);
+            let expected = a.wrapping_mul(b);
 
             let r = a_bit.mul(cs.ns(|| "multiply"), &b_bit).unwrap();
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(_) => panic!(),
-                    &Boolean::Not(_) => panic!(),
-                    &Boolean::Constant(b) => {
-                        assert!(b == (expected & 1 == 1));
-                    }
-                }
-
-                expected >>= 1;
-            }
+            check_all_constant_bits(expected, r);
         }
     }
 
@@ -1107,10 +1084,14 @@ mod test {
             let a: u32 = rng.gen_range(0, u32::from(u16::max_value()));
             let b: u32 = rng.gen_range(0, u32::from(u16::max_value()));
 
-            let mut expected = a.wrapping_mul(b);
+            let expected = a.wrapping_mul(b);
 
             let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
-            let b_bit = UInt32::constant(b);
+            let b_bit = if b > u32::from(u16::max_value() / 2) {
+                UInt32::constant(b)
+            } else {
+                UInt32::alloc(cs.ns(|| "b_bit"), Some(b)).unwrap()
+            };
 
             let r = a_bit.mul(cs.ns(|| "multiplication"), &b_bit).unwrap();
 
@@ -1118,19 +1099,7 @@ mod test {
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(ref b) => {
-                        assert!(b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Not(ref b) => {
-                        assert!(!b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Constant(_) => unreachable!(),
-                }
-
-                expected >>= 1;
-            }
+            check_all_allocated_bits(expected, r);
 
             // Flip a bit_gadget and see if the multiplication constraint still works
             if cs
@@ -1165,23 +1134,13 @@ mod test {
             let a_bit = UInt32::constant(a);
             let b_bit = UInt32::constant(b);
 
-            let mut expected = a.wrapping_div(b);
+            let expected = a.wrapping_div(b);
 
             let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(_) => panic!(),
-                    &Boolean::Not(_) => panic!(),
-                    &Boolean::Constant(b) => {
-                        assert!(b == (expected & 1 == 1));
-                    }
-                }
-
-                expected >>= 1;
-            }
+            check_all_constant_bits(expected, r);
         }
     }
 
@@ -1195,10 +1154,14 @@ mod test {
             let a: u32 = rng.gen();
             let b: u32 = rng.gen();
 
-            let mut expected = a.wrapping_div(b);
+            let expected = a.wrapping_div(b);
 
             let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
-            let b_bit = UInt32::constant(b);
+            let b_bit = if b > u32::max_value() / 2 {
+                UInt32::constant(b)
+            } else {
+                UInt32::alloc(cs.ns(|| "b_bit"), Some(b)).unwrap()
+            };
 
             let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
 
@@ -1206,28 +1169,25 @@ mod test {
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(ref b) => {
-                        assert!(b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Not(ref b) => {
-                        assert!(!b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Constant(_) => unreachable!(),
-                }
+            check_all_allocated_bits(expected, r);
 
-                expected >>= 1;
+            // Flip a bit_gadget and see if the division constraint still works
+            if cs
+                .get("division/subtract_divisor_0/add_not/result bit_gadget 0/boolean")
+                .is_zero()
+            {
+                cs.set(
+                    "division/subtract_divisor_0/add_not/result bit_gadget 0/boolean",
+                    Field::one(),
+                );
+            } else {
+                cs.set(
+                    "division/subtract_divisor_0/add_not/result bit_gadget 0/boolean",
+                    Field::zero(),
+                );
             }
 
-            // // Flip a bit_gadget and see if the division constraint still works
-            // if cs.get("division/result bit_gadget 0/boolean").is_zero() {
-            //     cs.set("division/result bit_gadget 0/boolean", Field::one());
-            // } else {
-            //     cs.set("division/result bit_gadget 0/boolean", Field::zero());
-            // }
-            //
-            // assert!(!cs.is_satisfied());
+            assert!(!cs.is_satisfied());
         }
     }
 
@@ -1244,23 +1204,13 @@ mod test {
             let a_bit = UInt32::constant(a);
             let b_bit = UInt32::constant(b);
 
-            let mut expected = a.wrapping_pow(b);
+            let expected = a.wrapping_pow(b);
 
             let r = a_bit.pow(cs.ns(|| "exponentiation"), &b_bit).unwrap();
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(_) => panic!(),
-                    &Boolean::Not(_) => panic!(),
-                    &Boolean::Constant(b) => {
-                        assert!(b == (expected & 1 == 1));
-                    }
-                }
-
-                expected >>= 1;
-            }
+            check_all_constant_bits(expected, r);
         }
     }
 
@@ -1274,10 +1224,14 @@ mod test {
             let a: u32 = rng.gen_range(0, u32::from(u8::max_value()));
             let b: u32 = rng.gen_range(0, 4);
 
-            let mut expected = a.wrapping_pow(b);
+            let expected = a.wrapping_pow(b);
 
             let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), Some(a)).unwrap();
-            let b_bit = UInt32::constant(b);
+            let b_bit = if b > 2 {
+                UInt32::constant(b)
+            } else {
+                UInt32::alloc(cs.ns(|| "b_bit"), Some(b)).unwrap()
+            };
 
             let r = a_bit.pow(cs.ns(|| "exponentiation"), &b_bit).unwrap();
 
@@ -1285,28 +1239,25 @@ mod test {
 
             assert!(r.value == Some(expected));
 
-            for b in r.bits.iter() {
-                match b {
-                    &Boolean::Is(ref b) => {
-                        assert!(b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Not(ref b) => {
-                        assert!(!b.get_value().unwrap() == (expected & 1 == 1));
-                    }
-                    &Boolean::Constant(_) => unreachable!(),
-                }
+            check_all_allocated_bits(expected, r);
 
-                expected >>= 1;
+            // Flip a bit_gadget and see if the exponentiation constraint still works
+            if cs
+                .get("exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean")
+                .is_zero()
+            {
+                cs.set(
+                    "exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean",
+                    Field::one(),
+                );
+            } else {
+                cs.set(
+                    "exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean",
+                    Field::zero(),
+                );
             }
 
-            // // Flip a bit_gadget and see if the exponentiation constraint still works
-            // if cs.get("exponentiation/multiply_by_self/partial_products/result bit_gadget 0/boolean").is_zero() {
-            //     cs.set("exponentiation/multiply_by_self/partial_products/result bit_gadget 0/boolean", Field::one());
-            // } else {
-            //     cs.set("exponentiation/multiply_by_self/partial_products/result bit_gadget 0/boolean", Field::zero());
-            // }
-            //
-            // assert!(!cs.is_satisfied());
+            assert!(!cs.is_satisfied());
         }
     }
 }
