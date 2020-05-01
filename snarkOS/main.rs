@@ -14,12 +14,12 @@ use snarkos_dpc::{
     },
     dpc::address::AddressPublicKey,
 };
-use snarkos_dpc_network::{
+use snarkos_errors::node::NodeError;
+use snarkos_network::{
     context::Context,
     protocol::SyncHandler,
     server::{MinerInstance, Server},
 };
-use snarkos_errors::node::NodeError;
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 

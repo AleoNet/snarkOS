@@ -2,8 +2,8 @@ use crate::{
     cli::CLI,
     parameters::{flag, option, subcommand, types::*},
 };
-use snarkos_dpc_network::bootnodes::*;
 use snarkos_errors::node::CliError;
+use snarkos_network::bootnodes::*;
 
 use clap::ArgMatches;
 use serde::Serialize;

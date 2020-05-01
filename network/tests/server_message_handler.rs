@@ -7,7 +7,7 @@ mod server_message_handler {
         },
         test_data::*,
     };
-    use snarkos_dpc_network::{
+    use snarkos_network::{
         message::{types::*, Channel, Message},
         test_data::*,
         PingState,

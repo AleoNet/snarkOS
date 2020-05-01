@@ -4,7 +4,7 @@ mod server_connection_handler {
         base_dpc::{instantiated::Components, parameters::PublicParameters},
         test_data::setup_or_load_parameters,
     };
-    use snarkos_dpc_network::{
+    use snarkos_network::{
         message::{types::GetMemoryPool, Message},
         test_data::*,
         Channel,

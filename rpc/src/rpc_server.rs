@@ -1,7 +1,7 @@
 use crate::{RpcFunctions, RpcImpl};
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
-use snarkos_dpc_network::context::Context;
+use snarkos_network::context::Context;
 
 use jsonrpc_http_server::ServerBuilder;
 use std::{net::SocketAddr, sync::Arc};

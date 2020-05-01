@@ -7,7 +7,7 @@ mod server_listen {
         },
         test_data::setup_or_load_parameters,
     };
-    use snarkos_dpc_network::{
+    use snarkos_network::{
         context::Context,
         message::{
             types::{GetPeers, GetSync, Verack},

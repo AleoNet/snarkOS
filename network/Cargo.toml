@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-dpc-network"
+name = "snarkos-network"
 version = "0.8.0"
 authors = ["The Aleo Team <hello@aleo.org"]
 description = "Network for a decentralized record system"

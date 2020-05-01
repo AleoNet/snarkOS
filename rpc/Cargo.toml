@@ -15,7 +15,7 @@ edition = "2018"
 snarkos-consensus = { path = "../consensus", version = "0.8.0", default-features = false }
 snarkos-dpc = { path = "../dpc", version = "0.8.0", default-features = false }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["rpc"] }
-snarkos-dpc-network = { path = "../dpc_network", version = "0.8.0", default-features = false }
+snarkos-network = { path = "../network", version = "0.8.0", default-features = false }
 snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
 snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
