@@ -1,6 +1,6 @@
 mod consensus_receive_block {
+    use snarkos_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::setup_or_load_parameters};
-    use snarkos_dpc_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_objects::Block;
 
     use rand::thread_rng;

@@ -1,4 +1,5 @@
 mod server_listen {
+    use snarkos_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_dpc::{
         base_dpc::{
             instantiated::{Components, MerkleTreeLedger},
@@ -6,7 +7,6 @@ mod server_listen {
         },
         test_data::setup_or_load_parameters,
     };
-    use snarkos_dpc_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_dpc_network::{
         context::Context,
         message::{

@@ -1,9 +1,9 @@
+use snarkos_consensus::{get_block_reward, miner::Miner, test_data::*, ConsensusParameters};
 use snarkos_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
     test_data::*,
     DPCScheme,
 };
-use snarkos_dpc_consensus::{get_block_reward, miner::Miner, test_data::*, ConsensusParameters};
 use snarkos_models::dpc::Record;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions},

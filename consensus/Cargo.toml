@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-dpc-consensus"
+name = "snarkos-consensus"
 version = "0.8.0"
 authors = ["The Aleo Team <hello@aleo.org"]
 description = "Consensus for a decentralized record system"

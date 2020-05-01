@@ -1,4 +1,5 @@
 mod server_message_handler {
+    use snarkos_consensus::{miner::Entry, test_data::*};
     use snarkos_dpc::{
         base_dpc::{
             instantiated::{Components, Tx},
@@ -6,7 +7,6 @@ mod server_message_handler {
         },
         test_data::*,
     };
-    use snarkos_dpc_consensus::{miner::Entry, test_data::*};
     use snarkos_dpc_network::{
         message::{types::*, Channel, Message},
         test_data::*,

@@ -5,6 +5,7 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_dpc::{
     base_dpc::{
         instantiated::{Components, MerkleTreeLedger},
@@ -13,7 +14,6 @@ use snarkos_dpc::{
     },
     dpc::address::AddressPublicKey,
 };
-use snarkos_dpc_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_dpc_network::{
     context::Context,
     protocol::SyncHandler,

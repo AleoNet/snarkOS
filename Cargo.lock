@@ -1966,8 +1966,8 @@ dependencies = [
  "rand",
  "rusty-hook",
  "serde",
+ "snarkos-consensus",
  "snarkos-dpc",
- "snarkos-dpc-consensus",
  "snarkos-dpc-network",
  "snarkos-errors",
  "snarkos-objects",
@@ -2021,6 +2021,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-consensus"
+version = "0.8.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "futures-await-test",
+ "hex",
+ "log",
+ "rand",
+ "serde",
+ "snarkos-algorithms",
+ "snarkos-dpc",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-storage",
+ "snarkos-utilities",
+ "tokio 0.2.13",
+]
+
+[[package]]
 name = "snarkos-console"
 version = "0.8.0"
 dependencies = [
@@ -2066,27 +2087,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-dpc-consensus"
-version = "0.8.0"
-dependencies = [
- "bincode",
- "chrono",
- "futures-await-test",
- "hex",
- "log",
- "rand",
- "serde",
- "snarkos-algorithms",
- "snarkos-dpc",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-objects",
- "snarkos-storage",
- "snarkos-utilities",
- "tokio 0.2.13",
-]
-
-[[package]]
 name = "snarkos-dpc-network"
 version = "0.8.0"
 dependencies = [
@@ -2099,8 +2099,8 @@ dependencies = [
  "serde",
  "serial_test",
  "snarkos-algorithms",
+ "snarkos-consensus",
  "snarkos-dpc",
- "snarkos-dpc-consensus",
  "snarkos-errors",
  "snarkos-objects",
  "snarkos-storage",
@@ -2184,8 +2184,8 @@ dependencies = [
  "jsonrpc-test",
  "serde",
  "serde_json",
+ "snarkos-consensus",
  "snarkos-dpc",
- "snarkos-dpc-consensus",
  "snarkos-dpc-network",
  "snarkos-errors",
  "snarkos-objects",

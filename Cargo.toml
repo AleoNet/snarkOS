@@ -25,7 +25,7 @@ members = [
     "profiler",
     "rpc",
     "storage",
-    "dpc_consensus",
+    "consensus",
     "dpc_network",
     "utilities"
 ]
@@ -39,8 +39,8 @@ name = "snarkos"
 path = "snarkOS/main.rs"
 
 [dependencies]
+snarkos-consensus = { path = "consensus", version = "0.8.0", default-features = false }
 snarkos-dpc = { path = "./dpc", version = "0.8.0", default-features = false }
-snarkos-dpc-consensus = { path = "./dpc_consensus", version = "0.8.0", default-features = false }
 snarkos-errors = { path = "./errors", version = "0.8.0", default-features = false, features = ["node"] }
 snarkos-dpc-network = { path = "./dpc_network", version = "0.8.0", default-features = false }
 snarkos-objects = { path = "objects", version = "0.8.0", default-features = false }

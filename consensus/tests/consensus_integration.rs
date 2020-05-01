@@ -1,10 +1,9 @@
 mod consensus_integration {
+    use snarkos_consensus::{miner::Miner, test_data::*};
     use snarkos_dpc::{
         address::AddressPublicKey,
         dpc::base_dpc::instantiated::{Components, Tx},
     };
-
-    use snarkos_dpc_consensus::{miner::Miner, test_data::*};
     use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash, MerkleRootHash};
     use snarkos_storage::genesis::*;
     use snarkos_utilities::bytes::FromBytes;

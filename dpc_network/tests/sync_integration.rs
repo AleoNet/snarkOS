@@ -1,5 +1,5 @@
 mod sync_integration {
-    use snarkos_dpc_consensus::test_data::*;
+    use snarkos_consensus::test_data::*;
     use snarkos_dpc_network::{
         message::{types::*, Channel, Message},
         protocol::sync::*,

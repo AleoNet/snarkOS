@@ -6,9 +6,8 @@ use crate::{
     Server,
     SyncState,
 };
-
+use snarkos_consensus::miner::Entry;
 use snarkos_dpc::base_dpc::instantiated::Tx;
-use snarkos_dpc_consensus::miner::Entry;
 use snarkos_errors::network::ServerError;
 use snarkos_objects::{dpc::Block as BlockStruct, BlockHeaderHash};
 use snarkos_utilities::{

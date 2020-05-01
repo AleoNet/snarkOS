@@ -4,12 +4,11 @@ use crate::{
     message::{Channel, MessageName},
     protocol::*,
 };
-
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger, Tx},
     parameters::PublicParameters,
 };
-use snarkos_dpc_consensus::{miner::MemoryPool, ConsensusParameters};
 use snarkos_errors::network::ServerError;
 
 use chrono::{DateTime, Utc};

@@ -1,9 +1,9 @@
 mod server_connection_handler {
+    use snarkos_consensus::test_data::*;
     use snarkos_dpc::{
         base_dpc::{instantiated::Components, parameters::PublicParameters},
         test_data::setup_or_load_parameters,
     };
-    use snarkos_dpc_consensus::test_data::*;
     use snarkos_dpc_network::{
         message::{types::GetMemoryPool, Message},
         test_data::*,

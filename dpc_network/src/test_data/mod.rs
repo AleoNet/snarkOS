@@ -1,10 +1,9 @@
 use crate::{context::Context, message::Channel, protocol::SyncHandler, server::Server};
-
+use snarkos_consensus::{miner::MemoryPool, test_data::*};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger},
     parameters::PublicParameters,
 };
-use snarkos_dpc_consensus::{miner::MemoryPool, test_data::*};
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
