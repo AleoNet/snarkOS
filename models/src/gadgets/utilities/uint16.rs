@@ -1,48 +1,39 @@
 use crate::{
-    curves::{to_field_vec::ToConstraintField, Field, FpParameters, PrimeField},
+    curves::{Field, FpParameters, PrimeField},
     gadgets::{
-        curves::fp::FpGadget,
         r1cs::{Assignment, ConstraintSystem, LinearCombination},
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
-            ToBitsGadget,
+            uint8::UInt8,
+            ToBytesGadget,
         },
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
+use snarkos_utilities::bytes::ToBytes;
 
 use std::borrow::Borrow;
 
-/// Represents an interpretation of 8 `Boolean` objects as an
+/// Represents an interpretation of 16 `Boolean` objects as an
 /// unsigned integer.
 #[derive(Clone, Debug)]
-pub struct UInt8 {
+pub struct UInt16 {
     // Least significant bit_gadget first
     pub bits: Vec<Boolean>,
     pub negated: bool,
-    pub value: Option<u8>,
+    pub value: Option<u16>,
 }
 
-impl UInt8 {
-    /// Construct a constant vector of `UInt8` from a vector of `u8`
-    pub fn constant_vec(values: &[u8]) -> Vec<Self> {
-        let mut result = Vec::new();
-        for value in values {
-            result.push(UInt8::constant(*value));
-        }
-        result
-    }
-
-    /// Construct a constant `UInt8` from a `u8`
-    pub fn constant(value: u8) -> Self {
-        let mut bits = Vec::with_capacity(8);
+impl UInt16 {
+    /// Construct a constant `UInt16` from a `u16`
+    pub fn constant(value: u16) -> Self {
+        let mut bits = Vec::with_capacity(16);
 
         let mut tmp = value;
-        for _ in 0..8 {
-            // If last bit is one, push one.
+        for _ in 0..16 {
             if tmp & 1 == 1 {
                 bits.push(Boolean::constant(true))
             } else {
@@ -59,90 +50,36 @@ impl UInt8 {
         }
     }
 
-    pub fn alloc_vec<F, CS, T>(mut cs: CS, values: &[T]) -> Result<Vec<Self>, SynthesisError>
-    where
-        F: Field,
-        CS: ConstraintSystem<F>,
-        T: Into<Option<u8>> + Copy,
-    {
-        let mut output_vec = Vec::with_capacity(values.len());
-        for (i, value) in values.into_iter().enumerate() {
-            let byte: Option<u8> = Into::into(*value);
-            let alloc_byte = Self::alloc(&mut cs.ns(|| format!("byte_{}", i)), || byte.get())?;
-            output_vec.push(alloc_byte);
-        }
-        Ok(output_vec)
-    }
-
-    /// Allocates a vector of `u8`'s by first converting (chunks of) them to
-    /// `F` elements, (thus reducing the number of input allocations),
-    /// and then converts this list of `F` gadgets back into
-    /// bytes.
-    pub fn alloc_input_vec<F, CS>(mut cs: CS, values: &[u8]) -> Result<Vec<Self>, SynthesisError>
-    where
-        F: PrimeField,
-        CS: ConstraintSystem<F>,
-    {
-        let values_len = values.len();
-        let field_elements: Vec<F> = ToConstraintField::<F>::to_field_elements(values).unwrap();
-
-        let max_size = 8 * (F::Params::CAPACITY / 8) as usize;
-        let mut allocated_bits = Vec::new();
-        for (i, field_element) in field_elements.into_iter().enumerate() {
-            let fe = FpGadget::alloc_input(&mut cs.ns(|| format!("Field element {}", i)), || Ok(field_element))?;
-            let mut fe_bits = fe.to_bits(cs.ns(|| format!("Convert fe to bits {}", i)))?;
-            // FpGadget::to_bits outputs a big-endian binary representation of
-            // fe_gadget's value, so we have to reverse it to get the little-endian
-            // form.
-            fe_bits.reverse();
-
-            // Remove the most significant bit, because we know it should be zero
-            // because `values.to_field_elements()` only
-            // packs field elements up to the penultimate bit.
-            // That is, the most significant bit (`F::NUM_BITS`-th bit) is
-            // unset, so we can just pop it off.
-            allocated_bits.extend_from_slice(&fe_bits[0..max_size]);
-        }
-
-        // Chunk up slices of 8 bit into bytes.
-        Ok(allocated_bits[0..8 * values_len]
-            .chunks(8)
-            .map(Self::from_bits_le)
-            .collect())
-    }
-
-    /// Turns this `UInt8` into its little-endian byte order representation.
-    /// LSB-first means that we can easily get the corresponding field element
-    /// via double and add.
-    pub fn into_bits_le(&self) -> Vec<Boolean> {
-        self.bits.iter().cloned().collect()
+    /// Turns this `UInt16` into its little-endian byte order representation.
+    pub fn to_bits_le(&self) -> Vec<Boolean> {
+        self.bits.clone()
     }
 
     /// Converts a little-endian byte order representation of bits into a
-    /// `UInt8`.
+    /// `UInt16`.
     pub fn from_bits_le(bits: &[Boolean]) -> Self {
-        assert_eq!(bits.len(), 8);
+        assert_eq!(bits.len(), 16);
 
         let bits = bits.to_vec();
 
-        let mut value = Some(0u8);
+        let mut value = Some(0u16);
         for b in bits.iter().rev() {
             value.as_mut().map(|v| *v <<= 1);
 
-            match *b {
-                Boolean::Constant(b) => {
+            match b {
+                &Boolean::Constant(b) => {
                     if b {
                         value.as_mut().map(|v| *v |= 1);
                     }
                 }
-                Boolean::Is(ref b) => match b.get_value() {
+                &Boolean::Is(ref b) => match b.get_value() {
                     Some(true) => {
                         value.as_mut().map(|v| *v |= 1);
                     }
                     Some(false) => {}
                     None => value = None,
                 },
-                Boolean::Not(ref b) => match b.get_value() {
+                &Boolean::Not(ref b) => match b.get_value() {
                     Some(false) => {
                         value.as_mut().map(|v| *v |= 1);
                     }
@@ -160,25 +97,25 @@ impl UInt8 {
     }
 
     pub fn rotr(&self, by: usize) -> Self {
-        let by = by % 8;
+        let by = by % 16;
 
         let new_bits = self
             .bits
             .iter()
             .skip(by)
             .chain(self.bits.iter())
-            .take(8)
+            .take(16)
             .cloned()
             .collect();
 
         Self {
             bits: new_bits,
             negated: false,
-            value: self.value.map(|v| v.rotate_right(by as u32) as u8),
+            value: self.value.map(|v| v.rotate_right(by as u32) as u16),
         }
     }
 
-    /// XOR this `UInt8` with another `UInt8`
+    /// XOR this `UInt16` with another `UInt16`
     pub fn xor<F, CS>(&self, mut cs: CS, other: &Self) -> Result<Self, SynthesisError>
     where
         F: Field,
@@ -204,7 +141,7 @@ impl UInt8 {
         })
     }
 
-    /// Returns the inverse `UInt8`
+    /// Returns the inverse UInt16
     pub fn negate(&self) -> Self {
         Self {
             bits: self.bits.clone(),
@@ -213,7 +150,7 @@ impl UInt8 {
         }
     }
 
-    /// Returns true if all bits in this `UInt8` are constant
+    /// Returns true if all bits in this UInt16 are constant
     fn is_constant(&self) -> bool {
         let mut constant = true;
 
@@ -229,7 +166,7 @@ impl UInt8 {
         constant
     }
 
-    /// Returns true if both `UInt8` objects have constant bits
+    /// Returns true if both UInt16s have constant bits
     fn result_is_constant(first: &Self, second: &Self) -> bool {
         // If any bits of first are allocated bits, return false
         if !first.is_constant() {
@@ -240,7 +177,7 @@ impl UInt8 {
         second.is_constant()
     }
 
-    /// Perform modular addition of several `UInt8` objects.
+    /// Perform modular addition of several `UInt16` objects.
     pub fn addmany<F, CS>(mut cs: CS, operands: &[Self]) -> Result<Self, SynthesisError>
     where
         F: PrimeField,
@@ -253,7 +190,7 @@ impl UInt8 {
 
         // Compute the maximum value of the sum so we allocate enough bits for
         // the result
-        let mut max_value = (operands.len() as u64) * u64::from(u8::max_value());
+        let mut max_value = (operands.len() as u64) * u64::from(u16::max_value());
 
         // Keep track of the resulting value
         let mut result_value = Some(0u64);
@@ -326,8 +263,8 @@ impl UInt8 {
             }
         }
 
-        // The value of the actual result is modulo 2^32
-        let modular_value = result_value.map(|v| v as u8);
+        // The value of the actual result is modulo 2^16
+        let modular_value = result_value.map(|v| v as u16);
 
         if all_constants && modular_value.is_some() {
             // We can just return a constant, rather than
@@ -363,7 +300,7 @@ impl UInt8 {
         cs.enforce(|| "modular addition", |lc| lc, |lc| lc, |_| lc);
 
         // Discard carry bits that we don't care about
-        result_bits.truncate(8);
+        result_bits.truncate(16);
 
         Ok(Self {
             bits: result_bits,
@@ -372,7 +309,7 @@ impl UInt8 {
         })
     }
 
-    /// Perform modular subtraction of two `UInt8` objects.
+    /// Perform modular subtraction of two `UInt16` objects.
     pub fn sub<F: PrimeField, CS: ConstraintSystem<F>>(
         &self,
         mut cs: CS,
@@ -386,7 +323,7 @@ impl UInt8 {
         Self::addmany(&mut cs.ns(|| "add_not"), &[self.clone(), other.negate()])
     }
 
-    /// Perform unsafe subtraction of two `UInt8` objects which returns 0 if overflowed
+    /// Perform unsafe subtraction of two `UInt16` objects which returns 0 if overflowed
     fn sub_unsafe<F: PrimeField, CS: ConstraintSystem<F>>(
         &self,
         mut cs: CS,
@@ -399,12 +336,12 @@ impl UInt8 {
                     // Instead of erroring, return 0
 
                     if Self::result_is_constant(&self, &other) {
-                        // Return constant 0u32
-                        Ok(Self::constant(0u8))
+                        // Return constant 0u16
+                        Ok(Self::constant(0u16))
                     } else {
-                        // Return allocated 0u32
+                        // Return allocated 0u16
                         let result_value = Some(0u64);
-                        let modular_value = result_value.map(|v| v as u8);
+                        let modular_value = result_value.map(|v| v as u16);
 
                         // Storage area for the resulting bits
                         let mut result_bits = vec![];
@@ -414,7 +351,7 @@ impl UInt8 {
 
                         // Allocate each bit_gadget of the result
                         let mut coeff = F::one();
-                        for i in 0..8 {
+                        for i in 0..16 {
                             // Allocate the bit_gadget
                             let b = AllocatedBit::alloc(cs.ns(|| format!("result bit_gadget {}", i)), || {
                                 result_value.map(|v| (v >> i) & 1 == 1).get()
@@ -433,7 +370,7 @@ impl UInt8 {
                         cs.enforce(|| "unsafe subtraction", |lc| lc, |lc| lc, |_| lc);
 
                         // Discard carry bits that we don't care about
-                        result_bits.truncate(8);
+                        result_bits.truncate(16);
 
                         Ok(Self {
                             bits: result_bits,
@@ -454,7 +391,7 @@ impl UInt8 {
         }
     }
 
-    /// Bitwise multiplication of two `UInt8` objects.
+    /// Bitwise multiplication of two `UInt16` objects.
     /// Reference: https://en.wikipedia.org/wiki/Binary_multiplier
     pub fn mul<F: PrimeField, CS: ConstraintSystem<F>>(
         &self,
@@ -474,8 +411,8 @@ impl UInt8 {
         // return res
 
         let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
-        let constant_result = Self::constant(0u8);
-        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u32"), || Ok(0u8))?;
+        let constant_result = Self::constant(0u16);
+        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u16"), || Ok(0u16))?;
         let zero_result = Self::conditionally_select(
             &mut cs.ns(|| "constant_or_allocated"),
             &is_constant,
@@ -510,7 +447,7 @@ impl UInt8 {
         Self::addmany(&mut cs.ns(|| format!("partial_products")), &partial_products)
     }
 
-    /// Perform long division of two `UInt8` objects.
+    /// Perform long division of two `UInt16` objects.
     /// Reference: https://en.wikipedia.org/wiki/Division_algorithm
     pub fn div<F: PrimeField, CS: ConstraintSystem<F>>(
         &self,
@@ -531,7 +468,7 @@ impl UInt8 {
         //   end
         // end
 
-        if other.eq(&Self::constant(0u8)) {
+        if other.eq(&Self::constant(0u16)) {
             return Err(SynthesisError::DivisionByZero);
         }
 
@@ -545,23 +482,23 @@ impl UInt8 {
             &allocated_true,
         )?;
 
-        let allocated_one = Self::alloc(&mut cs.ns(|| "one"), || Ok(1u8))?;
+        let allocated_one = Self::alloc(&mut cs.ns(|| "one"), || Ok(1u16))?;
         let one = Self::conditionally_select(
-            &mut cs.ns(|| "constant_or_allocated_1u32"),
+            &mut cs.ns(|| "constant_or_allocated_1u16"),
             &is_constant,
-            &Self::constant(1u8),
+            &Self::constant(1u16),
             &allocated_one,
         )?;
 
-        let allocated_zero = Self::alloc(&mut cs.ns(|| "zero"), || Ok(0u8))?;
+        let allocated_zero = Self::alloc(&mut cs.ns(|| "zero"), || Ok(0u16))?;
         let zero = Self::conditionally_select(
-            &mut cs.ns(|| "constant_or_allocated_0u32"),
+            &mut cs.ns(|| "constant_or_allocated_0u16"),
             &is_constant,
-            &Self::constant(0u8),
+            &Self::constant(0u16),
             &allocated_zero,
         )?;
 
-        let self_is_zero = Boolean::Constant(self.eq(&Self::constant(0u8)));
+        let self_is_zero = Boolean::Constant(self.eq(&Self::constant(0u16)));
         let mut quotient = zero.clone();
         let mut remainder = zero.clone();
 
@@ -611,8 +548,8 @@ impl UInt8 {
                 &remainder,
             )?;
 
-            let index = 7 - i as usize;
-            let bit_value = 1u8 << (index as u8);
+            let index = 15 - i as usize;
+            let bit_value = 1u16 << (index as u16);
             let mut new_quotient = quotient.clone();
             new_quotient.bits[index] = true_bit.clone();
             new_quotient.value = Some(new_quotient.value.unwrap() + bit_value);
@@ -627,7 +564,7 @@ impl UInt8 {
         Self::conditionally_select(&mut cs.ns(|| "self_or_quotient"), &self_is_zero, self, &quotient)
     }
 
-    /// Bitwise multiplication of two `UInt8` objects.
+    /// Bitwise multiplication of two `UInt16` objects.
     /// Reference: /snarkOS/models/src/curves/field.rs
     pub fn pow<F: Field + PrimeField, CS: ConstraintSystem<F>>(
         &self,
@@ -656,8 +593,8 @@ impl UInt8 {
         // res
 
         let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
-        let constant_result = Self::constant(1u8);
-        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u32"), || Ok(1u8))?;
+        let constant_result = Self::constant(1u16);
+        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u16"), || Ok(1u16))?;
         let mut result = Self::conditionally_select(
             &mut cs.ns(|| "constant_or_allocated"),
             &is_constant,
@@ -666,7 +603,7 @@ impl UInt8 {
         )?;
 
         for (i, bit) in other.bits.iter().rev().enumerate() {
-            let found_one = Boolean::Constant(result.eq(&Self::constant(1u8)));
+            let found_one = Boolean::Constant(result.eq(&Self::constant(1u16)));
             let cond1 = Boolean::and(cs.ns(|| format!("found_one_{}", i)), &bit.not(), &found_one)?;
             let square = result.mul(cs.ns(|| format!("square_{}", i)), &result).unwrap();
 
@@ -691,17 +628,46 @@ impl UInt8 {
     }
 }
 
-impl PartialEq for UInt8 {
+impl<F: Field> ToBytesGadget<F> for UInt16 {
+    #[inline]
+    fn to_bytes<CS: ConstraintSystem<F>>(&self, _cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        let value_chunks = match self.value.map(|val| {
+            let mut bytes = [0u8; 4];
+            val.write(bytes.as_mut()).unwrap();
+            bytes
+        }) {
+            Some(chunks) => [Some(chunks[0]), Some(chunks[1]), Some(chunks[2]), Some(chunks[3])],
+            None => [None, None, None, None],
+        };
+        let mut bytes = Vec::new();
+        for (i, chunk8) in self.to_bits_le().chunks(8).into_iter().enumerate() {
+            let byte = UInt8 {
+                bits: chunk8.to_vec(),
+                negated: false,
+                value: value_chunks[i],
+            };
+            bytes.push(byte);
+        }
+
+        Ok(bytes)
+    }
+
+    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.to_bytes(cs)
+    }
+}
+
+impl PartialEq for UInt16 {
     fn eq(&self, other: &Self) -> bool {
         !self.value.is_none() && !other.value.is_none() && self.value == other.value
     }
 }
 
-impl Eq for UInt8 {}
+impl Eq for UInt16 {}
 
-impl<F: Field> EqGadget<F> for UInt8 {}
+impl<F: Field> EqGadget<F> for UInt16 {}
 
-impl<F: Field> ConditionalEqGadget<F> for UInt8 {
+impl<F: Field> ConditionalEqGadget<F> for UInt16 {
     fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
         &self,
         mut cs: CS,
@@ -709,21 +675,17 @@ impl<F: Field> ConditionalEqGadget<F> for UInt8 {
         condition: &Boolean,
     ) -> Result<(), SynthesisError> {
         for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-            a.conditional_enforce_equal(
-                &mut cs.ns(|| format!("UInt8 equality check for {}-th bit", i)),
-                b,
-                condition,
-            )?;
+            a.conditional_enforce_equal(&mut cs.ns(|| format!("uint16_equal_{}", i)), b, condition)?;
         }
         Ok(())
     }
 
     fn cost() -> usize {
-        8 * <Boolean as ConditionalEqGadget<F>>::cost()
+        16 * <Boolean as ConditionalEqGadget<F>>::cost()
     }
 }
 
-impl<F: PrimeField> CondSelectGadget<F> for UInt8 {
+impl<F: PrimeField> CondSelectGadget<F> for UInt16 {
     fn conditionally_select<CS: ConstraintSystem<F>>(
         mut cs: CS,
         cond: &Boolean,
@@ -755,12 +717,12 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt8 {
                 .zip(&second.bits)
                 .enumerate()
                 .map(|(i, (a, b))| {
-                    Boolean::conditionally_select(&mut cs.ns(|| format!("uint8_cond_select_{}", i)), cond, a, b)
+                    Boolean::conditionally_select(&mut cs.ns(|| format!("uint16_cond_select_{}", i)), cond, a, b)
                         .unwrap()
                 })
                 .collect::<Vec<Boolean>>();
 
-            for (i, (actual, expected)) in result.into_bits_le().iter().zip(expected_bits.iter()).enumerate() {
+            for (i, (actual, expected)) in result.to_bits_le().iter().zip(expected_bits.iter()).enumerate() {
                 actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), expected)?;
             }
 
@@ -769,29 +731,29 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt8 {
     }
 
     fn cost() -> usize {
-        8 * (<Boolean as ConditionalEqGadget<F>>::cost() + <Boolean as CondSelectGadget<F>>::cost())
+        16 * (<Boolean as ConditionalEqGadget<F>>::cost() + <Boolean as CondSelectGadget<F>>::cost())
     }
 }
 
-impl<F: Field> AllocGadget<u8, F> for UInt8 {
+impl<F: Field> AllocGadget<u16, F> for UInt16 {
     fn alloc<Fn, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: Fn) -> Result<Self, SynthesisError>
     where
         Fn: FnOnce() -> Result<T, SynthesisError>,
-        T: Borrow<u8>,
+        T: Borrow<u16>,
     {
         let value = value_gen().map(|val| *val.borrow());
         let values = match value {
             Ok(mut val) => {
-                let mut v = Vec::with_capacity(8);
+                let mut v = Vec::with_capacity(16);
 
-                for _ in 0..8 {
+                for _ in 0..16 {
                     v.push(Some(val & 1 == 1));
                     val >>= 1;
                 }
 
                 v
             }
-            _ => vec![None; 8],
+            _ => vec![None; 16],
         };
 
         let bits = values
@@ -815,20 +777,21 @@ impl<F: Field> AllocGadget<u8, F> for UInt8 {
     fn alloc_input<Fn, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: Fn) -> Result<Self, SynthesisError>
     where
         Fn: FnOnce() -> Result<T, SynthesisError>,
-        T: Borrow<u8>,
+        T: Borrow<u16>,
     {
         let value = value_gen().map(|val| *val.borrow());
         let values = match value {
             Ok(mut val) => {
-                let mut v = Vec::with_capacity(8);
-                for _ in 0..8 {
+                let mut v = Vec::with_capacity(16);
+
+                for _ in 0..16 {
                     v.push(Some(val & 1 == 1));
                     val >>= 1;
                 }
 
                 v
             }
-            _ => vec![None; 8],
+            _ => vec![None; 16],
         };
 
         let bits = values
@@ -853,12 +816,18 @@ impl<F: Field> AllocGadget<u8, F> for UInt8 {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::gadgets::r1cs::{Fr, TestConstraintSystem};
+    use crate::{
+        curves::Field,
+        gadgets::{
+            r1cs::{Fr, TestConstraintSystem},
+            utilities::boolean::Boolean,
+        },
+    };
 
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
-    fn check_all_constant_bits(mut expected: u8, actual: UInt8) {
+    fn check_all_constant_bits(mut expected: u16, actual: UInt16) {
         for b in actual.bits.iter() {
             match b {
                 &Boolean::Is(_) => panic!(),
@@ -872,7 +841,7 @@ mod test {
         }
     }
 
-    fn check_all_allocated_bits(mut expected: u8, actual: UInt8) {
+    fn check_all_allocated_bits(mut expected: u16, actual: UInt16) {
         for b in actual.bits.iter() {
             match b {
                 &Boolean::Is(ref b) => {
@@ -889,37 +858,13 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_from_bits_to_bits() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        let byte_val = 0b01110001;
-        let byte = UInt8::alloc(cs.ns(|| "alloc value"), || Ok(byte_val)).unwrap();
-        let bits = byte.into_bits_le();
-        for (i, bit) in bits.iter().enumerate() {
-            assert_eq!(bit.get_value().unwrap(), (byte_val >> i) & 1 == 1)
-        }
-    }
-
-    #[test]
-    fn test_uint8_alloc_input_vec() {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-        let byte_vals = (64u8..128u8).into_iter().collect::<Vec<_>>();
-        let bytes = UInt8::alloc_input_vec(cs.ns(|| "alloc value"), &byte_vals).unwrap();
-        for (native_byte, gadget_byte) in byte_vals.into_iter().zip(bytes) {
-            let bits = gadget_byte.into_bits_le();
-            for (i, bit) in bits.iter().enumerate() {
-                assert_eq!(bit.get_value().unwrap(), (native_byte >> i) & 1 == 1)
-            }
-        }
-    }
-
-    #[test]
-    fn test_uint8_from_bits() {
+    fn test_uint16_from_bits() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
-            let v = (0..8).map(|_| Boolean::constant(rng.gen())).collect::<Vec<_>>();
+            let v = (0..16).map(|_| Boolean::constant(rng.gen())).collect::<Vec<_>>();
 
-            let b = UInt8::from_bits_le(&v);
+            let b = UInt16::from_bits_le(&v);
 
             for (i, bit_gadget) in b.bits.iter().enumerate() {
                 match bit_gadget {
@@ -930,7 +875,7 @@ mod test {
                 }
             }
 
-            let expected_to_be_same = b.into_bits_le();
+            let expected_to_be_same = b.to_bits_le();
 
             for x in v.iter().zip(expected_to_be_same.iter()) {
                 match x {
@@ -943,21 +888,21 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_xor() {
+    fn test_uint16_xor() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen();
-            let c: u8 = rng.gen();
+            let a: u16 = rng.gen();
+            let b: u16 = rng.gen();
+            let c: u16 = rng.gen();
 
             let mut expected = a ^ b ^ c;
 
-            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = UInt8::constant(b);
-            let c_bit = UInt8::alloc(cs.ns(|| "c_bit"), || Ok(c)).unwrap();
+            let a_bit = UInt16::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = UInt16::constant(b);
+            let c_bit = UInt16::alloc(cs.ns(|| "c_bit"), || Ok(c)).unwrap();
 
             let r = a_bit.xor(cs.ns(|| "first xor"), &b_bit).unwrap();
             let r = r.xor(cs.ns(|| "second xor"), &c_bit).unwrap();
@@ -985,14 +930,14 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_rotr() {
+    fn test_uint16_rotr() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         let mut num = rng.gen();
 
-        let a = UInt8::constant(num);
+        let a = UInt16::constant(num);
 
-        for i in 0..8 {
+        for i in 0..16 {
             let b = a.rotr(i);
 
             assert!(b.value.unwrap() == num);
@@ -1014,23 +959,23 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_addmany_constants() {
+    fn test_uint16_addmany_constants() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen();
-            let c: u8 = rng.gen();
+            let a: u16 = rng.gen();
+            let b: u16 = rng.gen();
+            let c: u16 = rng.gen();
 
-            let a_bit = UInt8::constant(a);
-            let b_bit = UInt8::constant(b);
-            let c_bit = UInt8::constant(c);
+            let a_bit = UInt16::constant(a);
+            let b_bit = UInt16::constant(b);
+            let c_bit = UInt16::constant(c);
 
             let expected = a.wrapping_add(b).wrapping_add(c);
 
-            let r = UInt8::addmany(cs.ns(|| "addition"), &[a_bit, b_bit, c_bit]).unwrap();
+            let r = UInt16::addmany(cs.ns(|| "addition"), &[a_bit, b_bit, c_bit]).unwrap();
 
             assert!(r.value == Some(expected));
 
@@ -1039,26 +984,26 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_addmany() {
+    fn test_uint16_addmany() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen();
-            let c: u8 = rng.gen();
-            let d: u8 = rng.gen();
+            let a: u16 = rng.gen();
+            let b: u16 = rng.gen();
+            let c: u16 = rng.gen();
+            let d: u16 = rng.gen();
 
             let expected = (a ^ b).wrapping_add(c).wrapping_add(d);
 
-            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = UInt8::constant(b);
-            let c_bit = UInt8::constant(c);
-            let d_bit = UInt8::alloc(cs.ns(|| "d_bit"), || Ok(d)).unwrap();
+            let a_bit = UInt16::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = UInt16::constant(b);
+            let c_bit = UInt16::constant(c);
+            let d_bit = UInt16::alloc(cs.ns(|| "d_bit"), || Ok(d)).unwrap();
 
             let r = a_bit.xor(cs.ns(|| "xor"), &b_bit).unwrap();
-            let r = UInt8::addmany(cs.ns(|| "addition"), &[r, c_bit, d_bit]).unwrap();
+            let r = UInt16::addmany(cs.ns(|| "addition"), &[r, c_bit, d_bit]).unwrap();
 
             assert!(cs.is_satisfied());
 
@@ -1078,17 +1023,17 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_sub_constants() {
+    fn test_uint16_sub_constants() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen_range(u8::max_value() / 2u8, u8::max_value());
-            let b: u8 = rng.gen_range(0u8, u8::max_value() / 2u8);
+            let a: u16 = rng.gen_range(u16::max_value() / 2u16, u16::max_value());
+            let b: u16 = rng.gen_range(0u16, u16::max_value() / 2u16);
 
-            let a_bit = UInt8::constant(a);
-            let b_bit = UInt8::constant(b);
+            let a_bit = UInt16::constant(a);
+            let b_bit = UInt16::constant(b);
 
             let expected = a.wrapping_sub(b);
 
@@ -1101,22 +1046,22 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_sub() {
+    fn test_uint16_sub() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen_range(u8::max_value() / 2u8, u8::max_value());
-            let b: u8 = rng.gen_range(0u8, u8::max_value() / 2u8);
+            let a: u16 = rng.gen_range(u16::max_value() / 2u16, u16::max_value());
+            let b: u16 = rng.gen_range(0u16, u16::max_value() / 2u16);
 
             let expected = a.wrapping_sub(b);
 
-            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = if b > u8::max_value() / 4 {
-                UInt8::constant(b)
+            let a_bit = UInt16::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > u16::max_value() / 4 {
+                UInt16::constant(b)
             } else {
-                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+                UInt16::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
             };
 
             let r = a_bit.sub(cs.ns(|| "subtraction"), &b_bit).unwrap();
@@ -1139,17 +1084,17 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_mul_constants() {
+    fn test_uint16_mul_constants() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen_range(0, u8::max_value());
-            let b: u8 = rng.gen_range(0, u8::max_value());
+            let a: u16 = rng.gen_range(0, u16::max_value());
+            let b: u16 = rng.gen_range(0, u16::max_value());
 
-            let a_bit = UInt8::constant(a);
-            let b_bit = UInt8::constant(b);
+            let a_bit = UInt16::constant(a);
+            let b_bit = UInt16::constant(b);
 
             let expected = a.wrapping_mul(b);
 
@@ -1162,22 +1107,22 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_mul() {
+    fn test_uint16_mul() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
-        for _ in 0..1000 {
+        for _ in 0..100 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen_range(0, u8::max_value());
-            let b: u8 = rng.gen_range(0, u8::max_value());
+            let a: u16 = rng.gen_range(0, u16::max_value());
+            let b: u16 = rng.gen_range(0, u16::max_value());
 
             let expected = a.wrapping_mul(b);
 
-            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = if b > u8::max_value() / 2 {
-                UInt8::constant(b)
+            let a_bit = UInt16::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > u16::max_value() / 2 {
+                UInt16::constant(b)
             } else {
-                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+                UInt16::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
             };
 
             let r = a_bit.mul(cs.ns(|| "multiplication"), &b_bit).unwrap();
@@ -1209,17 +1154,17 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_div_constants() {
+    fn test_uint16_div_constants() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen_range(1, u8::max_value());
+            let a: u16 = rng.gen();
+            let b: u16 = rng.gen_range(0u16, u16::max_value());
 
-            let a_bit = UInt8::constant(a);
-            let b_bit = UInt8::constant(b);
+            let a_bit = UInt16::constant(a);
+            let b_bit = UInt16::constant(b);
 
             let expected = a.wrapping_div(b);
 
@@ -1232,22 +1177,22 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_div() {
+    fn test_uint16_div() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
-        for _ in 0..100 {
+        for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen_range(1, u8::max_value());
+            let a: u16 = rng.gen();
+            let b: u16 = rng.gen_range(0u16, u16::max_value());
 
             let expected = a.wrapping_div(b);
 
-            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = if b > u8::max_value() / 2 {
-                UInt8::constant(b)
+            let a_bit = UInt16::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > u16::max_value() / 2 {
+                UInt16::constant(b)
             } else {
-                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+                UInt16::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
             };
 
             let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
@@ -1273,17 +1218,17 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_pow_constants() {
+    fn test_uint16_pow_constants() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
-        for _ in 0..1000 {
+        for _ in 0..100 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen();
+            let a: u16 = rng.gen();
+            let b: u16 = rng.gen();
 
-            let a_bit = UInt8::constant(a);
-            let b_bit = UInt8::constant(b);
+            let a_bit = UInt16::constant(a);
+            let b_bit = UInt16::constant(b);
 
             let expected = a.wrapping_pow(b.into());
 
@@ -1296,22 +1241,22 @@ mod test {
     }
 
     #[test]
-    fn test_uint8_pow() {
+    fn test_uint16_pow() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
-        for _ in 0..100 {
+        for _ in 0..10 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u8 = rng.gen();
-            let b: u8 = rng.gen();
+            let a: u16 = rng.gen_range(0, u16::from(u8::max_value()));
+            let b: u16 = rng.gen_range(0, 4);
 
             let expected = a.wrapping_pow(b.into());
 
-            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = if b > u8::max_value() / 2 {
-                UInt8::constant(b)
+            let a_bit = UInt16::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > 2 {
+                UInt16::constant(b)
             } else {
-                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+                UInt16::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
             };
 
             let r = a_bit.pow(cs.ns(|| "exponentiation"), &b_bit).unwrap();

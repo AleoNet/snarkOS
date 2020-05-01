@@ -11,6 +11,7 @@ pub mod alloc;
 pub mod boolean;
 pub mod eq;
 pub mod select;
+pub mod uint16;
 pub mod uint32;
 pub mod uint8;
 

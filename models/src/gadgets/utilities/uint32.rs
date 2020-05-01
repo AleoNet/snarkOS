@@ -1089,8 +1089,8 @@ mod test {
         for _ in 0..1000 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u32 = rng.gen_range(0, u32::max_value() << 16);
-            let b: u32 = rng.gen_range(0, u32::max_value() << 16);
+            let a: u32 = rng.gen();
+            let b: u32 = rng.gen();
 
             let a_bit = UInt32::constant(a);
             let b_bit = UInt32::constant(b);
@@ -1112,13 +1112,13 @@ mod test {
         for _ in 0..100 {
             let mut cs = TestConstraintSystem::<Fr>::new();
 
-            let a: u32 = rng.gen_range(0, u32::max_value() << 16);
-            let b: u32 = rng.gen_range(0, u32::max_value() << 16);
+            let a: u32 = rng.gen();
+            let b: u32 = rng.gen();
 
             let expected = a.wrapping_mul(b);
 
             let a_bit = UInt32::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-            let b_bit = if b > (u32::max_value() << 17) {
+            let b_bit = if b > (u32::max_value() / 2) {
                 UInt32::constant(b)
             } else {
                 UInt32::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
