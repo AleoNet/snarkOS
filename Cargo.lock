@@ -2190,6 +2190,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-objects",
  "snarkos-storage",
+ "snarkos-utilities",
  "tokio 0.2.13",
 ]
 

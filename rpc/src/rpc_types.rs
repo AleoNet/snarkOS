@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 /// Returned value for the `getblock` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -38,40 +38,29 @@ pub struct PeerInfo {
     pub peers: Vec<SocketAddr>,
 }
 
-/// Transaction input
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionOutpoint {
-    /// Previous transaction id
-    pub txid: String,
-    /// Previous transaction output index
-    pub vout: u32,
+pub struct RPCTransactionStuff {
+    /// Merkle tree digest
+    pub digest: String,
+
+    /// Inner snark proof
+    pub inner_proof: String,
+
+    /// Predicate proof
+    pub predicate_proof: String,
+
+    /// Predicate verification key commitment
+    pub predicate_commitment: String,
+
+    /// Local data commitment
+    pub local_data_commitment: String,
+
+    /// Transaction value balance
+    pub value_balance: i64,
+
+    /// Transaction signatures (Delegated DPC)
+    pub signatures: Vec<String>,
 }
-
-/// Transaction input
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionInput {
-    /// Previous transaction id
-    pub txid: String,
-
-    /// Previous transaction output index
-    pub vout: u32,
-
-    /// Script signature
-    pub script_sig: String,
-}
-
-/// Transaction output
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionOutput {
-    /// Transaction output amount
-    pub amount: u64,
-
-    /// Transaction output public key script
-    pub script_pub_key: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionOutputs(pub HashMap<String, u64>);
 
 /// Returned value for the `gettransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -82,14 +71,17 @@ pub struct TransactionInfo {
     /// Transaction size
     pub size: usize,
 
-    /// Transaction version
-    pub version: u32,
-
     /// Transaction inputs
-    pub inputs: Vec<RPCTransactionInput>,
+    pub old_serial_numbers: Vec<String>,
 
     /// Transaction outputs
-    pub outputs: Vec<RPCTransactionOutput>,
+    pub new_commitments: Vec<String>,
+
+    /// Transaction Memo
+    pub memo: String,
+
+    /// DPC Stuff
+    pub stuff: RPCTransactionStuff,
 }
 
 /// Returned value for the `getblocktemplate` rpc call

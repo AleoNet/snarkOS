@@ -27,18 +27,21 @@ pub trait RpcFunctions {
     #[rpc(name = "getrawtransaction")]
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError>;
 
-    #[rpc(name = "createtransaction")]
-    fn create_transaction(
+    #[rpc(name = "createrawtransaction")]
+    fn create_raw_transaction(
         &self,
-        inputs: Vec<RPCTransactionOutpoint>,
-        outputs: RPCTransactionOutputs,
+        //        inputs: Vec<RPCTransactionOutpoint>,
+        //        outputs: RPCTransactionOutputs,
     ) -> Result<String, RpcError>;
 
-    #[rpc(name = "decodetransaction")]
-    fn decode_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError>;
+    #[rpc(name = "decoderawtransaction")]
+    fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError>;
 
     #[rpc(name = "sendtransaction")]
-    fn send_transaction(&self, transaction_bytes: String) -> Result<String, RpcError>;
+    fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError>;
+
+    //    #[rpc(name = "decoderecord")]
+    //    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 
     #[rpc(name = "getconnectioncount")]
     fn get_connection_count(&self) -> Result<usize, RpcError>;

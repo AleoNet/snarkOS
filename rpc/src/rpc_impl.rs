@@ -1,9 +1,13 @@
 use crate::{rpc_types::*, RpcFunctions};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_dpc_consensus::{get_block_reward, miner::MemoryPool, ConsensusParameters};
-use snarkos_dpc_network::context::Context;
+use snarkos_dpc_network::{context::Context, process_transaction_internal};
 use snarkos_errors::rpc::RpcError;
 use snarkos_objects::{BlockHeaderHash, Transaction};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use chrono::Utc;
 use std::sync::Arc;
@@ -117,10 +121,10 @@ impl RpcFunctions for RpcImpl {
     }
 
     /// Returns hex encoded bytes of a transaction from transaction inputs and outputs.
-    fn create_transaction(
+    fn create_raw_transaction(
         &self,
-        _inputs: Vec<RPCTransactionOutpoint>,
-        _outputs: RPCTransactionOutputs,
+        //        _inputs: Vec<RPCTransactionOutpoint>,
+        //        _outputs: RPCTransactionOutputs,
     ) -> Result<String, RpcError> {
         //        let mut transaction_inputs = vec![];
         //        for input in inputs {
@@ -148,58 +152,72 @@ impl RpcFunctions for RpcImpl {
     }
 
     /// Returns information about a transaction from serialized bytes.
-    fn decode_transaction(&self, _transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
-        //        let transaction = Transaction::from_str(&transaction_bytes)?;
-        //
-        //        let mut inputs = vec![];
-        //
-        //        for input in &transaction.parameters.inputs {
-        //            inputs.push(RPCTransactionInput {
-        //                txid: hex::encode(&input.outpoint.transaction_id),
-        //                vout: input.outpoint.index,
-        //                script_sig: hex::encode(&input.script_sig),
-        //            })
-        //        }
-        //
-        //        let mut outputs = vec![];
-        //        for output in &transaction.parameters.outputs {
-        //            outputs.push(RPCTransactionOutput {
-        //                amount: output.amount,
-        //                script_pub_key: hex::encode(&output.script_pub_key),
-        //            })
-        //        }
-        //
-        //        Ok(TransactionInfo {
-        //            txid: hex::encode(&transaction.to_transaction_id()?),
-        //            size: hex::decode(transaction_bytes)?.len(),
-        //            version: transaction.parameters.version,
-        //            inputs,
-        //            outputs,
-        //        })
-        unimplemented!()
+    fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
+        let transaction_bytes = hex::decode(transaction_bytes)?;
+        let transaction = Tx::read(&transaction_bytes[..])?;
+
+        let mut old_serial_numbers = vec![];
+
+        for sn in transaction.old_serial_numbers() {
+            old_serial_numbers.push(hex::encode(to_bytes![sn]?));
+        }
+
+        let mut new_commitments = vec![];
+
+        for cm in transaction.new_commitments() {
+            new_commitments.push(hex::encode(to_bytes![cm]?));
+        }
+
+        let memo = hex::encode(to_bytes![transaction.memorandum()]?);
+
+        let transaction_stuff = &transaction.stuff;
+
+        let mut signatures = vec![];
+        for sig in &transaction_stuff.signatures {
+            signatures.push(hex::encode(to_bytes![sig]?));
+        }
+
+        let stuff = RPCTransactionStuff {
+            digest: hex::encode(to_bytes![transaction_stuff.digest]?),
+            inner_proof: hex::encode(to_bytes![transaction_stuff.inner_proof]?),
+            predicate_proof: hex::encode(to_bytes![transaction_stuff.predicate_proof]?),
+            predicate_commitment: hex::encode(to_bytes![transaction_stuff.predicate_commitment]?),
+            local_data_commitment: hex::encode(to_bytes![transaction_stuff.local_data_commitment]?),
+            value_balance: transaction_stuff.value_balance,
+            signatures,
+        };
+
+        Ok(TransactionInfo {
+            txid: hex::encode(&transaction.transaction_id()?),
+            size: transaction_bytes.len(),
+            old_serial_numbers,
+            new_commitments,
+            memo,
+            stuff,
+        })
     }
 
     /// Send raw transaction bytes to this node to be added into the mempool.
     /// If valid, the transaction will be stored and propagated to all peers.
     /// Returns the transaction id if valid.
-    fn send_transaction(&self, _transaction_bytes: String) -> Result<String, RpcError> {
-        //        let transaction = Transaction::from_str(&transaction_bytes)?;
-        //
-        //        match self.storage.check_for_double_spend(&transaction) {
-        //            Ok(_) => {
-        //                Runtime::new()?.block_on(process_transaction_internal(
-        //                    self.server_context.clone(),
-        //                    self.storage.clone(),
-        //                    self.memory_pool_lock.clone(),
-        //                    transaction.serialize()?,
-        //                    self.server_context.local_address,
-        //                ))?;
-        //
-        //                Ok(hex::encode(transaction.to_transaction_id()?))
-        //            }
-        //            Err(_) => Ok("Transaction contains spent outputs".into()),
-        //        }
-        unimplemented!()
+    fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
+        let transaction_bytes = hex::decode(transaction_bytes)?;
+        let transaction = Tx::read(&transaction_bytes[..])?;
+
+        match self.storage.transcation_conflicts(&transaction) {
+            Ok(_) => {
+                Runtime::new()?.block_on(process_transaction_internal(
+                    self.server_context.clone(),
+                    self.storage.clone(),
+                    self.memory_pool_lock.clone(),
+                    to_bytes![transaction]?.to_vec(),
+                    self.server_context.local_address,
+                ))?;
+
+                Ok(hex::encode(transaction.transaction_id()?))
+            }
+            Err(_) => Ok("Transaction contains spent outputs".into()),
+        }
     }
 
     /// Fetch the number of connected peers this node has.
@@ -319,22 +337,6 @@ impl RpcImpl {}
 //    }
 //
 //    #[test]
-//    fn test_get_balance() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let genesis_miner = TEST_WALLETS[0].address;
-//
-//        assert_eq!(rpc.request("getbalance", &[genesis_miner]), format![
-//            r#"{}"#,
-//            GENESIS_BLOCK_GENESIS_MINER_BALANCE
-//        ]);
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
 //    fn test_get_block_call() {
 //        let (storage, path) = initialize_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
@@ -417,29 +419,29 @@ impl RpcImpl {}
 //        kill_storage_async(path);
 //    }
 //
-//    #[test]
-//    fn test_create_raw_transaction() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let inputs = RPCTransactionOutpoint {
-//            txid: TEST_TRANSACTION_TXID.into(),
-//            vout: 0,
-//        };
-//
-//        let mut map = HashMap::new();
-//        map.insert(TEST_TRANSACTION_PRIVATE_KEY.to_string(), TEST_TRANSACTION_SPENDABLE);
-//
-//        let outputs = RPCTransactionOutputs(map);
-//
-//        assert_eq!(rpc.request("createrawtransaction", &(vec![inputs], outputs)), format![
-//            r#""{}""#,
-//            TEST_TRANSACTION_UNSIGNED
-//        ]);
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
+////    #[test]
+////    fn test_create_raw_transaction() {
+////        let (storage, path) = initialize_test_blockchain();
+////        let rpc = initialize_test_rpc(storage);
+////
+////        let inputs = RPCTransactionOutpoint {
+////            txid: TEST_TRANSACTION_TXID.into(),
+////            vout: 0,
+////        };
+////
+////        let mut map = HashMap::new();
+////        map.insert(TEST_TRANSACTION_PRIVATE_KEY.to_string(), TEST_TRANSACTION_SPENDABLE);
+////
+////        let outputs = RPCTransactionOutputs(map);
+////
+////        assert_eq!(rpc.request("createrawtransaction", &(vec![inputs], outputs)), format![
+////            r#""{}""#,
+////            TEST_TRANSACTION_UNSIGNED
+////        ]);
+////
+////        drop(rpc);
+////        kill_storage_async(path);
+////    }
 //
 //    #[test]
 //    fn test_decode_raw_transaction() {
@@ -455,38 +457,19 @@ impl RpcImpl {}
 //        kill_storage_async(path);
 //    }
 //
-//    #[test]
-//    fn test_sign_raw_transaction() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let genesis_miner_private_key = TEST_WALLETS[0].private_key;
-//
-//        assert_eq!(
-//            rpc.request(
-//                "signrawtransaction",
-//                &(BLOCK_1_TRANSACTION, vec![genesis_miner_private_key])
-//            ),
-//            format![r#""{}""#, BLOCK_1_TRANSACTION]
-//        );
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_send_raw_transaction() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        assert_eq!(
-//            rpc.request("sendrawtransaction", &[BLOCK_1_TRANSACTION]),
-//            r#""Transaction contains spent outputs""#
-//        );
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
+////    #[test]
+////    fn test_send_raw_transaction() {
+////        let (storage, path) = initialize_test_blockchain();
+////        let rpc = initialize_test_rpc(storage);
+////
+////        assert_eq!(
+////            rpc.request("sendrawtransaction", &[BLOCK_1_TRANSACTION]),
+////            r#""Transaction contains spent outputs""#
+////        );
+////
+////        drop(rpc);
+////        kill_storage_async(path);
+////    }
 //
 //    #[test]
 //    fn test_get_connection_count() {

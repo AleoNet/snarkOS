@@ -27,6 +27,7 @@ snarkos-errors = { path = "../errors", version = "0.8.0", default-features = fal
 snarkos-dpc-network = { path = "../dpc_network", version = "0.8.0", default-features = false }
 snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
 snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
