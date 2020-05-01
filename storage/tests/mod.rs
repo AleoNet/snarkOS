@@ -124,6 +124,22 @@ impl Storage for TestMerkleParams {
     }
 }
 
+impl ToBytes for TestMerkleParams {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for TestMerkleParams {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let crh: H = FromBytes::read(&mut reader)?;
+
+        Ok(Self(crh))
+    }
+}
+
 type Store = BlockStorage<TestTx, TestMerkleParams>;
 
 pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {

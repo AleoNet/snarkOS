@@ -15,11 +15,17 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
-use snarkos_utilities::storage::Storage;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use std::{io::Result as IoResult, path::PathBuf};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Clone)]
 pub(super) struct Size;
@@ -66,6 +72,22 @@ impl Default for EdwardsMerkleParameters {
     fn default() -> Self {
         let rng = &mut XorShiftRng::seed_from_u64(9174123u64);
         Self(H::setup(rng))
+    }
+}
+
+impl ToBytes for EdwardsMerkleParameters {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for EdwardsMerkleParameters {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let crh: H = FromBytes::read(&mut reader)?;
+
+        Ok(Self(crh))
     }
 }
 

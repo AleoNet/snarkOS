@@ -4,11 +4,17 @@ use crate::{
 };
 use snarkos_curves::edwards_bls12::EdwardsAffine as Edwards;
 use snarkos_models::{algorithms::CRH, curves::pairing_engine::AffineCurve};
-use snarkos_utilities::{bytes::ToBytes, storage::Storage};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use std::{io::Result as IoResult, path::PathBuf};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Clone)]
 pub(crate) struct Size;
@@ -42,7 +48,7 @@ impl MerkleParameters for MTParameters {
 impl Default for MTParameters {
     fn default() -> Self {
         let mut rng = XorShiftRng::seed_from_u64(9174123u64);
-        Self(PedersenCRH::<Edwards, Size>::setup(&mut rng))
+        Self(H::setup(&mut rng))
     }
 }
 
@@ -55,6 +61,22 @@ impl Storage for MTParameters {
     /// Load the SNARK proof from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
         Ok(Self(H::load(path)?))
+    }
+}
+
+impl ToBytes for MTParameters {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for MTParameters {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let crh: H = FromBytes::read(&mut reader)?;
+
+        Ok(Self(crh))
     }
 }
 
