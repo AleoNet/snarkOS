@@ -10,7 +10,7 @@ mod consensus_receive_block {
     fn new_in_order() {
         let (mut blockchain, path) = initialize_test_blockchain();
 
-        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
+        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
 
         let mut memory_pool = MemoryPool::new();
 

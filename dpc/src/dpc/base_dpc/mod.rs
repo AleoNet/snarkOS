@@ -588,6 +588,10 @@ where
             Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
         end_timer!(snark_setup_time);
         end_timer!(setup_time);
+
+        let inner_snark_parameters = (Some(inner_snark_parameters.0), inner_snark_parameters.1);
+        let outer_snark_parameters = (Some(outer_snark_parameters.0), outer_snark_parameters.1);
+
         Ok(PublicParameters {
             circuit_parameters,
             predicate_snark_parameters,
@@ -732,7 +736,12 @@ where
                 &binding_signature,
             );
 
-            Components::InnerSNARK::prove(&parameters.inner_snark_parameters.0, circuit, rng)?
+            let inner_snark_parameters = match &parameters.inner_snark_parameters.0 {
+                Some(inner_snark_parameters) => inner_snark_parameters,
+                None => return Err(DPCError::MissingInnerSnarkProvingParameters),
+            };
+
+            Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
         };
 
         let outer_proof = {
@@ -745,7 +754,12 @@ where
                 &local_data_commitment,
             );
 
-            Components::OuterSNARK::prove(&parameters.outer_snark_parameters.0, circuit, rng)?
+            let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
+                Some(outer_snark_parameters) => outer_snark_parameters,
+                None => return Err(DPCError::MissingOuterSnarkProvingParameters),
+            };
+
+            Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
 
         let signature_message = to_bytes![

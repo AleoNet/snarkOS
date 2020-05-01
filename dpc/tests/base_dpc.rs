@@ -36,7 +36,7 @@ fn base_dpc_integration_test() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, parameters) = setup_or_load_parameters(&mut rng);
+    let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
     // Generate addresses
     let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);

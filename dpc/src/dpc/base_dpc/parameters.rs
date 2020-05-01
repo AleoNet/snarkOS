@@ -30,11 +30,11 @@ pub struct PublicParameters<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
     pub predicate_snark_parameters: PredicateSNARKParameters<C>,
     pub outer_snark_parameters: (
-        <C::OuterSNARK as SNARK>::ProvingParameters,
+        Option<<C::OuterSNARK as SNARK>::ProvingParameters>,
         <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
     ),
     pub inner_snark_parameters: (
-        <C::InnerSNARK as SNARK>::ProvingParameters,
+        Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
         <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
     ),
 }
@@ -47,7 +47,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn inner_snark_parameters(
         &self,
     ) -> &(
-        <C::InnerSNARK as SNARK>::ProvingParameters,
+        Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
         <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
     ) {
         &self.inner_snark_parameters
@@ -60,7 +60,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn outer_snark_parameters(
         &self,
     ) -> &(
-        <C::OuterSNARK as SNARK>::ProvingParameters,
+        Option<<C::OuterSNARK as SNARK>::ProvingParameters>,
         <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
     ) {
         &self.outer_snark_parameters
@@ -151,12 +151,14 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         // Outer SNARK parameters
 
-        let outer_snark_path = &parameter_dir.join("outer_snark.params");
+        let outer_snark_pp_path = &parameter_dir.join("outer_snark.params");
         let outer_snark_vk_path = &parameter_dir.join("outer_snark_vk.params");
         let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
-            self.outer_snark_parameters.0.clone().into();
+            self.outer_snark_parameters.1.clone().into();
 
-        self.outer_snark_parameters.0.store(outer_snark_path)?;
+        if let Some(parameters) = &self.outer_snark_parameters.0 {
+            parameters.store(outer_snark_pp_path)?;
+        };
         outer_snark_vk.store(outer_snark_vk_path)?;
 
         // Inner SNARK parameters
@@ -164,15 +166,17 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         let inner_snark_pp_path = &parameter_dir.join("inner_snark.params");
         let inner_snark_vk_path = &parameter_dir.join("inner_snark_vk.params");
         let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
-            self.inner_snark_parameters.0.clone().into();
+            self.inner_snark_parameters.1.clone().into();
 
-        self.inner_snark_parameters.0.store(inner_snark_pp_path)?;
+        if let Some(parameters) = &self.inner_snark_parameters.0 {
+            parameters.store(inner_snark_pp_path)?;
+        };
         inner_snark_vk.store(inner_snark_vk_path)?;
 
         Ok(())
     }
 
-    pub fn load(dir_path: &PathBuf) -> IoResult<Self> {
+    pub fn load(dir_path: &PathBuf, verify_only: bool) -> IoResult<Self> {
         let circuit_dir = dir_path.join("circuit/");
 
         // Circuit Parameters
@@ -227,23 +231,37 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         };
 
         let outer_snark_parameters: (
-            <C::OuterSNARK as SNARK>::ProvingParameters,
+            Option<<C::OuterSNARK as SNARK>::ProvingParameters>,
             <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
         ) = {
             let outer_snark_path = &dir_path.join("outer_snark.params");
-            let outer_snark_pk = <C::OuterSNARK as SNARK>::ProvingParameters::load(outer_snark_path)?;
-            let outer_snark_prepared_vk = outer_snark_pk.clone().into();
+            let outer_snark_vk_path = &dir_path.join("outer_snark_vk.params");
+
+            let outer_snark_pk = match verify_only {
+                true => None,
+                false => Some(<C::OuterSNARK as SNARK>::ProvingParameters::load(outer_snark_path)?),
+            };
+
+            let outer_snark_vk = <C::OuterSNARK as SNARK>::VerificationParameters::load(outer_snark_vk_path)?;
+            let outer_snark_prepared_vk = outer_snark_vk.into();
 
             (outer_snark_pk, outer_snark_prepared_vk)
         };
 
         let inner_snark_parameters: (
-            <C::InnerSNARK as SNARK>::ProvingParameters,
+            Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
             <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
         ) = {
             let inner_snark_pp_path = &dir_path.join("inner_snark.params");
-            let inner_snark_pk = <C::InnerSNARK as SNARK>::ProvingParameters::load(inner_snark_pp_path)?;
-            let inner_snark_prepared_vk = inner_snark_pk.clone().into();
+            let inner_snark_vk_path = &dir_path.join("inner_snark_vk.params");
+
+            let inner_snark_pk = match verify_only {
+                true => None,
+                false => Some(<C::InnerSNARK as SNARK>::ProvingParameters::load(inner_snark_pp_path)?),
+            };
+
+            let inner_snark_vk = <C::InnerSNARK as SNARK>::VerificationParameters::load(inner_snark_vk_path)?;
+            let inner_snark_prepared_vk = inner_snark_vk.into();
 
             (inner_snark_pk, inner_snark_prepared_vk)
         };

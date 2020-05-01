@@ -69,7 +69,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     parameters_path.push("dpc/src/parameters/");
 
     info!("Loading Parameters");
-    let parameters = PublicParameters::<Components>::load(&parameters_path)?;
+    let parameters = PublicParameters::<Components>::load(&parameters_path, !config.miner)?;
     info!("Parameters Loaded");
 
     let server = Server::new(

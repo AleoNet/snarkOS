@@ -16,6 +16,7 @@ pub struct Wallet {
 }
 
 pub fn setup_or_load_parameters<R: Rng>(
+    verify_only: bool,
     rng: &mut R,
 ) -> (
     <Components as BaseDPCComponents>::MerkleParameters,
@@ -28,18 +29,19 @@ pub fn setup_or_load_parameters<R: Rng>(
     let (ledger_parameters, parameters) =
         match <Components as BaseDPCComponents>::MerkleParameters::load(&ledger_parameter_path) {
             Ok(ledger_parameters) => {
-                let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path) {
-                    Ok(parameters) => parameters,
-                    Err(_) => {
-                        println!("Parameter Setup");
-                        let parameters =
-                            <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
-                                .expect("DPC setup failed");
+                let parameters =
+                    match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
+                        Ok(parameters) => parameters,
+                        Err(_) => {
+                            println!("Parameter Setup");
+                            let parameters =
+                                <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
+                                    .expect("DPC setup failed");
 
-                        parameters.store(&path).unwrap();
-                        parameters
-                    }
-                };
+                            parameters.store(&path).unwrap();
+                            parameters
+                        }
+                    };
 
                 (ledger_parameters, parameters)
             }

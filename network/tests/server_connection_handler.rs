@@ -310,7 +310,7 @@ mod server_connection_handler {
     #[test]
     #[serial]
     fn test_peer_searching() {
-        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
+        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
 
         {
             println!("test peer connect");

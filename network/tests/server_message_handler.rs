@@ -944,7 +944,7 @@ mod server_message_handler {
     #[test]
     #[serial]
     fn test_message_handler_structs() {
-        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
+        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
         {
             println!("test receive block message");
             receive_block_message(parameters.clone());
@@ -979,7 +979,7 @@ mod server_message_handler {
     #[test]
     #[serial]
     fn test_message_handler_misc() {
-        let (_, parameters) = setup_or_load_parameters(&mut thread_rng());
+        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
         {
             println!("test receive get empty memory pool");
             receive_get_memory_pool_empty(parameters.clone());
