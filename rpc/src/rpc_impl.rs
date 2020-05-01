@@ -406,19 +406,6 @@ impl RpcImpl {}
 //        kill_storage_async(path);
 //    }
 //
-//    #[test]
-//    fn test_list_unspent() {
-//        let (storage, path) = initialize_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let genesis_miner = TEST_WALLETS[0].address;
-//
-//        assert_eq!(rpc.request("listunspent", &[genesis_miner]), GENESIS_UNSPENT);
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
 ////    #[test]
 ////    fn test_create_raw_transaction() {
 ////        let (storage, path) = initialize_test_blockchain();

@@ -20,8 +20,8 @@ use snarkos_dpc_network::{
     server::{MinerInstance, Server},
 };
 use snarkos_errors::node::NodeError;
+use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
-//use snarkos_rpc::start_rpc_server;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
@@ -91,16 +91,16 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start rpc thread
 
-    //    if config.jsonrpc {
-    //        start_rpc_server(
-    //            config.rpc_port,
-    //            storage.clone(),
-    //            server.context.clone(),
-    //            consensus.clone(),
-    //            memory_pool_lock.clone(),
-    //        )
-    //        .await?;
-    //    }
+    if config.jsonrpc {
+        start_rpc_server(
+            config.rpc_port,
+            storage.clone(),
+            server.context.clone(),
+            consensus.clone(),
+            memory_pool_lock.clone(),
+        )
+        .await?;
+    }
 
     // Start miner thread
 
