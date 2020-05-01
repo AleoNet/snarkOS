@@ -642,6 +642,7 @@ impl<F: Field> ToBytesGadget<F> for UInt32 {
         for (i, chunk8) in self.to_bits_le().chunks(8).into_iter().enumerate() {
             let byte = UInt8 {
                 bits: chunk8.to_vec(),
+                negated: false,
                 value: value_chunks[i],
             };
             bytes.push(byte);

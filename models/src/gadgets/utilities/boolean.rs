@@ -699,7 +699,11 @@ impl<F: Field> ToBytesGadget<F> for Boolean {
         bits.push(*self);
         bits.reverse();
         let value = self.get_value().map(|val| val as u8);
-        let byte = UInt8 { bits, value };
+        let byte = UInt8 {
+            bits,
+            negated: false,
+            value,
+        };
         Ok(vec![byte])
     }
 

@@ -13,6 +13,7 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
+use crate::gadgets::{r1cs::LinearCombination, utilities::select::CondSelectGadget};
 use std::borrow::Borrow;
 
 /// Represents an interpretation of 8 `Boolean` objects as an
@@ -20,15 +21,12 @@ use std::borrow::Borrow;
 #[derive(Clone, Debug)]
 pub struct UInt8 {
     // Least significant bit_gadget first
-    pub(crate) bits: Vec<Boolean>,
-    pub(crate) value: Option<u8>,
+    pub bits: Vec<Boolean>,
+    pub negated: bool,
+    pub value: Option<u8>,
 }
 
 impl UInt8 {
-    pub fn get_value(&self) -> Option<u8> {
-        self.value
-    }
-
     /// Construct a constant vector of `UInt8` from a vector of `u8`
     pub fn constant_vec(values: &[u8]) -> Vec<Self> {
         let mut result = Vec::new();
@@ -56,6 +54,7 @@ impl UInt8 {
 
         Self {
             bits,
+            negated: false,
             value: Some(value),
         }
     }
@@ -153,7 +152,30 @@ impl UInt8 {
             }
         }
 
-        Self { value, bits }
+        Self {
+            value,
+            negated: false,
+            bits,
+        }
+    }
+
+    pub fn rotr(&self, by: usize) -> Self {
+        let by = by % 8;
+
+        let new_bits = self
+            .bits
+            .iter()
+            .skip(by)
+            .chain(self.bits.iter())
+            .take(8)
+            .cloned()
+            .collect();
+
+        Self {
+            bits: new_bits,
+            negated: false,
+            value: self.value.map(|v| v.rotate_right(by as u32) as u8),
+        }
     }
 
     /// XOR this `UInt8` with another `UInt8`
@@ -175,7 +197,497 @@ impl UInt8 {
             .map(|(i, (a, b))| Boolean::xor(cs.ns(|| format!("xor of bit_gadget {}", i)), a, b))
             .collect::<Result<_, _>>()?;
 
-        Ok(Self { bits, value: new_value })
+        Ok(Self {
+            bits,
+            negated: false,
+            value: new_value,
+        })
+    }
+
+    /// Returns the inverse `UInt8`
+    pub fn negate(&self) -> Self {
+        Self {
+            bits: self.bits.clone(),
+            negated: true,
+            value: self.value.clone(),
+        }
+    }
+
+    /// Returns true if all bits in this `UInt8` are constant
+    fn is_constant(&self) -> bool {
+        let mut constant = true;
+
+        // If any bits of self are allocated bits, return false
+        for bit in &self.bits {
+            match *bit {
+                Boolean::Is(ref _bit) => constant = false,
+                Boolean::Not(ref _bit) => constant = false,
+                Boolean::Constant(_bit) => {}
+            }
+        }
+
+        constant
+    }
+
+    /// Returns true if both `UInt8` objects have constant bits
+    fn result_is_constant(first: &Self, second: &Self) -> bool {
+        // If any bits of first are allocated bits, return false
+        if !first.is_constant() {
+            return false;
+        }
+
+        // If any bits of second are allocated bits, return false
+        second.is_constant()
+    }
+
+    /// Perform modular addition of several `UInt8` objects.
+    pub fn addmany<F, CS>(mut cs: CS, operands: &[Self]) -> Result<Self, SynthesisError>
+    where
+        F: PrimeField,
+        CS: ConstraintSystem<F>,
+    {
+        // Make some arbitrary bounds for ourselves to avoid overflows
+        // in the scalar field
+        assert!(F::Params::MODULUS_BITS >= 64);
+        assert!(operands.len() >= 2); // Weird trivial cases that should never happen
+
+        // Compute the maximum value of the sum so we allocate enough bits for
+        // the result
+        let mut max_value = (operands.len() as u64) * u64::from(u8::max_value());
+
+        // Keep track of the resulting value
+        let mut result_value = Some(0u64);
+
+        // This is a linear combination that we will enforce to be "zero"
+        let mut lc = LinearCombination::zero();
+
+        let mut all_constants = true;
+
+        // Iterate over the operands
+        for op in operands {
+            // Accumulate the value
+            match op.value {
+                Some(val) => {
+                    // Subtract or add operand
+                    if op.negated {
+                        // Perform subtraction
+                        result_value.as_mut().map(|v| *v -= u64::from(val));
+                    } else {
+                        // Perform addition
+                        result_value.as_mut().map(|v| *v += u64::from(val));
+                    }
+                }
+                None => {
+                    // If any of our operands have unknown value, we won't
+                    // know the value of the result
+                    result_value = None;
+                }
+            }
+
+            // Iterate over each bit_gadget of the operand and add the operand to
+            // the linear combination
+            let mut coeff = F::one();
+            for bit in &op.bits {
+                match *bit {
+                    Boolean::Is(ref bit) => {
+                        all_constants = false;
+
+                        if op.negated {
+                            // Subtract coeff * bit gadget
+                            lc = lc - (coeff, bit.get_variable());
+                        } else {
+                            // Add coeff * bit_gadget
+                            lc = lc + (coeff, bit.get_variable());
+                        }
+                    }
+                    Boolean::Not(ref bit) => {
+                        all_constants = false;
+
+                        if op.negated {
+                            // subtract coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                            lc = lc - (coeff, CS::one()) + (coeff, bit.get_variable());
+                        } else {
+                            // Add coeff * (1 - bit_gadget) = coeff * ONE - coeff * bit_gadget
+                            lc = lc + (coeff, CS::one()) - (coeff, bit.get_variable());
+                        }
+                    }
+                    Boolean::Constant(bit) => {
+                        if bit {
+                            if op.negated {
+                                lc = lc - (coeff, CS::one());
+                            } else {
+                                lc = lc + (coeff, CS::one());
+                            }
+                        }
+                    }
+                }
+
+                coeff.double_in_place();
+            }
+        }
+
+        // The value of the actual result is modulo 2^32
+        let modular_value = result_value.map(|v| v as u8);
+
+        if all_constants && modular_value.is_some() {
+            // We can just return a constant, rather than
+            // unpacking the result into allocated bits.
+
+            return Ok(Self::constant(modular_value.unwrap()));
+        }
+
+        // Storage area for the resulting bits
+        let mut result_bits = vec![];
+
+        // Allocate each bit_gadget of the result
+        let mut coeff = F::one();
+        let mut i = 0;
+        while max_value != 0 {
+            // Allocate the bit_gadget
+            let b = AllocatedBit::alloc(cs.ns(|| format!("result bit_gadget {}", i)), || {
+                result_value.map(|v| (v >> i) & 1 == 1).get()
+            })?;
+
+            // Subtract this bit_gadget from the linear combination to ensure the sums
+            // balance out
+            lc = lc - (coeff, b.get_variable());
+
+            result_bits.push(b.into());
+
+            max_value >>= 1;
+            i += 1;
+            coeff.double_in_place();
+        }
+
+        // Enforce that the linear combination equals zero
+        cs.enforce(|| "modular addition", |lc| lc, |lc| lc, |_| lc);
+
+        // Discard carry bits that we don't care about
+        result_bits.truncate(8);
+
+        Ok(Self {
+            bits: result_bits,
+            negated: false,
+            value: modular_value,
+        })
+    }
+
+    /// Perform modular subtraction of two `UInt8` objects.
+    pub fn sub<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // pseudocode:
+        //
+        // a - b
+        // a + (-b)
+
+        Self::addmany(&mut cs.ns(|| "add_not"), &[self.clone(), other.negate()])
+    }
+
+    /// Perform unsafe subtraction of two `UInt8` objects which returns 0 if overflowed
+    fn sub_unsafe<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        match (self.value, other.value) {
+            (Some(val1), Some(val2)) => {
+                // Check for overflow
+                if val1 < val2 {
+                    // Instead of erroring, return 0
+
+                    if Self::result_is_constant(&self, &other) {
+                        // Return constant 0u32
+                        Ok(Self::constant(0u8))
+                    } else {
+                        // Return allocated 0u32
+                        let result_value = Some(0u64);
+                        let modular_value = result_value.map(|v| v as u8);
+
+                        // Storage area for the resulting bits
+                        let mut result_bits = vec![];
+
+                        // This is a linear combination that we will enforce to be "zero"
+                        let mut lc = LinearCombination::zero();
+
+                        // Allocate each bit_gadget of the result
+                        let mut coeff = F::one();
+                        for i in 0..8 {
+                            // Allocate the bit_gadget
+                            let b = AllocatedBit::alloc(cs.ns(|| format!("result bit_gadget {}", i)), || {
+                                result_value.map(|v| (v >> i) & 1 == 1).get()
+                            })?;
+
+                            // Subtract this bit_gadget from the linear combination to ensure the sums
+                            // balance out
+                            lc = lc - (coeff, b.get_variable());
+
+                            result_bits.push(b.into());
+
+                            coeff.double_in_place();
+                        }
+
+                        // Enforce that the linear combination equals zero
+                        cs.enforce(|| "unsafe subtraction", |lc| lc, |lc| lc, |_| lc);
+
+                        // Discard carry bits that we don't care about
+                        result_bits.truncate(8);
+
+                        Ok(Self {
+                            bits: result_bits,
+                            negated: false,
+                            value: modular_value,
+                        })
+                    }
+                } else {
+                    // Perform subtraction
+                    self.sub(&mut cs.ns(|| ""), &other)
+                }
+            }
+            (_, _) => {
+                // If either of our operands have unknown value, we won't
+                // know the value of the result
+                return Err(SynthesisError::AssignmentMissing);
+            }
+        }
+    }
+
+    /// Bitwise multiplication of two `UInt8` objects.
+    /// Reference: https://en.wikipedia.org/wiki/Binary_multiplier
+    pub fn mul<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // pseudocode:
+        //
+        // res = 0;
+        // shifted_self = self;
+        // for bit in other.bits {
+        //   if bit {
+        //     res += shifted_self;
+        //   }
+        //   shifted_self = shifted_self << 1;
+        // }
+        // return res
+
+        let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
+        let constant_result = Self::constant(0u8);
+        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u32"), || Ok(0u8))?;
+        let zero_result = Self::conditionally_select(
+            &mut cs.ns(|| "constant_or_allocated"),
+            &is_constant,
+            &constant_result,
+            &allocated_result,
+        )?;
+
+        let mut left_shift = self.clone();
+
+        let partial_products = other
+            .bits
+            .iter()
+            .enumerate()
+            .map(|(i, bit)| {
+                let current_left_shift = left_shift.clone();
+                left_shift = Self::addmany(&mut cs.ns(|| format!("shift_left_{}", i)), &[
+                    left_shift.clone(),
+                    left_shift.clone(),
+                ])
+                .unwrap();
+
+                Self::conditionally_select(
+                    &mut cs.ns(|| format!("calculate_product_{}", i)),
+                    &bit,
+                    &current_left_shift,
+                    &zero_result,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<Self>>();
+
+        Self::addmany(&mut cs.ns(|| format!("partial_products")), &partial_products)
+    }
+
+    /// Perform long division of two `UInt8` objects.
+    /// Reference: https://en.wikipedia.org/wiki/Division_algorithm
+    pub fn div<F: PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // pseudocode:
+        //
+        // if D = 0 then error(DivisionByZeroException) end
+        // Q := 0                  -- Initialize quotient and remainder to zero
+        // R := 0
+        // for i := n − 1 .. 0 do  -- Where n is number of bits in N
+        //   R := R << 1           -- Left-shift R by 1 bit
+        //   R(0) := N(i)          -- Set the least-significant bit of R equal to bit i of the numerator
+        //   if R ≥ D then
+        //     R := R − D
+        //     Q(i) := 1
+        //   end
+        // end
+
+        if other.eq(&Self::constant(0u8)) {
+            return Err(SynthesisError::DivisionByZero);
+        }
+
+        let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
+
+        let allocated_true = Boolean::from(AllocatedBit::alloc(&mut cs.ns(|| "true"), || Ok(true)).unwrap());
+        let true_bit = Boolean::conditionally_select(
+            &mut cs.ns(|| "constant_or_allocated_true"),
+            &is_constant,
+            &Boolean::constant(true),
+            &allocated_true,
+        )?;
+
+        let allocated_one = Self::alloc(&mut cs.ns(|| "one"), || Ok(1u8))?;
+        let one = Self::conditionally_select(
+            &mut cs.ns(|| "constant_or_allocated_1u32"),
+            &is_constant,
+            &Self::constant(1u8),
+            &allocated_one,
+        )?;
+
+        let allocated_zero = Self::alloc(&mut cs.ns(|| "zero"), || Ok(0u8))?;
+        let zero = Self::conditionally_select(
+            &mut cs.ns(|| "constant_or_allocated_0u32"),
+            &is_constant,
+            &Self::constant(0u8),
+            &allocated_zero,
+        )?;
+
+        let self_is_zero = Boolean::Constant(self.eq(&Self::constant(0u8)));
+        let mut quotient = zero.clone();
+        let mut remainder = zero.clone();
+
+        for (i, bit) in self.bits.iter().rev().enumerate() {
+            // Left shift remainder by 1
+            remainder = Self::addmany(&mut cs.ns(|| format!("shift_left_{}", i)), &[
+                remainder.clone(),
+                remainder.clone(),
+            ])?;
+
+            // Set the least-significant bit of remainder to bit i of the numerator
+            let bit_is_true = Boolean::constant(bit.eq(&Boolean::constant(true)));
+            let new_remainder = Self::addmany(&mut cs.ns(|| format!("set_remainder_bit_{}", i)), &[
+                remainder.clone(),
+                one.clone(),
+            ])?;
+
+            remainder = Self::conditionally_select(
+                &mut cs.ns(|| format!("increment_or_remainder_{}", i)),
+                &bit_is_true,
+                &new_remainder,
+                &remainder,
+            )?;
+
+            // Greater than or equal to:
+            //   R >= D
+            //   (R == D) || (R > D)
+            //   (R == D) || ((R !=D) && ((R - D) != 0))
+            //
+            //  (R > D)                     checks subtraction overflow before evaluation
+            //  (R != D) && ((R - D) != 0)  instead evaluate subtraction and check for overflow after
+
+            let no_remainder = Boolean::constant(remainder.eq(&other));
+            let subtraction = remainder.sub_unsafe(&mut cs.ns(|| format!("subtract_divisor_{}", i)), &other)?;
+            let sub_is_zero = Boolean::constant(subtraction.eq(&Self::constant(0)));
+            let cond1 = Boolean::and(
+                &mut cs.ns(|| format!("cond_1_{}", i)),
+                &no_remainder.not(),
+                &sub_is_zero.not(),
+            )?;
+            let cond2 = Boolean::or(&mut cs.ns(|| format!("cond_2_{}", i)), &no_remainder, &cond1)?;
+
+            remainder = Self::conditionally_select(
+                &mut cs.ns(|| format!("subtract_or_same_{}", i)),
+                &cond2,
+                &subtraction,
+                &remainder,
+            )?;
+
+            let index = 7 - i as usize;
+            let bit_value = 1u8 << (index as u8);
+            let mut new_quotient = quotient.clone();
+            new_quotient.bits[index] = true_bit.clone();
+            new_quotient.value = Some(new_quotient.value.unwrap() + bit_value);
+
+            quotient = Self::conditionally_select(
+                &mut cs.ns(|| format!("set_bit_or_same_{}", i)),
+                &cond2,
+                &new_quotient,
+                &quotient,
+            )?;
+        }
+        Self::conditionally_select(&mut cs.ns(|| "self_or_quotient"), &self_is_zero, self, &quotient)
+    }
+
+    /// Bitwise multiplication of two `UInt8` objects.
+    /// Reference: /snarkOS/models/src/curves/field.rs
+    pub fn pow<F: Field + PrimeField, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+    ) -> Result<Self, SynthesisError> {
+        // let mut res = Self::one();
+        //
+        // let mut found_one = false;
+        //
+        // for i in BitIterator::new(exp) {
+        //     if !found_one {
+        //         if i {
+        //             found_one = true;
+        //         } else {
+        //             continue;
+        //         }
+        //     }
+        //
+        //     res.square_in_place();
+        //
+        //     if i {
+        //         res *= self;
+        //     }
+        // }
+        // res
+
+        let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
+        let constant_result = Self::constant(1u8);
+        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u32"), || Ok(1u8))?;
+        let mut result = Self::conditionally_select(
+            &mut cs.ns(|| "constant_or_allocated"),
+            &is_constant,
+            &constant_result,
+            &allocated_result,
+        )?;
+
+        for (i, bit) in other.bits.iter().rev().enumerate() {
+            let found_one = Boolean::Constant(result.eq(&Self::constant(1u8)));
+            let cond1 = Boolean::and(cs.ns(|| format!("found_one_{}", i)), &bit.not(), &found_one)?;
+            let square = result.mul(cs.ns(|| format!("square_{}", i)), &result).unwrap();
+
+            result = Self::conditionally_select(
+                &mut cs.ns(|| format!("result_or_sqaure_{}", i)),
+                &cond1,
+                &result,
+                &square,
+            )?;
+
+            let mul_by_self = result.mul(cs.ns(|| format!("multiply_by_self_{}", i)), &self).unwrap();
+
+            result = Self::conditionally_select(
+                &mut cs.ns(|| format!("mul_by_self_or_result_{}", i)),
+                &bit,
+                &mul_by_self,
+                &result,
+            )?;
+        }
+
+        Ok(result)
     }
 }
 
@@ -186,6 +698,8 @@ impl PartialEq for UInt8 {
 }
 
 impl Eq for UInt8 {}
+
+impl<F: Field> EqGadget<F> for UInt8 {}
 
 impl<F: Field> ConditionalEqGadget<F> for UInt8 {
     fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
@@ -209,7 +723,55 @@ impl<F: Field> ConditionalEqGadget<F> for UInt8 {
     }
 }
 
-impl<F: Field> EqGadget<F> for UInt8 {}
+impl<F: PrimeField> CondSelectGadget<F> for UInt8 {
+    fn conditionally_select<CS: ConstraintSystem<F>>(
+        mut cs: CS,
+        cond: &Boolean,
+        first: &Self,
+        second: &Self,
+    ) -> Result<Self, SynthesisError> {
+        if let Boolean::Constant(cond) = *cond {
+            if cond { Ok(first.clone()) } else { Ok(second.clone()) }
+        } else {
+            let mut is_negated = false;
+
+            let result_val = cond.get_value().and_then(|c| {
+                if c {
+                    is_negated = first.negated;
+                    first.value
+                } else {
+                    is_negated = second.negated;
+                    second.value
+                }
+            });
+
+            let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get().map(|v| v))?;
+
+            result.negated = is_negated;
+
+            let expected_bits = first
+                .bits
+                .iter()
+                .zip(&second.bits)
+                .enumerate()
+                .map(|(i, (a, b))| {
+                    Boolean::conditionally_select(&mut cs.ns(|| format!("uint8_cond_select_{}", i)), cond, a, b)
+                        .unwrap()
+                })
+                .collect::<Vec<Boolean>>();
+
+            for (i, (actual, expected)) in result.into_bits_le().iter().zip(expected_bits.iter()).enumerate() {
+                actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), expected)?;
+            }
+
+            Ok(result)
+        }
+    }
+
+    fn cost() -> usize {
+        8 * <Boolean as ConditionalEqGadget<F>>::cost()
+    }
+}
 
 impl<F: Field> AllocGadget<u8, F> for UInt8 {
     fn alloc<Fn, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: Fn) -> Result<Self, SynthesisError>
@@ -245,6 +807,7 @@ impl<F: Field> AllocGadget<u8, F> for UInt8 {
 
         Ok(Self {
             bits,
+            negated: false,
             value: value.ok(),
         })
     }
@@ -281,6 +844,7 @@ impl<F: Field> AllocGadget<u8, F> for UInt8 {
 
         Ok(Self {
             bits,
+            negated: false,
             value: value.ok(),
         })
     }
@@ -293,6 +857,36 @@ mod test {
 
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
+
+    fn check_all_constant_bits(mut expected: u8, actual: UInt8) {
+        for b in actual.bits.iter() {
+            match b {
+                &Boolean::Is(_) => panic!(),
+                &Boolean::Not(_) => panic!(),
+                &Boolean::Constant(b) => {
+                    assert!(b == (expected & 1 == 1));
+                }
+            }
+
+            expected >>= 1;
+        }
+    }
+
+    fn check_all_allocated_bits(mut expected: u8, actual: UInt8) {
+        for b in actual.bits.iter() {
+            match b {
+                &Boolean::Is(ref b) => {
+                    assert!(b.get_value().unwrap() == (expected & 1 == 1));
+                }
+                &Boolean::Not(ref b) => {
+                    assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+                }
+                &Boolean::Constant(_) => unreachable!(),
+            }
+
+            expected >>= 1;
+        }
+    }
 
     #[test]
     fn test_uint8_from_bits_to_bits() {
@@ -387,6 +981,364 @@ mod test {
 
                 expected >>= 1;
             }
+        }
+    }
+
+    #[test]
+    fn test_uint8_rotr() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        let mut num = rng.gen();
+
+        let a = UInt8::constant(num);
+
+        for i in 0..8 {
+            let b = a.rotr(i);
+
+            assert!(b.value.unwrap() == num);
+
+            let mut tmp = num;
+            for b in &b.bits {
+                match b {
+                    &Boolean::Constant(b) => {
+                        assert_eq!(b, tmp & 1 == 1);
+                    }
+                    _ => unreachable!(),
+                }
+
+                tmp >>= 1;
+            }
+
+            num = num.rotate_right(1);
+        }
+    }
+
+    #[test]
+    fn test_uint8_addmany_constants() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen();
+            let b: u8 = rng.gen();
+            let c: u8 = rng.gen();
+
+            let a_bit = UInt8::constant(a);
+            let b_bit = UInt8::constant(b);
+            let c_bit = UInt8::constant(c);
+
+            let expected = a.wrapping_add(b).wrapping_add(c);
+
+            let r = UInt8::addmany(cs.ns(|| "addition"), &[a_bit, b_bit, c_bit]).unwrap();
+
+            assert!(r.value == Some(expected));
+
+            check_all_constant_bits(expected, r);
+        }
+    }
+
+    #[test]
+    fn test_uint8_addmany() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen();
+            let b: u8 = rng.gen();
+            let c: u8 = rng.gen();
+            let d: u8 = rng.gen();
+
+            let expected = (a ^ b).wrapping_add(c).wrapping_add(d);
+
+            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = UInt8::constant(b);
+            let c_bit = UInt8::constant(c);
+            let d_bit = UInt8::alloc(cs.ns(|| "d_bit"), || Ok(d)).unwrap();
+
+            let r = a_bit.xor(cs.ns(|| "xor"), &b_bit).unwrap();
+            let r = UInt8::addmany(cs.ns(|| "addition"), &[r, c_bit, d_bit]).unwrap();
+
+            assert!(cs.is_satisfied());
+
+            assert!(r.value == Some(expected));
+
+            check_all_allocated_bits(expected, r);
+
+            // Flip a bit_gadget and see if the addition constraint still works
+            if cs.get("addition/result bit_gadget 0/boolean").is_zero() {
+                cs.set("addition/result bit_gadget 0/boolean", Field::one());
+            } else {
+                cs.set("addition/result bit_gadget 0/boolean", Field::zero());
+            }
+
+            assert!(!cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_uint8_sub_constants() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen_range(u8::max_value() / 2u8, u8::max_value());
+            let b: u8 = rng.gen_range(0u8, u8::max_value() / 2u8);
+
+            let a_bit = UInt8::constant(a);
+            let b_bit = UInt8::constant(b);
+
+            let expected = a.wrapping_sub(b);
+
+            let r = a_bit.sub(cs.ns(|| "subtraction"), &b_bit).unwrap();
+
+            assert!(r.value == Some(expected));
+
+            check_all_constant_bits(expected, r);
+        }
+    }
+
+    #[test]
+    fn test_uint8_sub() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen_range(u8::max_value() / 2u8, u8::max_value());
+            let b: u8 = rng.gen_range(0u8, u8::max_value() / 2u8);
+
+            let expected = a.wrapping_sub(b);
+
+            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > u8::max_value() / 4 {
+                UInt8::constant(b)
+            } else {
+                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+            };
+
+            let r = a_bit.sub(cs.ns(|| "subtraction"), &b_bit).unwrap();
+
+            assert!(cs.is_satisfied());
+
+            assert!(r.value == Some(expected));
+
+            check_all_allocated_bits(expected, r);
+
+            // Flip a bit_gadget and see if the subtraction constraint still works
+            if cs.get("subtraction/add_not/result bit_gadget 0/boolean").is_zero() {
+                cs.set("subtraction/add_not/result bit_gadget 0/boolean", Field::one());
+            } else {
+                cs.set("subtraction/add_not/result bit_gadget 0/boolean", Field::zero());
+            }
+
+            assert!(!cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_uint8_mul_constants() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen_range(0, u8::max_value());
+            let b: u8 = rng.gen_range(0, u8::max_value());
+
+            let a_bit = UInt8::constant(a);
+            let b_bit = UInt8::constant(b);
+
+            let expected = a.wrapping_mul(b);
+
+            let r = a_bit.mul(cs.ns(|| "multiply"), &b_bit).unwrap();
+
+            assert!(r.value == Some(expected));
+
+            check_all_constant_bits(expected, r);
+        }
+    }
+
+    #[test]
+    fn test_uint8_mul() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..100 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen_range(0, u8::max_value());
+            let b: u8 = rng.gen_range(0, u8::max_value());
+
+            let expected = a.wrapping_mul(b);
+
+            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > u8::max_value() / 2 {
+                UInt8::constant(b)
+            } else {
+                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+            };
+
+            let r = a_bit.mul(cs.ns(|| "multiplication"), &b_bit).unwrap();
+
+            assert!(cs.is_satisfied());
+
+            assert!(r.value == Some(expected));
+
+            check_all_allocated_bits(expected, r);
+
+            // Flip a bit_gadget and see if the multiplication constraint still works
+            if cs
+                .get("multiplication/partial_products/result bit_gadget 0/boolean")
+                .is_zero()
+            {
+                cs.set(
+                    "multiplication/partial_products/result bit_gadget 0/boolean",
+                    Field::one(),
+                );
+            } else {
+                cs.set(
+                    "multiplication/partial_products/result bit_gadget 0/boolean",
+                    Field::zero(),
+                );
+            }
+
+            assert!(!cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_uint8_div_constants() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..1000 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen();
+            let b: u8 = rng.gen_range(1, u8::max_value());
+
+            let a_bit = UInt8::constant(a);
+            let b_bit = UInt8::constant(b);
+
+            let expected = a.wrapping_div(b);
+
+            let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
+
+            assert!(r.value == Some(expected));
+
+            check_all_constant_bits(expected, r);
+        }
+    }
+
+    #[test]
+    fn test_uint8_div() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..100 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen();
+            let b: u8 = rng.gen_range(1, u8::max_value());
+
+            let expected = a.wrapping_div(b);
+
+            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > u8::max_value() / 2 {
+                UInt8::constant(b)
+            } else {
+                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+            };
+
+            let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
+
+            assert!(cs.is_satisfied());
+
+            assert!(r.value == Some(expected));
+
+            check_all_allocated_bits(expected, r);
+
+            // Flip a bit_gadget and see if the division constraint still works
+            if cs
+                .get("division/subtract_divisor_0/result bit_gadget 0/boolean")
+                .is_zero()
+            {
+                cs.set("division/subtract_divisor_0/result bit_gadget 0/boolean", Field::one());
+            } else {
+                cs.set("division/subtract_divisor_0/result bit_gadget 0/boolean", Field::zero());
+            }
+
+            assert!(!cs.is_satisfied());
+        }
+    }
+
+    #[test]
+    fn test_uint8_pow_constants() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..100 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen_range(0, u8::max_value());
+            let b: u8 = rng.gen_range(0, 4);
+
+            let a_bit = UInt8::constant(a);
+            let b_bit = UInt8::constant(b);
+
+            let expected = a.wrapping_pow(b.into());
+
+            let r = a_bit.pow(cs.ns(|| "exponentiation"), &b_bit).unwrap();
+
+            assert!(r.value == Some(expected));
+
+            check_all_constant_bits(expected, r);
+        }
+    }
+
+    #[test]
+    fn test_uint8_pow() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..10 {
+            let mut cs = TestConstraintSystem::<Fr>::new();
+
+            let a: u8 = rng.gen_range(0, u8::max_value());
+            let b: u8 = rng.gen_range(0, 4);
+
+            let expected = a.wrapping_pow(b.into());
+
+            let a_bit = UInt8::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
+            let b_bit = if b > 2 {
+                UInt8::constant(b)
+            } else {
+                UInt8::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap()
+            };
+
+            let r = a_bit.pow(cs.ns(|| "exponentiation"), &b_bit).unwrap();
+
+            assert!(cs.is_satisfied());
+
+            assert!(r.value == Some(expected));
+
+            check_all_allocated_bits(expected, r);
+
+            // Flip a bit_gadget and see if the exponentiation constraint still works
+            if cs
+                .get("exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean")
+                .is_zero()
+            {
+                cs.set(
+                    "exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean",
+                    Field::one(),
+                );
+            } else {
+                cs.set(
+                    "exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean",
+                    Field::zero(),
+                );
+            }
+
+            assert!(!cs.is_satisfied());
         }
     }
 }
