@@ -1,8 +1,8 @@
+use crate::storage::Storage;
 use snarkos_errors::algorithms::CommitmentError;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
-    storage::Storage,
 };
 
 use rand::Rng;

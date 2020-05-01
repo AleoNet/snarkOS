@@ -151,10 +151,10 @@ mod serialization {
     use crate::snark::{create_random_proof, generate_random_parameters, Parameters, Proof, VerifyingKey};
 
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
+    use snarkos_models::storage::Storage;
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         rand::UniformRand,
-        storage::Storage,
         to_bytes,
     };
 

@@ -3,11 +3,8 @@ use crate::{
     merkle_tree::*,
 };
 use snarkos_curves::edwards_bls12::EdwardsAffine as Edwards;
-use snarkos_models::{algorithms::CRH, curves::pairing_engine::AffineCurve};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    storage::Storage,
-};
+use snarkos_models::{algorithms::CRH, curves::pairing_engine::AffineCurve, storage::Storage};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;

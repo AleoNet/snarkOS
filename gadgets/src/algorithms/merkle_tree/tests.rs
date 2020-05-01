@@ -14,11 +14,9 @@ use snarkos_models::{
         r1cs::{ConstraintSystem, TestConstraintSystem},
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
-};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
     storage::Storage,
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;

@@ -35,12 +35,9 @@ use snarkos_gadgets::{
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
+use snarkos_models::{algorithms::CRH, dpc::DPCComponents, storage::Storage};
 use snarkos_storage::BlockStorage;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    storage::Storage,
-};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use blake2::Blake2s as Blake2sHash;
 use rand::Rng;

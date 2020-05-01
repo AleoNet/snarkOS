@@ -13,3 +13,6 @@ pub mod dpc;
 
 #[cfg(feature = "gadgets")]
 pub mod gadgets;
+
+#[cfg(feature = "storage")]
+pub mod storage;

@@ -1,9 +1,6 @@
 use snarkos_errors::algorithms::CommitmentError;
-use snarkos_models::algorithms::CommitmentScheme;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    storage::Storage,
-};
+use snarkos_models::{algorithms::CommitmentScheme, storage::Storage};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use blake2::Blake2s as b2s;
 use digest::Digest;

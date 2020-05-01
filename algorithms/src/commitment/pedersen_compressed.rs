@@ -6,11 +6,9 @@ use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
     algorithms::CommitmentScheme,
     curves::{AffineCurve, Group, ProjectiveCurve},
-};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
     storage::Storage,
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{

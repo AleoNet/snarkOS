@@ -1,10 +1,8 @@
 use crate::{commitment::PedersenCommitment, crh::PedersenSize};
-
 use snarkos_curves::edwards_bls12::EdwardsProjective;
-use snarkos_models::algorithms::CommitmentScheme;
+use snarkos_models::{algorithms::CommitmentScheme, storage::Storage};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
-    storage::Storage,
     to_bytes,
 };
 

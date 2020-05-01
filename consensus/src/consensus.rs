@@ -1,5 +1,4 @@
 use crate::miner::MemoryPool;
-
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
     base_dpc::{

@@ -1,5 +1,4 @@
 use crate::*;
-
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
 use snarkos_objects::{

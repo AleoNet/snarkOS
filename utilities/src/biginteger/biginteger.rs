@@ -9,7 +9,6 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
-
 use std::fmt::{Debug, Display};
 
 bigint_impl!(BigInteger64, 1);

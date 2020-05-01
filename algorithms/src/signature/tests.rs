@@ -1,10 +1,9 @@
 use crate::signature::SchnorrSignature;
 use snarkos_curves::edwards_sw6::EdwardsAffine as Edwards;
-use snarkos_models::{algorithms::SignatureScheme, curves::Group};
+use snarkos_models::{algorithms::SignatureScheme, curves::Group, storage::Storage};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
-    storage::Storage,
     to_bytes,
 };
 

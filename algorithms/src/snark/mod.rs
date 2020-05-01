@@ -2,11 +2,11 @@
 //! [GM17]: https://eprint.iacr.org/2017/540
 
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
+use snarkos_models::{
+    curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine},
     storage::Storage,
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::{
     fs::File,

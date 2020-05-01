@@ -3,11 +3,11 @@ use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::SignatureScheme,
     curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
+    storage::Storage,
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
-    storage::Storage,
     to_bytes,
 };
 

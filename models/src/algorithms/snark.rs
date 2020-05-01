@@ -1,8 +1,6 @@
+use crate::storage::Storage;
 use snarkos_errors::algorithms::SNARKError;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    storage::Storage,
-};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::fmt::Debug;

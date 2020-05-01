@@ -4,9 +4,9 @@ use crate::{
     DPCScheme,
 };
 
-use snarkos_models::{algorithms::CRH, dpc::Record};
+use snarkos_models::{algorithms::CRH, dpc::Record, storage::Storage};
 use snarkos_objects::ledger::Ledger;
-use snarkos_utilities::{bytes::ToBytes, storage::Storage, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;
 

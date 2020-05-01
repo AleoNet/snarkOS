@@ -1,12 +1,12 @@
 use crate::crh::{PedersenCRH, PedersenSize};
-use rand::thread_rng;
 use snarkos_curves::edwards_bls12::EdwardsProjective;
-use snarkos_models::algorithms::CRH;
+use snarkos_models::{algorithms::CRH, storage::Storage};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
-    storage::Storage,
     to_bytes,
 };
+
+use rand::thread_rng;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Window;

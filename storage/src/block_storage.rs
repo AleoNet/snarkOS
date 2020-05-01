@@ -1,5 +1,4 @@
 use crate::*;
-
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_objects::{

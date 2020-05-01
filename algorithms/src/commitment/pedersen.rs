@@ -3,11 +3,11 @@ use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{Group, PrimeField},
+    storage::Storage,
 };
 use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
-    storage::Storage,
 };
 
 use rand::Rng;

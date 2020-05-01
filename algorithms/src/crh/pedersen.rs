@@ -3,11 +3,9 @@ use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, Field, Group},
-};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
     storage::Storage,
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use rayon::prelude::*;

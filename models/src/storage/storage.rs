@@ -1,4 +1,4 @@
-use crate::{
+use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     io::Result as IoResult,
 };

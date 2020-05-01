@@ -1,7 +1,5 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
-
-use snarkos_models::algorithms::SNARK;
-use snarkos_utilities::storage::Storage;
+use snarkos_models::{algorithms::SNARK, storage::Storage};
 
 use std::{io::Result as IoResult, path::PathBuf};
 
