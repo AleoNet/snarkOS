@@ -37,11 +37,17 @@ use snarkos_gadgets::{
 };
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
 use snarkos_storage::BlockStorage;
-use snarkos_utilities::storage::Storage;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use blake2::Blake2s as Blake2sHash;
 use rand::Rng;
-use std::{io::Result as IoResult, path::PathBuf};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -137,6 +143,22 @@ impl Storage for CommitmentMerkleParameters {
     /// Load the SNARK proof from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
         Ok(Self(H::load(path)?))
+    }
+}
+
+impl ToBytes for CommitmentMerkleParameters {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for CommitmentMerkleParameters {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let crh: H = FromBytes::read(&mut reader)?;
+
+        Ok(Self(crh))
     }
 }
 

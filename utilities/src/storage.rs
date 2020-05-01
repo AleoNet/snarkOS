@@ -1,8 +1,11 @@
-use crate::io::Result as IoResult;
+use crate::{
+    bytes::{FromBytes, ToBytes},
+    io::Result as IoResult,
+};
 
 use std::path::PathBuf;
 
-pub trait Storage: Sized {
+pub trait Storage: Sized + FromBytes + ToBytes {
     /// Stores `self` to the `path`
     fn store(&self, path: &PathBuf) -> IoResult<()>;
 

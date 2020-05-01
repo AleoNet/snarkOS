@@ -7,10 +7,16 @@ use snarkos_models::{
     algorithms::CommitmentScheme,
     curves::{AffineCurve, Group, ProjectiveCurve},
 };
-use snarkos_utilities::storage::Storage;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    storage::Storage,
+};
 
 use rand::Rng;
-use std::{io::Result as IoResult, path::PathBuf};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCompressedCommitment<G: Group + ProjectiveCurve, S: PedersenSize> {
@@ -55,6 +61,22 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> Storage for PedersenCompressed
     /// Load the Pedersen compressed commitment parameters from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
         let parameters = PedersenCommitmentParameters::<G, S>::load(path)?;
+
+        Ok(Self { parameters })
+    }
+}
+
+impl<G: Group + ProjectiveCurve, S: PedersenSize> ToBytes for PedersenCompressedCommitment<G, S> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.parameters.write(&mut writer)
+    }
+}
+
+impl<G: Group + ProjectiveCurve, S: PedersenSize> FromBytes for PedersenCompressedCommitment<G, S> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let parameters: PedersenCommitmentParameters<G, S> = FromBytes::read(&mut reader)?;
 
         Ok(Self { parameters })
     }
