@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_block() {
-        let block_hash = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
+        let block_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
         let message = GetBlock::new(block_hash);
 
         let serialized = message.serialize().unwrap();

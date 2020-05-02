@@ -1,27 +1,27 @@
-use crate::{BlockStorage, Key, KeyValue, TransactionMeta, KEY_BEST_BLOCK_NUMBER};
+use crate::*;
+use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, Transactions};
+use snarkos_objects::{
+    dpc::{Block, Transaction},
+    BlockHeader,
+    BlockHeaderHash,
+};
 
-use std::collections::HashMap;
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-impl BlockStorage {
+//use std::collections::HashMap;
+
+impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get a block given the block hash.
-    pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block, StorageError> {
-        let block_transactions = self.get_block_transactions(block_hash)?;
-
-        let mut transactions = vec![];
-        for block_transaction_id in block_transactions {
-            transactions.push(self.get_transaction_bytes(&block_transaction_id)?);
-        }
-
+    pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
         Ok(Block {
-            header: self.get_block_header(&block_hash)?,
-            transactions: Transactions::from(&transactions),
+            header: self.get_block_header(block_hash)?,
+            transactions: self.get_block_transactions(block_hash)?,
         })
     }
 
     /// Get a block given the block number.
-    pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block, StorageError> {
+    pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block<T>, StorageError> {
         if block_num > self.get_latest_block_height() {
             return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_num)));
         }
@@ -32,7 +32,7 @@ impl BlockStorage {
     }
 
     /// Get the latest block in the chain.
-    pub fn get_latest_block(&self) -> Result<Block, StorageError> {
+    pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
         self.get_block_from_block_num(self.get_latest_block_height())
     }
 
@@ -42,12 +42,12 @@ impl BlockStorage {
     }
 
     /// Find the potential parent block given a block header.
-    pub fn find_parent_block(&self, block_header: &BlockHeader) -> Result<Block, StorageError> {
+    pub fn find_parent_block(&self, block_header: &BlockHeader) -> Result<Block<T>, StorageError> {
         self.get_block(&block_header.previous_block_hash)
     }
 
     /// Returns the block number of a conflicting block that has already been mined.
-    pub fn already_mined(&self, block: &Block) -> Result<Option<u32>, StorageError> {
+    pub fn already_mined(&self, block: &Block<T>) -> Result<Option<u32>, StorageError> {
         // look up new block's previous block by hash
         // if the block after previous_block_number exists, then someone has already mined this new block
         let previous_block_number = self.get_block_num(&block.header.previous_block_hash)?;
@@ -64,78 +64,127 @@ impl BlockStorage {
     }
 
     /// Remove a block and it's related data from the storage.
-    pub fn remove_block(&self, block_hash: BlockHeaderHash) -> Result<(), StorageError> {
-        let block_transactions: Vec<Vec<u8>> = self.get_block_transactions(&block_hash)?;
-
-        for block_transaction_id in block_transactions {
-            self.decrement_transaction_value(&block_transaction_id)?;
-        }
-
-        self.storage.remove_batch(vec![
-            Key::BlockHeaders(block_hash.clone()),
-            Key::BlockTransactions(block_hash),
-        ])?;
-
-        Ok(())
-    }
-
-    /// Remove the latest block.
-    pub fn remove_latest_block(&self) -> Result<(), StorageError> {
-        // De-commit the block from the valid chain
-
+    pub fn remove_block(&self, block_hash: BlockHeaderHash) -> Result<DatabaseTransaction, StorageError> {
         let latest_block_height = self.get_latest_block_height();
         if latest_block_height == 0 {
             return Err(StorageError::InvalidBlockRemovalNum(0, 0));
         }
 
-        let block_hash: BlockHeaderHash = self.get_block_hash(latest_block_height)?;
-        let block_transactions: Vec<Vec<u8>> = self.get_block_transactions(&block_hash)?;
+        let block_transactions = self.get_block_transactions(&block_hash)?;
 
-        let mut transaction_meta_updates: HashMap<Vec<u8>, TransactionMeta> = HashMap::new();
+        let mut sn_index = self.current_sn_index()?;
+        let mut cm_index = self.current_cm_index()?;
+        let mut memo_index = self.current_memo_index()?;
 
-        for block_transaction_id in block_transactions {
-            // Update transaction meta spends
+        let mut database_transaction = DatabaseTransaction::new();
 
-            for input in self.get_transaction_bytes(&block_transaction_id)?.parameters.inputs {
-                if input.outpoint.is_coinbase() {
-                    continue;
-                }
+        if let Ok(block_num) = self.get_block_num(&block_hash) {
+            database_transaction.push(Op::Delete {
+                col: COL_BLOCK_LOCATOR,
+                key: block_num.to_le_bytes().to_vec(),
+            });
+        };
 
-                let mut new_transaction_meta = match transaction_meta_updates.get(&input.outpoint.transaction_id) {
-                    Some(transaction_meta) => transaction_meta.clone(),
-                    None => self.get_transaction_meta(&input.outpoint.transaction_id)?,
-                };
+        database_transaction.push(Op::Delete {
+            col: COL_BLOCK_TRANSACTIONS,
+            key: block_hash.0.to_vec(),
+        });
 
-                new_transaction_meta.spent[input.outpoint.index as usize] = false;
-                transaction_meta_updates.insert(input.outpoint.transaction_id.clone(), new_transaction_meta);
+        database_transaction.push(Op::Delete {
+            col: COL_BLOCK_LOCATOR,
+            key: block_hash.0.to_vec(),
+        });
+
+        for transaction in block_transactions.0 {
+            database_transaction.push(Op::Delete {
+                col: COL_TRANSACTION_LOCATION,
+                key: transaction.transaction_id()?.to_vec(),
+            });
+
+            for sn in transaction.old_serial_numbers() {
+                database_transaction.push(Op::Delete {
+                    col: COL_SERIAL_NUMBER,
+                    key: to_bytes![sn]?.to_vec(),
+                });
+                sn_index -= 1;
             }
+
+            for cm in transaction.new_commitments() {
+                database_transaction.push(Op::Delete {
+                    col: COL_COMMITMENT,
+                    key: to_bytes![cm]?.to_vec(),
+                });
+                cm_index -= 1;
+            }
+
+            database_transaction.push(Op::Delete {
+                col: COL_MEMO,
+                key: to_bytes![transaction.memorandum()]?.to_vec(),
+            });
+            memo_index -= 1;
         }
 
-        // Update spent status of relevant utxos
+        // Update the database state for current indexes
 
-        let mut update_spent_transactions = vec![];
-        for (txid, transaction_meta) in transaction_meta_updates {
-            update_spent_transactions.push(KeyValue::TransactionMeta(txid, transaction_meta));
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_SN_INDEX.as_bytes().to_vec(),
+            value: (sn_index as u32).to_le_bytes().to_vec(),
+        });
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
+            value: (cm_index as u32).to_le_bytes().to_vec(),
+        });
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
+            value: (memo_index as u32).to_le_bytes().to_vec(),
+        });
+
+        Ok(database_transaction)
+    }
+
+    /// Remove the latest block.
+    pub fn remove_latest_block(&self) -> Result<(), StorageError> {
+        let latest_block_height = self.get_latest_block_height();
+        if latest_block_height == 0 {
+            return Err(StorageError::InvalidBlockRemovalNum(0, 0));
         }
 
         let update_best_block_num = latest_block_height - 1;
-        let best_block_number = KeyValue::Meta(KEY_BEST_BLOCK_NUMBER, (update_best_block_num).to_le_bytes().to_vec());
+        let block_hash: BlockHeaderHash = self.get_block_hash(latest_block_height)?;
 
-        let mut storage_inserts = vec![best_block_number];
-        storage_inserts.extend(update_spent_transactions);
+        let mut database_transaction = DatabaseTransaction::new();
 
-        self.storage.insert_batch(storage_inserts)?;
-        self.storage.remove_batch(vec![
-            Key::BlockHashes(latest_block_height),
-            Key::BlockNumbers(block_hash.clone()),
-        ])?;
+        database_transaction.push(Op::Insert {
+            col: COL_META,
+            key: KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec(),
+            value: update_best_block_num.to_le_bytes().to_vec(),
+        });
+
+        database_transaction.push(Op::Delete {
+            col: COL_DIGEST,
+            key: self.current_digest()?,
+        });
+
+        database_transaction.extend(self.remove_block(block_hash)?);
+
+        self.storage.write(database_transaction)?;
 
         let mut latest_block_height = self.latest_block_height.write();
         *latest_block_height -= 1;
 
-        // Remove the block structure
+        let mut merkle_tree = self.cm_merkle_tree.write();
+        *merkle_tree = self.build_merkle_tree(vec![])?;
 
-        self.remove_block(block_hash)?;
+        let update_current_digest = DatabaseTransaction(vec![Op::Insert {
+            col: COL_META,
+            key: KEY_CURR_DIGEST.as_bytes().to_vec(),
+            value: to_bytes![merkle_tree.root()]?.to_vec(),
+        }]);
+
+        self.storage.write(update_current_digest)?;
 
         Ok(())
     }

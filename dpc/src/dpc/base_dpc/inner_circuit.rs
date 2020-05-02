@@ -9,7 +9,6 @@ use crate::{
             BaseDPCComponents,
         },
     },
-    ledger::MerkleTreeParameters,
     Assignment,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
@@ -24,7 +23,7 @@ use snarkos_models::{
 pub struct InnerCircuit<C: BaseDPCComponents> {
     // Parameters
     circuit_parameters: Option<CircuitParameters<C>>,
-    ledger_parameters: Option<MerkleTreeParameters<C::MerkleParameters>>,
+    ledger_parameters: Option<C::MerkleParameters>,
 
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
 
@@ -51,15 +50,12 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 
     input_value_commitments: Option<Vec<[u8; 32]>>,
     output_value_commitments: Option<Vec<[u8; 32]>>,
-    value_balance: Option<u64>,
+    value_balance: Option<i64>,
     binding_signature: Option<BindingSignature>,
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
-    pub fn blank(
-        circuit_parameters: &CircuitParameters<C>,
-        ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
-    ) -> Self {
+    pub fn blank(circuit_parameters: &CircuitParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
@@ -84,7 +80,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         let input_value_commitments = vec![[0u8; 32]; num_input_records];
         let output_value_commitments = vec![[0u8; 32]; num_output_records];
-        let value_balance: u64 = 0;
+        let value_balance: i64 = 0;
         let binding_signature = BindingSignature::default();
 
         Self {
@@ -124,7 +120,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
     pub fn new(
         // Parameters
         circuit_parameters: &CircuitParameters<C>,
-        ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
+        ledger_parameters: &C::MerkleParameters,
 
         // Digest
         ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
@@ -152,7 +148,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         input_value_commitments: &[[u8; 32]],
         output_value_commitments: &[[u8; 32]],
-        value_balance: u64,
+        value_balance: i64,
         binding_signature: &BindingSignature,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;

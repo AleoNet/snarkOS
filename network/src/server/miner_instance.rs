@@ -3,34 +3,39 @@ use snarkos_consensus::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
-use snarkos_objects::Block;
-use snarkos_storage::BlockStorage;
+use snarkos_dpc::{
+    address::AddressPublicKey,
+    base_dpc::{instantiated::*, parameters::PublicParameters},
+};
+use snarkos_objects::block::Block;
 
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};
-use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
-    coinbase_address: BitcoinAddress<Mainnet>,
+    coinbase_address: AddressPublicKey<Components>,
     consensus: ConsensusParameters,
-    storage: Arc<BlockStorage>,
-    memory_pool_lock: Arc<Mutex<MemoryPool>>,
+    parameters: PublicParameters<Components>,
+    storage: Arc<MerkleTreeLedger>,
+    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     server_context: Arc<Context>,
 }
 
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
     pub fn new(
-        coinbase_address: BitcoinAddress<Mainnet>,
+        coinbase_address: AddressPublicKey<Components>,
         consensus: ConsensusParameters,
-        storage: Arc<BlockStorage>,
-        memory_pool_lock: Arc<Mutex<MemoryPool>>,
+        parameters: PublicParameters<Components>,
+        storage: Arc<MerkleTreeLedger>,
+        memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
         server_context: Arc<Context>,
     ) -> Self {
         Self {
             coinbase_address,
             consensus,
+            parameters,
             storage,
             memory_pool_lock,
             server_context,
@@ -48,11 +53,16 @@ impl MinerInstance {
             let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone());
 
             loop {
-                let block_serialized = miner.mine_block(&self.storage, &self.memory_pool_lock).await.unwrap();
+                info!("Mining new block");
+
+                let (block_serialized, _coinbase_records) = miner
+                    .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
+                    .await
+                    .unwrap();
 
                 info!(
                     "Block found!           {:?}",
-                    Block::deserialize(&block_serialized).unwrap()
+                    Block::<Tx>::deserialize(&block_serialized).unwrap()
                 );
 
                 propagate_block(context.clone(), block_serialized, local_address)

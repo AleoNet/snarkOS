@@ -9,3 +9,6 @@ pub use self::pedersen_parameters::*;
 
 pub mod sha256;
 pub use self::sha256::*;
+
+#[cfg(test)]
+mod tests;

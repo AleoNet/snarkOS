@@ -13,6 +13,9 @@ pub enum BindingSignatureError {
 
     #[fail(display = "{}", _0)]
     Message(String),
+
+    #[fail(display = "The value balance is out of bounds: {}", _0)]
+    OutOfBounds(i64),
 }
 
 impl From<CommitmentError> for BindingSignatureError {

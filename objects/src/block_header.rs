@@ -1,7 +1,9 @@
 use crate::{BlockHeaderHash, MerkleRootHash};
 use snarkos_algorithms::crh::double_sha256;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use serde::{Deserialize, Serialize};
+use std::io::{Read, Result as IoResult, Write};
 
 /// Block header.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -47,7 +49,7 @@ impl BlockHeader {
         difficulty_target.copy_from_slice(&bytes[72..80]);
         nonce.copy_from_slice(&bytes[80..84]);
 
-        BlockHeader {
+        Self {
             previous_block_hash: BlockHeaderHash(previous_block_hash),
             merkle_root_hash: MerkleRootHash(merkle_root_hash),
             time: i64::from_le_bytes(time),
@@ -69,6 +71,36 @@ impl BlockHeader {
         sliced.copy_from_slice(&self.get_hash().0[0..8]);
 
         u64::from_le_bytes(sliced)
+    }
+}
+
+impl ToBytes for BlockHeader {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.previous_block_hash.0.write(&mut writer)?;
+        self.merkle_root_hash.0.write(&mut writer)?;
+        self.time.to_le_bytes().write(&mut writer)?;
+        self.difficulty_target.to_le_bytes().write(&mut writer)?;
+        self.nonce.to_le_bytes().write(&mut writer)
+    }
+}
+
+impl FromBytes for BlockHeader {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let previous_block_hash: [u8; 32] = FromBytes::read(&mut reader)?;
+        let merkle_root_hash: [u8; 32] = FromBytes::read(&mut reader)?;
+        let time: [u8; 8] = FromBytes::read(&mut reader)?;
+        let difficulty_target: [u8; 8] = FromBytes::read(&mut reader)?;
+        let nonce: [u8; 4] = FromBytes::read(&mut reader)?;
+
+        Ok(Self {
+            previous_block_hash: BlockHeaderHash(previous_block_hash),
+            merkle_root_hash: MerkleRootHash(merkle_root_hash),
+            time: i64::from_le_bytes(time),
+            difficulty_target: u64::from_le_bytes(difficulty_target),
+            nonce: u32::from_le_bytes(nonce),
+        })
     }
 }
 

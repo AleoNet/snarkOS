@@ -34,23 +34,31 @@ fn test_schnorr_signature_gadget() {
 
     // Native Schnorr signing
 
-    let parameters = Schnorr::setup::<_>(rng).unwrap();
-    let (public_key, private_key) = Schnorr::keygen(&parameters, rng).unwrap();
-    let signature = Schnorr::sign(&parameters, &private_key, &message, rng).unwrap();
-    assert!(Schnorr::verify(&parameters, &public_key, &message, &signature).unwrap());
+    let schnorr_signature = Schnorr::setup::<_>(rng).unwrap();
+    let (public_key, private_key) = schnorr_signature.keygen(rng).unwrap();
+    let signature = schnorr_signature.sign(&private_key, &message, rng).unwrap();
+    assert!(schnorr_signature.verify(&public_key, &message, &signature).unwrap());
 
     // Native Schnorr randomization
 
     let random_scalar = to_bytes!(<EdwardsAffine as Group>::ScalarField::rand(rng)).unwrap();
-    let randomized_public_key = Schnorr::randomize_public_key(&parameters, &public_key, &random_scalar).unwrap();
-    let randomized_signature = Schnorr::randomize_signature(&parameters, &signature, &random_scalar).unwrap();
-    assert!(Schnorr::verify(&parameters, &randomized_public_key, &message, &randomized_signature).unwrap());
+    let randomized_public_key = schnorr_signature
+        .randomize_public_key(&public_key, &random_scalar)
+        .unwrap();
+    let randomized_signature = schnorr_signature
+        .randomize_signature(&signature, &random_scalar)
+        .unwrap();
+    assert!(
+        schnorr_signature
+            .verify(&randomized_public_key, &message, &randomized_signature)
+            .unwrap()
+    );
 
     // Circuit Schnorr randomized public key (candidate)
 
     let candidate_parameters_gadget = SchnorrParametersGadget::<EdwardsAffine, Fr, EdwardsBlsGadget>::alloc_input(
         &mut cs.ns(|| "candidate_parameters"),
-        || Ok(&parameters),
+        || Ok(schnorr_signature.parameters()),
     )
     .unwrap();
 

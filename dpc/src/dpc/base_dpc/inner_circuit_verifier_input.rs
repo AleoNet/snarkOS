@@ -1,7 +1,4 @@
-use crate::{
-    dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents},
-    ledger::MerkleTreeParameters,
-};
+use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTreeDigest};
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
@@ -14,7 +11,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
 
     // Ledger parameters and digest
-    pub ledger_parameters: MerkleTreeParameters<C::MerkleParameters>,
+    pub ledger_parameters: C::MerkleParameters,
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Input record serial numbers and death predicate commitments
@@ -28,7 +25,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub memo: [u8; 32],
 
-    pub value_balance: u64,
+    pub value_balance: i64,
 }
 
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
@@ -52,10 +49,8 @@ where
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
-    MerkleTreeParameters<C::MerkleParameters>: ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
-
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = Vec::new();
@@ -97,7 +92,13 @@ where
                 .to_field_elements()?,
         );
 
-        v.extend_from_slice(&self.circuit_parameters.signature_parameters.to_field_elements()?);
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .signature_parameters
+                .parameters()
+                .to_field_elements()?,
+        );
 
         v.extend_from_slice(
             &self
@@ -119,13 +120,19 @@ where
         }
 
         v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);
-        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            self.memo.as_ref(),
-        )?);
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(&self.memo)?);
         v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
 
+        let value_balance_as_u64 = self.value_balance.abs() as u64;
+
+        let is_negative: bool = self.value_balance.is_negative();
+
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &self.value_balance.to_le_bytes()[..],
+            &value_balance_as_u64.to_le_bytes()[..],
+        )?);
+
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
+            &[is_negative as u8][..],
         )?);
 
         Ok(v)

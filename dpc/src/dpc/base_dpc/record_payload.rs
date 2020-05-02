@@ -1,7 +1,8 @@
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::io::{Result as IoResult, Write};
+use std::io::{Read, Result as IoResult, Write};
 
+//TODO enforce lock condition
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PaymentRecordPayload {
     /// Attributes
@@ -45,5 +46,15 @@ impl ToBytes for PaymentRecordPayload {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.balance.write(&mut writer)?;
         self.lock.write(&mut writer)
+    }
+}
+
+impl FromBytes for PaymentRecordPayload {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let balance: u64 = FromBytes::read(&mut reader)?;
+        let lock: u32 = FromBytes::read(&mut reader)?;
+
+        Ok(Self { balance, lock })
     }
 }

@@ -1,15 +1,24 @@
+use crate::storage::Storage;
 use snarkos_errors::algorithms::SNARKError;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
+use std::fmt::Debug;
 
 pub trait SNARK {
     type AssignedCircuit;
     type Circuit;
-    type Proof: ToBytes + Clone + Default;
-    type PreparedVerificationParameters: Clone + Default + From<Self::VerificationParameters>;
-    type ProvingParameters: Clone;
-    type VerificationParameters: Clone + Default + From<Self::PreparedVerificationParameters>;
+    type Proof: ToBytes + FromBytes + Clone + Debug + Default + Storage;
+    type PreparedVerificationParameters: Clone
+        + Default
+        + From<Self::VerificationParameters>
+        + From<Self::ProvingParameters>;
+    type ProvingParameters: Clone + Storage;
+    type VerificationParameters: Clone
+        + Default
+        + Storage
+        + From<Self::PreparedVerificationParameters>
+        + From<Self::ProvingParameters>;
     type VerifierInput: ?Sized;
 
     fn setup<R: Rng>(

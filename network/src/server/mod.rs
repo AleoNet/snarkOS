@@ -12,10 +12,10 @@ use crate::{
     message::types::{Block, Transaction},
     Context,
 };
-use snarkos_consensus::miner::{Entry, MemoryPool as MemoryPoolStruct};
+use snarkos_consensus::miner::{Entry, MemoryPool};
+use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_errors::network::SendError;
-use snarkos_objects::Transaction as TransactionStruct;
-use snarkos_storage::BlockStorage;
+use snarkos_utilities::bytes::FromBytes;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
@@ -23,15 +23,15 @@ use tokio::sync::Mutex;
 /// Verify a transaction, add it to the memory pool, propagate it to peers.
 pub async fn process_transaction_internal(
     context: Arc<Context>,
-    storage: Arc<BlockStorage>,
-    memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
+    storage: Arc<MerkleTreeLedger>,
+    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     transaction_bytes: Vec<u8>,
     transaction_sender: SocketAddr,
 ) -> Result<(), SendError> {
-    if let Ok(transaction) = TransactionStruct::deserialize(&transaction_bytes) {
+    if let Ok(transaction) = Tx::read(&transaction_bytes[..]) {
         let mut memory_pool = memory_pool_lock.lock().await;
 
-        let entry = Entry {
+        let entry = Entry::<Tx> {
             size: transaction_bytes.len(),
             transaction,
         };

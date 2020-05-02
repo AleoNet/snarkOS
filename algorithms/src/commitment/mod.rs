@@ -9,3 +9,6 @@ pub use self::pedersen_compressed::*;
 
 pub mod pedersen_parameters;
 pub use self::pedersen_parameters::*;
+
+#[cfg(test)]
+mod tests;

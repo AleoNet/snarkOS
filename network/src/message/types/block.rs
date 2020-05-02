@@ -37,8 +37,7 @@ mod tests {
 
     #[test]
     fn test_block() {
-        let data = hex::decode(BLOCK_1).unwrap();
-        let message = Block::new(data);
+        let message = Block::new(BLOCK_1.to_vec());
 
         let serialized = message.serialize().unwrap();
         let deserialized = Block::deserialize(serialized).unwrap();

@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_sync() {
-        let data = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
+        let data = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
         let message = Sync::new(vec![data]);
 
         let serialized = message.serialize().unwrap();

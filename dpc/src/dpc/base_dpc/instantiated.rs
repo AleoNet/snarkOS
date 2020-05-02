@@ -1,17 +1,14 @@
-use crate::{
-    dpc::base_dpc::{
-        inner_circuit::InnerCircuit,
-        inner_circuit_verifier_input::InnerCircuitVerifierInput,
-        outer_circuit::OuterCircuit,
-        outer_circuit_verifier_input::OuterCircuitVerifierInput,
-        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-        predicate::DPCPredicate,
-        transaction::DPCTransaction,
-        BaseDPCComponents,
-        LocalData as DPCLocalData,
-        DPC,
-    },
-    ledger::ideal_ledger::IdealLedger,
+use crate::dpc::base_dpc::{
+    inner_circuit::InnerCircuit,
+    inner_circuit_verifier_input::InnerCircuitVerifierInput,
+    outer_circuit::OuterCircuit,
+    outer_circuit_verifier_input::OuterCircuitVerifierInput,
+    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    predicate::DPCPredicate,
+    transaction::DPCTransaction,
+    BaseDPCComponents,
+    LocalData as DPCLocalData,
+    DPC,
 };
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
@@ -38,9 +35,16 @@ use snarkos_gadgets::{
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
+use snarkos_models::{algorithms::CRH, dpc::DPCComponents, storage::Storage};
+use snarkos_storage::BlockStorage;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use blake2::Blake2s as Blake2sHash;
+use rand::Rng;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -114,8 +118,44 @@ impl MerkleParameters for CommitmentMerkleParameters {
 
     const HEIGHT: usize = 32;
 
+    fn setup<R: Rng>(rng: &mut R) -> Self {
+        Self(H::setup(rng))
+    }
+
     fn crh(&self) -> &Self::H {
         &self.0
+    }
+
+    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
+        self.crh().parameters()
+    }
+}
+
+impl Storage for CommitmentMerkleParameters {
+    /// Store the SNARK proof to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.0.store(path)
+    }
+
+    /// Load the SNARK proof from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        Ok(Self(H::load(path)?))
+    }
+}
+
+impl ToBytes for CommitmentMerkleParameters {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for CommitmentMerkleParameters {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let crh: H = FromBytes::read(&mut reader)?;
+
+        Ok(Self(crh))
     }
 }
 
@@ -190,6 +230,12 @@ pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCirc
 pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
+pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
+pub type Tx = DPCTransaction<Components>;
+
+pub type InstantiatedDPC = DPC<Components>;
+pub type LocalData = DPCLocalData<Components>;
+
 // Gadgets
 
 pub type AddressCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
@@ -207,9 +253,3 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
-
-pub type MerkleTreeIdealLedger = IdealLedger<Tx, CommitmentMerkleParameters>;
-pub type Tx = DPCTransaction<Components>;
-
-pub type InstantiatedDPC = DPC<Components>;
-pub type LocalData = DPCLocalData<Components>;

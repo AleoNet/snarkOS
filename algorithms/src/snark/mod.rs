@@ -2,10 +2,17 @@
 //! [GM17]: https://eprint.iacr.org/2017/540
 
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::curves::pairing_engine::{PairingCurve, PairingEngine};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_models::{
+    curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine},
+    storage::Storage,
+};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::io::{self, Read, Result as IoResult, Write};
+use std::{
+    fs::File,
+    io::{self, Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[macro_use]
 pub mod macros;
@@ -30,10 +37,10 @@ pub mod verifier;
 pub use self::verifier::*;
 
 #[cfg(test)]
-mod test;
+mod tests;
 
 /// A proof in the GM17 SNARK.
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq)]
 pub struct Proof<E: PairingEngine> {
     pub a: E::G1Affine,
     pub b: E::G2Affine,
@@ -42,10 +49,15 @@ pub struct Proof<E: PairingEngine> {
 
 impl<E: PairingEngine> ToBytes for Proof<E> {
     #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        self.a.write(&mut writer)?;
-        self.b.write(&mut writer)?;
-        self.c.write(&mut writer)
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Proof<E> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Self::read(&mut reader)
     }
 }
 
@@ -65,23 +77,47 @@ impl<E: PairingEngine> Default for Proof<E> {
     }
 }
 
+impl<E: PairingEngine> Storage for Proof<E> {
+    /// Store the SNARK proof to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the SNARK proof from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
+    }
+}
+
 impl<E: PairingEngine> Proof<E> {
     /// Serialize the proof into bytes, for storage on disk or transmission
     /// over the network.
-    pub fn write<W: Write>(&self, mut _writer: W) -> io::Result<()> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.a.write(&mut writer)?;
+        self.b.write(&mut writer)?;
+        self.c.write(&mut writer)
     }
 
     /// Deserialize the proof from bytes.
-    pub fn read<R: Read>(mut _reader: R) -> io::Result<Self> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let a: E::G1Affine = FromBytes::read(&mut reader)?;
+        let b: E::G2Affine = FromBytes::read(&mut reader)?;
+        let c: E::G1Affine = FromBytes::read(&mut reader)?;
+
+        Ok(Self { a, b, c })
     }
 }
 
 /// A verification key in the GM17 SNARK.
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq)]
 pub struct VerifyingKey<E: PairingEngine> {
     pub h_g2: E::G2Affine,
     pub g_alpha_g1: E::G1Affine,
@@ -93,15 +129,14 @@ pub struct VerifyingKey<E: PairingEngine> {
 
 impl<E: PairingEngine> ToBytes for VerifyingKey<E> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.h_g2.write(&mut writer)?;
-        self.g_alpha_g1.write(&mut writer)?;
-        self.h_beta_g2.write(&mut writer)?;
-        self.g_gamma_g1.write(&mut writer)?;
-        self.h_gamma_g2.write(&mut writer)?;
-        for q in &self.query {
-            q.write(&mut writer)?;
-        }
-        Ok(())
+        self.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Self::read(&mut reader)
     }
 }
 
@@ -129,23 +164,70 @@ impl<E: PairingEngine> PartialEq for VerifyingKey<E> {
     }
 }
 
+impl<E: PairingEngine> Storage for VerifyingKey<E> {
+    /// Store the SNARK verifying key to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the SNARK verifying key from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
+    }
+}
+
 impl<E: PairingEngine> VerifyingKey<E> {
     /// Serialize the verification key into bytes, for storage on disk
     /// or transmission over the network.
-    pub fn write<W: Write>(&self, mut _writer: W) -> io::Result<()> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.h_g2.write(&mut writer)?;
+        self.g_alpha_g1.write(&mut writer)?;
+        self.h_beta_g2.write(&mut writer)?;
+        self.g_gamma_g1.write(&mut writer)?;
+        self.h_gamma_g2.write(&mut writer)?;
+        (self.query.len() as u32).write(&mut writer)?;
+        for q in &self.query {
+            q.write(&mut writer)?;
+        }
+        Ok(())
     }
 
     /// Deserialize the verification key from bytes.
-    pub fn read<R: Read>(mut _reader: R) -> io::Result<Self> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let h_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_alpha_g1: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_beta_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_gamma_g1: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_gamma_g2: E::G2Affine = FromBytes::read(&mut reader)?;
+
+        let query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut query: Vec<E::G1Affine> = vec![];
+        for _ in 0..query_len {
+            let query_element: E::G1Affine = FromBytes::read(&mut reader)?;
+            query.push(query_element);
+        }
+
+        Ok(Self {
+            h_g2,
+            g_alpha_g1,
+            h_beta_g2,
+            g_gamma_g1,
+            h_gamma_g2,
+            query,
+        })
     }
 }
 
 /// Full public (prover and verifier) parameters for the GM17 zkSNARK.
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq)]
 pub struct Parameters<E: PairingEngine> {
     pub vk: VerifyingKey<E>,
     pub a_query: Vec<E::G1Affine>,
@@ -174,17 +256,170 @@ impl<E: PairingEngine> PartialEq for Parameters<E> {
     }
 }
 
+impl<E: PairingEngine> ToBytes for Parameters<E> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Parameters<E> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Self::read(&mut reader, false)
+    }
+}
+
+impl<E: PairingEngine> Storage for Parameters<E> {
+    /// Store the SNARK parameters to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the SNARK parameters from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file, false)?)
+    }
+}
+
+impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        other.vk
+    }
+}
+
+impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        prepare_verifying_key(&other.vk)
+    }
+}
+
 impl<E: PairingEngine> Parameters<E> {
     /// Serialize the parameters to bytes.
-    pub fn write<W: Write>(&self, mut _writer: W) -> io::Result<()> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.vk.write(&mut writer)?;
+
+        (self.a_query.len() as u32).write(&mut writer)?;
+        for g in &self.a_query[..] {
+            g.write(&mut writer)?;
+        }
+
+        (self.b_query.len() as u32).write(&mut writer)?;
+        for g in &self.b_query[..] {
+            g.write(&mut writer)?;
+        }
+
+        (self.c_query_1.len() as u32).write(&mut writer)?;
+        for g in &self.c_query_1[..] {
+            g.write(&mut writer)?;
+        }
+
+        (self.c_query_2.len() as u32).write(&mut writer)?;
+        for g in &self.c_query_2[..] {
+            g.write(&mut writer)?;
+        }
+
+        self.g_gamma_z.write(&mut writer)?;
+
+        self.h_gamma_z.write(&mut writer)?;
+
+        self.g_ab_gamma_z.write(&mut writer)?;
+
+        self.g_gamma2_z2.write(&mut writer)?;
+
+        (self.g_gamma2_z_t.len() as u32).write(&mut writer)?;
+        for g in &self.g_gamma2_z_t[..] {
+            g.write(&mut writer)?;
+        }
+
+        Ok(())
     }
 
     /// Deserialize the public parameters from bytes.
-    pub fn read<R: Read>(mut _reader: R, _checked: bool) -> io::Result<Self> {
-        // TODO: implement serialization
-        unimplemented!()
+    pub fn read<R: Read>(mut reader: R, checked: bool) -> IoResult<Self> {
+        let read_g1_affine = |mut reader: &mut R| -> IoResult<E::G1Affine> {
+            let g1_affine: E::G1Affine = FromBytes::read(&mut reader)?;
+
+            if checked && !g1_affine.is_in_correct_subgroup_assuming_on_curve() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "point is not in the correct subgroup",
+                ));
+            }
+
+            Ok(g1_affine)
+        };
+
+        let read_g2_affine = |mut reader: &mut R| -> IoResult<E::G2Affine> {
+            let g2_affine: E::G2Affine = FromBytes::read(&mut reader)?;
+
+            if checked && !g2_affine.is_in_correct_subgroup_assuming_on_curve() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "point is not in the correct subgroup",
+                ));
+            }
+
+            Ok(g2_affine)
+        };
+
+        let vk = VerifyingKey::<E>::read(&mut reader)?;
+
+        let mut a_query: Vec<E::G1Affine> = vec![];
+        let mut b_query: Vec<E::G2Affine> = vec![];
+        let mut c_query_1: Vec<E::G1Affine> = vec![];
+        let mut c_query_2: Vec<E::G1Affine> = vec![];
+        let mut g_gamma2_z_t: Vec<E::G1Affine> = vec![];
+
+        let a_query_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..a_query_len {
+            a_query.push(read_g1_affine(&mut reader)?);
+        }
+
+        let b_query_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..b_query_len {
+            b_query.push(read_g2_affine(&mut reader)?);
+        }
+
+        let c_query_1_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..c_query_1_len {
+            c_query_1.push(read_g1_affine(&mut reader)?);
+        }
+
+        let c_query_2_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..c_query_2_len {
+            c_query_2.push(read_g1_affine(&mut reader)?);
+        }
+
+        let g_gamma_z: E::G1Affine = FromBytes::read(&mut reader)?;
+        let h_gamma_z: E::G2Affine = FromBytes::read(&mut reader)?;
+        let g_ab_gamma_z: E::G1Affine = FromBytes::read(&mut reader)?;
+        let g_gamma2_z2: E::G1Affine = FromBytes::read(&mut reader)?;
+
+        let g_gamma2_z_t_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..g_gamma2_z_t_len {
+            g_gamma2_z_t.push(read_g1_affine(&mut reader)?);
+        }
+
+        Ok(Self {
+            vk,
+            a_query,
+            b_query,
+            c_query_1,
+            c_query_2,
+            g_gamma_z,
+            h_gamma_z,
+            g_ab_gamma_z,
+            g_gamma2_z2,
+            g_gamma2_z_t,
+        })
     }
 }
 

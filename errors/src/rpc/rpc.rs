@@ -82,18 +82,6 @@ impl From<std::io::Error> for RpcError {
     }
 }
 
-impl From<wagyu_model::AddressError> for RpcError {
-    fn from(error: wagyu_model::AddressError) -> Self {
-        RpcError::Crate("wagyu_model", format!("{:?}", error))
-    }
-}
-
-impl From<wagyu_model::PrivateKeyError> for RpcError {
-    fn from(error: wagyu_model::PrivateKeyError) -> Self {
-        RpcError::Crate("wagyu_model", format!("{:?}", error))
-    }
-}
-
 impl From<&'static str> for RpcError {
     fn from(msg: &'static str) -> Self {
         RpcError::Message(msg.into())

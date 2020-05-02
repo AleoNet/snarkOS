@@ -42,21 +42,9 @@ pub enum TransactionError {
     NullError(()),
 }
 
-impl From<base58::FromBase58Error> for TransactionError {
-    fn from(error: base58::FromBase58Error) -> Self {
-        TransactionError::Crate("base58", format!("{:?}", error))
-    }
-}
-
 impl From<hex::FromHexError> for TransactionError {
     fn from(error: hex::FromHexError) -> Self {
         TransactionError::Crate("hex", format!("{:?}", error))
-    }
-}
-
-impl From<secp256k1::Error> for TransactionError {
-    fn from(error: secp256k1::Error) -> Self {
-        TransactionError::Crate("secp256k1", format!("{:?}", error))
     }
 }
 
@@ -75,18 +63,6 @@ impl From<std::num::ParseIntError> for TransactionError {
 impl From<std::str::ParseBoolError> for TransactionError {
     fn from(error: std::str::ParseBoolError) -> Self {
         TransactionError::Crate("std::str", format!("{:?}", error))
-    }
-}
-
-impl From<wagyu_model::AddressError> for TransactionError {
-    fn from(error: wagyu_model::AddressError) -> Self {
-        TransactionError::Crate("wagyu_model", format!("{:?}", error))
-    }
-}
-
-impl From<wagyu_model::PublicKeyError> for TransactionError {
-    fn from(error: wagyu_model::PublicKeyError) -> Self {
-        TransactionError::Crate("wagyu_model", format!("{:?}", error))
     }
 }
 

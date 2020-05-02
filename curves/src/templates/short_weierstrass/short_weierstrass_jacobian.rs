@@ -18,7 +18,7 @@ use rand::{
 };
 use std::{
     fmt::{Display, Formatter, Result as FmtResult},
-    io::{Read, Result as IoResult, Write},
+    io::{Error, ErrorKind, Read, Result as IoResult, Write},
     marker::PhantomData,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -189,7 +189,11 @@ impl<P: Parameters> FromBytes for GroupAffine<P> {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let x = P::BaseField::read(&mut reader)?;
         let y = P::BaseField::read(&mut reader)?;
-        let infinity = x.is_zero() && y.is_one();
+        let infinity = bool::read(&mut reader)?;
+
+        if infinity != x.is_zero() && y.is_one() {
+            return Err(Error::new(ErrorKind::InvalidData, "Infinity flag is not valid"));
+        }
         Ok(Self::new(x, y, infinity))
     }
 }

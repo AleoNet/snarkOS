@@ -1,8 +1,14 @@
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
-use std::marker::PhantomData;
+use std::{
+    fs::File,
+    io::{Read, Result as IoResult, Write},
+    marker::PhantomData,
+    path::PathBuf,
+};
 
 pub trait PedersenSize: Clone {
     const WINDOW_SIZE: usize;
@@ -13,6 +19,44 @@ pub trait PedersenSize: Clone {
 pub struct PedersenCRHParameters<G: Group, S: PedersenSize> {
     pub bases: Vec<Vec<G>>,
     _size: PhantomData<S>,
+}
+
+impl<G: Group, S: PedersenSize> ToBytes for PedersenCRHParameters<G, S> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.bases.len() as u32).write(&mut writer)?;
+        for base in &self.bases {
+            (base.len() as u32).write(&mut writer)?;
+            for g in base {
+                g.write(&mut writer)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<G: Group, S: PedersenSize> FromBytes for PedersenCRHParameters<G, S> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let mut bases = vec![];
+
+        let num_bases: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..num_bases {
+            let mut base = vec![];
+
+            let base_len: u32 = FromBytes::read(&mut reader)?;
+            for _ in 0..base_len {
+                let g: G = FromBytes::read(&mut reader)?;
+                base.push(g);
+            }
+            bases.push(base);
+        }
+
+        Ok(Self {
+            bases,
+            _size: PhantomData,
+        })
+    }
 }
 
 impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
@@ -39,6 +83,24 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
             base.double_in_place();
         }
         powers
+    }
+
+    /// Store the Pedersen CRH parameters to a file at the given path.
+    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the Pedersen CRH parameters from a file at the given path.
+    pub fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
     }
 }
 

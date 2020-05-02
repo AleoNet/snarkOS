@@ -4,9 +4,12 @@ use crate::{
     message::{Channel, MessageName},
     protocol::*,
 };
-use snarkos_consensus::{miner::MemoryPool as MemoryPoolStruct, ConsensusParameters};
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_dpc::base_dpc::{
+    instantiated::{Components, MerkleTreeLedger, Tx},
+    parameters::PublicParameters,
+};
 use snarkos_errors::network::ServerError;
-use snarkos_storage::BlockStorage;
 
 use chrono::{DateTime, Utc};
 use std::{
@@ -24,8 +27,9 @@ use tokio::{
 pub struct Server {
     pub consensus: ConsensusParameters,
     pub context: Arc<Context>,
-    pub storage: Arc<BlockStorage>,
-    pub memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
+    pub storage: Arc<MerkleTreeLedger>,
+    pub parameters: PublicParameters<Components>,
+    pub memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     pub sync_handler_lock: Arc<Mutex<SyncHandler>>,
     pub connection_frequency: u64,
     pub sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
@@ -37,8 +41,9 @@ impl Server {
     pub fn new(
         context: Context,
         consensus: ConsensusParameters,
-        storage: Arc<BlockStorage>,
-        memory_pool_lock: Arc<Mutex<MemoryPoolStruct>>,
+        storage: Arc<MerkleTreeLedger>,
+        parameters: PublicParameters<Components>,
+        memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
         sync_handler_lock: Arc<Mutex<SyncHandler>>,
         connection_frequency: u64,
     ) -> Self {
@@ -47,6 +52,7 @@ impl Server {
             consensus,
             context: Arc::new(context),
             storage,
+            parameters,
             memory_pool_lock,
             receiver,
             sender,
@@ -102,16 +108,13 @@ impl Server {
 
     /// Send a handshake request to every peer this server previously connected to.
     async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
-        if let Ok(serialized_peers_option) = self.storage.get_peer_book() {
-            if let Some(serialized_peers) = serialized_peers_option {
-                let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> =
-                    bincode::deserialize(&serialized_peers)?;
+        if let Ok(serialized_peers) = self.storage.get_peer_book() {
+            let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> = bincode::deserialize(&serialized_peers)?;
 
-                for (stored_peer, _old_time) in stored_connected_peers {
-                    info!("Connecting to stored peer: {:?}", stored_peer);
+            for (stored_peer, _old_time) in stored_connected_peers {
+                info!("Connecting to stored peer: {:?}", stored_peer);
 
-                    self.send_handshake_non_blocking(stored_peer);
-                }
+                self.send_handshake_non_blocking(stored_peer);
             }
         }
 

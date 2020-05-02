@@ -8,7 +8,7 @@ use snarkos_models::{
         algorithms::{BindingSignatureGadget, CommitmentGadget},
         curves::CompressedGroupGadget,
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, uint8::UInt8},
+        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
     },
 };
 
@@ -46,20 +46,32 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
         mut cs: CS,
         partial_bvk: &Self::OutputGadget,
         value_balance_comm: &Self::OutputGadget,
+        is_negative: &Boolean,
         c: &Self::RandomnessGadget,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,
     ) -> Result<(), SynthesisError> {
-        let bvk = partial_bvk.sub(cs.ns(|| "construct_bvk"), &value_balance_comm)?;
+        // TODO make this circuit more efficient
+
+        let negative_bvk = partial_bvk.add(cs.ns(|| "construct_negative_bvk"), &value_balance_comm)?;
+        let positive_bvk = partial_bvk.sub(cs.ns(|| "construct_positive_bvk"), &value_balance_comm)?;
 
         let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
 
-        let result = bvk.mul_bits(cs.ns(|| "mul_bits"), &zero, c_bits.iter())?;
+        let negative_result = negative_bvk.mul_bits(cs.ns(|| "mul_bits_negative"), &zero, c_bits.iter())?;
+        let positive_result = positive_bvk.mul_bits(cs.ns(|| "mul_bits_positive"), &zero, c_bits.iter())?;
 
-        let result = result
-            .add(cs.ns(|| "add_affine_r"), &affine_r)?
-            .sub(cs.ns(|| "sub_recommit"), &recommit)?;
+        let temp = affine_r.sub(cs.ns(|| "sub_recommit"), &recommit)?;
+        let negative_result = negative_result.add(cs.ns(|| "add_temp"), &temp)?;
+        let positive_result = positive_result.add(cs.ns(|| "add_temp2"), &temp)?;
+
+        let result = GG::conditionally_select(
+            cs.ns(|| "select result"),
+            &is_negative.not(),
+            &positive_result,
+            &negative_result,
+        )?;
 
         result.enforce_equal(&mut cs.ns(|| "Check that the binding signature verifies"), &zero)?;
 

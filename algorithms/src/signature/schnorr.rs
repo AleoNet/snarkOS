@@ -3,15 +3,21 @@ use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::SignatureScheme,
     curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
+    storage::Storage,
 };
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    rand::UniformRand,
+    to_bytes,
+};
 
 use digest::Digest;
 use rand::Rng;
 use std::{
     hash::Hash,
-    io::{Result as IoResult, Write},
+    io::{Read, Result as IoResult, Write},
     marker::PhantomData,
+    path::PathBuf,
 };
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
@@ -26,7 +32,7 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "G: Group"), Default(bound = "G: Group"))]
+#[derivative(Clone(bound = "G: Group"), Debug(bound = "G: Group"), Default(bound = "G: Group"))]
 pub struct SchnorrOutput<G: Group> {
     pub prover_response: <G as Group>::ScalarField,
     pub verifier_challenge: <G as Group>::ScalarField,
@@ -37,6 +43,19 @@ impl<G: Group> ToBytes for SchnorrOutput<G> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.prover_response.write(&mut writer)?;
         self.verifier_challenge.write(&mut writer)
+    }
+}
+
+impl<G: Group> FromBytes for SchnorrOutput<G> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let prover_response = <G as Group>::ScalarField::read(&mut reader)?;
+        let verifier_challenge = <G as Group>::ScalarField::read(&mut reader)?;
+
+        Ok(Self {
+            prover_response,
+            verifier_challenge,
+        })
     }
 }
 
@@ -59,6 +78,13 @@ impl<G: Group> ToBytes for SchnorrPublicKey<G> {
     }
 }
 
+impl<G: Group> FromBytes for SchnorrPublicKey<G> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Ok(Self(G::read(&mut reader)?))
+    }
+}
+
 impl<F: Field, G: Group + ToConstraintField<F>> ToConstraintField<F> for SchnorrPublicKey<G> {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
@@ -66,9 +92,30 @@ impl<F: Field, G: Group + ToConstraintField<F>> ToConstraintField<F> for Schnorr
     }
 }
 
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "G: Group, D: Digest"),
+    Debug(bound = "G: Group, D: Digest"),
+    PartialEq(bound = "G: Group, D: Digest"),
+    Eq(bound = "G: Group, D: Digest")
+)]
 pub struct SchnorrSignature<G: Group, D: Digest> {
-    _group: PhantomData<G>,
-    _hash: PhantomData<D>,
+    pub parameters: SchnorrParameters<G, D>,
+}
+
+impl<G: Group, D: Digest> ToBytes for SchnorrSignature<G, D> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.parameters.write(&mut writer)
+    }
+}
+
+impl<G: Group, D: Digest> FromBytes for SchnorrSignature<G, D> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let parameters: SchnorrParameters<G, D> = FromBytes::read(&mut reader)?;
+
+        Ok(Self { parameters })
+    }
 }
 
 impl<G: Group + Hash, D: Digest + Send + Sync> SignatureScheme for SchnorrSignature<G, D>
@@ -80,7 +127,7 @@ where
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = SchnorrPublicKey<G>;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, SignatureError> {
+    fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError> {
         let setup_time = start_timer!(|| "SchnorrSig::Setup");
 
         let mut salt = [0u8; 32];
@@ -88,28 +135,32 @@ where
         let generator = G::rand(rng);
 
         end_timer!(setup_time);
-        Ok(SchnorrParameters {
+
+        let parameters = SchnorrParameters {
             _hash: PhantomData,
             generator,
             salt,
-        })
+        };
+
+        Ok(Self { parameters })
     }
 
-    fn keygen<R: Rng>(
-        parameters: &Self::Parameters,
-        rng: &mut R,
-    ) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError> {
+    fn parameters(&self) -> &Self::Parameters {
+        &self.parameters
+    }
+
+    fn keygen<R: Rng>(&self, rng: &mut R) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError> {
         let keygen_time = start_timer!(|| "SchnorrSig::KeyGen");
 
         let private_key = <G as Group>::ScalarField::rand(rng);
-        let public_key = parameters.generator.mul(&private_key);
+        let public_key = self.parameters.generator.mul(&private_key);
 
         end_timer!(keygen_time);
         Ok((SchnorrPublicKey(public_key), private_key))
     }
 
     fn sign<R: Rng>(
-        parameters: &Self::Parameters,
+        &self,
         private_key: &Self::PrivateKey,
         message: &[u8],
         rng: &mut R,
@@ -121,11 +172,11 @@ where
             let random_scalar: <G as Group>::ScalarField = <G as Group>::ScalarField::rand(rng);
             // Commit to the random scalar via r := k · g.
             // This is the prover's first msg in the Sigma protocol.
-            let prover_commitment: G = parameters.generator.mul(&random_scalar);
+            let prover_commitment: G = self.parameters.generator.mul(&random_scalar);
 
             // Hash everything to get verifier challenge.
             let mut hash_input = Vec::new();
-            hash_input.extend_from_slice(&parameters.salt);
+            hash_input.extend_from_slice(&self.parameters.salt);
             hash_input.extend_from_slice(&to_bytes![prover_commitment]?);
             hash_input.extend_from_slice(message);
 
@@ -147,7 +198,7 @@ where
     }
 
     fn verify(
-        parameters: &Self::Parameters,
+        &self,
         public_key: &Self::PublicKey,
         message: &[u8],
         signature: &Self::Output,
@@ -158,12 +209,12 @@ where
             prover_response,
             verifier_challenge,
         } = signature;
-        let mut claimed_prover_commitment = parameters.generator.mul(prover_response);
+        let mut claimed_prover_commitment = self.parameters.generator.mul(prover_response);
         let public_key_times_verifier_challenge = public_key.0.mul(verifier_challenge);
         claimed_prover_commitment += &public_key_times_verifier_challenge;
 
         let mut hash_input = Vec::new();
-        hash_input.extend_from_slice(&parameters.salt);
+        hash_input.extend_from_slice(&self.parameters.salt);
         hash_input.extend_from_slice(&to_bytes![claimed_prover_commitment]?);
         hash_input.extend_from_slice(&message);
 
@@ -179,14 +230,14 @@ where
     }
 
     fn randomize_public_key(
-        parameters: &Self::Parameters,
+        &self,
         public_key: &Self::PublicKey,
         randomness: &[u8],
     ) -> Result<Self::PublicKey, SignatureError> {
         let rand_pk_time = start_timer!(|| "SchnorrSig::RandomizePubKey");
 
         let mut randomized_pk = public_key.0.clone();
-        let mut base = parameters.generator;
+        let mut base = self.parameters.generator;
         let mut encoded = <G as Group>::zero();
         for bit in bytes_to_bits(randomness) {
             if bit {
@@ -201,11 +252,7 @@ where
         Ok(SchnorrPublicKey(randomized_pk))
     }
 
-    fn randomize_signature(
-        _parameter: &Self::Parameters,
-        signature: &Self::Output,
-        randomness: &[u8],
-    ) -> Result<Self::Output, SignatureError> {
+    fn randomize_signature(&self, signature: &Self::Output, randomness: &[u8]) -> Result<Self::Output, SignatureError> {
         let rand_signature_time = start_timer!(|| "SchnorrSig::RandomizeSig");
         let SchnorrOutput {
             prover_response,
@@ -226,5 +273,21 @@ where
         };
         end_timer!(rand_signature_time);
         Ok(new_sig)
+    }
+}
+
+impl<G: Group, D: Digest> Storage for SchnorrSignature<G, D> {
+    /// Store the Schnorr signature parameters to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.parameters.store(path)?;
+
+        Ok(())
+    }
+
+    /// Load the Schnorr signature parameters from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let parameters = SchnorrParameters::<G, D>::load(path)?;
+
+        Ok(Self { parameters })
     }
 }

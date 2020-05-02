@@ -10,75 +10,48 @@ use snarkos_dpc::{
         LocalData,
         DPC,
     },
-    ledger::Ledger,
+    test_data::*,
     DPCScheme,
-    Record,
 };
-use snarkos_models::algorithms::{CommitmentScheme, CRH, SNARK};
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_models::{
+    algorithms::{CommitmentScheme, CRH, SNARK},
+    dpc::Record,
+};
+use snarkos_objects::{
+    dpc::{Block, DPCTransactions},
+    ledger::Ledger,
+    merkle_root,
+    BlockHeader,
+    MerkleRootHash,
+};
+use snarkos_storage::BlockStorage;
+use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn base_dpc_integration_test() {
     let mut rng = XorShiftRng::seed_from_u64(23472342u64);
-    // Generate parameters for the ledger, commitment schemes, CRH, and the
-    // "always-accept" predicate.
-    let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
 
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeIdealLedger>>::setup(&ledger_parameters, &mut rng)
-        .expect("DPC setup failed");
+    // Generate or load parameters for the ledger, commitment schemes, and CRH
+    let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
+
+    // Generate addresses
+    let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
+
+    // Setup the ledger
+    let (ledger, genesis_pred_vk_bytes) = setup_ledger(
+        "test_dpc_integration_db".to_string(),
+        &parameters,
+        ledger_parameters,
+        &genesis_address,
+        &mut rng,
+    );
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
-    // Generate metadata and an address for a dummy initial, or "genesis", record.
-    let genesis_metadata = [1u8; 32];
-    let genesis_address =
-        DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, &mut rng).unwrap();
-
-    let genesis_sn_nonce = SerialNumberNonce::hash(
-        &parameters.circuit_parameters.serial_number_nonce_parameters,
-        &[34u8; 1],
-    )
-    .unwrap();
-    let genesis_pred_vk_bytes = to_bytes![
-        PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash_parameters,
-            &to_bytes![parameters.predicate_snark_parameters.verification_key].unwrap()
-        )
-        .unwrap()
-    ]
-    .unwrap();
-
-    let genesis_record = DPC::generate_record(
-        &parameters.circuit_parameters,
-        &genesis_sn_nonce,
-        &genesis_address.public_key,
-        true, // The inital record should be dummy
-        &PaymentRecordPayload::default(),
-        &Predicate::new(genesis_pred_vk_bytes.clone()),
-        &Predicate::new(genesis_pred_vk_bytes.clone()),
-        &mut rng,
-    )
-    .unwrap();
-
-    // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(
-        &parameters.circuit_parameters,
-        &genesis_record,
-        &genesis_address.secret_key,
-    )
-    .unwrap();
-    let genesis_memo = [1u8; 32];
-
-    // Use genesis record, serial number, and memo to initialize the ledger.
-    let mut ledger = MerkleTreeIdealLedger::new(
-        ledger_parameters,
-        genesis_record.commitment(),
-        genesis_sn.clone(),
-        genesis_memo,
-    );
 
     // Generate dummy input records having as address the genesis address.
     let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
@@ -105,16 +78,13 @@ fn base_dpc_integration_test() {
 
     // Construct new records.
 
-    // Create an address for an actual new record.
-    let new_metadata = [2u8; 32];
-    let new_address = DPC::create_address_helper(&parameters.circuit_parameters, &new_metadata, &mut rng).unwrap();
-
     // Create a payload.
-    let new_payload = PaymentRecordPayload::default();
+    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
 
-    let new_apks = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -190,7 +160,7 @@ fn base_dpc_integration_test() {
             };
             old_proof_and_vk.push(private_input);
         }
-        old_proof_and_vk
+        Ok(old_proof_and_vk)
     };
     let new_birth_vk_and_proof_generator = |local_data: &LocalData<Components>| {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
@@ -258,7 +228,7 @@ fn base_dpc_integration_test() {
             };
             new_proof_and_vk.push(private_input);
         }
-        new_proof_and_vk
+        Ok(new_proof_and_vk)
     };
 
     let (_new_records, transaction) = InstantiatedDPC::execute(
@@ -279,8 +249,44 @@ fn base_dpc_integration_test() {
     )
     .unwrap();
 
-    assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
+    // Craft the block
 
-    ledger.push(transaction).unwrap();
-    assert_eq!(ledger.len(), 1);
+    let previous_block = ledger.get_latest_block().unwrap();
+
+    let mut transactions = DPCTransactions::new();
+    transactions.push(transaction);
+
+    let transaction_ids: Vec<Vec<u8>> = transactions
+        .to_transaction_ids()
+        .unwrap()
+        .iter()
+        .map(|id| id.to_vec())
+        .collect();
+
+    let mut merkle_root_bytes = [0u8; 32];
+    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i64;
+
+    let header = BlockHeader {
+        previous_block_hash: previous_block.header.get_hash(),
+        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        time,
+        difficulty_target: previous_block.header.difficulty_target,
+        nonce: 0,
+    };
+
+    assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());
+
+    let block = Block { header, transactions };
+
+    ledger.insert_block(&block).unwrap();
+    assert_eq!(ledger.len(), 2);
+
+    let path = ledger.storage.storage.path().to_owned();
+    drop(ledger);
+    BlockStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
 }

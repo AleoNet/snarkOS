@@ -1,23 +1,17 @@
-use crate::{
-    dpc::{
-        address::{AddressPair, AddressPublicKey, AddressSecretKey},
-        base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
-        AddressKeyPair,
-        DPCScheme,
-        Predicate,
-        Record,
-        Transaction,
-    },
-    ledger::*,
+use crate::dpc::{
+    address::{AddressPair, AddressPublicKey, AddressSecretKey},
+    base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
+    DPCScheme,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
-    dpc::DPCComponents,
+    dpc::{AddressKeyPair, DPCComponents, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
+use snarkos_objects::{dpc::Transaction, ledger::*};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
@@ -150,7 +144,7 @@ pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
     local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
 
     // Value Balance
-    value_balance: u64,
+    value_balance: i64,
 }
 
 impl<Components: BaseDPCComponents> ExecuteContext<'_, Components> {
@@ -233,6 +227,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             signature_parameters: sig_pp,
         };
+
         Ok(comm_crh_sig_pp)
     }
 
@@ -329,7 +324,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.signature_parameters, rng)?;
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(sk_bytes.as_ref())?;
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
 
         // Sample randomness rpk for the commitment scheme.
         let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -393,7 +388,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let mut joint_serial_numbers = Vec::new();
         let mut old_death_pred_hashes = Vec::new();
 
-        let mut value_balance: u64 = 0;
+        let mut value_balance: i64 = 0;
 
         // Compute the ledger membership witness and serial number from the old records.
         for (i, record) in old_records.iter().enumerate() {
@@ -406,7 +401,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 let witness = ledger.prove_cm(comm)?;
                 old_witnesses.push(witness);
 
-                value_balance += record.payload.balance;
+                value_balance += record.payload.balance as i64;
             }
 
             let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_address_secret_keys[i])?;
@@ -448,7 +443,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             )?;
 
             if !record.is_dummy {
-                value_balance -= record.payload.balance;
+                value_balance -= record.payload.balance as i64;
             }
 
             new_commitments.push(record.commitment.clone());
@@ -566,7 +561,7 @@ where
     type Transaction = DPCTransaction<Components>;
 
     fn setup<R: Rng>(
-        ledger_parameters: &MerkleTreeParameters<Components::MerkleParameters>,
+        ledger_parameters: &Components::MerkleParameters,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
         let setup_time = start_timer!(|| "DPC::Setup");
@@ -593,6 +588,10 @@ where
             Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
         end_timer!(snark_setup_time);
         end_timer!(setup_time);
+
+        let inner_snark_parameters = (Some(inner_snark_parameters.0), inner_snark_parameters.1);
+        let outer_snark_parameters = (Some(outer_snark_parameters.0), outer_snark_parameters.1);
+
         Ok(PublicParameters {
             circuit_parameters,
             predicate_snark_parameters,
@@ -616,14 +615,14 @@ where
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
         old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
-        mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Vec<Self::PrivatePredInput>,
+        mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
         new_death_predicates: &[Self::Predicate],
-        mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Vec<Self::PrivatePredInput>,
+        mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
@@ -647,8 +646,8 @@ where
         )?;
 
         let local_data = context.into_local_data();
-        let old_death_pred_attributes = old_death_pred_proof_generator(&local_data);
-        let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data);
+        let old_death_pred_attributes = old_death_pred_proof_generator(&local_data)?;
+        let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data)?;
 
         let ExecuteContext {
             circuit_parameters,
@@ -737,7 +736,12 @@ where
                 &binding_signature,
             );
 
-            Components::InnerSNARK::prove(&parameters.inner_snark_parameters.0, circuit, rng)?
+            let inner_snark_parameters = match &parameters.inner_snark_parameters.0 {
+                Some(inner_snark_parameters) => inner_snark_parameters,
+                None => return Err(DPCError::MissingInnerSnarkProvingParameters),
+            };
+
+            Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
         };
 
         let outer_proof = {
@@ -750,7 +754,12 @@ where
                 &local_data_commitment,
             );
 
-            Components::OuterSNARK::prove(&parameters.outer_snark_parameters.0, circuit, rng)?
+            let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
+                Some(outer_snark_parameters) => outer_snark_parameters,
+                None => return Err(DPCError::MissingOuterSnarkProvingParameters),
+            };
+
+            Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
 
         let signature_message = to_bytes![
@@ -888,6 +897,21 @@ where
         end_timer!(sig_time);
 
         end_timer!(verify_time);
+        Ok(true)
+    }
+
+    /// Returns true iff all the transactions in the block are valid according to the ledger.
+    fn verify_transactions(
+        parameters: &Self::Parameters,
+        transactions: &Vec<Self::Transaction>,
+        ledger: &L,
+    ) -> Result<bool, DPCError> {
+        for transaction in transactions {
+            if !Self::verify(parameters, transaction, ledger)? {
+                return Ok(false);
+            }
+        }
+
         Ok(true)
     }
 }

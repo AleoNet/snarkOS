@@ -1,3 +1,5 @@
+use std::io::{Error, ErrorKind};
+
 use crate::algorithms::CRHError;
 
 #[derive(Debug, Fail)]
@@ -15,5 +17,17 @@ pub enum CommitmentError {
 impl From<CRHError> for CommitmentError {
     fn from(error: CRHError) -> Self {
         CommitmentError::CRHError(error)
+    }
+}
+
+impl From<Error> for CommitmentError {
+    fn from(error: Error) -> Self {
+        CommitmentError::Crate("std::io", format!("{:?}", error))
+    }
+}
+
+impl From<CommitmentError> for Error {
+    fn from(error: CommitmentError) -> Error {
+        Error::new(ErrorKind::Other, error.to_string())
     }
 }

@@ -23,6 +23,12 @@ pub enum DPCError {
     #[fail(display = "{}", _0)]
     Message(String),
 
+    #[fail(display = "missing inner snark proving parameters")]
+    MissingInnerSnarkProvingParameters,
+
+    #[fail(display = "missing outer snark proving parameters")]
+    MissingOuterSnarkProvingParameters,
+
     #[fail(display = "{}", _0)]
     PRFError(PRFError),
 

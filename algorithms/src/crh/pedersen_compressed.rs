@@ -3,9 +3,15 @@ use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, Group, ProjectiveCurve},
+    storage::Storage,
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCompressedCRH<G: Group + ProjectiveCurve, S: PedersenSize> {
@@ -38,6 +44,38 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CRH for PedersenCompressedCRH<
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
+    }
+}
+
+impl<G: Group + ProjectiveCurve, S: PedersenSize> Storage for PedersenCompressedCRH<G, S> {
+    /// Store the Pedersen compressed CRH parameters to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.parameters.store(path)?;
+
+        Ok(())
+    }
+
+    /// Load the Pedersen Compressed CRH parameters from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        let parameters = PedersenCRHParameters::<G, S>::load(path)?;
+
+        Ok(Self { parameters })
+    }
+}
+
+impl<G: Group + ProjectiveCurve, S: PedersenSize> ToBytes for PedersenCompressedCRH<G, S> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.parameters.write(&mut writer)
+    }
+}
+
+impl<G: Group + ProjectiveCurve, S: PedersenSize> FromBytes for PedersenCompressedCRH<G, S> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let parameters: PedersenCRHParameters<G, S> = FromBytes::read(&mut reader)?;
+
+        Ok(Self { parameters })
     }
 }
 

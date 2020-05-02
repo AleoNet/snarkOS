@@ -1,14 +1,76 @@
 use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
+use std::{
+    fs::File,
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCommitmentParameters<G: Group, S: PedersenSize> {
     pub bases: Vec<Vec<G>>,
     pub random_base: Vec<G>,
     pub crh: PedersenCRH<G, S>,
+}
+
+impl<G: Group, S: PedersenSize> ToBytes for PedersenCommitmentParameters<G, S> {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.bases.len() as u32).write(&mut writer)?;
+        for base in &self.bases {
+            (base.len() as u32).write(&mut writer)?;
+            for g in base {
+                g.write(&mut writer)?;
+            }
+        }
+
+        (self.random_base.len() as u32).write(&mut writer)?;
+        for g in &self.random_base {
+            g.write(&mut writer)?;
+        }
+
+        self.crh.write(&mut writer)?;
+
+        Ok(())
+    }
+}
+
+impl<G: Group, S: PedersenSize> FromBytes for PedersenCommitmentParameters<G, S> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let mut bases = vec![];
+
+        let num_bases: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..num_bases {
+            let mut base = vec![];
+
+            let base_len: u32 = FromBytes::read(&mut reader)?;
+            for _ in 0..base_len {
+                let g: G = FromBytes::read(&mut reader)?;
+                base.push(g);
+            }
+            bases.push(base);
+        }
+
+        let mut random_base = vec![];
+
+        let random_base_len: u32 = FromBytes::read(&mut reader)?;
+        for _ in 0..random_base_len {
+            let g: G = FromBytes::read(&mut reader)?;
+            random_base.push(g);
+        }
+
+        let crh: PedersenCRH<G, S> = FromBytes::read(&mut reader)?;
+
+        Ok(Self {
+            bases,
+            random_base,
+            crh,
+        })
+    }
 }
 
 impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
@@ -43,5 +105,25 @@ impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintFie
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         Ok(Vec::new())
+    }
+}
+
+impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
+    /// Store the Pedersen commitment parameters to a file at the given path.
+    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
+        let mut file = File::create(path)?;
+        let mut parameter_bytes = vec![];
+
+        self.write(&mut parameter_bytes)?;
+        file.write_all(&parameter_bytes)?;
+        drop(file);
+
+        Ok(())
+    }
+
+    /// Load the Pedersen commitment parameters from a file at the given path.
+    pub fn load(path: &PathBuf) -> IoResult<Self> {
+        let mut file = File::open(path)?;
+        Ok(Self::read(&mut file)?)
     }
 }

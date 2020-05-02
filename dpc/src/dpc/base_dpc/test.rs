@@ -1,27 +1,23 @@
 use super::instantiated::*;
-use crate::{
-    dpc::{
-        base_dpc::{
-            binding_signature::*,
-            execute_inner_proof_gadget,
-            execute_outer_proof_gadget,
-            payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-            predicate::PrivatePredicateInput,
-            record_payload::PaymentRecordPayload,
-            BaseDPCComponents,
-            ExecuteContext,
-            DPC,
-        },
-        Record,
-    },
-    ledger::Ledger,
+use crate::dpc::base_dpc::{
+    binding_signature::*,
+    execute_inner_proof_gadget,
+    execute_outer_proof_gadget,
+    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    predicate::PrivatePredicateInput,
+    record_payload::PaymentRecordPayload,
+    BaseDPCComponents,
+    ExecuteContext,
+    DPC,
 };
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
+    dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
 };
+use snarkos_objects::ledger::Ledger;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::SeedableRng;
@@ -32,7 +28,7 @@ fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
-    let ledger_parameters = MerkleTreeIdealLedger::setup(&mut rng).expect("Ledger setup failed");
+    let ledger_parameters = MerkleTreeLedger::setup(&mut rng).expect("Ledger setup failed");
     let circuit_parameters = InstantiatedDPC::generate_circuit_parameters(&mut rng).unwrap();
     let pred_nizk_pp = InstantiatedDPC::generate_pred_nizk_parameters(&circuit_parameters, &mut rng).unwrap();
     #[cfg(debug_assertions)]
@@ -68,13 +64,20 @@ fn test_execute_base_dpc_constraints() {
     let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
     let genesis_memo = [0u8; 32];
 
+    let mut path = std::env::current_dir().unwrap();
+    path.push("../base_dpc_constraints_db");
+
     // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger = MerkleTreeIdealLedger::new(
+    let ledger = MerkleTreeLedger::new(
+        &path,
         ledger_parameters,
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
-    );
+        pred_nizk_vk_bytes.to_vec(),
+        to_bytes![genesis_address].unwrap().to_vec(),
+    )
+    .unwrap();
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
@@ -87,7 +90,8 @@ fn test_execute_base_dpc_constraints() {
     let new_address = DPC::create_address_helper(&circuit_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
-    let new_payload = PaymentRecordPayload::default();
+    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 

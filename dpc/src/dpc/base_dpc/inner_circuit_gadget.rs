@@ -1,17 +1,14 @@
-use crate::{
-    dpc::{
-        address::AddressSecretKey,
-        base_dpc::{
-            binding_signature::{gadget_verification_setup, BindingSignature},
-            parameters::CircuitParameters,
-            record::DPCRecord,
-            BaseDPCComponents,
-        },
-        Record,
+use crate::dpc::{
+    address::AddressSecretKey,
+    base_dpc::{
+        binding_signature::{gadget_verification_setup, BindingSignature},
+        parameters::CircuitParameters,
+        record::DPCRecord,
+        BaseDPCComponents,
     },
-    ledger::MerkleTreeParameters,
+    Record,
 };
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
@@ -34,7 +31,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     cs: &mut CS,
     // Parameters
     comm_crh_sig_parameters: &CircuitParameters<C>,
-    ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
+    ledger_parameters: &C::MerkleParameters,
 
     // Digest
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
@@ -59,7 +56,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     auxiliary: &[u8; 32],
     input_value_commitments: &[[u8; 32]],
     output_value_commitments: &[[u8; 32]],
-    value_balance: u64,
+    value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
@@ -127,7 +124,7 @@ fn base_dpc_execute_gadget_helper<
 
     //
     comm_crh_sig_parameters: &CircuitParameters<C>,
-    ledger_parameters: &MerkleTreeParameters<C::MerkleParameters>,
+    ledger_parameters: &C::MerkleParameters,
 
     //
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
@@ -152,7 +149,7 @@ fn base_dpc_execute_gadget_helper<
     auxiliary: &[u8; 32],
     input_value_commitments: &[[u8; 32]],
     output_value_commitments: &[[u8; 32]],
-    value_balance: u64,
+    value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
@@ -252,7 +249,7 @@ where
             })?;
 
         let sig_pp = SignatureSGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare SIG Parameters"), || {
-            Ok(&comm_crh_sig_parameters.signature_parameters)
+            Ok(comm_crh_sig_parameters.signature_parameters.parameters())
         })?;
 
         let value_commitment_pp = <C::BindingSignatureGadget as BindingSignatureGadget<
@@ -747,8 +744,14 @@ where
             C::BindingSignatureGroup,
         >>::OutputGadget::alloc(&mut cs.ns(|| "recommit_gadget"), || Ok(recommit))?;
 
-        let value_balance_bytes =
-            UInt8::alloc_input_vec(cs.ns(|| "value_balance_bytes"), &value_balance.to_le_bytes())?;
+        let value_balance_bytes = UInt8::alloc_input_vec(
+            cs.ns(|| "value_balance_bytes"),
+            &(value_balance.abs() as u64).to_le_bytes(),
+        )?;
+
+        let is_negative = Boolean::alloc_input(&mut cs.ns(|| "value_balance_is_negative"), || {
+            Ok(value_balance.is_negative())
+        })?;
 
         let value_balance_comm = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
@@ -764,6 +767,7 @@ where
             &mut cs.ns(|| "verify_binding_signature"),
             &partial_bvk_gadget,
             &value_balance_comm,
+            &is_negative,
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,

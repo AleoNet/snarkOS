@@ -3,7 +3,7 @@ use crate::{
     curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
@@ -26,6 +26,7 @@ pub trait BindingSignatureGadget<C: CommitmentScheme, F: Field, G: Group + Proje
         cs: CS,
         partial_bvk: &Self::OutputGadget,
         value_balance_comm: &Self::OutputGadget,
+        is_negative: &Boolean,
         c: &Self::RandomnessGadget,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,

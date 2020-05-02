@@ -1,5 +1,7 @@
 use crate::address_book::AddressBook;
+use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::network::ServerError;
+use snarkos_objects::dpc::Transaction;
 use snarkos_storage::BlockStorage;
 
 use chrono::{DateTime, Utc};
@@ -79,7 +81,7 @@ impl PeerBook {
     }
 
     /// Writes connected peers to storage.
-    pub fn store(&self, storage: &BlockStorage) -> Result<(), ServerError> {
+    pub fn store<T: Transaction, P: MerkleParameters>(&self, storage: &BlockStorage<T, P>) -> Result<(), ServerError> {
         Ok(storage.store_to_peer_book(bincode::serialize(&self.get_connected())?)?)
     }
 }

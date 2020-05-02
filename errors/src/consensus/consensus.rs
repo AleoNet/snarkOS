@@ -1,4 +1,6 @@
 use crate::{
+    algorithms::CRHError,
+    dpc::DPCError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
@@ -17,8 +19,23 @@ pub enum ConsensusError {
     #[fail(display = "Block is too large: {}. Exceeds {} maximum", _0, _1)]
     BlockTooLarge(usize, usize),
 
+    #[fail(display = "A coinbase transaction already exists in the block")]
+    CoinbaseTransactionAlreadyExists(),
+
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[fail(display = "{}", _0)]
+    CRHError(CRHError),
+
+    #[fail(display = "{}", _0)]
+    DPCError(DPCError),
+
+    #[fail(display = "duplicate commitment")]
+    DuplicateCm,
+
+    #[fail(display = "duplicate serial number")]
+    DuplicateSn,
 
     #[fail(display = "timestamp more than 2 hours into the future {:?} actual {:?}", _0, _1)]
     FuturisticTimestamp(i64, i64),
@@ -29,6 +46,9 @@ pub enum ConsensusError {
     #[fail(display = "block transactions do not hash to merkle root {:?}", _0)]
     MerkleRoot(String),
 
+    #[fail(display = "{}", _0)]
+    Message(String),
+
     #[fail(display = "the block has multiple coinbase transactions: {:?}", _0)]
     MultipleCoinbaseTransactions(u32),
 
@@ -37,6 +57,9 @@ pub enum ConsensusError {
 
     #[fail(display = "all nonces have been tried for the current block header")]
     NonceLimitError,
+
+    #[fail(display = "Missing genesis block")]
+    NoGenesisBlock,
 
     #[fail(display = "expected {:?} actual {:?}", _0, _1)]
     NoParent(String, String),
@@ -63,6 +86,18 @@ impl From<BlockError> for ConsensusError {
     }
 }
 
+impl From<CRHError> for ConsensusError {
+    fn from(error: CRHError) -> Self {
+        ConsensusError::CRHError(error)
+    }
+}
+
+impl From<DPCError> for ConsensusError {
+    fn from(error: DPCError) -> Self {
+        ConsensusError::DPCError(error)
+    }
+}
+
 impl From<StorageError> for ConsensusError {
     fn from(error: StorageError) -> Self {
         ConsensusError::StorageError(error)
@@ -78,6 +113,12 @@ impl From<TransactionError> for ConsensusError {
 impl From<bincode::Error> for ConsensusError {
     fn from(error: bincode::Error) -> Self {
         ConsensusError::Crate("bincode", format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for ConsensusError {
+    fn from(error: std::io::Error) -> Self {
+        ConsensusError::Crate("std::io", format!("{:?}", error))
     }
 }
 

@@ -292,6 +292,10 @@ impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> ToBytesGadg
         bytes.extend_from_slice(&self.h_beta_g2.to_bytes(&mut cs.ns(|| "h_beta_g2 to bytes"))?);
         bytes.extend_from_slice(&self.g_gamma_g1.to_bytes(&mut cs.ns(|| "g_gamma_g1 to bytes"))?);
         bytes.extend_from_slice(&self.h_gamma_g2.to_bytes(&mut cs.ns(|| "h_gamma_g2 to bytes"))?);
+        bytes.extend_from_slice(&UInt8::alloc_vec(
+            &mut cs.ns(|| "query_length"),
+            &(self.query.len() as u32).to_le_bytes()[..],
+        )?);
         for (i, q) in self.query.iter().enumerate() {
             let mut cs = cs.ns(|| format!("Iteration {}", i));
             bytes.extend_from_slice(&q.to_bytes(&mut cs.ns(|| "q"))?);

@@ -1,267 +1,123 @@
-use snarkos_errors::storage::StorageError;
-use snarkos_objects::{BlockHeader, BlockHeaderHash};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use bincode;
-use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display, Formatter};
+use std::io::{Read, Result as IoResult, Write};
 
-pub const COL_META: u32 = 0;
-pub const COL_BLOCK: u32 = 1;
-pub const COL_BLOCK_HASHES: u32 = 2;
-pub const COL_BLOCK_NUMBERS: u32 = 3;
-pub const COL_BLOCK_TRANSACTIONS: u32 = 4;
-pub const COL_TRANSACTIONS: u32 = 5;
-pub const COL_TRANSACTION_META: u32 = 6;
-pub const COL_CHILD_HASHES: u32 = 7;
+pub const COL_META: u32 = 0; // MISC Values
+pub const COL_BLOCK_HEADER: u32 = 1; // Block hash -> block header
+pub const COL_BLOCK_TRANSACTIONS: u32 = 2; // Block hash -> block transactions
+pub const COL_BLOCK_LOCATOR: u32 = 3; // Block num -> block hash && block hash -> block num
+pub const COL_TRANSACTION_LOCATION: u32 = 4; // Transaction Hash -> (block hash and index)
+pub const COL_COMMITMENT: u32 = 5; // Commitment -> index
+pub const COL_SERIAL_NUMBER: u32 = 6; // SN -> index
+pub const COL_MEMO: u32 = 7; // Memo -> index
+pub const COL_DIGEST: u32 = 8; // Ledger digest -> index
 
-pub const NUM_COLS: u32 = 8;
+pub const COL_RECORDS: u32 = 9; // commitment -> record bytes
+
+pub const NUM_COLS: u32 = 10;
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
 pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
-//pub const KEY_BEST_BLOCK_HASH: &'static str = "BEST_BLOCK_HASH";
 
-/// Wrapper for which transaction outpoints are spent.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TransactionMeta {
-    pub spent: Vec<bool>,
+pub const KEY_GENESIS_CM: &str = "GENESIS_CM";
+pub const KEY_GENESIS_SN: &str = "GENESIS_SN";
+pub const KEY_GENESIS_MEMO: &str = "GENESIS_MEMO";
+pub const KEY_GENESIS_PRED_VK: &str = "GENESIS_PREDICATE_VK";
+pub const KEY_GENESIS_ADDRESS_PAIR: &str = "GENESIS_ADDRESS_PAIR";
+
+pub const KEY_CURR_CM_INDEX: &str = "CURRENT_CM_INDEX";
+pub const KEY_CURR_SN_INDEX: &str = "CURRENT_SN_INDEX";
+pub const KEY_CURR_MEMO_INDEX: &str = "CURRENT_MEMO_INDEX";
+pub const KEY_CURR_DIGEST: &str = "CURRENT_DIGEST";
+
+/// Represents address of certain transaction within block
+#[derive(Debug, PartialEq, Clone)]
+pub struct TransactionLocation {
+    /// Transaction index within the block
+    pub index: u32,
+    /// Block hash
+    pub block_hash: [u8; 32],
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TransactionValue {
-    pub count: u8,
-    pub transaction_bytes: Vec<u8>,
+impl ToBytes for TransactionLocation {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.index.write(&mut writer)?;
+        self.block_hash.write(&mut writer)
+    }
 }
 
-impl TransactionValue {
-    pub fn new(transaction_bytes: Vec<u8>) -> Self {
-        Self {
-            count: 1,
-            transaction_bytes,
+impl FromBytes for TransactionLocation {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let index: u32 = FromBytes::read(&mut reader)?;
+        let block_hash: [u8; 32] = FromBytes::read(&mut reader)?;
+
+        Ok(Self { index, block_hash })
+    }
+}
+
+/// Database operation.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Op {
+    Insert { col: u32, key: Vec<u8>, value: Vec<u8> },
+    Delete { col: u32, key: Vec<u8> },
+}
+
+impl Op {
+    pub fn key(&self) -> &[u8] {
+        match self {
+            Op::Insert { key, .. } => &key,
+            Op::Delete { key, .. } => &key,
         }
     }
 
-    pub fn increment(self) -> Self {
-        Self {
-            count: self.count + 1,
-            transaction_bytes: self.transaction_bytes,
-        }
-    }
-
-    pub fn decrement(self) -> Self {
-        Self {
-            count: self.count - 1,
-            transaction_bytes: self.transaction_bytes,
+    pub fn col(&self) -> u32 {
+        match self {
+            Op::Insert { col, .. } => *col,
+            Op::Delete { col, .. } => *col,
         }
     }
 }
 
-// Key, value pair
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum KeyValue {
-    /// Meta data
-    Meta(&'static str, Vec<u8>),
-    /// block_header_hash to block
-    BlockHeaders(BlockHeaderHash, BlockHeader),
-    /// block number -> block hash
-    BlockHashes(u32, BlockHeaderHash),
-    /// block_hash -> block number
-    BlockNumbers(BlockHeaderHash, u32),
-    /// block_hash -> list of transaction ids
-    BlockTransactions(BlockHeaderHash, Vec<Vec<u8>>),
-    /// parent_block_hash -> child_block_hash
-    ChildHashes(BlockHeaderHash, BlockHeaderHash),
-    /// transaction id -> Transaction hex
-    Transactions(Vec<u8>, TransactionValue),
-    /// transaction id -> TransactionMeta
-    TransactionMeta(Vec<u8>, TransactionMeta),
-}
+/// Batched transaction of database operations.
+#[derive(Default, Clone, PartialEq)]
+pub struct DatabaseTransaction(pub Vec<Op>);
 
-// Key
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum Key {
-    /// Meta data
-    Meta(&'static str),
-    /// block header hash
-    BlockHeaders(BlockHeaderHash),
-    /// block nu ber -> block hash
-    BlockHashes(u32),
-    /// block_hash -> block number
-    BlockNumbers(BlockHeaderHash),
-    /// block_hash
-    BlockTransactions(BlockHeaderHash),
-    /// parent_block_hash
-    ChildHashes(BlockHeaderHash),
-    /// transaction id
-    Transactions(Vec<u8>),
-    /// transaction id
-    TransactionMeta(Vec<u8>),
-}
-
-impl Display for Key {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+impl DatabaseTransaction {
+    /// Create new transaction.
+    pub fn new() -> Self {
+        Self(vec![])
     }
-}
 
-// Value
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum Value {
-    /// Meta data
-    Meta(Vec<u8>),
-    /// block number to block
-    BlockHeaders(BlockHeader),
-    /// block number -> block hash
-    BlockHashes(BlockHeaderHash),
-    /// block_hash -> block number
-    BlockNumbers(u32),
-    /// list of transactions ids
-    BlockTransactions(Vec<Vec<u8>>),
-    /// child_block_hash
-    ChildHashes(BlockHeaderHash),
-    /// Transaction hex
-    Transactions(TransactionValue),
-    /// Transaction Meta
-    TransactionMeta(TransactionMeta),
-}
-
-impl Value {
-    pub fn from_bytes(key: &Key, bytes: &Vec<u8>) -> Result<Self, StorageError> {
-        Ok(match *key {
-            Key::Meta(_) => Value::Meta(bytes.clone()),
-            Key::BlockHeaders(_) => Value::BlockHeaders(bincode::deserialize(&bytes)?),
-            Key::BlockHashes(_) => Value::BlockHashes(bincode::deserialize(&bytes)?),
-            Key::BlockNumbers(_) => Value::BlockNumbers(bytes_to_u32(bytes.clone())),
-            Key::BlockTransactions(_) => Value::BlockTransactions(bincode::deserialize(bytes)?),
-            Key::ChildHashes(_) => Value::ChildHashes(bincode::deserialize(&bytes)?),
-            Key::Transactions(_) => Value::Transactions(bincode::deserialize(bytes)?),
-            Key::TransactionMeta(_) => Value::TransactionMeta(bincode::deserialize(bytes)?),
+    /// Add a key value pair under a specific col.
+    pub fn add(&mut self, col: u32, key: &[u8], value: &[u8]) {
+        self.0.push(Op::Insert {
+            col,
+            key: key.to_vec(),
+            value: value.to_vec(),
         })
     }
 
-    pub fn meta(self) -> Option<Vec<u8>> {
-        match self {
-            Value::Meta(bytes) => Some(bytes),
-            _ => None,
-        }
+    /// Delete a value given a col and key.
+    pub fn delete(&mut self, col: u32, key: &[u8]) {
+        self.0.push(Op::Delete { col, key: key.to_vec() })
     }
 
-    pub fn block_header(self) -> Option<BlockHeader> {
-        match self {
-            Value::BlockHeaders(block_hash) => Some(block_hash),
-            _ => None,
-        }
+    /// Add an operation.
+    pub fn push(&mut self, op: Op) {
+        self.0.push(op)
     }
 
-    pub fn block_hash(self) -> Option<BlockHeaderHash> {
-        match self {
-            Value::BlockHashes(block_header) => Some(block_header),
-            _ => None,
-        }
+    /// Add a vector of operations.
+    pub fn push_vec(&mut self, ops: Vec<Op>) {
+        self.0.extend(ops)
     }
 
-    pub fn block_number(self) -> Option<u32> {
-        match self {
-            Value::BlockNumbers(block_number) => Some(block_number),
-            _ => None,
-        }
-    }
-
-    pub fn block_transactions(self) -> Option<Vec<Vec<u8>>> {
-        match self {
-            Value::BlockTransactions(transactions) => Some(transactions),
-            _ => None,
-        }
-    }
-
-    pub fn child_hashes(self) -> Option<BlockHeaderHash> {
-        match self {
-            Value::ChildHashes(child_hash) => Some(child_hash),
-            _ => None,
-        }
-    }
-
-    pub fn transactions(self) -> Option<TransactionValue> {
-        match self {
-            Value::Transactions(transaction_value) => Some(transaction_value),
-            _ => None,
-        }
-    }
-
-    pub fn transaction_meta(self) -> Option<TransactionMeta> {
-        match self {
-            Value::TransactionMeta(transaction_meta) => Some(transaction_meta),
-            _ => None,
-        }
-    }
-}
-
-pub struct ColKey {
-    pub column: u32,
-    pub key: Vec<u8>,
-}
-
-impl<'a> From<&'a Key> for ColKey {
-    fn from(i: &'a Key) -> Self {
-        let (column, key) = match *i {
-            Key::Meta(ref key) => (COL_META, bincode::serialize(key).unwrap()),
-            Key::BlockHeaders(ref key) => (COL_BLOCK, bincode::serialize(key).unwrap()),
-            Key::BlockHashes(ref key) => (COL_BLOCK_HASHES, key.to_le_bytes().to_vec()),
-            Key::BlockNumbers(ref key) => (COL_BLOCK_NUMBERS, bincode::serialize(key).unwrap()),
-            Key::BlockTransactions(ref key) => (COL_BLOCK_TRANSACTIONS, bincode::serialize(key).unwrap()),
-            Key::ChildHashes(ref key) => (COL_CHILD_HASHES, bincode::serialize(key).unwrap()),
-            Key::Transactions(ref key) => (COL_TRANSACTIONS, key.clone()),
-            Key::TransactionMeta(ref key) => (COL_TRANSACTION_META, key.clone()),
-        };
-
-        Self { column, key }
-    }
-}
-
-pub struct ColKeyValue {
-    pub column: u32,
-    pub key: Vec<u8>,
-    pub value: Vec<u8>,
-}
-
-impl<'a> From<&'a KeyValue> for ColKeyValue {
-    fn from(i: &'a KeyValue) -> Self {
-        let (column, key, value) = match *i {
-            KeyValue::Meta(ref key, ref value) => (COL_META, bincode::serialize(key).unwrap(), value.clone()),
-            KeyValue::BlockHeaders(ref key, ref value) => (
-                COL_BLOCK,
-                bincode::serialize(key).unwrap(),
-                bincode::serialize(value).unwrap(),
-            ),
-            KeyValue::BlockHashes(ref key, ref value) => (
-                COL_BLOCK_HASHES,
-                key.to_le_bytes().to_vec(),
-                bincode::serialize(value).unwrap(),
-            ),
-            KeyValue::BlockNumbers(ref key, ref value) => (
-                COL_BLOCK_NUMBERS,
-                bincode::serialize(key).unwrap(),
-                value.to_le_bytes().to_vec(),
-            ),
-            KeyValue::BlockTransactions(ref key, ref value) => (
-                COL_BLOCK_TRANSACTIONS,
-                bincode::serialize(key).unwrap(),
-                bincode::serialize(value).unwrap(),
-            ),
-            KeyValue::ChildHashes(ref key, ref value) => (
-                COL_CHILD_HASHES,
-                bincode::serialize(key).unwrap(),
-                bincode::serialize(value).unwrap(),
-            ),
-            KeyValue::Transactions(ref key, ref value) => {
-                (COL_TRANSACTIONS, key.clone(), bincode::serialize(value).unwrap())
-            }
-            KeyValue::TransactionMeta(ref key, ref value) => {
-                (COL_TRANSACTION_META, key.clone(), bincode::serialize(value).unwrap())
-            }
-        };
-
-        Self { column, key, value }
+    /// Add another database transaction.
+    pub fn extend(&mut self, database_transaction: DatabaseTransaction) {
+        self.0.extend(database_transaction.0)
     }
 }
 
