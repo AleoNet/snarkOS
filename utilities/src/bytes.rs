@@ -225,6 +225,22 @@ impl FromBytes for u64 {
     }
 }
 
+impl ToBytes for u128 {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        writer.write_all(&self.to_le_bytes())
+    }
+}
+
+impl FromBytes for u128 {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let mut bytes = [0u8; 16];
+        reader.read_exact(&mut bytes)?;
+        Ok(u128::from_le_bytes(bytes))
+    }
+}
+
 impl ToBytes for () {
     #[inline]
     fn write<W: Write>(&self, _writer: W) -> IoResult<()> {

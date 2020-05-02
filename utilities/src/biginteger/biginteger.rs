@@ -136,3 +136,23 @@ pub mod arithmetic {
         tmp as u64
     }
 }
+
+impl BigInteger256 {
+    pub fn from_u128(num: u128) -> Self {
+        // Takes a 256 bit buffer
+        let mut bytes = [0u8; 32];
+
+        num.write(bytes.as_mut()).unwrap();
+
+        Self::read(&bytes[..]).unwrap()
+    }
+
+    pub fn to_u128(&self) -> u128 {
+        let mut bytes = [0u8; 32];
+
+        self.write(bytes.as_mut()).unwrap();
+
+        // We cut off the last 128 bits here
+        u128::read(&bytes[..16]).unwrap()
+    }
+}
