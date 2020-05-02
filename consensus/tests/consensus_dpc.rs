@@ -21,7 +21,7 @@ fn base_dpc_multiple_transactions() {
     let consensus = TEST_CONSENSUS;
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, parameters) = setup_or_load_parameters(true, &mut rng);
+    let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
     // Generate addresses
     let [genesis_address, miner_address, recipient] = generate_test_addresses(&parameters, &mut rng);
