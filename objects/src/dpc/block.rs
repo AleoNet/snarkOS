@@ -2,7 +2,6 @@ use crate::{
     dpc::{DPCTransactions, Transaction},
     BlockHeader,
 };
-
 use snarkos_errors::objects::BlockError;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},

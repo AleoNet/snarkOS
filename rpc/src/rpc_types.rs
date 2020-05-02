@@ -38,6 +38,7 @@ pub struct PeerInfo {
     pub peers: Vec<SocketAddr>,
 }
 
+/// Additional transaction attributes
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RPCTransactionStuff {
     /// Merkle tree digest
@@ -82,6 +83,44 @@ pub struct TransactionInfo {
 
     /// DPC Stuff
     pub stuff: RPCTransactionStuff,
+}
+
+/// Record payload
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RPCRecordPayload {
+    /// Record balance
+    pub balance: u64,
+
+    /// Record lock
+    pub lock: u32,
+}
+
+/// Returned value for the `decoderawrecord` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RecordInfo {
+    /// Address public key of the record owner
+    pub address_public_key: String,
+
+    /// Record is dummy flag
+    pub is_dummy: bool,
+
+    /// Record Payload
+    pub payload: RPCRecordPayload,
+
+    /// Record birth predicate bytes
+    pub birth_predicate_repr: String,
+
+    /// Record death predicate bytes
+    pub death_predicate_repr: String,
+
+    /// Record serial number nonce
+    pub serial_number_nonce: String,
+
+    /// Record commitment
+    pub commitment: String,
+
+    /// Record commitment randomness
+    pub commitment_randomness: String,
 }
 
 /// Returned value for the `getblocktemplate` rpc call

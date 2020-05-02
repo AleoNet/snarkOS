@@ -10,7 +10,6 @@ use snarkos_dpc::{
     base_dpc::{
         instantiated::{Components, MerkleTreeLedger},
         parameters::PublicParameters,
-        DPC,
     },
     dpc::address::AddressPublicKey,
 };

@@ -30,20 +30,19 @@ impl Message for SyncBlock {
         Ok(bincode::serialize(&self.data)?)
     }
 }
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use snarkos_consensus::test_data::BLOCK_1;
-//
-//     #[test]
-//     fn test_sync_block() {
-//         let data = hex::decode(BLOCK_1).unwrap();
-//         let message = SyncBlock::new(data);
-//
-//         let serialized = message.serialize().unwrap();
-//         let deserialized = SyncBlock::deserialize(serialized).unwrap();
-//
-//         assert_eq!(message, deserialized);
-//     }
-// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkos_consensus::test_data::BLOCK_1;
+
+    #[test]
+    fn test_sync_block() {
+        let message = SyncBlock::new(BLOCK_1.to_vec());
+
+        let serialized = message.serialize().unwrap();
+        let deserialized = SyncBlock::deserialize(serialized).unwrap();
+
+        assert_eq!(message, deserialized);
+    }
+}

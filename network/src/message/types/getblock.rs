@@ -32,19 +32,19 @@ impl Message for GetBlock {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use snarkos_consensus::test_data::BLOCK_1_HEADER_HASH;
-//
-//     #[test]
-//     fn test_block() {
-//         let block_hash = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
-//         let message = GetBlock::new(block_hash);
-//
-//         let serialized = message.serialize().unwrap();
-//         let deserialized = GetBlock::deserialize(serialized).unwrap();
-//
-//         assert_eq!(message, deserialized);
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkos_consensus::test_data::BLOCK_1_HEADER_HASH;
+
+    #[test]
+    fn test_block() {
+        let block_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
+        let message = GetBlock::new(block_hash);
+
+        let serialized = message.serialize().unwrap();
+        let deserialized = GetBlock::deserialize(serialized).unwrap();
+
+        assert_eq!(message, deserialized);
+    }
+}

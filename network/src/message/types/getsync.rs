@@ -31,20 +31,20 @@ impl Message for GetSync {
         Ok(bincode::serialize(&self.block_locator_hashes)?)
     }
 }
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use snarkos_consensus::test_data::BLOCK_1_HEADER_HASH;
-//
-//     #[test]
-//     fn test_get_sync() {
-//         let data = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
-//         let message = GetSync::new(vec![data]);
-//
-//         let serialized = message.serialize().unwrap();
-//         let deserialized = GetSync::deserialize(serialized).unwrap();
-//
-//         assert_eq!(message, deserialized);
-//     }
-// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkos_consensus::test_data::BLOCK_1_HEADER_HASH;
+
+    #[test]
+    fn test_get_sync() {
+        let data = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
+        let message = GetSync::new(vec![data]);
+
+        let serialized = message.serialize().unwrap();
+        let deserialized = GetSync::deserialize(serialized).unwrap();
+
+        assert_eq!(message, deserialized);
+    }
+}

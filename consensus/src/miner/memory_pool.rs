@@ -34,7 +34,7 @@ pub struct MemoryPool<T: Transaction> {
 }
 
 const BLOCK_HEADER_SIZE: usize = 84;
-const COINBASE_TRANSACTION_SIZE: usize = 500; // TODO Find the value for actual coinbase transaction size
+const COINBASE_TRANSACTION_SIZE: usize = 1889; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
     #[inline]
@@ -216,80 +216,74 @@ impl<T: Transaction> MemoryPool<T> {
     }
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//    use snarkos_dpc_storage::test_data::*;
-//
-//    use hex;
-//
-//    #[test]
-//    fn push() {
-//        let (blockchain, path) = initialize_test_blockchain();
-//
-//        let mut mem_pool = MemoryPool::new();
-//        mem_pool
-//            .insert(&blockchain, Entry {
-//                size: TRANSACTION_BYTES.len(),
-//                transaction: Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap(),
-//            })
-//            .unwrap();
-//
-//        assert_eq!(434, mem_pool.total_size);
-//        assert_eq!(1, mem_pool.transactions.len());
-//
-//        kill_storage_sync(blockchain, path);
-//    }
-//
-//    #[test]
-//    fn remove_transaction_by_hash() {
-//        let (blockchain, path) = initialize_test_blockchain();
-//
-//        let mut mem_pool = MemoryPool::new();
-//        let transaction = Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap();
-//        mem_pool
-//            .insert(&blockchain, Entry {
-//                size: TRANSACTION_BYTES.len(),
-//                transaction: transaction.clone(),
-//            })
-//            .unwrap();
-//
-//        assert_eq!(1, mem_pool.transactions.len());
-//        assert_eq!(
-//            transaction.parameters.inputs.len(),
-//            mem_pool.transaction_from_outpoint.len()
-//        );
-//
-//        mem_pool
-//            .remove_by_hash(&transaction.to_transaction_id().unwrap())
-//            .unwrap();
-//
-//        assert_eq!(0, mem_pool.transactions.len());
-//        assert_eq!(0, mem_pool.transaction_from_outpoint.len());
-//
-//        kill_storage_sync(blockchain, path);
-//    }
-//
-//    #[test]
-//    fn get_candidates() {
-//        let (blockchain, path) = initialize_test_blockchain();
-//
-//        let mut mem_pool = MemoryPool::new();
-//        let transaction = Transaction::deserialize(&hex::decode(TRANSACTION_BYTES).unwrap()).unwrap();
-//        let expected_transaction = transaction.clone();
-//        mem_pool
-//            .insert(&blockchain, Entry {
-//                size: TRANSACTION_BYTES.len(),
-//                transaction,
-//            })
-//            .unwrap();
-//
-//        let max_block_size = TRANSACTION_BYTES.len() + BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE;
-//
-//        let candidates = mem_pool.get_candidates(&blockchain, max_block_size).unwrap();
-//
-//        assert!(candidates.contains(&expected_transaction));
-//
-//        kill_storage_sync(blockchain, path);
-//    }
-//}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_data::*;
+    use snarkos_dpc::base_dpc::instantiated::Tx;
+
+    #[test]
+    fn push() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        let mut mem_pool = MemoryPool::new();
+        mem_pool
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_1.len(),
+                transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
+            })
+            .unwrap();
+
+        assert_eq!(1889, mem_pool.total_size);
+        assert_eq!(1, mem_pool.transactions.len());
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
+    fn remove_transaction_by_hash() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        let mut mem_pool = MemoryPool::new();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        mem_pool
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_1.len(),
+                transaction: transaction.clone(),
+            })
+            .unwrap();
+
+        assert_eq!(1, mem_pool.transactions.len());
+
+        mem_pool
+            .remove_by_hash(&transaction.transaction_id().unwrap().to_vec())
+            .unwrap();
+
+        assert_eq!(0, mem_pool.transactions.len());
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
+    fn get_candidates() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        let mut mem_pool = MemoryPool::new();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let expected_transaction = transaction.clone();
+        mem_pool
+            .insert(&blockchain, Entry {
+                size: TRANSACTION_1.len(),
+                transaction,
+            })
+            .unwrap();
+
+        let max_block_size = TRANSACTION_1.len() + BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE;
+
+        let candidates = mem_pool.get_candidates(&blockchain, max_block_size).unwrap();
+
+        assert!(candidates.contains(&expected_transaction));
+
+        kill_storage_sync(blockchain, path);
+    }
+}
