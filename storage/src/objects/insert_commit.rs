@@ -21,7 +21,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
             if sn != &self.genesis_sn()? {
                 let sn_bytes = to_bytes![sn]?;
                 if self.get_sn_index(&sn_bytes)?.is_some() {
-                    return Err(StorageError::Message("Duplicate sn".into()));
+                    return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
                 }
 
                 ops.push(Op::Insert {
@@ -36,7 +36,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         for cm in transaction.new_commitments() {
             let cm_bytes = to_bytes![cm]?;
             if cm == &self.genesis_cm()? || self.get_cm_index(&cm_bytes)?.is_some() {
-                return Err(StorageError::Message("Invalid cm".into()));
+                return Err(StorageError::ExistingCm(cm_bytes.to_vec()));
             }
 
             ops.push(Op::Insert {
@@ -52,7 +52,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         if transaction.memorandum() != &self.genesis_memo()? {
             let memo_bytes = to_bytes![transaction.memorandum()]?;
             if self.get_memo_index(&memo_bytes)?.is_some() {
-                return Err(StorageError::Message("Duplicate memo".into()));
+                return Err(StorageError::ExistingMemo(memo_bytes.to_vec()));
             } else {
                 ops.push(Op::Insert {
                     col: COL_MEMO,
@@ -89,17 +89,17 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
         // Check if the transactions in the block have duplicate serial numbers
         if has_duplicates(transaction_serial_numbers) {
-            return Err(StorageError::Message("Duplicate serial numbers".into()));
+            return Err(StorageError::DuplicateSn);
         }
 
         // Check if the transactions in the block have duplicate commitments
         if has_duplicates(transaction_commitments) {
-            return Err(StorageError::Message("Duplicate commitments".into()));
+            return Err(StorageError::DuplicateCm);
         }
 
         // Check if the transactions in the block have duplicate memos
         if has_duplicates(transaction_memos) {
-            return Err(StorageError::Message("Duplicate transaction memos".into()));
+            return Err(StorageError::DuplicateMemo);
         }
 
         let mut sn_index = self.current_sn_index()?;

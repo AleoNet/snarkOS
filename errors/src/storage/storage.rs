@@ -12,6 +12,24 @@ pub enum StorageError {
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[fail(display = "duplicate commitment")]
+    DuplicateCm,
+
+    #[fail(display = "duplicate serial number")]
+    DuplicateSn,
+
+    #[fail(display = "duplicate transaction memo")]
+    DuplicateMemo,
+
+    #[fail(display = "existing record commitment {:?}", _0)]
+    ExistingCm(Vec<u8>),
+
+    #[fail(display = "existing transaction memo {:?}", _0)]
+    ExistingMemo(Vec<u8>),
+
+    #[fail(display = "existing serial number {:?}", _0)]
+    ExistingSn(Vec<u8>),
+
     #[fail(
         display = "invalid number of blocks to remove {}. There are only {} existing blocks",
         _0, _1
@@ -44,6 +62,33 @@ pub enum StorageError {
 
     #[fail(display = "missing child block hashes value for block hash {}", _0)]
     MissingChildBlock(String),
+
+    #[fail(display = "missing current commitment index")]
+    MissingCurrentCmIndex,
+
+    #[fail(display = "missing current merkle tree digest")]
+    MissingCurrentDigest,
+
+    #[fail(display = "missing current memo index")]
+    MissingCurrentMemoIndex,
+
+    #[fail(display = "missing current serial number index")]
+    MissingCurrentSnIndex,
+
+    #[fail(display = "missing genesis address")]
+    MissingGenesisAddress,
+
+    #[fail(display = "missing genesis commitment")]
+    MissingGenesisCm,
+
+    #[fail(display = "missing genesis memo")]
+    MissingGenesisMemo,
+
+    #[fail(display = "missing genesis predicate vk bytes")]
+    MissingGenesisPredVkBytes,
+
+    #[fail(display = "missing genesis serial number")]
+    MissingGenesisSn,
 
     #[fail(display = "missing transaction meta value for transaction id {}", _0)]
     MissingTransactionMeta(String),

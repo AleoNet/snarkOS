@@ -11,7 +11,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn genesis_cm(&self) -> Result<T::Commitment, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
             Some(cm_bytes) => Ok(FromBytes::read(&cm_bytes[..])?),
-            None => Err(StorageError::Message("Missing genesis cm".to_string())),
+            None => Err(StorageError::MissingGenesisCm),
         }
     }
 
@@ -19,7 +19,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn genesis_sn(&self) -> Result<T::SerialNumber, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_SN.as_bytes())? {
             Some(genesis_sn_bytes) => Ok(FromBytes::read(&genesis_sn_bytes[..])?),
-            None => Err(StorageError::Message("Missing genesis sn".to_string())),
+            None => Err(StorageError::MissingGenesisSn),
         }
     }
 
@@ -27,7 +27,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn genesis_memo(&self) -> Result<T::Memorandum, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_MEMO.as_bytes())? {
             Some(genesis_memo_bytes) => Ok(FromBytes::read(&genesis_memo_bytes[..])?),
-            None => Err(StorageError::Message("Missing genesis memo".to_string())),
+            None => Err(StorageError::MissingGenesisMemo),
         }
     }
 
@@ -35,7 +35,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn genesis_pred_vk_bytes(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_PRED_VK.as_bytes())? {
             Some(genesis_pred_vk_bytes) => Ok(genesis_pred_vk_bytes),
-            None => Err(StorageError::Message("Missing genesis predicate vk".to_string())),
+            None => Err(StorageError::MissingGenesisPredVkBytes),
         }
     }
 
@@ -43,7 +43,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn genesis_address_pair_bytes(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_ADDRESS_PAIR.as_bytes())? {
             Some(genesis_address_pair_bytes) => Ok(genesis_address_pair_bytes),
-            None => Err(StorageError::Message("Missing genesis address pair".to_string())),
+            None => Err(StorageError::MissingGenesisAddress),
         }
     }
 
@@ -56,7 +56,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
                 Ok(u32::from_le_bytes(curr_cm_index) as usize)
             }
-            None => Err(StorageError::Message("Missing current cm index".to_string())),
+            None => Err(StorageError::MissingCurrentCmIndex),
         }
     }
 
@@ -64,7 +64,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn current_sn_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
             Some(sn_index_bytes) => Ok(bytes_to_u32(sn_index_bytes) as usize),
-            None => Err(StorageError::Message("Missing current sn index".to_string())),
+            None => Err(StorageError::MissingCurrentSnIndex),
         }
     }
 
@@ -72,7 +72,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn current_memo_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_MEMO_INDEX.as_bytes())? {
             Some(memo_index_bytes) => Ok(bytes_to_u32(memo_index_bytes) as usize),
-            None => Err(StorageError::Message("Missing current memo index".to_string())),
+            None => Err(StorageError::MissingCurrentMemoIndex),
         }
     }
 
@@ -80,7 +80,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     pub fn current_digest(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
             Some(current_digest) => Ok(current_digest),
-            None => Err(StorageError::Message("Missing current digest".to_string())),
+            None => Err(StorageError::MissingCurrentDigest),
         }
     }
 

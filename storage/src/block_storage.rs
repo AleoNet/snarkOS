@@ -72,7 +72,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
                 let genesis_cm: T::Commitment = match storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
                     Some(cm_bytes) => FromBytes::read(&cm_bytes[..])?,
-                    None => return Err(StorageError::Message("Missing genesis cm".to_string())),
+                    None => return Err(StorageError::MissingGenesisCm),
                 };
 
                 assert!(commitments[0] == genesis_cm);

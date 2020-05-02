@@ -3,7 +3,7 @@
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_errors::consensus::ConsensusError;
+use snarkos_errors::{consensus::ConsensusError, storage::StorageError};
 use snarkos_objects::{
     dpc::{DPCTransactions, Transaction},
     Ledger,
@@ -89,11 +89,11 @@ impl<T: Transaction> MemoryPool<T> {
         let transaction_memo = entry.transaction.memorandum();
 
         if has_duplicates(transaction_serial_numbers) {
-            return Err(ConsensusError::Message("Duplicate serial numbers".into()));
+            return Err(ConsensusError::DuplicateSn);
         }
 
         if has_duplicates(transaction_commitments) {
-            return Err(ConsensusError::Message("Duplicate commitments".into()));
+            return Err(ConsensusError::DuplicateCm);
         }
 
         if self.contains(&entry) {
@@ -112,18 +112,24 @@ impl<T: Transaction> MemoryPool<T> {
 
         for sn in transaction_serial_numbers {
             if storage.contains_sn(sn) || holding_serial_numbers.contains(&sn) {
-                return Err(ConsensusError::Message("Existing serial number".into()));
+                return Err(ConsensusError::StorageError(StorageError::ExistingSn(
+                    to_bytes![sn]?.to_vec(),
+                )));
             }
         }
 
         for cm in transaction_commitments {
             if storage.contains_cm(cm) || holding_commitments.contains(&cm) {
-                return Err(ConsensusError::Message("Existing commitment".into()));
+                return Err(ConsensusError::StorageError(StorageError::ExistingCm(
+                    to_bytes![cm]?.to_vec(),
+                )));
             }
         }
 
         if storage.contains_memo(transaction_memo) || holding_memos.contains(&transaction_memo) {
-            return Err(ConsensusError::Message("Existing transaction memo".into()));
+            return Err(ConsensusError::StorageError(StorageError::ExistingMemo(
+                to_bytes![transaction_memo]?.to_vec(),
+            )));
         }
 
         let transaction_id = entry.transaction.transaction_id()?.to_vec();

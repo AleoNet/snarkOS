@@ -45,7 +45,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
 
         if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
             if bytes_to_u32(block_num) != 0 {
-                return Err(LedgerError::Message("Existing database".into()));
+                return Err(LedgerError::ExistingDatabase);
             }
         }
 

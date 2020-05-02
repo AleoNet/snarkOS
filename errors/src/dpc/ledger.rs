@@ -5,16 +5,19 @@ pub enum LedgerError {
     #[fail(display = "{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "Duplicate sn pushed to ledger")]
+    #[fail(display = "duplicate sn pushed to ledger")]
     DuplicateMemo,
 
-    #[fail(display = "Duplicate memo pushed to ledger")]
+    #[fail(display = "duplicate memo pushed to ledger")]
     DuplicateSn,
 
-    #[fail(display = "Invalid cm pushed to ledger")]
+    #[fail(display = "database already exists")]
+    ExistingDatabase,
+
+    #[fail(display = "invalid cm pushed to ledger")]
     InvalidCm,
 
-    #[fail(display = "Invalid cm index during proving")]
+    #[fail(display = "invalid cm index during proving")]
     InvalidCmIndex,
 
     #[fail(display = "{}", _0)]
