@@ -253,6 +253,7 @@ impl<F: Field> AllocGadget<bool, F> for AllocatedBit {
         T: Borrow<bool>,
     {
         let mut value = None;
+
         let var = cs.alloc(
             || "boolean",
             || {
@@ -279,6 +280,7 @@ impl<F: Field> AllocGadget<bool, F> for AllocatedBit {
         T: Borrow<bool>,
     {
         let mut value = None;
+
         let var = cs.alloc_input(
             || "boolean",
             || {
