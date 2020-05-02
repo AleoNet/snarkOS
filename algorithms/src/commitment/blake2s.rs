@@ -37,6 +37,9 @@ impl CommitmentScheme for Blake2sCommitment {
     }
 }
 
+/// TODO Remove required placeholder trait impls
+///   Blake2sCommitment is different in that it's a CommitmentScheme, with no parameters to store/load.
+
 impl Storage for Blake2sCommitment {
     fn store(&self, _path: &PathBuf) -> IoResult<()> {
         Ok(())
