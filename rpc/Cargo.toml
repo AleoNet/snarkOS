@@ -31,4 +31,4 @@ tokio = { version = "0.2", features = ["full"] }
 
 [dev-dependencies]
 jsonrpc-test = { version = "14.0.5" }
-serde_json = { version = "1.0.47" }
+serde_json = { version = "1.0.52" }
