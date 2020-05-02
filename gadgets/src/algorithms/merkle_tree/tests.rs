@@ -95,7 +95,7 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
     let parameters = EdwardsMerkleParameters::setup(&mut rng);
-    let tree = EdwardsMerkleTree::new(&parameters, leaves).unwrap();
+    let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
     let mut satisfied = true;
     for (i, leaf) in leaves.iter().enumerate() {

@@ -49,7 +49,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             }
         }
 
-        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()]).unwrap();
+        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(parameters.clone(), &[genesis_cm.clone()]).unwrap();
 
         let header = BlockHeader {
             previous_block_hash: BlockHeaderHash([0u8; 32]),

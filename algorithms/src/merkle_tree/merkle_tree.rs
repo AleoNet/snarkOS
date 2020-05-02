@@ -13,7 +13,7 @@ pub struct MerkleTree<P: MerkleParameters> {
 impl<P: MerkleParameters> MerkleTree<P> {
     pub const HEIGHT: u8 = P::HEIGHT as u8;
 
-    pub fn new<L: ToBytes>(parameters: &P, leaves: &[L]) -> Result<Self, MerkleError> {
+    pub fn new<L: ToBytes>(parameters: P, leaves: &[L]) -> Result<Self, MerkleError> {
         let new_time = start_timer!(|| "MerkleTree::New");
 
         let last_level_size = leaves.len().next_power_of_two();
@@ -76,7 +76,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         Ok(MerkleTree {
             tree,
             padding_tree,
-            parameters: parameters.clone(),
+            parameters,
             root: Some(root_hash),
         })
     }

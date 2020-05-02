@@ -83,7 +83,7 @@ fn generate_merkle_tree<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
     let parameters = MTParameters::setup(&mut rng);
-    let tree = EdwardsMerkleTree::new(&parameters, leaves).unwrap();
+    let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
         assert!(proof.verify(&tree.root(), &leaf).unwrap());
@@ -94,7 +94,7 @@ fn bad_merkle_tree_verify<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
     let parameters = MTParameters::setup(&mut rng);
-    let tree = EdwardsMerkleTree::new(&parameters, leaves).unwrap();
+    let tree = EdwardsMerkleTree::new(parameters, leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
         assert!(proof.verify(&Edwards::zero(), &leaf).unwrap());

@@ -77,7 +77,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
                 assert!(commitments[0] == genesis_cm);
 
-                let merkle_tree = MerkleTree::new(&parameters, &commitments)?;
+                let merkle_tree = MerkleTree::new(parameters.clone(), &commitments)?;
 
                 Ok(Self {
                     latest_block_height: RwLock::new(bytes_to_u32(val)),

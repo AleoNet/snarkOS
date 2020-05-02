@@ -49,7 +49,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
         _genesis_predicate_vk_bytes: Vec<u8>,
         _genesis_address_pair_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError> {
-        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(&parameters, &[genesis_cm.clone()])?;
+        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(parameters.clone(), &[genesis_cm.clone()])?;
 
         let mut cur_cm_index = 0;
         let mut comm_to_index = HashMap::new();
@@ -129,7 +129,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
             .cloned()
             .collect::<Vec<_>>();
         assert!(commitments[0] == self.genesis_cm);
-        self.cm_merkle_tree = MerkleTree::new(self.parameters(), &commitments)?;
+        self.cm_merkle_tree = MerkleTree::new(self.parameters().clone(), &commitments)?;
 
         let new_digest = self.cm_merkle_tree.root();
         self.past_digests.insert(new_digest.clone());

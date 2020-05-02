@@ -151,6 +151,6 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
         assert!(commitments[0] == self.genesis_cm()?);
 
-        Ok(MerkleTree::new(&self.ledger_parameters, &commitments)?)
+        Ok(MerkleTree::new(self.ledger_parameters.clone(), &commitments)?)
     }
 }
