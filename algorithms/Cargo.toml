@@ -17,8 +17,8 @@ path = "examples/snark/gm17.rs"
 required-features = ["rand", "snarkos-curves/bls12_377", "snarkos-models/gadgets"]
 
 [dependencies]
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["algorithms"] }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["algorithms", "gadgets"] }
 snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
@@ -46,7 +46,7 @@ rand_xorshift = { version = "0.2" }
 #
 [features]
 default = []
-commitment = ["blake2", "digest"]
+commitment = ["blake2", "crh", "digest"]
 crh = ["rand", "rayon", "sha2"]
 fft = ["rand", "rayon"]
 merkle_tree = ["rand"]
