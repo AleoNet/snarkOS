@@ -32,6 +32,9 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
+    /// A transaction value balance is the difference between input and output record balances.
+    /// This value effectively becomes the transaction fee for the miner. Only coinbase transactions
+    /// can have a negative value balance representing tokens being minted.
     pub value_balance: i64,
 
     #[derivative(PartialEq = "ignore")]
