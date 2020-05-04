@@ -12,14 +12,14 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
-snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-gadgets = { path = "../gadgets", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
-snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
-snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-gadgets = { path = "../gadgets", version = "0.8.0" }
+snarkos-models = { path = "../models", version = "0.8.0" }
+snarkos-objects = { path = "../objects", version = "0.8.0" }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
+snarkos-storage = { path = "../storage", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 blake2 = { version = "0.7.1" }

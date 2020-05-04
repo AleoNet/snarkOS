@@ -39,13 +39,13 @@ name = "snarkos"
 path = "snarkOS/main.rs"
 
 [dependencies]
-snarkos-consensus = { path = "consensus", version = "0.8.0", default-features = false }
-snarkos-dpc = { path = "./dpc", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "./errors", version = "0.8.0", default-features = false, features = ["node"] }
-snarkos-network = { path = "network", version = "0.8.0", default-features = false }
-snarkos-objects = { path = "objects", version = "0.8.0", default-features = false }
-snarkos-rpc = { path = "./rpc", version = "0.8.0", default-features = false }
-snarkos-storage = { path = "storage", version = "0.8.0", default-features = false }
+snarkos-consensus = { path = "consensus", version = "0.8.0" }
+snarkos-dpc = { path = "./dpc", version = "0.8.0" }
+snarkos-errors = { path = "./errors", version = "0.8.0" }
+snarkos-network = { path = "network", version = "0.8.0" }
+snarkos-objects = { path = "objects", version = "0.8.0" }
+snarkos-rpc = { path = "./rpc", version = "0.8.0" }
+snarkos-storage = { path = "storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
 clap = { version = "2.33.0" }
@@ -76,7 +76,7 @@ debug-assertions = false
 opt-level = 0
 
 [profile.test]
-opt-level = 1 # necessary for DPC testing
+opt-level = 3 # necessary for DPC testing
 incremental = true
 debug-assertions = true
 debug = true
