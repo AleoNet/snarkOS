@@ -2,8 +2,9 @@ use crate::message::{
     types::{GetBlock, GetSync},
     Channel,
 };
+use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::network::SendError;
-use snarkos_objects::BlockHeaderHash;
+use snarkos_objects::{dpc::Transaction, BlockHeaderHash};
 use snarkos_storage::BlockStorage;
 
 use chrono::{DateTime, Utc};
@@ -56,7 +57,11 @@ impl SyncHandler {
     }
 
     /// Finish syncing or ask for the next block from the sync node.
-    pub async fn increment(&mut self, channel: Arc<Channel>, storage: Arc<BlockStorage>) -> Result<(), SendError> {
+    pub async fn increment<T: Transaction, P: MerkleParameters>(
+        &mut self,
+        channel: Arc<Channel>,
+        storage: Arc<BlockStorage<T, P>>,
+    ) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
             if self.block_headers.is_empty() {
                 info!(

@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-gadgets"
 version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+authors = ["The Aleo Team <hello@aleo.org"]
 description = "Gadgets for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms" }
-snarkos-curves = { path = "../curves" }
-snarkos-errors = { path = "../errors" }
-snarkos-models = { path = "../models" }
-snarkos-utilities = { path = "../utilities" }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-models = { path = "../models", version = "0.8.0" }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 derivative = { version = "1" }
 digest = { version = "0.7" }

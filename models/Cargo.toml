@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-models"
 version = "0.8.0"
-authors = ["Michael Beller", "Collin Chin", "Raymond Chu", "Matthew Green", "Ian Miers", "Howard Wu"]
+authors = ["The Aleo Team <hello@aleo.org"]
 description = "Models for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-errors = { path = "../errors" }
-snarkos-utilities = { path = "../utilities" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 derivative = { version = "1" }
 failure = { version = "0.1" }
-rand = { version = "0.7" }
-rand_xorshift = { version = "0.2" }
+rand = { version = "0.7", default-features = false }
+rand_xorshift = { version = "0.2", default-features = false }
 smallvec = { version = "1.2" }

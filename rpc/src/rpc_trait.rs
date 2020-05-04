@@ -9,8 +9,8 @@ pub trait RpcFunctions {
     #[rpc(name = "add")]
     fn add(&self, a: u64, b: u64) -> Result<u64, RpcError>;
 
-    #[rpc(name = "getbalance")]
-    fn get_balance(&self, address_string: String) -> Result<u64, RpcError>;
+    //    #[rpc(name = "getbalance")]
+    //    fn get_balance(&self, identifier: String) -> Result<u64, RpcError>;
 
     #[rpc(name = "getblock")]
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError>;
@@ -24,31 +24,24 @@ pub trait RpcFunctions {
     #[rpc(name = "getblockhash")]
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError>;
 
-    #[rpc(name = "listunspent")]
-    fn list_unspent(&self, address_string: String) -> Result<Vec<(String, u32)>, RpcError>;
-
     #[rpc(name = "getrawtransaction")]
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError>;
 
     #[rpc(name = "createrawtransaction")]
     fn create_raw_transaction(
         &self,
-        inputs: Vec<RPCTransactionOutpoint>,
-        outputs: RPCTransactionOutputs,
+        //        inputs: Vec<RPCTransactionOutpoint>,
+        //        outputs: RPCTransactionOutputs,
     ) -> Result<String, RpcError>;
 
     #[rpc(name = "decoderawtransaction")]
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError>;
 
-    #[rpc(name = "signrawtransaction")]
-    fn sign_raw_transaction(
-        &self,
-        unsigned_transaction_bytes: String,
-        private_key: Vec<String>,
-    ) -> Result<String, RpcError>;
-
-    #[rpc(name = "sendrawtransaction")]
+    #[rpc(name = "sendtransaction")]
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError>;
+
+    //    #[rpc(name = "decoderecord")]
+    //    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 
     #[rpc(name = "getconnectioncount")]
     fn get_connection_count(&self) -> Result<usize, RpcError>;

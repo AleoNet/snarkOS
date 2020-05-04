@@ -38,8 +38,7 @@ mod tests {
 
     #[test]
     fn test_sync_block() {
-        let data = hex::decode(BLOCK_1).unwrap();
-        let message = SyncBlock::new(data);
+        let message = SyncBlock::new(BLOCK_1.to_vec());
 
         let serialized = message.serialize().unwrap();
         let deserialized = SyncBlock::deserialize(serialized).unwrap();

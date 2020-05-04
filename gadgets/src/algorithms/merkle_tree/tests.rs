@@ -14,11 +14,16 @@ use snarkos_models::{
         r1cs::{ConstraintSystem, TestConstraintSystem},
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
+    storage::Storage,
 };
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use std::rc::Rc;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    path::PathBuf,
+};
 
 #[derive(Clone)]
 pub(super) struct Size;
@@ -37,8 +42,28 @@ impl MerkleParameters for EdwardsMerkleParameters {
 
     const HEIGHT: usize = 32;
 
+    fn setup<R: Rng>(rng: &mut R) -> Self {
+        Self(H::setup(rng))
+    }
+
     fn crh(&self) -> &Self::H {
         &self.0
+    }
+
+    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
+        self.crh().parameters()
+    }
+}
+
+impl Storage for EdwardsMerkleParameters {
+    /// Store the SNARK proof to a file at the given path.
+    fn store(&self, path: &PathBuf) -> IoResult<()> {
+        self.0.store(path)
+    }
+
+    /// Load the SNARK proof from a file at the given path.
+    fn load(path: &PathBuf) -> IoResult<Self> {
+        Ok(Self(H::load(path)?))
     }
 }
 impl Default for EdwardsMerkleParameters {
@@ -48,14 +73,29 @@ impl Default for EdwardsMerkleParameters {
     }
 }
 
+impl ToBytes for EdwardsMerkleParameters {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for EdwardsMerkleParameters {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let crh: H = FromBytes::read(&mut reader)?;
+
+        Ok(Self(crh))
+    }
+}
+
 type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 
 fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
 
-    let crh = Rc::new(H::setup(&mut rng));
-    let crh_parameters = crh.parameters.clone();
-    let tree = EdwardsMerkleTree::new(leaves).unwrap();
+    let parameters = EdwardsMerkleParameters::setup(&mut rng);
+    let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
     let mut satisfied = true;
     for (i, leaf) in leaves.iter().enumerate() {
@@ -79,7 +119,7 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
         // Allocate Parameters for CRH
         let crh_parameters =
             <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| format!("new_parameters_{}", i)), || {
-                Ok(crh_parameters.clone())
+                Ok(parameters.parameters())
             })
             .unwrap();
 

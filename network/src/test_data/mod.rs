@@ -1,6 +1,9 @@
 use crate::{context::Context, message::Channel, protocol::SyncHandler, server::Server};
 use snarkos_consensus::{miner::MemoryPool, test_data::*};
-use snarkos_storage::BlockStorage;
+use snarkos_dpc::base_dpc::{
+    instantiated::{Components, MerkleTreeLedger},
+    parameters::PublicParameters,
+};
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
@@ -27,7 +30,8 @@ pub async fn sleep(time: u64) {
 pub fn initialize_test_server(
     server_address: SocketAddr,
     bootnode_address: SocketAddr,
-    storage: Arc<BlockStorage>,
+    storage: Arc<MerkleTreeLedger>,
+    parameters: PublicParameters<Components>,
     connection_frequency: u64,
 ) -> Server {
     let consensus = TEST_CONSENSUS;
@@ -41,6 +45,7 @@ pub fn initialize_test_server(
         Context::new(server_address, 5, 1, 10, true, vec![]),
         consensus,
         storage,
+        parameters,
         memory_pool_lock,
         sync_handler_lock,
         connection_frequency,

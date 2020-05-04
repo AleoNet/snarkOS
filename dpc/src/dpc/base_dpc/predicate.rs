@@ -1,6 +1,9 @@
-use crate::dpc::{base_dpc::BaseDPCComponents, Predicate};
+use crate::dpc::base_dpc::BaseDPCComponents;
 
-use snarkos_models::algorithms::{CommitmentScheme, SNARK};
+use snarkos_models::{
+    algorithms::{CommitmentScheme, SNARK},
+    dpc::Predicate,
+};
 
 use std::marker::PhantomData;
 

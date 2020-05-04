@@ -41,15 +41,15 @@ matrix:
             - libiberty-dev
       script:
         - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
-      after_success: |
-        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-        tar xzf master.tar.gz && cd kcov-master &&
-        mkdir build && cd build && cmake .. && make && sudo make install &&
-        cd ../.. && rm -rf kcov-master &&
-        rm -rf target/debug/base_dpc* &&
-        for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-        bash <(curl -s https://codecov.io/bash) &&
-        echo "Uploaded code coverage"
+#      after_success: |
+#        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+#        tar xzf master.tar.gz && cd kcov-master &&
+#        mkdir build && cd build && cmake .. && make && sudo make install &&
+#        cd ../.. && rm -rf kcov-master &&
+#        rm -rf target/debug/base_dpc* && rm -rf target/debug/consensus_dpc* && rm -rf target/debug/consensus_receive_block* && rm -rf target/debug/server_connection_handler*
+#        for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+#        bash <(curl -s https://codecov.io/bash) &&
+#        echo "Uploaded code coverage"
 
     - rust: nightly-2020-03-18
       install:

@@ -1,5 +1,12 @@
 mod server_listen {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
+    use snarkos_dpc::{
+        base_dpc::{
+            instantiated::{Components, MerkleTreeLedger},
+            parameters::PublicParameters,
+        },
+        test_data::setup_or_load_parameters,
+    };
     use snarkos_network::{
         context::Context,
         message::{
@@ -11,9 +18,9 @@ mod server_listen {
         test_data::*,
         Handshakes,
     };
-    use snarkos_storage::{test_data::*, BlockStorage};
 
     use chrono::{DateTime, Utc};
+    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{
@@ -27,7 +34,8 @@ mod server_listen {
         tx: Sender<()>,
         server_address: SocketAddr,
         bootnode_address: SocketAddr,
-        storage: Arc<BlockStorage>,
+        storage: Arc<MerkleTreeLedger>,
+        parameters: PublicParameters<Components>,
         is_bootnode: bool,
     ) {
         let memory_pool = MemoryPool::new();
@@ -44,6 +52,7 @@ mod server_listen {
             ]),
             consensus,
             storage,
+            parameters,
             memory_pool_lock,
             sync_handler_lock,
             10000,
@@ -54,9 +63,7 @@ mod server_listen {
         server.listen().await.unwrap();
     }
 
-    #[test]
-    #[serial]
-    fn bind_to_port() {
+    fn bind_to_port(parameters: PublicParameters<Components>) {
         let (storage, path) = initialize_test_blockchain();
 
         // Create a new runtime so we can spawn and block_on threads
@@ -72,7 +79,7 @@ mod server_listen {
             // 1. Simulate server
 
             tokio::spawn(async move {
-                start_server(tx, server_address, bootnode_address, storage, true).await;
+                start_server(tx, server_address, bootnode_address, storage, parameters, true).await;
             });
             rx.await.unwrap();
 
@@ -86,9 +93,7 @@ mod server_listen {
         kill_storage_async(path);
     }
 
-    #[test]
-    #[serial]
-    fn startup_handshake_bootnode() {
+    fn startup_handshake_bootnode(parameters: PublicParameters<Components>) {
         let (storage, path) = initialize_test_blockchain();
 
         let mut rt = Runtime::new().unwrap();
@@ -105,7 +110,9 @@ mod server_listen {
 
             let (tx, rx) = oneshot::channel();
 
-            tokio::spawn(async move { start_server(tx, server_address, bootnode_address, storage, false).await });
+            tokio::spawn(async move {
+                start_server(tx, server_address, bootnode_address, storage, parameters, false).await
+            });
 
             rx.await.unwrap();
 
@@ -145,9 +152,7 @@ mod server_listen {
         kill_storage_async(path);
     }
 
-    #[test]
-    #[serial]
-    fn startup_handshake_stored_peers() {
+    fn startup_handshake_stored_peers(parameters: PublicParameters<Components>) {
         let (storage, path) = initialize_test_blockchain();
 
         let mut rt = Runtime::new().unwrap();
@@ -172,7 +177,9 @@ mod server_listen {
 
             let (tx, rx) = oneshot::channel();
 
-            tokio::spawn(async move { start_server(tx, server_address, peer_address, storage, true).await });
+            tokio::spawn(
+                async move { start_server(tx, server_address, peer_address, storage, parameters, true).await },
+            );
 
             rx.await.unwrap();
 
@@ -191,5 +198,26 @@ mod server_listen {
 
         drop(rt);
         kill_storage_async(path);
+    }
+
+    #[test]
+    #[serial]
+    fn test_server_listen() {
+        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
+
+        {
+            println!("test bind to port");
+            bind_to_port(parameters.clone());
+        }
+
+        {
+            println!("test startup handshake bootnode");
+            startup_handshake_bootnode(parameters.clone());
+        }
+
+        {
+            println!("test startup handshake bootnode with stored peers");
+            startup_handshake_stored_peers(parameters);
+        }
     }
 }

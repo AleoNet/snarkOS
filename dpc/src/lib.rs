@@ -43,10 +43,11 @@ extern crate snarkos_profiler;
 #[macro_use]
 extern crate derivative;
 
-pub(crate) mod dpc;
+pub mod dpc;
 pub use crate::dpc::*;
 
-pub mod ledger;
+#[allow(dead_code)]
+pub mod test_data;
 
 use snarkos_errors::gadgets::SynthesisError;
 

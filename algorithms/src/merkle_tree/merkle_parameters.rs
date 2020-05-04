@@ -1,16 +1,23 @@
 use snarkos_errors::algorithms::MerkleError;
-use snarkos_models::algorithms::CRH;
+use snarkos_models::{algorithms::CRH, storage::Storage};
 use snarkos_utilities::bytes::ToBytes;
 
+use rand::Rng;
 use std::io::Cursor;
 
-pub trait MerkleParameters: Clone + Default {
+pub trait MerkleParameters: Clone + Default + Storage {
     type H: CRH;
 
     const HEIGHT: usize;
 
+    /// Setup the MerkleParameters
+    fn setup<R: Rng>(rng: &mut R) -> Self;
+
     /// Returns the collision-resistant hash function used by the Merkle tree.
     fn crh(&self) -> &Self::H;
+
+    /// Returns the collision-resistant hash function used by the Merkle tree.
+    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters;
 
     /// Returns the hash of a given leaf.
     fn hash_leaf<L: ToBytes>(&self, leaf: &L, buffer: &mut [u8]) -> Result<<Self::H as CRH>::Output, MerkleError> {

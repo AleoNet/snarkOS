@@ -1,7 +1,7 @@
 use crate::{RpcFunctions, RpcImpl};
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_network::context::Context;
-use snarkos_storage::BlockStorage;
 
 use jsonrpc_http_server::ServerBuilder;
 use std::{net::SocketAddr, sync::Arc};
@@ -12,10 +12,10 @@ use tokio::sync::Mutex;
 /// This may be changed in the future to give the node more control of the rpc server.
 pub async fn start_rpc_server(
     rpc_port: u16,
-    storage: Arc<BlockStorage>,
+    storage: Arc<MerkleTreeLedger>,
     server_context: Arc<Context>,
     consensus: ConsensusParameters,
-    memory_pool_lock: Arc<Mutex<MemoryPool>>,
+    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let rpc_server: SocketAddr = format!("127.0.0.1:{}", rpc_port).parse()?;
 

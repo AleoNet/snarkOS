@@ -33,12 +33,11 @@ impl Message for Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_consensus::test_data::TRANSACTION;
+    use snarkos_consensus::test_data::TRANSACTION_1;
 
     #[test]
     fn test_transaction() {
-        let transaction = hex::decode(TRANSACTION).unwrap();
-        let message = Transaction::new(transaction);
+        let message = Transaction::new(TRANSACTION_1.to_vec());
 
         let serialized = message.serialize().unwrap();
         let deserialized = Transaction::deserialize(serialized).unwrap();

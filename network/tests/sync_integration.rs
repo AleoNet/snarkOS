@@ -6,7 +6,6 @@ mod sync_integration {
         test_data::*,
     };
     use snarkos_objects::BlockHeaderHash;
-    use snarkos_storage::test_data::*;
 
     use serial_test::serial;
     use std::sync::Arc;
@@ -24,7 +23,7 @@ mod sync_integration {
 
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
-            let block_hash = BlockHeaderHash::new(hex::decode(BLOCK_1_HEADER_HASH).unwrap());
+            let block_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
 
             // 1. Push hash to sync handler, set syncing to true
 

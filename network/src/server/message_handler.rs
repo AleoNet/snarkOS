@@ -7,8 +7,13 @@ use crate::{
     SyncState,
 };
 use snarkos_consensus::miner::Entry;
+use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_errors::network::ServerError;
-use snarkos_objects::{Block as BlockStruct, BlockHeaderHash, Transaction as TransactionStruct};
+use snarkos_objects::{dpc::Block as BlockStruct, BlockHeaderHash};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use chrono::Utc;
 use std::sync::Arc;
@@ -79,7 +84,7 @@ impl Server {
             let mut memory_pool = self.memory_pool_lock.lock().await;
             let inserted = self
                 .consensus
-                .receive_block(&self.storage, &mut memory_pool, &block)
+                .receive_block(&self.parameters, &self.storage, &mut memory_pool, &block)
                 .is_ok();
             drop(memory_pool);
 
@@ -121,7 +126,7 @@ impl Server {
         let mut transactions = vec![];
 
         for (_tx_id, entry) in &memory_pool.transactions {
-            if let Ok(transaction_bytes) = entry.transaction.serialize() {
+            if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                 transactions.push(transaction_bytes);
             }
         }
@@ -139,9 +144,10 @@ impl Server {
         let mut memory_pool = self.memory_pool_lock.lock().await;
 
         for transaction_bytes in message.transactions {
-            let entry = Entry {
+            let transaction: Tx = Tx::read(&transaction_bytes[..])?;
+            let entry = Entry::<Tx> {
                 size: transaction_bytes.len(),
-                transaction: TransactionStruct::deserialize(&transaction_bytes)?,
+                transaction,
             };
 
             if let Ok(inserted) = memory_pool.insert(&self.storage, entry) {

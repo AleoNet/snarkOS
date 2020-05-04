@@ -26,6 +26,12 @@ pub enum BlockError {
     IrrelevantBlock(String),
 }
 
+impl From<std::io::Error> for BlockError {
+    fn from(error: std::io::Error) -> Self {
+        BlockError::Crate("std::io", format!("{:?}", error))
+    }
+}
+
 impl From<TransactionError> for BlockError {
     fn from(error: TransactionError) -> Self {
         BlockError::TransactionError(error)

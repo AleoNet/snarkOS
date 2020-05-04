@@ -14,13 +14,6 @@ pub const PORT: OptionType = (
     &[],
 );
 
-pub const GET_BALANCE: OptionType = (
-    "[getbalance] --getbalance=[address] 'Returns the total available balance for an address'",
-    &[],
-    &[],
-    &[],
-);
-
 pub const GET_BLOCK: OptionType = (
     "[getblock] --getblock=[block_hash] 'Returns a block for a particular block header hash'",
     &[],
@@ -37,13 +30,6 @@ pub const GET_BLOCK_COUNT: OptionType = (
 
 pub const GET_BEST_BLOCK_HASH: OptionType = (
     "[getbestblockhash] --getbestblockhash 'Returns the hash of the best block in the longest chain'",
-    &[],
-    &[],
-    &[],
-);
-
-pub const LIST_UNSPENT: OptionType = (
-    "[listunspent] --listunspent=[address] 'Returns a list of unspent transaction outputs for an address'",
     &[],
     &[],
     &[],
@@ -67,13 +53,6 @@ pub const CREATE_RAW_TRANSACTION: OptionType = (
 
 pub const DECODE_RAW_TRANSACTION: OptionType = (
     "[decoderawtransaction] --decoderawtransaction=[transaction_bytes] 'Returns a decoded transaction from a serialized transaction'",
-    &[],
-    &[],
-    &[],
-);
-
-pub const SIGN_RAW_TRANSACTION: OptionType = (
-    "[signrawtransaction] --signrawtransaction=[transaction_bytes][private_keys] 'Sign a raw transaction Private keys format: '[\"private_key\", ...]''",
     &[],
     &[],
     &[],
