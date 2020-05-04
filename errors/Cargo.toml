@@ -15,5 +15,5 @@ edition = "2018"
 bincode = { version = "1.2.0" }
 failure = { version = "0.1.7" }
 hex = { version = "0.4.2" }
-jsonrpc-core = { version = "14.0.5" }
+jsonrpc-core = { version = "14.1.0" }
 rocksdb = { version = "0.13.0" }
