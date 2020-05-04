@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["curves"] }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 

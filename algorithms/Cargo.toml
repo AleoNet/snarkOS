@@ -17,9 +17,9 @@ path = "examples/snark/gm17.rs"
 required-features = ["rand", "snarkos-curves/bls12_377", "snarkos-models/gadgets"]
 
 [dependencies]
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false, features = ["algorithms"] }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["algorithms", "gadgets"] }
-snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 blake2 = { version = "0.7" }

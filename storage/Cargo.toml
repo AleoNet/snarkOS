@@ -12,10 +12,10 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["dpc"] }
-snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
+snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 bincode = { version = "1.2.0" }

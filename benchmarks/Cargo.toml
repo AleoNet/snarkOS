@@ -17,11 +17,11 @@ path = "algorithms/snark/snark.rs"
 harness = false
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 blake2 = { version = "0.7" }

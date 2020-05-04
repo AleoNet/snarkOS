@@ -12,28 +12,8 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-bincode = { version = "1.2.0", optional = true }
+bincode = { version = "1.2.0" }
 failure = { version = "0.1.7" }
-hex = { version = "0.4.2", optional = true }
-jsonrpc-core = { version = "14.0.5", optional = true }
-rocksdb = { version = "0.13.0", optional = true }
-
-#
-# Each module in `snarkos-errors` is guarded by a feature flag to minimize compilation resources.
-# To include any one of the modules in `snarkos-errors`, simply include its corresponding feature flag.
-#
-# For example, to include errors for `snarkos-algorithms`, add the "algorithms" feature as follows:
-# snarkos-errors = { version = "x.x.x", default-features = false, features = ["algorithms"] }
-#
-[features]
-default = []
-algorithms = ["curves", "gadgets"]
-consensus = []
-curves = ["gadgets"]
-dpc = ["algorithms", "storage"]
-gadgets = []
-network = ["bincode"]
-node = ["consensus"]
-objects = ["hex"]
-rpc = ["hex", "jsonrpc-core"]
-storage = ["bincode", "hex", "rocksdb"]
+hex = { version = "0.4.2" }
+jsonrpc-core = { version = "14.0.5" }
+rocksdb = { version = "0.13.0" }
