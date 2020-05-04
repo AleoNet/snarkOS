@@ -1,6 +1,6 @@
 mod server_message_handler {
     use snarkos_consensus::{miner::Entry, test_data::*};
-    use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::*};
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_network::{
         message::{types::*, Channel, Message},
         test_data::*,
@@ -13,7 +13,6 @@ mod server_message_handler {
     };
 
     use chrono::{DateTime, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{net::TcpListener, runtime::Runtime, sync::oneshot};

@@ -1,11 +1,8 @@
 mod server_listen {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_dpc::{
-        base_dpc::{
-            instantiated::{Components, MerkleTreeLedger},
-            parameters::PublicParameters,
-        },
-        test_data::setup_or_load_parameters,
+    use snarkos_dpc::base_dpc::{
+        instantiated::{Components, MerkleTreeLedger},
+        parameters::PublicParameters,
     };
     use snarkos_network::{
         context::Context,
@@ -20,7 +17,6 @@ mod server_listen {
     };
 
     use chrono::{DateTime, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{

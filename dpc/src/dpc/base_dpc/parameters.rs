@@ -275,7 +275,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         })
     }
 
-    pub fn load_direct(verify_only: bool) -> IoResult<Self> {
+    pub fn load_vk_direct() -> IoResult<Self> {
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {
             let address_comm_pp_bytes = include_bytes!["../../parameters/circuit/address_commitment.params"];
@@ -335,15 +335,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             Option<<C::OuterSNARK as SNARK>::ProvingParameters>,
             <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
         ) = {
-            let outer_snark_pk = match verify_only {
-                true => None,
-                false => {
-                    let outer_snark_pp_bytes = include_bytes!["../../parameters/outer_snark.params"];
-                    let parameters: <C::OuterSNARK as SNARK>::ProvingParameters =
-                        FromBytes::read(&outer_snark_pp_bytes[..])?;
-                    Some(parameters)
-                }
-            };
+            let outer_snark_pk = None;
 
             let outer_snark_vk_bytes = include_bytes!["../../parameters/outer_snark_vk.params"];
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
@@ -357,15 +349,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
             <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
         ) = {
-            let inner_snark_pk = match verify_only {
-                true => None,
-                false => {
-                    let inner_snark_pp_bytes = include_bytes!["../../parameters/inner_snark.params"];
-                    let parameters: <C::InnerSNARK as SNARK>::ProvingParameters =
-                        FromBytes::read(&inner_snark_pp_bytes[..])?;
-                    Some(parameters)
-                }
-            };
+            let inner_snark_pk = None;
 
             let inner_snark_vk_bytes = include_bytes!["../../parameters/inner_snark_vk.params"];
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =

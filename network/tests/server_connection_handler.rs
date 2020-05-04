@@ -1,6 +1,5 @@
 mod server_connection_handler {
     use snarkos_consensus::test_data::*;
-    use snarkos_dpc::test_data::setup_or_load_parameters;
     use snarkos_network::{
         message::{types::GetMemoryPool, Message},
         test_data::*,
@@ -8,7 +7,6 @@ mod server_connection_handler {
     };
 
     use chrono::{Duration, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};

@@ -38,7 +38,7 @@ pub fn setup_or_load_parameters<R: Rng>(
                                 <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
                                     .expect("DPC setup failed");
 
-                            //                            parameters.store(&path).unwrap();
+                            //  parameters.store(&path).unwrap();
                             parameters
                         }
                     };
@@ -53,8 +53,8 @@ pub fn setup_or_load_parameters<R: Rng>(
                 let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
                     .expect("DPC setup failed");
 
-                //                ledger_parameters.store(&ledger_parameter_path).unwrap();
-                //                parameters.store(&path).unwrap();
+                //  ledger_parameters.store(&ledger_parameter_path).unwrap();
+                //  parameters.store(&path).unwrap();
 
                 (ledger_parameters, parameters)
             }

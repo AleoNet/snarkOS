@@ -32,7 +32,7 @@ pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
 }
 
 pub fn load_verifying_parameters() -> PublicParameters<Components> {
-    PublicParameters::<Components>::load_direct(true).unwrap()
+    PublicParameters::<Components>::load_vk_direct().unwrap()
 }
 
 pub fn kill_storage_async(path: PathBuf) {
