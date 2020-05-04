@@ -32,12 +32,12 @@ where
 /// This is our assembly structure that we'll use to synthesize the
 /// circuit into a SAP.
 pub struct KeypairAssembly<E: PairingEngine> {
-    pub(crate) num_inputs: usize,
-    pub(crate) num_aux: usize,
-    pub(crate) num_constraints: usize,
-    pub(crate) at: Vec<Vec<(E::Fr, Index)>>,
-    pub(crate) bt: Vec<Vec<(E::Fr, Index)>>,
-    pub(crate) ct: Vec<Vec<(E::Fr, Index)>>,
+    pub num_inputs: usize,
+    pub num_aux: usize,
+    pub num_constraints: usize,
+    pub at: Vec<Vec<(E::Fr, Index)>>,
+    pub bt: Vec<Vec<(E::Fr, Index)>>,
+    pub ct: Vec<Vec<(E::Fr, Index)>>,
 }
 
 impl<E: PairingEngine> ConstraintSystem<E::Fr> for KeypairAssembly<E> {
