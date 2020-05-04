@@ -18,7 +18,7 @@ harness = false
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
-snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
@@ -33,7 +33,7 @@ sha2 = { version = "0.8" }
 smallvec = { version = "1.2" }
 
 [dev-dependencies]
-snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
 
 criterion = "0.3.1"
 csv = { version = "1" }

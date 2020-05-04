@@ -21,18 +21,3 @@ rand = { version = "0.7", default-features = false }
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2", default-features = false }
-
-#
-# Each module in `snarkos-curves` is guarded by a feature flag to minimize compilation resources.
-# To include any one of the modules in `snarkos-curves`, simply include its corresponding feature flag.
-#
-# For example, to include bls12_377 in `snarkos-gadgets`, add the "bls12_377" feature as follows:
-# snarkos-curves = { version = "x.x.x", default-features = false, features = ["bls12_377"] }
-#
-[features]
-default = []
-bls12_377 = ["templates"]
-edwards_bls12 = ["bls12_377", "templates"]
-edwards_sw6 = ["sw6", "templates"]
-sw6 = ["bls12_377", "templates"]
-templates = []
