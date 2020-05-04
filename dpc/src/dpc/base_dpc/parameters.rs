@@ -1,5 +1,6 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
 use snarkos_models::{algorithms::SNARK, storage::Storage};
+use snarkos_utilities::bytes::FromBytes;
 
 use std::{io::Result as IoResult, path::PathBuf};
 
@@ -261,6 +262,114 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             };
 
             let inner_snark_vk = <C::InnerSNARK as SNARK>::VerificationParameters::load(inner_snark_vk_path)?;
+            let inner_snark_prepared_vk = inner_snark_vk.into();
+
+            (inner_snark_pk, inner_snark_prepared_vk)
+        };
+
+        Ok(Self {
+            circuit_parameters,
+            predicate_snark_parameters,
+            outer_snark_parameters,
+            inner_snark_parameters,
+        })
+    }
+
+    pub fn load_direct(verify_only: bool) -> IoResult<Self> {
+        // Circuit Parameters
+        let circuit_parameters: CircuitParameters<C> = {
+            let address_comm_pp_bytes = include_bytes!["../../parameters/circuit/address_commitment.params"];
+            let record_comm_pp_bytes = include_bytes!["../../parameters/circuit/record_commitment.params"];
+            let predicate_vk_comm_pp_bytes = vec![];
+            let predicate_vk_crh_pp_bytes = include_bytes!["../../parameters/circuit/predicate_vk_crh.params"];
+            let local_data_comm_pp_bytes = include_bytes!["../../parameters/circuit/local_data_commitment.params"];
+            let value_comm_pp_bytes = include_bytes!["../../parameters/circuit/value_commitment.params"];
+            let serial_number_comm_pp_bytes =
+                include_bytes!["../../parameters/circuit/serial_number_commitment.params"];
+            let signature_pp_bytes = &include_bytes!["../../parameters/circuit/signature.params"];
+
+            let address_commitment_parameters: C::AddressCommitment = FromBytes::read(&address_comm_pp_bytes[..])?;
+            let record_commitment_parameters: C::RecordCommitment = FromBytes::read(&record_comm_pp_bytes[..])?;
+            let predicate_verification_key_commitment_parameters: C::PredicateVerificationKeyCommitment =
+                FromBytes::read(&predicate_vk_comm_pp_bytes[..])?;
+            let predicate_verification_key_hash_parameters: C::PredicateVerificationKeyHash =
+                FromBytes::read(&predicate_vk_crh_pp_bytes[..])?;
+            let local_data_commitment_parameters: C::LocalDataCommitment =
+                FromBytes::read(&local_data_comm_pp_bytes[..])?;
+            let value_commitment_parameters: C::ValueCommitment = FromBytes::read(&value_comm_pp_bytes[..])?;
+            let serial_number_nonce_parameters: C::SerialNumberNonce =
+                FromBytes::read(&serial_number_comm_pp_bytes[..])?;
+            let signature_parameters: C::Signature = FromBytes::read(&signature_pp_bytes[..])?;
+
+            CircuitParameters::<C> {
+                address_commitment_parameters,
+                record_commitment_parameters,
+                predicate_verification_key_commitment_parameters,
+                predicate_verification_key_hash_parameters,
+                local_data_commitment_parameters,
+                value_commitment_parameters,
+                serial_number_nonce_parameters,
+                signature_parameters,
+            }
+        };
+
+        // Snark Parameters
+
+        let predicate_snark_parameters: PredicateSNARKParameters<C> = {
+            let predicate_snark_pp_bytes = include_bytes!["../../parameters/predicate_snark.params"];
+            let predicate_snark_proof_bytes = include_bytes!["../../parameters/predicate_snark.proof"];
+
+            let proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters =
+                FromBytes::read(&predicate_snark_pp_bytes[..])?;
+            let verification_key = proving_key.clone().into();
+            let proof: <C::PredicateSNARK as SNARK>::Proof = FromBytes::read(&predicate_snark_proof_bytes[..])?;
+
+            PredicateSNARKParameters::<C> {
+                proving_key,
+                verification_key,
+                proof,
+            }
+        };
+
+        let outer_snark_parameters: (
+            Option<<C::OuterSNARK as SNARK>::ProvingParameters>,
+            <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
+        ) = {
+            let outer_snark_pk = match verify_only {
+                true => None,
+                false => {
+                    let outer_snark_pp_bytes = include_bytes!["../../parameters/outer_snark.params"];
+                    let parameters: <C::OuterSNARK as SNARK>::ProvingParameters =
+                        FromBytes::read(&outer_snark_pp_bytes[..])?;
+                    Some(parameters)
+                }
+            };
+
+            let outer_snark_vk_bytes = include_bytes!["../../parameters/outer_snark_vk.params"];
+            let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
+                FromBytes::read(&outer_snark_vk_bytes[..])?;
+            let outer_snark_prepared_vk = outer_snark_vk.into();
+
+            (outer_snark_pk, outer_snark_prepared_vk)
+        };
+
+        let inner_snark_parameters: (
+            Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
+            <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
+        ) = {
+            let inner_snark_pk = match verify_only {
+                true => None,
+                false => {
+                    let inner_snark_pp_bytes = include_bytes!["../../parameters/inner_snark.params"];
+                    let parameters: <C::InnerSNARK as SNARK>::ProvingParameters =
+                        FromBytes::read(&inner_snark_pp_bytes[..])?;
+                    Some(parameters)
+                }
+            };
+
+            let inner_snark_vk_bytes = include_bytes!["../../parameters/inner_snark_vk.params"];
+            let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
+                FromBytes::read(&inner_snark_vk_bytes[..])?;
             let inner_snark_prepared_vk = inner_snark_vk.into();
 
             (inner_snark_pk, inner_snark_prepared_vk)

@@ -1,9 +1,6 @@
 mod server_connection_handler {
     use snarkos_consensus::test_data::*;
-    use snarkos_dpc::{
-        base_dpc::{instantiated::Components, parameters::PublicParameters},
-        test_data::setup_or_load_parameters,
-    };
+    use snarkos_dpc::test_data::setup_or_load_parameters;
     use snarkos_network::{
         message::{types::GetMemoryPool, Message},
         test_data::*,
@@ -16,9 +13,12 @@ mod server_connection_handler {
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};
 
-    fn peer_connect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn peer_connect() {
         let mut rt = Runtime::new().unwrap();
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -63,9 +63,12 @@ mod server_connection_handler {
         kill_storage_async(path);
     }
 
-    fn peer_disconnect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -108,9 +111,12 @@ mod server_connection_handler {
         kill_storage_async(path);
     }
 
-    fn gossiped_peer_connect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn gossiped_peer_connect() {
         let mut rt = Runtime::new().unwrap();
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -155,9 +161,12 @@ mod server_connection_handler {
         kill_storage_async(path);
     }
 
-    fn gossiped_peer_disconnect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn gossiped_peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -207,9 +216,12 @@ mod server_connection_handler {
         kill_storage_async(path);
     }
 
-    fn sync_node_disconnect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn sync_node_disconnect() {
         let mut rt = Runtime::new().unwrap();
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -261,10 +273,13 @@ mod server_connection_handler {
         kill_storage_async(path);
     }
 
-    fn memory_pool_interval(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn memory_pool_interval() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -305,41 +320,5 @@ mod server_connection_handler {
 
         drop(rt);
         kill_storage_async(path);
-    }
-
-    #[test]
-    #[serial]
-    fn test_peer_searching() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-
-        {
-            println!("test peer connect");
-            peer_connect(parameters.clone());
-        }
-
-        {
-            println!("test peer disconnect");
-            peer_disconnect(parameters.clone());
-        }
-
-        {
-            println!("test gossiped peer connect");
-            gossiped_peer_connect(parameters.clone());
-        }
-
-        {
-            println!("test gossiped peer disconnect");
-            gossiped_peer_disconnect(parameters.clone());
-        }
-
-        {
-            println!("test sync node disconnect");
-            sync_node_disconnect(parameters.clone());
-        }
-
-        {
-            println!("test memory pool interval");
-            memory_pool_interval(parameters);
-        }
     }
 }

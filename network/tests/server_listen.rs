@@ -63,8 +63,11 @@ mod server_listen {
         server.listen().await.unwrap();
     }
 
-    fn bind_to_port(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn bind_to_port() {
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         // Create a new runtime so we can spawn and block_on threads
 
@@ -93,8 +96,11 @@ mod server_listen {
         kill_storage_async(path);
     }
 
-    fn startup_handshake_bootnode(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn startup_handshake_bootnode() {
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
 
@@ -152,8 +158,11 @@ mod server_listen {
         kill_storage_async(path);
     }
 
-    fn startup_handshake_stored_peers(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn startup_handshake_stored_peers() {
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
 
@@ -198,26 +207,5 @@ mod server_listen {
 
         drop(rt);
         kill_storage_async(path);
-    }
-
-    #[test]
-    #[serial]
-    fn test_server_listen() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-
-        {
-            println!("test bind to port");
-            bind_to_port(parameters.clone());
-        }
-
-        {
-            println!("test startup handshake bootnode");
-            startup_handshake_bootnode(parameters.clone());
-        }
-
-        {
-            println!("test startup handshake bootnode with stored peers");
-            startup_handshake_stored_peers(parameters);
-        }
     }
 }
