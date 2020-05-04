@@ -18,7 +18,7 @@ required-features = ["rand", "snarkos-curves/bls12_377", "snarkos-models/gadgets
 
 [dependencies]
 snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["algorithms", "gadgets"] }
+snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 

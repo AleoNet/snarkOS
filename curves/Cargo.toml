@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["curves"] }
+snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 derivative = { version = "1" }

@@ -16,7 +16,7 @@ snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-gadgets = { path = "../gadgets", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
+snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }

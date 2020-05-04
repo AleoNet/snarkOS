@@ -17,21 +17,6 @@ snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 derivative = { version = "1" }
 failure = { version = "0.1" }
-rand = { version = "0.7", default-features = false, optional = true }
-rand_xorshift = { version = "0.2", default-features = false, optional = true }
-smallvec = { version = "1.2", optional = true }
-
-#
-# Each module in `snarkos-models` is guarded by a feature flag to minimize compilation resources.
-# To include any one of the modules in `snarkos-models`, simply include its corresponding feature flag.
-#
-# For example, to include models for `snarkos-algorithms`, add the "algorithm" feature as follows:
-# snarkos-models = { version = "x.x.x", default-features = false, features = ["algorithms"] }
-#
-[features]
-default = []
-algorithms = ["storage"]
-curves = ["rand", "rand_xorshift"]
-dpc = ["gadgets"]
-gadgets = ["algorithms", "curves", "rand_xorshift", "smallvec"]
-storage = []
+rand = { version = "0.7", default-features = false }
+rand_xorshift = { version = "0.2", default-features = false }
+smallvec = { version = "1.2" }
