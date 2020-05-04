@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false, features = ["commitment", "crh", "merkle_tree", "prf", "signature", "snark"] }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false, features = ["edwards_bls12", "edwards_sw6"] }
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false, features = ["algorithms"] }

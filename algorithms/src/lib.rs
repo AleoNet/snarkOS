@@ -12,26 +12,11 @@ extern crate derivative;
 #[macro_use]
 extern crate snarkos_profiler;
 
-#[cfg(feature = "commitment")]
 pub mod commitment;
-
-#[cfg(feature = "crh")]
 pub mod crh;
-
-#[cfg(feature = "fft")]
 pub mod fft;
-
-#[cfg(feature = "merkle_tree")]
 pub mod merkle_tree;
-
-#[cfg(feature = "msm")]
 pub mod msm;
-
-#[cfg(feature = "prf")]
 pub mod prf;
-
-#[cfg(feature = "signature")]
 pub mod signature;
-
-#[cfg(feature = "snark")]
 pub mod snark;

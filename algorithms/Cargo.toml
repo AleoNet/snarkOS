@@ -22,13 +22,13 @@ snarkos-models = { path = "../models", version = "0.8.0", default-features = fal
 snarkos-profiler = { path = "../profiler", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
-blake2 = { version = "0.7", optional = true }
+blake2 = { version = "0.7" }
 derivative = { version = "1" }
-digest = { version = "0.7", optional = true }
-rand = { version = "0.7", default-features = false, optional = true }
-rayon = { version = "1", optional = true }
-sha2 = { version = "0.8", optional = true }
-smallvec = { version = "1.2", optional = true }
+digest = { version = "0.7" }
+rand = { version = "0.7", default-features = false }
+rayon = { version = "1" }
+sha2 = { version = "0.8" }
+smallvec = { version = "1.2" }
 
 [dev-dependencies]
 snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
@@ -37,22 +37,5 @@ criterion = { version = "0.3.1" }
 csv = { version = "1" }
 rand_xorshift = { version = "0.2" }
 
-#
-# Each module in `snarkos-algorithms` is guarded by a feature flag to minimize compilation resources.
-# To include any one of the modules in `snarkos-algorithms`, simply include its corresponding feature flag.
-#
-# For example, to include commitments for `snarkos-gadgets`, add the "commitment" feature as follows:
-# snarkos-algorithms = { version = "x.x.x", default-features = false, features = ["commitment"] }
-#
 [features]
-default = []
-commitment = ["blake2", "crh", "digest"]
-crh = ["rand", "rayon", "sha2"]
-fft = ["rand", "rayon"]
-merkle_tree = ["rand"]
-msm = ["rand"]
-prf = ["blake2", "digest"]
-signature = ["blake2", "digest"]
-snark = ["fft", "msm", "rand", "smallvec"]
-
 print-trace = [ "snarkos-profiler/print-trace" ]
