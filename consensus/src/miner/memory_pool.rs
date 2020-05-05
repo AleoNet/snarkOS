@@ -3,7 +3,7 @@
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_errors::{consensus::ConsensusError, storage::StorageError};
+use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{
     dpc::{DPCTransactions, Transaction},
     Ledger,
@@ -88,15 +88,10 @@ impl<T: Transaction> MemoryPool<T> {
         let transaction_commitments = entry.transaction.new_commitments();
         let transaction_memo = entry.transaction.memorandum();
 
-        if has_duplicates(transaction_serial_numbers) {
-            return Err(ConsensusError::DuplicateSn);
-        }
-
-        if has_duplicates(transaction_commitments) {
-            return Err(ConsensusError::DuplicateCm);
-        }
-
-        if self.contains(&entry) {
+        if has_duplicates(transaction_serial_numbers)
+            || has_duplicates(transaction_commitments)
+            || self.contains(&entry)
+        {
             return Ok(None);
         }
 
@@ -112,24 +107,18 @@ impl<T: Transaction> MemoryPool<T> {
 
         for sn in transaction_serial_numbers {
             if storage.contains_sn(sn) || holding_serial_numbers.contains(&sn) {
-                return Err(ConsensusError::StorageError(StorageError::ExistingSn(
-                    to_bytes![sn]?.to_vec(),
-                )));
+                return Ok(None);
             }
         }
 
         for cm in transaction_commitments {
             if storage.contains_cm(cm) || holding_commitments.contains(&cm) {
-                return Err(ConsensusError::StorageError(StorageError::ExistingCm(
-                    to_bytes![cm]?.to_vec(),
-                )));
+                return Ok(None);
             }
         }
 
         if storage.contains_memo(transaction_memo) || holding_memos.contains(&transaction_memo) {
-            return Err(ConsensusError::StorageError(StorageError::ExistingMemo(
-                to_bytes![transaction_memo]?.to_vec(),
-            )));
+            return Ok(None);
         }
 
         let transaction_id = entry.transaction.transaction_id()?.to_vec();
@@ -227,18 +216,29 @@ mod tests {
     use super::*;
     use crate::test_data::*;
     use snarkos_dpc::base_dpc::instantiated::Tx;
+    use snarkos_objects::dpc::Block;
 
     #[test]
     fn push() {
         let (blockchain, path) = initialize_test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let size = TRANSACTION_1.len();
+
         mem_pool
             .insert(&blockchain, Entry {
-                size: TRANSACTION_1.len(),
-                transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
+                size,
+                transaction: transaction.clone(),
             })
             .unwrap();
+
+        assert_eq!(1889, mem_pool.total_size);
+        assert_eq!(1, mem_pool.transactions.len());
+
+        // Duplicate pushes don't do anything
+
+        mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();
 
         assert_eq!(1889, mem_pool.total_size);
         assert_eq!(1, mem_pool.transactions.len());
@@ -247,7 +247,81 @@ mod tests {
     }
 
     #[test]
+    fn remove_entry() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        let mut mem_pool = MemoryPool::new();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let size = TRANSACTION_1.len();
+
+        let entry = Entry::<Tx> {
+            size,
+            transaction: transaction.clone(),
+        };
+
+        mem_pool.insert(&blockchain, entry.clone()).unwrap();
+
+        assert_eq!(1, mem_pool.transactions.len());
+        assert_eq!(size, mem_pool.total_size);
+
+        mem_pool.remove(&entry).unwrap();
+
+        assert_eq!(0, mem_pool.transactions.len());
+        assert_eq!(0, mem_pool.total_size);
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
     fn remove_transaction_by_hash() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        let mut mem_pool = MemoryPool::new();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let size = TRANSACTION_1.len();
+
+        mem_pool
+            .insert(&blockchain, Entry {
+                size,
+                transaction: transaction.clone(),
+            })
+            .unwrap();
+
+        assert_eq!(1, mem_pool.transactions.len());
+        assert_eq!(size, mem_pool.total_size);
+
+        mem_pool
+            .remove_by_hash(&transaction.transaction_id().unwrap().to_vec())
+            .unwrap();
+
+        assert_eq!(0, mem_pool.transactions.len());
+        assert_eq!(0, mem_pool.total_size);
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
+    fn get_candidates() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        let mut mem_pool = MemoryPool::new();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let size = TRANSACTION_1.len();
+
+        let expected_transaction = transaction.clone();
+        mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();
+
+        let max_block_size = size + BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE;
+
+        let candidates = mem_pool.get_candidates(&blockchain, max_block_size).unwrap();
+
+        assert!(candidates.contains(&expected_transaction));
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
+    fn store_memory_pool() {
         let (blockchain, path) = initialize_test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
@@ -261,34 +335,40 @@ mod tests {
 
         assert_eq!(1, mem_pool.transactions.len());
 
-        mem_pool
-            .remove_by_hash(&transaction.transaction_id().unwrap().to_vec())
-            .unwrap();
+        mem_pool.store(&blockchain).unwrap();
 
-        assert_eq!(0, mem_pool.transactions.len());
+        let new_mem_pool = MemoryPool::from_storage(&blockchain).unwrap();
+
+        assert_eq!(mem_pool.total_size, new_mem_pool.total_size);
 
         kill_storage_sync(blockchain, path);
     }
 
     #[test]
-    fn get_candidates() {
+    fn cleanse_memory_pool() {
         let (blockchain, path) = initialize_test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let expected_transaction = transaction.clone();
         mem_pool
             .insert(&blockchain, Entry {
                 size: TRANSACTION_1.len(),
-                transaction,
+                transaction: transaction.clone(),
             })
             .unwrap();
 
-        let max_block_size = TRANSACTION_1.len() + BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE;
+        assert_eq!(1, mem_pool.transactions.len());
 
-        let candidates = mem_pool.get_candidates(&blockchain, max_block_size).unwrap();
+        mem_pool.store(&blockchain).unwrap();
 
-        assert!(candidates.contains(&expected_transaction));
+        let block = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
+
+        blockchain.insert_block(&block).unwrap();
+
+        mem_pool.cleanse(&blockchain).unwrap();
+
+        assert_eq!(0, mem_pool.transactions.len());
+        assert_eq!(0, mem_pool.total_size);
 
         kill_storage_sync(blockchain, path);
     }
