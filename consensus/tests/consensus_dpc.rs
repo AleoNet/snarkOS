@@ -20,6 +20,7 @@ mod consensus_dpc {
         let mut rng = thread_rng();
 
         let consensus = TEST_CONSENSUS;
+        let proving_key = PROVING_KEY;
 
         // Generate or load parameters for the ledger, commitment schemes, and CRH
         let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
@@ -35,7 +36,7 @@ mod consensus_dpc {
             &mut rng,
         );
 
-        let miner = Miner::new(miner_address.public_key, consensus.clone());
+        let miner = Miner::new(miner_address.public_key, consensus.clone(), proving_key.clone());
 
         // Initialize the predicate values
         let new_predicate = Predicate::new(genesis_pred_vk_bytes);

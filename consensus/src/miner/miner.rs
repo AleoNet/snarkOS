@@ -1,5 +1,5 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
-use snarkos_algorithms::merkle_tree::MerkleParameters;
+use snarkos_algorithms::{merkle_tree::MerkleParameters, crh::sha256d_to_u64};
 use snarkos_dpc::{
     address::AddressPublicKey,
     base_dpc::{instantiated::*, parameters::PublicParameters},
@@ -9,8 +9,11 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     merkle_root,
+    pedersen_merkle_root,
     BlockHeader,
+    PedersenMerkleRootHash,
     MerkleRootHash,
+    ProofOfSuccinctWork,
 };
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::bytes::FromBytes;
@@ -30,12 +33,17 @@ pub struct Miner {
 
     /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
+
+    pub proving_key: ProvingKey,
 }
+
+// TODO: Make this an actual proving key
+pub type ProvingKey = [u8; 32];
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
-    pub fn new(address: AddressPublicKey<Components>, consensus: ConsensusParameters) -> Self {
-        Self { address, consensus }
+    pub fn new(address: AddressPublicKey<Components>, consensus: ConsensusParameters, proving_key: ProvingKey) -> Self {
+        Self { address, consensus, proving_key }
     }
 
     /// Fetches new transactions from the memory pool.
@@ -105,31 +113,44 @@ impl Miner {
         transactions: &DPCTransactions<Tx>,
         parent_header: &BlockHeader,
     ) -> Result<BlockHeader, ConsensusError> {
+        let transaction_ids = transactions.to_transaction_ids()?;
+
         let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transactions.to_transaction_ids()?));
+        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
 
         let time = Utc::now().timestamp();
+        let difficulty_target = self.consensus.get_block_difficulty(parent_header, time); 
+
+        let mut nonce;
+        let mut proof;
+        loop {
+            nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
+            // 1. Instantiate the circuit with the `transaction_ids` and the `nonce`
+            // 2. Generate the proof using `self.proving_key` and `GM17::create_random_proof`
+            proof = ProofOfSuccinctWork::default(); // TODO: Add the actual proof
+
+            // Hash the proof and parse it as a u64
+            let hash_result = sha256d_to_u64(&proof.0[..]);
+
+            // if it passes the difficulty chec, use the proof/nonce pairs and return the header
+            if hash_result <= difficulty_target {
+                break
+            }
+        }
 
         let header = BlockHeader {
             merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+            pedersen_merkle_root_hash: pedersen_merkle_root,
             previous_block_hash: parent_header.get_hash(),
             time,
-            difficulty_target: self.consensus.get_block_difficulty(parent_header, time),
-            nonce: 0u32,
+            difficulty_target,
+            nonce,
+            proof,
         };
 
-        let mut hash_input = header.serialize();
-
-        loop {
-            let nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
-
-            hash_input[80..84].copy_from_slice(&nonce.to_le_bytes());
-            let hash_result = BlockHeader::deserialize(&hash_input).to_difficulty_hash();
-
-            if hash_result <= header.difficulty_target {
-                return Ok(BlockHeader::deserialize(&hash_input));
-            }
-        }
+        Ok(header)
     }
 
     /// Returns a mined block.

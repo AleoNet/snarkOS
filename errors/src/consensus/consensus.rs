@@ -46,6 +46,9 @@ pub enum ConsensusError {
     #[fail(display = "block transactions do not hash to merkle root {:?}", _0)]
     MerkleRoot(String),
 
+    #[fail(display = "block transactions do not hash to pedersen merkle root {:?}", _0)]
+    PedersenMerkleRoot(String),
+
     #[fail(display = "{}", _0)]
     Message(String),
 

@@ -1,4 +1,4 @@
-use crate::ConsensusParameters;
+use crate::{miner::ProvingKey, ConsensusParameters};
 
 use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
 
@@ -8,7 +8,11 @@ pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
+    verifying_key: [0; 32], // TODO: Replace with a proper verifying key mock
 };
+
+// TODO: Replace with a proper proving key mock
+pub const PROVING_KEY: ProvingKey = [0; 32];
 
 pub const TEST_DB_PATH: &str = "../test_db";
 

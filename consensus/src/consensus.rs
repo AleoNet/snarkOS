@@ -1,5 +1,5 @@
 use crate::miner::MemoryPool;
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::{snark::PreparedVerifyingKey, crh::sha256d_to_u64};
 use snarkos_dpc::{
     base_dpc::{
         instantiated::*,
@@ -23,9 +23,12 @@ use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     ledger::Ledger,
     merkle_root,
+    pedersen_merkle_root,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
 };
 use snarkos_utilities::rand::UniformRand;
 
@@ -33,6 +36,9 @@ use chrono::Utc;
 use rand::{thread_rng, Rng};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
+
+// TODO: Replace this with an actual VK.
+type Vk = [u8; 32];
 
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,8 +51,12 @@ pub struct ConsensusParameters {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
+
     // /// Mainnet or testnet
     // network: Network
+    
+    /// The verifying key for the PoSW Merkle Tree SNARK
+    pub verifying_key: Vk
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -108,10 +118,13 @@ impl ConsensusParameters {
         header: &BlockHeader,
         parent_header: &BlockHeader,
         merkle_root_hash: &MerkleRootHash,
+        pedersen_merkle_root_hash: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
         let hash_result = header.to_difficulty_hash();
-
         let future_timelimit: i64 = Utc::now().timestamp() as i64 + TWO_HOURS_UNIX;
+
+        // Verify the proof
+        self.verify_proof(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
 
         if parent_header.get_hash() != header.previous_block_hash {
             Err(ConsensusError::NoParent(
@@ -120,6 +133,8 @@ impl ConsensusParameters {
             ))
         } else if header.merkle_root_hash != *merkle_root_hash {
             Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()))
+        } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
+            Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()))
         } else if header.time > future_timelimit {
             Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
         } else if header.time < parent_header.time {
@@ -131,6 +146,19 @@ impl ConsensusParameters {
         } else {
             Ok(())
         }
+    }
+
+    // TODO: This function will be calling the Merkle Tree gadget and will verify that the
+    // provided merkle tree root matches the proof
+    fn verify_proof(
+        &self,
+        nonce: u32,
+        proof: &ProofOfSuccinctWork,
+        pedersen_merkle_root: &PedersenMerkleRootHash,
+    ) -> Result<(), ConsensusError> {
+        // 1. Convert the nonce/merkle_root to field elements to be passed as public inputs
+        // 2. call GM17::verify_proof with the VK, proof and public inputs
+        Ok(())
     }
 
     /// Check if the block is valid
@@ -151,19 +179,20 @@ impl ConsensusParameters {
         let mut merkle_root_bytes = [0u8; 32];
         merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
 
-        // Verify the block header
+        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
 
+        // Verify the block header
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
             if let Err(err) =
-                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes))
+                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes), &pedersen_merkle_root)
             {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
             }
         }
-        // Verify block amounts and check that there is a single coinbase transaction
 
+        // Verify block amounts and check that there is a single coinbase transaction
         let mut coinbase_transaction_count = 0;
         let mut total_value_balance = 0;
 
