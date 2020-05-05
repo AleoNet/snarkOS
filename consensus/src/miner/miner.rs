@@ -11,7 +11,6 @@ use snarkos_objects::{
     merkle_root,
     pedersen_merkle_root,
     BlockHeader,
-    PedersenMerkleRootHash,
     MerkleRootHash,
     ProofOfSuccinctWork,
 };

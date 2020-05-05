@@ -21,8 +21,10 @@ use snarkos_objects::{
     dpc::{Block, DPCTransactions},
     ledger::Ledger,
     merkle_root,
+    pedersen_merkle_root,
     BlockHeader,
     MerkleRootHash,
+    ProofOfSuccinctWork,
 };
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::rand::UniformRand;
@@ -266,6 +268,8 @@ fn base_dpc_integration_test() {
     let mut merkle_root_bytes = [0u8; 32];
     merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
 
+    let pedersen_merkle_root_hash = pedersen_merkle_root(&transaction_ids);
+
     let time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
@@ -274,9 +278,11 @@ fn base_dpc_integration_test() {
     let header = BlockHeader {
         previous_block_hash: previous_block.header.get_hash(),
         merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        pedersen_merkle_root_hash,
         time,
         difficulty_target: previous_block.header.difficulty_target,
         nonce: 0,
+        proof: ProofOfSuccinctWork::default(),
     };
 
     assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());

@@ -22,7 +22,7 @@ use snarkos_network::{
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, fs::File, io::Read};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -42,10 +42,21 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
+    // TODO: Properly read VK from the file
+    let mut vk_file = File::open(config.vk_path)?;
+    let mut vk = [0u8; 32];
+    vk_file.read_exact(&mut vk)?;
+
+    // TODO: Properly read PK from the file
+    let mut pk_file = File::open(config.pk_path)?;
+    let mut pk = [0u8; 32];
+    pk_file.read_exact(&mut pk)?;
+
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
+        verifying_key: vk,
     };
 
     let mut path = std::env::current_dir()?;
@@ -113,6 +124,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             storage.clone(),
             memory_pool_lock.clone(),
             server.context.clone(),
+            pk,
         )
         .spawn();
     }

@@ -1,6 +1,6 @@
 use crate::{context::Context, server::propagate_block};
 use snarkos_consensus::{
-    miner::{MemoryPool, Miner},
+    miner::{MemoryPool, Miner, ProvingKey},
     ConsensusParameters,
 };
 use snarkos_dpc::{
@@ -20,6 +20,7 @@ pub struct MinerInstance {
     storage: Arc<MerkleTreeLedger>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     server_context: Arc<Context>,
+    proving_key: ProvingKey,
 }
 
 impl MinerInstance {
@@ -31,6 +32,7 @@ impl MinerInstance {
         storage: Arc<MerkleTreeLedger>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
         server_context: Arc<Context>,
+        proving_key: ProvingKey,
     ) -> Self {
         Self {
             coinbase_address,
@@ -39,6 +41,7 @@ impl MinerInstance {
             storage,
             memory_pool_lock,
             server_context,
+            proving_key,
         }
     }
 
@@ -50,7 +53,7 @@ impl MinerInstance {
         task::spawn(async move {
             let context = self.server_context.clone();
             let local_address = self.server_context.local_address;
-            let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone());
+            let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone(), self.proving_key.clone());
 
             loop {
                 info!("Mining new block");

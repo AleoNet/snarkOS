@@ -1,5 +1,5 @@
 use crate::miner::MemoryPool;
-use snarkos_algorithms::{snark::PreparedVerifyingKey, crh::sha256d_to_u64};
+use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
     base_dpc::{
         instantiated::*,
@@ -152,9 +152,9 @@ impl ConsensusParameters {
     // provided merkle tree root matches the proof
     fn verify_proof(
         &self,
-        nonce: u32,
-        proof: &ProofOfSuccinctWork,
-        pedersen_merkle_root: &PedersenMerkleRootHash,
+        _nonce: u32,
+        _proof: &ProofOfSuccinctWork,
+        _pedersen_merkle_root: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
         // 1. Convert the nonce/merkle_root to field elements to be passed as public inputs
         // 2. call GM17::verify_proof with the VK, proof and public inputs
