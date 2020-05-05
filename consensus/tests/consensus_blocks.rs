@@ -18,8 +18,6 @@ mod consensus_blocks {
 
         // Find first block
 
-        println!("old_block_height: {:?}", old_block_height);
-
         let block_1 = Block::<Tx>::deserialize(&BLOCK_1.to_vec()).unwrap();
         consensus
             .receive_block(&parameters, &mut blockchain, &mut memory_pool, &block_1)
@@ -27,7 +25,6 @@ mod consensus_blocks {
 
         let new_block_height = blockchain.get_latest_block_height();
 
-        println!("new_block_height: {:?}", old_block_height);
         assert_eq!(old_block_height + 1, new_block_height);
 
         // Duplicate blocks dont do anything
@@ -52,7 +49,7 @@ mod consensus_blocks {
     }
 
     #[test]
-    fn remove_block() {
+    fn remove_latest_block() {
         let (mut blockchain, path) = initialize_test_blockchain();
 
         let parameters = load_verifying_parameters();
