@@ -3,8 +3,6 @@ mod consensus_blocks {
     use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
 
-    use rand::thread_rng;
-
     // Receive two new blocks in order.
     #[test]
     fn new_in_order() {
