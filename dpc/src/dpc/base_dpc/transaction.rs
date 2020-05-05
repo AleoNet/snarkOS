@@ -173,11 +173,22 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         &self.stuff
     }
 
+    /// Transaction id = Hash of (serial numbers || commitments || memo)
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
-        let transaction_bytes = to_bytes![self]?;
+        let mut pre_image_bytes: Vec<u8> = vec![];
+
+        for sn in self.old_serial_numbers() {
+            pre_image_bytes.extend(&to_bytes![sn]?);
+        }
+
+        for cm in self.new_commitments() {
+            pre_image_bytes.extend(&to_bytes![cm]?);
+        }
+
+        pre_image_bytes.extend(self.memorandum());
 
         let mut h = b2s::new();
-        h.input(&transaction_bytes);
+        h.input(&pre_image_bytes);
 
         let mut result = [0u8; 32];
         result.copy_from_slice(&h.result());
