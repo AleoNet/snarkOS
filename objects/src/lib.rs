@@ -18,3 +18,6 @@ pub use self::merkle_tree::*;
 
 pub mod pedersen_merkle_tree;
 pub use self::pedersen_merkle_tree::*;
+
+pub mod posw;
+pub use posw::ProofOfSuccinctWork;
