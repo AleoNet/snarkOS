@@ -1,6 +1,6 @@
-mod consensus_receive_block {
+mod consensus_blocks {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::setup_or_load_parameters};
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
 
     use rand::thread_rng;
@@ -10,7 +10,7 @@ mod consensus_receive_block {
     fn new_in_order() {
         let (mut blockchain, path) = initialize_test_blockchain();
 
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
+        let parameters = load_verifying_parameters();
 
         let mut memory_pool = MemoryPool::new();
 
@@ -49,6 +49,38 @@ mod consensus_receive_block {
 
         let new_block_height = blockchain.get_latest_block_height();
         assert_eq!(old_block_height + 2, new_block_height);
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
+    fn remove_block() {
+        let (mut blockchain, path) = initialize_test_blockchain();
+
+        let parameters = load_verifying_parameters();
+
+        let mut memory_pool = MemoryPool::new();
+
+        let consensus = TEST_CONSENSUS;
+
+        let old_block_height = blockchain.get_latest_block_height();
+
+        // Find first block
+
+        let block_1 = Block::<Tx>::deserialize(&BLOCK_1.to_vec()).unwrap();
+        consensus
+            .receive_block(&parameters, &mut blockchain, &mut memory_pool, &block_1)
+            .unwrap();
+
+        let new_block_height = blockchain.get_latest_block_height();
+
+        assert_eq!(old_block_height + 1, new_block_height);
+
+        blockchain.remove_latest_blocks(1).unwrap();
+
+        let new_block_height = blockchain.get_latest_block_height();
+
+        assert_eq!(old_block_height, new_block_height);
 
         kill_storage_sync(blockchain, path);
     }
