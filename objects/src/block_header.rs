@@ -124,10 +124,7 @@ impl BlockHeader {
     }
 
     pub fn to_difficulty_hash(&self) -> u64 {
-        let mut sliced = [0u8; 8];
-        sliced.copy_from_slice(&self.get_hash().0[0..8]);
-
-        u64::from_le_bytes(sliced)
+        sha256d_to_u64(&self.proof.0[..])
     }
 }
 
