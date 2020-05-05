@@ -2154,13 +2154,17 @@ name = "snarkos-objects"
 version = "0.8.0"
 dependencies = [
  "base58",
+ "bincode",
  "chrono",
  "hex",
  "rand",
+ "rand_chacha",
  "serde",
  "sha2",
  "snarkos-algorithms",
+ "snarkos-curves",
  "snarkos-errors",
+ "snarkos-models",
  "snarkos-utilities",
 ]
 
