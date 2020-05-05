@@ -10,7 +10,7 @@ use std::io::{Read, Result as IoResult, Write};
 
 // 2 * G1 + 1 * G2 assuming Bls12-377 and GM17.
 // Marlin requires 13 * G1 + 21 * Fq = 1296 btyes.
-const PROOF_SIZE: usize = 188;
+const PROOF_SIZE: usize = 192;
 
 #[derive(Clone)]
 /// A Proof of Succinct Work is a SNARK proof which 
