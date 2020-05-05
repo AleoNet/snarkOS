@@ -3,7 +3,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, ProjectiveCurve},
     gadgets::{
-        algorithms::CRHGadget,
+        algorithms::{CRHGadget, MaskedCRHGadget},
         curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, uint8::UInt8},
@@ -93,6 +93,54 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     }
 }
 
+impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHGadget<PedersenCRH<G, S>, F>
+    for PedersenCRHGadget<G, F, GG>
+{
+    fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
+        mut cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+        mask: &[UInt8],
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        if input.len() != mask.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
+        let mask_hash = <Self as CRHGadget<PedersenCRH<G, S>, F>>::check_evaluation_gadget(
+            cs.ns(|| "evaluate mask"),
+            parameters,
+            mask,
+        )?;
+
+        let mut padded_input = input.to_vec();
+        let mut padded_mask = mask.to_vec();
+        // Pad the input if it is not the current length.
+        if input.len() * 8 < S::WINDOW_SIZE * S::NUM_WINDOWS {
+            let current_length = input.len();
+            for _ in current_length..(S::WINDOW_SIZE * S::NUM_WINDOWS / 8) {
+                padded_input.push(UInt8::constant(0u8));
+                padded_mask.push(UInt8::constant(0u8));
+            }
+        }
+        assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
+        assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
+
+        // Allocate new variable for the result.
+        let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.into_bits_le()).collect();
+        let input_in_bits = input_in_bits.chunks(S::WINDOW_SIZE);
+
+        let mask_in_bits: Vec<_> = padded_mask.iter().flat_map(|byte| byte.into_bits_le()).collect();
+        let mask_in_bits = mask_in_bits.chunks(S::WINDOW_SIZE);
+
+        let masked_output = GG::precomputed_base_multiscalar_mul_masked(
+            cs.ns(|| "multiscalar multiplication"),
+            &parameters.parameters.bases,
+            input_in_bits,
+            mask_in_bits,
+        )?;
+        masked_output.add(cs.ns(|| "remove mask"), &mask_hash)
+    }
+}
+
 pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
     _group: PhantomData<*const G>,
     _group_gadget: PhantomData<*const GG>,
@@ -111,6 +159,20 @@ impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: P
         input: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
         let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(cs, parameters, input)?;
+        Ok(output.to_x_coordinate())
+    }
+}
+
+impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    MaskedCRHGadget<PedersenCompressedCRH<G, S>, F> for PedersenCompressedCRHGadget<G, F, GG>
+{
+    fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+        mask: &[UInt8],
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget_masked(cs, parameters, input, mask)?;
         Ok(output.to_x_coordinate())
     }
 }

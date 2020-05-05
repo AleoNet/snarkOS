@@ -832,6 +832,34 @@ mod projective_impl {
             Ok(())
         }
 
+        fn precomputed_base_scalar_mul_masked<'a, CS, I, B>(
+            &mut self,
+            mut cs: CS,
+            scalar_bits_with_base_powers: I,
+        ) -> Result<(), SynthesisError>
+        where
+            CS: ConstraintSystem<F>,
+            I: Iterator<Item = ((B, B), &'a TEProjective<P>)>,
+            B: Borrow<Boolean>,
+        {
+            let zero = TEProjective::zero();
+            for (i, ((bit, mask), base)) in scalar_bits_with_base_powers.enumerate() {
+                let mut cs = cs.ns(|| format!("Bit {}", i));
+                let mut table = [zero, *base, base.neg(), zero];
+                TEProjective::batch_normalization(&mut table);
+                let x_s = [table[0].x, table[1].x, table[2].x, table[3].x];
+                let y_s = [table[0].y, table[1].y, table[2].y, table[3].y];
+
+                let bits = [*bit.borrow(), *mask.borrow()];
+                let x: FG = FG::two_bit_lookup(cs.ns(|| "Lookup x"), &bits[..], &x_s)?;
+                let y: FG = FG::two_bit_lookup(cs.ns(|| "Lookup y"), &bits[..], &y_s)?;
+                let adder: Self = Self::new(x, y);
+                *self = <Self as GroupGadget<TEProjective<P>, F>>::add(self, &mut cs.ns(|| "Add"), &adder)?;
+            }
+
+            Ok(())
+        }
+
         fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, B>(
             mut cs: CS,
             bases: &[B],

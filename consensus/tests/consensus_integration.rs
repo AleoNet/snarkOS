@@ -4,7 +4,14 @@ mod consensus_integration {
         address::AddressPublicKey,
         dpc::base_dpc::instantiated::{Components, Tx},
     };
-    use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash, MerkleRootHash, PedersenMerkleRootHash, ProofOfSuccinctWork};
+    use snarkos_objects::{
+        dpc::DPCTransactions,
+        BlockHeader,
+        BlockHeaderHash,
+        MerkleRootHash,
+        PedersenMerkleRootHash,
+        ProofOfSuccinctWork,
+    };
     use snarkos_storage::genesis::*;
     use snarkos_utilities::bytes::FromBytes;
 
@@ -23,7 +30,12 @@ mod consensus_integration {
         assert_eq!(header.merkle_root_hash, *expected_merkle_root_hash);
     }
 
-    fn test_verify_header(parent_header: &BlockHeader, child_header: &BlockHeader, merkle_root_hash: &MerkleRootHash, ped_merkle_root_hash: &PedersenMerkleRootHash) {
+    fn test_verify_header(
+        parent_header: &BlockHeader,
+        child_header: &BlockHeader,
+        merkle_root_hash: &MerkleRootHash,
+        ped_merkle_root_hash: &PedersenMerkleRootHash,
+    ) {
         let consensus = TEST_CONSENSUS;
         consensus
             .verify_header(child_header, parent_header, merkle_root_hash, ped_merkle_root_hash)
@@ -297,7 +309,12 @@ mod consensus_integration {
             .iter()
             .for_each(|(_, parent_header, child_header, _, expected_merkle_root_hash)| {
                 // TODO: The Ped hash should be adjusted for the SNARK verification to pass
-                test_verify_header(parent_header, child_header, expected_merkle_root_hash, &PedersenMerkleRootHash([0u8; 32]));
+                test_verify_header(
+                    parent_header,
+                    child_header,
+                    expected_merkle_root_hash,
+                    &PedersenMerkleRootHash([0u8; 32]),
+                );
             });
     }
 }

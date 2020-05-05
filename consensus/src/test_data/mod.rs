@@ -8,7 +8,7 @@ pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
-    verifying_key: [0; 32], // TODO: Replace with a proper verifying key mock
+    verifying_key: [0; 32],  // TODO: Replace with a proper verifying key mock
 };
 
 // TODO: Replace with a proper proving key mock

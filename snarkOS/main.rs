@@ -22,7 +22,7 @@ use snarkos_network::{
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{net::SocketAddr, sync::Arc, fs::File, io::Read};
+use std::{fs::File, io::Read, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.

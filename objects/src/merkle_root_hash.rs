@@ -6,7 +6,9 @@ use std::fmt::{self, Display, Formatter};
 pub struct MerkleRootHash(pub [u8; 32]);
 
 impl MerkleRootHash {
-    pub const fn size() -> usize { 32 }
+    pub const fn size() -> usize {
+        32
+    }
 }
 
 impl Display for MerkleRootHash {

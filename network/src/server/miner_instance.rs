@@ -53,7 +53,11 @@ impl MinerInstance {
         task::spawn(async move {
             let context = self.server_context.clone();
             let local_address = self.server_context.local_address;
-            let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone(), self.proving_key.clone());
+            let miner = Miner::new(
+                self.coinbase_address.clone(),
+                self.consensus.clone(),
+                self.proving_key.clone(),
+            );
 
             loop {
                 info!("Mining new block");

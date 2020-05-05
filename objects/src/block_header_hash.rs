@@ -13,7 +13,9 @@ impl BlockHeaderHash {
         Self(block_hash)
     }
 
-    pub const fn size() -> usize { 32 }
+    pub const fn size() -> usize {
+        32
+    }
 }
 
 impl Display for BlockHeaderHash {

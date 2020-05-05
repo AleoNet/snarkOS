@@ -33,3 +33,12 @@ pub trait CRHGadget<H: CRH, F: Field>: Sized {
         input: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError>;
 }
+
+pub trait MaskedCRHGadget<H: CRH, F: Field>: CRHGadget<H, F> {
+    fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+        mask: &[UInt8],
+    ) -> Result<Self::OutputGadget, SynthesisError>;
+}
