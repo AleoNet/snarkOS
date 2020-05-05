@@ -48,11 +48,11 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        let parameter_path = path.as_ref().join("../dpc/src/parameters/");
+        //        let parameter_path = path.as_ref().join("../dpc/src/parameters/");
+        //        let ledger_parameter_path = parameter_path.join("ledger.params");
 
-        let ledger_parameter_path = parameter_path.join("ledger.params");
-
-        let parameters = P::load(&ledger_parameter_path)?;
+        let ledger_param_bytes = include_bytes!("../../dpc/src/parameters/ledger.params");
+        let parameters = P::read(&ledger_param_bytes[..])?;
 
         match latest_block_number {
             Some(val) => {

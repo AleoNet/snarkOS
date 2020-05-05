@@ -1,6 +1,9 @@
 use crate::ConsensusParameters;
 
-use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
+use snarkos_dpc::base_dpc::{
+    instantiated::{Components, MerkleTreeLedger},
+    parameters::PublicParameters,
+};
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -26,6 +29,10 @@ pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
     let blockchain = Arc::new(MerkleTreeLedger::open_at_path(path.clone()).unwrap());
 
     (blockchain, path)
+}
+
+pub fn load_verifying_parameters() -> PublicParameters<Components> {
+    PublicParameters::<Components>::load_vk_direct().unwrap()
 }
 
 pub fn kill_storage_async(path: PathBuf) {

@@ -6,6 +6,7 @@ use snarkos_dpc::{
     DPCScheme,
 };
 use snarkos_errors::consensus::ConsensusError;
+use snarkos_models::dpc::Record;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     merkle_root,
@@ -13,7 +14,10 @@ use snarkos_objects::{
     MerkleRootHash,
 };
 use snarkos_storage::BlockStorage;
-use snarkos_utilities::bytes::FromBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -150,6 +154,11 @@ impl Miner {
 
         println!("Miner generated coinbase transaction");
 
+        for (index, record) in coinbase_records.iter().enumerate() {
+            let record_commitment = hex::encode(&to_bytes![record.commitment()]?);
+            println!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
+        }
+
         let header = self.find_block(&transactions, &previous_block_header)?;
 
         println!("Miner found block block");
@@ -160,6 +169,8 @@ impl Miner {
 
         self.consensus
             .receive_block(parameters, storage, &mut memory_pool, &block)?;
+
+        storage.store_records(&coinbase_records)?;
 
         Ok((block.serialize()?, coinbase_records))
     }

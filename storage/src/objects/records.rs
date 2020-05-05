@@ -33,6 +33,21 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         self.storage.write(database_transaction)
     }
 
+    /// Get a transaction bytes given the transaction id.
+    pub fn store_records<R: Record>(&self, records: &Vec<R>) -> Result<(), StorageError> {
+        let mut database_transaction = DatabaseTransaction::new();
+
+        for record in records {
+            database_transaction.push(Op::Insert {
+                col: COL_RECORDS,
+                key: to_bytes![record.commitment()]?.to_vec(),
+                value: to_bytes![record]?.to_vec(),
+            });
+        }
+
+        self.storage.write(database_transaction)
+    }
+
     /// Remove a record from storage
     pub fn delete_record<R: Record>(&self, record: R) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();

@@ -1,12 +1,6 @@
 mod server_message_handler {
     use snarkos_consensus::{miner::Entry, test_data::*};
-    use snarkos_dpc::{
-        base_dpc::{
-            instantiated::{Components, Tx},
-            parameters::PublicParameters,
-        },
-        test_data::*,
-    };
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_network::{
         message::{types::*, Channel, Message},
         test_data::*,
@@ -19,15 +13,18 @@ mod server_message_handler {
     };
 
     use chrono::{DateTime, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{net::TcpListener, runtime::Runtime, sync::oneshot};
 
-    fn receive_block_message(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_block_message() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
+
         let storage_ref = storage.clone();
 
         rt.block_on(async move {
@@ -76,10 +73,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_get_block(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_block() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         let genesis_block = storage.get_block_from_block_num(0).unwrap();
 
@@ -137,10 +137,14 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_sync_block(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_sync_block() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
+
         let storage_ref = Arc::clone(&storage);
 
         rt.block_on(async move {
@@ -192,10 +196,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_get_sync(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_sync() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -271,10 +278,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_sync(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_sync() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -335,10 +345,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_transaction(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_transaction() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -392,10 +405,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_get_memory_pool_empty(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_memory_pool_empty() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -439,10 +455,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_get_memory_pool_normal(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_memory_pool_normal() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -509,10 +528,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_memory_pool(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_memory_pool() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -565,10 +587,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_get_peers(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_peers() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -625,10 +650,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_peers(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_peers() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -678,10 +706,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_ping(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_ping() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -734,10 +765,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_pong_unknown(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_pong_unknown() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -785,10 +819,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_pong_rejected(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_pong_rejected() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -862,10 +899,13 @@ mod server_message_handler {
         kill_storage_async(path);
     }
 
-    fn receive_pong_accepted(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_pong_accepted() {
         let mut rt = Runtime::new().unwrap();
 
         let (storage, path) = initialize_test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -939,95 +979,5 @@ mod server_message_handler {
 
         drop(rt);
         kill_storage_async(path);
-    }
-
-    #[test]
-    #[serial]
-    fn test_message_handler_structs() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-        {
-            println!("test receive block message");
-            receive_block_message(parameters.clone());
-        }
-
-        {
-            println!("test receive get_block");
-            receive_get_block(parameters.clone());
-        }
-
-        {
-            println!("test receive sync block");
-            receive_sync_block(parameters.clone());
-        }
-
-        {
-            println!("test receive get_sync");
-            receive_get_sync(parameters.clone());
-        }
-
-        {
-            println!("test receive receive sync");
-            receive_sync(parameters.clone());
-        }
-
-        {
-            println!("test receive transaction");
-            receive_transaction(parameters.clone());
-        }
-    }
-
-    #[test]
-    #[serial]
-    fn test_message_handler_misc() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-        {
-            println!("test receive get empty memory pool");
-            receive_get_memory_pool_empty(parameters.clone());
-        }
-
-        {
-            println!("test receive get normal memory pool");
-            receive_get_memory_pool_normal(parameters.clone());
-        }
-
-        {
-            println!("test receive memory pool");
-            receive_memory_pool(parameters.clone());
-        }
-
-        {
-            println!("test receive peers");
-            receive_peers(parameters.clone());
-        }
-
-        {
-            println!("test receive get_peers");
-            receive_get_peers(parameters.clone());
-        }
-
-        {
-            println!("test receive ping");
-            receive_ping(parameters.clone());
-        }
-
-        {
-            println!("test receive ping unknown");
-            receive_pong_unknown(parameters.clone());
-        }
-
-        {
-            println!("test receive ping rejected");
-            receive_pong_rejected(parameters.clone());
-        }
-
-        {
-            println!("test receive pong accepted");
-            receive_pong_accepted(parameters.clone());
-        }
-
-        {
-            println!("test receive pong unknown");
-            receive_pong_unknown(parameters.clone());
-        }
     }
 }
