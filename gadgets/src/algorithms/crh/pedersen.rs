@@ -1,7 +1,7 @@
 use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenCompressedCRH, PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group, ProjectiveCurve},
+    curves::{Field, Group, ProjectiveCurve, PrimeField},
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         curves::{CompressedGroupGadget, GroupGadget},
@@ -93,7 +93,7 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     }
 }
 
-impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHGadget<PedersenCRH<G, S>, F>
+impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHGadget<PedersenCRH<G, S>, F>
     for PedersenCRHGadget<G, F, GG>
 {
     fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
@@ -102,13 +102,14 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHGadget
         input: &[UInt8],
         mask: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        if input.len() != mask.len() {
+        if input.len() != mask.len()*2 {
             return Err(SynthesisError::Unsatisfiable);
         }
+        let mask = <Self as MaskedCRHGadget<PedersenCRH<G, S>, F>>::extend_mask(cs.ns(|| "extend mask"), mask)?;
         let mask_hash = <Self as CRHGadget<PedersenCRH<G, S>, F>>::check_evaluation_gadget(
             cs.ns(|| "evaluate mask"),
             parameters,
-            mask,
+            &mask,
         )?;
 
         let mut padded_input = input.to_vec();
@@ -163,7 +164,7 @@ impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: P
     }
 }
 
-impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
     MaskedCRHGadget<PedersenCompressedCRH<G, S>, F> for PedersenCompressedCRHGadget<G, F, GG>
 {
     fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
