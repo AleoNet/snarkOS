@@ -1,5 +1,10 @@
 mod consensus_dpc {
-    use snarkos_consensus::{get_block_reward, miner::Miner, test_data::*, ConsensusParameters};
+    use snarkos_consensus::{
+        get_block_reward,
+        miner::{MemoryPool, Miner},
+        test_data::*,
+        ConsensusParameters,
+    };
     use snarkos_dpc::{
         base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
         test_data::*,
@@ -20,6 +25,7 @@ mod consensus_dpc {
         let mut rng = thread_rng();
 
         let consensus = TEST_CONSENSUS;
+        let mut memory_pool = MemoryPool::new();
 
         // Generate or load parameters for the ledger, commitment schemes, and CRH
         let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
@@ -63,11 +69,11 @@ mod consensus_dpc {
         assert_eq!(coinbase_records[0].payload().balance, block_reward);
         assert_eq!(coinbase_records[1].payload().balance, 0);
 
-        println!("Verifying the block");
+        println!("Verifying and receiving the block");
+        consensus
+            .receive_block(&parameters, &ledger, &mut memory_pool, &block)
+            .unwrap();
 
-        assert!(consensus.verify_block(&parameters, &block, &ledger).unwrap());
-
-        ledger.insert_block(&block).unwrap();
         assert_eq!(ledger.len(), 2);
 
         // Add new block spending records from the previous block
@@ -134,11 +140,12 @@ mod consensus_dpc {
         );
         assert_eq!(new_coinbase_records[1].payload().balance, 0);
 
-        println!("Verify the block with the new payment transaction");
+        println!("Verify and receive the block with the new payment transaction");
 
-        assert!(consensus.verify_block(&parameters, &new_block, &ledger).unwrap());
+        consensus
+            .receive_block(&parameters, &ledger, &mut memory_pool, &new_block)
+            .unwrap();
 
-        ledger.insert_block(&new_block).unwrap();
         assert_eq!(ledger.len(), 3);
 
         for record in &new_coinbase_records {

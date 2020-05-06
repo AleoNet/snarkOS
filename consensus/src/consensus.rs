@@ -213,7 +213,9 @@ impl ConsensusParameters {
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
         // 1. verify that the block valid
-        self.verify_block(parameters, block, storage)?;
+        if !self.verify_block(parameters, block, storage)? {
+            return Err(ConsensusError::InvalidBlock(block.header.get_hash().0.to_vec()));
+        }
 
         // 2. Insert/canonize block
         storage.insert_block(block)?;

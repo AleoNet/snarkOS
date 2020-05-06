@@ -31,14 +31,11 @@ pub enum ConsensusError {
     #[fail(display = "{}", _0)]
     DPCError(DPCError),
 
-    #[fail(display = "duplicate commitment")]
-    DuplicateCm,
-
-    #[fail(display = "duplicate serial number")]
-    DuplicateSn,
-
     #[fail(display = "timestamp more than 2 hours into the future {:?} actual {:?}", _0, _1)]
     FuturisticTimestamp(i64, i64),
+
+    #[fail(display = "invalid block {:?}", _0)]
+    InvalidBlock(Vec<u8>),
 
     #[fail(display = "invalid coinbase transaction")]
     InvalidCoinbaseTransaction,
