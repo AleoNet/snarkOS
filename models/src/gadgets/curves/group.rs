@@ -164,10 +164,8 @@ pub trait GroupGadget<G: Group, F: Field>:
             let base_powers = base_powers.borrow();
             let scalar_bits = scalar.to_bits(&mut cs.ns(|| format!("Convert scalar {} to bits", i)))?;
             let mask_bits = mask.to_bits(&mut cs.ns(|| format!("Convert mask {} to bits", i)))?;
-            result.precomputed_base_scalar_mul_masked(
-                cs.ns(|| format!("Chunk {}", i)),
-                scalar_bits.into_iter().zip(mask_bits).zip(base_powers),
-            )?;
+            let x = scalar_bits.into_iter().zip(mask_bits).zip(base_powers);
+            result.precomputed_base_scalar_mul_masked(cs.ns(|| format!("Chunk {}", i)), x)?;
         }
         Ok(result)
     }

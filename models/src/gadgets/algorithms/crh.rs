@@ -5,10 +5,10 @@ use crate::{
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
+            boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
             uint8::UInt8,
-            boolean::Boolean,
             ToBytesGadget,
         },
     },
@@ -46,9 +46,19 @@ pub trait MaskedCRHGadget<H: CRH, F: PrimeField>: CRHGadget<H, F> {
             for c in m_bits.iter().enumerate().collect::<Vec<_>>().chunks(4) {
                 let mut new_byte = vec![];
                 for (j, b) in c {
-                    let bit1 = Boolean::conditionally_select(cs.ns(|| format!("Extend bit {} in integer {}, bit 1", j, i)), b, &zero[0], &one[0])?;
+                    let bit1 = Boolean::conditionally_select(
+                        cs.ns(|| format!("Extend bit {} in integer {}, bit 1", j, i)),
+                        b,
+                        &zero[0],
+                        &one[0],
+                    )?;
                     new_byte.push(bit1);
-                    let bit2 = Boolean::conditionally_select(cs.ns(|| format!("Extend bit {} in integer {}, bit 2", j, i)), b, &zero[1], &one[1])?;
+                    let bit2 = Boolean::conditionally_select(
+                        cs.ns(|| format!("Extend bit {} in integer {}, bit 2", j, i)),
+                        b,
+                        &zero[1],
+                        &one[1],
+                    )?;
                     new_byte.push(bit2);
                 }
                 extended_mask.push(UInt8::from_bits_le(&new_byte));

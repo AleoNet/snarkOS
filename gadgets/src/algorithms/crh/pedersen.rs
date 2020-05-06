@@ -1,7 +1,7 @@
 use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenCompressedCRH, PedersenSize};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group, ProjectiveCurve, PrimeField},
+    curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         curves::{CompressedGroupGadget, GroupGadget},
@@ -102,7 +102,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
         input: &[UInt8],
         mask: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        if input.len() != mask.len()*2 {
+        if input.len() != mask.len() * 2 {
             return Err(SynthesisError::Unsatisfiable);
         }
         let mask = <Self as MaskedCRHGadget<PedersenCRH<G, S>, F>>::extend_mask(cs.ns(|| "extend mask"), mask)?;

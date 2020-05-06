@@ -42,7 +42,6 @@ fn generate_input<CS: ConstraintSystem<Fr>, R: Rng>(mut cs: CS, rng: &mut R) -> 
             let cs_mask = cs.ns(|| format!("mask_byte_gadget_{}", byte_i));
             mask_bytes.push(UInt8::alloc(cs_mask, || Ok(*mask_byte)).unwrap());
         }
-        
     }
     (input, input_bytes, mask_bytes)
 }
