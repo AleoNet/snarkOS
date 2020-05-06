@@ -599,6 +599,24 @@ mod projective_impl {
     };
     use std::ops::Neg;
 
+    fn two_bit_lookup_helper<'a, P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>, CS>(
+        mut cs: CS,
+        bits: [Boolean; 2],
+        mut table: [TEProjective<P>; 4],
+    ) -> Result<AffineGadget<P, F, FG>, SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        TEProjective::batch_normalization(&mut table);
+        let x_s = [table[0].x, table[1].x, table[2].x, table[3].x];
+        let y_s = [table[0].y, table[1].y, table[2].y, table[3].y];
+
+        let x: FG = FG::two_bit_lookup(cs.ns(|| "Lookup x"), &bits[..], &x_s)?;
+        let y: FG = FG::two_bit_lookup(cs.ns(|| "Lookup y"), &bits[..], &y_s)?;
+
+        Ok(AffineGadget::new(x, y))
+    }
+
     impl<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>> GroupGadget<TEProjective<P>, F>
         for AffineGadget<P, F, FG>
     {
@@ -810,16 +828,8 @@ mod projective_impl {
                 if bits_base_powers.len() == 2 {
                     let bits = [bits_base_powers[0].0, bits_base_powers[1].0];
                     let base_powers = [bits_base_powers[0].1, bits_base_powers[1].1];
-
-                    let mut table = [zero, base_powers[0], base_powers[1], base_powers[0] + &base_powers[1]];
-
-                    TEProjective::batch_normalization(&mut table);
-                    let x_s = [table[0].x, table[1].x, table[2].x, table[3].x];
-                    let y_s = [table[0].y, table[1].y, table[2].y, table[3].y];
-
-                    let x: FG = FG::two_bit_lookup(cs.ns(|| "Lookup x"), &bits, &x_s)?;
-                    let y: FG = FG::two_bit_lookup(cs.ns(|| "Lookup y"), &bits, &y_s)?;
-                    let adder: Self = Self::new(x, y);
+                    let table = [zero, base_powers[0], base_powers[1], base_powers[0] + &base_powers[1]];
+                    let adder: Self = two_bit_lookup_helper(cs.ns(|| "two bit lookup"), bits, table)?;
                     *self = <Self as GroupGadget<TEProjective<P>, F>>::add(self, &mut cs.ns(|| "Add"), &adder)?;
                 } else if bits_base_powers.len() == 1 {
                     let bit = bits_base_powers[0].0;
@@ -832,28 +842,24 @@ mod projective_impl {
             Ok(())
         }
 
-        fn precomputed_base_scalar_mul_masked<'a, CS, I, B>(
+        fn precomputed_base_scalar_mul_masked<'a, CS, I, M, B>(
             &mut self,
             mut cs: CS,
             scalar_bits_with_base_powers: I,
+            mask_bits: M,
         ) -> Result<(), SynthesisError>
         where
             CS: ConstraintSystem<F>,
-            I: Iterator<Item = ((B, B), &'a TEProjective<P>)>,
+            I: Iterator<Item = (B, &'a TEProjective<P>)>,
+            M: Iterator<Item = B>,
             B: Borrow<Boolean>,
         {
             let zero = TEProjective::zero();
-            for (i, ((bit, mask), base)) in scalar_bits_with_base_powers.enumerate() {
+            for (i, ((bit, base), mask)) in scalar_bits_with_base_powers.zip(mask_bits).enumerate() {
                 let mut cs = cs.ns(|| format!("Bit {}", i));
-                let mut table = [zero, *base, base.neg(), zero];
-                TEProjective::batch_normalization(&mut table);
-                let x_s = [table[0].x, table[1].x, table[2].x, table[3].x];
-                let y_s = [table[0].y, table[1].y, table[2].y, table[3].y];
-
                 let bits = [*bit.borrow(), *mask.borrow()];
-                let x: FG = FG::two_bit_lookup(cs.ns(|| "Lookup x"), &bits[..], &x_s)?;
-                let y: FG = FG::two_bit_lookup(cs.ns(|| "Lookup y"), &bits[..], &y_s)?;
-                let adder: Self = Self::new(x, y);
+                let table = [zero, *base, base.neg(), zero];
+                let adder: Self = two_bit_lookup_helper(cs.ns(|| "two bit lookup"), bits, table)?;
                 *self = <Self as GroupGadget<TEProjective<P>, F>>::add(self, &mut cs.ns(|| "Add"), &adder)?;
             }
 

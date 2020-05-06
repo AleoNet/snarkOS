@@ -5,7 +5,6 @@ use crate::{
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
-            boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
             uint8::UInt8,
@@ -36,34 +35,22 @@ pub trait CRHGadget<H: CRH, F: Field>: Sized {
 }
 
 pub trait MaskedCRHGadget<H: CRH, F: PrimeField>: CRHGadget<H, F> {
-    fn extend_mask<CS: ConstraintSystem<F>>(mut cs: CS, mask: &[UInt8]) -> Result<Vec<UInt8>, SynthesisError> {
-        let zero = [Boolean::constant(false), Boolean::constant(true)];
-        let one = [Boolean::constant(true), Boolean::constant(false)];
-
-        let mut extended_mask = vec![];
-        for (i, m) in mask.iter().enumerate() {
-            let m_bits = m.into_bits_le();
-            for c in m_bits.iter().enumerate().collect::<Vec<_>>().chunks(4) {
-                let mut new_byte = vec![];
-                for (j, b) in c {
-                    let bit1 = Boolean::conditionally_select(
-                        cs.ns(|| format!("Extend bit {} in integer {}, bit 1", j, i)),
-                        b,
-                        &zero[0],
-                        &one[0],
-                    )?;
-                    new_byte.push(bit1);
-                    let bit2 = Boolean::conditionally_select(
-                        cs.ns(|| format!("Extend bit {} in integer {}, bit 2", j, i)),
-                        b,
-                        &zero[1],
-                        &one[1],
-                    )?;
-                    new_byte.push(bit2);
-                }
-                extended_mask.push(UInt8::from_bits_le(&new_byte));
-            }
-        }
+    /// Extends the mask such that 0 => 01, 1 => 10.
+    fn extend_mask<CS: ConstraintSystem<F>>(_: CS, mask: &[UInt8]) -> Result<Vec<UInt8>, SynthesisError> {
+        let extended_mask = mask
+            .iter()
+            .flat_map(|m| {
+                m.into_bits_le()
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .chunks(4)
+                    .map(|c| {
+                        let new_byte = c.into_iter().flat_map(|b| vec![*b, b.not()]).collect::<Vec<_>>();
+                        UInt8::from_bits_le(&new_byte)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
         Ok(extended_mask)
     }

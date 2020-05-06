@@ -101,10 +101,11 @@ pub trait GroupGadget<G: Group, F: Field>:
         Ok(())
     }
 
-    fn precomputed_base_scalar_mul_masked<'a, CS, I, B>(&mut self, _: CS, _: I) -> Result<(), SynthesisError>
+    fn precomputed_base_scalar_mul_masked<'a, CS, I, M, B>(&mut self, _: CS, _: I, _: M) -> Result<(), SynthesisError>
     where
         CS: ConstraintSystem<F>,
-        I: Iterator<Item = ((B, B), &'a G)>,
+        I: Iterator<Item = (B, &'a G)>,
+        M: Iterator<Item = B>,
         B: Borrow<Boolean>,
         G: 'a,
     {
@@ -146,6 +147,8 @@ pub trait GroupGadget<G: Group, F: Field>:
         Ok(result)
     }
 
+    /// Compute ∏((h_i * 1[p_i = 0] + h_i^{-1} * 1[p_i = 1])^{m_i \xor p_i}) for all i, m_i
+    /// being the scalars, p_i being the masks and h_i being the bases.
     fn precomputed_base_multiscalar_mul_masked<'a, CS, T, I, B>(
         mut cs: CS,
         bases: &[B],
@@ -159,13 +162,16 @@ pub trait GroupGadget<G: Group, F: Field>:
         B: Borrow<[G]>,
     {
         let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
-        // Compute ∏(h_i^{m_i}) for all i.
         for (i, ((scalar, mask), base_powers)) in scalars.zip(masks).zip(bases).enumerate() {
             let base_powers = base_powers.borrow();
             let scalar_bits = scalar.to_bits(&mut cs.ns(|| format!("Convert scalar {} to bits", i)))?;
             let mask_bits = mask.to_bits(&mut cs.ns(|| format!("Convert mask {} to bits", i)))?;
-            let x = scalar_bits.into_iter().zip(mask_bits).zip(base_powers);
-            result.precomputed_base_scalar_mul_masked(cs.ns(|| format!("Chunk {}", i)), x)?;
+            let scalar_bits_with_base_powers = scalar_bits.into_iter().zip(base_powers);
+            result.precomputed_base_scalar_mul_masked(
+                cs.ns(|| format!("Chunk {}", i)),
+                scalar_bits_with_base_powers,
+                mask_bits.into_iter(),
+            )?;
         }
         Ok(result)
     }

@@ -38,6 +38,8 @@ fn generate_input<CS: ConstraintSystem<Fr>, R: Rng>(mut cs: CS, rng: &mut R) -> 
     for (byte_i, (input_byte, mask_byte)) in input.iter().zip(mask.iter()).enumerate() {
         let cs_input = cs.ns(|| format!("input_byte_gadget_{}", byte_i));
         input_bytes.push(UInt8::alloc(cs_input, || Ok(*input_byte)).unwrap());
+        // The mask will later on be extended to be double the size, so we only need half the bits
+        // as the input.
         if byte_i % 2 == 0 {
             let cs_mask = cs.ns(|| format!("mask_byte_gadget_{}", byte_i));
             mask_bytes.push(UInt8::alloc(cs_mask, || Ok(*mask_byte)).unwrap());
