@@ -70,9 +70,9 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
+        assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
         // Pad the input if it is not the correct length.
         let input_in_bits = pad_input_and_bitify::<S>(input);
-        assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
 
         Ok(GG::precomputed_base_multiscalar_mul(
             cs,
