@@ -5,12 +5,14 @@ use crate::{
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     merkle_tree::{MerkleParameters, MerkleTree},
+    prf::blake2s::Blake2s,
 };
 use snarkos_curves::edwards_bls12::{EdwardsProjective as Edwards, Fq};
 use snarkos_models::{
-    algorithms::CRH,
+    algorithms::{CRH, PRF},
     gadgets::{
         algorithms::CRHGadget,
+        curves::field::FieldGadget,
         r1cs::{ConstraintSystem, TestConstraintSystem},
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
@@ -180,31 +182,25 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
 
     let mut nonce = [1u8; 32];
     rng.fill_bytes(&mut nonce);
-    let mut nonce_bytes = vec![];
-    for (byte_i, nonce_byte) in nonce.iter().enumerate() {
-        let cs_nonce = cs.ns(|| format!("nonce_byte_gadget_{}", byte_i));
-        nonce_bytes.push(UInt8::alloc(cs_nonce, || Ok(*nonce_byte)).unwrap());
-    }
+    let mut root_bytes = [1u8; 32];
+    root.write(&mut root_bytes[..]).unwrap();
 
-    let root = <HG as CRHGadget<H, _>>::OutputGadget::alloc(&mut cs.ns(|| "new_digest_root"), || {
-        if use_bad_root {
-            Ok(<H as CRH>::Output::default())
-        } else {
-            Ok(root)
-        }
-    })
-    .unwrap();
+    let mask = Blake2s::evaluate(&nonce, &root_bytes).unwrap();
+    let mut mask_bytes = vec![];
+    for (byte_i, mask_byte) in mask.iter().enumerate() {
+        let cs_mask = cs.ns(|| format!("mask_byte_gadget_{}", byte_i));
+        mask_bytes.push(UInt8::alloc(cs_mask, || Ok(*mask_byte)).unwrap());
+    }
 
     let crh_parameters = <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
         Ok(parameters.parameters())
     })
     .unwrap();
 
-    check_root::<EdwardsMerkleParameters, HG, _, _, _>(
+    let computed_root = compute_root::<EdwardsMerkleParameters, HG, _, _, _>(
         cs.ns(|| "compute masked root"),
         &crh_parameters,
-        &nonce_bytes,
-        &root,
+        &mask_bytes,
         &leaf_gadgets,
     )
     .unwrap();
@@ -213,6 +209,12 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
         println!("Unsatisfied constraint: {}", cs.which_is_unsatisfied().unwrap());
     }
     assert!(cs.is_satisfied());
+    let given_root = if use_bad_root {
+        <H as CRH>::Output::default()
+    } else {
+        root
+    };
+    assert_eq!(given_root, computed_root.get_value().unwrap());
 }
 
 #[test]

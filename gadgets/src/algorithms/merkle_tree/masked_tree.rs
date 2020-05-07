@@ -1,4 +1,3 @@
-use crate::algorithms::prf::blake2s_gadget;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -7,13 +6,13 @@ use snarkos_models::{
     gadgets::{
         algorithms::MaskedCRHGadget,
         r1cs::ConstraintSystem,
-        utilities::{eq::EqGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{uint8::UInt8, ToBytesGadget},
     },
 };
 
-/// Checks a given `root` against a root computed given `leaves`. Uses a nonce to mask the
-/// computation, to ensure hardness against amortization.
-pub fn check_root<
+/// Computes a root given `leaves`. Uses a nonce to mask the
+/// computation, to ensure amortization resistance.
+pub fn compute_root<
     P: MerkleParameters,
     HG: MaskedCRHGadget<P::H, F>,
     F: PrimeField,
@@ -22,27 +21,12 @@ pub fn check_root<
 >(
     mut cs: CS,
     parameters: &HG::ParametersGadget,
-    nonce: &[UInt8],
-    root: &HG::OutputGadget,
+    mask: &TB,
     leaves: &[TB],
-) -> Result<(), SynthesisError> {
-    let nonce_bits = nonce.iter().flat_map(|b| b.into_bits_le()).collect::<Vec<_>>();
-    let root_bytes = root.to_bytes(cs.ns(|| "convert root to bytes"))?;
-    let root_bits = root_bytes.iter().flat_map(|b| b.into_bits_le()).collect::<Vec<_>>();
-    // Derive a mask from the nonce and the root, such that the mask will have good randomness.
-    // TODO(kobi): generalize to a generic hasher?
-    let mask = blake2s_gadget(
-        cs.ns(|| "derive mask from nonce || root"),
-        &[nonce_bits, root_bits].concat(),
-    )?;
-    let mask_bytes = mask
-        .iter()
-        .enumerate()
-        .map(|(i, m)| m.to_bytes(cs.ns(|| format!("mask part {} to bytes", i))))
-        .collect::<Result<Vec<Vec<UInt8>>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
+) -> Result<HG::OutputGadget, SynthesisError> {
+    // Mask is assumed to be derived from the nonce and the root, which will be checked by the
+    // verifier.
+    let mask_bytes = mask.to_bytes(cs.ns(|| "mask  to bytes"))?;
 
     // Hash the leaves to get to the base level.
     let mut current_leaves = leaves
@@ -86,8 +70,7 @@ pub fn check_root<
         &mask_bytes[..mask_bytes.len() / 2],
     )?;
 
-    // Enforce the given root is equal to the computed root.
-    root.enforce_equal(&mut cs.ns(|| "root_is_last"), &computed_root)
+    Ok(computed_root)
 }
 
 pub(crate) fn hash_inner_node_gadget<H, HG, F, TB, CS>(
