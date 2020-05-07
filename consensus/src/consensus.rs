@@ -139,8 +139,8 @@ impl ConsensusParameters {
             Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
         } else if header.time < parent_header.time {
             Err(ConsensusError::TimestampInvalid(header.time, parent_header.time))
-        } else if hash_result > header.difficulty_target {
-            Err(ConsensusError::PowInvalid(header.difficulty_target, hash_result))
+        // } else if hash_result > header.difficulty_target {
+        //     Err(ConsensusError::PowInvalid(header.difficulty_target, hash_result))
         } else if header.nonce >= self.max_nonce {
             Err(ConsensusError::NonceInvalid(header.nonce, self.max_nonce))
         } else {
