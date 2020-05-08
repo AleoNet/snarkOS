@@ -54,9 +54,8 @@ pub struct ConsensusParameters {
 
     // /// Mainnet or testnet
     // network: Network
-    
     /// The verifying key for the PoSW Merkle Tree SNARK
-    pub verifying_key: Vk
+    pub verifying_key: Vk,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -184,9 +183,12 @@ impl ConsensusParameters {
         // Verify the block header
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
-            if let Err(err) =
-                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes), &pedersen_merkle_root)
-            {
+            if let Err(err) = self.verify_header(
+                &block.header,
+                &parent_block.header,
+                &MerkleRootHash(merkle_root_bytes),
+                &pedersen_merkle_root,
+            ) {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
             }

@@ -4,7 +4,14 @@ mod consensus_integration {
         address::AddressPublicKey,
         dpc::base_dpc::instantiated::{Components, Tx},
     };
-    use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash, MerkleRootHash, PedersenMerkleRootHash, ProofOfSuccinctWork};
+    use snarkos_objects::{
+        dpc::DPCTransactions,
+        BlockHeader,
+        BlockHeaderHash,
+        MerkleRootHash,
+        PedersenMerkleRootHash,
+        ProofOfSuccinctWork,
+    };
     use snarkos_storage::genesis::*;
     use snarkos_utilities::bytes::FromBytes;
 
@@ -23,7 +30,12 @@ mod consensus_integration {
         assert_eq!(header.merkle_root_hash, *expected_merkle_root_hash);
     }
 
-    fn test_verify_header(parent_header: &BlockHeader, child_header: &BlockHeader, merkle_root_hash: &MerkleRootHash, ped_merkle_root_hash: &PedersenMerkleRootHash) {
+    fn test_verify_header(
+        parent_header: &BlockHeader,
+        child_header: &BlockHeader,
+        merkle_root_hash: &MerkleRootHash,
+        ped_merkle_root_hash: &PedersenMerkleRootHash,
+    ) {
         let consensus = TEST_CONSENSUS;
         consensus
             .verify_header(child_header, parent_header, merkle_root_hash, ped_merkle_root_hash)
@@ -130,7 +142,8 @@ mod consensus_integration {
             },
             BlockHeader {
                 previous_block_hash: BlockHeaderHash([
-                    86, 98, 228, 165, 97, 0, 249, 17, 101, 54, 41, 0, 76, 248, 108, 93, 75, 113, 157, 0, 211, 4, 130, 119, 84, 91, 180, 105, 237, 23, 56, 211
+                    86, 98, 228, 165, 97, 0, 249, 17, 101, 54, 41, 0, 76, 248, 108, 93, 75, 113, 157, 0, 211, 4, 130,
+                    119, 84, 91, 180, 105, 237, 23, 56, 211,
                 ]),
                 merkle_root_hash: MerkleRootHash([
                     57, 234, 200, 188, 96, 77, 30, 155, 49, 208, 100, 5, 50, 64, 76, 66, 82, 237, 186, 233, 186, 237,
@@ -143,7 +156,8 @@ mod consensus_integration {
                 nonce: 0u32,
             },
             BlockHeaderHash([
-                86, 98, 228, 165, 97, 0, 249, 17, 101, 54, 41, 0, 76, 248, 108, 93, 75, 113, 157, 0, 211, 4, 130, 119, 84, 91, 180, 105, 237, 23, 56, 211
+                86, 98, 228, 165, 97, 0, 249, 17, 101, 54, 41, 0, 76, 248, 108, 93, 75, 113, 157, 0, 211, 4, 130, 119,
+                84, 91, 180, 105, 237, 23, 56, 211,
             ]),
             MerkleRootHash([
                 57, 234, 200, 188, 96, 77, 30, 155, 49, 208, 100, 5, 50, 64, 76, 66, 82, 237, 186, 233, 186, 237, 244,
@@ -248,7 +262,8 @@ mod consensus_integration {
             },
             BlockHeader {
                 previous_block_hash: BlockHeaderHash([
-                    228, 95, 55, 164, 138, 111, 150, 15, 120, 173, 241, 57, 69, 59, 129, 11, 198, 142, 152, 107, 21, 4, 59, 132, 50, 117, 209, 33, 14, 31, 97, 148
+                    228, 95, 55, 164, 138, 111, 150, 15, 120, 173, 241, 57, 69, 59, 129, 11, 198, 142, 152, 107, 21, 4,
+                    59, 132, 50, 117, 209, 33, 14, 31, 97, 148,
                 ]),
                 merkle_root_hash: MerkleRootHash([
                     57, 234, 200, 188, 96, 77, 30, 155, 49, 208, 100, 5, 50, 64, 76, 66, 82, 237, 186, 233, 186, 237,
@@ -261,7 +276,8 @@ mod consensus_integration {
                 nonce: 55793u32,
             },
             BlockHeaderHash([
-                228, 95, 55, 164, 138, 111, 150, 15, 120, 173, 241, 57, 69, 59, 129, 11, 198, 142, 152, 107, 21, 4, 59, 132, 50, 117, 209, 33, 14, 31, 97, 148
+                228, 95, 55, 164, 138, 111, 150, 15, 120, 173, 241, 57, 69, 59, 129, 11, 198, 142, 152, 107, 21, 4, 59,
+                132, 50, 117, 209, 33, 14, 31, 97, 148,
             ]),
             MerkleRootHash([
                 57, 234, 200, 188, 96, 77, 30, 155, 49, 208, 100, 5, 50, 64, 76, 66, 82, 237, 186, 233, 186, 237, 244,
@@ -293,7 +309,12 @@ mod consensus_integration {
             .iter()
             .for_each(|(_, parent_header, child_header, _, expected_merkle_root_hash)| {
                 // TODO: The Ped hash should be adjusted for the SNARK verification to pass
-                test_verify_header(parent_header, child_header, expected_merkle_root_hash, &PedersenMerkleRootHash([0u8; 32]));
+                test_verify_header(
+                    parent_header,
+                    child_header,
+                    expected_merkle_root_hash,
+                    &PedersenMerkleRootHash([0u8; 32]),
+                );
             });
     }
 }

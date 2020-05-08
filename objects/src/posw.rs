@@ -2,18 +2,23 @@ use hex;
 use serde::{
     de::{Error as DeserializeError, SeqAccess, Visitor},
     ser::SerializeTuple,
-    Deserialize, Deserializer, Serialize, Serializer,
+    Deserialize,
+    Deserializer,
+    Serialize,
+    Serializer,
 };
-use std::fmt::{self, Display, Debug, Formatter};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
-use std::io::{Read, Result as IoResult, Write};
+use std::{
+    fmt::{self, Debug, Display, Formatter},
+    io::{Read, Result as IoResult, Write},
+};
 
 // 2 * G1 + 1 * G2 assuming Bls12-377 and GM17.
 // Marlin requires 13 * G1 + 21 * Fq = 1296 btyes.
 const PROOF_SIZE: usize = 192;
 
 #[derive(Clone)]
-/// A Proof of Succinct Work is a SNARK proof which 
+/// A Proof of Succinct Work is a SNARK proof which
 pub struct ProofOfSuccinctWork(pub [u8; PROOF_SIZE]);
 
 impl std::default::Default for ProofOfSuccinctWork {
@@ -29,7 +34,9 @@ impl ProofOfSuccinctWork {
     }
 
     /// Returns the proof's size
-    pub const fn size() -> usize { PROOF_SIZE }
+    pub const fn size() -> usize {
+        PROOF_SIZE
+    }
 }
 
 impl Display for ProofOfSuccinctWork {
@@ -72,7 +79,9 @@ impl<'de> Deserialize<'de> for ProofOfSuccinctWork {
             {
                 let mut bytes = [0u8; PROOF_SIZE];
                 for b in &mut bytes[..] {
-                    *b = seq.next_element()?.ok_or_else(|| DeserializeError::custom("could not read bytes"))?;
+                    *b = seq
+                        .next_element()?
+                        .ok_or_else(|| DeserializeError::custom("could not read bytes"))?;
                 }
                 Ok(ProofOfSuccinctWork(bytes))
             }

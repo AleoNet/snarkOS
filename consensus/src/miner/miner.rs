@@ -1,5 +1,5 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
-use snarkos_algorithms::{merkle_tree::MerkleParameters, crh::sha256d_to_u64};
+use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters};
 use snarkos_dpc::{
     address::AddressPublicKey,
     base_dpc::{instantiated::*, parameters::PublicParameters},
@@ -42,7 +42,11 @@ pub type ProvingKey = [u8; 32];
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
     pub fn new(address: AddressPublicKey<Components>, consensus: ConsensusParameters, proving_key: ProvingKey) -> Self {
-        Self { address, consensus, proving_key }
+        Self {
+            address,
+            consensus,
+            proving_key,
+        }
     }
 
     /// Fetches new transactions from the memory pool.
@@ -120,7 +124,7 @@ impl Miner {
         let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
 
         let time = Utc::now().timestamp();
-        let difficulty_target = self.consensus.get_block_difficulty(parent_header, time); 
+        let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
 
         let mut nonce;
         let mut proof;

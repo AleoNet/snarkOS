@@ -1,10 +1,10 @@
-use std::path::PathBuf;
 use crate::{
     cli::CLI,
     parameters::{flag, option, subcommand, types::*},
 };
 use snarkos_errors::node::CliError;
 use snarkos_network::bootnodes::*;
+use std::path::PathBuf;
 
 use clap::ArgMatches;
 use serde::Serialize;

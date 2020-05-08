@@ -3,8 +3,10 @@ use snarkos_algorithms::crh::{double_sha256, sha256d_to_u64};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Result as IoResult, Write};
-use std::mem::size_of;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    mem::size_of,
+};
 
 /// Block header.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -33,17 +35,19 @@ pub struct BlockHeader {
 }
 
 const HEADER_SIZE: usize = {
-    BlockHeaderHash::size() + 
-        MerkleRootHash::size() + 
-        PedersenMerkleRootHash::size() + 
-        ProofOfSuccinctWork::size() +
-        size_of::<i64>() +
-        size_of::<u64>() +
-        size_of::<u32>()
+    BlockHeaderHash::size()
+        + MerkleRootHash::size()
+        + PedersenMerkleRootHash::size()
+        + ProofOfSuccinctWork::size()
+        + size_of::<i64>()
+        + size_of::<u64>()
+        + size_of::<u32>()
 };
 
 impl BlockHeader {
-    pub const fn size() -> usize { HEADER_SIZE }
+    pub const fn size() -> usize {
+        HEADER_SIZE
+    }
 
     pub fn serialize(&self) -> [u8; HEADER_SIZE] {
         let mut header_bytes = [0u8; HEADER_SIZE];
@@ -52,22 +56,28 @@ impl BlockHeader {
 
         header_bytes[start..end].copy_from_slice(&self.previous_block_hash.0);
 
-        start = end; end += MerkleRootHash::size();
+        start = end;
+        end += MerkleRootHash::size();
         header_bytes[start..end].copy_from_slice(&self.merkle_root_hash.0);
 
-        start = end; end += PedersenMerkleRootHash::size();
+        start = end;
+        end += PedersenMerkleRootHash::size();
         header_bytes[start..end].copy_from_slice(&self.pedersen_merkle_root_hash.0);
 
-        start = end; end += ProofOfSuccinctWork::size();
+        start = end;
+        end += ProofOfSuccinctWork::size();
         header_bytes[start..end].copy_from_slice(&self.proof.0);
 
-        start = end; end += size_of::<i64>();
+        start = end;
+        end += size_of::<i64>();
         header_bytes[start..end].copy_from_slice(&self.time.to_le_bytes());
 
-        start = end; end += size_of::<u64>();
+        start = end;
+        end += size_of::<u64>();
         header_bytes[start..end].copy_from_slice(&self.difficulty_target.to_le_bytes());
 
-        start = end; end += size_of::<u32>();
+        start = end;
+        end += size_of::<u32>();
         header_bytes[start..end].copy_from_slice(&self.nonce.to_le_bytes());
 
         header_bytes
@@ -86,22 +96,28 @@ impl BlockHeader {
         let mut end = BlockHeaderHash::size();
         previous_block_hash.copy_from_slice(&bytes[start..end]);
 
-        start = end; end += MerkleRootHash::size();
+        start = end;
+        end += MerkleRootHash::size();
         merkle_root_hash.copy_from_slice(&bytes[start..end]);
 
-        start = end; end += PedersenMerkleRootHash::size();
+        start = end;
+        end += PedersenMerkleRootHash::size();
         pedersen_merkle_root_hash.copy_from_slice(&bytes[start..end]);
 
-        start = end; end += ProofOfSuccinctWork::size();
+        start = end;
+        end += ProofOfSuccinctWork::size();
         proof.copy_from_slice(&bytes[start..end]);
 
-        start = end; end += size_of::<i64>();
+        start = end;
+        end += size_of::<i64>();
         time.copy_from_slice(&bytes[start..end]);
 
-        start = end; end += size_of::<u64>();
+        start = end;
+        end += size_of::<u64>();
         difficulty_target.copy_from_slice(&bytes[start..end]);
 
-        start = end; end += size_of::<u32>();
+        start = end;
+        end += size_of::<u32>();
         nonce.copy_from_slice(&bytes[start..end]);
 
         Self {

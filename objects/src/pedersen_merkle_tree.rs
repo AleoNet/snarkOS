@@ -1,27 +1,30 @@
-use snarkos_algorithms::{merkle_tree::{MerkleTree, MerkleParameters}};
-use snarkos_utilities::{to_bytes, bytes::{ToBytes}};
+use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use rand::{SeedableRng, Rng};
 
 // TODO: How should this seed be chosen?
-const PRNG_SEED: [u8; 32] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const PRNG_SEED: [u8; 32] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
 
 // PRNG to instantiate the Merkle Tree parameters
 fn prng() -> impl Rng {
     ChaChaRng::from_seed(PRNG_SEED)
 }
 
-
 /// A Pedersen Merkle Root Hash
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PedersenMerkleRootHash(pub [u8; 32]);
 
 impl PedersenMerkleRootHash {
-    pub const fn size() -> usize { 32 }
+    pub const fn size() -> usize {
+        32
+    }
 }
 
 impl Display for PedersenMerkleRootHash {
@@ -47,10 +50,13 @@ pub fn pedersen_merkle_root(hashes: &[Vec<u8>]) -> PedersenMerkleRootHash {
 // CommitmentMerkleParameters.
 mod mtree {
     use rand::Rng;
-    use snarkos_algorithms::{crh::{PedersenCompressedCRH, PedersenSize}, merkle_tree::{MerkleParameters}};
+    use snarkos_algorithms::{
+        crh::{PedersenCompressedCRH, PedersenSize},
+        merkle_tree::MerkleParameters,
+    };
     use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
     use snarkos_models::{algorithms::crh::CRH, storage::Storage};
-    use snarkos_utilities::{bytes::{ToBytes, FromBytes}};
+    use snarkos_utilities::bytes::{FromBytes, ToBytes};
     use std::{
         io::{Read, Result as IoResult, Write},
         path::PathBuf,
@@ -115,7 +121,6 @@ mod mtree {
             Ok(Self(crh))
         }
     }
-
 
     #[derive(Clone, PartialEq, Eq, Hash)]
     pub(super) struct TwoToOneWindow;
