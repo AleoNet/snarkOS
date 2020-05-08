@@ -1,5 +1,5 @@
 use crate::dpc::{
-    address::AddressPublicKey,
+    address::AccountPublicKey,
     base_dpc::{predicate::DPCPredicate, record_payload::PaymentRecordPayload, BaseDPCComponents},
 };
 use snarkos_models::{
@@ -24,7 +24,7 @@ use std::{
     Clone(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCRecord<C: BaseDPCComponents> {
-    pub(super) address_public_key: AddressPublicKey<C>,
+    pub(super) account_public_key: AccountPublicKey<C>,
 
     pub(super) is_dummy: bool,
     pub(super) payload: PaymentRecordPayload,
@@ -47,7 +47,7 @@ fn default_predicate_hash<C: CRH>() -> Vec<u8> {
 }
 
 impl<C: BaseDPCComponents> Record for DPCRecord<C> {
-    type AddressPublicKey = AddressPublicKey<C>;
+    type AccountPublicKey = AccountPublicKey<C>;
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Payload = PaymentRecordPayload;
@@ -55,8 +55,8 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonce as CRH>::Output;
 
-    fn address_public_key(&self) -> &Self::AddressPublicKey {
-        &self.address_public_key
+    fn account_public_key(&self) -> &Self::AccountPublicKey {
+        &self.account_public_key
     }
 
     fn is_dummy(&self) -> bool {
@@ -91,7 +91,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
 impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.address_public_key.write(&mut writer)?;
+        self.account_public_key.write(&mut writer)?;
 
         self.is_dummy.write(&mut writer)?;
         self.payload.write(&mut writer)?;
@@ -111,7 +111,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
 impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let address_public_key: AddressPublicKey<C> = FromBytes::read(&mut reader)?;
+        let account_public_key: AccountPublicKey<C> = FromBytes::read(&mut reader)?;
         let is_dummy: bool = FromBytes::read(&mut reader)?;
         let payload: PaymentRecordPayload = FromBytes::read(&mut reader)?;
 
@@ -138,7 +138,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             FromBytes::read(&mut reader)?;
 
         Ok(Self {
-            address_public_key,
+            account_public_key,
             is_dummy,
             payload,
             birth_predicate_repr: birth_pred_repr.to_vec(),

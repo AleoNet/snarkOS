@@ -6,7 +6,7 @@ pub mod components;
 pub use self::components::*;
 
 pub trait AddressKeyPair: FromBytes + ToBytes {
-    type AddressPublicKey: Default;
+    type AccountPublicKey: Default;
     type AccountPrivateKey: Default;
 }
 
@@ -21,7 +21,7 @@ pub trait Predicate: Clone {
 }
 
 pub trait Record: Default + FromBytes + ToBytes {
-    type AddressPublicKey;
+    type AccountPublicKey;
     type Commitment: FromBytes + ToBytes;
     type CommitmentRandomness;
     type Payload;
@@ -29,8 +29,8 @@ pub trait Record: Default + FromBytes + ToBytes {
     type SerialNumberNonce;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
 
-    /// Returns the address public key.
-    fn address_public_key(&self) -> &Self::AddressPublicKey;
+    /// Returns the account public key.
+    fn account_public_key(&self) -> &Self::AccountPublicKey;
 
     /// Returns whether or not the record is dummy.
     fn is_dummy(&self) -> bool;

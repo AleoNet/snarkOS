@@ -11,7 +11,7 @@ use snarkos_dpc::{
         instantiated::{Components, MerkleTreeLedger},
         parameters::PublicParameters,
     },
-    dpc::address::AddressPublicKey,
+    dpc::address::AccountPublicKey,
 };
 use snarkos_errors::node::NodeError;
 use snarkos_network::{
@@ -103,7 +103,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    let miner_address: AddressPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
+    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
 
     if config.miner {
         MinerInstance::new(

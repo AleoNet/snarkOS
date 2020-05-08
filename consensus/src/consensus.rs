@@ -11,7 +11,7 @@ use snarkos_dpc::{
         BaseDPCComponents,
         LocalData,
     },
-    dpc::address::{AccountPrivateKey, AddressPair, AddressPublicKey},
+    dpc::address::{AccountPrivateKey, AccountPublicKey, AddressPair},
     DPCScheme,
 };
 use snarkos_errors::consensus::ConsensusError;
@@ -255,7 +255,7 @@ impl ConsensusParameters {
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         genesis_address: AddressPair<Components>,
-        recipient: AddressPublicKey<Components>,
+        recipient: AccountPublicKey<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -303,7 +303,7 @@ impl ConsensusParameters {
         };
         let dummy_payload = PaymentRecordPayload { balance: 0, lock: 0 };
 
-        let new_apks = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_account_public_keys = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_payloads = [vec![new_payload], vec![
             dummy_payload;
@@ -318,7 +318,7 @@ impl ConsensusParameters {
             parameters,
             old_records,
             old_account_private_keys,
-            new_apks,
+            new_account_public_keys,
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,
@@ -334,7 +334,7 @@ impl ConsensusParameters {
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
-        new_apks: Vec<AddressPublicKey<Components>>,
+        new_account_public_keys: Vec<AccountPublicKey<Components>>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         new_dummy_flags: Vec<bool>,
@@ -501,7 +501,7 @@ impl ConsensusParameters {
             &old_records,
             &old_account_private_keys,
             &old_death_vk_and_proof_generator,
-            &new_apks,
+            &new_account_public_keys,
             &new_dummy_flags,
             &new_payloads,
             &new_birth_predicates,

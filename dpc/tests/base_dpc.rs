@@ -84,7 +84,7 @@ fn base_dpc_integration_test() {
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
 
-    let new_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -236,7 +236,7 @@ fn base_dpc_integration_test() {
         &old_records,
         &old_account_private_keys,
         &old_death_vk_and_proof_generator,
-        &new_apks,
+        &new_account_public_keys,
         &new_dummy_flags,
         &new_payloads,
         &new_birth_predicates,

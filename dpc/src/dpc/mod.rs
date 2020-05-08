@@ -16,7 +16,7 @@ pub trait DPCScheme<L: Ledger> {
     type Predicate: Predicate<PrivateWitness = Self::PrivatePredInput>;
     type PrivatePredInput;
     type Record: Record<
-        AddressPublicKey = <Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey,
+        AccountPublicKey = <Self::AddressKeyPair as AddressKeyPair>::AccountPublicKey,
         Predicate = Self::Predicate,
     >;
     type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
@@ -42,7 +42,7 @@ pub trait DPCScheme<L: Ledger> {
         old_account_private_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPrivateKey],
         old_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
+        new_account_public_key: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],

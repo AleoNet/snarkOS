@@ -95,7 +95,7 @@ fn test_execute_base_dpc_constraints() {
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_apks = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_public_keys = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -107,7 +107,7 @@ fn test_execute_base_dpc_constraints() {
         &circuit_parameters,
         &old_records,
         &old_account_private_keys,
-        &new_apks,
+        &new_account_public_keys,
         &new_dummy_flags,
         &new_payloads,
         &new_birth_predicates,

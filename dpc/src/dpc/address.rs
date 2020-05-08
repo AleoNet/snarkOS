@@ -9,13 +9,13 @@ use std::io::{Read, Result as IoResult, Write};
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct AddressPair<C: DPCComponents> {
-    pub public_key: AddressPublicKey<C>,
+    pub public_key: AccountPublicKey<C>,
     pub private_key: AccountPrivateKey<C>,
 }
 
 impl<C: DPCComponents> AddressKeyPair for AddressPair<C> {
     type AccountPrivateKey = AccountPrivateKey<C>;
-    type AddressPublicKey = AddressPublicKey<C>;
+    type AccountPublicKey = AccountPublicKey<C>;
 }
 
 impl<C: DPCComponents> ToBytes for AddressPair<C> {
@@ -28,7 +28,7 @@ impl<C: DPCComponents> ToBytes for AddressPair<C> {
 impl<C: DPCComponents> FromBytes for AddressPair<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let public_key: AddressPublicKey<C> = FromBytes::read(&mut reader)?;
+        let public_key: AccountPublicKey<C> = FromBytes::read(&mut reader)?;
         let private_key: AccountPrivateKey<C> = FromBytes::read(&mut reader)?;
 
         Ok(Self {
@@ -44,17 +44,17 @@ impl<C: DPCComponents> FromBytes for AddressPair<C> {
     Clone(bound = "C: DPCComponents"),
     Debug(bound = "C: DPCComponents")
 )]
-pub struct AddressPublicKey<C: DPCComponents> {
+pub struct AccountPublicKey<C: DPCComponents> {
     pub public_key: <C::AddressCommitment as CommitmentScheme>::Output,
 }
 
-impl<C: DPCComponents> ToBytes for AddressPublicKey<C> {
+impl<C: DPCComponents> ToBytes for AccountPublicKey<C> {
     fn write<W: Write>(&self, writer: W) -> IoResult<()> {
         self.public_key.write(writer)
     }
 }
 
-impl<C: DPCComponents> FromBytes for AddressPublicKey<C> {
+impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let public_key: <C::AddressCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;

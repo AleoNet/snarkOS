@@ -1,7 +1,7 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::{
-    address::AddressPublicKey,
+    address::AccountPublicKey,
     base_dpc::{instantiated::*, parameters::PublicParameters},
     DPCScheme,
 };
@@ -30,7 +30,7 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct Miner {
     /// Receiving address that block rewards will be sent to.
-    address: AddressPublicKey<Components>,
+    address: AccountPublicKey<Components>,
 
     /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
@@ -38,7 +38,7 @@ pub struct Miner {
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
-    pub fn new(address: AddressPublicKey<Components>, consensus: ConsensusParameters) -> Self {
+    pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters) -> Self {
         Self { address, consensus }
     }
 

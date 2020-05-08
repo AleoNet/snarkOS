@@ -1,5 +1,5 @@
 use crate::dpc::{
-    address::{AccountPrivateKey, AddressPair, AddressPublicKey},
+    address::{AccountPrivateKey, AccountPublicKey, AddressPair},
     base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
     DPCScheme,
 };
@@ -270,7 +270,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonce as CRH>::Output,
-        address_public_key: &AddressPublicKey<Components>,
+        account_public_key: &AccountPublicKey<Components>,
         is_dummy: bool,
         payload: &PaymentRecordPayload,
         birth_predicate: &DPCPredicate<Components>,
@@ -286,7 +286,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let death_predicate_repr = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 32 + 32 + 32 + 32 = 161 bytes
         let commitment_input = to_bytes![
-            address_public_key.public_key, // 256 bits = 32 bytes
+            account_public_key.public_key, // 256 bits = 32 bytes
             is_dummy,                      // 1 bit = 1 byte
             payload,                       // 256 bits = 32 bytes
             birth_predicate_repr,          // 256 bits = 32 bytes
@@ -301,7 +301,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         )?;
 
         let record = DPCRecord {
-            address_public_key: address_public_key.clone(),
+            account_public_key: account_public_key.clone(),
             is_dummy,
             payload: payload.clone(),
             birth_predicate_repr,
@@ -336,7 +336,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let public_key =
             Components::AddressCommitment::commit(&parameters.address_commitment_parameters, &commit_input, &r_pk)?;
 
-        let public_key = AddressPublicKey { public_key };
+        let public_key = AccountPublicKey { public_key };
 
         // Construct the address secret key.
         let private_key = AccountPrivateKey {
@@ -359,7 +359,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_address_public_keys: &[AddressPublicKey<Components>],
+        new_account_public_keys: &[AccountPublicKey<Components>],
         new_is_dummy_flags: &[bool],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
         new_birth_predicates: &[<Self as DPCScheme<L>>::Predicate],
@@ -381,7 +381,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_address_public_keys.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_public_keys.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -439,7 +439,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_address_public_keys[j],
+                &new_account_public_keys[j],
                 new_is_dummy_flags[j],
                 &new_payloads[j],
                 &new_birth_predicates[j],
@@ -465,7 +465,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = &old_records[i];
             let bytes = to_bytes![
                 record.commitment(),
-                record.address_public_key(),
+                record.account_public_key(),
                 record.is_dummy(),
                 record.payload(),
                 record.birth_predicate_repr(),
@@ -479,7 +479,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = &new_records[j];
             let bytes = to_bytes![
                 record.commitment(),
-                record.address_public_key(),
+                record.account_public_key(),
                 record.is_dummy(),
                 record.payload(),
                 record.birth_predicate_repr(),
@@ -622,7 +622,7 @@ where
         old_account_private_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
+        new_account_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
@@ -639,7 +639,7 @@ where
             &parameters.circuit_parameters,
             old_records,
             old_account_private_keys,
-            new_address_public_keys,
+            new_account_public_keys,
             new_is_dummy_flags,
             new_payloads,
             new_birth_predicates,
