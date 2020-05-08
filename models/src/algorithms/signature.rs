@@ -15,7 +15,9 @@ pub trait SignatureScheme: Sized + Clone + Storage {
 
     fn parameters(&self) -> &Self::Parameters;
 
-    fn keygen<R: Rng>(&self, rng: &mut R) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError>;
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Result<Self::PrivateKey, SignatureError>;
+
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, SignatureError>;
 
     fn sign<R: Rng>(
         &self,
