@@ -1,5 +1,5 @@
 use crate::dpc::{
-    address::{AddressPair, AddressPublicKey, AddressSecretKey},
+    address::{AccountPrivateKey, AddressPair, AddressPublicKey},
     base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
     DPCScheme,
 };
@@ -125,7 +125,7 @@ pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
     ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
 
     // Old record stuff
-    old_address_secret_keys: &'a [AddressSecretKey<Components>],
+    old_account_private_keys: &'a [AccountPrivateKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
     old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
@@ -248,10 +248,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_sn(
         params: &CircuitParameters<Components>,
         record: &DPCRecord<Components>,
-        address_secret_key: &AddressSecretKey<Components>,
+        account_private_key: &AccountPrivateKey<Components>,
     ) -> Result<(<Components::Signature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
-        let sk_prf = &address_secret_key.sk_prf;
+        let sk_prf = &account_private_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
         // Compute the serial number.
         let prf_input = FromBytes::read(sn_nonce.as_slice())?;
@@ -260,7 +260,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let sn = Components::Signature::randomize_public_key(
             &params.signature_parameters,
-            &address_secret_key.pk_sig,
+            &account_private_key.pk_sig,
             &sig_and_pk_randomizer,
         )?;
         end_timer!(sn_time);
@@ -339,7 +339,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let public_key = AddressPublicKey { public_key };
 
         // Construct the address secret key.
-        let secret_key = AddressSecretKey {
+        let private_key = AccountPrivateKey {
             pk_sig,
             sk_sig,
             sk_prf,
@@ -347,14 +347,17 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             r_pk,
         };
 
-        Ok(AddressPair { public_key, secret_key })
+        Ok(AddressPair {
+            public_key,
+            private_key,
+        })
     }
 
     pub(crate) fn execute_helper<'a, L, R: Rng>(
         parameters: &'a CircuitParameters<Components>,
 
         old_records: &'a [<Self as DPCScheme<L>>::Record],
-        old_address_secret_keys: &'a [AddressSecretKey<Components>],
+        old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
         new_address_public_keys: &[AddressPublicKey<Components>],
         new_is_dummy_flags: &[bool],
@@ -376,7 +379,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
-        assert_eq!(Components::NUM_INPUT_RECORDS, old_address_secret_keys.len());
+        assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_address_public_keys.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
@@ -406,7 +409,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 value_balance += record.payload.balance as i64;
             }
 
-            let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_address_secret_keys[i])?;
+            let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
             old_serial_numbers.push(sn);
             old_randomizers.push(randomizer);
@@ -524,7 +527,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             old_records,
             old_witnesses,
-            old_address_secret_keys,
+            old_account_private_keys,
             old_serial_numbers,
             old_randomizers,
 
@@ -616,7 +619,7 @@ where
     fn execute<R: Rng>(
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
-        old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
+        old_account_private_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
@@ -635,7 +638,7 @@ where
         let context = Self::execute_helper(
             &parameters.circuit_parameters,
             old_records,
-            old_address_secret_keys,
+            old_account_private_keys,
             new_address_public_keys,
             new_is_dummy_flags,
             new_payloads,
@@ -657,7 +660,7 @@ where
 
             old_records,
             old_witnesses,
-            old_address_secret_keys,
+            old_account_private_keys,
             old_serial_numbers,
             old_randomizers,
 
@@ -721,7 +724,7 @@ where
                 &ledger_digest,
                 old_records,
                 &old_witnesses,
-                old_address_secret_keys,
+                old_account_private_keys,
                 &old_serial_numbers,
                 &new_records,
                 &new_sn_nonce_randomness,
@@ -777,7 +780,7 @@ where
         for i in 0..Components::NUM_INPUT_RECORDS {
             let sig_time = start_timer!(|| format!("Sign and randomize Tx contents {}", i));
 
-            let sk_sig = &old_address_secret_keys[i].sk_sig;
+            let sk_sig = &old_account_private_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
             let signature = Components::Signature::sign(

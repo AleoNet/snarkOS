@@ -54,7 +54,7 @@ fn base_dpc_integration_test() {
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
-    let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
@@ -234,7 +234,7 @@ fn base_dpc_integration_test() {
     let (_new_records, transaction) = InstantiatedDPC::execute(
         &parameters,
         &old_records,
-        &old_asks,
+        &old_account_private_keys,
         &old_death_vk_and_proof_generator,
         &new_apks,
         &new_dummy_flags,

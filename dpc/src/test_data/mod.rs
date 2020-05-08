@@ -11,7 +11,7 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use rand::Rng;
 
 pub struct Wallet {
-    pub secret_key: &'static str,
+    pub private_key: &'static str,
     pub public_key: &'static str,
 }
 
@@ -120,7 +120,7 @@ pub fn setup_ledger<R: Rng>(
     let (genesis_sn, _) = DPC::generate_sn(
         &parameters.circuit_parameters,
         &genesis_record,
-        &genesis_address.secret_key,
+        &genesis_address.private_key,
     )
     .unwrap();
     let genesis_memo = [0u8; 32];

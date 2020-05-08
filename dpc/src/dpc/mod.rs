@@ -39,7 +39,7 @@ pub trait DPCScheme<L: Ledger> {
         parameters: &Self::Parameters,
 
         old_records: &[Self::Record],
-        old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
+        old_account_private_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPrivateKey],
         old_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],

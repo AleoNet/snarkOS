@@ -1,5 +1,5 @@
 use crate::dpc::{
-    address::AddressSecretKey,
+    address::AccountPrivateKey,
     base_dpc::{
         binding_signature::{gadget_verification_setup, BindingSignature},
         parameters::CircuitParameters,
@@ -39,7 +39,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Old record stuff
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
-    old_address_secret_keys: &[AddressSecretKey<C>],
+    old_account_private_keys: &[AccountPrivateKey<C>],
     old_serial_numbers: &[<C::Signature as SignatureScheme>::PublicKey],
 
     // New record stuff
@@ -84,7 +84,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         //
         old_records,
         old_witnesses,
-        old_address_secret_keys,
+        old_account_private_keys,
         old_serial_numbers,
         //
         new_records,
@@ -132,7 +132,7 @@ fn base_dpc_execute_gadget_helper<
     //
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
-    old_address_secret_keys: &[AddressSecretKey<C>],
+    old_account_private_keys: &[AccountPrivateKey<C>],
     old_serial_numbers: &[SignatureS::PublicKey],
 
     //
@@ -282,10 +282,10 @@ where
         || Ok(ledger_digest),
     )?;
 
-    for (i, (((record, witness), secret_key), given_serial_number)) in old_records
+    for (i, (((record, witness), account_private_key), given_serial_number)) in old_records
         .iter()
         .zip(old_witnesses)
-        .zip(old_address_secret_keys)
+        .zip(old_account_private_keys)
         .zip(old_serial_numbers)
         .enumerate()
     {
@@ -383,15 +383,16 @@ where
             // Declare variables for addr_sk contents.
             let address_cs = &mut cs.ns(|| "Check address keypair");
             let pk_sig = SignatureSGadget::PublicKeyGadget::alloc(&mut address_cs.ns(|| "Declare pk_sig"), || {
-                Ok(&secret_key.pk_sig)
+                Ok(&account_private_key.pk_sig)
             })?;
 
             let pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
 
-            let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &secret_key.sk_prf);
-            let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &secret_key.metadata)?;
-            let r_pk =
-                AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || Ok(&secret_key.r_pk))?;
+            let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
+            let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &account_private_key.metadata)?;
+            let r_pk = AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || {
+                Ok(&account_private_key.r_pk)
+            })?;
 
             let mut apk_input = pk_sig_bytes.clone();
             apk_input.extend_from_slice(&sk_prf);

@@ -61,7 +61,7 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
+    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.private_key).unwrap();
     let genesis_memo = [0u8; 32];
 
     let mut path = std::env::current_dir().unwrap();
@@ -81,7 +81,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
-    let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
 
     // Construct new records.
 
@@ -106,7 +106,7 @@ fn test_execute_base_dpc_constraints() {
     let context = DPC::execute_helper(
         &circuit_parameters,
         &old_records,
-        &old_asks,
+        &old_account_private_keys,
         &new_apks,
         &new_dummy_flags,
         &new_payloads,
@@ -125,7 +125,7 @@ fn test_execute_base_dpc_constraints() {
 
         old_records,
         old_witnesses,
-        old_address_secret_keys,
+        old_account_private_keys,
         old_serial_numbers,
         old_randomizers: _,
 
@@ -315,7 +315,7 @@ fn test_execute_base_dpc_constraints() {
         &ledger_digest,
         &old_records,
         &old_witnesses,
-        &old_address_secret_keys,
+        &old_account_private_keys,
         &old_serial_numbers,
         &new_records,
         &new_sn_nonce_randomness,

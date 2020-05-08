@@ -7,7 +7,7 @@ pub use self::components::*;
 
 pub trait AddressKeyPair: FromBytes + ToBytes {
     type AddressPublicKey: Default;
-    type AddressSecretKey: Default;
+    type AccountPrivateKey: Default;
 }
 
 pub trait Predicate: Clone {

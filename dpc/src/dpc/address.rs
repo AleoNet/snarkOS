@@ -10,18 +10,18 @@ use std::io::{Read, Result as IoResult, Write};
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct AddressPair<C: DPCComponents> {
     pub public_key: AddressPublicKey<C>,
-    pub secret_key: AddressSecretKey<C>,
+    pub private_key: AccountPrivateKey<C>,
 }
 
 impl<C: DPCComponents> AddressKeyPair for AddressPair<C> {
+    type AccountPrivateKey = AccountPrivateKey<C>;
     type AddressPublicKey = AddressPublicKey<C>;
-    type AddressSecretKey = AddressSecretKey<C>;
 }
 
 impl<C: DPCComponents> ToBytes for AddressPair<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.public_key.write(&mut writer)?;
-        self.secret_key.write(&mut writer)
+        self.private_key.write(&mut writer)
     }
 }
 
@@ -29,9 +29,12 @@ impl<C: DPCComponents> FromBytes for AddressPair<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let public_key: AddressPublicKey<C> = FromBytes::read(&mut reader)?;
-        let secret_key: AddressSecretKey<C> = FromBytes::read(&mut reader)?;
+        let private_key: AccountPrivateKey<C> = FromBytes::read(&mut reader)?;
 
-        Ok(Self { public_key, secret_key })
+        Ok(Self {
+            public_key,
+            private_key,
+        })
     }
 }
 
@@ -62,7 +65,7 @@ impl<C: DPCComponents> FromBytes for AddressPublicKey<C> {
 
 #[derive(Derivative)]
 #[derivative(Default(bound = "C: DPCComponents"), Clone(bound = "C: DPCComponents"))]
-pub struct AddressSecretKey<C: DPCComponents> {
+pub struct AccountPrivateKey<C: DPCComponents> {
     pub pk_sig: <C::Signature as SignatureScheme>::PublicKey,
     pub sk_sig: <C::Signature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
@@ -70,7 +73,7 @@ pub struct AddressSecretKey<C: DPCComponents> {
     pub r_pk: <C::AddressCommitment as CommitmentScheme>::Randomness,
 }
 
-impl<C: DPCComponents> ToBytes for AddressSecretKey<C> {
+impl<C: DPCComponents> ToBytes for AccountPrivateKey<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.pk_sig.write(&mut writer)?;
         self.sk_sig.write(&mut writer)?;
@@ -80,7 +83,7 @@ impl<C: DPCComponents> ToBytes for AddressSecretKey<C> {
     }
 }
 
-impl<C: DPCComponents> FromBytes for AddressSecretKey<C> {
+impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let pk_sig: <C::Signature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
