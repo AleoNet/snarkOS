@@ -60,7 +60,7 @@ impl Miner {
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let genesis_pred_vk_bytes = storage.genesis_pred_vk_bytes()?;
-        let genesis_address_pair = FromBytes::read(&storage.genesis_address_pair_bytes()?[..])?;
+        let genesis_account = FromBytes::read(&storage.genesis_account_bytes()?[..])?;
 
         let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
         let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -73,7 +73,7 @@ impl Miner {
             &genesis_pred_vk_bytes,
             new_birth_predicates,
             new_death_predicates,
-            genesis_address_pair,
+            genesis_account,
             self.address.clone(),
             &storage,
             rng,

@@ -1,5 +1,5 @@
 use crate::{
-    address::AddressPair,
+    address::Account,
     base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
     DPCScheme,
 };
@@ -70,7 +70,7 @@ pub fn setup_or_load_parameters<R: Rng>(
 pub fn generate_test_addresses<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
-) -> [AddressPair<Components>; 3] {
+) -> [Account<Components>; 3] {
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, rng).unwrap();
 
@@ -87,7 +87,7 @@ pub fn setup_ledger<R: Rng>(
     db_name: String,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
-    genesis_address: &AddressPair<Components>,
+    genesis_address: &Account<Components>,
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
     let genesis_sn_nonce = SerialNumberNonce::hash(

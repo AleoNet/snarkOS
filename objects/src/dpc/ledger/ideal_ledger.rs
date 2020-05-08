@@ -47,7 +47,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
         _genesis_predicate_vk_bytes: Vec<u8>,
-        _genesis_address_pair_bytes: Vec<u8>,
+        _genesis_account_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError> {
         let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(parameters.clone(), &[genesis_cm.clone()])?;
 

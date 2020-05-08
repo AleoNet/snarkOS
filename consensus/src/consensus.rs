@@ -11,7 +11,7 @@ use snarkos_dpc::{
         BaseDPCComponents,
         LocalData,
     },
-    dpc::address::{AccountPrivateKey, AccountPublicKey, AddressPair},
+    dpc::address::{Account, AccountPrivateKey, AccountPublicKey},
     DPCScheme,
 };
 use snarkos_errors::consensus::ConsensusError;
@@ -254,7 +254,7 @@ impl ConsensusParameters {
         genesis_pred_vk_bytes: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
-        genesis_address: AddressPair<Components>,
+        genesis_account: Account<Components>,
         recipient: AccountPublicKey<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -272,7 +272,7 @@ impl ConsensusParameters {
         }
 
         // Generate dummy input records having as address the genesis address.
-        let old_account_private_keys = vec![genesis_address.private_key.clone(); Components::NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![genesis_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
         let mut old_records = vec![];
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
@@ -285,7 +285,7 @@ impl ConsensusParameters {
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,
                 &old_sn_nonce,
-                &genesis_address.public_key,
+                &genesis_account.public_key,
                 true, // The input record is dummy
                 &PaymentRecordPayload::default(),
                 // Filler predicate input

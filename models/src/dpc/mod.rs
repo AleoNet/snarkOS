@@ -5,7 +5,7 @@ use std::hash::Hash;
 pub mod components;
 pub use self::components::*;
 
-pub trait AddressKeyPair: FromBytes + ToBytes {
+pub trait AccountScheme: FromBytes + ToBytes {
     type AccountPublicKey: Default;
     type AccountPrivateKey: Default;
 }

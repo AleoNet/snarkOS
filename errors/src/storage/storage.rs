@@ -76,7 +76,7 @@ pub enum StorageError {
     MissingCurrentSnIndex,
 
     #[fail(display = "missing genesis address")]
-    MissingGenesisAddress,
+    MissingGenesisAccount,
 
     #[fail(display = "missing genesis commitment")]
     MissingGenesisCm,

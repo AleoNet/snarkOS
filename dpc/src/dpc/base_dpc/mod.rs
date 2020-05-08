@@ -1,5 +1,5 @@
 use crate::dpc::{
-    address::{AccountPrivateKey, AccountPublicKey, AddressPair},
+    address::{Account, AccountPrivateKey, AccountPublicKey},
     base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
     DPCScheme,
 };
@@ -8,7 +8,7 @@ use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
-    dpc::{AddressKeyPair, DPCComponents, Predicate, Record},
+    dpc::{AccountScheme, DPCComponents, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
 use snarkos_objects::{dpc::Transaction, ledger::*};
@@ -319,7 +319,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         parameters: &CircuitParameters<Components>,
         metadata: &[u8; 32],
         rng: &mut R,
-    ) -> Result<AddressPair<Components>, DPCError> {
+    ) -> Result<Account<Components>, DPCError> {
         // Sample SIG key pair.
         let sk_sig = Components::Signature::generate_private_key(&parameters.signature_parameters, rng)?;
         let pk_sig = Components::Signature::generate_public_key(&parameters.signature_parameters, &sk_sig)?;
@@ -347,7 +347,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             r_pk,
         };
 
-        Ok(AddressPair {
+        Ok(Account {
             public_key,
             private_key,
         })
@@ -554,7 +554,7 @@ where
         SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
     >,
 {
-    type AddressKeyPair = AddressPair<Components>;
+    type AddressKeyPair = Account<Components>;
     type Auxiliary = [u8; 32];
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
@@ -619,10 +619,10 @@ where
     fn execute<R: Rng>(
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPrivateKey],
+        old_account_private_keys: &[<Self::AddressKeyPair as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AccountPublicKey],
+        new_account_public_keys: &[<Self::AddressKeyPair as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
