@@ -26,27 +26,20 @@ pub fn compute_root<
 ) -> Result<HG::OutputGadget, SynthesisError> {
     // Mask is assumed to be derived from the nonce and the root, which will be checked by the
     // verifier.
-    let mask_bytes = mask.to_bytes(cs.ns(|| "mask  to bytes"))?;
+    let mask_bytes = mask.to_bytes(cs.ns(|| "mask to bytes"))?;
 
     // Hash the leaves to get to the base level.
     let mut current_leaves = leaves
         .iter()
         .enumerate()
         .map(|(i, l)| {
-            hash_leaf_gadget::<P::H, HG, F, _, _>(
-                cs.ns(|| format!("hash leaf {}", i)),
-                parameters,
-                &l,
-                &mask_bytes[..mask_bytes.len() / 2],
-            )
+            hash_leaf_gadget::<P::H, HG, F, _, _>(cs.ns(|| format!("hash leaf {}", i)), parameters, &l, &mask_bytes)
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut level = 0;
     // Keep hashing pairs until there is only one element - the root.
     while current_leaves.len() != 1 {
         current_leaves = current_leaves
-            .iter()
-            .collect::<Vec<_>>()
             .chunks(2)
             .enumerate()
             .map(|(i, left_right)| {
@@ -89,8 +82,7 @@ where
 {
     let left_bytes = left_child.to_bytes(&mut cs.ns(|| "left_to_bytes"))?;
     let right_bytes = right_child.to_bytes(&mut cs.ns(|| "right_to_bytes"))?;
-    let mut bytes = left_bytes;
-    bytes.extend_from_slice(&right_bytes);
+    let bytes = [left_bytes, right_bytes].concat();
 
     HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask)
 }
@@ -109,5 +101,5 @@ where
     TB: ToBytesGadget<F>,
 {
     let bytes = leaf.to_bytes(&mut cs.ns(|| "left_to_bytes"))?;
-    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask)
+    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask[..bytes.len() / 2])
 }
