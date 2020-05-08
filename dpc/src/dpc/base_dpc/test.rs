@@ -20,7 +20,7 @@ use snarkos_models::{
 use snarkos_objects::ledger::Ledger;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 #[test]
@@ -64,8 +64,9 @@ fn test_execute_base_dpc_constraints() {
     let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
     let genesis_memo = [0u8; 32];
 
-    let mut path = std::env::current_dir().unwrap();
-    path.push("../base_dpc_constraints_db");
+    let mut path = std::env::temp_dir();
+    let random_storage_path: usize = rng.gen();
+    path.push(format!("test_execute_base_dpc_constraints{}", random_storage_path));
 
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger = MerkleTreeLedger::new(
@@ -394,4 +395,8 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     assert!(verify_binding_signature);
+
+    let path = ledger.storage.storage.path().to_owned();
+    drop(ledger);
+    MerkleTreeLedger::destroy_storage(path).unwrap();
 }

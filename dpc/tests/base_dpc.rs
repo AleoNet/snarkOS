@@ -27,7 +27,7 @@ use snarkos_objects::{
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::rand::UniformRand;
 
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -41,14 +41,13 @@ fn base_dpc_integration_test() {
     // Generate addresses
     let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
 
+    let mut path = std::env::temp_dir();
+    let random_storage_path: usize = rng.gen();
+    path.push(format!("test_dpc_integration_db{}", random_storage_path));
+
     // Setup the ledger
-    let (ledger, genesis_pred_vk_bytes) = setup_ledger(
-        "test_dpc_integration_db".to_string(),
-        &parameters,
-        ledger_parameters,
-        &genesis_address,
-        &mut rng,
-    );
+    let (ledger, genesis_pred_vk_bytes) =
+        setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();

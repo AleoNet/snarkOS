@@ -18,7 +18,7 @@ mod consensus_dpc {
     use snarkos_storage::BlockStorage;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-    use rand::thread_rng;
+    use rand::{thread_rng, Rng};
 
     #[test]
     fn base_dpc_multiple_transactions() {
@@ -33,13 +33,12 @@ mod consensus_dpc {
         // Generate addresses
         let [genesis_address, miner_address, recipient] = generate_test_addresses(&parameters, &mut rng);
 
-        let (ledger, genesis_pred_vk_bytes) = setup_ledger(
-            "test_multiple_transations_db".to_string(),
-            &parameters,
-            ledger_parameters,
-            &genesis_address,
-            &mut rng,
-        );
+        let mut path = std::env::temp_dir();
+        let random_storage_path: usize = rng.gen();
+        path.push(format!("test_multiple_transations_db{}", random_storage_path));
+
+        let (ledger, genesis_pred_vk_bytes) =
+            setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
 
         let miner = Miner::new(miner_address.public_key, consensus.clone());
 

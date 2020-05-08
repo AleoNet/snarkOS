@@ -71,7 +71,7 @@ fn schnorr_signature_parameter_serialization() {
 #[test]
 fn schnorr_signature_parameter_storage() {
     let rng = &mut thread_rng();
-    let mut path = std::env::current_dir().unwrap();
+    let mut path = std::env::temp_dir();
     path.push(TEST_SIGNATURE_PARAMETERS_PATH);
 
     let schnorr_signature = TestSignature::setup(rng).unwrap();

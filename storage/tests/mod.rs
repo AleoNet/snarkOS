@@ -16,7 +16,7 @@ use std::{
     sync::Arc,
 };
 
-pub const TEST_DB_PATH: &str = "../test_db";
+pub const TEST_DB_PATH: &str = "./test_db";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
@@ -139,7 +139,7 @@ impl FromBytes for TestMerkleParams {
 type Store = BlockStorage<TestTx, TestMerkleParams>;
 
 pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {
-    let mut path = std::env::current_dir().unwrap();
+    let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
     Store::destroy_storage(path.clone()).unwrap();
@@ -169,12 +169,7 @@ mod tests {
 
     #[test]
     pub fn test_initialize_blockchain() {
-        let mut path = std::env::current_dir().unwrap();
-        path.push(random_storage_path());
-
-        Store::destroy_storage(path.clone()).unwrap();
-
-        let blockchain = Arc::new(BlockStorage::open_at_path(path.clone()).unwrap());
+        let (blockchain, path) = initialize_test_blockchain();
 
         assert_eq!(blockchain.get_latest_block_height(), 0);
 
@@ -185,10 +180,7 @@ mod tests {
 
     #[test]
     pub fn test_storage() {
-        let mut path = std::env::current_dir().unwrap();
-        path.push(random_storage_path());
-
-        let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
+        let (blockchain, path) = initialize_test_blockchain();
 
         blockchain.storage.storage.put(b"my key", b"my value").unwrap();
 
@@ -229,7 +221,7 @@ mod tests {
 
     #[test]
     pub fn test_destroy_storage() {
-        let mut path = std::env::current_dir().unwrap();
+        let mut path = std::env::temp_dir();
         path.push(random_storage_path());
 
         Store::destroy_storage(path).unwrap();
@@ -240,12 +232,7 @@ mod tests {
 
         #[test]
         pub fn test_invalid_block_addition() {
-            let mut path = std::env::current_dir().unwrap();
-            path.push(random_storage_path());
-
-            Store::destroy_storage(path.clone()).unwrap();
-
-            let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
+            let (blockchain, path) = initialize_test_blockchain();
 
             let latest_block = blockchain.get_latest_block().unwrap();
 
@@ -256,12 +243,7 @@ mod tests {
 
         #[test]
         pub fn test_invalid_block_removal() {
-            let mut path = std::env::current_dir().unwrap();
-            path.push(random_storage_path());
-
-            Store::destroy_storage(path.clone()).unwrap();
-
-            let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
+            let (blockchain, path) = initialize_test_blockchain();
 
             assert!(blockchain.remove_latest_block().is_err());
             assert!(blockchain.remove_latest_blocks(5).is_err());
@@ -271,12 +253,7 @@ mod tests {
 
         #[test]
         pub fn test_invalid_block_retrieval() {
-            let mut path = std::env::current_dir().unwrap();
-            path.push(random_storage_path());
-
-            Store::destroy_storage(path.clone()).unwrap();
-
-            let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
+            let (blockchain, path) = initialize_test_blockchain();
 
             assert!(blockchain.get_block_from_block_num(2).is_err());
             assert!(blockchain.get_block_from_block_num(10).is_err());

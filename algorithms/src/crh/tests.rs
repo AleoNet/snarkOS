@@ -35,7 +35,7 @@ fn crh_parameter_serialization() {
 #[test]
 fn crh_parameter_storage() {
     let rng = &mut thread_rng();
-    let mut path = std::env::current_dir().unwrap();
+    let mut path = std::env::temp_dir();
     path.push(TEST_CRH_PARAMETERS_PATH);
 
     let crh = TestCRH::setup(rng);
