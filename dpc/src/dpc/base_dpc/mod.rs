@@ -321,7 +321,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         rng: &mut R,
     ) -> Result<AddressPair<Components>, DPCError> {
         // Sample SIG key pair.
-        let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.signature_parameters, rng)?;
+        let sk_sig = Components::Signature::generate_private_key(&parameters.signature_parameters, rng)?;
+        let pk_sig = Components::Signature::generate_public_key(&parameters.signature_parameters, &sk_sig)?;
+
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
         let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;

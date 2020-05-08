@@ -17,30 +17,34 @@ const TEST_SIGNATURE_PARAMETERS_PATH: &str = "./schnorr_signature.params";
 fn sign_and_verify<S: SignatureScheme>(message: &[u8]) {
     let rng = &mut thread_rng();
     let schnorr_signature = S::setup::<_>(rng).unwrap();
-    let (pk, sk) = schnorr_signature.keygen(rng).unwrap();
-    let sig = schnorr_signature.sign(&sk, message, rng).unwrap();
-    assert!(schnorr_signature.verify(&pk, &message, &sig).unwrap());
+    let private_key = schnorr_signature.generate_private_key(rng).unwrap();
+    let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
+    let signature = schnorr_signature.sign(&private_key, message, rng).unwrap();
+    assert!(schnorr_signature.verify(&public_key, &message, &signature).unwrap());
 }
 
 fn failed_verification<S: SignatureScheme>(message: &[u8], bad_message: &[u8]) {
     let rng = &mut thread_rng();
     let schnorr_signature = S::setup::<_>(rng).unwrap();
-    let (pk, sk) = schnorr_signature.keygen(rng).unwrap();
-    let sig = schnorr_signature.sign(&sk, message, rng).unwrap();
-    assert!(!schnorr_signature.verify(&pk, bad_message, &sig).unwrap());
+    let private_key = schnorr_signature.generate_private_key(rng).unwrap();
+    let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
+    let signature = schnorr_signature.sign(&private_key, message, rng).unwrap();
+    assert!(!schnorr_signature.verify(&public_key, bad_message, &signature).unwrap());
 }
 
 fn randomize_and_verify<S: SignatureScheme>(message: &[u8], randomness: &[u8]) {
     let rng = &mut thread_rng();
     let schnorr_signature = S::setup::<_>(rng).unwrap();
-    let (pk, sk) = schnorr_signature.keygen(rng).unwrap();
-    let sig = schnorr_signature.sign(&sk, message, rng).unwrap();
-    assert!(schnorr_signature.verify(&pk, message, &sig).unwrap());
-    let randomized_pk = schnorr_signature.randomize_public_key(&pk, randomness).unwrap();
-    let randomized_sig = schnorr_signature.randomize_signature(&sig, randomness).unwrap();
+    let private_key = schnorr_signature.generate_private_key(rng).unwrap();
+    let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
+    let signature = schnorr_signature.sign(&private_key, message, rng).unwrap();
+    assert!(schnorr_signature.verify(&public_key, message, &signature).unwrap());
+
+    let randomized_public_key = schnorr_signature.randomize_public_key(&public_key, randomness).unwrap();
+    let randomized_signature = schnorr_signature.randomize_signature(&signature, randomness).unwrap();
     assert!(
         schnorr_signature
-            .verify(&randomized_pk, &message, &randomized_sig)
+            .verify(&randomized_public_key, &message, &randomized_signature)
             .unwrap()
     );
 }

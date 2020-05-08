@@ -128,7 +128,7 @@ where
     type PublicKey = SchnorrPublicKey<G>;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError> {
-        let setup_time = start_timer!(|| "SchnorrSig::Setup");
+        let setup_time = start_timer!(|| "SchnorrSignature::setup");
 
         let mut salt = [0u8; 32];
         rng.fill_bytes(&mut salt);
@@ -149,14 +149,20 @@ where
         &self.parameters
     }
 
-    fn keygen<R: Rng>(&self, rng: &mut R) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError> {
-        let keygen_time = start_timer!(|| "SchnorrSig::KeyGen");
-
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Result<Self::PrivateKey, SignatureError> {
+        let keygen_time = start_timer!(|| "SchnorrSignature::generate_private_key");
         let private_key = <G as Group>::ScalarField::rand(rng);
-        let public_key = self.parameters.generator.mul(&private_key);
-
         end_timer!(keygen_time);
-        Ok((SchnorrPublicKey(public_key), private_key))
+
+        Ok(private_key)
+    }
+
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, SignatureError> {
+        let keygen_time = start_timer!(|| "SchnorrSignature::generate_public_key");
+        let public_key = self.parameters.generator.mul(private_key);
+        end_timer!(keygen_time);
+
+        Ok(SchnorrPublicKey(public_key))
     }
 
     fn sign<R: Rng>(
@@ -165,7 +171,7 @@ where
         message: &[u8],
         rng: &mut R,
     ) -> Result<Self::Output, SignatureError> {
-        let sign_time = start_timer!(|| "SchnorrSig::Sign");
+        let sign_time = start_timer!(|| "SchnorrSignature::sign");
         // (k, e);
         let (random_scalar, verifier_challenge) = loop {
             // Sample a random scalar `k` from the prime scalar field.
@@ -203,7 +209,7 @@ where
         message: &[u8],
         signature: &Self::Output,
     ) -> Result<bool, SignatureError> {
-        let verify_time = start_timer!(|| "SchnorrSig::Verify");
+        let verify_time = start_timer!(|| "SchnorrSignature::Verify");
 
         let SchnorrOutput {
             prover_response,
@@ -234,7 +240,7 @@ where
         public_key: &Self::PublicKey,
         randomness: &[u8],
     ) -> Result<Self::PublicKey, SignatureError> {
-        let rand_pk_time = start_timer!(|| "SchnorrSig::RandomizePubKey");
+        let rand_pk_time = start_timer!(|| "SchnorrSignature::randomize_public_key");
 
         let mut randomized_pk = public_key.0.clone();
         let mut base = self.parameters.generator;
@@ -253,7 +259,7 @@ where
     }
 
     fn randomize_signature(&self, signature: &Self::Output, randomness: &[u8]) -> Result<Self::Output, SignatureError> {
-        let rand_signature_time = start_timer!(|| "SchnorrSig::RandomizeSig");
+        let rand_signature_time = start_timer!(|| "SchnorrSignature::randomize_signature");
         let SchnorrOutput {
             prover_response,
             verifier_challenge,
