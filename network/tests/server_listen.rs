@@ -79,6 +79,7 @@ mod server_listen {
 
             tokio::spawn(async move {
                 start_server(tx, server_address, bootnode_address, storage, parameters, true).await;
+                sleep(5000).await;
             });
             rx.await.unwrap();
 
@@ -113,7 +114,8 @@ mod server_listen {
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                start_server(tx, server_address, bootnode_address, storage, parameters, false).await
+                start_server(tx, server_address, bootnode_address, storage, parameters, false).await;
+                sleep(5000);
             });
 
             rx.await.unwrap();
@@ -179,9 +181,10 @@ mod server_listen {
 
             let (tx, rx) = oneshot::channel();
 
-            tokio::spawn(
-                async move { start_server(tx, server_address, peer_address, storage, parameters, true).await },
-            );
+            tokio::spawn(async move {
+                start_server(tx, server_address, peer_address, storage, parameters, true).await;
+                sleep(5000).await;
+            });
 
             rx.await.unwrap();
 
