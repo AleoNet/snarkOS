@@ -167,6 +167,7 @@ mod server_listen {
             let peer_address = random_socket_address();
 
             // 1. Add peer to storage
+
             let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
 
             connected_peers.insert(peer_address, Utc::now());
@@ -174,11 +175,7 @@ mod server_listen {
                 .store_to_peer_book(bincode::serialize(&connected_peers).unwrap())
                 .unwrap();
 
-            // 2. Start peer
-
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
-
-            // 3. Start server
+            // 2. Start server
 
             let (tx, rx) = oneshot::channel();
 
@@ -187,6 +184,10 @@ mod server_listen {
             );
 
             rx.await.unwrap();
+
+            // 3. Start peer
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
             // 4. Check that peer received Version message
 
