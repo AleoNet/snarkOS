@@ -1,11 +1,10 @@
 use crate::{
-    address::Account,
     base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
     DPCScheme,
 };
 
 use snarkos_models::{algorithms::CRH, dpc::Record, storage::Storage};
-use snarkos_objects::ledger::Ledger;
+use snarkos_objects::{Account, Ledger};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;

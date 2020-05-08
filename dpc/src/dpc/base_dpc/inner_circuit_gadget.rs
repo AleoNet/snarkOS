@@ -1,5 +1,4 @@
 use crate::dpc::{
-    address::AccountPrivateKey,
     base_dpc::{
         binding_signature::{gadget_verification_setup, BindingSignature},
         parameters::CircuitParameters,
@@ -25,6 +24,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
+use snarkos_objects::AccountPrivateKey;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(

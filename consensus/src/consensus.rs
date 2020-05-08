@@ -11,7 +11,6 @@ use snarkos_dpc::{
         BaseDPCComponents,
         LocalData,
     },
-    dpc::address::{Account, AccountPrivateKey, AccountPublicKey},
     DPCScheme,
 };
 use snarkos_errors::consensus::ConsensusError;
@@ -23,6 +22,9 @@ use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     ledger::Ledger,
     merkle_root,
+    Account,
+    AccountPrivateKey,
+    AccountPublicKey,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,

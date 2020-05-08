@@ -3,11 +3,8 @@ use snarkos_consensus::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
-use snarkos_dpc::{
-    address::AccountPublicKey,
-    base_dpc::{instantiated::*, parameters::PublicParameters},
-};
-use snarkos_objects::block::Block;
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkos_objects::{AccountPublicKey, Block};
 
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};

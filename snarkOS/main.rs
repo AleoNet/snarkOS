@@ -6,12 +6,9 @@ use snarkos::{
     config::{Config, ConfigCli},
 };
 use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
-use snarkos_dpc::{
-    base_dpc::{
-        instantiated::{Components, MerkleTreeLedger},
-        parameters::PublicParameters,
-    },
-    dpc::address::AccountPublicKey,
+use snarkos_dpc::base_dpc::{
+    instantiated::{Components, MerkleTreeLedger},
+    parameters::PublicParameters,
 };
 use snarkos_errors::node::NodeError;
 use snarkos_network::{
@@ -19,6 +16,7 @@ use snarkos_network::{
     protocol::SyncHandler,
     server::{MinerInstance, Server},
 };
+use snarkos_objects::AccountPublicKey;
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 

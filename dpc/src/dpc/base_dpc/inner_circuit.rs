@@ -1,13 +1,10 @@
 use crate::{
-    dpc::{
-        address::AccountPrivateKey,
-        base_dpc::{
-            binding_signature::BindingSignature,
-            inner_circuit_gadget::execute_inner_proof_gadget,
-            parameters::CircuitParameters,
-            record::DPCRecord,
-            BaseDPCComponents,
-        },
+    dpc::base_dpc::{
+        binding_signature::BindingSignature,
+        inner_circuit_gadget::execute_inner_proof_gadget,
+        parameters::CircuitParameters,
+        record::DPCRecord,
+        BaseDPCComponents,
     },
     Assignment,
 };
@@ -17,6 +14,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
+use snarkos_objects::AccountPrivateKey;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]

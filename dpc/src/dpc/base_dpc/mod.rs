@@ -1,5 +1,4 @@
 use crate::dpc::{
-    address::{Account, AccountPrivateKey, AccountPublicKey},
     base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
     DPCScheme,
 };
@@ -11,7 +10,7 @@ use snarkos_models::{
     dpc::{AccountScheme, DPCComponents, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
 };
-use snarkos_objects::{dpc::Transaction, ledger::*};
+use snarkos_objects::{dpc::Transaction, ledger::*, Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,

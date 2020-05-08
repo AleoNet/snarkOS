@@ -1,7 +1,6 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::{
-    address::AccountPublicKey,
     base_dpc::{instantiated::*, parameters::PublicParameters},
     DPCScheme,
 };
@@ -10,6 +9,7 @@ use snarkos_models::dpc::Record;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     merkle_root,
+    AccountPublicKey,
     BlockHeader,
     MerkleRootHash,
 };

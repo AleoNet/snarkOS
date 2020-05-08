@@ -4,7 +4,6 @@ use snarkos_objects::{dpc::Transaction, ledger::*};
 
 use rand::Rng;
 
-pub mod address;
 pub mod base_dpc;
 
 pub trait DPCScheme<L: Ledger> {

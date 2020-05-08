@@ -2155,12 +2155,14 @@ version = "0.8.0"
 dependencies = [
  "base58",
  "chrono",
+ "derivative",
  "hex",
  "rand",
  "serde",
  "sha2",
  "snarkos-algorithms",
  "snarkos-errors",
+ "snarkos-models",
  "snarkos-utilities",
 ]
 
