@@ -136,11 +136,12 @@ impl Miner {
 
             // Hash the proof and parse it as a u64
             let hash_result = sha256d_to_u64(&proof.0[..]);
+            break;
 
             // if it passes the difficulty chec, use the proof/nonce pairs and return the header
-            if hash_result <= difficulty_target {
-                break;
-            }
+            // if hash_result <= difficulty_target {
+            //     break;
+            // }
         }
 
         let header = BlockHeader {
