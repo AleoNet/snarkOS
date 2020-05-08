@@ -38,8 +38,8 @@ impl PedersenSize for Size {
 type H = PedersenCompressedCRH<Edwards, Size>;
 type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
-define_merkle_tree_with_height!(EdwardsMerkleParameters, 32);
-define_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, 3);
+define_test_merkle_tree_with_height!(EdwardsMerkleParameters, 32);
+define_test_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, 3);
 
 fn generate_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
     type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
@@ -136,7 +136,7 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
     })
     .unwrap();
 
-    let computed_root = compute_root::<EdwardsMerkleParameters, HG, _, _, _>(
+    let computed_root = compute_root::<H, HG, _, _, _>(
         cs.ns(|| "compute masked root"),
         &crh_parameters,
         &mask_bytes,

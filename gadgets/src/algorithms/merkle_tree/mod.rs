@@ -8,8 +8,18 @@ pub use self::masked_tree::*;
 pub mod tests;
 
 #[macro_export]
-macro_rules! define_merkle_tree_with_height {
+macro_rules! define_test_merkle_tree_with_height {
     ($struct_name:ident, $height:expr) => {
+        use rand::{Rng, RngCore, SeedableRng};
+        use rand_xorshift::XorShiftRng;
+        use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
+        use snarkos_models::storage::Storage;
+        use snarkos_utilities::bytes::{FromBytes, ToBytes};
+        use std::{
+            io::{Read, Result as IoResult, Write},
+            path::PathBuf,
+        };
+
         #[derive(Clone)]
         struct $struct_name(H);
         impl MerkleParameters for $struct_name {

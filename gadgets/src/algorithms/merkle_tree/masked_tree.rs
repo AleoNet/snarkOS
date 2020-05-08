@@ -1,4 +1,3 @@
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::CRH,
@@ -12,13 +11,7 @@ use snarkos_models::{
 
 /// Computes a root given `leaves`. Uses a nonce to mask the
 /// computation, to ensure amortization resistance.
-pub fn compute_root<
-    P: MerkleParameters,
-    HG: MaskedCRHGadget<P::H, F>,
-    F: PrimeField,
-    TB: ToBytesGadget<F>,
-    CS: ConstraintSystem<F>,
->(
+pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToBytesGadget<F>, CS: ConstraintSystem<F>>(
     mut cs: CS,
     parameters: &HG::ParametersGadget,
     mask: &TB,
@@ -33,12 +26,7 @@ pub fn compute_root<
         .iter()
         .enumerate()
         .map(|(i, l)| {
-            hash_leaf_gadget::<P::H, HG, F, _, _>(
-                cs.ns(|| format!("hash leaf {}", i)),
-                parameters,
-                &l,
-                &mask_bytes[..mask_bytes.len() / 2],
-            )
+            hash_leaf_gadget::<H, HG, F, _, _>(cs.ns(|| format!("hash leaf {}", i)), parameters, &l, &mask_bytes)
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut level = 0;
@@ -50,7 +38,7 @@ pub fn compute_root<
             .chunks(2)
             .enumerate()
             .map(|(i, left_right)| {
-                hash_inner_node_gadget::<P::H, HG, F, _, _>(
+                hash_inner_node_gadget::<H, HG, F, _, _>(
                     cs.ns(|| format!("hash left right {} on level {}", i, level)),
                     parameters,
                     &left_right[0],
@@ -63,7 +51,7 @@ pub fn compute_root<
     }
 
     // Hash the root.
-    let computed_root = hash_leaf_gadget::<P::H, HG, F, _, _>(
+    let computed_root = hash_leaf_gadget::<H, HG, F, _, _>(
         cs.ns(|| "hash root"),
         parameters,
         &current_leaves[0],
@@ -109,5 +97,5 @@ where
     TB: ToBytesGadget<F>,
 {
     let bytes = leaf.to_bytes(&mut cs.ns(|| "left_to_bytes"))?;
-    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask)
+    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask[..bytes.len() / 2])
 }
