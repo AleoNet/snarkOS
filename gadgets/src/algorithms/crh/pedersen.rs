@@ -84,12 +84,7 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
 
 fn pad_input_and_bitify<S: PedersenSize>(input: &[UInt8]) -> Vec<Boolean> {
     let mut padded_input = input.to_vec();
-    if input.len() * 8 < S::WINDOW_SIZE * S::NUM_WINDOWS {
-        let current_length = input.len();
-        for _ in current_length..(S::WINDOW_SIZE * S::NUM_WINDOWS / 8) {
-            padded_input.push(UInt8::constant(0u8));
-        }
-    }
+    padded_input.resize(S::WINDOW_SIZE * S::NUM_WINDOWS / 8, UInt8::constant(0u8));
     assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
     padded_input.into_iter().flat_map(|byte| byte.into_bits_le()).collect()
 }

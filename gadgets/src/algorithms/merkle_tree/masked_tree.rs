@@ -19,7 +19,7 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
 ) -> Result<HG::OutputGadget, SynthesisError> {
     // Mask is assumed to be derived from the nonce and the root, which will be checked by the
     // verifier.
-    let mask_bytes = mask.to_bytes(cs.ns(|| "mask  to bytes"))?;
+    let mask_bytes = mask.to_bytes(cs.ns(|| "mask to bytes"))?;
 
     // Hash the leaves to get to the base level.
     let mut current_leaves = leaves
@@ -33,8 +33,6 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
     // Keep hashing pairs until there is only one element - the root.
     while current_leaves.len() != 1 {
         current_leaves = current_leaves
-            .iter()
-            .collect::<Vec<_>>()
             .chunks(2)
             .enumerate()
             .map(|(i, left_right)| {
@@ -77,8 +75,7 @@ where
 {
     let left_bytes = left_child.to_bytes(&mut cs.ns(|| "left_to_bytes"))?;
     let right_bytes = right_child.to_bytes(&mut cs.ns(|| "right_to_bytes"))?;
-    let mut bytes = left_bytes;
-    bytes.extend_from_slice(&right_bytes);
+    let bytes = [left_bytes, right_bytes].concat();
 
     HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask)
 }

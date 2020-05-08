@@ -599,6 +599,11 @@ mod projective_impl {
     };
     use std::ops::Neg;
 
+    /// Based on 2 input bits, output on a group element from a 4 element table.
+    /// 00 => table[0]
+    /// 10 => table[1]
+    /// 01 => table[2]
+    /// 11 => table[3]
     fn two_bit_lookup_helper<'a, P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>, CS>(
         mut cs: CS,
         bits: [Boolean; 2],
@@ -857,6 +862,10 @@ mod projective_impl {
             let zero = TEProjective::zero();
             for (i, ((bit, base), mask)) in scalar_bits_with_base_powers.zip(mask_bits).enumerate() {
                 let mut cs = cs.ns(|| format!("Bit {}", i));
+                // The masking algorithm specifies that the result must be incremented by:
+                //   1. g_i if the input bit is 1 and the mask is 0.
+                //   2. g_i^-1 if the input bit is 0 and the mask is 1.
+                //   3. 0 otherwise.
                 let bits = [*bit.borrow(), *mask.borrow()];
                 let table = [zero, *base, base.neg(), zero];
                 let adder: Self = two_bit_lookup_helper(cs.ns(|| "two bit lookup"), bits, table)?;

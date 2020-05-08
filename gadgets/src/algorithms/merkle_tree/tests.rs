@@ -1,16 +1,14 @@
 use crate::{
     algorithms::{crh::PedersenCompressedCRHGadget, merkle_tree::*},
     curves::edwards_bls12::EdwardsBlsGadget,
-    define_merkle_tree_with_height,
 };
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     merkle_tree::{MerkleParameters, MerkleTree},
-    prf::blake2s::Blake2s,
 };
 use snarkos_curves::edwards_bls12::{EdwardsProjective as Edwards, Fq};
 use snarkos_models::{
-    algorithms::{CRH, PRF},
+    algorithms::CRH,
     gadgets::{
         algorithms::CRHGadget,
         curves::field::FieldGadget,
@@ -21,6 +19,7 @@ use snarkos_models::{
 };
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
+use blake2::{digest::Digest, Blake2s};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use std::{
@@ -38,10 +37,68 @@ impl PedersenSize for Size {
 type H = PedersenCompressedCRH<Edwards, Size>;
 type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
-define_test_merkle_tree_with_height!(EdwardsMerkleParameters, 32);
-define_test_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, 3);
+macro_rules! define_merkle_tree_with_height {
+    ($struct_name:ident, $height:expr) => {
+        #[derive(Clone)]
+        struct $struct_name(H);
+        impl MerkleParameters for $struct_name {
+            type H = H;
 
-fn generate_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
+            const HEIGHT: usize = $height;
+
+            fn setup<R: Rng>(rng: &mut R) -> Self {
+                Self(H::setup(rng))
+            }
+
+            fn crh(&self) -> &Self::H {
+                &self.0
+            }
+
+            fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
+                self.crh().parameters()
+            }
+        }
+
+        impl Storage for $struct_name {
+            /// Store the SNARK proof to a file at the given path.
+            fn store(&self, path: &PathBuf) -> IoResult<()> {
+                self.0.store(path)
+            }
+
+            /// Load the SNARK proof from a file at the given path.
+            fn load(path: &PathBuf) -> IoResult<Self> {
+                Ok(Self(H::load(path)?))
+            }
+        }
+        impl Default for $struct_name {
+            fn default() -> Self {
+                let rng = &mut XorShiftRng::seed_from_u64(9174123u64);
+                Self(H::setup(rng))
+            }
+        }
+
+        impl ToBytes for $struct_name {
+            #[inline]
+            fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+                self.0.write(&mut writer)
+            }
+        }
+
+        impl FromBytes for $struct_name {
+            #[inline]
+            fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+                let crh: H = FromBytes::read(&mut reader)?;
+
+                Ok(Self(crh))
+            }
+        }
+    };
+}
+
+define_merkle_tree_with_height!(EdwardsMerkleParameters, 32);
+define_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, 3);
+
+fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
@@ -111,7 +168,7 @@ fn generate_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
     assert!(satisfied);
 }
 
-fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
+fn generate_masked_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
 
     let mut rng = XorShiftRng::seed_from_u64(9174123u64);
@@ -123,13 +180,16 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
     let mut cs = TestConstraintSystem::<Fq>::new();
     let leaf_gadgets = leaves.iter().map(|l| UInt8::constant_vec(l)).collect::<Vec<_>>();
 
-    let mut nonce = [1u8; 32];
+    let mut nonce = [1u8; 4];
     rng.fill_bytes(&mut nonce);
     let mut root_bytes = [1u8; 32];
     root.write(&mut root_bytes[..]).unwrap();
 
-    let mask = Blake2s::evaluate(&nonce, &root_bytes).unwrap();
-    let mask_bytes = UInt8::alloc_vec(cs.ns(|| "mask"), &mask[..]).unwrap();
+    let mut h = Blake2s::new();
+    h.input(nonce.as_ref());
+    h.input(root_bytes.as_ref());
+    let mask = h.result().to_vec();
+    let mask_bytes = UInt8::alloc_vec(cs.ns(|| "mask"), &mask).unwrap();
 
     let crh_parameters = <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
         Ok(parameters.parameters())
@@ -160,7 +220,7 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
 fn good_root_test() {
     let mut leaves = Vec::new();
     for i in 0..4u8 {
-        let input = [i; 32];
+        let input = [i; 30];
         leaves.push(input);
     }
     generate_merkle_tree(&leaves, false);
@@ -171,7 +231,7 @@ fn good_root_test() {
 fn bad_root_test() {
     let mut leaves = Vec::new();
     for i in 0..4u8 {
-        let input = [i; 32];
+        let input = [i; 30];
         leaves.push(input);
     }
     generate_merkle_tree(&leaves, true);
@@ -181,7 +241,7 @@ fn bad_root_test() {
 fn good_masked_root_test() {
     let mut leaves = Vec::new();
     for i in 0..4u8 {
-        let input = [i; 32];
+        let input = [i; 30];
         leaves.push(input);
     }
     generate_masked_merkle_tree(&leaves, false);
@@ -192,7 +252,7 @@ fn good_masked_root_test() {
 fn bad_masked_root_test() {
     let mut leaves = Vec::new();
     for i in 0..4u8 {
-        let input = [i; 32];
+        let input = [i; 30];
         leaves.push(input);
     }
     generate_masked_merkle_tree(&leaves, true);
