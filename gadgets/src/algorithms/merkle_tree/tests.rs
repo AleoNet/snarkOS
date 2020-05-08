@@ -1,6 +1,7 @@
 use crate::{
     algorithms::{crh::PedersenCompressedCRHGadget, merkle_tree::*},
     curves::edwards_bls12::EdwardsBlsGadget,
+    define_merkle_tree_with_height,
 };
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
@@ -36,64 +37,6 @@ impl PedersenSize for Size {
 
 type H = PedersenCompressedCRH<Edwards, Size>;
 type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
-
-macro_rules! define_merkle_tree_with_height {
-    ($struct_name:ident, $height:expr) => {
-        #[derive(Clone)]
-        struct $struct_name(H);
-        impl MerkleParameters for $struct_name {
-            type H = H;
-
-            const HEIGHT: usize = $height;
-
-            fn setup<R: Rng>(rng: &mut R) -> Self {
-                Self(H::setup(rng))
-            }
-
-            fn crh(&self) -> &Self::H {
-                &self.0
-            }
-
-            fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
-                self.crh().parameters()
-            }
-        }
-
-        impl Storage for $struct_name {
-            /// Store the SNARK proof to a file at the given path.
-            fn store(&self, path: &PathBuf) -> IoResult<()> {
-                self.0.store(path)
-            }
-
-            /// Load the SNARK proof from a file at the given path.
-            fn load(path: &PathBuf) -> IoResult<Self> {
-                Ok(Self(H::load(path)?))
-            }
-        }
-        impl Default for $struct_name {
-            fn default() -> Self {
-                let rng = &mut XorShiftRng::seed_from_u64(9174123u64);
-                Self(H::setup(rng))
-            }
-        }
-
-        impl ToBytes for $struct_name {
-            #[inline]
-            fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-                self.0.write(&mut writer)
-            }
-        }
-
-        impl FromBytes for $struct_name {
-            #[inline]
-            fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-                let crh: H = FromBytes::read(&mut reader)?;
-
-                Ok(Self(crh))
-            }
-        }
-    };
-}
 
 define_merkle_tree_with_height!(EdwardsMerkleParameters, 32);
 define_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, 3);
@@ -186,11 +129,7 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 32]], use_bad_root: bool) -> () {
     root.write(&mut root_bytes[..]).unwrap();
 
     let mask = Blake2s::evaluate(&nonce, &root_bytes).unwrap();
-    let mut mask_bytes = vec![];
-    for (byte_i, mask_byte) in mask.iter().enumerate() {
-        let cs_mask = cs.ns(|| format!("mask_byte_gadget_{}", byte_i));
-        mask_bytes.push(UInt8::alloc(cs_mask, || Ok(*mask_byte)).unwrap());
-    }
+    let mask_bytes = UInt8::alloc_vec(cs.ns(|| "mask"), &mask[..]).unwrap();
 
     let crh_parameters = <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
         Ok(parameters.parameters())
