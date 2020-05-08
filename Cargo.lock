@@ -2174,8 +2174,6 @@ version = "0.8.0"
 dependencies = [
  "blake2",
  "criterion",
- "derivative",
- "hex",
  "rand",
  "rand_xorshift",
  "snarkos-algorithms",
@@ -2183,9 +2181,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-gadgets",
  "snarkos-models",
- "snarkos-objects",
  "snarkos-profiler",
- "snarkos-storage",
  "snarkos-utilities",
 ]
 
