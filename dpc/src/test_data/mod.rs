@@ -8,6 +8,7 @@ use snarkos_objects::{Account, Ledger};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;
+use std::path::PathBuf;
 
 pub struct Wallet {
     pub private_key: &'static str,
@@ -83,7 +84,7 @@ pub fn generate_test_addresses<R: Rng>(
 }
 
 pub fn setup_ledger<R: Rng>(
-    db_name: String,
+    path: &PathBuf,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
     genesis_address: &Account<Components>,
@@ -123,9 +124,6 @@ pub fn setup_ledger<R: Rng>(
     )
     .unwrap();
     let genesis_memo = [0u8; 32];
-
-    let mut path = std::env::current_dir().unwrap();
-    path.push(db_name);
 
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger = MerkleTreeLedger::new(

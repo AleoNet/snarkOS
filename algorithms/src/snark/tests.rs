@@ -201,7 +201,7 @@ mod serialization {
     #[test]
     fn parameter_storage() {
         let rng = &mut thread_rng();
-        let mut path = std::env::current_dir().unwrap();
+        let mut path = std::env::temp_dir();
         path.push(TEST_PARAMETERS_PATH);
 
         let parameters =

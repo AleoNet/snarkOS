@@ -13,7 +13,7 @@ pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
     target_block_time: 2i64, //unix seconds
 };
 
-pub const TEST_DB_PATH: &str = "../test_db";
+pub const TEST_DB_PATH: &str = "./test_db";
 
 pub fn random_storage_path() -> String {
     let ptr = Box::into_raw(Box::new(123));
@@ -21,7 +21,7 @@ pub fn random_storage_path() -> String {
 }
 
 pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
-    let mut path = std::env::current_dir().unwrap();
+    let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
     MerkleTreeLedger::destroy_storage(path.clone()).unwrap();
