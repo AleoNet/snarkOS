@@ -7,30 +7,30 @@ use crate::{
 
 use std::fmt::Debug;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum RpcError {
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     BlockError(BlockError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ConsensusError(ConsensusError),
 
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "invalid block hash: {}", _0)]
+    #[error("invalid block hash: {}", _0)]
     InvalidBlockHash(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SendError(SendError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     StorageError(StorageError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     TransactionError(TransactionError),
 }
 

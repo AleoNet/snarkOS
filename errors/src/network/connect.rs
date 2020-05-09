@@ -2,21 +2,21 @@ use crate::network::message::{MessageError, MessageHeaderError};
 
 use std::net::SocketAddr;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum ConnectError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MessageHeaderError(MessageHeaderError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MessageError(MessageError),
 
-    #[fail(display = "Address {:?} not found", _0)]
+    #[error("Address {:?} not found", _0)]
     AddressNotFound(SocketAddr),
 }
 

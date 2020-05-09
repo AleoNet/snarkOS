@@ -1,35 +1,35 @@
 use crate::{algorithms::MerkleError, objects::TransactionError, storage::StorageError};
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum LedgerError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "duplicate sn pushed to ledger")]
+    #[error("duplicate sn pushed to ledger")]
     DuplicateMemo,
 
-    #[fail(display = "duplicate memo pushed to ledger")]
+    #[error("duplicate memo pushed to ledger")]
     DuplicateSn,
 
-    #[fail(display = "database already exists")]
+    #[error("database already exists")]
     ExistingDatabase,
 
-    #[fail(display = "invalid cm pushed to ledger")]
+    #[error("invalid cm pushed to ledger")]
     InvalidCm,
 
-    #[fail(display = "invalid cm index during proving")]
+    #[error("invalid cm index during proving")]
     InvalidCmIndex,
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MerkleError(MerkleError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     StorageError(StorageError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     TransactionError(TransactionError),
 }
 

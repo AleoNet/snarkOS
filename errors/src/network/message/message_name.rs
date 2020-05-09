@@ -1,11 +1,11 @@
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum MessageNameError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "Invalid message name length {}. Expected length of 12", _0)]
+    #[error("Invalid message name length {}. Expected length of 12", _0)]
     InvalidLength(usize),
 }

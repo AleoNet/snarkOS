@@ -1,14 +1,14 @@
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum PRFError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "incorrect input length: {}", _0)]
+    #[error("incorrect input length: {}", _0)]
     IncorrectInputLength(usize),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "element is not of prime order")]
+    #[error("element is not of prime order")]
     NotPrimeOrder,
 }
