@@ -1,17 +1,16 @@
 use crate::{
-    address::AddressPair,
     base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
     DPCScheme,
 };
 
 use snarkos_models::{algorithms::CRH, dpc::Record, storage::Storage};
-use snarkos_objects::ledger::Ledger;
+use snarkos_objects::{Account, Ledger};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;
 
 pub struct Wallet {
-    pub secret_key: &'static str,
+    pub private_key: &'static str,
     pub public_key: &'static str,
 }
 
@@ -70,7 +69,7 @@ pub fn setup_or_load_parameters<R: Rng>(
 pub fn generate_test_addresses<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
-) -> [AddressPair<Components>; 3] {
+) -> [Account<Components>; 3] {
     let genesis_metadata = [1u8; 32];
     let genesis_address = DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, rng).unwrap();
 
@@ -87,7 +86,7 @@ pub fn setup_ledger<R: Rng>(
     db_name: String,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
-    genesis_address: &AddressPair<Components>,
+    genesis_address: &Account<Components>,
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
     let genesis_sn_nonce = SerialNumberNonce::hash(
@@ -120,7 +119,7 @@ pub fn setup_ledger<R: Rng>(
     let (genesis_sn, _) = DPC::generate_sn(
         &parameters.circuit_parameters,
         &genesis_record,
-        &genesis_address.secret_key,
+        &genesis_address.private_key,
     )
     .unwrap();
     let genesis_memo = [0u8; 32];

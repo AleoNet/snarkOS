@@ -61,7 +61,7 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.secret_key).unwrap();
+    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.private_key).unwrap();
     let genesis_memo = [0u8; 32];
 
     let mut path = std::env::current_dir().unwrap();
@@ -81,7 +81,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
-    let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
 
     // Construct new records.
 
@@ -95,7 +95,7 @@ fn test_execute_base_dpc_constraints() {
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_apks = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_public_keys = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -106,8 +106,8 @@ fn test_execute_base_dpc_constraints() {
     let context = DPC::execute_helper(
         &circuit_parameters,
         &old_records,
-        &old_asks,
-        &new_apks,
+        &old_account_private_keys,
+        &new_account_public_keys,
         &new_dummy_flags,
         &new_payloads,
         &new_birth_predicates,
@@ -125,7 +125,7 @@ fn test_execute_base_dpc_constraints() {
 
         old_records,
         old_witnesses,
-        old_address_secret_keys,
+        old_account_private_keys,
         old_serial_numbers,
         old_randomizers: _,
 
@@ -315,7 +315,7 @@ fn test_execute_base_dpc_constraints() {
         &ledger_digest,
         &old_records,
         &old_witnesses,
-        &old_address_secret_keys,
+        &old_account_private_keys,
         &old_serial_numbers,
         &new_records,
         &new_sn_nonce_randomness,

@@ -1,14 +1,13 @@
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::dpc::{AddressKeyPair, Predicate, Record};
+use snarkos_models::dpc::{AccountScheme, Predicate, Record};
 use snarkos_objects::{dpc::Transaction, ledger::*};
 
 use rand::Rng;
 
-pub mod address;
 pub mod base_dpc;
 
 pub trait DPCScheme<L: Ledger> {
-    type AddressKeyPair: AddressKeyPair;
+    type AddressKeyPair: AccountScheme;
     type Auxiliary;
     type Metadata: ?Sized;
     type Payload;
@@ -16,7 +15,7 @@ pub trait DPCScheme<L: Ledger> {
     type Predicate: Predicate<PrivateWitness = Self::PrivatePredInput>;
     type PrivatePredInput;
     type Record: Record<
-        AddressPublicKey = <Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey,
+        AccountPublicKey = <Self::AddressKeyPair as AccountScheme>::AccountPublicKey,
         Predicate = Self::Predicate,
     >;
     type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
@@ -39,10 +38,10 @@ pub trait DPCScheme<L: Ledger> {
         parameters: &Self::Parameters,
 
         old_records: &[Self::Record],
-        old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
+        old_account_private_keys: &[<Self::AddressKeyPair as AccountScheme>::AccountPrivateKey],
         old_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
+        new_account_public_key: &[<Self::AddressKeyPair as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],

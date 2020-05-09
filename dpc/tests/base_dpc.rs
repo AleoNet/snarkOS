@@ -54,7 +54,7 @@ fn base_dpc_integration_test() {
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
-    let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
@@ -84,7 +84,7 @@ fn base_dpc_integration_test() {
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
 
-    let new_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -234,9 +234,9 @@ fn base_dpc_integration_test() {
     let (_new_records, transaction) = InstantiatedDPC::execute(
         &parameters,
         &old_records,
-        &old_asks,
+        &old_account_private_keys,
         &old_death_vk_and_proof_generator,
-        &new_apks,
+        &new_account_public_keys,
         &new_dummy_flags,
         &new_payloads,
         &new_birth_predicates,

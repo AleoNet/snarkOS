@@ -1,13 +1,10 @@
 use crate::{
-    dpc::{
-        address::AddressSecretKey,
-        base_dpc::{
-            binding_signature::BindingSignature,
-            inner_circuit_gadget::execute_inner_proof_gadget,
-            parameters::CircuitParameters,
-            record::DPCRecord,
-            BaseDPCComponents,
-        },
+    dpc::base_dpc::{
+        binding_signature::BindingSignature,
+        inner_circuit_gadget::execute_inner_proof_gadget,
+        parameters::CircuitParameters,
+        record::DPCRecord,
+        BaseDPCComponents,
     },
     Assignment,
 };
@@ -17,6 +14,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
+use snarkos_objects::AccountPrivateKey;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -30,7 +28,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     // Inputs for old records.
     old_records: Option<Vec<DPCRecord<C>>>,
     old_witnesses: Option<Vec<MerklePath<C::MerkleParameters>>>,
-    old_address_secret_keys: Option<Vec<AddressSecretKey<C>>>,
+    old_account_private_keys: Option<Vec<AccountPrivateKey<C>>>,
     old_serial_numbers: Option<Vec<<C::Signature as SignatureScheme>::PublicKey>>,
 
     // Inputs for new records.
@@ -63,7 +61,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let old_serial_numbers = vec![<C::Signature as SignatureScheme>::PublicKey::default(); num_input_records];
         let old_records = vec![DPCRecord::default(); num_input_records];
         let old_witnesses = vec![MerklePath::default(); num_input_records];
-        let old_address_secret_keys = vec![AddressSecretKey::default(); num_input_records];
+        let old_account_private_keys = vec![AccountPrivateKey::default(); num_input_records];
 
         let new_commitments = vec![<C::RecordCommitment as CommitmentScheme>::Output::default(); num_output_records];
         let new_serial_number_nonce_randomness = vec![[0u8; 32]; num_output_records];
@@ -94,7 +92,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             // Input records
             old_records: Some(old_records),
             old_witnesses: Some(old_witnesses),
-            old_address_secret_keys: Some(old_address_secret_keys),
+            old_account_private_keys: Some(old_account_private_keys),
             old_serial_numbers: Some(old_serial_numbers),
 
             // Output records
@@ -128,7 +126,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         // Old records
         old_records: &[DPCRecord<C>],
         old_witnesses: &[MerklePath<C::MerkleParameters>],
-        old_address_secret_keys: &[AddressSecretKey<C>],
+        old_account_private_keys: &[AccountPrivateKey<C>],
         old_serial_numbers: &[<C::Signature as SignatureScheme>::PublicKey],
 
         // New records
@@ -156,7 +154,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         assert_eq!(num_input_records, old_records.len());
         assert_eq!(num_input_records, old_witnesses.len());
-        assert_eq!(num_input_records, old_address_secret_keys.len());
+        assert_eq!(num_input_records, old_account_private_keys.len());
         assert_eq!(num_input_records, old_serial_numbers.len());
 
         assert_eq!(num_output_records, new_records.len());
@@ -174,7 +172,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             // Input records
             old_records: Some(old_records.to_vec()),
             old_witnesses: Some(old_witnesses.to_vec()),
-            old_address_secret_keys: Some(old_address_secret_keys.to_vec()),
+            old_account_private_keys: Some(old_account_private_keys.to_vec()),
             old_serial_numbers: Some(old_serial_numbers.to_vec()),
 
             // Output records
@@ -212,7 +210,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             // old records
             self.old_records.get()?,
             self.old_witnesses.get()?,
-            self.old_address_secret_keys.get()?,
+            self.old_account_private_keys.get()?,
             self.old_serial_numbers.get()?,
             // new records
             self.new_records.get()?,

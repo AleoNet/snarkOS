@@ -1,10 +1,7 @@
 mod consensus_integration {
     use snarkos_consensus::{miner::Miner, test_data::*};
-    use snarkos_dpc::{
-        address::AddressPublicKey,
-        dpc::base_dpc::instantiated::{Components, Tx},
-    };
-    use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash, MerkleRootHash};
+    use snarkos_dpc::dpc::base_dpc::instantiated::{Components, Tx};
+    use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, BlockHeader, BlockHeaderHash, MerkleRootHash};
     use snarkos_storage::genesis::*;
     use snarkos_utilities::bytes::FromBytes;
 
@@ -15,7 +12,7 @@ mod consensus_integration {
         expected_merkle_root_hash: &MerkleRootHash,
     ) {
         let consensus = TEST_CONSENSUS;
-        let miner_address: AddressPublicKey<Components> = FromBytes::read(&GENESIS_ADDRESS_PAIR[..]).unwrap();
+        let miner_address: AccountPublicKey<Components> = FromBytes::read(&GENESIS_ACCOUNT[..]).unwrap();
         let miner = Miner::new(miner_address, consensus);
 
         let header = miner.find_block(transactions, parent_header).unwrap();

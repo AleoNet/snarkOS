@@ -78,8 +78,8 @@ mod consensus_dpc {
 
         // Add new block spending records from the previous block
 
-        let spend_asks = vec![miner_address.secret_key.clone(); NUM_INPUT_RECORDS];
-        let newer_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+        let old_account_private_keys = vec![miner_address.private_key.clone(); NUM_INPUT_RECORDS];
+        let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
 
         let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
         let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
@@ -96,8 +96,8 @@ mod consensus_dpc {
         let (spend_records, transaction) = ConsensusParameters::create_transaction(
             &parameters,
             coinbase_records,
-            spend_asks,
-            newer_apks,
+            old_account_private_keys,
+            new_account_public_keys,
             new_birth_predicates.clone(),
             new_death_predicates.clone(),
             new_dummy_flags,

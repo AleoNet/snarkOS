@@ -1,5 +1,4 @@
 use crate::dpc::{
-    address::AddressSecretKey,
     base_dpc::{
         binding_signature::{gadget_verification_setup, BindingSignature},
         parameters::CircuitParameters,
@@ -25,6 +24,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
+use snarkos_objects::AccountPrivateKey;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
@@ -39,7 +39,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Old record stuff
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
-    old_address_secret_keys: &[AddressSecretKey<C>],
+    old_account_private_keys: &[AccountPrivateKey<C>],
     old_serial_numbers: &[<C::Signature as SignatureScheme>::PublicKey],
 
     // New record stuff
@@ -84,7 +84,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         //
         old_records,
         old_witnesses,
-        old_address_secret_keys,
+        old_account_private_keys,
         old_serial_numbers,
         //
         new_records,
@@ -132,7 +132,7 @@ fn base_dpc_execute_gadget_helper<
     //
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
-    old_address_secret_keys: &[AddressSecretKey<C>],
+    old_account_private_keys: &[AccountPrivateKey<C>],
     old_serial_numbers: &[SignatureS::PublicKey],
 
     //
@@ -183,14 +183,14 @@ where
 {
     let mut old_sns = Vec::with_capacity(old_records.len());
     let mut old_rec_comms = Vec::with_capacity(old_records.len());
-    let mut old_apks = Vec::with_capacity(old_records.len());
+    let mut old_account_public_keys = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags = Vec::with_capacity(old_records.len());
     let mut old_payloads = Vec::with_capacity(old_records.len());
     let mut old_birth_pred_hashes = Vec::with_capacity(old_records.len());
     let mut old_death_pred_hashes = Vec::with_capacity(old_records.len());
 
     let mut new_rec_comms = Vec::with_capacity(new_records.len());
-    let mut new_apks = Vec::with_capacity(new_records.len());
+    let mut new_account_public_keys = Vec::with_capacity(new_records.len());
     let mut new_dummy_flags = Vec::with_capacity(new_records.len());
     let mut new_payloads = Vec::with_capacity(new_records.len());
     let mut new_death_pred_hashes = Vec::with_capacity(new_records.len());
@@ -282,17 +282,17 @@ where
         || Ok(ledger_digest),
     )?;
 
-    for (i, (((record, witness), secret_key), given_serial_number)) in old_records
+    for (i, (((record, witness), account_private_key), given_serial_number)) in old_records
         .iter()
         .zip(old_witnesses)
-        .zip(old_address_secret_keys)
+        .zip(old_account_private_keys)
         .zip(old_serial_numbers)
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process input record {}", i));
         // Declare record contents
         let (
-            given_apk,
+            given_account_public_key,
             given_commitment,
             given_is_dummy,
             given_payload,
@@ -307,10 +307,11 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_apk = AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
-                Ok(&record.address_public_key().public_key)
-            })?;
-            old_apks.push(given_apk.clone());
+            let given_account_public_key =
+                AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
+                    Ok(&record.account_public_key().public_key)
+                })?;
+            old_account_public_keys.push(given_account_public_key.clone());
 
             let given_commitment = RecCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Commitment"), || {
                 Ok(record.commitment().clone())
@@ -340,7 +341,7 @@ where
                 Ok(record.serial_number_nonce())
             })?;
             (
-                given_apk,
+                given_account_public_key,
                 given_commitment,
                 given_is_dummy,
                 given_payload,
@@ -383,30 +384,31 @@ where
             // Declare variables for addr_sk contents.
             let address_cs = &mut cs.ns(|| "Check address keypair");
             let pk_sig = SignatureSGadget::PublicKeyGadget::alloc(&mut address_cs.ns(|| "Declare pk_sig"), || {
-                Ok(&secret_key.pk_sig)
+                Ok(&account_private_key.pk_sig)
             })?;
 
             let pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
 
-            let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &secret_key.sk_prf);
-            let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &secret_key.metadata)?;
-            let r_pk =
-                AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || Ok(&secret_key.r_pk))?;
+            let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
+            let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &account_private_key.metadata)?;
+            let r_pk = AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || {
+                Ok(&account_private_key.r_pk)
+            })?;
 
-            let mut apk_input = pk_sig_bytes.clone();
-            apk_input.extend_from_slice(&sk_prf);
-            apk_input.extend_from_slice(&metadata);
+            let mut account_public_key_input = pk_sig_bytes.clone();
+            account_public_key_input.extend_from_slice(&sk_prf);
+            account_public_key_input.extend_from_slice(&metadata);
 
-            let candidate_apk = AddrCGadget::check_commitment_gadget(
+            let candidate_account_public_key = AddrCGadget::check_commitment_gadget(
                 &mut address_cs.ns(|| "Compute Addr PubKey"),
                 &addr_comm_pp,
-                &apk_input,
+                &account_public_key_input,
                 &r_pk,
             )?;
 
-            candidate_apk.enforce_equal(
+            candidate_account_public_key.enforce_equal(
                 &mut address_cs.ns(|| "Check that declared and computed pks are equal"),
-                &given_apk,
+                &given_account_public_key,
             )?;
             (sk_prf, pk_sig)
         };
@@ -453,11 +455,12 @@ where
         // Check that the record is well-formed.
         {
             let comm_cs = &mut cs.ns(|| "Check that record is well-formed");
-            let apk_bytes = given_apk.to_bytes(&mut comm_cs.ns(|| "Convert apk to bytes"))?;
+            let account_public_key_bytes =
+                given_account_public_key.to_bytes(&mut comm_cs.ns(|| "Convert account_public_key to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut comm_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut comm_input = Vec::new();
-            comm_input.extend_from_slice(&apk_bytes);
+            comm_input.extend_from_slice(&account_public_key_bytes);
             comm_input.extend_from_slice(&is_dummy_bytes);
             comm_input.extend_from_slice(&given_payload);
             comm_input.extend_from_slice(&given_birth_pred_hash);
@@ -496,7 +499,7 @@ where
         let j = j as u8;
 
         let (
-            given_apk,
+            given_account_public_key,
             given_record_comm,
             given_comm,
             given_is_dummy,
@@ -507,10 +510,11 @@ where
             sn_nonce,
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
-            let given_apk = AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
-                Ok(&record.address_public_key().public_key)
-            })?;
-            new_apks.push(given_apk.clone());
+            let given_account_public_key =
+                AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
+                    Ok(&record.account_public_key().public_key)
+                })?;
+            new_account_public_keys.push(given_account_public_key.clone());
             let given_record_comm = RecCGadget::OutputGadget::alloc(
                 &mut declare_cs.ns(|| "Record Commitment"),
                 || Ok(record.commitment()),
@@ -542,7 +546,7 @@ where
             })?;
 
             (
-                given_apk,
+                given_account_public_key,
                 given_record_comm,
                 given_comm,
                 given_is_dummy,
@@ -587,12 +591,13 @@ where
         // *******************************************************************
         {
             let comm_cs = &mut cs.ns(|| "Check that record is well-formed");
-            let apk_bytes = given_apk.to_bytes(&mut comm_cs.ns(|| "Convert Addr PubKey to bytes"))?;
+            let account_public_key_bytes =
+                given_account_public_key.to_bytes(&mut comm_cs.ns(|| "Convert account_public_key to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut comm_cs.ns(|| "Convert is_dummy to bytes"))?;
             let sn_nonce_bytes = sn_nonce.to_bytes(&mut comm_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             let mut comm_input = Vec::new();
-            comm_input.extend_from_slice(&apk_bytes);
+            comm_input.extend_from_slice(&account_public_key_bytes);
             comm_input.extend_from_slice(&is_dummy_bytes);
             comm_input.extend_from_slice(&given_payload);
             comm_input.extend_from_slice(&given_birth_pred_hash);
@@ -662,7 +667,8 @@ where
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with Input Record {}", i));
             local_data_bytes.extend_from_slice(&old_rec_comms[i].to_bytes(&mut cs.ns(|| "Record Comm"))?);
-            local_data_bytes.extend_from_slice(&old_apks[i].to_bytes(&mut cs.ns(|| "Apk"))?);
+            local_data_bytes
+                .extend_from_slice(&old_account_public_keys[i].to_bytes(&mut cs.ns(|| "account_public_key"))?);
             local_data_bytes.extend_from_slice(&old_dummy_flags[i].to_bytes(&mut cs.ns(|| "IsDummy"))?);
             local_data_bytes.extend_from_slice(&old_payloads[i]);
             local_data_bytes.extend_from_slice(&old_birth_pred_hashes[i]);
@@ -673,7 +679,8 @@ where
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with Output Record {}", j));
             local_data_bytes.extend_from_slice(&new_rec_comms[j].to_bytes(&mut cs.ns(|| "Record Comm"))?);
-            local_data_bytes.extend_from_slice(&new_apks[j].to_bytes(&mut cs.ns(|| "Apk"))?);
+            local_data_bytes
+                .extend_from_slice(&new_account_public_keys[j].to_bytes(&mut cs.ns(|| "account_public_key"))?);
             local_data_bytes.extend_from_slice(&new_dummy_flags[j].to_bytes(&mut cs.ns(|| "IsDummy"))?);
             local_data_bytes.extend_from_slice(&new_payloads[j]);
             local_data_bytes.extend_from_slice(&new_birth_pred_hashes[j]);

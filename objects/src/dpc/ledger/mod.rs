@@ -31,7 +31,7 @@ pub trait Ledger: Sized {
         dummy_sn: Self::SerialNumber,
         dummy_memo: Self::Memo,
         dummy_predicate_vk_bytes: Vec<u8>,
-        dummy_genesis_address_pair_bytes: Vec<u8>,
+        dummy_genesis_account_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError>;
 
     /// Return the current number of transactions on the ledger.

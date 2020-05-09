@@ -39,11 +39,11 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
         }
     }
 
-    /// Get the genesis address pair bytes
-    pub fn genesis_address_pair_bytes(&self) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(COL_META, KEY_GENESIS_ADDRESS_PAIR.as_bytes())? {
-            Some(genesis_address_pair_bytes) => Ok(genesis_address_pair_bytes),
-            None => Err(StorageError::MissingGenesisAddress),
+    /// Get the genesis account bytes
+    pub fn genesis_account_bytes(&self) -> Result<Vec<u8>, StorageError> {
+        match self.storage.get(COL_META, KEY_GENESIS_ACCOUNT.as_bytes())? {
+            Some(genesis_account_bytes) => Ok(genesis_account_bytes),
+            None => Err(StorageError::MissingGenesisAccount),
         }
     }
 
