@@ -1,20 +1,20 @@
 use crate::algorithms::CRHError;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum MerkleError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CRHError(CRHError),
 
-    #[fail(display = "Incorrect leaf index: {}", _0)]
+    #[error("Incorrect leaf index: {}", _0)]
     IncorrectLeafIndex(usize),
 
-    #[fail(display = "Incorrect path length: {}", _0)]
+    #[error("Incorrect path length: {}", _0)]
     IncorrectPathLength(usize),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 }
 

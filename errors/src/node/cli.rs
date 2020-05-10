@@ -1,5 +1,5 @@
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum CliError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 }

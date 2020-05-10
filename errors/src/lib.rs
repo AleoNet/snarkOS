@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate failure;
+extern crate thiserror;
 
 pub mod algorithms;
 pub mod consensus;

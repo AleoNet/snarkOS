@@ -1,20 +1,20 @@
 use crate::algorithms::commitment::CommitmentError;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum BindingSignatureError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CommitmentError(CommitmentError),
 
-    #[fail(display = "Affine point is not in the correct subgroup on curve {:?}", _0)]
+    #[error("Affine point is not in the correct subgroup on curve {:?}", _0)]
     NotInCorrectSubgroupOnCurve(Vec<u8>),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "The value balance is out of bounds: {}", _0)]
+    #[error("The value balance is out of bounds: {}", _0)]
     OutOfBounds(i64),
 }
 
