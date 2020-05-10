@@ -1,5 +1,8 @@
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::dpc::{AccountScheme, Predicate, Record};
+use snarkos_models::{
+    dpc::{Predicate, Record},
+    objects::AccountScheme,
+};
 use snarkos_objects::{dpc::Transaction, ledger::*};
 
 use rand::Rng;

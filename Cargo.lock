@@ -88,6 +88,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
+name = "bech32"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58946044516aa9dc922182e0d6e9d124a31aafe6b421614654eb27cf90cec09c"
+
+[[package]]
 name = "bincode"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2154,6 +2160,7 @@ name = "snarkos-objects"
 version = "0.8.0"
 dependencies = [
  "base58",
+ "bech32",
  "chrono",
  "derivative",
  "hex",
