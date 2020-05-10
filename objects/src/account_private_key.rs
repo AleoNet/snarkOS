@@ -104,24 +104,24 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
 
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut private_key = [0u8; 131];
+        let mut private_key = [0u8; 132];
         let prefix = match self.is_testnet {
             true => account_format::PRIVATE_KEY_TESTNET,
             false => account_format::PRIVATE_KEY_MAINNET,
         };
-        private_key[0..3].copy_from_slice(&prefix);
+        private_key[0..4].copy_from_slice(&prefix);
 
         self.sk_sig
-            .write(&mut private_key[3..35])
+            .write(&mut private_key[4..36])
             .expect("sk_sig formatting failed");
         self.sk_prf
-            .write(&mut private_key[35..67])
+            .write(&mut private_key[36..68])
             .expect("sk_prf formatting failed");
         self.metadata
-            .write(&mut private_key[67..99])
+            .write(&mut private_key[68..100])
             .expect("metadata formatting failed");
         self.r_pk
-            .write(&mut private_key[99..131])
+            .write(&mut private_key[100..132])
             .expect("r_pk formatting failed");
 
         write!(f, "{}", private_key.to_base58())
