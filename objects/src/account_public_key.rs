@@ -13,11 +13,7 @@ use std::{
 };
 
 #[derive(Derivative)]
-#[derivative(
-    Default(bound = "C: DPCComponents"),
-    Clone(bound = "C: DPCComponents"),
-    Debug(bound = "C: DPCComponents")
-)]
+#[derivative(Default(bound = "C: DPCComponents"), Clone(bound = "C: DPCComponents"))]
 pub struct AccountPublicKey<C: DPCComponents> {
     pub public_key: <C::AddressCommitment as CommitmentScheme>::Output,
     pub is_testnet: bool,
@@ -73,5 +69,11 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
 
         let result = Bech32::new(prefix, public_key.to_base32());
         result.unwrap().fmt(f)
+    }
+}
+
+impl<C: DPCComponents> fmt::Debug for AccountPublicKey<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

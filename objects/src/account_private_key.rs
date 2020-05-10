@@ -127,3 +127,9 @@ impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
         write!(f, "{}", private_key.to_base58())
     }
 }
+
+impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
