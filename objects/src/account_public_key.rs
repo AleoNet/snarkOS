@@ -15,19 +15,19 @@ use std::{
 #[derive(Derivative)]
 #[derivative(Default(bound = "C: DPCComponents"), Clone(bound = "C: DPCComponents"))]
 pub struct AccountPublicKey<C: DPCComponents> {
-    pub public_key: <C::AddressCommitment as CommitmentScheme>::Output,
+    pub public_key: <C::AccountCommitment as CommitmentScheme>::Output,
     pub is_testnet: bool,
 }
 
 impl<C: DPCComponents> AccountPublicKey<C> {
     /// Creates a new account public key from an account private key. Defaults to a testnet account
     /// if no network indicator is provided.
-    pub fn from(parameters: &C::AddressCommitment, private_key: &AccountPrivateKey<C>) -> Result<Self, AccountError> {
+    pub fn from(parameters: &C::AccountCommitment, private_key: &AccountPrivateKey<C>) -> Result<Self, AccountError> {
         // Construct the commitment input for the account public key.
         let commit_input = to_bytes![private_key.pk_sig, private_key.sk_prf, private_key.metadata]?;
 
         Ok(Self {
-            public_key: C::AddressCommitment::commit(parameters, &commit_input, &private_key.r_pk)?,
+            public_key: C::AccountCommitment::commit(parameters, &commit_input, &private_key.r_pk)?,
             is_testnet: private_key.is_testnet,
         })
     }
@@ -45,7 +45,7 @@ impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
     /// if no network indicator is provided.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let public_key: <C::AddressCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
+        let public_key: <C::AccountCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
         let is_testnet: bool = match FromBytes::read(&mut reader) {
             Ok(is_testnet) => is_testnet,
             _ => true, // Defaults to testnet

@@ -30,8 +30,8 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
 where
-    <C::AddressCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::AddressCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -58,7 +58,7 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .address_commitment_parameters
+                .account_commitment
                 .parameters()
                 .to_field_elements()?,
         );

@@ -38,8 +38,8 @@ fn base_dpc_integration_test() {
     // Generate or load parameters for the ledger, commitment schemes, and CRH
     let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
-    // Generate addresses
-    let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
+    // Generate accounts
+    let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
     let mut path = std::env::temp_dir();
     let random_storage_path: usize = rng.gen();
@@ -47,13 +47,13 @@ fn base_dpc_integration_test() {
 
     // Setup the ledger
     let (ledger, genesis_pred_vk_bytes) =
-        setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
+        setup_ledger(&path, &parameters, ledger_parameters, &genesis_account, &mut rng);
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
-    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
@@ -64,7 +64,7 @@ fn base_dpc_integration_test() {
         let old_record = DPC::generate_record(
             &parameters.circuit_parameters,
             &old_sn_nonce,
-            &genesis_address.public_key,
+            &genesis_account.public_key,
             true, // The input record is dummy
             &PaymentRecordPayload::default(),
             &Predicate::new(genesis_pred_vk_bytes.clone()),

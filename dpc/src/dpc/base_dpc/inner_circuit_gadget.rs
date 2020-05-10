@@ -62,13 +62,13 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     base_dpc_execute_gadget_helper::<
         C,
         CS,
-        C::AddressCommitment,
+        C::AccountCommitment,
         C::RecordCommitment,
         C::LocalDataCommitment,
         C::SerialNumberNonce,
         C::Signature,
         C::PRF,
-        C::AddressCommitmentGadget,
+        C::AccountCommitmentGadget,
         C::RecordCommitmentGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceGadget,
@@ -107,13 +107,13 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
 fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
-    AddrC,
+    AccountCommitment,
     RecC,
     LocalDataC,
     SnNonceH,
     SignatureS,
     P,
-    AddrCGadget,
+    AccountCommitmentGadget,
     RecCGadget,
     LocalDataCGadget,
     SnNonceHGadget,
@@ -154,27 +154,27 @@ fn base_dpc_execute_gadget_helper<
 ) -> Result<(), SynthesisError>
 where
     C: BaseDPCComponents<
-        AddressCommitment = AddrC,
+        AccountCommitment = AccountCommitment,
         RecordCommitment = RecC,
         LocalDataCommitment = LocalDataC,
         SerialNumberNonce = SnNonceH,
         Signature = SignatureS,
         PRF = P,
-        AddressCommitmentGadget = AddrCGadget,
+        AccountCommitmentGadget = AccountCommitmentGadget,
         RecordCommitmentGadget = RecCGadget,
         LocalDataCommitmentGadget = LocalDataCGadget,
         SerialNumberNonceGadget = SnNonceHGadget,
         SignatureGadget = SignatureSGadget,
         PRFGadget = PGadget,
     >,
-    AddrC: CommitmentScheme,
+    AccountCommitment: CommitmentScheme,
     RecC: CommitmentScheme,
     LocalDataC: CommitmentScheme,
     SnNonceH: CRH,
     SignatureS: SignatureScheme,
     P: PRF,
     RecC::Output: Eq,
-    AddrCGadget: CommitmentGadget<AddrC, C::InnerField>,
+    AccountCommitmentGadget: CommitmentGadget<AccountCommitment, C::InnerField>,
     RecCGadget: CommitmentGadget<RecC, C::InnerField>,
     LocalDataCGadget: CommitmentGadget<LocalDataC, C::InnerField>,
     SnNonceHGadget: CRHGadget<SnNonceH, C::InnerField>,
@@ -222,10 +222,10 @@ where
         ledger_pp,
     ) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
-        let addr_comm_pp =
-            AddrCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Addr Comm parameters"), || {
-                Ok(comm_crh_sig_parameters.address_commitment_parameters.parameters())
-            })?;
+        let addr_comm_pp = AccountCommitmentGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare Addr Comm parameters"),
+            || Ok(comm_crh_sig_parameters.account_commitment.parameters()),
+        )?;
 
         let rec_comm_pp =
             RecCGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare Rec Comm parameters"), || {
@@ -308,7 +308,7 @@ where
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
             let given_account_public_key =
-                AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
+                AccountCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
                     Ok(&record.account_public_key().public_key)
                 })?;
             old_account_public_keys.push(given_account_public_key.clone());
@@ -376,22 +376,22 @@ where
         // ********************************************************************
 
         // ********************************************************************
-        // Check that the address public key and secret key form a valid key
+        // Check that the account public key and private key form a valid key
         // pair.
         // ********************************************************************
 
         let (sk_prf, pk_sig) = {
             // Declare variables for addr_sk contents.
-            let address_cs = &mut cs.ns(|| "Check address keypair");
-            let pk_sig = SignatureSGadget::PublicKeyGadget::alloc(&mut address_cs.ns(|| "Declare pk_sig"), || {
+            let account_cs = &mut cs.ns(|| "Check account");
+            let pk_sig = SignatureSGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
                 Ok(&account_private_key.pk_sig)
             })?;
 
-            let pk_sig_bytes = pk_sig.to_bytes(&mut address_cs.ns(|| "Pk_sig To Bytes"))?;
+            let pk_sig_bytes = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
 
-            let sk_prf = PGadget::new_seed(&mut address_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
-            let metadata = UInt8::alloc_vec(&mut address_cs.ns(|| "Declare metadata"), &account_private_key.metadata)?;
-            let r_pk = AddrCGadget::RandomnessGadget::alloc(&mut address_cs.ns(|| "Declare r_pk"), || {
+            let sk_prf = PGadget::new_seed(&mut account_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
+            let metadata = UInt8::alloc_vec(&mut account_cs.ns(|| "Declare metadata"), &account_private_key.metadata)?;
+            let r_pk = AccountCommitmentGadget::RandomnessGadget::alloc(&mut account_cs.ns(|| "Declare r_pk"), || {
                 Ok(&account_private_key.r_pk)
             })?;
 
@@ -399,15 +399,15 @@ where
             account_public_key_input.extend_from_slice(&sk_prf);
             account_public_key_input.extend_from_slice(&metadata);
 
-            let candidate_account_public_key = AddrCGadget::check_commitment_gadget(
-                &mut address_cs.ns(|| "Compute Addr PubKey"),
+            let candidate_account_public_key = AccountCommitmentGadget::check_commitment_gadget(
+                &mut account_cs.ns(|| "Compute account public key"),
                 &addr_comm_pp,
                 &account_public_key_input,
                 &r_pk,
             )?;
 
             candidate_account_public_key.enforce_equal(
-                &mut address_cs.ns(|| "Check that declared and computed pks are equal"),
+                &mut account_cs.ns(|| "Check that declared and computed public keys are equal"),
                 &given_account_public_key,
             )?;
             (sk_prf, pk_sig)
@@ -511,7 +511,7 @@ where
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
             let given_account_public_key =
-                AddrCGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
+                AccountCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "Addr PubKey"), || {
                     Ok(&record.account_public_key().public_key)
                 })?;
             new_account_public_keys.push(given_account_public_key.clone());

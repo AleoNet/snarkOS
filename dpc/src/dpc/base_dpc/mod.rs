@@ -183,8 +183,8 @@ pub struct LocalData<Components: BaseDPCComponents> {
 
 impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_circuit_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
-        let time = start_timer!(|| "Address commitment scheme setup");
-        let addr_comm_pp = Components::AddressCommitment::setup(rng);
+        let time = start_timer!(|| "Account commitment scheme setup");
+        let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
@@ -216,7 +216,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let comm_crh_sig_pp = CircuitParameters {
-            address_commitment_parameters: addr_comm_pp,
+            account_commitment,
             record_commitment_parameters: rec_comm_pp,
             predicate_verification_key_commitment_parameters: pred_vk_comm_pp,
             local_data_commitment_parameters: local_data_comm_pp,
@@ -516,7 +516,7 @@ where
         SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
     >,
 {
-    type AddressKeyPair = Account<Components>;
+    type Account = Account<Components>;
     type Auxiliary = [u8; 32];
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
@@ -567,15 +567,15 @@ where
         })
     }
 
-    fn create_address<R: Rng>(
+    fn create_account<R: Rng>(
         parameters: &Self::Parameters,
         metadata: &Self::Metadata,
         rng: &mut R,
-    ) -> Result<Self::AddressKeyPair, DPCError> {
-        let time = start_timer!(|| "BaseDPC::create_address");
+    ) -> Result<Self::Account, DPCError> {
+        let time = start_timer!(|| "BaseDPC::create_account");
 
         let signature_parameters = &parameters.circuit_parameters.signature_parameters;
-        let commitment_parameters = &parameters.circuit_parameters.address_commitment_parameters;
+        let commitment_parameters = &parameters.circuit_parameters.account_commitment;
         let account = Account::new(signature_parameters, commitment_parameters, metadata, None, rng)?;
 
         end_timer!(time);
@@ -586,10 +586,10 @@ where
     fn execute<R: Rng>(
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::AddressKeyPair as AccountScheme>::AccountPrivateKey],
+        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_keys: &[<Self::AddressKeyPair as AccountScheme>::AccountPublicKey],
+        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],

@@ -7,7 +7,7 @@ use std::{io::Result as IoResult, path::PathBuf};
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct CircuitParameters<C: BaseDPCComponents> {
-    pub address_commitment_parameters: C::AddressCommitment,
+    pub account_commitment: C::AccountCommitment,
     pub record_commitment_parameters: C::RecordCommitment,
     pub predicate_verification_key_commitment_parameters: C::PredicateVerificationKeyCommitment,
     pub predicate_verification_key_hash_parameters: C::PredicateVerificationKeyHash,
@@ -41,8 +41,8 @@ pub struct PublicParameters<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> PublicParameters<C> {
-    pub fn address_commitment_parameters(&self) -> &C::AddressCommitment {
-        &self.circuit_parameters.address_commitment_parameters
+    pub fn account_commitment_parameters(&self) -> &C::AccountCommitment {
+        &self.circuit_parameters.account_commitment
     }
 
     pub fn inner_snark_parameters(
@@ -100,7 +100,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         // Circuit Parameters
 
-        let address_comm_pp_path = &circuit_dir.join("address_commitment.params");
+        let account_commitment_parameters_path = &circuit_dir.join("account_commitment.params");
         let record_comm_pp_path = &circuit_dir.join("record_commitment.params");
         let predicate_vk_comm_pp_path = &circuit_dir.join("predicate_vk_commitment.params");
         let predicate_vk_crh_pp_path = &circuit_dir.join("predicate_vk_crh.params");
@@ -112,8 +112,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         let circuit_parameters = &self.circuit_parameters;
 
         circuit_parameters
-            .address_commitment_parameters
-            .store(address_comm_pp_path)?;
+            .account_commitment
+            .store(account_commitment_parameters_path)?;
         circuit_parameters
             .record_commitment_parameters
             .store(record_comm_pp_path)?;
@@ -182,7 +182,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {
-            let address_comm_pp_path = &circuit_dir.join("address_commitment.params");
+            let account_commitment_parameters_path = &circuit_dir.join("account_commitment.params");
             let record_comm_pp_path = &circuit_dir.join("record_commitment.params");
             let predicate_vk_comm_pp_path = &circuit_dir.join("predicate_vk_commitment.params");
             let predicate_vk_crh_pp_path = &circuit_dir.join("predicate_vk_crh.params");
@@ -191,7 +191,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let serial_number_comm_pp_path = &circuit_dir.join("serial_number_commitment.params");
             let signature_pp_path = &circuit_dir.join("signature.params");
 
-            let address_commitment_parameters = C::AddressCommitment::load(address_comm_pp_path)?;
+            let account_commitment = C::AccountCommitment::load(account_commitment_parameters_path)?;
             let record_commitment_parameters = C::RecordCommitment::load(record_comm_pp_path)?;
             let predicate_verification_key_commitment_parameters =
                 C::PredicateVerificationKeyCommitment::load(predicate_vk_comm_pp_path)?;
@@ -203,7 +203,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let signature_parameters = C::Signature::load(signature_pp_path)?;
 
             CircuitParameters::<C> {
-                address_commitment_parameters,
+                account_commitment,
                 record_commitment_parameters,
                 predicate_verification_key_commitment_parameters,
                 predicate_verification_key_hash_parameters,
@@ -214,7 +214,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             }
         };
 
-        // Snark Parameters
+        // SNARK Parameters
 
         let predicate_snark_parameters: PredicateSNARKParameters<C> = {
             let predicate_snark_pp_path = &dir_path.join("predicate_snark.params");
@@ -278,7 +278,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn load_vk_direct() -> IoResult<Self> {
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {
-            let address_comm_pp_bytes = include_bytes!["../../parameters/circuit/address_commitment.params"];
+            let account_commitment_parameters = include_bytes!["../../parameters/circuit/account_commitment.params"];
             let record_comm_pp_bytes = include_bytes!["../../parameters/circuit/record_commitment.params"];
             let predicate_vk_comm_pp_bytes = vec![];
             let predicate_vk_crh_pp_bytes = include_bytes!["../../parameters/circuit/predicate_vk_crh.params"];
@@ -288,7 +288,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
                 include_bytes!["../../parameters/circuit/serial_number_commitment.params"];
             let signature_pp_bytes = &include_bytes!["../../parameters/circuit/signature.params"];
 
-            let address_commitment_parameters: C::AddressCommitment = FromBytes::read(&address_comm_pp_bytes[..])?;
+            let account_commitment: C::AccountCommitment = FromBytes::read(&account_commitment_parameters[..])?;
             let record_commitment_parameters: C::RecordCommitment = FromBytes::read(&record_comm_pp_bytes[..])?;
             let predicate_verification_key_commitment_parameters: C::PredicateVerificationKeyCommitment =
                 FromBytes::read(&predicate_vk_comm_pp_bytes[..])?;
@@ -302,7 +302,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let signature_parameters: C::Signature = FromBytes::read(&signature_pp_bytes[..])?;
 
             CircuitParameters::<C> {
-                address_commitment_parameters,
+                account_commitment,
                 record_commitment_parameters,
                 predicate_verification_key_commitment_parameters,
                 predicate_verification_key_hash_parameters,
@@ -313,7 +313,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             }
         };
 
-        // Snark Parameters
+        // SNARK Parameters
 
         let predicate_snark_parameters: PredicateSNARKParameters<C> = {
             let predicate_snark_pp_bytes = include_bytes!["../../parameters/predicate_snark.params"];

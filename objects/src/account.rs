@@ -17,7 +17,7 @@ pub struct Account<C: DPCComponents> {
 impl<C: DPCComponents> AccountScheme for Account<C> {
     type AccountPrivateKey = AccountPrivateKey<C>;
     type AccountPublicKey = AccountPublicKey<C>;
-    type CommitmentScheme = C::AddressCommitment;
+    type CommitmentScheme = C::AccountCommitment;
     type SignatureScheme = C::Signature;
 
     /// Creates a new account. Defaults to a testnet account

@@ -23,7 +23,7 @@ pub struct AccountPrivateKey<C: DPCComponents> {
     pub sk_sig: <C::Signature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub metadata: [u8; 32],
-    pub r_pk: <C::AddressCommitment as CommitmentScheme>::Randomness,
+    pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
     pub is_testnet: bool,
 }
 
@@ -45,7 +45,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
 
         // Sample randomness rpk for the commitment scheme.
-        let r_pk = <C::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Determine if this is a testnet account.
         let is_testnet = match is_testnet {
@@ -53,7 +53,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
             None => true, // Defaults to testnet
         };
 
-        // Construct the address secret key.
+        // Construct the account private key.
         Ok(Self {
             pk_sig,
             sk_sig,
@@ -85,7 +85,7 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
         let sk_sig: <C::Signature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
         let metadata: [u8; 32] = FromBytes::read(&mut reader)?;
-        let r_pk: <C::AddressCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
+        let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
         let is_testnet: bool = match FromBytes::read(&mut reader) {
             Ok(is_testnet) => is_testnet,
             _ => true, // Defaults to testnet

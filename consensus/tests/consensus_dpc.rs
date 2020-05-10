@@ -31,7 +31,7 @@ mod consensus_dpc {
         let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
         // Generate addresses
-        let [genesis_address, miner_address, recipient] = generate_test_addresses(&parameters, &mut rng);
+        let [genesis_address, miner_address, recipient] = generate_test_accounts(&parameters, &mut rng);
 
         let mut path = std::env::temp_dir();
         let random_storage_path: usize = rng.gen();

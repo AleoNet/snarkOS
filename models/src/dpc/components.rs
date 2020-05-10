@@ -12,8 +12,8 @@ pub trait DPCComponents: 'static + Sized {
     type OuterField: PrimeField;
 
     /// Commitment scheme for address contents. Invoked only over `Self::InnerField`.
-    type AddressCommitment: CommitmentScheme;
-    type AddressCommitmentGadget: CommitmentGadget<Self::AddressCommitment, Self::InnerField>;
+    type AccountCommitment: CommitmentScheme;
+    type AccountCommitmentGadget: CommitmentGadget<Self::AccountCommitment, Self::InnerField>;
 
     /// Commitment scheme for committing to predicate input. Invoked inside
     /// `Self::MainN` and every predicate SNARK.

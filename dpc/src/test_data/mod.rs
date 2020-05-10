@@ -66,15 +66,15 @@ pub fn setup_or_load_parameters<R: Rng>(
     (ledger_parameters, parameters)
 }
 
-pub fn generate_test_addresses<R: Rng>(
+pub fn generate_test_accounts<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
     let signature_parameters = &parameters.circuit_parameters.signature_parameters;
-    let commitment_parameters = &parameters.circuit_parameters.address_commitment_parameters;
+    let commitment_parameters = &parameters.circuit_parameters.account_commitment;
 
     let genesis_metadata = [1u8; 32];
-    let genesis_address = Account::new(
+    let genesis_account = Account::new(
         signature_parameters,
         commitment_parameters,
         &genesis_metadata,
@@ -89,14 +89,14 @@ pub fn generate_test_addresses<R: Rng>(
     let metadata_2 = [3u8; 32];
     let address_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, None, rng).unwrap();
 
-    [genesis_address, address_1, address_2]
+    [genesis_account, address_1, address_2]
 }
 
 pub fn setup_ledger<R: Rng>(
     path: &PathBuf,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
-    genesis_address: &Account<Components>,
+    genesis_account: &Account<Components>,
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
     let genesis_sn_nonce = SerialNumberNonce::hash(
@@ -116,7 +116,7 @@ pub fn setup_ledger<R: Rng>(
     let genesis_record = DPC::generate_record(
         &parameters.circuit_parameters,
         &genesis_sn_nonce,
-        &genesis_address.public_key,
+        &genesis_account.public_key,
         true, // The inital record should be dummy
         &PaymentRecordPayload::default(),
         &Predicate::new(genesis_pred_vk_bytes.clone()),
@@ -129,7 +129,7 @@ pub fn setup_ledger<R: Rng>(
     let (genesis_sn, _) = DPC::generate_sn(
         &parameters.circuit_parameters,
         &genesis_record,
-        &genesis_address.private_key,
+        &genesis_account.private_key,
     )
     .unwrap();
     let genesis_memo = [0u8; 32];
