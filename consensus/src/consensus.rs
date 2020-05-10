@@ -280,7 +280,7 @@ impl ConsensusParameters {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
             let old_sn_nonce = SerialNumberNonce::hash(
-                &parameters.circuit_parameters.serial_number_nonce_parameters,
+                &parameters.circuit_parameters.serial_number_nonce,
                 &sn_nonce_input,
             )?;
 
@@ -370,7 +370,7 @@ impl ConsensusParameters {
                 // Generate the value commitment
                 let value_commitment = local_data
                     .circuit_parameters
-                    .value_commitment_parameters
+                    .value_commitment
                     .commit(&input_value.to_le_bytes(), &value_commitment_randomness)?;
 
                 // Instantiate death predicate circuit
@@ -395,13 +395,13 @@ impl ConsensusParameters {
                     let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                         local_data_commitment_parameters: local_data
                             .circuit_parameters
-                            .local_data_commitment_parameters
+                            .local_data_commitment
                             .parameters()
                             .clone(),
                         local_data_commitment: local_data.local_data_commitment.clone(),
                         value_commitment_parameters: local_data
                             .circuit_parameters
-                            .value_commitment_parameters
+                            .value_commitment
                             .parameters()
                             .clone(),
                         value_commitment_randomness: value_commitment_randomness.clone(),
@@ -444,7 +444,7 @@ impl ConsensusParameters {
                 // Generate the value commitment
                 let value_commitment = local_data
                     .circuit_parameters
-                    .value_commitment_parameters
+                    .value_commitment
                     .commit(&output_value.to_le_bytes(), &value_commitment_randomness)?;
 
                 // Instantiate birth predicate circuit
@@ -469,13 +469,13 @@ impl ConsensusParameters {
                     let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                         local_data_commitment_parameters: local_data
                             .circuit_parameters
-                            .local_data_commitment_parameters
+                            .local_data_commitment
                             .parameters()
                             .clone(),
                         local_data_commitment: local_data.local_data_commitment.clone(),
                         value_commitment_parameters: local_data
                             .circuit_parameters
-                            .value_commitment_parameters
+                            .value_commitment
                             .parameters()
                             .clone(),
                         value_commitment_randomness: value_commitment_randomness.clone(),

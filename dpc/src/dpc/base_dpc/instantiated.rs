@@ -183,8 +183,8 @@ impl DPCComponents for Components {
     type PredicateVerificationKeyHashGadget = PredicateVerificationKeyHashGadget;
     type RecordCommitment = RecordCommitment;
     type RecordCommitmentGadget = RecordCommitmentGadget;
-    type SerialNumberNonce = SerialNumberNonce;
-    type SerialNumberNonceGadget = SerialNumberNonceGadget;
+    type SerialNumberNonceCRH = SerialNumberNonce;
+    type SerialNumberNonceCRHGadget = SerialNumberNonceGadget;
     type Signature = Signature;
     type SignatureGadget = SignatureGadget;
 

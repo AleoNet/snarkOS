@@ -204,7 +204,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SerialNumberNonce::setup(rng);
+        let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key CRH setup");
@@ -217,15 +217,15 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let comm_crh_sig_pp = CircuitParameters {
             account_commitment,
-            record_commitment_parameters: rec_comm_pp,
-            predicate_verification_key_commitment_parameters: pred_vk_comm_pp,
-            local_data_commitment_parameters: local_data_comm_pp,
-            value_commitment_parameters: value_comm_pp,
+            record_commitment: rec_comm_pp,
+            predicate_verification_key_commitment: pred_vk_comm_pp,
+            local_data_commitment: local_data_comm_pp,
+            value_commitment: value_comm_pp,
 
-            serial_number_nonce_parameters: sn_nonce_crh_pp,
-            predicate_verification_key_hash_parameters: pred_vk_crh_pp,
+            serial_number_nonce: sn_nonce_crh_pp,
+            predicate_verification_key_hash: pred_vk_crh_pp,
 
-            signature_parameters: sig_pp,
+            signature: sig_pp,
         };
 
         Ok(comm_crh_sig_pp)
@@ -259,7 +259,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let sig_and_pk_randomizer = to_bytes![Components::PRF::evaluate(&prf_seed, &prf_input)?]?;
 
         let sn = Components::Signature::randomize_public_key(
-            &params.signature_parameters,
+            &params.signature,
             &account_private_key.pk_sig,
             &sig_and_pk_randomizer,
         )?;
@@ -269,7 +269,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
-        sn_nonce: &<Components::SerialNumberNonce as CRH>::Output,
+        sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
         account_public_key: &AccountPublicKey<Components>,
         is_dummy: bool,
         payload: &PaymentRecordPayload,
@@ -295,7 +295,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         ]?;
 
         let commitment = Components::RecordCommitment::commit(
-            &parameters.record_commitment_parameters,
+            &parameters.record_commitment,
             &commitment_input,
             &commitment_randomness,
         )?;
@@ -394,7 +394,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let sn_randomness: [u8; 32] = rng.gen();
 
             let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
-            let sn_nonce = Components::SerialNumberNonce::hash(&parameters.serial_number_nonce_parameters, &crh_input)?;
+            let sn_nonce = Components::SerialNumberNonceCRH::hash(&parameters.serial_number_nonce, &crh_input)?;
 
             end_timer!(sn_nonce_time);
 
@@ -454,7 +454,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
         let local_data_comm = Components::LocalDataCommitment::commit(
-            &parameters.local_data_commitment_parameters,
+            &parameters.local_data_commitment,
             &predicate_input,
             &local_data_rand,
         )?;
@@ -473,7 +473,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let predicate_rand =
                 <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
             let predicate_comm = Components::PredicateVerificationKeyCommitment::commit(
-                &parameters.predicate_verification_key_commitment_parameters,
+                &parameters.predicate_verification_key_commitment,
                 &input,
                 &predicate_rand,
             )?;
@@ -574,7 +574,7 @@ where
     ) -> Result<Self::Account, DPCError> {
         let time = start_timer!(|| "BaseDPC::create_account");
 
-        let signature_parameters = &parameters.circuit_parameters.signature_parameters;
+        let signature_parameters = &parameters.circuit_parameters.signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
         let account = Account::new(signature_parameters, commitment_parameters, metadata, None, rng)?;
 
@@ -674,7 +674,7 @@ where
 
         let binding_signature =
             create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
-                &circuit_parameters.value_commitment_parameters,
+                &circuit_parameters.value_commitment,
                 &old_value_commits,
                 &new_value_commits,
                 &old_value_commit_randomness,
@@ -751,13 +751,13 @@ where
             let randomizer = &old_randomizers[i];
             // Sign transaction message
             let signature = Components::Signature::sign(
-                &circuit_parameters.signature_parameters,
+                &circuit_parameters.signature,
                 sk_sig,
                 &signature_message,
                 rng,
             )?;
             let randomized_signature = Components::Signature::randomize_signature(
-                &circuit_parameters.signature_parameters,
+                &circuit_parameters.signature,
                 &signature,
                 randomizer,
             )?;
@@ -855,7 +855,7 @@ where
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
-        let sig_pp = &parameters.circuit_parameters.signature_parameters;
+        let sig_pp = &parameters.circuit_parameters.signature;
         for (pk, sig) in transaction
             .old_serial_numbers()
             .iter()

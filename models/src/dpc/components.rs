@@ -41,8 +41,8 @@ pub trait DPCComponents: 'static + Sized {
     type RecordCommitmentGadget: CommitmentGadget<Self::RecordCommitment, Self::InnerField>;
 
     /// CRH for computing the serial number nonce. Invoked only over `Self::InnerField`.
-    type SerialNumberNonce: CRH;
-    type SerialNumberNonceGadget: CRHGadget<Self::SerialNumberNonce, Self::InnerField>;
+    type SerialNumberNonceCRH: CRH;
+    type SerialNumberNonceCRHGadget: CRHGadget<Self::SerialNumberNonceCRH, Self::InnerField>;
 
     /// Signature scheme for delegated compute.
     type Signature: SignatureScheme;

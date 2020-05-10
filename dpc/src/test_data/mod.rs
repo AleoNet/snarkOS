@@ -70,7 +70,7 @@ pub fn generate_test_accounts<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
-    let signature_parameters = &parameters.circuit_parameters.signature_parameters;
+    let signature_parameters = &parameters.circuit_parameters.signature;
     let commitment_parameters = &parameters.circuit_parameters.account_commitment;
 
     let genesis_metadata = [1u8; 32];
@@ -100,13 +100,13 @@ pub fn setup_ledger<R: Rng>(
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
     let genesis_sn_nonce = SerialNumberNonce::hash(
-        &parameters.circuit_parameters.serial_number_nonce_parameters,
+        &parameters.circuit_parameters.serial_number_nonce,
         &[34u8; 1],
     )
     .unwrap();
-    let genesis_pred_vk_bytes = to_bytes![
+    let genesis_predicate_vk_bytes = to_bytes![
         PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash_parameters,
+            &parameters.circuit_parameters.predicate_verification_key_hash,
             &to_bytes![parameters.predicate_snark_parameters.verification_key].unwrap()
         )
         .unwrap()
@@ -119,8 +119,8 @@ pub fn setup_ledger<R: Rng>(
         &genesis_account.public_key,
         true, // The inital record should be dummy
         &PaymentRecordPayload::default(),
-        &Predicate::new(genesis_pred_vk_bytes.clone()),
-        &Predicate::new(genesis_pred_vk_bytes.clone()),
+        &Predicate::new(genesis_predicate_vk_bytes.clone()),
+        &Predicate::new(genesis_predicate_vk_bytes.clone()),
         rng,
     )
     .unwrap();
@@ -141,10 +141,10 @@ pub fn setup_ledger<R: Rng>(
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
-        genesis_pred_vk_bytes.to_vec(),
-        to_bytes![genesis_address].unwrap().to_vec(),
+        genesis_predicate_vk_bytes.to_vec(),
+        to_bytes![genesis_account].unwrap().to_vec(),
     )
     .unwrap();
 
-    (ledger, genesis_pred_vk_bytes)
+    (ledger, genesis_predicate_vk_bytes)
 }

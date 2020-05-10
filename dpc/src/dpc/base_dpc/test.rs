@@ -37,14 +37,14 @@ fn test_execute_base_dpc_constraints() {
 
     let pred_nizk_vk_bytes = to_bytes![
         PredicateVerificationKeyHash::hash(
-            &circuit_parameters.predicate_verification_key_hash_parameters,
+            &circuit_parameters.predicate_verification_key_hash,
             &to_bytes![pred_nizk_pp.verification_key].unwrap()
         )
         .unwrap()
     ]
     .unwrap();
 
-    let signature_parameters = &circuit_parameters.signature_parameters;
+    let signature_parameters = &circuit_parameters.signature;
     let commitment_parameters = &circuit_parameters.account_commitment;
 
     // Generate metadata and an account for a dummy initial, or "genesis", record.
@@ -59,7 +59,7 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     let genesis_sn_nonce =
-        SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce_parameters, &[0u8; 1]).unwrap();
+        SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
         &circuit_parameters,
         &genesis_sn_nonce,
@@ -173,7 +173,7 @@ fn test_execute_base_dpc_constraints() {
         let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
         let value_commitment = ValueCommitment::commit(
-            &circuit_parameters.value_commitment_parameters,
+            &circuit_parameters.value_commitment,
             &value.to_le_bytes(),
             &value_commitment_randomness,
         )
@@ -196,11 +196,11 @@ fn test_execute_base_dpc_constraints() {
         {
             let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters
-                    .local_data_commitment_parameters
+                    .local_data_commitment
                     .parameters()
                     .clone(),
                 local_data_commitment: local_data_comm.clone(),
-                value_commitment_parameters: circuit_parameters.value_commitment_parameters.parameters().clone(),
+                value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
                 value_commitment_randomness: value_commitment_randomness.clone(),
                 value_commitment: value_commitment.clone(),
                 position: i as u8,
@@ -227,7 +227,7 @@ fn test_execute_base_dpc_constraints() {
         let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
         let value_commitment = ValueCommitment::commit(
-            &circuit_parameters.value_commitment_parameters,
+            &circuit_parameters.value_commitment,
             &value.to_le_bytes(),
             &value_commitment_randomness,
         )
@@ -251,11 +251,11 @@ fn test_execute_base_dpc_constraints() {
         {
             let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters
-                    .local_data_commitment_parameters
+                    .local_data_commitment
                     .parameters()
                     .clone(),
                 local_data_commitment: local_data_comm.clone(),
-                value_commitment_parameters: circuit_parameters.value_commitment_parameters.parameters().clone(),
+                value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
                 value_commitment_randomness: value_commitment_randomness.clone(),
                 value_commitment: value_commitment.clone(),
                 position: j as u8,
@@ -314,7 +314,7 @@ fn test_execute_base_dpc_constraints() {
         <Components as BaseDPCComponents>::BindingSignatureGroup,
         _,
     >(
-        &circuit_parameters.value_commitment_parameters,
+        &circuit_parameters.value_commitment,
         &old_value_commits,
         &new_value_commits,
         &old_value_commit_randomness,
@@ -405,7 +405,7 @@ fn test_execute_base_dpc_constraints() {
         <Components as BaseDPCComponents>::ValueCommitment,
         <Components as BaseDPCComponents>::BindingSignatureGroup,
     >(
-        &circuit_parameters.value_commitment_parameters,
+        &circuit_parameters.value_commitment,
         &old_value_commits,
         &new_value_commits,
         value_balance,

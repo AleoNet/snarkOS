@@ -31,20 +31,20 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .predicate_verification_key_commitment_parameters
+                .predicate_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .predicate_verification_key_hash_parameters
+                .predicate_verification_key_hash
                 .parameters()
                 .to_field_elements()?,
         );
 
         let local_data_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            self.circuit_parameters.local_data_commitment_parameters.parameters(),
+            self.circuit_parameters.local_data_commitment.parameters(),
         )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
@@ -53,7 +53,7 @@ where
                 .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         let value_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            self.circuit_parameters.value_commitment_parameters.parameters(),
+            self.circuit_parameters.value_commitment.parameters(),
         )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 

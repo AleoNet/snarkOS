@@ -32,7 +32,7 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
     pub(super) death_predicate_repr: Vec<u8>,
 
-    pub(super) serial_number_nonce: <C::SerialNumberNonce as CRH>::Output,
+    pub(super) serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
 
     pub(super) commitment: <C::RecordCommitment as CommitmentScheme>::Output,
     pub(super) commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness,
@@ -51,7 +51,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
     type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
-    type SerialNumberNonce = <C::SerialNumberNonce as CRH>::Output;
+    type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
 
     fn account_public_key(&self) -> &Self::AccountPublicKey {
         &self.account_public_key
@@ -129,7 +129,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             death_pred_repr.push(byte);
         }
 
-        let serial_number_nonce: <C::SerialNumberNonce as CRH>::Output = FromBytes::read(&mut reader)?;
+        let serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output = FromBytes::read(&mut reader)?;
 
         let commitment: <C::RecordCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
         let commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness =

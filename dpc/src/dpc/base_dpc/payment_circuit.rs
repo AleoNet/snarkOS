@@ -119,7 +119,7 @@ fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::In
     let _local_data_commitment_parameters_gadget =
         <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare Pred Input Comm parameters"),
-            || Ok(circuit_parameters.local_data_commitment_parameters.parameters().clone()),
+            || Ok(circuit_parameters.local_data_commitment.parameters().clone()),
         )?;
 
     let _local_data_commitment_gadget =
@@ -131,7 +131,7 @@ fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::In
     let value_commitment_parameters_gadget =
         <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare value comm parameters"),
-            || Ok(circuit_parameters.value_commitment_parameters.parameters()),
+            || Ok(circuit_parameters.value_commitment.parameters()),
         )?;
 
     let value_commitment_randomness_gadget =
