@@ -221,9 +221,9 @@ where
         value_commitment_pp,
         ledger_pp,
     ) = {
-        let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
-        let addr_comm_pp = AccountCommitmentGadget::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Addr Comm parameters"),
+        let cs = &mut cs.ns(|| "Declare commitment and CRH parameters");
+        let account_commitment = AccountCommitmentGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare account commit parameters"),
             || Ok(comm_crh_sig_parameters.account_commitment.parameters()),
         )?;
 
@@ -266,7 +266,7 @@ where
             || Ok(ledger_parameters.parameters()),
         )?;
         (
-            addr_comm_pp,
+            account_commitment,
             rec_comm_pp,
             pred_vk_comm_pp,
             local_data_comm_pp,
