@@ -81,9 +81,3 @@ pub enum CLIError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 }
-
-impl From<CLIError> for Box<dyn std::error::Error> {
-    fn from(error: CLIError) -> Self {
-        error.into()
-    }
-}
