@@ -7,9 +7,8 @@ use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
-    dpc::{DPCComponents, Predicate, Record},
+    dpc::{AccountScheme, DPCComponents, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
-    objects::AccountScheme,
 };
 use snarkos_objects::{dpc::Transaction, ledger::*, Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
@@ -315,6 +314,44 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok(record)
     }
 
+    pub fn create_address_helper<R: Rng>(
+        parameters: &CircuitParameters<Components>,
+        metadata: &[u8; 32],
+        rng: &mut R,
+    ) -> Result<Account<Components>, DPCError> {
+        // Sample SIG key pair.
+        let sk_sig = Components::Signature::generate_private_key(&parameters.signature_parameters, rng)?;
+        let pk_sig = Components::Signature::generate_public_key(&parameters.signature_parameters, &sk_sig)?;
+
+        // Sample PRF secret key.
+        let sk_bytes: [u8; 32] = rng.gen();
+        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
+
+        // Sample randomness rpk for the commitment scheme.
+        let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+        // Construct the address public key.
+        let commit_input = to_bytes![pk_sig, sk_prf, metadata]?;
+        let public_key =
+            Components::AddressCommitment::commit(&parameters.address_commitment_parameters, &commit_input, &r_pk)?;
+
+        let public_key = AccountPublicKey { public_key };
+
+        // Construct the address secret key.
+        let private_key = AccountPrivateKey {
+            pk_sig,
+            sk_sig,
+            sk_prf,
+            metadata: *metadata,
+            r_pk,
+        };
+
+        Ok(Account {
+            public_key,
+            private_key,
+        })
+    }
+
     pub(crate) fn execute_helper<'a, L, R: Rng>(
         parameters: &'a CircuitParameters<Components>,
 
@@ -531,7 +568,7 @@ where
         ledger_parameters: &Components::MerkleParameters,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
-        let setup_time = start_timer!(|| "BaseDPC::Setup");
+        let setup_time = start_timer!(|| "DPC::Setup");
         let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
         let predicate_snark_setup_time = start_timer!(|| "Dummy Predicate SNARK Setup");
@@ -572,15 +609,10 @@ where
         metadata: &Self::Metadata,
         rng: &mut R,
     ) -> Result<Self::AddressKeyPair, DPCError> {
-        let time = start_timer!(|| "BaseDPC::create_address");
-
-        let signature_parameters = &parameters.circuit_parameters.signature_parameters;
-        let commitment_parameters = &parameters.circuit_parameters.address_commitment_parameters;
-        let account = Account::new(signature_parameters, commitment_parameters, metadata, None, rng)?;
-
+        let time = start_timer!(|| "PlainDPC::CreateAddr");
+        let result = Self::create_address_helper(&parameters.circuit_parameters, metadata, rng)?;
         end_timer!(time);
-
-        Ok(account)
+        Ok(result)
     }
 
     fn execute<R: Rng>(
@@ -601,7 +633,7 @@ where
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
-        let exec_time = start_timer!(|| "BaseDPC::execute");
+        let exec_time = start_timer!(|| "PlainDPC::Exec");
         let context = Self::execute_helper(
             &parameters.circuit_parameters,
             old_records,
@@ -784,7 +816,7 @@ where
     }
 
     fn verify(parameters: &Self::Parameters, transaction: &Self::Transaction, ledger: &L) -> Result<bool, DPCError> {
-        let verify_time = start_timer!(|| "BaseDPC::verify");
+        let verify_time = start_timer!(|| "PlainDPC::Verify");
         let ledger_time = start_timer!(|| "Ledger checks");
         for sn in transaction.old_serial_numbers() {
             if ledger.contains_sn(sn) {

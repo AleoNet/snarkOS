@@ -5,6 +5,11 @@ use std::hash::Hash;
 pub mod components;
 pub use self::components::*;
 
+pub trait AccountScheme: FromBytes + ToBytes {
+    type AccountPublicKey: Default;
+    type AccountPrivateKey: Default;
+}
+
 pub trait Predicate: Clone {
     type PublicInput;
     type PrivateWitness;

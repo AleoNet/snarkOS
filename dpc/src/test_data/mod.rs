@@ -2,7 +2,8 @@ use crate::{
     base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
     DPCScheme,
 };
-use snarkos_models::{algorithms::CRH, dpc::Record, objects::AccountScheme, storage::Storage};
+
+use snarkos_models::{algorithms::CRH, dpc::Record, storage::Storage};
 use snarkos_objects::{Account, Ledger};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -70,24 +71,14 @@ pub fn generate_test_addresses<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
-    let signature_parameters = &parameters.circuit_parameters.signature_parameters;
-    let commitment_parameters = &parameters.circuit_parameters.address_commitment_parameters;
-
     let genesis_metadata = [1u8; 32];
-    let genesis_address = Account::new(
-        signature_parameters,
-        commitment_parameters,
-        &genesis_metadata,
-        None,
-        rng,
-    )
-    .unwrap();
+    let genesis_address = DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, rng).unwrap();
 
     let metadata_1 = [2u8; 32];
-    let address_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, None, rng).unwrap();
+    let address_1 = DPC::create_address_helper(&parameters.circuit_parameters, &metadata_1, rng).unwrap();
 
     let metadata_2 = [3u8; 32];
-    let address_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, None, rng).unwrap();
+    let address_2 = DPC::create_address_helper(&parameters.circuit_parameters, &metadata_2, rng).unwrap();
 
     [genesis_address, address_1, address_2]
 }

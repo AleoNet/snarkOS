@@ -16,9 +16,8 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
-    objects::AccountScheme,
 };
-use snarkos_objects::{Account, Ledger};
+use snarkos_objects::ledger::Ledger;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::{Rng, SeedableRng};
@@ -44,26 +43,15 @@ fn test_execute_base_dpc_constraints() {
     ]
     .unwrap();
 
-    let signature_parameters = &circuit_parameters.signature_parameters;
-    let commitment_parameters = &circuit_parameters.address_commitment_parameters;
-
-    // Generate metadata and an account for a dummy initial, or "genesis", record.
+    // Generate metadata and an address for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
-    let genesis_account = Account::new(
-        signature_parameters,
-        commitment_parameters,
-        &genesis_metadata,
-        None,
-        &mut rng,
-    )
-    .unwrap();
-
+    let genesis_address = DPC::create_address_helper(&circuit_parameters, &genesis_metadata, &mut rng).unwrap();
     let genesis_sn_nonce =
         SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce_parameters, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
         &circuit_parameters,
         &genesis_sn_nonce,
-        &genesis_account.public_key,
+        &genesis_address.public_key,
         true,
         &PaymentRecordPayload::default(),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
@@ -73,7 +61,7 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_account.private_key).unwrap();
+    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_address.private_key).unwrap();
     let genesis_memo = [0u8; 32];
 
     let mut path = std::env::temp_dir();
@@ -88,27 +76,19 @@ fn test_execute_base_dpc_constraints() {
         genesis_sn.clone(),
         genesis_memo,
         pred_nizk_vk_bytes.to_vec(),
-        to_bytes![genesis_account].unwrap().to_vec(),
+        to_bytes![genesis_address].unwrap().to_vec(),
     )
     .unwrap();
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
-    let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
 
     // Construct new records.
 
-    // Create an account for an actual new record.
-
+    // Create an address for an actual new record.
     let new_metadata = [1u8; 32];
-    let new_account = Account::new(
-        signature_parameters,
-        commitment_parameters,
-        &new_metadata,
-        None,
-        &mut rng,
-    )
-    .unwrap();
+    let new_address = DPC::create_address_helper(&circuit_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
     let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
@@ -116,7 +96,7 @@ fn test_execute_base_dpc_constraints() {
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_account_public_keys = vec![new_account.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_public_keys = vec![new_address.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
