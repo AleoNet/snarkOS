@@ -1,11 +1,11 @@
 use std::io::{Error, ErrorKind};
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum SignatureError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 }
 

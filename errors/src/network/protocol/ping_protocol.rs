@@ -2,24 +2,24 @@ use crate::network::{ConnectError, SendError};
 
 use std::net::SocketAddr;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum PingProtocolError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ConnectError(ConnectError),
 
-    #[fail(display = "Expected nonce: {}, got {}", _0, _1)]
+    #[error("Expected nonce: {}, got {}", _0, _1)]
     InvalidNonce(u64, u64),
 
-    #[fail(display = "No stored ping for peer {:?}", _0)]
+    #[error("No stored ping for peer {:?}", _0)]
     PingProtocolMissing(SocketAddr),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SendError(SendError),
 }
 

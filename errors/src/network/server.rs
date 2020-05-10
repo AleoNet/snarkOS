@@ -4,36 +4,36 @@ use crate::{
     storage::StorageError,
 };
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum ServerError {
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     BlockError(BlockError),
 
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ConnectError(ConnectError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     HandshakeError(HandshakeError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MessageError(MessageError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     PingProtocolError(PingProtocolError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SendError(SendError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     StorageError(StorageError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     TransactionError(TransactionError),
 }
 

@@ -1,23 +1,23 @@
 use crate::algorithms::{CRHError, CommitmentError, PRFError, SignatureError};
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum AccountError {
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CommitmentError(CommitmentError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CRHError(CRHError),
 
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     PRFError(PRFError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SignatureError(SignatureError),
 }
 

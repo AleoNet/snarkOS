@@ -3,21 +3,21 @@ use crate::{
     objects::BlockError,
 };
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum SendError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ConnectError(ConnectError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MessageError(MessageError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     BlockError(BlockError),
 }
 

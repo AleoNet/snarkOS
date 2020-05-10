@@ -4,42 +4,42 @@ use crate::{
     objects::AccountError,
 };
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum DPCError {
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     AccountError(AccountError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     BindingSignatureError(BindingSignatureError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CommitmentError(CommitmentError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CRHError(CRHError),
 
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     LedgerError(LedgerError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "missing inner snark proving parameters")]
+    #[error("missing inner snark proving parameters")]
     MissingInnerSnarkProvingParameters,
 
-    #[fail(display = "missing outer snark proving parameters")]
+    #[error("missing outer snark proving parameters")]
     MissingOuterSnarkProvingParameters,
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     PRFError(PRFError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SignatureError(SignatureError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SNARKError(SNARKError),
 }
 
