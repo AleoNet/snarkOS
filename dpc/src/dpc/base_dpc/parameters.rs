@@ -126,9 +126,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         circuit_parameters
             .local_data_commitment
             .store(local_data_commitment_path)?;
-        circuit_parameters
-            .value_commitment
-            .store(value_commitment_path)?;
+        circuit_parameters.value_commitment.store(value_commitment_path)?;
         circuit_parameters
             .serial_number_nonce
             .store(serial_number_commitment_path)?;
@@ -195,8 +193,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let record_commitment = C::RecordCommitment::load(record_commitment_path)?;
             let predicate_verification_key_commitment =
                 C::PredicateVerificationKeyCommitment::load(predicate_vk_commitment_path)?;
-            let predicate_verification_key_hash =
-                C::PredicateVerificationKeyHash::load(predicate_vk_crh_path)?;
+            let predicate_verification_key_hash = C::PredicateVerificationKeyHash::load(predicate_vk_crh_path)?;
             let local_data_commitment = C::LocalDataCommitment::load(local_data_commitment_path)?;
             let value_commitment = C::ValueCommitment::load(value_commitment_path)?;
             let serial_number_nonce = C::SerialNumberNonceCRH::load(serial_number_commitment_path)?;
@@ -282,7 +279,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let record_commitment_parameters = include_bytes!["../../parameters/circuit/record_commitment.params"];
             let predicate_vk_commitment_parameters = vec![];
             let predicate_vk_crh_parameters = include_bytes!["../../parameters/circuit/predicate_vk_crh.params"];
-            let local_data_commitment_parameters = include_bytes!["../../parameters/circuit/local_data_commitment.params"];
+            let local_data_commitment_parameters =
+                include_bytes!["../../parameters/circuit/local_data_commitment.params"];
             let value_commitment_parameters = include_bytes!["../../parameters/circuit/value_commitment.params"];
             let serial_number_commitment_parameters =
                 include_bytes!["../../parameters/circuit/serial_number_commitment.params"];
@@ -294,8 +292,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
                 FromBytes::read(&predicate_vk_commitment_parameters[..])?;
             let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
                 FromBytes::read(&predicate_vk_crh_parameters[..])?;
-            let local_data_commitment: C::LocalDataCommitment =
-                FromBytes::read(&local_data_commitment_parameters[..])?;
+            let local_data_commitment: C::LocalDataCommitment = FromBytes::read(&local_data_commitment_parameters[..])?;
             let value_commitment: C::ValueCommitment = FromBytes::read(&value_commitment_parameters[..])?;
             let serial_number_nonce: C::SerialNumberNonceCRH =
                 FromBytes::read(&serial_number_commitment_parameters[..])?;

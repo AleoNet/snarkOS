@@ -139,11 +139,7 @@ fn base_dpc_integration_test() {
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data
-                        .circuit_parameters
-                        .value_commitment
-                        .parameters()
-                        .clone(),
+                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
                     value_commitment_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: i as u8,
@@ -208,11 +204,7 @@ fn base_dpc_integration_test() {
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data
-                        .circuit_parameters
-                        .value_commitment
-                        .parameters()
-                        .clone(),
+                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
                     value_commitment_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: j as u8,

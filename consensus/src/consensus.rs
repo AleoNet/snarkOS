@@ -279,10 +279,8 @@ impl ConsensusParameters {
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
-            let old_sn_nonce = SerialNumberNonce::hash(
-                &parameters.circuit_parameters.serial_number_nonce,
-                &sn_nonce_input,
-            )?;
+            let old_sn_nonce =
+                SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &sn_nonce_input)?;
 
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,

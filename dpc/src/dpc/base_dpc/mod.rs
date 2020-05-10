@@ -750,17 +750,10 @@ where
             let sk_sig = &old_account_private_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
-            let signature = Components::Signature::sign(
-                &circuit_parameters.signature,
-                sk_sig,
-                &signature_message,
-                rng,
-            )?;
-            let randomized_signature = Components::Signature::randomize_signature(
-                &circuit_parameters.signature,
-                &signature,
-                randomizer,
-            )?;
+            let signature =
+                Components::Signature::sign(&circuit_parameters.signature, sk_sig, &signature_message, rng)?;
+            let randomized_signature =
+                Components::Signature::randomize_signature(&circuit_parameters.signature, &signature, randomizer)?;
             signatures.push(randomized_signature);
 
             end_timer!(sig_time);

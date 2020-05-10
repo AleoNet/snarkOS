@@ -228,30 +228,33 @@ where
             || Ok(circuit_parameters.account_commitment.parameters()),
         )?;
 
-        let record_commitment_parameters =
-            RecordCommitmentGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare record commitment parameters"), || {
-                Ok(circuit_parameters.record_commitment.parameters())
-            })?;
+        let record_commitment_parameters = RecordCommitmentGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare record commitment parameters"),
+            || Ok(circuit_parameters.record_commitment.parameters()),
+        )?;
 
-        let predicate_vk_commitment_parameters =
-            <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare predicate vk commitment parameters"),
-                || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
-            )?;
+        let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+            _,
+            C::InnerField,
+        >>::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare predicate vk commitment parameters"),
+            || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
+        )?;
 
         let local_data_commitment_parameters = LocalDataCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare local data commitment parameters"),
             || Ok(circuit_parameters.local_data_commitment.parameters()),
         )?;
 
-        let serial_number_nonce_crh_parameters =
-            SerialNumberNonceCRHGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare serial number nonce CRH parameters"), || {
-                Ok(circuit_parameters.serial_number_nonce.parameters())
-            })?;
+        let serial_number_nonce_crh_parameters = SerialNumberNonceCRHGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare serial number nonce CRH parameters"),
+            || Ok(circuit_parameters.serial_number_nonce.parameters()),
+        )?;
 
-        let signature_parameters = SignatureGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare signature parameters"), || {
-            Ok(circuit_parameters.signature.parameters())
-        })?;
+        let signature_parameters =
+            SignatureGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare signature parameters"), || {
+                Ok(circuit_parameters.signature.parameters())
+            })?;
 
         let value_commitment_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
@@ -311,15 +314,16 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_account_public_key =
-                AccountCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_account_public_key"), || {
-                    Ok(&record.account_public_key().public_key)
-                })?;
+            let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
+                &mut declare_cs.ns(|| "given_account_public_key"),
+                || Ok(&record.account_public_key().public_key),
+            )?;
             old_account_public_keys_gadgets.push(given_account_public_key.clone());
 
-            let given_commitment = RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
-                Ok(record.commitment().clone())
-            })?;
+            let given_commitment =
+                RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
+                    Ok(record.commitment().clone())
+                })?;
             old_record_commitments_gadgets.push(given_commitment.clone());
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
@@ -328,22 +332,27 @@ where
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             old_payloads_gadgets.push(given_payload.clone());
 
-            let given_birth_predicate_crh =
-                UInt8::alloc_vec(&mut declare_cs.ns(|| "given_birth_predicate_crh"), &record.birth_predicate_repr())?;
+            let given_birth_predicate_crh = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_predicate_crh"),
+                &record.birth_predicate_repr(),
+            )?;
             old_birth_predicate_hashes_gadgets.push(given_birth_predicate_crh.clone());
 
-            let given_death_predicate_crh =
-                UInt8::alloc_vec(&mut declare_cs.ns(|| "given_death_predicate_crh"), &record.death_predicate_repr())?;
+            let given_death_predicate_crh = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_predicate_crh"),
+                &record.death_predicate_repr(),
+            )?;
             old_death_predicate_hashes_gadgets.push(given_death_predicate_crh.clone());
 
-            let given_commitment_randomness =
-                RecordCommitmentGadget::RandomnessGadget::alloc(&mut declare_cs.ns(|| "given_commitment_randomness"), || {
-                    Ok(record.commitment_randomness())
-                })?;
+            let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
+                &mut declare_cs.ns(|| "given_commitment_randomness"),
+                || Ok(record.commitment_randomness()),
+            )?;
 
-            let serial_number_nonce = SerialNumberNonceCRHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "serial_number_nonce"), || {
-                Ok(record.serial_number_nonce())
-            })?;
+            let serial_number_nonce =
+                SerialNumberNonceCRHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "serial_number_nonce"), || {
+                    Ok(record.serial_number_nonce())
+                })?;
             (
                 given_account_public_key,
                 given_commitment,
@@ -364,10 +373,10 @@ where
         {
             let witness_cs = &mut cs.ns(|| "Check ledger membership witness");
 
-            let witness_gadget =
-                MerklePathGadget::<_, C::MerkleHashGadget, _>::alloc(&mut witness_cs.ns(|| "Declare membership witness"), || {
-                    Ok(witness)
-                })?;
+            let witness_gadget = MerklePathGadget::<_, C::MerkleHashGadget, _>::alloc(
+                &mut witness_cs.ns(|| "Declare membership witness"),
+                || Ok(witness),
+            )?;
 
             witness_gadget.conditionally_check_membership(
                 &mut witness_cs.ns(|| "Perform ledger membership witness check"),
@@ -442,10 +451,10 @@ where
                 &randomizer_bytes,
             )?;
 
-            let given_serial_number_gadget = SignatureGadget::PublicKeyGadget::alloc_input(
-                &mut sn_cs.ns(|| "Declare given serial number"),
-                || Ok(given_serial_number),
-            )?;
+            let given_serial_number_gadget =
+                SignatureGadget::PublicKeyGadget::alloc_input(&mut sn_cs.ns(|| "Declare given serial number"), || {
+                    Ok(given_serial_number)
+                })?;
 
             candidate_serial_number_gadget.enforce_equal(
                 &mut sn_cs.ns(|| "Check that given and computed serial numbers are equal"),
@@ -519,20 +528,22 @@ where
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
-            let given_account_public_key =
-                AccountCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_account_public_key"), || {
-                    Ok(&record.account_public_key().public_key)
-                })?;
+            let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
+                &mut declare_cs.ns(|| "given_account_public_key"),
+                || Ok(&record.account_public_key().public_key),
+            )?;
             new_account_public_keys_gadgets.push(given_account_public_key.clone());
 
-            let given_record_commitment = RecordCommitmentGadget::OutputGadget::alloc(
-                &mut declare_cs.ns(|| "given_record_commitment"),
-                || Ok(record.commitment()),
-            )?;
+            let given_record_commitment =
+                RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_record_commitment"), || {
+                    Ok(record.commitment())
+                })?;
             new_record_commitments_gadgets.push(given_record_commitment.clone());
 
             let given_commitment =
-                RecordCommitmentGadget::OutputGadget::alloc_input(&mut declare_cs.ns(|| "given_commitment"), || Ok(commitment))?;
+                RecordCommitmentGadget::OutputGadget::alloc_input(&mut declare_cs.ns(|| "given_commitment"), || {
+                    Ok(commitment)
+                })?;
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
             new_dummy_flags_gadgets.push(given_is_dummy.clone());
@@ -540,22 +551,27 @@ where
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             new_payloads_gadgets.push(given_payload.clone());
 
-            let given_birth_predicate_hash =
-                UInt8::alloc_vec(&mut declare_cs.ns(|| "given_birth_predicate_hash"), &record.birth_predicate_repr())?;
+            let given_birth_predicate_hash = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_predicate_hash"),
+                &record.birth_predicate_repr(),
+            )?;
             new_birth_predicate_hashes_gadgets.push(given_birth_predicate_hash.clone());
 
-            let given_death_predicate_hash =
-                UInt8::alloc_vec(&mut declare_cs.ns(|| "given_death_predicate_hash"), &record.death_predicate_repr())?;
+            let given_death_predicate_hash = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_predicate_hash"),
+                &record.death_predicate_repr(),
+            )?;
             new_death_predicate_hashes_gadgets.push(given_death_predicate_hash.clone());
 
-            let given_commitment_randomness =
-                RecordCommitmentGadget::RandomnessGadget::alloc(&mut declare_cs.ns(|| "given_commitment_randomness"), || {
-                    Ok(record.commitment_randomness())
-                })?;
+            let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
+                &mut declare_cs.ns(|| "given_commitment_randomness"),
+                || Ok(record.commitment_randomness()),
+            )?;
 
-            let serial_number_nonce = SerialNumberNonceCRHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "serial_number_nonce"), || {
-                Ok(record.serial_number_nonce())
-            })?;
+            let serial_number_nonce =
+                SerialNumberNonceCRHGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "serial_number_nonce"), || {
+                    Ok(record.serial_number_nonce())
+                })?;
 
             (
                 given_account_public_key,
@@ -579,8 +595,10 @@ where
             let current_record_number = UInt8::constant(j);
             let mut current_record_number_bytes_le = vec![current_record_number];
 
-            let serial_number_nonce_randomness =
-                UInt8::alloc_vec(sn_cs.ns(|| "Allocate serial number nonce randomness"), sn_nonce_randomness)?;
+            let serial_number_nonce_randomness = UInt8::alloc_vec(
+                sn_cs.ns(|| "Allocate serial number nonce randomness"),
+                sn_nonce_randomness,
+            )?;
             current_record_number_bytes_le.extend_from_slice(&serial_number_nonce_randomness);
             current_record_number_bytes_le.extend_from_slice(&serial_number_nonce_input);
 
@@ -648,7 +666,10 @@ where
             input.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
         }
 
-        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::RandomnessGadget::alloc(
+        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+            _,
+            C::InnerField,
+        >>::RandomnessGadget::alloc(
             &mut commitment_cs.ns(|| "given_commitment_randomness"),
             || Ok(predicate_randomness),
         )?;
@@ -679,19 +700,24 @@ where
         let mut local_data_bytes = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
-            local_data_bytes.extend_from_slice(&old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?);
-            local_data_bytes
-                .extend_from_slice(&old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?);
+            local_data_bytes.extend_from_slice(
+                &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
+            );
+            local_data_bytes.extend_from_slice(
+                &old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?,
+            );
             local_data_bytes.extend_from_slice(&old_dummy_flags_gadgets[i].to_bytes(&mut cs.ns(|| "is_dummy"))?);
             local_data_bytes.extend_from_slice(&old_payloads_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_birth_predicate_hashes_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
-            local_data_bytes.extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
+            local_data_bytes
+                .extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
-            local_data_bytes.extend_from_slice(&new_record_commitments_gadgets[j].to_bytes(&mut cs.ns(|| "record_commitment"))?);
+            local_data_bytes
+                .extend_from_slice(&new_record_commitments_gadgets[j].to_bytes(&mut cs.ns(|| "record_commitment"))?);
             local_data_bytes
                 .extend_from_slice(&new_account_public_keys_gadgets[j].to_bytes(&mut cs.ns(|| "account_public_key"))?);
             local_data_bytes.extend_from_slice(&new_dummy_flags_gadgets[j].to_bytes(&mut cs.ns(|| "is_dummy"))?);
@@ -705,10 +731,10 @@ where
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
-        let local_data_commitment_randomness =
-            LocalDataCommitmentGadget::RandomnessGadget::alloc(cs.ns(|| "Allocate local data commitment randomness"), || {
-                Ok(local_data_rand)
-            })?;
+        let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
+            cs.ns(|| "Allocate local data commitment randomness"),
+            || Ok(local_data_rand),
+        )?;
 
         let declared_local_data_commitment =
             LocalDataCommitmentGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {

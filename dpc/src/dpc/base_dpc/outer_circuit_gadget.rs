@@ -37,20 +37,18 @@ where
     let (predicate_vk_commitment_parameters, predicate_vk_crh_parameters) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
 
-        let predicate_vk_commitment_parameters =
-            <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare predicate_vk_commitment_parameters"),
-                || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
-            )?;
+        let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+            _,
+            C::OuterField,
+        >>::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare predicate_vk_commitment_parameters"),
+            || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
+        )?;
 
         let predicate_vk_crh_parameters =
             <C::PredicateVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare predicate_vk_crh_parameters"),
-                || {
-                    Ok(circuit_parameters
-                        .predicate_verification_key_hash
-                        .parameters())
-                },
+                || Ok(circuit_parameters.predicate_verification_key_hash.parameters()),
             )?;
 
         (predicate_vk_commitment_parameters, predicate_vk_crh_parameters)
@@ -61,18 +59,16 @@ where
     // ************************************************************************
 
     // First we convert the input for the predicates into `CoreCheckF` field elements
-    let local_data_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-        circuit_parameters.local_data_commitment.parameters(),
-    )
-    .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let local_data_commitment_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_commitment.parameters())
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let value_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-        circuit_parameters.value_commitment.parameters(),
-    )
-    .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let value_commitment_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.value_commitment.parameters())
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     // Then we convert these field elements into bytes
     let predicate_input = [
@@ -140,9 +136,10 @@ where
         )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_commitment_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(&old_death_predicate_verification_inputs[i].value_commitment)
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+            &old_death_predicate_verification_inputs[i].value_commitment,
+        )
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         let value_commitment_inputs = [
             to_bytes![value_commitment_randomness_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
@@ -225,9 +222,10 @@ where
         )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let value_commitment_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(&new_birth_predicate_verification_inputs[j].value_commitment)
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let value_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+            &new_birth_predicate_verification_inputs[j].value_commitment,
+        )
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
 
         let value_commitment_inputs = [
             to_bytes![value_commitment_randomness_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
@@ -287,7 +285,10 @@ where
             input.extend_from_slice(&new_birth_predicate_hashes[j]);
         }
 
-        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::RandomnessGadget::alloc(
+        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+            _,
+            C::OuterField,
+        >>::RandomnessGadget::alloc(
             &mut commitment_cs.ns(|| "Commitment randomness"),
             || Ok(predicate_randomness),
         )?;

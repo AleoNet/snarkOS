@@ -58,8 +58,7 @@ fn test_execute_base_dpc_constraints() {
     )
     .unwrap();
 
-    let genesis_sn_nonce =
-        SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
+    let genesis_sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
         &circuit_parameters,
         &genesis_sn_nonce,
@@ -195,10 +194,7 @@ fn test_execute_base_dpc_constraints() {
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
-                local_data_commitment_parameters: circuit_parameters
-                    .local_data_commitment
-                    .parameters()
-                    .clone(),
+                local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
                 value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
                 value_commitment_randomness: value_commitment_randomness.clone(),
@@ -250,10 +246,7 @@ fn test_execute_base_dpc_constraints() {
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
-                local_data_commitment_parameters: circuit_parameters
-                    .local_data_commitment
-                    .parameters()
-                    .clone(),
+                local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
                 value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
                 value_commitment_randomness: value_commitment_randomness.clone(),

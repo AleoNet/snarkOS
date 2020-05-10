@@ -99,11 +99,8 @@ pub fn setup_ledger<R: Rng>(
     genesis_account: &Account<Components>,
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
-    let genesis_sn_nonce = SerialNumberNonce::hash(
-        &parameters.circuit_parameters.serial_number_nonce,
-        &[34u8; 1],
-    )
-    .unwrap();
+    let genesis_sn_nonce =
+        SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &[34u8; 1]).unwrap();
     let genesis_predicate_vk_bytes = to_bytes![
         PredicateVerificationKeyHash::hash(
             &parameters.circuit_parameters.predicate_verification_key_hash,
