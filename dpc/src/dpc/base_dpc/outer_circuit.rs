@@ -57,11 +57,11 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
     pub fn new(
         circuit_parameters: &CircuitParameters<C>,
-        // Private pred input = Verification key and input
+        // Private predicate input = Verification key and input
         // Commitment contains commitment to hash of death predicate vk.
         old_private_predicate_inputs: &[PrivatePredicateInput<C>],
 
-        // Private pred input = Verification key and input
+        // Private predicate input = Verification key and input
         // Commitment contains commitment to hash of birth predicate vk.
         new_private_predicate_inputs: &[PrivatePredicateInput<C>],
 

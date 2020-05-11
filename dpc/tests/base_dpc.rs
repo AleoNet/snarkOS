@@ -38,8 +38,8 @@ fn base_dpc_integration_test() {
     // Generate or load parameters for the ledger, commitment schemes, and CRH
     let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
-    // Generate addresses
-    let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
+    // Generate accounts
+    let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
     let mut path = std::env::temp_dir();
     let random_storage_path: usize = rng.gen();
@@ -47,24 +47,24 @@ fn base_dpc_integration_test() {
 
     // Setup the ledger
     let (ledger, genesis_pred_vk_bytes) =
-        setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
+        setup_ledger(&path, &parameters, ledger_parameters, &genesis_account, &mut rng);
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
-    let old_account_private_keys = vec![genesis_address.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
-            &parameters.circuit_parameters.serial_number_nonce_parameters,
+            &parameters.circuit_parameters.serial_number_nonce,
             &[64u8 + (i as u8); 1],
         )
         .unwrap();
         let old_record = DPC::generate_record(
             &parameters.circuit_parameters,
             &old_sn_nonce,
-            &genesis_address.public_key,
+            &genesis_account.public_key,
             true, // The input record is dummy
             &PaymentRecordPayload::default(),
             &Predicate::new(genesis_pred_vk_bytes.clone()),
@@ -109,7 +109,7 @@ fn base_dpc_integration_test() {
             // Generate the value commitment
             let value_commitment = local_data
                 .circuit_parameters
-                .value_commitment_parameters
+                .value_commitment
                 .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
                 .unwrap();
 
@@ -135,15 +135,11 @@ fn base_dpc_integration_test() {
                 let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                     local_data_commitment_parameters: local_data
                         .circuit_parameters
-                        .local_data_commitment_parameters
+                        .local_data_commitment
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data
-                        .circuit_parameters
-                        .value_commitment_parameters
-                        .parameters()
-                        .clone(),
+                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
                     value_commitment_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: i as u8,
@@ -178,7 +174,7 @@ fn base_dpc_integration_test() {
             // Generate the value commitment
             let value_commitment = local_data
                 .circuit_parameters
-                .value_commitment_parameters
+                .value_commitment
                 .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
                 .unwrap();
 
@@ -204,15 +200,11 @@ fn base_dpc_integration_test() {
                 let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                     local_data_commitment_parameters: local_data
                         .circuit_parameters
-                        .local_data_commitment_parameters
+                        .local_data_commitment
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data
-                        .circuit_parameters
-                        .value_commitment_parameters
-                        .parameters()
-                        .clone(),
+                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
                     value_commitment_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: j as u8,

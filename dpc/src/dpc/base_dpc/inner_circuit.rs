@@ -202,21 +202,21 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_inner_proof_gadget::<C, CS>(
             cs,
-            // Params
+            // Parameters
             self.circuit_parameters.get()?,
             self.ledger_parameters.get()?,
-            // digest
+            // Digest
             self.ledger_digest.get()?,
-            // old records
+            // Old records
             self.old_records.get()?,
             self.old_witnesses.get()?,
             self.old_account_private_keys.get()?,
             self.old_serial_numbers.get()?,
-            // new records
+            // New records
             self.new_records.get()?,
             self.new_serial_number_nonce_randomness.get()?,
             self.new_commitments.get()?,
-            // other stuff
+            // Other stuff
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,
             self.local_data_commitment.get()?,

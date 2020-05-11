@@ -2,8 +2,7 @@ use crate::{
     base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
     DPCScheme,
 };
-
-use snarkos_models::{algorithms::CRH, dpc::Record, storage::Storage};
+use snarkos_models::{algorithms::CRH, dpc::Record, objects::AccountScheme, storage::Storage};
 use snarkos_objects::{Account, Ledger};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -67,37 +66,44 @@ pub fn setup_or_load_parameters<R: Rng>(
     (ledger_parameters, parameters)
 }
 
-pub fn generate_test_addresses<R: Rng>(
+pub fn generate_test_accounts<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
+    let signature_parameters = &parameters.circuit_parameters.signature;
+    let commitment_parameters = &parameters.circuit_parameters.account_commitment;
+
     let genesis_metadata = [1u8; 32];
-    let genesis_address = DPC::create_address_helper(&parameters.circuit_parameters, &genesis_metadata, rng).unwrap();
+    let genesis_account = Account::new(
+        signature_parameters,
+        commitment_parameters,
+        &genesis_metadata,
+        None,
+        rng,
+    )
+    .unwrap();
 
     let metadata_1 = [2u8; 32];
-    let address_1 = DPC::create_address_helper(&parameters.circuit_parameters, &metadata_1, rng).unwrap();
+    let address_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, None, rng).unwrap();
 
     let metadata_2 = [3u8; 32];
-    let address_2 = DPC::create_address_helper(&parameters.circuit_parameters, &metadata_2, rng).unwrap();
+    let address_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, None, rng).unwrap();
 
-    [genesis_address, address_1, address_2]
+    [genesis_account, address_1, address_2]
 }
 
 pub fn setup_ledger<R: Rng>(
     path: &PathBuf,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
-    genesis_address: &Account<Components>,
+    genesis_account: &Account<Components>,
     rng: &mut R,
 ) -> (MerkleTreeLedger, Vec<u8>) {
-    let genesis_sn_nonce = SerialNumberNonce::hash(
-        &parameters.circuit_parameters.serial_number_nonce_parameters,
-        &[34u8; 1],
-    )
-    .unwrap();
-    let genesis_pred_vk_bytes = to_bytes![
+    let genesis_sn_nonce =
+        SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &[34u8; 1]).unwrap();
+    let genesis_predicate_vk_bytes = to_bytes![
         PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash_parameters,
+            &parameters.circuit_parameters.predicate_verification_key_hash,
             &to_bytes![parameters.predicate_snark_parameters.verification_key].unwrap()
         )
         .unwrap()
@@ -107,11 +113,11 @@ pub fn setup_ledger<R: Rng>(
     let genesis_record = DPC::generate_record(
         &parameters.circuit_parameters,
         &genesis_sn_nonce,
-        &genesis_address.public_key,
+        &genesis_account.public_key,
         true, // The inital record should be dummy
         &PaymentRecordPayload::default(),
-        &Predicate::new(genesis_pred_vk_bytes.clone()),
-        &Predicate::new(genesis_pred_vk_bytes.clone()),
+        &Predicate::new(genesis_predicate_vk_bytes.clone()),
+        &Predicate::new(genesis_predicate_vk_bytes.clone()),
         rng,
     )
     .unwrap();
@@ -120,7 +126,7 @@ pub fn setup_ledger<R: Rng>(
     let (genesis_sn, _) = DPC::generate_sn(
         &parameters.circuit_parameters,
         &genesis_record,
-        &genesis_address.private_key,
+        &genesis_account.private_key,
     )
     .unwrap();
     let genesis_memo = [0u8; 32];
@@ -132,10 +138,10 @@ pub fn setup_ledger<R: Rng>(
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
-        genesis_pred_vk_bytes.to_vec(),
-        to_bytes![genesis_address].unwrap().to_vec(),
+        genesis_predicate_vk_bytes.to_vec(),
+        to_bytes![genesis_account].unwrap().to_vec(),
     )
     .unwrap();
 
-    (ledger, genesis_pred_vk_bytes)
+    (ledger, genesis_predicate_vk_bytes)
 }

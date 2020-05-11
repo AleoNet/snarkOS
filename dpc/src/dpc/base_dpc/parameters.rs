@@ -7,14 +7,14 @@ use std::{io::Result as IoResult, path::PathBuf};
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct CircuitParameters<C: BaseDPCComponents> {
-    pub address_commitment_parameters: C::AddressCommitment,
-    pub record_commitment_parameters: C::RecordCommitment,
-    pub predicate_verification_key_commitment_parameters: C::PredicateVerificationKeyCommitment,
-    pub predicate_verification_key_hash_parameters: C::PredicateVerificationKeyHash,
-    pub local_data_commitment_parameters: C::LocalDataCommitment,
-    pub value_commitment_parameters: C::ValueCommitment,
-    pub serial_number_nonce_parameters: C::SerialNumberNonce,
-    pub signature_parameters: C::Signature,
+    pub account_commitment: C::AccountCommitment,
+    pub record_commitment: C::RecordCommitment,
+    pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
+    pub predicate_verification_key_hash: C::PredicateVerificationKeyHash,
+    pub local_data_commitment: C::LocalDataCommitment,
+    pub value_commitment: C::ValueCommitment,
+    pub serial_number_nonce: C::SerialNumberNonceCRH,
+    pub signature: C::Signature,
 }
 
 #[derive(Derivative)]
@@ -41,8 +41,8 @@ pub struct PublicParameters<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> PublicParameters<C> {
-    pub fn address_commitment_parameters(&self) -> &C::AddressCommitment {
-        &self.circuit_parameters.address_commitment_parameters
+    pub fn account_commitment_parameters(&self) -> &C::AccountCommitment {
+        &self.circuit_parameters.account_commitment
     }
 
     pub fn inner_snark_parameters(
@@ -55,7 +55,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn local_data_commitment_parameters(&self) -> &C::LocalDataCommitment {
-        &self.circuit_parameters.local_data_commitment_parameters
+        &self.circuit_parameters.local_data_commitment
     }
 
     pub fn outer_snark_parameters(
@@ -72,27 +72,27 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn predicate_verification_key_commitment_parameters(&self) -> &C::PredicateVerificationKeyCommitment {
-        &self.circuit_parameters.predicate_verification_key_commitment_parameters
+        &self.circuit_parameters.predicate_verification_key_commitment
     }
 
     pub fn predicate_verification_key_hash_parameters(&self) -> &C::PredicateVerificationKeyHash {
-        &self.circuit_parameters.predicate_verification_key_hash_parameters
+        &self.circuit_parameters.predicate_verification_key_hash
     }
 
     pub fn record_commitment_parameters(&self) -> &C::RecordCommitment {
-        &self.circuit_parameters.record_commitment_parameters
+        &self.circuit_parameters.record_commitment
     }
 
-    pub fn serial_number_nonce_parameters(&self) -> &C::SerialNumberNonce {
-        &self.circuit_parameters.serial_number_nonce_parameters
+    pub fn serial_number_nonce_parameters(&self) -> &C::SerialNumberNonceCRH {
+        &self.circuit_parameters.serial_number_nonce
     }
 
     pub fn signature_parameters(&self) -> &C::Signature {
-        &self.circuit_parameters.signature_parameters
+        &self.circuit_parameters.signature
     }
 
     pub fn value_commitment_parameters(&self) -> &C::ValueCommitment {
-        &self.circuit_parameters.value_commitment_parameters
+        &self.circuit_parameters.value_commitment
     }
 
     pub fn store(&self, parameter_dir: &PathBuf) -> IoResult<()> {
@@ -100,77 +100,75 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         // Circuit Parameters
 
-        let address_comm_pp_path = &circuit_dir.join("address_commitment.params");
-        let record_comm_pp_path = &circuit_dir.join("record_commitment.params");
-        let predicate_vk_comm_pp_path = &circuit_dir.join("predicate_vk_commitment.params");
-        let predicate_vk_crh_pp_path = &circuit_dir.join("predicate_vk_crh.params");
-        let local_data_comm_pp_path = &circuit_dir.join("local_data_commitment.params");
-        let value_comm_pp_path = &circuit_dir.join("value_commitment.params");
-        let serial_number_comm_pp_path = &circuit_dir.join("serial_number_commitment.params");
-        let signature_pp_path = &circuit_dir.join("signature.params");
+        let account_commitment_parameters_path = &circuit_dir.join("account_commitment.params");
+        let record_commitment_parameters_path = &circuit_dir.join("record_commitment.params");
+        let predicate_vk_commitment_path = &circuit_dir.join("predicate_vk_commitment.params");
+        let predicate_vk_crh_path = &circuit_dir.join("predicate_vk_crh.params");
+        let local_data_commitment_path = &circuit_dir.join("local_data_commitment.params");
+        let value_commitment_path = &circuit_dir.join("value_commitment.params");
+        let serial_number_commitment_path = &circuit_dir.join("serial_number_commitment.params");
+        let signature_path = &circuit_dir.join("signature.params");
 
         let circuit_parameters = &self.circuit_parameters;
 
         circuit_parameters
-            .address_commitment_parameters
-            .store(address_comm_pp_path)?;
+            .account_commitment
+            .store(account_commitment_parameters_path)?;
         circuit_parameters
-            .record_commitment_parameters
-            .store(record_comm_pp_path)?;
+            .record_commitment
+            .store(record_commitment_parameters_path)?;
         circuit_parameters
-            .predicate_verification_key_commitment_parameters
-            .store(predicate_vk_comm_pp_path)?;
+            .predicate_verification_key_commitment
+            .store(predicate_vk_commitment_path)?;
         circuit_parameters
-            .predicate_verification_key_hash_parameters
-            .store(predicate_vk_crh_pp_path)?;
+            .predicate_verification_key_hash
+            .store(predicate_vk_crh_path)?;
         circuit_parameters
-            .local_data_commitment_parameters
-            .store(local_data_comm_pp_path)?;
+            .local_data_commitment
+            .store(local_data_commitment_path)?;
+        circuit_parameters.value_commitment.store(value_commitment_path)?;
         circuit_parameters
-            .value_commitment_parameters
-            .store(value_comm_pp_path)?;
-        circuit_parameters
-            .serial_number_nonce_parameters
-            .store(serial_number_comm_pp_path)?;
-        circuit_parameters.signature_parameters.store(signature_pp_path)?;
+            .serial_number_nonce
+            .store(serial_number_commitment_path)?;
+        circuit_parameters.signature.store(signature_path)?;
 
         // Predicate SNARK Parameters
 
-        let predicate_snark_pp_path = &parameter_dir.join("predicate_snark.params");
-        let predicate_snark_vk_pp_path = &parameter_dir.join("predicate_snark_vk.params");
+        let predicate_snark_pk_path = &parameter_dir.join("predicate_snark.params");
+        let predicate_snark_vk_path = &parameter_dir.join("predicate_snark_vk.params");
         let predicate_snark_proof_path = &parameter_dir.join("predicate_snark.proof");
 
         self.predicate_snark_parameters
             .proving_key
-            .store(predicate_snark_pp_path)?;
+            .store(predicate_snark_pk_path)?;
         self.predicate_snark_parameters
             .verification_key
-            .store(predicate_snark_vk_pp_path)?;
+            .store(predicate_snark_vk_path)?;
         self.predicate_snark_parameters
             .proof
             .store(predicate_snark_proof_path)?;
 
         // Outer SNARK parameters
 
-        let outer_snark_pp_path = &parameter_dir.join("outer_snark.params");
+        let outer_snark_pk_path = &parameter_dir.join("outer_snark.params");
         let outer_snark_vk_path = &parameter_dir.join("outer_snark_vk.params");
         let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
             self.outer_snark_parameters.1.clone().into();
 
         if let Some(parameters) = &self.outer_snark_parameters.0 {
-            parameters.store(outer_snark_pp_path)?;
+            parameters.store(outer_snark_pk_path)?;
         };
         outer_snark_vk.store(outer_snark_vk_path)?;
 
         // Inner SNARK parameters
 
-        let inner_snark_pp_path = &parameter_dir.join("inner_snark.params");
+        let inner_snark_pk_path = &parameter_dir.join("inner_snark.params");
         let inner_snark_vk_path = &parameter_dir.join("inner_snark_vk.params");
         let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
             self.inner_snark_parameters.1.clone().into();
 
         if let Some(parameters) = &self.inner_snark_parameters.0 {
-            parameters.store(inner_snark_pp_path)?;
+            parameters.store(inner_snark_pk_path)?;
         };
         inner_snark_vk.store(inner_snark_vk_path)?;
 
@@ -182,45 +180,44 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {
-            let address_comm_pp_path = &circuit_dir.join("address_commitment.params");
-            let record_comm_pp_path = &circuit_dir.join("record_commitment.params");
-            let predicate_vk_comm_pp_path = &circuit_dir.join("predicate_vk_commitment.params");
-            let predicate_vk_crh_pp_path = &circuit_dir.join("predicate_vk_crh.params");
-            let local_data_comm_pp_path = &circuit_dir.join("local_data_commitment.params");
-            let value_comm_pp_path = &circuit_dir.join("value_commitment.params");
-            let serial_number_comm_pp_path = &circuit_dir.join("serial_number_commitment.params");
-            let signature_pp_path = &circuit_dir.join("signature.params");
+            let account_commitment_path = &circuit_dir.join("account_commitment.params");
+            let record_commitment_path = &circuit_dir.join("record_commitment.params");
+            let predicate_vk_commitment_path = &circuit_dir.join("predicate_vk_commitment.params");
+            let predicate_vk_crh_path = &circuit_dir.join("predicate_vk_crh.params");
+            let local_data_commitment_path = &circuit_dir.join("local_data_commitment.params");
+            let value_commitment_path = &circuit_dir.join("value_commitment.params");
+            let serial_number_commitment_path = &circuit_dir.join("serial_number_commitment.params");
+            let signature_path = &circuit_dir.join("signature.params");
 
-            let address_commitment_parameters = C::AddressCommitment::load(address_comm_pp_path)?;
-            let record_commitment_parameters = C::RecordCommitment::load(record_comm_pp_path)?;
-            let predicate_verification_key_commitment_parameters =
-                C::PredicateVerificationKeyCommitment::load(predicate_vk_comm_pp_path)?;
-            let predicate_verification_key_hash_parameters =
-                C::PredicateVerificationKeyHash::load(predicate_vk_crh_pp_path)?;
-            let local_data_commitment_parameters = C::LocalDataCommitment::load(local_data_comm_pp_path)?;
-            let value_commitment_parameters = C::ValueCommitment::load(value_comm_pp_path)?;
-            let serial_number_nonce_parameters = C::SerialNumberNonce::load(serial_number_comm_pp_path)?;
-            let signature_parameters = C::Signature::load(signature_pp_path)?;
+            let account_commitment = C::AccountCommitment::load(account_commitment_path)?;
+            let record_commitment = C::RecordCommitment::load(record_commitment_path)?;
+            let predicate_verification_key_commitment =
+                C::PredicateVerificationKeyCommitment::load(predicate_vk_commitment_path)?;
+            let predicate_verification_key_hash = C::PredicateVerificationKeyHash::load(predicate_vk_crh_path)?;
+            let local_data_commitment = C::LocalDataCommitment::load(local_data_commitment_path)?;
+            let value_commitment = C::ValueCommitment::load(value_commitment_path)?;
+            let serial_number_nonce = C::SerialNumberNonceCRH::load(serial_number_commitment_path)?;
+            let signature = C::Signature::load(signature_path)?;
 
             CircuitParameters::<C> {
-                address_commitment_parameters,
-                record_commitment_parameters,
-                predicate_verification_key_commitment_parameters,
-                predicate_verification_key_hash_parameters,
-                local_data_commitment_parameters,
-                value_commitment_parameters,
-                serial_number_nonce_parameters,
-                signature_parameters,
+                account_commitment,
+                record_commitment,
+                predicate_verification_key_commitment,
+                predicate_verification_key_hash,
+                local_data_commitment,
+                value_commitment,
+                serial_number_nonce,
+                signature,
             }
         };
 
-        // Snark Parameters
+        // SNARK Parameters
 
         let predicate_snark_parameters: PredicateSNARKParameters<C> = {
-            let predicate_snark_pp_path = &dir_path.join("predicate_snark.params");
+            let predicate_snark_pk_path = &dir_path.join("predicate_snark.params");
             let predicate_snark_proof_path = &dir_path.join("predicate_snark.proof");
 
-            let proving_key = <C::PredicateSNARK as SNARK>::ProvingParameters::load(predicate_snark_pp_path)?;
+            let proving_key = <C::PredicateSNARK as SNARK>::ProvingParameters::load(predicate_snark_pk_path)?;
             let verification_key = proving_key.clone().into();
             let proof = <C::PredicateSNARK as SNARK>::Proof::load(predicate_snark_proof_path)?;
 
@@ -235,12 +232,12 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             Option<<C::OuterSNARK as SNARK>::ProvingParameters>,
             <C::OuterSNARK as SNARK>::PreparedVerificationParameters,
         ) = {
-            let outer_snark_path = &dir_path.join("outer_snark.params");
+            let outer_snark_pk_path = &dir_path.join("outer_snark.params");
             let outer_snark_vk_path = &dir_path.join("outer_snark_vk.params");
 
             let outer_snark_pk = match verify_only {
                 true => None,
-                false => Some(<C::OuterSNARK as SNARK>::ProvingParameters::load(outer_snark_path)?),
+                false => Some(<C::OuterSNARK as SNARK>::ProvingParameters::load(outer_snark_pk_path)?),
             };
 
             let outer_snark_vk = <C::OuterSNARK as SNARK>::VerificationParameters::load(outer_snark_vk_path)?;
@@ -253,12 +250,12 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
             <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
         ) = {
-            let inner_snark_pp_path = &dir_path.join("inner_snark.params");
+            let inner_snark_pk_path = &dir_path.join("inner_snark.params");
             let inner_snark_vk_path = &dir_path.join("inner_snark_vk.params");
 
             let inner_snark_pk = match verify_only {
                 true => None,
-                false => Some(<C::InnerSNARK as SNARK>::ProvingParameters::load(inner_snark_pp_path)?),
+                false => Some(<C::InnerSNARK as SNARK>::ProvingParameters::load(inner_snark_pk_path)?),
             };
 
             let inner_snark_vk = <C::InnerSNARK as SNARK>::VerificationParameters::load(inner_snark_vk_path)?;
@@ -278,49 +275,49 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn load_vk_direct() -> IoResult<Self> {
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {
-            let address_comm_pp_bytes = include_bytes!["../../parameters/circuit/address_commitment.params"];
-            let record_comm_pp_bytes = include_bytes!["../../parameters/circuit/record_commitment.params"];
-            let predicate_vk_comm_pp_bytes = vec![];
-            let predicate_vk_crh_pp_bytes = include_bytes!["../../parameters/circuit/predicate_vk_crh.params"];
-            let local_data_comm_pp_bytes = include_bytes!["../../parameters/circuit/local_data_commitment.params"];
-            let value_comm_pp_bytes = include_bytes!["../../parameters/circuit/value_commitment.params"];
-            let serial_number_comm_pp_bytes =
+            let account_commitment_parameters = include_bytes!["../../parameters/circuit/account_commitment.params"];
+            let record_commitment_parameters = include_bytes!["../../parameters/circuit/record_commitment.params"];
+            let predicate_vk_commitment_parameters = vec![];
+            let predicate_vk_crh_parameters = include_bytes!["../../parameters/circuit/predicate_vk_crh.params"];
+            let local_data_commitment_parameters =
+                include_bytes!["../../parameters/circuit/local_data_commitment.params"];
+            let value_commitment_parameters = include_bytes!["../../parameters/circuit/value_commitment.params"];
+            let serial_number_commitment_parameters =
                 include_bytes!["../../parameters/circuit/serial_number_commitment.params"];
-            let signature_pp_bytes = &include_bytes!["../../parameters/circuit/signature.params"];
+            let signature_parameters = &include_bytes!["../../parameters/circuit/signature.params"];
 
-            let address_commitment_parameters: C::AddressCommitment = FromBytes::read(&address_comm_pp_bytes[..])?;
-            let record_commitment_parameters: C::RecordCommitment = FromBytes::read(&record_comm_pp_bytes[..])?;
-            let predicate_verification_key_commitment_parameters: C::PredicateVerificationKeyCommitment =
-                FromBytes::read(&predicate_vk_comm_pp_bytes[..])?;
-            let predicate_verification_key_hash_parameters: C::PredicateVerificationKeyHash =
-                FromBytes::read(&predicate_vk_crh_pp_bytes[..])?;
-            let local_data_commitment_parameters: C::LocalDataCommitment =
-                FromBytes::read(&local_data_comm_pp_bytes[..])?;
-            let value_commitment_parameters: C::ValueCommitment = FromBytes::read(&value_comm_pp_bytes[..])?;
-            let serial_number_nonce_parameters: C::SerialNumberNonce =
-                FromBytes::read(&serial_number_comm_pp_bytes[..])?;
-            let signature_parameters: C::Signature = FromBytes::read(&signature_pp_bytes[..])?;
+            let account_commitment: C::AccountCommitment = FromBytes::read(&account_commitment_parameters[..])?;
+            let record_commitment: C::RecordCommitment = FromBytes::read(&record_commitment_parameters[..])?;
+            let predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment =
+                FromBytes::read(&predicate_vk_commitment_parameters[..])?;
+            let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
+                FromBytes::read(&predicate_vk_crh_parameters[..])?;
+            let local_data_commitment: C::LocalDataCommitment = FromBytes::read(&local_data_commitment_parameters[..])?;
+            let value_commitment: C::ValueCommitment = FromBytes::read(&value_commitment_parameters[..])?;
+            let serial_number_nonce: C::SerialNumberNonceCRH =
+                FromBytes::read(&serial_number_commitment_parameters[..])?;
+            let signature: C::Signature = FromBytes::read(&signature_parameters[..])?;
 
             CircuitParameters::<C> {
-                address_commitment_parameters,
-                record_commitment_parameters,
-                predicate_verification_key_commitment_parameters,
-                predicate_verification_key_hash_parameters,
-                local_data_commitment_parameters,
-                value_commitment_parameters,
-                serial_number_nonce_parameters,
-                signature_parameters,
+                account_commitment,
+                record_commitment,
+                predicate_verification_key_commitment,
+                predicate_verification_key_hash,
+                local_data_commitment,
+                value_commitment,
+                serial_number_nonce,
+                signature,
             }
         };
 
-        // Snark Parameters
+        // SNARK Parameters
 
         let predicate_snark_parameters: PredicateSNARKParameters<C> = {
-            let predicate_snark_pp_bytes = include_bytes!["../../parameters/predicate_snark.params"];
+            let predicate_snark_pk_bytes = include_bytes!["../../parameters/predicate_snark.params"];
             let predicate_snark_proof_bytes = include_bytes!["../../parameters/predicate_snark.proof"];
 
             let proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters =
-                FromBytes::read(&predicate_snark_pp_bytes[..])?;
+                FromBytes::read(&predicate_snark_pk_bytes[..])?;
             let verification_key = proving_key.clone().into();
             let proof: <C::PredicateSNARK as SNARK>::Proof = FromBytes::read(&predicate_snark_proof_bytes[..])?;
 
