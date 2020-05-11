@@ -1,18 +1,48 @@
-use crate::{miner::ProvingKey, ConsensusParameters};
-
+use crate::{posw::{VerifyingKey, ProvingKey}, ConsensusParameters};
 use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
-
 use std::{path::PathBuf, sync::Arc};
+use once_cell::sync::Lazy;
 
-pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
+use rand_xorshift::XorShiftRng;
+
+pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusParameters {
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
-    verifying_key: [0; 32],  // TODO: Replace with a proper verifying key mock
-};
+    verifying_key: POSW_PP.1.clone(),
+});
 
-// TODO: Replace with a proper proving key mock
-pub const PROVING_KEY: ProvingKey = [0; 32];
+const TREE_DEPTH: u32 = 9;
+
+// Public parameters for the POSW SNARK
+pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
+    use std::marker::PhantomData;
+    use rand::SeedableRng;
+    use snarkos_algorithms::{
+        snark::generate_random_parameters,
+        merkle_tree::MerkleParameters,
+    };
+    use snarkos_objects::pedersen_merkle_tree::PARAMS;
+    use crate::posw;
+
+    let leaves_number = 2u32.pow(TREE_DEPTH) as usize;
+    let params = generate_random_parameters(
+        posw::POSW {
+            leaves: vec![vec![None; 32]; leaves_number],
+            crh_parameters: PARAMS.parameters().clone(),
+            mask: None,
+            root: None,
+            field_type: PhantomData,
+            crh_gadget_type: PhantomData,
+            circuit_parameters_type: PhantomData,
+        },
+        &mut XorShiftRng::seed_from_u64(1234567),
+    )
+    .unwrap();
+
+    let vk = params.vk.clone();
+    (params, vk)
+});
 
 pub const TEST_DB_PATH: &str = "../test_db";
 

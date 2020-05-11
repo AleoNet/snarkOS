@@ -32,13 +32,15 @@ use snarkos_objects::{
 };
 use snarkos_utilities::rand::UniformRand;
 
+use snarkos_utilities::bytes::FromBytes;
+use snarkos_algorithms::snark::{prepare_verifying_key, verify_proof};
+use crate::posw::{Proof, VerifyingKey, Field};
+
 use chrono::Utc;
 use rand::{thread_rng, Rng};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
-// TODO: Replace this with an actual VK.
-type Vk = [u8; 32];
 
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,7 +57,7 @@ pub struct ConsensusParameters {
     // /// Mainnet or testnet
     // network: Network
     /// The verifying key for the PoSW Merkle Tree SNARK
-    pub verifying_key: Vk,
+    pub verifying_key: VerifyingKey,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -138,8 +140,8 @@ impl ConsensusParameters {
             Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
         } else if header.time < parent_header.time {
             Err(ConsensusError::TimestampInvalid(header.time, parent_header.time))
-        // } else if hash_result > header.difficulty_target {
-        //     Err(ConsensusError::PowInvalid(header.difficulty_target, hash_result))
+        } else if hash_result > header.difficulty_target {
+            Err(ConsensusError::PowInvalid(header.difficulty_target, hash_result))
         } else if header.nonce >= self.max_nonce {
             Err(ConsensusError::NonceInvalid(header.nonce, self.max_nonce))
         } else {
@@ -147,16 +149,25 @@ impl ConsensusParameters {
         }
     }
 
-    // TODO: This function will be calling the Merkle Tree gadget and will verify that the
-    // provided merkle tree root matches the proof
     fn verify_proof(
         &self,
-        _nonce: u32,
-        _proof: &ProofOfSuccinctWork,
-        _pedersen_merkle_root: &PedersenMerkleRootHash,
+        nonce: u32,
+        proof: &ProofOfSuccinctWork,
+        pedersen_merkle_root: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
-        // 1. Convert the nonce/merkle_root to field elements to be passed as public inputs
-        // 2. call GM17::verify_proof with the VK, proof and public inputs
+        // TODO: Replace Unwrap's with error handling
+        let nonce = Field::from(nonce);
+        let merkle_root = Field::read(&pedersen_merkle_root.0[..]).unwrap();
+        let inputs = &[nonce, merkle_root];
+
+        // deserialize the snark proof
+        let proof = Proof::read(&proof.0[..]).unwrap();
+
+        let res = verify_proof(&prepare_verifying_key(&self.verifying_key), &proof, inputs).unwrap();
+        if !res {
+            return Err(ConsensusError::DuplicateCm);
+        }
+
         Ok(())
     }
 
