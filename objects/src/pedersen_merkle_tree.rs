@@ -35,20 +35,35 @@ impl Display for PedersenMerkleRootHash {
 
 /// Calculates the root of the Merkle tree using a Pedersen Hash instantiated with a PRNG
 pub fn pedersen_merkle_root(hashes: &[Vec<u8>]) -> PedersenMerkleRootHash {
-    let params = mtree::CommitmentMerkleParameters::setup(&mut prng());
-    let tree = MerkleTree::new(params, hashes).expect("could not create merkle tree");
-    let root_bytes = to_bytes![tree.root()].expect("could not convert merkle root to bytes");
-
-    let mut pedersen_merkle_root_bytes = [0u8; 32];
-    pedersen_merkle_root_bytes[..].copy_from_slice(&root_bytes);
-
-    PedersenMerkleRootHash(pedersen_merkle_root_bytes)
+    pedersen_merkle_root_hash(hashes).into()
 }
 
-// TODO: This is copy-pasted from snarkos_dpc/instantiated. We cannot import dpc because it
-// introduces a cyclic dependency. We should refactor the dpc to allow importing the
-// CommitmentMerkleParameters.
-mod mtree {
+use snarkos_curves::bls12_377::Fr;
+use once_cell::sync::Lazy;
+
+pub static PARAMS: Lazy<mtree::CommitmentMerkleParameters> = Lazy::new(|| {
+    mtree::CommitmentMerkleParameters::setup(&mut prng())
+});
+
+/// Calculates the root of the Merkle tree using a Pedersen Hash instantiated with a PRNG
+pub fn pedersen_merkle_root_hash(hashes: &[Vec<u8>]) -> Fr {
+    let params = mtree::CommitmentMerkleParameters::setup(&mut prng());
+    let tree = MerkleTree::new(params, hashes).expect("could not create merkle tree");
+    tree.root()
+}
+
+impl From<Fr> for PedersenMerkleRootHash {
+    fn from(src: Fr) -> PedersenMerkleRootHash {
+        let root_bytes = to_bytes![src].expect("could not convert merkle root to bytes");
+        let mut pedersen_merkle_root_bytes = [0u8; 32];
+        pedersen_merkle_root_bytes[..].copy_from_slice(&root_bytes);
+        PedersenMerkleRootHash(pedersen_merkle_root_bytes)
+    }
+}
+
+pub type EdwardsMaskedMerkleTree = MerkleTree<mtree::CommitmentMerkleParameters>;
+
+pub mod mtree {
     use rand::Rng;
     use snarkos_algorithms::{
         crh::{PedersenCompressedCRH, PedersenSize},
@@ -62,12 +77,12 @@ mod mtree {
         path::PathBuf,
     };
 
-    type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
+    pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 
-    type H = MerkleTreeCRH;
+    pub type H = MerkleTreeCRH;
 
     #[derive(Clone, PartialEq, Eq)]
-    pub(super) struct CommitmentMerkleParameters(H);
+    pub struct CommitmentMerkleParameters(H);
 
     impl Default for CommitmentMerkleParameters {
         fn default() -> Self {
@@ -123,7 +138,7 @@ mod mtree {
     }
 
     #[derive(Clone, PartialEq, Eq, Hash)]
-    pub(super) struct TwoToOneWindow;
+    pub struct TwoToOneWindow;
 
     impl PedersenSize for TwoToOneWindow {
         const NUM_WINDOWS: usize = 4;

@@ -133,9 +133,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73b77e29dbd0115e43938be2d5128ecf81c0353e00acaa65339a1242586951d9"
 dependencies = [
  "byte-tools 0.2.0",
- "crypto-mac",
+ "crypto-mac 0.5.2",
  "digest 0.7.6",
 ]
+
+[[package]]
+name = "blake2"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94cb07b0da6a73955f8fb85d24c466778e70cda767a568229b104f0264089330"
+dependencies = [
+ "byte-tools 0.3.1",
+ "crypto-mac 0.7.0",
+ "digest 0.8.1",
+ "opaque-debug",
+]
+
+[[package]]
+name = "blake2s"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c0aa0b171b8fbd1d73e1b0b02d72aeb4bb61de77ce442e3c77d388536c7dc33"
 
 [[package]]
 name = "block-buffer"
@@ -430,6 +448,16 @@ checksum = "0999b4ff4d3446d4ddb19a63e9e00c1876e75cd7000d20e57a693b4b3f08d958"
 dependencies = [
  "constant_time_eq",
  "generic-array 0.9.0",
+]
+
+[[package]]
+name = "crypto-mac"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
+dependencies = [
+ "generic-array 0.12.3",
+ "subtle",
 ]
 
 [[package]]
@@ -1366,6 +1394,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "once_cell"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c601810575c99596d4afc46f78a678c80105117c379eb3650cf99b8a21ce5b"
+
+[[package]]
 name = "oorandom"
 version = "11.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1981,7 +2015,7 @@ dependencies = [
 name = "snarkos-algorithms"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "criterion",
  "csv",
  "derivative",
@@ -2002,7 +2036,7 @@ dependencies = [
 name = "snarkos-benchmarks"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "criterion",
  "csv",
  "derivative",
@@ -2025,17 +2059,24 @@ name = "snarkos-consensus"
 version = "0.8.0"
 dependencies = [
  "bincode",
+ "blake2 0.8.1",
+ "blake2s",
  "chrono",
  "futures-await-test",
  "hex",
  "log",
+ "once_cell",
  "rand",
+ "rand_xorshift",
  "serde",
  "snarkos-algorithms",
+ "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-gadgets",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-posw",
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.2.13",
@@ -2069,7 +2110,7 @@ dependencies = [
 name = "snarkos-dpc"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "criterion",
  "derivative",
  "hex",
@@ -2101,7 +2142,7 @@ dependencies = [
 name = "snarkos-gadgets"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "derivative",
  "digest 0.7.6",
  "rand",
@@ -2157,6 +2198,7 @@ dependencies = [
  "bincode",
  "chrono",
  "hex",
+ "once_cell",
  "rand",
  "rand_chacha",
  "serde",
@@ -2172,7 +2214,7 @@ dependencies = [
 name = "snarkos-posw"
 version = "0.8.0"
 dependencies = [
- "blake2",
+ "blake2 0.7.1",
  "criterion",
  "rand",
  "rand_xorshift",
@@ -2273,6 +2315,12 @@ name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
+
+[[package]]
+name = "subtle"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d67a5a62ba6e01cb2192ff309324cb4875d0c451d55fe2319433abe7a05a8ee"
 
 [[package]]
 name = "syn"

@@ -22,14 +22,14 @@ pub trait POSWCircuitParameters {
 }
 
 pub struct POSWCircuit<F: PrimeField, H: CRH, HG: MaskedCRHGadget<H, F>, CP: POSWCircuitParameters> {
-    leaves: Vec<Vec<Option<u8>>>,
-    crh_parameters: H::Parameters,
-    mask: Option<Vec<u8>>,
-    root: Option<H::Output>,
+    pub leaves: Vec<Vec<Option<u8>>>,
+    pub crh_parameters: H::Parameters,
+    pub mask: Option<Vec<u8>>,
+    pub root: Option<H::Output>,
 
-    field_type: PhantomData<F>,
-    crh_gadget_type: PhantomData<HG>,
-    circuit_parameters_type: PhantomData<CP>,
+    pub field_type: PhantomData<F>,
+    pub crh_gadget_type: PhantomData<HG>,
+    pub circuit_parameters_type: PhantomData<CP>,
 }
 
 impl<F: PrimeField, H: CRH, HG: MaskedCRHGadget<H, F>, CP: POSWCircuitParameters> ConstraintSynthesizer<F>
@@ -37,16 +37,10 @@ impl<F: PrimeField, H: CRH, HG: MaskedCRHGadget<H, F>, CP: POSWCircuitParameters
 {
     fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // Compute the mask if it exists.
-        let mask = match self.mask.clone() {
-            Some(mask) => {
-                if mask.len() != CP::MASK_LENGTH {
-                    Err(SynthesisError::Unsatisfiable)
-                } else {
-                    Ok(mask)
-                }
-            }
-            _ => Ok(vec![0; CP::MASK_LENGTH]),
-        }?;
+        let mask = self.mask.clone().unwrap_or(vec![0; CP::MASK_LENGTH]);
+        if mask.len() != CP::MASK_LENGTH {
+            return Err(SynthesisError::Unsatisfiable)
+        }
         let mask_bytes = UInt8::alloc_input_vec(cs.ns(|| "mask"), &mask)?;
 
         let crh_parameters = <HG as CRHGadget<H, F>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
