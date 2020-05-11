@@ -19,8 +19,9 @@ mod consensus_dpc {
     fn base_dpc_multiple_transactions() {
         let mut rng = thread_rng();
 
-        let consensus = TEST_CONSENSUS;
-        let proving_key = PROVING_KEY;
+        let consensus = TEST_CONSENSUS.clone();
+        let proving_key = POSW_PP.0.clone();
+        dbg!("ok");
 
         // Generate or load parameters for the ledger, commitment schemes, and CRH
         let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);

@@ -5,7 +5,7 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters, posw::{ProvingKey, VerifyingKey}};
 use snarkos_dpc::{
     base_dpc::{
         instantiated::{Components, MerkleTreeLedger},
@@ -22,7 +22,7 @@ use snarkos_network::{
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{fs::File, io::Read, net::SocketAddr, sync::Arc};
+use std::{fs::File, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -42,15 +42,11 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
-    // TODO: Properly read VK from the file
-    let mut vk_file = File::open(config.vk_path)?;
-    let mut vk = [0u8; 32];
-    vk_file.read_exact(&mut vk)?;
+    let vk_file = File::open(config.vk_path)?;
+    let vk = VerifyingKey::read(vk_file)?;
 
-    // TODO: Properly read PK from the file
-    let mut pk_file = File::open(config.pk_path)?;
-    let mut pk = [0u8; 32];
-    pk_file.read_exact(&mut pk)?;
+    let pk_file = File::open(config.pk_path)?;
+    let pk = <ProvingKey as FromBytes>::read(pk_file)?;
 
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,

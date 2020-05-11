@@ -2,6 +2,7 @@ use crate::{posw::{VerifyingKey, ProvingKey}, ConsensusParameters};
 use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
 use std::{path::PathBuf, sync::Arc};
 use once_cell::sync::Lazy;
+use snarkos_objects::pedersen_merkle_tree::mtree::CommitmentMerkleParameters;
 
 use rand_xorshift::XorShiftRng;
 
@@ -11,8 +12,6 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
     target_block_time: 2i64, //unix seconds
     verifying_key: POSW_PP.1.clone(),
 });
-
-const TREE_DEPTH: u32 = 9;
 
 // Public parameters for the POSW SNARK
 pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
@@ -25,7 +24,7 @@ pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
     use snarkos_objects::pedersen_merkle_tree::PARAMS;
     use crate::posw;
 
-    let leaves_number = 2u32.pow(TREE_DEPTH) as usize;
+    let leaves_number = 2u32.pow(CommitmentMerkleParameters::HEIGHT as u32) as usize;
     let params = generate_random_parameters(
         posw::POSW {
             leaves: vec![vec![None; 32]; leaves_number],

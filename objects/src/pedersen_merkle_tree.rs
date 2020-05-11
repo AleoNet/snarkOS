@@ -94,7 +94,7 @@ pub mod mtree {
     impl MerkleParameters for CommitmentMerkleParameters {
         type H = H;
 
-        const HEIGHT: usize = 32;
+        const HEIGHT: usize = 9;
 
         fn setup<R: Rng>(rng: &mut R) -> Self {
             Self(H::setup(rng))
