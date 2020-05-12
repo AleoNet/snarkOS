@@ -316,7 +316,7 @@ where
             // or hash is incorrect, then it will not match the computed equivalent.
             let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
                 &mut declare_cs.ns(|| "given_account_public_key"),
-                || Ok(&record.account_public_key().public_key),
+                || Ok(&record.account_public_key().commitment),
             )?;
             old_account_public_keys_gadgets.push(given_account_public_key.clone());
 
@@ -530,7 +530,7 @@ where
 
             let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
                 &mut declare_cs.ns(|| "given_account_public_key"),
-                || Ok(&record.account_public_key().public_key),
+                || Ok(&record.account_public_key().commitment),
             )?;
             new_account_public_keys_gadgets.push(given_account_public_key.clone());
 
