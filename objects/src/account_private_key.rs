@@ -17,7 +17,12 @@ use std::{
 };
 
 #[derive(Derivative)]
-#[derivative(Default(bound = "C: DPCComponents"), Clone(bound = "C: DPCComponents"))]
+#[derivative(
+    Default(bound = "C: DPCComponents"),
+    Clone(bound = "C: DPCComponents"),
+    PartialEq(bound = "C: DPCComponents"),
+    Eq(bound = "C: DPCComponents")
+)]
 pub struct AccountPrivateKey<C: DPCComponents> {
     pub pk_sig: <C::Signature as SignatureScheme>::PublicKey,
     pub sk_sig: <C::Signature as SignatureScheme>::PrivateKey,
@@ -130,6 +135,10 @@ impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
 
 impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(
+            f,
+            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, metadata: {:?}, r_pk: {:?}, is_testnet: {} }}",
+            self.sk_sig, self.sk_prf, self.metadata, self.r_pk, self.is_testnet,
+        )
     }
 }

@@ -13,9 +13,14 @@ use std::{
 };
 
 #[derive(Derivative)]
-#[derivative(Default(bound = "C: DPCComponents"), Clone(bound = "C: DPCComponents"))]
+#[derivative(
+    Default(bound = "C: DPCComponents"),
+    Clone(bound = "C: DPCComponents"),
+    PartialEq(bound = "C: DPCComponents"),
+    Eq(bound = "C: DPCComponents")
+)]
 pub struct AccountPublicKey<C: DPCComponents> {
-    pub public_key: <C::AccountCommitment as CommitmentScheme>::Output,
+    pub commitment: <C::AccountCommitment as CommitmentScheme>::Output,
     pub is_testnet: bool,
 }
 
@@ -27,7 +32,7 @@ impl<C: DPCComponents> AccountPublicKey<C> {
         let commit_input = to_bytes![private_key.pk_sig, private_key.sk_prf, private_key.metadata]?;
 
         Ok(Self {
-            public_key: C::AccountCommitment::commit(parameters, &commit_input, &private_key.r_pk)?,
+            commitment: C::AccountCommitment::commit(parameters, &commit_input, &private_key.r_pk)?,
             is_testnet: private_key.is_testnet,
         })
     }
@@ -35,7 +40,7 @@ impl<C: DPCComponents> AccountPublicKey<C> {
 
 impl<C: DPCComponents> ToBytes for AccountPublicKey<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.public_key.write(&mut writer)?;
+        self.commitment.write(&mut writer)?;
         self.is_testnet.write(&mut writer)
     }
 }
@@ -45,20 +50,20 @@ impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
     /// if no network indicator is provided.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let public_key: <C::AccountCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
+        let commitment: <C::AccountCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
         let is_testnet: bool = match FromBytes::read(&mut reader) {
             Ok(is_testnet) => is_testnet,
             _ => true, // Defaults to testnet
         };
 
-        Ok(Self { public_key, is_testnet })
+        Ok(Self { commitment, is_testnet })
     }
 }
 
 impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut public_key = [0u8; 32];
-        self.public_key
+        self.commitment
             .write(&mut public_key[0..32])
             .expect("public key formatting failed");
 
@@ -74,6 +79,10 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
 
 impl<C: DPCComponents> fmt::Debug for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(
+            f,
+            "AccountPublicKey {{ commitment: {:?}, is_testnet: {} }}",
+            self.commitment, self.is_testnet,
+        )
     }
 }
