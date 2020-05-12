@@ -15,20 +15,14 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
     mut cs: CS,
     parameters: &HG::ParametersGadget,
     mask: &TB,
-    leaves: &[TB],
+    leaves: &[HG::OutputGadget],
 ) -> Result<HG::OutputGadget, SynthesisError> {
     // Mask is assumed to be derived from the nonce and the root, which will be checked by the
     // verifier.
     let mask_bytes = mask.to_bytes(cs.ns(|| "mask to bytes"))?;
 
-    // Hash the leaves to get to the base level.
-    let mut current_leaves = leaves
-        .iter()
-        .enumerate()
-        .map(|(i, l)| {
-            hash_leaf_gadget::<H, HG, F, _, _>(cs.ns(|| format!("hash leaf {}", i)), parameters, &l, &mask_bytes)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    // Assume the leaves are already hashed.
+    let mut current_leaves = leaves.to_vec();
     let mut level = 0;
     // Keep hashing pairs until there is only one element - the root.
     while current_leaves.len() != 1 {
@@ -36,25 +30,21 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
             .chunks(2)
             .enumerate()
             .map(|(i, left_right)| {
-                hash_inner_node_gadget::<H, HG, F, _, _>(
+                let inner_hash = hash_inner_node_gadget::<H, HG, F, _, _>(
                     cs.ns(|| format!("hash left right {} on level {}", i, level)),
                     parameters,
                     &left_right[0],
                     &left_right[1],
                     &mask_bytes,
-                )
+                );
+                inner_hash
             })
             .collect::<Result<Vec<_>, _>>()?;
         level += 1;
     }
 
+    let computed_root = current_leaves[0].clone();
     // Hash the root.
-    let computed_root = hash_leaf_gadget::<H, HG, F, _, _>(
-        cs.ns(|| "hash root"),
-        parameters,
-        &current_leaves[0],
-        &mask_bytes[..mask_bytes.len() / 2],
-    )?;
 
     Ok(computed_root)
 }

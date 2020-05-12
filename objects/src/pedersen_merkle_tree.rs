@@ -38,18 +38,25 @@ pub fn pedersen_merkle_root(hashes: &[Vec<u8>]) -> PedersenMerkleRootHash {
     pedersen_merkle_root_hash(hashes).into()
 }
 
-use snarkos_curves::bls12_377::Fr;
 use once_cell::sync::Lazy;
+use snarkos_curves::bls12_377::Fr;
 
-pub static PARAMS: Lazy<mtree::CommitmentMerkleParameters> = Lazy::new(|| {
-    mtree::CommitmentMerkleParameters::setup(&mut prng())
-});
+pub static PARAMS: Lazy<mtree::CommitmentMerkleParameters> =
+    Lazy::new(|| mtree::CommitmentMerkleParameters::setup(&mut prng()));
 
 /// Calculates the root of the Merkle tree using a Pedersen Hash instantiated with a PRNG
 pub fn pedersen_merkle_root_hash(hashes: &[Vec<u8>]) -> Fr {
     let params = mtree::CommitmentMerkleParameters::setup(&mut prng());
     let tree = MerkleTree::new(params, hashes).expect("could not create merkle tree");
     tree.root()
+}
+
+/// Calculates the root of the Merkle tree using a Pedersen Hash instantiated with a PRNG and the
+/// base layer hashes leaved
+pub fn pedersen_merkle_root_hash_with_leaves(hashes: &[Vec<u8>]) -> (Fr, Vec<Fr>) {
+    let params = mtree::CommitmentMerkleParameters::setup(&mut prng());
+    let tree = MerkleTree::new(params, hashes).expect("could not create merkle tree");
+    (tree.root(), tree.leaves_hashed())
 }
 
 impl From<Fr> for PedersenMerkleRootHash {

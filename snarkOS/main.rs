@@ -5,7 +5,11 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters, posw::{ProvingKey, VerifyingKey}};
+use snarkos_consensus::{
+    miner::MemoryPool,
+    posw::{ProvingKey, VerifyingKey},
+    ConsensusParameters,
+};
 use snarkos_dpc::{
     base_dpc::{
         instantiated::{Components, MerkleTreeLedger},

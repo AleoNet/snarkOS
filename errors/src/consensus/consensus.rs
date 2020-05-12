@@ -81,6 +81,9 @@ pub enum ConsensusError {
 
     #[fail(display = "Transactions are spending more funds than they have available")]
     TransactionOverspending,
+
+    #[fail(display = "POSW verification failed")]
+    PoswVerificationFailed,
 }
 
 impl From<BlockError> for ConsensusError {

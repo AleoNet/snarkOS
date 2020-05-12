@@ -15,7 +15,10 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_storage::BlockStorage;
-use snarkos_utilities::{to_bytes, bytes::{FromBytes, ToBytes}};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -132,11 +135,12 @@ impl Miner {
             nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
             proof = {
                 // instantiate the circuit with the nonce
-                let circuit =  instantiate_posw(nonce, &transaction_ids);
+                let circuit = instantiate_posw(nonce, &transaction_ids);
 
                 // generate the proof
+                let proof_timer = start_timer!(|| "POSW proof");
                 let proof = create_random_proof(circuit, &self.proving_key, &mut thread_rng()).unwrap();
-
+                end_timer!(proof_timer);
 
                 // serialize it
                 let proof_bytes = to_bytes![proof]?;

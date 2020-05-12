@@ -17,6 +17,7 @@ use snarkos_dpc::{
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
+    curves::to_field_vec::ToConstraintField,
     dpc::{DPCComponents, Record},
 };
 use snarkos_objects::{
@@ -32,15 +33,14 @@ use snarkos_objects::{
 };
 use snarkos_utilities::rand::UniformRand;
 
-use snarkos_utilities::bytes::FromBytes;
+use crate::posw::{commit, Field, Proof, VerifyingKey};
 use snarkos_algorithms::snark::{prepare_verifying_key, verify_proof};
-use crate::posw::{Proof, VerifyingKey, Field};
+use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
-
 
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -125,7 +125,9 @@ impl ConsensusParameters {
         let future_timelimit: i64 = Utc::now().timestamp() as i64 + TWO_HOURS_UNIX;
 
         // Verify the proof
+        let verification_timer = start_timer!(|| "POSW verify");
         self.verify_proof(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
+        end_timer!(verification_timer);
 
         if parent_header.get_hash() != header.previous_block_hash {
             Err(ConsensusError::NoParent(
@@ -156,16 +158,19 @@ impl ConsensusParameters {
         pedersen_merkle_root: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
         // TODO: Replace Unwrap's with error handling
-        let nonce = Field::from(nonce);
+        let mask = commit(nonce, pedersen_merkle_root.clone());
         let merkle_root = Field::read(&pedersen_merkle_root.0[..]).unwrap();
-        let inputs = &[nonce, merkle_root];
+        let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..]).unwrap(), vec![
+            merkle_root,
+        ]]
+        .concat();
 
         // deserialize the snark proof
         let proof = Proof::read(&proof.0[..]).unwrap();
 
-        let res = verify_proof(&prepare_verifying_key(&self.verifying_key), &proof, inputs).unwrap();
+        let res = verify_proof(&prepare_verifying_key(&self.verifying_key), &proof, &inputs).unwrap();
         if !res {
-            return Err(ConsensusError::DuplicateCm);
+            return Err(ConsensusError::PoswVerificationFailed);
         }
 
         Ok(())

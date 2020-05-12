@@ -178,7 +178,13 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     let root = tree.root();
 
     let mut cs = TestConstraintSystem::<Fq>::new();
-    let leaf_gadgets = leaves.iter().map(|l| UInt8::constant_vec(l)).collect::<Vec<_>>();
+    let leaf_gadgets = tree
+        .leaves_hashed()
+        .iter()
+        .enumerate()
+        .map(|(i, l)| <HG as CRHGadget<H, Fq>>::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || Ok(l)))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
     let mut nonce = [1u8; 4];
     rng.fill_bytes(&mut nonce);
