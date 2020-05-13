@@ -1977,6 +1977,7 @@ dependencies = [
  "derivative",
  "digest 0.7.6",
  "rand",
+ "rand_chacha",
  "rand_xorshift",
  "rayon",
  "sha2",

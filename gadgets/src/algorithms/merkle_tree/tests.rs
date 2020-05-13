@@ -3,30 +3,20 @@ use crate::{
     curves::edwards_bls12::EdwardsBlsGadget,
 };
 use snarkos_algorithms::{
+    define_merkle_tree_parameters,
     crh::{PedersenCRH, PedersenSize},
-    merkle_tree::{MerkleParameters, MerkleTree},
 };
 use snarkos_curves::edwards_bls12::{EdwardsAffine as Edwards, Fq};
 use snarkos_models::{
-    algorithms::CRH,
     gadgets::{
         algorithms::CRHGadget,
         r1cs::{ConstraintSystem, TestConstraintSystem},
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
-    storage::Storage,
-};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
-
-use rand::{Rng, SeedableRng};
-use rand_xorshift::XorShiftRng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
 };
 
-#[derive(Clone)]
-pub(super) struct Size;
+#[derive(Clone, PartialEq, Eq)]
+pub struct Size;
 impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 256;
     const WINDOW_SIZE: usize = 4;
@@ -34,67 +24,12 @@ impl PedersenSize for Size {
 
 type H = PedersenCRH<Edwards, Size>;
 type HG = PedersenCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
-
-#[derive(Clone)]
-struct EdwardsMerkleParameters(H);
-impl MerkleParameters for EdwardsMerkleParameters {
-    type H = H;
-
-    const HEIGHT: usize = 32;
-
-    fn setup<R: Rng>(rng: &mut R) -> Self {
-        Self(H::setup(rng))
-    }
-
-    fn crh(&self) -> &Self::H {
-        &self.0
-    }
-
-    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
-        self.crh().parameters()
-    }
-}
-
-impl Storage for EdwardsMerkleParameters {
-    /// Store the SNARK proof to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.0.store(path)
-    }
-
-    /// Load the SNARK proof from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        Ok(Self(H::load(path)?))
-    }
-}
-impl Default for EdwardsMerkleParameters {
-    fn default() -> Self {
-        let rng = &mut XorShiftRng::seed_from_u64(9174123u64);
-        Self(H::setup(rng))
-    }
-}
-
-impl ToBytes for EdwardsMerkleParameters {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write(&mut writer)
-    }
-}
-
-impl FromBytes for EdwardsMerkleParameters {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let crh: H = FromBytes::read(&mut reader)?;
-
-        Ok(Self(crh))
-    }
-}
+define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 32);
 
 type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 
 fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
-    let mut rng = XorShiftRng::seed_from_u64(9174123u64);
-
-    let parameters = EdwardsMerkleParameters::setup(&mut rng);
+    let parameters = EdwardsMerkleParameters::default();
     let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
     let mut satisfied = true;
