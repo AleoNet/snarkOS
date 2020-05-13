@@ -24,7 +24,7 @@ mod consensus_dpc {
     fn base_dpc_multiple_transactions() {
         let mut rng = thread_rng();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
         let mut memory_pool = MemoryPool::new();
 
         // Generate or load parameters for the ledger, commitment schemes, and CRH
@@ -39,8 +39,7 @@ mod consensus_dpc {
 
         let (ledger, genesis_pred_vk_bytes) =
             setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
-
-        let miner = Miner::new(miner_address.public_key, consensus.clone());
+        let miner = Miner::new(miner_address.public_key, consensus.clone(), POSW_PP.clone().0);
 
         // Initialize the predicate values
         let new_predicate = Predicate::new(genesis_pred_vk_bytes);

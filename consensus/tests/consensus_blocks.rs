@@ -12,7 +12,7 @@ mod consensus_blocks {
 
         let mut memory_pool = MemoryPool::new();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let old_block_height = blockchain.get_latest_block_height();
 
@@ -56,7 +56,7 @@ mod consensus_blocks {
 
         let mut memory_pool = MemoryPool::new();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let old_block_height = blockchain.get_latest_block_height();
 
