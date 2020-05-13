@@ -15,13 +15,19 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_storage::BlockStorage;
-use snarkos_utilities::bytes::FromBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
 use snarkos_dpc::dpc::base_dpc::record::DPCRecord;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+use crate::posw::{instantiate_posw, ProvingKey};
+use snarkos_algorithms::snark::create_random_proof;
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
@@ -35,9 +41,6 @@ pub struct Miner {
 
     pub proving_key: ProvingKey,
 }
-
-// TODO: Make this an actual proving key
-pub type ProvingKey = [u8; 32];
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
@@ -130,18 +133,30 @@ impl Miner {
         let mut proof;
         loop {
             nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
-            // 1. Instantiate the circuit with the `transaction_ids` and the `nonce`
-            // 2. Generate the proof using `self.proving_key` and `GM17::create_random_proof`
-            proof = ProofOfSuccinctWork::default(); // TODO: Add the actual proof
+            proof = {
+                // instantiate the circuit with the nonce
+                let circuit = instantiate_posw(nonce, &transaction_ids);
+
+                // generate the proof
+                let proof_timer = start_timer!(|| "POSW proof");
+                let proof = create_random_proof(circuit, &self.proving_key, &mut thread_rng())?;
+                end_timer!(proof_timer);
+
+                // serialize it
+                let proof_bytes = to_bytes![proof]?;
+                let mut p = [0; ProofOfSuccinctWork::size()];
+                p.copy_from_slice(&proof_bytes);
+                ProofOfSuccinctWork(p)
+            };
 
             // Hash the proof and parse it as a u64
+            // TODO: replace u64 with bigint
             let hash_result = sha256d_to_u64(&proof.0[..]);
-            break;
 
             // if it passes the difficulty chec, use the proof/nonce pairs and return the header
-            // if hash_result <= difficulty_target {
-            //     break;
-            // }
+            if hash_result <= difficulty_target {
+                break;
+            }
         }
 
         let header = BlockHeader {

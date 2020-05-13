@@ -21,9 +21,9 @@ mod consensus_integration {
         expected_previous_block_hash: &BlockHeaderHash,
         expected_merkle_root_hash: &MerkleRootHash,
     ) {
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
         let miner_address: AddressPublicKey<Components> = FromBytes::read(&GENESIS_ADDRESS_PAIR[..]).unwrap();
-        let miner = Miner::new(miner_address, consensus, PROVING_KEY);
+        let miner = Miner::new(miner_address, consensus, POSW_PP.clone().0);
 
         let header = miner.find_block(transactions, parent_header).unwrap();
         assert_eq!(header.previous_block_hash, *expected_previous_block_hash);
@@ -36,7 +36,7 @@ mod consensus_integration {
         merkle_root_hash: &MerkleRootHash,
         ped_merkle_root_hash: &PedersenMerkleRootHash,
     ) {
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
         consensus
             .verify_header(child_header, parent_header, merkle_root_hash, ped_merkle_root_hash)
             .unwrap();

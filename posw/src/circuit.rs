@@ -2,6 +2,7 @@
 //! which are then used as leaves in a tree instantiated with a masked Pedersen hash. The prover
 //! inputs a mask computed as Blake2s(nonce || root), which the verifier also checks.
 
+use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::compute_root;
 use snarkos_models::{
@@ -17,58 +18,62 @@ use std::marker::PhantomData;
 
 /// Enforces sizes of the mask and leaves.
 pub trait POSWCircuitParameters {
-    const LEAF_LENGTH: usize;
     const MASK_LENGTH: usize;
 }
 
-pub struct POSWCircuit<F: PrimeField, H: CRH, HG: MaskedCRHGadget<H, F>, CP: POSWCircuitParameters> {
-    leaves: Vec<Vec<Option<u8>>>,
-    crh_parameters: H::Parameters,
-    mask: Option<Vec<u8>>,
-    root: Option<H::Output>,
+pub struct POSWCircuit<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters> {
+    pub leaves: Vec<Option<<M::H as CRH>::Output>>,
+    pub merkle_parameters: M,
+    pub mask: Option<Vec<u8>>,
+    pub root: Option<<M::H as CRH>::Output>,
 
-    field_type: PhantomData<F>,
-    crh_gadget_type: PhantomData<HG>,
-    circuit_parameters_type: PhantomData<CP>,
+    pub field_type: PhantomData<F>,
+    pub crh_gadget_type: PhantomData<HG>,
+    pub circuit_parameters_type: PhantomData<CP>,
 }
 
-impl<F: PrimeField, H: CRH, HG: MaskedCRHGadget<H, F>, CP: POSWCircuitParameters> ConstraintSynthesizer<F>
-    for POSWCircuit<F, H, HG, CP>
+impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters>
+    ConstraintSynthesizer<F> for POSWCircuit<F, M, HG, CP>
 {
     fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // Compute the mask if it exists.
-        let mask = match self.mask.clone() {
-            Some(mask) => {
-                if mask.len() != CP::MASK_LENGTH {
-                    Err(SynthesisError::Unsatisfiable)
-                } else {
-                    Ok(mask)
-                }
-            }
-            _ => Ok(vec![0; CP::MASK_LENGTH]),
-        }?;
+        let mask = self.mask.clone().unwrap_or(vec![0; CP::MASK_LENGTH]);
+        if mask.len() != CP::MASK_LENGTH {
+            return Err(SynthesisError::Unsatisfiable);
+        }
         let mask_bytes = UInt8::alloc_input_vec(cs.ns(|| "mask"), &mask)?;
 
-        let crh_parameters = <HG as CRHGadget<H, F>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
-            Ok(self.crh_parameters.clone())
-        })?;
+        let crh_parameters =
+            <HG as CRHGadget<M::H, F>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
+                let crh_parameters = self.merkle_parameters.parameters();
+                Ok(crh_parameters)
+            })?;
+
+        // According to the native tree in https://github.com/AleoHQ/snarkOS/blob/master/algorithms/src/merkle_tree/merkle_tree.rs,
+        // the tree height is calculated as ceil(log2(num_leaves)) + 1
+        let leaves_number = 2u32.pow(M::HEIGHT as u32 - 1) as usize;
+        assert!(self.leaves.len() <= leaves_number);
 
         // Initialize the leaves.
-        let leaf_gadgets = self
+        let mut leaf_gadgets = self
             .leaves
             .iter()
             .enumerate()
-            .map(|(i, l)| {
-                if l.len() != CP::LEAF_LENGTH {
-                    Err(SynthesisError::Unsatisfiable)
-                } else {
-                    Ok(UInt8::alloc_vec(cs.ns(|| format!("leaf {}", i)), &l)?)
-                }
-            })
+            .map(|(i, l)| HG::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || l.as_ref().get()))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let empty_hash = self
+            .merkle_parameters
+            .hash_empty()
+            .map_err(|_| SynthesisError::Unsatisfiable)?;
+        for i in leaf_gadgets.len()..leaves_number {
+            leaf_gadgets.push(HG::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || {
+                Ok(empty_hash.clone())
+            })?);
+        }
+
         // Compute the root using the masked tree.
-        let computed_root = compute_root::<H, HG, _, _, _>(
+        let computed_root = compute_root::<M::H, HG, _, _, _>(
             cs.ns(|| "compute masked root"),
             &crh_parameters,
             &mask_bytes,
@@ -99,37 +104,40 @@ mod test {
     use snarkos_gadgets::{
         algorithms::crh::PedersenCompressedCRHGadget,
         curves::edwards_bls12::EdwardsBlsGadget,
-        define_test_merkle_tree_with_height,
     };
-    use snarkos_models::{algorithms::CRH, curves::to_field_vec::ToConstraintField};
+    use snarkos_models::{curves::to_field_vec::ToConstraintField};
+    use snarkos_objects::define_merkle_tree_with_height;
     use std::marker::PhantomData;
 
+    // We'll use 32 byte masks in this test
+    struct TestPOSWCircuitParameters;
+    impl POSWCircuitParameters for TestPOSWCircuitParameters {
+        const MASK_LENGTH: usize = 32;
+    }
+
     #[derive(Clone)]
-    pub(super) struct Size;
+    pub struct Size;
     impl PedersenSize for Size {
         const NUM_WINDOWS: usize = 256;
         const WINDOW_SIZE: usize = 4;
     }
 
-    type H = PedersenCompressedCRH<Edwards, Size>;
-    type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
+    // We use a small tree in this test
+    define_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, PedersenCompressedCRH<Edwards, Size>, 5);
 
-    struct TestPOSWCircuitParameters {}
-    impl POSWCircuitParameters for TestPOSWCircuitParameters {
-        const LEAF_LENGTH: usize = 32;
-        const MASK_LENGTH: usize = 32;
-    }
+    type HashGadget = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
+    type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
 
-    define_test_merkle_tree_with_height!(EdwardsMaskedMerkleParameters, 5);
+
     #[test]
     fn test_tree_proof() {
         let mut rng = thread_rng();
 
         let parameters = EdwardsMaskedMerkleParameters::setup(&mut rng);
         let params = generate_random_parameters::<Bls12_377, _, _>(
-            POSWCircuit::<_, H, HG, TestPOSWCircuitParameters> {
-                leaves: vec![vec![None; 32]; 16],
-                crh_parameters: parameters.parameters().clone(),
+            POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
+                leaves: vec![None; 7],
+                merkle_parameters: parameters.clone(),
                 mask: None,
                 root: None,
                 field_type: PhantomData,
@@ -141,8 +149,7 @@ mod test {
         .unwrap();
 
         let nonce = [1; 32];
-        let leaves = vec![vec![3; 32]; 16];
-        type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
+        let leaves = vec![vec![3u8; 32]; 7];
         let tree = EdwardsMaskedMerkleTree::new(parameters.clone(), &leaves).unwrap();
         let root = tree.root();
         let mut root_bytes = [0; 32];
@@ -153,11 +160,11 @@ mod test {
         h.input(root_bytes.as_ref());
         let mask = h.result().to_vec();
 
-        let snark_leaves = leaves.iter().map(|l| l.iter().map(|b| Some(*b)).collect()).collect();
+        let snark_leaves = tree.leaves_hashed().into_iter().map(Some).collect();
         let proof = create_random_proof(
-            POSWCircuit::<_, H, HG, TestPOSWCircuitParameters> {
+            POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
                 leaves: snark_leaves,
-                crh_parameters: parameters.parameters().clone(),
+                merkle_parameters: parameters.clone(),
                 mask: Some(mask.clone()),
                 root: Some(root),
                 field_type: PhantomData,
