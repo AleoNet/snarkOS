@@ -1,6 +1,6 @@
 use crate::{
-    define_merkle_tree_parameters,
     crh::{PedersenCRH, PedersenSize},
+    define_merkle_tree_parameters,
 };
 use snarkos_curves::edwards_bls12::EdwardsAffine as Edwards;
 use snarkos_models::curves::pairing_engine::AffineCurve;

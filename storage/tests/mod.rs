@@ -1,6 +1,6 @@
 use snarkos_algorithms::{
-    define_merkle_tree_parameters,
     crh::{PedersenCompressedCRH, PedersenSize},
+    define_merkle_tree_parameters,
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;

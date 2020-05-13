@@ -3,16 +3,14 @@ use crate::{
     curves::edwards_bls12::EdwardsBlsGadget,
 };
 use snarkos_algorithms::{
-    define_merkle_tree_parameters,
     crh::{PedersenCRH, PedersenSize},
+    define_merkle_tree_parameters,
 };
 use snarkos_curves::edwards_bls12::{EdwardsAffine as Edwards, Fq};
-use snarkos_models::{
-    gadgets::{
-        algorithms::CRHGadget,
-        r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, uint8::UInt8},
-    },
+use snarkos_models::gadgets::{
+    algorithms::CRHGadget,
+    r1cs::{ConstraintSystem, TestConstraintSystem},
+    utilities::{alloc::AllocGadget, uint8::UInt8},
 };
 
 #[derive(Clone, PartialEq, Eq)]

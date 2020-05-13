@@ -10,7 +10,7 @@ pub use self::merkle_tree::*;
 #[cfg(test)]
 pub mod tests;
 
-use rand::{SeedableRng, Rng};
+use rand::{Rng, SeedableRng};
 
 // TODO: How should this seed be chosen?
 const PRNG_SEED: [u8; 32] = [
@@ -27,14 +27,13 @@ pub fn prng() -> impl Rng {
 macro_rules! define_merkle_tree_parameters {
     ($struct_name:ident, $hash:ty, $height:expr) => {
         use rand::Rng;
-        use $crate::merkle_tree::{MerkleParameters, MerkleTree};
-        use snarkos_models::storage::Storage;
-        use snarkos_models::algorithms::crh::CRH;
+        use snarkos_models::{algorithms::crh::CRH, storage::Storage};
         use snarkos_utilities::bytes::{FromBytes, ToBytes};
         use std::{
             io::{Read, Result as IoResult, Write},
             path::PathBuf,
         };
+        use $crate::merkle_tree::{MerkleParameters, MerkleTree};
 
         #[derive(Clone, PartialEq, Eq)]
         pub struct $struct_name($hash);
@@ -71,7 +70,9 @@ macro_rules! define_merkle_tree_parameters {
 
         impl Default for $struct_name {
             fn default() -> Self {
-                Self(<Self as MerkleParameters>::H::setup(&mut $crate::merkle_tree::prng()))
+                Self(<Self as MerkleParameters>::H::setup(
+                    &mut $crate::merkle_tree::prng(),
+                ))
             }
         }
 
@@ -92,4 +93,3 @@ macro_rules! define_merkle_tree_parameters {
         }
     };
 }
-
