@@ -2119,6 +2119,7 @@ version = "0.8.0"
 dependencies = [
  "base58",
  "bech32",
+ "bincode",
  "chrono",
  "derivative",
  "hex",
