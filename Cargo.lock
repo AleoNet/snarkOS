@@ -2158,6 +2158,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-posw"
+version = "0.8.0"
+dependencies = [
+ "blake2",
+ "criterion",
+ "rand",
+ "rand_xorshift",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-gadgets",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-profiler",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-profiler"
 version = "0.8.0"
 dependencies = [
