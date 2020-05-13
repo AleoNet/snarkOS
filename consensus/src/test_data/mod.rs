@@ -1,8 +1,12 @@
-use crate::{posw::{VerifyingKey, ProvingKey}, ConsensusParameters};
-use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
-use std::{path::PathBuf, sync::Arc};
+use crate::{
+    posw::{ProvingKey, VerifyingKey},
+    ConsensusParameters,
+};
 use once_cell::sync::Lazy;
+use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
+use snarkos_models::storage::Storage;
 use snarkos_objects::pedersen_merkle_tree::mtree::CommitmentMerkleParameters;
+use std::{path::PathBuf, sync::Arc};
 
 use rand_xorshift::XorShiftRng;
 
@@ -15,31 +19,45 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
 
 // Public parameters for the POSW SNARK
 pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
-    use std::marker::PhantomData;
-    use rand::SeedableRng;
-    use snarkos_algorithms::{
-        snark::generate_random_parameters,
-        merkle_tree::MerkleParameters,
-    };
-    use snarkos_objects::pedersen_merkle_tree::PARAMS;
+    let test_pk_path = PathBuf::from("test_posw.params");
+    let test_vk_path = PathBuf::from("test_posw_vk.params");
     use crate::posw;
+    use rand::SeedableRng;
+    use snarkos_algorithms::snark::generate_random_parameters;
+    use snarkos_objects::pedersen_merkle_tree::PARAMS;
+    use std::marker::PhantomData;
 
-    let leaves_number = 2u32.pow(CommitmentMerkleParameters::HEIGHT as u32) as usize;
-    let params = generate_random_parameters(
-        posw::POSW {
-            leaves: vec![vec![None; 32]; leaves_number],
-            crh_parameters: PARAMS.parameters().clone(),
-            mask: None,
-            root: None,
-            field_type: PhantomData,
-            crh_gadget_type: PhantomData,
-            circuit_parameters_type: PhantomData,
-        },
-        &mut XorShiftRng::seed_from_u64(1234567),
-    )
-    .unwrap();
+    let generation_timer = start_timer!(|| "POSW setup");
 
-    let vk = params.vk.clone();
+    let (params, vk) = if test_pk_path.exists() {
+        let vk = VerifyingKey::load(&test_vk_path).unwrap();
+        let pk = ProvingKey::load(&test_pk_path).unwrap();
+
+        (pk, vk)
+    } else {
+        let params = generate_random_parameters(
+            posw::POSW {
+                leaves: vec![None; 0],
+                merkle_parameters: PARAMS.clone(),
+                mask: None,
+                root: None,
+                field_type: PhantomData,
+                crh_gadget_type: PhantomData,
+                circuit_parameters_type: PhantomData,
+            },
+            &mut XorShiftRng::seed_from_u64(1234567),
+        )
+        .unwrap();
+
+        let vk = params.vk.clone();
+
+        params.store(&test_pk_path).unwrap();
+        vk.store(&test_vk_path).unwrap();
+
+        (params, vk)
+    };
+
+    end_timer!(generation_timer);
     (params, vk)
 });
 

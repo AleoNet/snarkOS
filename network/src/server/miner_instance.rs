@@ -1,7 +1,7 @@
 use crate::{context::Context, server::propagate_block};
 use snarkos_consensus::{
-    posw::ProvingKey,
     miner::{MemoryPool, Miner},
+    posw::ProvingKey,
     ConsensusParameters,
 };
 use snarkos_dpc::{

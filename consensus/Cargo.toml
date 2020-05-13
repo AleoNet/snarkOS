@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0", features = ["print-trace"] }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-objects = { path= "../objects", version = "0.8.0" }
 snarkos-dpc = { path = "../dpc", version = "0.8.0" }
@@ -20,6 +20,7 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-posw = { path = "../posw", version = "0.8.0" }
 snarkos-gadgets = { path = "../gadgets", version = "0.8.0" }
 
@@ -37,3 +38,6 @@ rand_xorshift = "0.2.0"
 
 [dev-dependencies]
 futures-await-test = { version = "0.3.0" }
+
+[features]
+print-trace = [ "snarkos-profiler/print-trace" ]
