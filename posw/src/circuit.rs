@@ -57,7 +57,7 @@ impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWC
             .leaves
             .iter()
             .enumerate()
-            .map(|(i, l)| HG::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || l.clone().get()))
+            .map(|(i, l)| HG::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || l.as_ref().get()))
             .collect::<Result<Vec<_>, _>>()?;
 
         let empty_hash = self
