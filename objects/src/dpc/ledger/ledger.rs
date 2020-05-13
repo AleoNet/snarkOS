@@ -4,6 +4,8 @@ use crate::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
 };
 
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTree, MerkleTreeDigest};
@@ -81,6 +83,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BasicLedger<T, P> {
             time: 0,
             difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
+            pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+            proof: ProofOfSuccinctWork::default(),
         };
 
         let genesis_block = Block::<T> {
