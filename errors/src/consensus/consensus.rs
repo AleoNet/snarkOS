@@ -3,6 +3,7 @@ use crate::{
     dpc::DPCError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
+    gadgets::SynthesisError,
 };
 
 use std::fmt::Debug;
@@ -84,6 +85,9 @@ pub enum ConsensusError {
 
     #[fail(display = "POSW verification failed")]
     PoswVerificationFailed,
+
+    #[fail(display = "{:?}", _0)]
+    SynthesisError(SynthesisError)
 }
 
 impl From<BlockError> for ConsensusError {
@@ -131,5 +135,11 @@ impl From<std::io::Error> for ConsensusError {
 impl From<ConsensusError> for Box<dyn std::error::Error> {
     fn from(error: ConsensusError) -> Self {
         error.into()
+    }
+}
+
+impl From<SynthesisError> for ConsensusError {
+    fn from(error: SynthesisError) -> Self {
+        ConsensusError::SynthesisError(error)
     }
 }

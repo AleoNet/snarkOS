@@ -23,7 +23,7 @@ pub mod posw {
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
-    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHashGadgetadget, curves::edwards_bls12::EdwardsBlsGadget};
     use snarkos_objects::pedersen_merkle_tree::{
         mtree::CommitmentMerkleParameters,
         pedersen_merkle_root_hash_with_leaves,
@@ -43,6 +43,7 @@ pub mod posw {
     // We use 32 byte leaves and 32 byte nonces in PoSW.
     pub struct PoSWParams;
     impl POSWCircuitParameters for PoSWParams {
+        // A 32 byte mask is sufficient for Pedersen hashes on BLS12-377, leaves and the root
         const MASK_LENGTH: usize = 32;
     }
 
@@ -53,9 +54,9 @@ pub mod posw {
         h.result().to_vec()
     }
 
-    type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
+    type HashGadget = PedersenCompressedCRHashGadgetadget<Edwards, Fq, EdwardsBlsGadget>;
 
-    pub type POSW = POSWCircuit<Fr, CommitmentMerkleParameters, HG, PoSWParams>;
+    pub type POSW = POSWCircuit<Fr, CommitmentMerkleParameters, HashGadget, PoSWParams>;
 
     pub fn instantiate_posw(nonce: u32, leaves: &[Vec<u8>]) -> POSW {
         let (root, leaves) = pedersen_merkle_root_hash_with_leaves(leaves);

@@ -139,7 +139,7 @@ impl Miner {
 
                 // generate the proof
                 let proof_timer = start_timer!(|| "POSW proof");
-                let proof = create_random_proof(circuit, &self.proving_key, &mut thread_rng()).unwrap();
+                let proof = create_random_proof(circuit, &self.proving_key, &mut thread_rng())?;
                 end_timer!(proof_timer);
 
                 // serialize it
@@ -150,6 +150,7 @@ impl Miner {
             };
 
             // Hash the proof and parse it as a u64
+            // TODO: replace u64 with bigint
             let hash_result = sha256d_to_u64(&proof.0[..]);
 
             // if it passes the difficulty chec, use the proof/nonce pairs and return the header
