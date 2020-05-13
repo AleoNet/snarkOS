@@ -7,6 +7,8 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -57,6 +59,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             time: 0,
             difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
+            pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+            proof: ProofOfSuccinctWork::default(),
         };
 
         let genesis_block = Block::<T> {
