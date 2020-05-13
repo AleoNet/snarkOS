@@ -115,7 +115,7 @@ mod test {
         const MASK_LENGTH: usize = 32;
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq, Eq)]
     pub struct Size;
     impl PedersenSize for Size {
         const NUM_WINDOWS: usize = 256;
