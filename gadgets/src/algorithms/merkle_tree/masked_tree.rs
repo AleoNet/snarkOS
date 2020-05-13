@@ -68,20 +68,3 @@ where
 
     HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask)
 }
-
-pub(crate) fn hash_leaf_gadget<H, HG, F, TB, CS>(
-    mut cs: CS,
-    parameters: &HG::ParametersGadget,
-    leaf: &TB,
-    mask: &[UInt8],
-) -> Result<HG::OutputGadget, SynthesisError>
-where
-    F: PrimeField,
-    CS: ConstraintSystem<F>,
-    H: CRH,
-    HG: MaskedCRHGadget<H, F>,
-    TB: ToBytesGadget<F>,
-{
-    let bytes = leaf.to_bytes(&mut cs.ns(|| "left_to_bytes"))?;
-    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask[..bytes.len() / 2])
-}

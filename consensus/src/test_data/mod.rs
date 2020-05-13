@@ -44,7 +44,6 @@ pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
                 field_type: PhantomData,
                 crh_gadget_type: PhantomData,
                 circuit_parameters_type: PhantomData,
-                merkle_tree_type: PhantomData,
             },
             &mut XorShiftRng::seed_from_u64(1234567),
         )

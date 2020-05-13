@@ -73,7 +73,6 @@ pub mod posw {
             field_type: PhantomData,
             crh_gadget_type: PhantomData,
             circuit_parameters_type: PhantomData,
-            merkle_tree_type: PhantomData,
         }
     }
 }

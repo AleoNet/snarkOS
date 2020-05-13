@@ -49,6 +49,8 @@ impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWC
                 Ok(crh_parameters)
             })?;
 
+        // According to the native tree in https://github.com/AleoHQ/snarkOS/blob/master/algorithms/src/merkle_tree/merkle_tree.rs,
+        // the tree height is calculated as ceil(log2(num_leaves)) + 1
         let leaves_number = 2u32.pow(M::HEIGHT as u32 - 1) as usize;
         assert!(self.leaves.len() <= leaves_number);
 
