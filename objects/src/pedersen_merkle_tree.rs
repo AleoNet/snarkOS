@@ -1,11 +1,10 @@
-use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_algorithms::{define_merkle_tree_parameters, merkle_tree::prng, crh::PedersenCompressedCRH};
-use snarkos_curves::bls12_377::Fr;
+use snarkos_algorithms::{crh::PedersenCompressedCRH, define_merkle_tree_parameters, merkle_tree::prng};
+use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
 use snarkos_utilities::to_bytes;
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
-use once_cell::sync::Lazy;
 
 // Do not leak the type
 mod window {
@@ -31,9 +30,7 @@ define_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, TREE_H
 pub type EdwardsMaskedMerkleTree = MerkleTree<MaskedMerkleTreeParameters>;
 
 /// Lazily evaluated parameters for the Masked Merkle tree
-pub static PARAMS: Lazy<MaskedMerkleTreeParameters> =
-    Lazy::new(|| MaskedMerkleTreeParameters::setup(&mut prng()));
-
+pub static PARAMS: Lazy<MaskedMerkleTreeParameters> = Lazy::new(|| MaskedMerkleTreeParameters::setup(&mut prng()));
 
 /// A Pedersen Merkle Root Hash
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

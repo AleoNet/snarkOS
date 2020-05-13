@@ -1,4 +1,4 @@
 pub mod circuit;
 
 mod instantiated;
-pub use instantiated::{POSW, Curve, Field, ProvingKey, Proof, VerifyingKey};
+pub use instantiated::{Curve, Field, Proof, ProvingKey, VerifyingKey, POSW};

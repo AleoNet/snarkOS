@@ -94,19 +94,16 @@ mod test {
     use blake2::{digest::Digest, Blake2s};
     use rand::thread_rng;
     use snarkos_algorithms::{
-        define_merkle_tree_parameters,
         crh::{PedersenCompressedCRH, PedersenSize},
+        define_merkle_tree_parameters,
         snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof},
     };
     use snarkos_curves::{
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
-    use snarkos_gadgets::{
-        algorithms::crh::PedersenCompressedCRHGadget,
-        curves::edwards_bls12::EdwardsBlsGadget,
-    };
-    use snarkos_models::{curves::to_field_vec::ToConstraintField};
+    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+    use snarkos_models::curves::to_field_vec::ToConstraintField;
     use std::marker::PhantomData;
 
     // We'll use 32 byte masks in this test
@@ -127,7 +124,6 @@ mod test {
 
     type HashGadget = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
     type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
-
 
     #[test]
     fn test_tree_proof() {
