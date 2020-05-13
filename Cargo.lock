@@ -2224,6 +2224,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-gadgets",
  "snarkos-models",
+ "snarkos-objects",
  "snarkos-profiler",
  "snarkos-utilities",
 ]

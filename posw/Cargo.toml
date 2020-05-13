@@ -24,6 +24,7 @@ rand = { version = "0.7" }
 [dev-dependencies]
 snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-objects = { path = "../objects", version = "0.8.0" }
 criterion = { version = "0.3.1" }
 rand_xorshift = { version = "0.2" }
 

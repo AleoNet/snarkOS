@@ -23,9 +23,9 @@ pub mod posw {
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
-    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHashGadgetadget, curves::edwards_bls12::EdwardsBlsGadget};
+    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
     use snarkos_objects::pedersen_merkle_tree::{
-        mtree::CommitmentMerkleParameters,
+        MaskedMerkleTreeParameters,
         pedersen_merkle_root_hash_with_leaves,
         PedersenMerkleRootHash,
         PARAMS,
@@ -54,9 +54,9 @@ pub mod posw {
         h.result().to_vec()
     }
 
-    type HashGadget = PedersenCompressedCRHashGadgetadget<Edwards, Fq, EdwardsBlsGadget>;
+    type HashGadget = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
-    pub type POSW = POSWCircuit<Fr, CommitmentMerkleParameters, HashGadget, PoSWParams>;
+    pub type POSW = POSWCircuit<Fr, MaskedMerkleTreeParameters, HashGadget, PoSWParams>;
 
     pub fn instantiate_posw(nonce: u32, leaves: &[Vec<u8>]) -> POSW {
         let (root, leaves) = pedersen_merkle_root_hash_with_leaves(leaves);

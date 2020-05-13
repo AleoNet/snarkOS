@@ -5,7 +5,6 @@ use crate::{
 use once_cell::sync::Lazy;
 use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
 use snarkos_models::storage::Storage;
-use snarkos_objects::pedersen_merkle_tree::mtree::CommitmentMerkleParameters;
 use std::{path::PathBuf, sync::Arc};
 
 use rand_xorshift::XorShiftRng;
