@@ -10,7 +10,7 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::{
     fs::File,
-    io::{self, Read, Result as IoResult, Write},
+    io::{self, BufReader, Read, Result as IoResult, Write},
     path::PathBuf,
 };
 
@@ -92,7 +92,7 @@ impl<E: PairingEngine> Storage for Proof<E> {
 
     /// Load the SNARK proof from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
+        let mut file = BufReader::new(File::open(path)?);
         Ok(Self::read(&mut file)?)
     }
 }
@@ -179,7 +179,7 @@ impl<E: PairingEngine> Storage for VerifyingKey<E> {
 
     /// Load the SNARK verifying key from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
+        let mut file = BufReader::new(File::open(path)?);
         Ok(Self::read(&mut file)?)
     }
 }
@@ -284,7 +284,7 @@ impl<E: PairingEngine> Storage for Parameters<E> {
 
     /// Load the SNARK parameters from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
+        let mut file = BufReader::new(File::open(path)?);
         Ok(Self::read(&mut file, false)?)
     }
 }

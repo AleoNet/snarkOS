@@ -1,18 +1,64 @@
-use crate::{miner::ProvingKey, ConsensusParameters};
-
+use crate::{
+    posw::{ProvingKey, VerifyingKey},
+    ConsensusParameters,
+};
+use once_cell::sync::Lazy;
 use snarkos_dpc::base_dpc::instantiated::MerkleTreeLedger;
-
+use snarkos_models::storage::Storage;
 use std::{path::PathBuf, sync::Arc};
 
-pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
+use rand_xorshift::XorShiftRng;
+
+pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusParameters {
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
-    verifying_key: [0; 32],  // TODO: Replace with a proper verifying key mock
-};
+    verifying_key: POSW_PP.1.clone(),
+});
 
-// TODO: Replace with a proper proving key mock
-pub const PROVING_KEY: ProvingKey = [0; 32];
+// Public parameters for the POSW SNARK
+pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
+    let test_pk_path = PathBuf::from("test_posw.params");
+    let test_vk_path = PathBuf::from("test_posw_vk.params");
+    use crate::posw;
+    use rand::SeedableRng;
+    use snarkos_algorithms::snark::generate_random_parameters;
+    use snarkos_objects::pedersen_merkle_tree::PARAMS;
+    use std::marker::PhantomData;
+
+    let generation_timer = start_timer!(|| "POSW setup");
+
+    let (params, vk) = if test_pk_path.exists() {
+        let vk = VerifyingKey::load(&test_vk_path).unwrap();
+        let pk = ProvingKey::load(&test_pk_path).unwrap();
+
+        (pk, vk)
+    } else {
+        let params = generate_random_parameters(
+            posw::POSW {
+                leaves: vec![None; 0],
+                merkle_parameters: PARAMS.clone(),
+                mask: None,
+                root: None,
+                field_type: PhantomData,
+                crh_gadget_type: PhantomData,
+                circuit_parameters_type: PhantomData,
+            },
+            &mut XorShiftRng::seed_from_u64(1234567),
+        )
+        .unwrap();
+
+        let vk = params.vk.clone();
+
+        params.store(&test_pk_path).unwrap();
+        vk.store(&test_vk_path).unwrap();
+
+        (params, vk)
+    };
+
+    end_timer!(generation_timer);
+    (params, vk)
+});
 
 pub const TEST_DB_PATH: &str = "../test_db";
 

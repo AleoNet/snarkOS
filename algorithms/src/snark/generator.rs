@@ -170,7 +170,10 @@ where
     end_timer!(domain_time);
     ///////////////////////////////////////////////////////////////////////////
 
-    let reduction_time = start_timer!(|| "R1CS to SAP Instance Map with Evaluation");
+    let reduction_time = start_timer!(|| format!(
+        "R1CS to SAP Instance Map with Evaluation, constraints: {}",
+        assembly.num_constraints
+    ));
     let (a, c, zt, sap_num_variables, m_raw) = R1CStoSAP::instance_map_with_evaluation::<E>(&assembly, &t)?;
     end_timer!(reduction_time);
 

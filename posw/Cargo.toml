@@ -1,0 +1,32 @@
+[package]
+name = "snarkos-posw"
+version = "0.8.0"
+authors = ["The Aleo Team <hello@aleo.org"]
+description = "Errors for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-gadgets = { path = "../gadgets", version = "0.8.0" }
+snarkos-models = { path = "../models", version = "0.8.0" }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
+
+blake2 = { version = "0.7.1" }
+rand = { version = "0.7" }
+
+[dev-dependencies]
+snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-objects = { path = "../objects", version = "0.8.0" }
+criterion = { version = "0.3.1" }
+rand_xorshift = { version = "0.2" }
+
+[features]
+print-trace = [ "snarkos-profiler/print-trace" ]
