@@ -44,7 +44,6 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
     }
 
     let computed_root = current_leaves[0].clone();
-    // Hash the root.
 
     Ok(computed_root)
 }
