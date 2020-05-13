@@ -28,8 +28,16 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+    pedersen_merkle_root,
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkos_utilities::{bytes::FromBytes, rand::UniformRand};
+use snarkos_models::curves::to_field_vec::ToConstraintField;
+
+use snarkos_posw::{commit, Proof, Field, VerifyingKey};
+use snarkos_algorithms::snark::{verify_proof, prepare_verifying_key};
+use snarkos_profiler::{start_timer, end_timer};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -47,8 +55,12 @@ pub struct ConsensusParameters {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
+
     // /// Mainnet or testnet
     // network: Network
+
+    /// The verifying key for the PoSW Merkle Tree SNARK
+    pub verifying_key: VerifyingKey,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -110,10 +122,15 @@ impl ConsensusParameters {
         header: &BlockHeader,
         parent_header: &BlockHeader,
         merkle_root_hash: &MerkleRootHash,
+        pedersen_merkle_root_hash: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
         let hash_result = header.to_difficulty_hash();
-
         let future_timelimit: i64 = Utc::now().timestamp() as i64 + TWO_HOURS_UNIX;
+
+        // Verify the proof
+        let verification_timer = start_timer!(|| "POSW verify");
+        self.verify_proof(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
+        end_timer!(verification_timer);
 
         if parent_header.get_hash() != header.previous_block_hash {
             Err(ConsensusError::NoParent(
@@ -122,6 +139,8 @@ impl ConsensusParameters {
             ))
         } else if header.merkle_root_hash != *merkle_root_hash {
             Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()))
+        } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
+            Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()))
         } else if header.time > future_timelimit {
             Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
         } else if header.time < parent_header.time {
@@ -133,6 +152,30 @@ impl ConsensusParameters {
         } else {
             Ok(())
         }
+    }
+
+    fn verify_proof(
+        &self,
+        nonce: u32,
+        proof: &ProofOfSuccinctWork,
+        pedersen_merkle_root: &PedersenMerkleRootHash,
+    ) -> Result<(), ConsensusError> {
+        let mask = commit(nonce, pedersen_merkle_root.clone());
+        let merkle_root = Field::read(&pedersen_merkle_root.0[..])?;
+        let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..])?, vec![
+            merkle_root,
+        ]]
+        .concat();
+
+        // deserialize the snark proof
+        let proof = Proof::read(&proof.0[..])?;
+
+        let res = verify_proof(&prepare_verifying_key(&self.verifying_key), &proof, &inputs)?;
+        if !res {
+            return Err(ConsensusError::PoswVerificationFailed);
+        }
+
+        Ok(())
     }
 
     /// Check if the block is valid
@@ -153,12 +196,13 @@ impl ConsensusParameters {
         let mut merkle_root_bytes = [0u8; 32];
         merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
 
-        // Verify the block header
+        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
 
+        // Verify the block header
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
             if let Err(err) =
-                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes))
+                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes), &pedersen_merkle_root)
             {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
