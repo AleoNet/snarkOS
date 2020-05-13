@@ -30,7 +30,6 @@ pub struct POSWCircuit<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M
     pub field_type: PhantomData<F>,
     pub crh_gadget_type: PhantomData<HG>,
     pub circuit_parameters_type: PhantomData<CP>,
-    pub merkle_tree_type: PhantomData<M>,
 }
 
 impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters>
