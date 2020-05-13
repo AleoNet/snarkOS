@@ -8,9 +8,9 @@ use snarkos_dpc::base_dpc::{
 use std::{path::PathBuf, sync::Arc};
 
 use once_cell::sync::Lazy;
-use snarkos_posw::{ProvingKey, VerifyingKey, POSW};
-use snarkos_profiler::{start_timer, end_timer};
 use snarkos_models::storage::Storage;
+use snarkos_posw::{ProvingKey, VerifyingKey, POSW};
+use snarkos_profiler::{end_timer, start_timer};
 
 pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusParameters {
     max_block_size: 1_000_000usize,
@@ -19,13 +19,12 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
     verifying_key: POSW_PP.1.clone(),
 });
 
-
 // Public parameters for the POSW SNARK
 pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
     let test_pk_path = PathBuf::from("test_posw.params");
     let test_vk_path = PathBuf::from("test_posw_vk.params");
-    use rand_xorshift::XorShiftRng;
     use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
     use snarkos_algorithms::snark::generate_random_parameters;
     use snarkos_objects::pedersen_merkle_tree::PARAMS;
     use std::marker::PhantomData;

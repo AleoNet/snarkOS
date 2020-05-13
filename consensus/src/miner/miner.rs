@@ -9,8 +9,8 @@ use snarkos_models::dpc::Record;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     merkle_root,
-    AccountPublicKey,
     pedersen_merkle_root,
+    AccountPublicKey,
     BlockHeader,
     MerkleRootHash,
     ProofOfSuccinctWork,
@@ -27,9 +27,9 @@ use snarkos_dpc::dpc::base_dpc::record::DPCRecord;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use snarkos_posw::{POSW, ProvingKey};
 use snarkos_algorithms::snark::create_random_proof;
-use snarkos_profiler::{start_timer, end_timer};
+use snarkos_posw::{ProvingKey, POSW};
+use snarkos_profiler::{end_timer, start_timer};
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.

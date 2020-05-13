@@ -43,7 +43,10 @@ pub enum ConsensusError {
     #[error("block transactions do not hash to merkle root {:?}", _0)]
     MerkleRoot(String),
 
-    #[error("block transactions do not hash to the correct pedersen hash to merkle root {:?}", _0)]
+    #[error(
+        "block transactions do not hash to the correct pedersen hash to merkle root {:?}",
+        _0
+    )]
     PedersenMerkleRoot(String),
 
     #[error("{}", _0)]
@@ -86,7 +89,7 @@ pub enum ConsensusError {
     PoswVerificationFailed,
 
     #[error(transparent)]
-    ConstraintFieldError(#[from] crate::curves::ConstraintFieldError)
+    ConstraintFieldError(#[from] crate::curves::ConstraintFieldError),
 }
 
 impl From<BlockError> for ConsensusError {

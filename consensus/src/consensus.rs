@@ -16,12 +16,14 @@ use snarkos_dpc::{
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
+    curves::to_field_vec::ToConstraintField,
     dpc::{DPCComponents, Record},
 };
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     ledger::Ledger,
     merkle_root,
+    pedersen_merkle_root,
     Account,
     AccountPrivateKey,
     AccountPublicKey,
@@ -30,14 +32,12 @@ use snarkos_objects::{
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
-    pedersen_merkle_root,
 };
 use snarkos_utilities::{bytes::FromBytes, rand::UniformRand};
-use snarkos_models::curves::to_field_vec::ToConstraintField;
 
-use snarkos_posw::{commit, Proof, Field, VerifyingKey};
-use snarkos_algorithms::snark::{verify_proof, prepare_verifying_key};
-use snarkos_profiler::{start_timer, end_timer};
+use snarkos_algorithms::snark::{prepare_verifying_key, verify_proof};
+use snarkos_posw::{commit, Field, Proof, VerifyingKey};
+use snarkos_profiler::{end_timer, start_timer};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -58,7 +58,6 @@ pub struct ConsensusParameters {
 
     // /// Mainnet or testnet
     // network: Network
-
     /// The verifying key for the PoSW Merkle Tree SNARK
     pub verifying_key: VerifyingKey,
 }
@@ -201,9 +200,12 @@ impl ConsensusParameters {
         // Verify the block header
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
-            if let Err(err) =
-                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes), &pedersen_merkle_root)
-            {
+            if let Err(err) = self.verify_header(
+                &block.header,
+                &parent_block.header,
+                &MerkleRootHash(merkle_root_bytes),
+                &pedersen_merkle_root,
+            ) {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
             }
