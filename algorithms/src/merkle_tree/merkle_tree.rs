@@ -68,6 +68,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         while cur_height < Self::HEIGHT as usize {
             cur_hash = parameters.hash_inner_node(&cur_hash, &empty_hash, &mut buffer)?;
 
+            // We reached the root, there's no path element at this level.
             if cur_height < Self::HEIGHT as usize - 1 {
                 padding_tree.push((cur_hash.clone(), empty_hash.clone()));
             }
