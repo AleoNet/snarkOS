@@ -1,13 +1,12 @@
-use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_algorithms::crh::PedersenCompressedCRH;
-use snarkos_curves::bls12_377::Fr;
-use snarkos_utilities::to_bytes;
 use crate::define_merkle_tree_with_height;
+use snarkos_algorithms::crh::PedersenCompressedCRH;
+use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
+use snarkos_utilities::to_bytes;
 
+use once_cell::sync::Lazy;
+use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
-use rand_chacha::ChaChaRng;
-use once_cell::sync::Lazy;
 
 // TODO: How should this seed be chosen?
 const PRNG_SEED: [u8; 32] = [
@@ -25,8 +24,7 @@ macro_rules! define_merkle_tree_with_height {
     ($struct_name:ident, $hash:ty, $height:expr) => {
         use rand::{Rng, SeedableRng};
         use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
-        use snarkos_models::storage::Storage;
-        use snarkos_models::algorithms::crh::CRH;
+        use snarkos_models::{algorithms::crh::CRH, storage::Storage};
         use snarkos_utilities::bytes::{FromBytes, ToBytes};
         use std::{
             io::{Read, Result as IoResult, Write},
@@ -68,7 +66,9 @@ macro_rules! define_merkle_tree_with_height {
 
         impl Default for $struct_name {
             fn default() -> Self {
-                Self(<Self as MerkleParameters>::H::setup(&mut $crate::pedersen_merkle_tree::prng()))
+                Self(<Self as MerkleParameters>::H::setup(
+                    &mut $crate::pedersen_merkle_tree::prng(),
+                ))
             }
         }
 
@@ -113,9 +113,7 @@ define_merkle_tree_with_height!(MaskedMerkleTreeParameters, MerkleTreeCRH, TREE_
 pub type EdwardsMaskedMerkleTree = MerkleTree<MaskedMerkleTreeParameters>;
 
 /// Lazily evaluated parameters for the Masked Merkle tree
-pub static PARAMS: Lazy<MaskedMerkleTreeParameters> =
-    Lazy::new(|| MaskedMerkleTreeParameters::setup(&mut prng()));
-
+pub static PARAMS: Lazy<MaskedMerkleTreeParameters> = Lazy::new(|| MaskedMerkleTreeParameters::setup(&mut prng()));
 
 /// A Pedersen Merkle Root Hash
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

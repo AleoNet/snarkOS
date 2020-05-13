@@ -6,4 +6,3 @@ pub use self::masked_tree::*;
 
 #[cfg(test)]
 pub mod tests;
-

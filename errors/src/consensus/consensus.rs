@@ -1,9 +1,9 @@
 use crate::{
     algorithms::CRHError,
     dpc::DPCError,
+    gadgets::SynthesisError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
-    gadgets::SynthesisError,
 };
 
 use std::fmt::Debug;
@@ -87,7 +87,7 @@ pub enum ConsensusError {
     PoswVerificationFailed,
 
     #[fail(display = "{:?}", _0)]
-    SynthesisError(SynthesisError)
+    SynthesisError(SynthesisError),
 }
 
 impl From<BlockError> for ConsensusError {

@@ -35,8 +35,8 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::dpc::DPCComponents;
-use snarkos_storage::BlockStorage;
 use snarkos_objects::define_merkle_tree_with_height;
+use snarkos_storage::BlockStorage;
 
 use blake2::Blake2s as Blake2sHash;
 

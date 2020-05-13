@@ -101,11 +101,8 @@ mod test {
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
-    use snarkos_gadgets::{
-        algorithms::crh::PedersenCompressedCRHGadget,
-        curves::edwards_bls12::EdwardsBlsGadget,
-    };
-    use snarkos_models::{curves::to_field_vec::ToConstraintField};
+    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+    use snarkos_models::curves::to_field_vec::ToConstraintField;
     use snarkos_objects::define_merkle_tree_with_height;
     use std::marker::PhantomData;
 
@@ -127,7 +124,6 @@ mod test {
 
     type HashGadget = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
     type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
-
 
     #[test]
     fn test_tree_proof() {
