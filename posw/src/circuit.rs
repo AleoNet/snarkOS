@@ -1,7 +1,6 @@
-//! Implements a Proof of Succinct work circuit. The inputs are transaction IDs as the leaves,
-//! which are then used as leaves in a tree instantiated with a masked Pedersen hash. The prover
+//! Implements a Proof of Succinct work circuit. The inputs are opaque leaves,
+//! which are then used to build a tree instantiated with a masked Pedersen hash. The prover
 //! inputs a mask computed as Blake2s(nonce || root), which the verifier also checks.
-
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::compute_root;
