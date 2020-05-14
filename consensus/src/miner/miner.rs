@@ -8,12 +8,13 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::dpc::Record;
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
-    merkle_root,
+    merkle_root_with_subroots,
     pedersen_merkle_root,
     AccountPublicKey,
     BlockHeader,
     MerkleRootHash,
     ProofOfSuccinctWork,
+    MASKED_TREE_HEIGHT,
 };
 use snarkos_posw::{ProvingKey, POSW};
 use snarkos_profiler::{end_timer, start_timer};
@@ -122,10 +123,11 @@ impl Miner {
     ) -> Result<BlockHeader, ConsensusError> {
         let transaction_ids = transactions.to_transaction_ids()?;
 
+        let (root, subroots) = merkle_root_with_subroots(&transaction_ids, MASKED_TREE_HEIGHT);
         let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+        merkle_root_bytes[..].copy_from_slice(&root);
 
-        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
+        let pedersen_merkle_root = pedersen_merkle_root(&subroots);
 
         let time = Utc::now().timestamp();
         let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
@@ -136,7 +138,7 @@ impl Miner {
             nonce = rng.gen_range(0, self.consensus.max_nonce);
             proof = {
                 // instantiate the circuit with the nonce
-                let circuit = POSW::new(nonce, &transaction_ids);
+                let circuit = POSW::new(nonce, &subroots);
 
                 // generate the proof
                 let proof_timer = start_timer!(|| "POSW proof");

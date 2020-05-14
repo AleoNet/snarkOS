@@ -34,3 +34,6 @@ tokio = { version = "0.2", features = ["full"] }
 
 [dev-dependencies]
 futures-await-test = { version = "0.3.0" }
+
+[features]
+print-trace = [ "snarkos-profiler/print-trace", "snarkos-dpc/print-trace" ]

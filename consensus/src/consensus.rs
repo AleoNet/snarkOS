@@ -22,7 +22,7 @@ use snarkos_models::{
 use snarkos_objects::{
     dpc::{Block, DPCTransactions, Transaction},
     ledger::Ledger,
-    merkle_root,
+    merkle_root_with_subroots,
     pedersen_merkle_root,
     Account,
     AccountPrivateKey,
@@ -32,6 +32,7 @@ use snarkos_objects::{
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
+    MASKED_TREE_HEIGHT,
 };
 use snarkos_utilities::{bytes::FromBytes, rand::UniformRand};
 
@@ -192,10 +193,11 @@ impl ConsensusParameters {
             .map(|id| id.to_vec())
             .collect();
 
+        let (root, subroots) = merkle_root_with_subroots(&transaction_ids, MASKED_TREE_HEIGHT);
         let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+        merkle_root_bytes[..].copy_from_slice(&root);
 
-        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
+        let pedersen_merkle_root = pedersen_merkle_root(&subroots);
 
         // Verify the block header
         if !Self::is_genesis(&block.header) {
