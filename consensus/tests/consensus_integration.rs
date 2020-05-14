@@ -23,7 +23,9 @@ mod consensus_integration {
         let miner_address: AccountPublicKey<Components> = FromBytes::read(&GENESIS_ACCOUNT[..]).unwrap();
         let miner = Miner::new(miner_address, consensus, POSW_PP.clone().0);
 
-        let header = miner.find_block(transactions, parent_header).unwrap();
+        let header = miner
+            .find_block(transactions, parent_header, &mut rand::thread_rng())
+            .unwrap();
         assert_eq!(header.previous_block_hash, *expected_previous_block_hash);
         assert_eq!(header.merkle_root_hash, *expected_merkle_root_hash);
     }

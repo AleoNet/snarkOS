@@ -4,6 +4,7 @@ use crate::{
 };
 use snarkos_errors::node::CliError;
 use snarkos_network::bootnodes::*;
+use std::path::PathBuf;
 
 use clap::ArgMatches;
 use serde::Serialize;
@@ -28,6 +29,9 @@ pub struct Config {
     pub mempool_interval: u8,
     pub min_peers: u16,
     pub max_peers: u16,
+
+    pub pk_path: PathBuf,
+    pub vk_path: PathBuf,
 
     //Subcommand
     subcommand: Option<String>,
@@ -57,6 +61,8 @@ impl Default for Config {
             mempool_interval: 5,
             min_peers: 2,
             max_peers: 20,
+            pk_path: PathBuf::from("./proving.key"),
+            vk_path: PathBuf::from("./verifying.key"),
         }
     }
 }
@@ -80,6 +86,8 @@ impl Config {
             "mempool_interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "min_peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "max_peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "proving_key" => self.pk_path(clap::value_t!(arguments.value_of(*option), PathBuf).ok()),
+            "verifying_key" => self.vk_path(clap::value_t!(arguments.value_of(*option), PathBuf).ok()),
             _ => (),
         });
     }
@@ -174,6 +182,18 @@ impl Config {
     fn max_peers(&mut self, argument: Option<u16>) {
         if let Some(num_peers) = argument {
             self.max_peers = num_peers;
+        }
+    }
+
+    fn pk_path(&mut self, argument: Option<PathBuf>) {
+        if let Some(path) = argument {
+            self.pk_path = path;
+        }
+    }
+
+    fn vk_path(&mut self, argument: Option<PathBuf>) {
+        if let Some(path) = argument {
+            self.vk_path = path;
         }
     }
 }

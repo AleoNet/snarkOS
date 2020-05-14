@@ -1,5 +1,5 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
-use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters};
+use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters, snark::create_random_proof};
 use snarkos_dpc::{
     base_dpc::{instantiated::*, parameters::PublicParameters},
     DPCScheme,
@@ -15,6 +15,8 @@ use snarkos_objects::{
     MerkleRootHash,
     ProofOfSuccinctWork,
 };
+use snarkos_posw::{ProvingKey, POSW};
+use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -26,10 +28,6 @@ use rand::{thread_rng, Rng};
 use snarkos_dpc::dpc::base_dpc::record::DPCRecord;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
-use snarkos_algorithms::snark::create_random_proof;
-use snarkos_posw::{ProvingKey, POSW};
-use snarkos_profiler::{end_timer, start_timer};
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
@@ -116,10 +114,11 @@ impl Miner {
 
     /// Run proof of work to find block.
     /// Returns BlockHeader with nonce solution.
-    pub fn find_block(
+    pub fn find_block<R: Rng>(
         &self,
         transactions: &DPCTransactions<Tx>,
         parent_header: &BlockHeader,
+        rng: &mut R,
     ) -> Result<BlockHeader, ConsensusError> {
         let transaction_ids = transactions.to_transaction_ids()?;
 
@@ -134,14 +133,14 @@ impl Miner {
         let mut nonce;
         let mut proof;
         loop {
-            nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
+            nonce = rng.gen_range(0, self.consensus.max_nonce);
             proof = {
                 // instantiate the circuit with the nonce
                 let circuit = POSW::new(nonce, &transaction_ids);
 
                 // generate the proof
                 let proof_timer = start_timer!(|| "POSW proof");
-                let proof = create_random_proof(circuit, &self.proving_key, &mut thread_rng())?;
+                let proof = create_random_proof(circuit, &self.proving_key, rng)?;
                 end_timer!(proof_timer);
 
                 // serialize it
@@ -176,11 +175,12 @@ impl Miner {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(
+    pub async fn mine_block<R: Rng>(
         &self,
         parameters: &PublicParameters<Components>,
         storage: &Arc<MerkleTreeLedger>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
+        rng: &mut R,
     ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
         let mut candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
@@ -197,7 +197,7 @@ impl Miner {
             println!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
         }
 
-        let header = self.find_block(&transactions, &previous_block_header)?;
+        let header = self.find_block(&transactions, &previous_block_header, rng)?;
 
         println!("Miner found block block");
 

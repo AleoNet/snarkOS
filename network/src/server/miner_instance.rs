@@ -5,6 +5,7 @@ use snarkos_consensus::{
 };
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_objects::{AccountPublicKey, Block};
+use snarkos_posw::ProvingKey;
 
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};
@@ -17,6 +18,7 @@ pub struct MinerInstance {
     storage: Arc<MerkleTreeLedger>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     server_context: Arc<Context>,
+    proving_key: ProvingKey,
 }
 
 impl MinerInstance {
@@ -28,6 +30,7 @@ impl MinerInstance {
         storage: Arc<MerkleTreeLedger>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
         server_context: Arc<Context>,
+        proving_key: ProvingKey,
     ) -> Self {
         Self {
             coinbase_address,
@@ -36,6 +39,7 @@ impl MinerInstance {
             storage,
             memory_pool_lock,
             server_context,
+            proving_key,
         }
     }
 
@@ -47,13 +51,14 @@ impl MinerInstance {
         task::spawn(async move {
             let context = self.server_context.clone();
             let local_address = self.server_context.local_address;
-            let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone());
+            let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone(), self.proving_key);
+            let rng = &mut rand::rngs::OsRng;
 
             loop {
                 info!("Mining new block");
 
                 let (block_serialized, _coinbase_records) = miner
-                    .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
+                    .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock, rng)
                     .await
                     .unwrap();
 

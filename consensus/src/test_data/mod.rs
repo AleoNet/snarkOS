@@ -1,16 +1,19 @@
 use crate::ConsensusParameters;
 
+use snarkos_algorithms::snark::generate_random_parameters;
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger},
     parameters::PublicParameters,
 };
-
-use std::{path::PathBuf, sync::Arc};
-
-use once_cell::sync::Lazy;
 use snarkos_models::storage::Storage;
+use snarkos_objects::pedersen_merkle_tree::PARAMS;
 use snarkos_posw::{ProvingKey, VerifyingKey, POSW};
 use snarkos_profiler::{end_timer, start_timer};
+
+use once_cell::sync::Lazy;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
+use std::{marker::PhantomData, path::PathBuf, sync::Arc};
 
 pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusParameters {
     max_block_size: 1_000_000usize,
@@ -23,12 +26,6 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
 pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
     let test_pk_path = PathBuf::from("test_posw.params");
     let test_vk_path = PathBuf::from("test_posw_vk.params");
-    use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
-    use snarkos_algorithms::snark::generate_random_parameters;
-    use snarkos_objects::pedersen_merkle_tree::PARAMS;
-    use std::marker::PhantomData;
-
     let generation_timer = start_timer!(|| "POSW setup");
 
     let (params, vk) = if test_pk_path.exists() {
