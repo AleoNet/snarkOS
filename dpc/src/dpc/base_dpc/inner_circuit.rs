@@ -53,14 +53,18 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
-    pub fn blank(circuit_parameters: &CircuitParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
+    pub fn blank<R: rand::Rng>(
+        circuit_parameters: &CircuitParameters<C>,
+        ledger_parameters: &C::MerkleParameters,
+        rng: &mut R,
+    ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
 
         let old_serial_numbers = vec![<C::Signature as SignatureScheme>::PublicKey::default(); num_input_records];
         let old_records = vec![DPCRecord::default(); num_input_records];
-        let old_witnesses = vec![MerklePath::default(); num_input_records];
+        let old_witnesses = vec![MerklePath::blank(rng); num_input_records];
         let old_account_private_keys = vec![AccountPrivateKey::default(); num_input_records];
 
         let new_commitments = vec![<C::RecordCommitment as CommitmentScheme>::Output::default(); num_output_records];

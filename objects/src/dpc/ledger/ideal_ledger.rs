@@ -168,14 +168,6 @@ impl<T: Transaction, P: MerkleParameters> Ledger for IdealLedger<T, P> {
         Ok(result)
     }
 
-    fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, LedgerError> {
-        Ok(MerklePath::default())
-    }
-
-    fn prove_memo(&self, _memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, LedgerError> {
-        Ok(MerklePath::default())
-    }
-
     fn verify_cm(
         _parameters: &Self::Parameters,
         digest: &MerkleTreeDigest<Self::Parameters>,

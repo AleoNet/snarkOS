@@ -17,7 +17,7 @@ define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 32);
 type EdwardsMerkleTree = MerkleTree<MTParameters>;
 
 fn generate_merkle_tree<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
-    let parameters = MTParameters::default();
+    let parameters = MTParameters::setup(&mut rand::thread_rng());
     let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
@@ -26,7 +26,7 @@ fn generate_merkle_tree<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
 }
 
 fn bad_merkle_tree_verify<L: ToBytes + Clone + Eq>(leaves: &[L]) -> () {
-    let parameters = MTParameters::default();
+    let parameters = MTParameters::setup(&mut rand::thread_rng());
     let tree = EdwardsMerkleTree::new(parameters, leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();

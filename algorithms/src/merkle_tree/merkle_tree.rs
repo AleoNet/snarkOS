@@ -136,17 +136,6 @@ impl<P: MerkleParameters> MerkleTree<P> {
     }
 }
 
-impl<P: MerkleParameters> Default for MerkleTree<P> {
-    fn default() -> Self {
-        MerkleTree {
-            tree: vec![],
-            padding_tree: vec![],
-            root: None,
-            parameters: P::default(),
-        }
-    }
-}
-
 /// Returns the height of the tree, given the size of the tree.
 #[inline]
 fn tree_height(tree_size: usize) -> usize {

@@ -5,7 +5,7 @@ use snarkos_utilities::bytes::ToBytes;
 use rand::Rng;
 use std::io::Cursor;
 
-pub trait MerkleParameters: Clone + Default + Storage {
+pub trait MerkleParameters: Clone + Storage {
     type H: CRH;
 
     const HEIGHT: usize;

@@ -10,18 +10,6 @@ pub use self::merkle_tree::*;
 #[cfg(test)]
 pub mod tests;
 
-use rand::{Rng, SeedableRng};
-
-// TODO: How should this seed be chosen?
-const PRNG_SEED: [u8; 32] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
-// PRNG to instantiate the Merkle Tree parameters
-pub fn prng() -> impl Rng {
-    rand_chacha::ChaChaRng::from_seed(PRNG_SEED)
-}
-
 #[macro_export]
 /// Defines a Merkle Tree using the provided hash and height.
 macro_rules! define_merkle_tree_parameters {
@@ -65,14 +53,6 @@ macro_rules! define_merkle_tree_parameters {
             /// Load the SNARK proof from a file at the given path.
             fn load(path: &PathBuf) -> IoResult<Self> {
                 Ok(Self(<Self as MerkleParameters>::H::load(path)?))
-            }
-        }
-
-        impl Default for $struct_name {
-            fn default() -> Self {
-                Self(<Self as MerkleParameters>::H::setup(
-                    &mut $crate::merkle_tree::prng(),
-                ))
             }
         }
 

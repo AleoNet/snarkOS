@@ -48,16 +48,14 @@ impl<P: MerkleParameters> MerklePath<P> {
             Ok(false)
         }
     }
-}
 
-impl<P: MerkleParameters> Default for MerklePath<P> {
-    fn default() -> Self {
+    pub fn blank<R: rand::Rng>(rng: &mut R) -> Self {
         let mut path = Vec::with_capacity(P::HEIGHT);
         for _i in 1..P::HEIGHT {
             path.push((<P::H as CRH>::Output::default(), <P::H as CRH>::Output::default()));
         }
         Self {
-            parameters: P::default(),
+            parameters: P::setup(rng),
             path,
         }
     }

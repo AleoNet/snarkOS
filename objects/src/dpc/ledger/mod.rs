@@ -55,8 +55,6 @@ pub trait Ledger: Sized {
     fn contains_memo(&self, memo: &Self::Memo) -> bool;
 
     fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, LedgerError>;
-    fn prove_sn(&self, sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, LedgerError>;
-    fn prove_memo(&self, memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, LedgerError>;
 
     fn verify_cm(
         parameters: &Self::Parameters,

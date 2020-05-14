@@ -362,7 +362,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let input_record_time = start_timer!(|| format!("Process input record {}", i));
 
             if record.is_dummy() {
-                old_witnesses.push(MerklePath::default());
+                old_witnesses.push(MerklePath::blank(rng));
             } else {
                 let comm = &record.commitment();
                 let witness = ledger.prove_cm(comm)?;
@@ -547,7 +547,7 @@ where
 
         let snark_setup_time = start_timer!(|| "Execute Inner SNARK Setup");
         let inner_snark_parameters =
-            Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters), rng)?;
+            Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters, rng), rng)?;
         end_timer!(snark_setup_time);
 
         let snark_setup_time = start_timer!(|| "Execute Outer SNARK Setup");
