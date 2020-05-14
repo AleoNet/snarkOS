@@ -111,6 +111,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
 
+    let rng = rand::rngs::OsRng;
     if config.miner {
         MinerInstance::new(
             miner_address,
@@ -121,7 +122,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             server.context.clone(),
             pk,
         )
-        .spawn();
+        .spawn(rng);
     }
 
     // Start server thread

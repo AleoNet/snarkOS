@@ -22,6 +22,9 @@ pub enum ConsensusError {
     #[error("A coinbase transaction already exists in the block")]
     CoinbaseTransactionAlreadyExists(),
 
+    #[error(transparent)]
+    ConstraintFieldError(#[from] crate::curves::ConstraintFieldError),
+
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
@@ -87,9 +90,6 @@ pub enum ConsensusError {
 
     #[error("POSW Verification failed")]
     PoswVerificationFailed,
-
-    #[error(transparent)]
-    ConstraintFieldError(#[from] crate::curves::ConstraintFieldError),
 }
 
 impl From<BlockError> for ConsensusError {

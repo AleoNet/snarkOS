@@ -53,7 +53,9 @@ mod consensus_dpc {
         let (previous_block_header, transactions, coinbase_records) =
             miner.establish_block(&parameters, &ledger, &transactions).unwrap();
 
-        let header = miner.find_block(&transactions, &previous_block_header, &mut rng).unwrap();
+        let header = miner
+            .find_block(&transactions, &previous_block_header, &mut rng)
+            .unwrap();
 
         let block = Block { header, transactions };
 
@@ -123,7 +125,9 @@ mod consensus_dpc {
         let (previous_block_header, transactions, new_coinbase_records) =
             miner.establish_block(&parameters, &ledger, &transactions).unwrap();
 
-        let header = miner.find_block(&transactions, &previous_block_header, &mut rand::thread_rng()).unwrap();
+        let header = miner
+            .find_block(&transactions, &previous_block_header, &mut rand::thread_rng())
+            .unwrap();
 
         let new_block = Block { header, transactions };
 

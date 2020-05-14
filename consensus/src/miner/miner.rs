@@ -154,7 +154,7 @@ impl Miner {
             // TODO: replace u64 with bigint
             let hash_result = sha256d_to_u64(&proof.0[..]);
 
-            // if it passes the difficulty chec, use the proof/nonce pairs and return the header
+            // if it passes the difficulty check, use the proof/nonce pairs and return the header
             if hash_result <= difficulty_target {
                 break;
             }

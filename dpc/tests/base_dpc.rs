@@ -21,10 +21,10 @@ use snarkos_objects::{
     dpc::{Block, DPCTransactions},
     ledger::Ledger,
     merkle_root,
+    pedersen_merkle_root,
     BlockHeader,
     MerkleRootHash,
     ProofOfSuccinctWork,
-    pedersen_merkle_root,
 };
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::rand::UniformRand;
