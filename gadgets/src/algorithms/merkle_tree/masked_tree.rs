@@ -9,8 +9,9 @@ use snarkos_models::{
     },
 };
 
-/// Computes a root given `leaves`. Uses a nonce to mask the
-/// computation, to ensure amortization resistance.
+/// Computes a root given `leaves`. Uses a nonce to mask the computation,
+/// to ensure amortization resistance. Assumes the number of leaves is
+/// for a full tree, so it hashes the leaves until there is only one element.
 pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToBytesGadget<F>, CS: ConstraintSystem<F>>(
     mut cs: CS,
     parameters: &HG::ParametersGadget,

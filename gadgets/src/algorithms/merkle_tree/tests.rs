@@ -167,7 +167,7 @@ fn bad_root_test() {
 #[test]
 fn good_masked_root_test() {
     let mut leaves = Vec::new();
-    for i in 0..4u8 {
+    for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
         let input = [i; 30];
         leaves.push(input);
     }
@@ -178,7 +178,7 @@ fn good_masked_root_test() {
 #[test]
 fn bad_masked_root_test() {
     let mut leaves = Vec::new();
-    for i in 0..4u8 {
+    for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
         let input = [i; 30];
         leaves.push(input);
     }
