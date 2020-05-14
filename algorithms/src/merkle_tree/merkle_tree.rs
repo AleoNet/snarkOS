@@ -7,7 +7,7 @@ pub struct MerkleTree<P: MerkleParameters> {
     root: Option<<P::H as CRH>::Output>,
     tree: Vec<<P::H as CRH>::Output>,
     leaves_hashed: Vec<<P::H as CRH>::Output>,
-    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>,
+    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>, // For each level after a full tree has been built from the leaves, keeps both the roots the siblings that are used to get to the desired height.
     parameters: P,
 }
 
