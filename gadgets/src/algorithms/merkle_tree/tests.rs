@@ -25,9 +25,10 @@ impl PedersenSize for Size {
 type H = PedersenCompressedCRH<Edwards, Size>;
 type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
+define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
+
 fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
-    define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 32);
-    type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
     let parameters = EdwardsMerkleParameters::default();
     let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
@@ -94,10 +95,8 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
 }
 
 fn generate_masked_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
-    define_merkle_tree_parameters!(EdwardsMaskedMerkleParameters, H, 3);
-    type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
-    let parameters = EdwardsMaskedMerkleParameters::default();
-    let tree = EdwardsMaskedMerkleTree::new(parameters.clone(), leaves).unwrap();
+    let parameters = EdwardsMerkleParameters::default();
+    let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
 
     let mut cs = TestConstraintSystem::<Fq>::new();
