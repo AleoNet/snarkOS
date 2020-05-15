@@ -27,7 +27,7 @@ use snarkos_objects::{
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::rand::UniformRand;
 
-use rand::{Rng, SeedableRng};
+use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -42,8 +42,9 @@ fn base_dpc_integration_test() {
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
     let mut path = std::env::temp_dir();
-    let random_storage_path: usize = rng.gen();
-    path.push(format!("test_dpc_integration_db{}", random_storage_path));
+    let mut temp_rng = thread_rng();
+    let random_storage_path: usize = temp_rng.gen();
+    path.push(format!("test_execute_base_dpc_constraints-{}", random_storage_path));
 
     // Setup the ledger
     let (ledger, genesis_pred_vk_bytes) =
