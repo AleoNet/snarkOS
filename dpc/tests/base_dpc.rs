@@ -17,12 +17,7 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Ledger,
 };
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions},
-    merkle_root,
-    BlockHeader,
-    MerkleRootHash,
-};
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::rand::UniformRand;
 

@@ -16,6 +16,9 @@ pub use self::account_public_key::*;
 pub mod amount;
 pub use self::amount::*;
 
+pub mod block;
+pub use self::block::*;
+
 pub mod block_header;
 pub use self::block_header::*;
 

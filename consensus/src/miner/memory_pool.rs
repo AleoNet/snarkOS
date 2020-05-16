@@ -214,7 +214,7 @@ mod tests {
     use super::*;
     use crate::test_data::*;
     use snarkos_dpc::base_dpc::instantiated::Tx;
-    use snarkos_objects::dpc::Block;
+    use snarkos_objects::Block;
 
     #[test]
     fn push() {

@@ -6,13 +6,7 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions},
-    merkle_root,
-    AccountPublicKey,
-    BlockHeader,
-    MerkleRootHash,
-};
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::BlockStorage;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
