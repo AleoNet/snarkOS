@@ -182,6 +182,7 @@ where
     PGadget: PRFGadget<P, C::InnerField>,
 {
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len());
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
     let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
@@ -461,7 +462,14 @@ where
                 &given_serial_number_gadget,
             )?;
 
-            old_serial_numbers_gadgets.push(candidate_serial_number_gadget);
+            old_serial_numbers_gadgets.push(candidate_serial_number_gadget.clone());
+
+            // Convert input serial numbers to bytes
+            {
+                let bytes = candidate_serial_number_gadget.to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
+                old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
+            }
+
             serial_number_nonce_bytes
         };
         // ********************************************************************
@@ -495,16 +503,6 @@ where
             )?;
         }
     }
-
-    let serial_number_nonce_input = {
-        let cs = &mut cs.ns(|| "Convert input serial numbers to bytes");
-        let mut sn_nonce_input = Vec::new();
-        for (i, old_sn) in old_serial_numbers_gadgets.iter().enumerate() {
-            let bytes = old_sn.to_bytes(&mut cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
-            sn_nonce_input.extend_from_slice(&bytes);
-        }
-        sn_nonce_input
-    };
 
     for (j, ((record, sn_nonce_randomness), commitment)) in new_records
         .iter()
@@ -600,7 +598,7 @@ where
                 sn_nonce_randomness,
             )?;
             current_record_number_bytes_le.extend_from_slice(&serial_number_nonce_randomness);
-            current_record_number_bytes_le.extend_from_slice(&serial_number_nonce_input);
+            current_record_number_bytes_le.extend_from_slice(&old_serial_numbers_bytes_gadgets);
 
             let sn_nonce_input = current_record_number_bytes_le;
 
