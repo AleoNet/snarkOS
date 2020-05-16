@@ -466,7 +466,8 @@ where
 
             // Convert input serial numbers to bytes
             {
-                let bytes = candidate_serial_number_gadget.to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
+                let bytes = candidate_serial_number_gadget
+                    .to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
                 old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
             }
 
