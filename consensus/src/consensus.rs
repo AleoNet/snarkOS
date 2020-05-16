@@ -42,6 +42,11 @@ use snarkos_profiler::{end_timer, start_timer};
 use chrono::Utc;
 use rand::{thread_rng, Rng};
 
+#[cfg(debug_assertions)]
+use snarkos_algorithms::snark::PreparedVerifyingKey;
+#[cfg(debug_assertions)]
+use snarkos_dpc::base_dpc::payment_circuit::PaymentPredicateLocalData;
+
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
 /// Parameters for a proof of work blockchain.
@@ -393,6 +398,10 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+        #[cfg(debug_assertions)]
+        let pred_nizk_pvk: PreparedVerifyingKey<_> =
+            { parameters.predicate_snark_parameters.verification_key.clone().into() };
+
         let old_death_vk_and_proof_generator = |local_data: &LocalData<Components>| {
             let mut rng = thread_rng();
             let mut old_proof_and_vk = vec![];
