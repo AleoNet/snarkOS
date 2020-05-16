@@ -58,7 +58,7 @@ mod consensus_dpc {
 
         let block = Block { header, transactions };
 
-        assert!(InstantiatedDPC::verify(&parameters, &block.transactions[0], &ledger).unwrap());
+        assert!(InstantiatedDPC::verify_transactions(&parameters, &block.transactions, &ledger).unwrap());
 
         let block_reward = get_block_reward(ledger.len() as u32);
 
@@ -123,6 +123,8 @@ mod consensus_dpc {
 
         let (previous_block_header, transactions, new_coinbase_records) =
             miner.establish_block(&parameters, &ledger, &transactions).unwrap();
+
+        assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions, &ledger).unwrap());
 
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
 

@@ -29,16 +29,16 @@ pub struct AccountPrivateKey<C: DPCComponents> {
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub metadata: [u8; 32],
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
-    pub is_testnet: bool,
 }
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
     /// Creates a new account private key. Defaults to a testnet account
     /// if no network indicator is provided.
+    // TODO: Add testnet account support.
     pub fn new<R: Rng>(
         parameters: &C::Signature,
         metadata: &[u8; 32],
-        is_testnet: Option<bool>,
+        _is_testnet: Option<bool>,
         rng: &mut R,
     ) -> Result<Self, AccountError> {
         // Sample SIG key pair.
@@ -52,12 +52,6 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         // Sample randomness rpk for the commitment scheme.
         let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
 
-        // Determine if this is a testnet account.
-        let is_testnet = match is_testnet {
-            Some(is_testnet) => is_testnet,
-            None => true, // Defaults to testnet
-        };
-
         // Construct the account private key.
         Ok(Self {
             pk_sig,
@@ -65,25 +59,25 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
             sk_prf,
             metadata: *metadata,
             r_pk,
-            is_testnet,
         })
     }
 }
 
 impl<C: DPCComponents> ToBytes for AccountPrivateKey<C> {
+    // TODO: Add testnet account support.
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.pk_sig.write(&mut writer)?;
         self.sk_sig.write(&mut writer)?;
         self.sk_prf.write(&mut writer)?;
         self.metadata.write(&mut writer)?;
-        self.r_pk.write(&mut writer)?;
-        self.is_testnet.write(&mut writer)
+        self.r_pk.write(&mut writer)
     }
 }
 
 impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
     /// Reads in an account private key buffer. Defaults to a testnet account
     /// if no network indicator is provided.
+    // TODO: Add testnet account support.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let pk_sig: <C::Signature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
@@ -91,10 +85,6 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
         let metadata: [u8; 32] = FromBytes::read(&mut reader)?;
         let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
-        let is_testnet: bool = match FromBytes::read(&mut reader) {
-            Ok(is_testnet) => is_testnet,
-            _ => true, // Defaults to testnet
-        };
 
         Ok(Self {
             pk_sig,
@@ -102,7 +92,6 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
             sk_prf,
             metadata,
             r_pk,
-            is_testnet,
         })
     }
 }
@@ -110,10 +99,8 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut private_key = [0u8; 132];
-        let prefix = match self.is_testnet {
-            true => account_format::PRIVATE_KEY_TESTNET,
-            false => account_format::PRIVATE_KEY_MAINNET,
-        };
+        let prefix = account_format::PRIVATE_KEY_MAINNET;
+
         private_key[0..4].copy_from_slice(&prefix);
 
         self.sk_sig
@@ -137,8 +124,8 @@ impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, metadata: {:?}, r_pk: {:?}, is_testnet: {} }}",
-            self.sk_sig, self.sk_prf, self.metadata, self.r_pk, self.is_testnet,
+            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, metadata: {:?}, r_pk: {:?} }}",
+            self.sk_sig, self.sk_prf, self.metadata, self.r_pk,
         )
     }
 }

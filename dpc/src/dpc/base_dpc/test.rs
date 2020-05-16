@@ -21,7 +21,7 @@ use snarkos_models::{
 use snarkos_objects::{Account, Ledger};
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
-use rand::{Rng, SeedableRng};
+use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 #[test]
@@ -76,7 +76,8 @@ fn test_execute_base_dpc_constraints() {
     let genesis_memo = [0u8; 32];
 
     let mut path = std::env::temp_dir();
-    let random_storage_path: usize = rng.gen();
+    let mut temp_rng = thread_rng();
+    let random_storage_path: usize = temp_rng.gen();
     path.push(format!("test_execute_base_dpc_constraints{}", random_storage_path));
 
     // Use genesis record, serial number, and memo to initialize the ledger.
