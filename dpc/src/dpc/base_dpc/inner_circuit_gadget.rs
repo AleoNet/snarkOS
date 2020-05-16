@@ -182,7 +182,7 @@ where
     PGadget: PRFGadget<P, C::InnerField>,
 {
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
     let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
