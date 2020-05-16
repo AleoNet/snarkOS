@@ -143,8 +143,8 @@ fn base_dpc_execute_gadget_helper<
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_comm: &LocalDataCommitment::Output,
-    local_data_rand: &LocalDataCommitment::Randomness,
+    local_data_commitment: &LocalDataCommitment::Output,
+    local_data_randomness: &LocalDataCommitment::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
     input_value_commitments: &[[u8; 32]],
@@ -196,6 +196,8 @@ where
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
     let mut new_birth_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
     let mut new_death_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
+
+    let mut local_data_bytes = Vec::new();
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
@@ -504,6 +506,48 @@ where
         }
     }
 
+    // Construct the old record components of the local data commitment.
+    {
+        let mut cs = cs.ns(|| "Construct the old record components of the local data commitment.");
+
+        for i in 0..C::NUM_INPUT_RECORDS {
+            let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
+            local_data_bytes.extend_from_slice(
+                &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
+            );
+            local_data_bytes.extend_from_slice(
+                &old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?,
+            );
+            local_data_bytes.extend_from_slice(&old_dummy_flags_gadgets[i].to_bytes(&mut cs.ns(|| "is_dummy"))?);
+            local_data_bytes.extend_from_slice(&old_payloads_gadgets[i]);
+            local_data_bytes.extend_from_slice(&old_birth_predicate_hashes_gadgets[i]);
+            local_data_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
+            local_data_bytes
+                .extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
+        }
+
+        // Deallocate these vectors as they're not used again.
+        // Do not clear yet `old_death_predicate_hashes_gadgets` as this will be used again.
+
+        old_record_commitments_gadgets.clear();
+        old_record_commitments_gadgets.shrink_to_fit();
+
+        old_account_public_keys_gadgets.clear();
+        old_account_public_keys_gadgets.shrink_to_fit();
+
+        old_dummy_flags_gadgets.clear();
+        old_dummy_flags_gadgets.shrink_to_fit();
+
+        old_payloads_gadgets.clear();
+        old_payloads_gadgets.shrink_to_fit();
+
+        old_birth_predicate_hashes_gadgets.clear();
+        old_birth_predicate_hashes_gadgets.shrink_to_fit();
+
+        old_serial_numbers_gadgets.clear();
+        old_serial_numbers_gadgets.shrink_to_fit();
+    }
+
     for (j, ((record, sn_nonce_randomness), commitment)) in new_records
         .iter()
         .zip(new_sn_nonce_randomness)
@@ -692,25 +736,10 @@ where
             &given_commitment,
         )?;
     }
-    {
-        let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
-        let mut local_data_bytes = Vec::new();
-        for i in 0..C::NUM_INPUT_RECORDS {
-            let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
-            local_data_bytes.extend_from_slice(
-                &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
-            );
-            local_data_bytes.extend_from_slice(
-                &old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?,
-            );
-            local_data_bytes.extend_from_slice(&old_dummy_flags_gadgets[i].to_bytes(&mut cs.ns(|| "is_dummy"))?);
-            local_data_bytes.extend_from_slice(&old_payloads_gadgets[i]);
-            local_data_bytes.extend_from_slice(&old_birth_predicate_hashes_gadgets[i]);
-            local_data_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
-            local_data_bytes
-                .extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
-        }
+    // Construct the new records, memo, and auxiliary components of the local data commitment.
+    {
+        let mut cs = cs.ns(|| "Construct the new records, memo, and auxiliary components of the local data commitment.");
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
@@ -723,20 +752,51 @@ where
             local_data_bytes.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_death_predicate_hashes_gadgets[j]);
         }
+
         let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
         local_data_bytes.extend_from_slice(&memo);
 
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
+        // Deallocate these vectors as they're not used again.
+
+        old_death_predicate_hashes_gadgets.clear();
+        old_death_predicate_hashes_gadgets.shrink_to_fit();
+
+        new_record_commitments_gadgets.clear();
+        new_record_commitments_gadgets.shrink_to_fit();
+
+        new_account_public_keys_gadgets.clear();
+        new_account_public_keys_gadgets.shrink_to_fit();
+
+        new_dummy_flags_gadgets.clear();
+        new_dummy_flags_gadgets.shrink_to_fit();
+
+        new_payloads_gadgets.clear();
+        new_payloads_gadgets.shrink_to_fit();
+
+        new_birth_predicate_hashes_gadgets.clear();
+        new_birth_predicate_hashes_gadgets.shrink_to_fit();
+
+        new_death_predicate_hashes_gadgets.clear();
+        new_death_predicate_hashes_gadgets.shrink_to_fit();
+    }
+
+    // *******************************************************************
+    // Check that local data commitment is valid.
+    // *******************************************************************
+    {
+        let mut cs = cs.ns(|| "Check that local data commitment is valid.");
+
         let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
             cs.ns(|| "Allocate local data commitment randomness"),
-            || Ok(local_data_rand),
+            || Ok(local_data_randomness),
         )?;
 
         let declared_local_data_commitment =
             LocalDataCommitmentGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
-                Ok(local_data_comm)
+                Ok(local_data_commitment)
             })?;
 
         let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
@@ -750,15 +810,20 @@ where
             &mut cs.ns(|| "Check that local data commitment is valid"),
             &declared_local_data_commitment,
         )?;
+    }
 
-        // Check the binding signature verification
+    // *******************************************************************
+    // Check that the binding signature verification is valid.
+    // *******************************************************************
+    {
+        let mut cs = cs.ns(|| "Check that the binding signature verification is valid.");
 
         let (c, partial_bvk, affine_r, recommit) =
             gadget_verification_setup::<C::ValueCommitment, C::BindingSignatureGroup>(
                 &circuit_parameters.value_commitment,
                 &input_value_commitments,
                 &output_value_commitments,
-                &to_bytes![local_data_comm]?,
+                &to_bytes![local_data_commitment]?,
                 &binding_signature,
             )
             .unwrap();
@@ -817,5 +882,6 @@ where
             &recommit_gadget,
         )?;
     }
+
     Ok(())
 }
