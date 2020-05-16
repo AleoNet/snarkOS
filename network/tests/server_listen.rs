@@ -26,6 +26,7 @@ mod server_listen {
     use tokio::{
         net::TcpListener,
         runtime::Runtime,
+        stream::StreamExt,
         sync::{oneshot, oneshot::Sender, Mutex},
     };
     use tokio_test::assert_err;
@@ -197,15 +198,22 @@ mod server_listen {
 
             // 4. Check that peer received Version message
 
-            let (reader, _peer) = peer_listener.accept().await.unwrap();
+            while let Some(stream) = peer_listener.next().await {
+                match stream {
+                    Ok(stream) => {
+                        // 5. Send handshake response from peer to server
 
-            // 5. Send handshake response from peer to server
+                        let mut peer_handshakes = Handshakes::new();
+                        peer_handshakes
+                            .receive_any(1u64, 1u32, peer_address, server_address, stream)
+                            .await
+                            .unwrap();
 
-            let mut peer_handshakes = Handshakes::new();
-            peer_handshakes
-                .receive_any(1u64, 1u32, peer_address, server_address, reader)
-                .await
-                .unwrap();
+                        break;
+                    }
+                    Err(err) => println!("Failed to connect to peer with error: {:?}", err),
+                }
+            }
         });
 
         drop(rt);
