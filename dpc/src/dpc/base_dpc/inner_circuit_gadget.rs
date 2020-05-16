@@ -468,7 +468,8 @@ where
 
             // Convert input serial numbers to bytes
             {
-                let bytes = candidate_serial_number_gadget.to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
+                let bytes = candidate_serial_number_gadget
+                    .to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
                 old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
             }
 
@@ -739,7 +740,8 @@ where
 
     // Construct the new records, memo, and auxiliary components of the local data commitment.
     {
-        let mut cs = cs.ns(|| "Construct the new records, memo, and auxiliary components of the local data commitment.");
+        let mut cs =
+            cs.ns(|| "Construct the new records, memo, and auxiliary components of the local data commitment.");
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
