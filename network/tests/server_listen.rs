@@ -115,7 +115,7 @@ mod server_listen {
 
             tokio::spawn(async move {
                 start_server(tx, server_address, bootnode_address, storage, parameters, false).await;
-                sleep(5000);
+                sleep(5000).await;
             });
 
             rx.await.unwrap();
@@ -168,29 +168,28 @@ mod server_listen {
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            // 1. Add peer to storage
+            // 1. Start peer
+
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            // 2. Add peer to storage
 
             let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
-
             connected_peers.insert(peer_address, Utc::now());
             storage
                 .store_to_peer_book(bincode::serialize(&connected_peers).unwrap())
                 .unwrap();
 
-            // 2. Start server
+            // 3. Start server
 
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                start_server(tx, server_address, peer_address, storage, parameters, true).await;
+                start_server(tx, server_address, peer_address, storage, parameters, false).await;
                 sleep(5000).await;
             });
 
             rx.await.unwrap();
-
-            // 3. Start peer
-
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
             // 4. Check that peer received Version message
 
