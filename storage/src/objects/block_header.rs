@@ -1,10 +1,8 @@
 use crate::BlockStorage;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{
-    dpc::{Block, Transaction},
-    BlockHeaderHash,
-};
+use snarkos_models::objects::Transaction;
+use snarkos_objects::{Block, BlockHeaderHash};
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Returns true if the block for the given block header hash exists.

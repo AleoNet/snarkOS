@@ -1,12 +1,8 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{
-    dpc::{DPCTransactions, Transaction},
-    ledger::Ledger,
-    BlockHeader,
-    BlockHeaderHash,
-};
+use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;

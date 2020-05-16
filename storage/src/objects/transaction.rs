@@ -1,7 +1,8 @@
 use crate::{has_duplicates, BlockStorage};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::dpc::{DPCTransactions, Ledger, Transaction};
+use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_objects::dpc::DPCTransactions;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {

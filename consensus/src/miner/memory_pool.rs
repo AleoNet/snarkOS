@@ -4,10 +4,8 @@
 
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{
-    dpc::{DPCTransactions, Transaction},
-    Ledger,
-};
+use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_objects::dpc::DPCTransactions;
 use snarkos_storage::{has_duplicates, BlockStorage};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
