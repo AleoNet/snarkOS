@@ -2,7 +2,6 @@ use crate::{
     algorithms::{crh::PedersenCompressedCRHGadget, merkle_tree::*},
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
@@ -24,11 +23,11 @@ impl PedersenSize for Size {
     const WINDOW_SIZE: usize = 4;
 }
 
+define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+
+type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 type H = PedersenCompressedCRH<Edwards, Size>;
 type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
-
-define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
-type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 
 fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     let parameters = EdwardsMerkleParameters::default();

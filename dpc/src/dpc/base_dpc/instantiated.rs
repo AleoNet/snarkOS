@@ -10,7 +10,6 @@ use crate::dpc::base_dpc::{
     LocalData as DPCLocalData,
     DPC,
 };
-use blake2::Blake2s as Blake2sHash;
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
@@ -38,6 +37,8 @@ use snarkos_gadgets::{
 };
 use snarkos_models::dpc::DPCComponents;
 use snarkos_storage::BlockStorage;
+
+use blake2::Blake2s as Blake2sHash;
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;

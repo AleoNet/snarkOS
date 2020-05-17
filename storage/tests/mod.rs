@@ -6,6 +6,7 @@ use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_objects::dpc::Transaction;
 use snarkos_storage::BlockStorage;
+
 use std::sync::Arc;
 
 pub const TEST_DB_PATH: &str = "./test_db";
