@@ -18,12 +18,11 @@ mod consensus_dpc {
     use snarkos_storage::test_data::*;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-    use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
+    use rand::thread_rng;
 
     #[test]
     fn base_dpc_multiple_transactions() {
-        let mut rng = XorShiftRng::seed_from_u64(23472342u64);
+        let mut rng = thread_rng();
 
         let consensus = TEST_CONSENSUS;
         let mut memory_pool = MemoryPool::new();
