@@ -6,7 +6,8 @@ use snarkos_utilities::bytes::ToBytes;
 pub struct MerkleTree<P: MerkleParameters> {
     root: Option<<P::H as CRH>::Output>,
     tree: Vec<<P::H as CRH>::Output>,
-    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>,
+    leaves_hashed: Vec<<P::H as CRH>::Output>,
+    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>, // For each level after a full tree has been built from the leaves, keeps both the roots the siblings that are used to get to the desired height.
     parameters: P,
 }
 
@@ -64,18 +65,24 @@ impl<P: MerkleParameters> MerkleTree<P> {
         let mut cur_height = tree_height;
         let mut padding_tree = vec![];
         let mut cur_hash = tree[0].clone();
-        while cur_height < (Self::HEIGHT - 1) as usize {
+        while cur_height < Self::HEIGHT as usize {
             cur_hash = parameters.hash_inner_node(&cur_hash, &empty_hash, &mut buffer)?;
-            padding_tree.push((cur_hash.clone(), empty_hash.clone()));
+
+            // do not pad at the top-level of the tree
+            if cur_height < Self::HEIGHT as usize - 1 {
+                padding_tree.push((cur_hash.clone(), empty_hash.clone()));
+            }
             cur_height += 1;
         }
-        let root_hash = parameters.hash_inner_node(&cur_hash, &empty_hash, &mut buffer)?;
+        let root_hash = cur_hash;
 
         end_timer!(new_time);
 
+        let leaves_hashed = tree[last_level_index..].to_vec();
         Ok(MerkleTree {
             tree,
             padding_tree,
+            leaves_hashed,
             parameters,
             root: Some(root_hash),
         })
@@ -84,6 +91,11 @@ impl<P: MerkleParameters> MerkleTree<P> {
     #[inline]
     pub fn root(&self) -> <P::H as CRH>::Output {
         self.root.clone().unwrap()
+    }
+
+    #[inline]
+    pub fn leaves_hashed(&self) -> Vec<<P::H as CRH>::Output> {
+        self.leaves_hashed.clone()
     }
 
     pub fn generate_proof<L: ToBytes>(&self, index: usize, leaf: &L) -> Result<MerklePath<P>, MerkleError> {
@@ -141,6 +153,7 @@ impl<P: MerkleParameters> Default for MerkleTree<P> {
         MerkleTree {
             tree: vec![],
             padding_tree: vec![],
+            leaves_hashed: vec![],
             root: None,
             parameters: P::default(),
         }
