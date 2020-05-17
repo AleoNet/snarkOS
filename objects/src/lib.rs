@@ -30,3 +30,6 @@ pub use self::merkle_root_hash::*;
 
 pub mod merkle_tree;
 pub use self::merkle_tree::*;
+
+pub mod pedersen_merkle_tree;
+pub use self::pedersen_merkle_tree::*;
