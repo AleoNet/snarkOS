@@ -97,7 +97,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
     /// homomorphic properties of Pedersen hashes. First, the mask is extended to ensure constant
     /// hardness - for each bit, 0 => 01, 1 => 10. Then, denoting input bits as m_i, mask bits
     /// as p_i and bases as h_i, computes sum of
-    /// (h_i * 1[p_i = 0] + h_i^{-1} * 1[p_i = 1])^{m_i \xor p_i} for all i. Finally, the hash of
+    /// (g_i * 1[p_i = 0] + g_i^{-1} * 1[p_i = 1])^{m_i \xor p_i} for all i. Finally, the hash of
     /// the mask itself, being sum of h_i^{p_i} for all i, is added to the computed sum. This
     /// algorithm ensures that each bit in the hash is affected by the mask and that the
     /// final hash remains the same as if no mask was used.

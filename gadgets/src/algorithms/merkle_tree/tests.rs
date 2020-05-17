@@ -2,7 +2,7 @@ use crate::{
     algorithms::{crh::PedersenCompressedCRHGadget, merkle_tree::*},
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use blake2::{digest::Digest, Blake2s};
+
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
@@ -14,6 +14,8 @@ use snarkos_models::gadgets::{
     r1cs::{ConstraintSystem, TestConstraintSystem},
     utilities::{alloc::AllocGadget, uint8::UInt8},
 };
+
+use blake2::{digest::Digest, Blake2s};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Size;

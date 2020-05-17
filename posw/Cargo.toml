@@ -2,7 +2,7 @@
 name = "snarkos-posw"
 version = "0.8.0"
 authors = ["The Aleo Team <hello@aleo.org"]
-description = "Errors for a decentralized record system"
+description = "Proof of Succinct Work circuit implementation based on [KB20]"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
