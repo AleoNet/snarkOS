@@ -1,5 +1,9 @@
 language: rust
 
+
+services:
+  - docker
+
 before_install:
   - set -e
   - export SCCACHE_CACHE_SIZE=200M
@@ -60,3 +64,10 @@ matrix:
 
 script:
   - echo "snarkOS"
+
+before_deploy:
+  - docker build -t snarkos:latest .
+
+deploy:
+  - docker run -d -p 4130:4130 --name snarkos snarkos
+
