@@ -13,6 +13,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
     },
 };
+
 use std::marker::PhantomData;
 
 /// Enforces sizes of the mask and leaves.
@@ -90,8 +91,6 @@ impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWC
 #[cfg(test)]
 mod test {
     use super::{POSWCircuit, POSWCircuitParameters};
-    use blake2::{digest::Digest, Blake2s};
-    use rand::thread_rng;
     use snarkos_algorithms::{
         crh::{PedersenCompressedCRH, PedersenSize},
         define_merkle_tree_parameters,
@@ -103,6 +102,9 @@ mod test {
     };
     use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
     use snarkos_models::curves::to_field_vec::ToConstraintField;
+
+    use blake2::{digest::Digest, Blake2s};
+    use rand::thread_rng;
     use std::marker::PhantomData;
 
     // We'll use 32 byte masks in this test

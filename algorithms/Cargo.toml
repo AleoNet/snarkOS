@@ -26,10 +26,10 @@ blake2 = { version = "0.7" }
 derivative = { version = "1" }
 digest = { version = "0.7" }
 rand = { version = "0.7" }
+rand_chacha = { version = "0.2.2" }
 rayon = { version = "1" }
 sha2 = { version = "0.8" }
 smallvec = { version = "1.4" }
-rand_chacha = "0.2.2"
 
 [dev-dependencies]
 snarkos-curves = { path = "../curves", version = "0.8.0" }
