@@ -13,8 +13,6 @@ before_install:
   - mv $TRAVIS_HOME/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $TRAVIS_HOME/.bin/sccache
   - export PATH="$PATH:$TRAVIS_HOME/.bin"
   - export RUSTC_WRAPPER="sccache"
-  - docker build -t snarkos:latest .
-  - docker run -d -p 4130:4130 snarkos:latest
 
 cache:
   directories:
@@ -45,8 +43,7 @@ matrix:
             - binutils-dev
             - libiberty-dev
       script:
-        - docker ps -a 
-        - docker run snarkos /bin/sh -c "cd /usr/src/snarkOS; RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test;"
+        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
       after_success: |
         wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
         tar xzf master.tar.gz && cd kcov-master &&
@@ -58,13 +55,18 @@ matrix:
         echo "Uploaded code coverage"
 
     - rust: nightly-2020-03-18
+      install:
+        - rustup component add rustfmt
       script:
-        - docker run snarkos /bin/sh -c "
-          cd /usr/src/snarkOS;
-          rustup component add rustfmt;
-          cargo fmt -- --check;
-          RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test;"
+        - cargo fmt -- --check
+        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
+
 script:
   - echo "snarkOS"
 
+before_deploy:
+  - docker build -t snarkos:latest .
+
+deploy:
+  - docker run -p 4130:4130 --name snarkos snarkos
 
