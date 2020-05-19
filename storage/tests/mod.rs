@@ -1,19 +1,12 @@
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
-    merkle_tree::MerkleParameters,
+    define_merkle_tree_parameters,
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
-use snarkos_models::{algorithms::CRH, objects::Transaction, storage::Storage};
+use snarkos_models::objects::Transaction;
 use snarkos_storage::BlockStorage;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
-
-use rand::Rng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 pub const TEST_DB_PATH: &str = "./test_db";
 
@@ -77,63 +70,7 @@ impl PedersenSize for Size {
     const WINDOW_SIZE: usize = 128;
 }
 
-type H = PedersenCompressedCRH<EdwardsBls, Size>;
-
-#[derive(Clone)]
-pub struct TestMerkleParams(H);
-
-impl MerkleParameters for TestMerkleParams {
-    type H = H;
-
-    const HEIGHT: usize = 32;
-
-    fn setup<R: Rng>(rng: &mut R) -> Self {
-        Self(H::setup(rng))
-    }
-
-    fn crh(&self) -> &Self::H {
-        &self.0
-    }
-
-    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
-        self.crh().parameters()
-    }
-}
-
-impl Default for TestMerkleParams {
-    fn default() -> Self {
-        let mut rng = rand::thread_rng();
-        Self(H::setup(&mut rng))
-    }
-}
-
-impl Storage for TestMerkleParams {
-    /// Store the SNARK proof to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.0.store(path)
-    }
-
-    /// Load the SNARK proof from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        Ok(Self(H::load(path)?))
-    }
-}
-
-impl ToBytes for TestMerkleParams {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write(&mut writer)
-    }
-}
-
-impl FromBytes for TestMerkleParams {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let crh: H = FromBytes::read(&mut reader)?;
-
-        Ok(Self(crh))
-    }
-}
+define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
 
 type Store = BlockStorage<TestTx, TestMerkleParams>;
 

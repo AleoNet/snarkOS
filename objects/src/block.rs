@@ -23,8 +23,8 @@ impl<T: Transaction> BlockScheme for Block<T> {
     type Transaction = T;
 
     /// Returns the header.
-    fn header(&self) -> Self::BlockHeader {
-        self.header.clone()
+    fn header(&self) -> &Self::BlockHeader {
+        &self.header
     }
 
     /// Returns the transactions.
