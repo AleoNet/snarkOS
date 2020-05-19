@@ -6,7 +6,7 @@ pub trait BlockScheme: Clone + Eq + FromBytes + ToBytes {
     type Transaction: Transaction;
 
     /// Returns the header.
-    fn header(&self) -> Self::BlockHeader;
+    fn header(&self) -> &Self::BlockHeader;
 
     /// Returns the transactions.
     fn transactions(&self) -> &[Self::Transaction];
