@@ -29,6 +29,7 @@ rand = { version = "0.7" }
 rayon = { version = "1" }
 sha2 = { version = "0.8" }
 smallvec = { version = "1.4" }
+rand_chacha = "0.2.2"
 
 [dev-dependencies]
 snarkos-curves = { path = "../curves", version = "0.8.0" }
