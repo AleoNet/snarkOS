@@ -5,7 +5,7 @@ use snarkos_algorithms::{
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
-use snarkos_storage::BlockStorage;
+use snarkos_storage::LedgerStorage;
 use std::sync::Arc;
 
 pub const TEST_DB_PATH: &str = "./test_db";
@@ -72,7 +72,7 @@ impl PedersenSize for Size {
 
 define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
 
-type Store = BlockStorage<TestTx, TestMerkleParams>;
+type Store = LedgerStorage<TestTx, TestMerkleParams>;
 
 pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {
     let mut path = std::env::temp_dir();

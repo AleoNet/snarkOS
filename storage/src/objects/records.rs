@@ -7,7 +7,7 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     /// Get a transaction bytes given the transaction id.
     pub fn get_record<R: Record>(&self, record_commitment: &Vec<u8>) -> Result<Option<R>, StorageError> {
         match self.storage.get(COL_RECORDS, &record_commitment)? {

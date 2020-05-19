@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use rand::Rng;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;
@@ -125,7 +125,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             value: genesis_account_bytes,
         });
 
-        let block_storage = Self {
+        let ledger_storage = Self {
             latest_block_height: RwLock::new(0),
             storage: Arc::new(storage),
             cm_merkle_tree: RwLock::new(cm_merkle_tree),
@@ -133,10 +133,10 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             _transaction: PhantomData,
         };
 
-        block_storage.storage.write(database_transaction)?;
-        block_storage.insert_block(&genesis_block)?;
+        ledger_storage.storage.write(database_transaction)?;
+        ledger_storage.insert_block(&genesis_block)?;
 
-        Ok(block_storage)
+        Ok(ledger_storage)
     }
 
     // Number of blocks including the genesis block

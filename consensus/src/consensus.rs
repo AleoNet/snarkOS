@@ -17,11 +17,12 @@ use snarkos_models::{
     objects::{Ledger, Transaction},
 };
 use snarkos_objects::{
-    dpc::{Block, DPCTransactions},
+    dpc::DPCTransactions,
     merkle_root,
     Account,
     AccountPrivateKey,
     AccountPublicKey,
+    Block,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,

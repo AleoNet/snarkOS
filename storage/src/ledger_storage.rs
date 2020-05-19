@@ -13,7 +13,7 @@ use std::{
     sync::Arc,
 };
 
-pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
+pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -21,7 +21,7 @@ pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     /// Create a new blockchain storage.
     pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;
@@ -86,7 +86,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
             None => {
                 // Add genesis block to database
 
-                let block_storage = Self::new(
+                let ledger_storage = Self::new(
                     &path.as_ref().to_path_buf(),
                     parameters,
                     FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
@@ -97,7 +97,7 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
                 )
                 .unwrap(); // TODO handle this unwrap. merge storage and ledger error
 
-                Ok(block_storage)
+                Ok(ledger_storage)
             }
         }
     }
