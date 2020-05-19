@@ -11,19 +11,13 @@ use snarkos_dpc::{
         DPC,
     },
     test_data::*,
-    DPCScheme,
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::Record,
+    dpc::{DPCScheme, Record},
+    objects::Ledger,
 };
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions},
-    ledger::Ledger,
-    merkle_root,
-    BlockHeader,
-    MerkleRootHash,
-};
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::test_data::*;
 use snarkos_utilities::rand::UniformRand;
 

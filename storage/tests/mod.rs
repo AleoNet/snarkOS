@@ -4,16 +4,10 @@ use snarkos_algorithms::{
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
-use snarkos_objects::dpc::Transaction;
-use snarkos_storage::{test_data::*, BlockStorage};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_models::objects::Transaction;
+use snarkos_storage::{test_data::*, LedgerStorage};
 
-use rand::Rng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
@@ -77,7 +71,7 @@ impl PedersenSize for Size {
 
 define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
 
-type Store = BlockStorage<TestTx, TestMerkleParams>;
+type Store = LedgerStorage<TestTx, TestMerkleParams>;
 
 #[cfg(test)]
 mod tests {

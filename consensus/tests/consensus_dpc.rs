@@ -8,13 +8,12 @@ mod consensus_dpc {
     use snarkos_dpc::{
         base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload},
         test_data::*,
-        DPCScheme,
     };
-    use snarkos_models::dpc::Record;
-    use snarkos_objects::{
-        dpc::{Block, DPCTransactions},
-        ledger::Ledger,
+    use snarkos_models::{
+        dpc::{DPCScheme, Record},
+        objects::Ledger,
     };
+    use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_storage::test_data::*;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -96,7 +95,7 @@ mod consensus_dpc {
 
         let mut transactions = DPCTransactions::new();
 
-        println!("Create a payment transaction transaction");
+        println!("Create a payment transaction");
 
         let (spend_records, transaction) = ConsensusParameters::create_transaction(
             &parameters,

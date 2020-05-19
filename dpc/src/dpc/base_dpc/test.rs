@@ -16,9 +16,9 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
-    objects::AccountScheme,
+    objects::{AccountScheme, Ledger},
 };
-use snarkos_objects::{Account, Ledger};
+use snarkos_objects::Account;
 use snarkos_storage::test_data::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 

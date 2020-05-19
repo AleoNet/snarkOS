@@ -1,30 +1,28 @@
 use crate::miner::MemoryPool;
 use snarkos_algorithms::snark::PreparedVerifyingKey;
-use snarkos_dpc::{
-    base_dpc::{
-        instantiated::*,
-        parameters::PublicParameters,
-        payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
-        predicate::{DPCPredicate, PrivatePredicateInput},
-        record::DPCRecord,
-        record_payload::PaymentRecordPayload,
-        BaseDPCComponents,
-        LocalData,
-    },
-    DPCScheme,
+use snarkos_dpc::base_dpc::{
+    instantiated::*,
+    parameters::PublicParameters,
+    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    predicate::{DPCPredicate, PrivatePredicateInput},
+    record::DPCRecord,
+    record_payload::PaymentRecordPayload,
+    BaseDPCComponents,
+    LocalData,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::{DPCComponents, Record},
+    dpc::{DPCComponents, DPCScheme, Record},
+    objects::{Ledger, Transaction},
 };
 use snarkos_objects::{
-    dpc::{Block, DPCTransactions, Transaction},
-    ledger::Ledger,
+    dpc::DPCTransactions,
     merkle_root,
     Account,
     AccountPrivateKey,
     AccountPublicKey,
+    Block,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
