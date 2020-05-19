@@ -18,7 +18,7 @@ use snarkos_models::{
     objects::Ledger,
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
-use snarkos_storage::BlockStorage;
+use snarkos_storage::LedgerStorage;
 use snarkos_utilities::rand::UniformRand;
 
 use rand::{thread_rng, Rng, SeedableRng};
@@ -274,5 +274,5 @@ fn base_dpc_integration_test() {
 
     let path = ledger.storage.storage.path().to_owned();
     drop(ledger);
-    BlockStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+    LedgerStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
 }

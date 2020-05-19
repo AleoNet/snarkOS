@@ -14,7 +14,7 @@ mod consensus_dpc {
         objects::Ledger,
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
-    use snarkos_storage::BlockStorage;
+    use snarkos_storage::LedgerStorage;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
     use rand::{thread_rng, Rng};
@@ -163,6 +163,6 @@ mod consensus_dpc {
 
         let path = ledger.storage.storage.path().to_owned();
         drop(ledger);
-        BlockStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+        LedgerStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
     }
 }

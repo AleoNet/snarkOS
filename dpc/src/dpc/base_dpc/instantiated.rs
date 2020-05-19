@@ -37,7 +37,7 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::dpc::DPCComponents;
-use snarkos_storage::BlockStorage;
+use snarkos_storage::LedgerStorage;
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -167,7 +167,7 @@ pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCirc
 pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
-pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = LedgerStorage<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;
