@@ -1,13 +1,13 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_dpc::{
-    base_dpc::{instantiated::*, parameters::PublicParameters},
-    DPCScheme,
-};
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::dpc::Record;
+use snarkos_models::{
+    dpc::{DPCScheme, Record},
+    objects::Transaction,
+};
 use snarkos_objects::{
-    dpc::{Block, DPCTransactions, Transaction},
+    dpc::{Block, DPCTransactions},
     merkle_root,
     AccountPublicKey,
     BlockHeader,

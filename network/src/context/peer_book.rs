@@ -1,7 +1,7 @@
 use crate::address_book::AddressBook;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::network::ServerError;
-use snarkos_objects::dpc::Transaction;
+use snarkos_models::objects::Transaction;
 use snarkos_storage::BlockStorage;
 
 use chrono::{DateTime, Utc};

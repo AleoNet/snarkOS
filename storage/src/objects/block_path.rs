@@ -1,7 +1,8 @@
 use crate::BlockStorage;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{dpc::Transaction, BlockHeader, BlockHeaderHash};
+use snarkos_models::objects::Transaction;
+use snarkos_objects::{BlockHeader, BlockHeaderHash};
 
 #[derive(Clone, Debug)]
 pub enum BlockPath {

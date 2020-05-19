@@ -4,7 +4,7 @@ use snarkos_algorithms::{
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
-use snarkos_objects::dpc::Transaction;
+use snarkos_models::objects::Transaction;
 use snarkos_storage::BlockStorage;
 use std::sync::Arc;
 

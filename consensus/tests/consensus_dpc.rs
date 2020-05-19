@@ -8,13 +8,12 @@ mod consensus_dpc {
     use snarkos_dpc::{
         base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
         test_data::*,
-        DPCScheme,
     };
-    use snarkos_models::dpc::Record;
-    use snarkos_objects::{
-        dpc::{Block, DPCTransactions},
-        ledger::Ledger,
+    use snarkos_models::{
+        dpc::{DPCScheme, Record},
+        objects::Ledger,
     };
+    use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_storage::BlockStorage;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 

@@ -1,15 +1,10 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{
-    dpc::{Block, Transaction},
-    BlockHeader,
-    BlockHeaderHash,
-};
+use snarkos_models::objects::Transaction;
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
-
-//use std::collections::HashMap;
 
 impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
     /// Get a block given the block hash.

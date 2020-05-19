@@ -11,15 +11,14 @@ use snarkos_dpc::{
         DPC,
     },
     test_data::*,
-    DPCScheme,
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::Record,
+    dpc::{DPCScheme, Record},
+    objects::Ledger,
 };
 use snarkos_objects::{
     dpc::{Block, DPCTransactions},
-    ledger::Ledger,
     merkle_root,
     BlockHeader,
     MerkleRootHash,
