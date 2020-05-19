@@ -1,6 +1,5 @@
 language: rust
 
-
 services:
   - docker
 
@@ -69,5 +68,5 @@ before_deploy:
   - docker build -t snarkos:latest .
 
 deploy:
-  - docker run -d -p 4130:4130 --name snarkos snarkos
+  - docker run -p 4130:4130 --name snarkos snarkos
 
