@@ -303,8 +303,13 @@ mod tests {
         let (blockchain, path) = initialize_test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let size = TRANSACTION_1.len();
+        let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        // modify the tx a bit so that it does not conflict with the one already inserted
+        // in the chain
+        transaction.old_serial_numbers.clear();
+        transaction.new_commitments.clear();
+        transaction.memorandum = [99; 32];
+        let size = to_bytes![transaction].unwrap().len();
 
         let expected_transaction = transaction.clone();
         mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();

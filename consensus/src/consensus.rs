@@ -514,3 +514,66 @@ impl ConsensusParameters {
         Ok((new_records, transaction))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verify_header() {
+        let consensus: ConsensusParameters = ConsensusParameters {
+            max_block_size: 1_000_000usize,
+            max_nonce: 1000,
+            target_block_time: 2i64, //unix seconds
+        };
+
+        let h1 = BlockHeader {
+            previous_block_hash: BlockHeaderHash([0; 32]),
+            merkle_root_hash: MerkleRootHash([1; 32]),
+            difficulty_target: u64::MAX,
+            nonce: 100,
+            time: 9999999,
+        };
+        let h1_clone = h1.clone();
+
+        let merkle_root_hash = MerkleRootHash([2; 32]);
+        let h2 = BlockHeader {
+            previous_block_hash: h1.get_hash(),
+            merkle_root_hash: merkle_root_hash.clone(),
+            ..h1_clone
+        };
+
+        // OK
+        consensus.verify_header(&h2, &h1, &merkle_root_hash).unwrap();
+
+        // invalid parent hash
+        let mut h2_err = h2.clone();
+        h2_err.previous_block_hash = BlockHeaderHash([9; 32]);
+        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+
+        // invalid merkle root hash
+        let mut h2_err = h2.clone();
+        h2_err.merkle_root_hash = MerkleRootHash([3; 32]);
+        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+
+        // past block
+        let mut h2_err = h2.clone();
+        h2_err.time = 100;
+        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+
+        // far in the future block
+        let mut h2_err = h2.clone();
+        h2_err.time = Utc::now().timestamp() as i64 + 7201;
+        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+
+        // invalid difficulty
+        let mut h2_err = h2.clone();
+        h2_err.difficulty_target = 100; // set the difficulty very very high
+        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+
+        // invalid nonce
+        let mut h2_err = h2.clone();
+        h2_err.nonce = 1001; // over the max nonce
+        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+    }
+}
