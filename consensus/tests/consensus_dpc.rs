@@ -17,50 +17,29 @@ mod consensus_dpc {
     use snarkos_storage::LedgerStorage;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-    use rand::{thread_rng, Rng};
-
     #[test]
     fn base_dpc_multiple_transactions() {
-        let mut rng = thread_rng();
+        let parameters = &FIXTURE.parameters;
+        let ledger = &FIXTURE.ledger;
+        let predicate = FIXTURE.predicate.clone();
+        let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
+        let mut rng = FIXTURE.rng.clone();
 
         let consensus = TEST_CONSENSUS;
-        let mut memory_pool = MemoryPool::new();
-
-        // Generate or load parameters for the ledger, commitment schemes, and CRH
-        let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
-
-        // Generate addresses
-        let [genesis_address, miner_address, recipient] = generate_test_accounts(&parameters, &mut rng);
-
-        let mut path = std::env::temp_dir();
-        let random_storage_path: usize = rng.gen();
-        path.push(format!("test_multiple_transations_db{}", random_storage_path));
-
-        let (ledger, genesis_pred_vk_bytes) =
-            setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
-
-        let miner = Miner::new(miner_address.public_key, consensus.clone());
-
-        // Initialize the predicate values
-        let new_predicate = Predicate::new(genesis_pred_vk_bytes);
-        let new_birth_predicates = vec![new_predicate.clone(); NUM_INPUT_RECORDS];
-        let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-
-        let transactions = DPCTransactions::<Tx>::new();
+        let miner = Miner::new(miner_acc.public_key, consensus.clone());
 
         println!("Creating block with coinbase transaction");
-
+        let transactions = DPCTransactions::<Tx>::new();
         let (previous_block_header, transactions, coinbase_records) =
-            miner.establish_block(&parameters, &ledger, &transactions).unwrap();
-
+            miner.establish_block(&parameters, ledger, &transactions).unwrap();
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
-
         let block = Block { header, transactions };
 
-        assert!(InstantiatedDPC::verify_transactions(&parameters, &block.transactions, &ledger).unwrap());
+        assert!(InstantiatedDPC::verify_transactions(&parameters, &block.transactions, ledger).unwrap());
 
         let block_reward = get_block_reward(ledger.len() as u32);
 
+        // dummy outputs have 0 balance, coinbase only pays the miner
         assert_eq!(coinbase_records.len(), 2);
         assert!(!coinbase_records[0].is_dummy());
         assert!(coinbase_records[1].is_dummy());
@@ -68,32 +47,37 @@ mod consensus_dpc {
         assert_eq!(coinbase_records[1].payload().balance, 0);
 
         println!("Verifying and receiving the block");
+        let mut memory_pool = MemoryPool::new();
         consensus
-            .receive_block(&parameters, &ledger, &mut memory_pool, &block)
+            .receive_block(&parameters, ledger, &mut memory_pool, &block)
             .unwrap();
-
         assert_eq!(ledger.len(), 2);
 
         // Add new block spending records from the previous block
 
-        let old_account_private_keys = vec![miner_address.private_key.clone(); NUM_INPUT_RECORDS];
-        let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+        // INPUTS
+
+        let old_account_private_keys = vec![miner_acc.private_key; NUM_INPUT_RECORDS];
+        let old_records = coinbase_records;
+        let new_birth_predicates = vec![predicate.clone(); NUM_INPUT_RECORDS];
+
+        // OUTPUTS
 
         let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
-        let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+        let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+        let new_death_predicates = vec![predicate; NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![PaymentRecordPayload { balance: 10, lock: 0 }; NUM_OUTPUT_RECORDS];
 
-        let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+        // Memo + Aux are dummies for now
 
         let auxiliary = [5u8; 32];
         let memo = [6u8; 32];
 
-        let mut transactions = DPCTransactions::new();
-
         println!("Create a payment transaction transaction");
-
+        // Create the transaction
         let (spend_records, transaction) = ConsensusParameters::create_transaction(
             &parameters,
-            coinbase_records,
+            old_records,
             old_account_private_keys,
             new_account_public_keys,
             new_birth_predicates.clone(),
@@ -114,21 +98,18 @@ mod consensus_dpc {
         assert_eq!(spend_records[1].payload().balance, 10);
         assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
 
-        assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
-
-        transactions.push(transaction);
+        assert!(InstantiatedDPC::verify(&parameters, &transaction, ledger).unwrap());
 
         println!("Create a new block with the payment transaction");
-
+        let mut transactions = DPCTransactions::new();
+        transactions.push(transaction);
         let (previous_block_header, transactions, new_coinbase_records) =
-            miner.establish_block(&parameters, &ledger, &transactions).unwrap();
+            miner.establish_block(&parameters, ledger, &transactions).unwrap();
 
-        assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions, &ledger).unwrap());
+        assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions, ledger).unwrap());
 
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
-
         let new_block = Block { header, transactions };
-
         let new_block_reward = get_block_reward(ledger.len() as u32);
 
         assert_eq!(new_coinbase_records.len(), 2);
@@ -143,7 +124,7 @@ mod consensus_dpc {
         println!("Verify and receive the block with the new payment transaction");
 
         consensus
-            .receive_block(&parameters, &ledger, &mut memory_pool, &new_block)
+            .receive_block(&parameters, ledger, &mut memory_pool, &new_block)
             .unwrap();
 
         assert_eq!(ledger.len(), 3);

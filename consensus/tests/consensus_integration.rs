@@ -23,7 +23,10 @@ mod consensus_integration {
 
     #[test]
     fn find_valid_block() {
-        let transactions = DPCTransactions(vec![DATA.block1.transactions.0[0].clone(), DATA.block2.transactions.0[0].clone()]);
+        let transactions = DPCTransactions(vec![
+            DATA.block1.transactions.0[0].clone(),
+            DATA.block2.transactions.0[0].clone(),
+        ]);
         let parent_header = genesis().header;
         test_find_block(&transactions, &parent_header);
     }

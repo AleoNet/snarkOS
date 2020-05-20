@@ -284,7 +284,7 @@ impl<E: PairingEngine> Storage for Parameters<E> {
 
     /// Load the SNARK parameters from a file at the given path.
     fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
+        let mut file = std::io::BufReader::new(File::open(path)?);
         Ok(Self::read(&mut file, false)?)
     }
 }

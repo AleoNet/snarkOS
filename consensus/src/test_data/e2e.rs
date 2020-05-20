@@ -117,7 +117,7 @@ fn generate_or_load_test_data() -> TestData {
     if path.exists() {
         let file = std::io::BufReader::new(File::open(path).expect("could not open file"));
         let test_data = TestData::read(file).unwrap();
-        return test_data
+        return test_data;
     }
 
     // get the params
