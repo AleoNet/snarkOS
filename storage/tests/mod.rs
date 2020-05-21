@@ -12,13 +12,12 @@ use std::sync::Arc;
 pub const TEST_DB_PATH: &str = "./test_db";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TestTx;
+pub struct TestTransaction;
 
-impl TransactionScheme for TestTx {
+impl TransactionScheme for TestTransaction {
     type Commitment = [u8; 32];
     type Memorandum = [u8; 32];
     type SerialNumber = [u8; 32];
-    type Stuff = [u8; 32];
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
         &[[0u8; 32]]
@@ -29,10 +28,6 @@ impl TransactionScheme for TestTx {
     }
 
     fn memorandum(&self) -> &Self::Memorandum {
-        &[0u8; 32]
-    }
-
-    fn stuff(&self) -> &Self::Stuff {
         &[0u8; 32]
     }
 
@@ -49,14 +44,14 @@ impl TransactionScheme for TestTx {
     }
 }
 
-impl ToBytes for TestTx {
+impl ToBytes for TestTransaction {
     #[inline]
     fn write<W: Write>(&self, mut _writer: W) -> IoResult<()> {
         Ok(())
     }
 }
 
-impl FromBytes for TestTx {
+impl FromBytes for TestTransaction {
     #[inline]
     fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
         Ok(Self)
@@ -73,7 +68,7 @@ impl PedersenSize for Size {
 
 define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
 
-type Store = LedgerStorage<TestTx, TestMerkleParams>;
+type Store = LedgerStorage<TestTransaction, TestMerkleParams>;
 
 pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {
     let mut path = std::env::temp_dir();

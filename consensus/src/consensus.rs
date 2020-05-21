@@ -14,7 +14,7 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::{DPCComponents, DPCScheme, Record},
-    objects::{Ledger, TransactionScheme},
+    objects::Ledger,
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
@@ -168,7 +168,7 @@ impl ConsensusParameters {
         let mut total_value_balance = 0;
 
         for transaction in block.transactions.iter() {
-            let value_balance = transaction.stuff().value_balance;
+            let value_balance = transaction.value_balance;
 
             if value_balance.is_negative() {
                 coinbase_transaction_count += 1;
@@ -262,13 +262,13 @@ impl ConsensusParameters {
         let mut total_value_balance = get_block_reward(block_num);
 
         for transaction in transactions.iter() {
-            let tx_value_balance = transaction.stuff.value_balance;
+            let tx_value_balance = transaction.value_balance;
 
             if tx_value_balance.is_negative() {
                 return Err(ConsensusError::CoinbaseTransactionAlreadyExists());
             }
 
-            total_value_balance += transaction.stuff.value_balance.abs() as u64;
+            total_value_balance += transaction.value_balance.abs() as u64;
         }
 
         // Generate dummy input records having as address the genesis address.

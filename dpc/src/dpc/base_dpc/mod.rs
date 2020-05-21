@@ -815,7 +815,7 @@ where
         }
 
         // Check that the record commitment digest is valid.
-        if !ledger.validate_digest(&transaction.stuff.digest) {
+        if !ledger.validate_digest(&transaction.digest) {
             eprintln!("Ledger digest is invalid.");
             return Ok(false);
         }
@@ -824,34 +824,26 @@ where
         let input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
             ledger_parameters: ledger.parameters().clone(),
-            ledger_digest: transaction.stuff.digest.clone(),
+            ledger_digest: transaction.digest.clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
             memo: transaction.memorandum().clone(),
-            predicate_commitment: transaction.stuff.predicate_commitment.clone(),
-            local_data_commitment: transaction.stuff.local_data_commitment.clone(),
-            value_balance: transaction.stuff.value_balance,
+            predicate_commitment: transaction.predicate_commitment.clone(),
+            local_data_commitment: transaction.local_data_commitment.clone(),
+            value_balance: transaction.value_balance,
         };
-        if !Components::InnerSNARK::verify(
-            &parameters.inner_snark_parameters.1,
-            &input,
-            &transaction.stuff.inner_proof,
-        )? {
+        if !Components::InnerSNARK::verify(&parameters.inner_snark_parameters.1, &input, &transaction.inner_proof)? {
             eprintln!("Core NIZK didn't verify.");
             return Ok(false);
         };
 
         let input = OuterCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
-            predicate_commitment: transaction.stuff.predicate_commitment.clone(),
-            local_data_commitment: transaction.stuff.local_data_commitment.clone(),
+            predicate_commitment: transaction.predicate_commitment.clone(),
+            local_data_commitment: transaction.local_data_commitment.clone(),
         };
 
-        if !Components::OuterSNARK::verify(
-            &parameters.outer_snark_parameters.1,
-            &input,
-            &transaction.stuff.predicate_proof,
-        )? {
+        if !Components::OuterSNARK::verify(&parameters.outer_snark_parameters.1, &input, &transaction.outer_proof)? {
             eprintln!("Predicate check NIZK didn't verify.");
             return Ok(false);
         }
@@ -860,18 +852,14 @@ where
             transaction.old_serial_numbers(),
             transaction.new_commitments(),
             transaction.memorandum(),
-            transaction.stuff.digest,
-            transaction.stuff.inner_proof,
-            transaction.stuff.predicate_proof
+            transaction.digest,
+            transaction.inner_proof,
+            transaction.outer_proof
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
         let sig_pp = &parameters.circuit_parameters.signature;
-        for (pk, sig) in transaction
-            .old_serial_numbers()
-            .iter()
-            .zip(&transaction.stuff.signatures)
-        {
+        for (pk, sig) in transaction.old_serial_numbers().iter().zip(&transaction.signatures) {
             if !Components::Signature::verify(sig_pp, pk, signature_message, sig)? {
                 eprintln!("Signature didn't verify.");
                 return Ok(false);
