@@ -43,7 +43,7 @@ matrix:
             - binutils-dev
             - libiberty-dev
       script:
-        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
+        - travis_wait 30 RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
       after_success: |
         wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
         tar xzf master.tar.gz && cd kcov-master &&
@@ -59,7 +59,7 @@ matrix:
         - rustup component add rustfmt
       script:
         - cargo fmt -- --check
-        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
+        - travis_wait 30 RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
 
 script:
   - echo "snarkOS"
