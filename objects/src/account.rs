@@ -19,17 +19,14 @@ impl<C: DPCComponents> AccountScheme for Account<C> {
     type CommitmentScheme = C::AccountCommitment;
     type SignatureScheme = C::Signature;
 
-    /// Creates a new account. Defaults to a testnet account
-    /// if no network indicator is provided.
-    // TODO: Add testnet account support.
+    /// Creates a new account.
     fn new<R: Rng>(
         signature_parameters: &Self::SignatureScheme,
         commitment_parameters: &Self::CommitmentScheme,
         metadata: &[u8; 32],
-        is_testnet: Option<bool>,
         rng: &mut R,
     ) -> Result<Self, AccountError> {
-        let private_key = AccountPrivateKey::new(signature_parameters, metadata, is_testnet, rng)?;
+        let private_key = AccountPrivateKey::new(signature_parameters, metadata, rng)?;
         let public_key = AccountPublicKey::from(commitment_parameters, &private_key)?;
 
         Ok(Self {
@@ -47,8 +44,7 @@ impl<C: DPCComponents> ToBytes for Account<C> {
 }
 
 impl<C: DPCComponents> FromBytes for Account<C> {
-    /// Reads in an account buffer. Defaults to a testnet account
-    /// if no network indicator is provided.
+    /// Reads in an account buffer.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let public_key: AccountPublicKey<C> = FromBytes::read(&mut reader)?;

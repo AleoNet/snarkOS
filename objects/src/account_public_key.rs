@@ -24,8 +24,7 @@ pub struct AccountPublicKey<C: DPCComponents> {
 }
 
 impl<C: DPCComponents> AccountPublicKey<C> {
-    /// Creates a new account public key from an account private key. Defaults to a testnet account
-    /// if no network indicator is provided.
+    /// Creates a new account public key from an account private key.
     // TODO: Add testnet account support.
     pub fn from(parameters: &C::AccountCommitment, private_key: &AccountPrivateKey<C>) -> Result<Self, AccountError> {
         // Construct the commitment input for the account public key.
@@ -45,9 +44,7 @@ impl<C: DPCComponents> ToBytes for AccountPublicKey<C> {
 }
 
 impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
-    /// Reads in an account public key buffer. Defaults to a testnet account
-    /// if no network indicator is provided.
-    // TODO: Add testnet account support.
+    /// Reads in an account public key buffer.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let commitment: <C::AccountCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
@@ -63,7 +60,7 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
             .write(&mut public_key[0..32])
             .expect("public key formatting failed");
 
-        let prefix = account_format::PUBLIC_KEY_MAINNET.to_string();
+        let prefix = account_format::PUBLIC_KEY_PREFIX.to_string();
 
         let result = Bech32::new(prefix, public_key.to_base32());
         result.unwrap().fmt(f)
@@ -71,7 +68,6 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
 }
 
 impl<C: DPCComponents> fmt::Debug for AccountPublicKey<C> {
-    // TODO: Add testnet account support.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "AccountPublicKey {{ commitment: {:?} }}", self.commitment,)
     }

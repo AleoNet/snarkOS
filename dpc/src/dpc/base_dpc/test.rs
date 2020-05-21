@@ -49,14 +49,8 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate metadata and an account for a dummy initial, or "genesis", record.
     let genesis_metadata = [1u8; 32];
-    let genesis_account = Account::new(
-        signature_parameters,
-        commitment_parameters,
-        &genesis_metadata,
-        None,
-        &mut rng,
-    )
-    .unwrap();
+    let genesis_account =
+        Account::new(signature_parameters, commitment_parameters, &genesis_metadata, &mut rng).unwrap();
 
     let genesis_sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
     let genesis_record = DPC::generate_record(
@@ -101,14 +95,7 @@ fn test_execute_base_dpc_constraints() {
     // Create an account for an actual new record.
 
     let new_metadata = [1u8; 32];
-    let new_account = Account::new(
-        signature_parameters,
-        commitment_parameters,
-        &new_metadata,
-        None,
-        &mut rng,
-    )
-    .unwrap();
+    let new_account = Account::new(signature_parameters, commitment_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
     let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
