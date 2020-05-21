@@ -152,6 +152,7 @@ impl RpcFunctions for RpcImpl {
         unimplemented!()
     }
 
+    // TODO (howardwu): Reorder after test data script is merged.
     /// Returns information about a transaction from serialized bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
@@ -176,7 +177,13 @@ impl RpcFunctions for RpcImpl {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
 
-        let stuff = RPCTransactionStuff {
+        Ok(TransactionInfo {
+            txid: hex::encode(&transaction.transaction_id()?),
+            size: transaction_bytes.len(),
+            old_serial_numbers,
+            new_commitments,
+            memo,
+
             digest: hex::encode(to_bytes![transaction.digest]?),
             inner_proof: hex::encode(to_bytes![transaction.inner_proof]?),
             predicate_proof: hex::encode(to_bytes![transaction.outer_proof]?),
@@ -184,15 +191,6 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
-        };
-
-        Ok(TransactionInfo {
-            txid: hex::encode(&transaction.transaction_id()?),
-            size: transaction_bytes.len(),
-            old_serial_numbers,
-            new_commitments,
-            memo,
-            stuff,
         })
     }
 
