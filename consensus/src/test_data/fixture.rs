@@ -1,8 +1,8 @@
 use snarkos_dpc::{
     base_dpc::instantiated::*,
     test_data::{generate_test_accounts, setup_ledger, setup_or_load_parameters},
-    DPCScheme,
 };
+use snarkos_models::dpc::DPCScheme;
 use snarkos_objects::Account;
 
 use once_cell::sync::Lazy;

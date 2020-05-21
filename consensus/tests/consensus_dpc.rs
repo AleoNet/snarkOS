@@ -5,9 +5,11 @@ mod consensus_dpc {
         test_data::*,
         ConsensusParameters,
     };
-    use snarkos_dpc::{
-        base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
-        test_data::*,
+    use snarkos_dpc::base_dpc::{
+        instantiated::*,
+        record::DPCRecord,
+        record_payload::PaymentRecordPayload,
+        BaseDPCComponents,
     };
     use snarkos_models::{
         dpc::{DPCScheme, Record},

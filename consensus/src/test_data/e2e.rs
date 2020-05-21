@@ -5,15 +5,13 @@ use crate::{
     ConsensusParameters,
 };
 
-use snarkos_dpc::{
-    base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload},
-    DPCScheme,
-};
-use snarkos_models::dpc::Record;
+use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload};
+use snarkos_models::dpc::{DPCScheme, Record};
 use snarkos_objects::{
-    dpc::{Block, DPCTransactions},
+    dpc::DPCTransactions,
     Account,
     AccountPublicKey,
+    Block,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
@@ -110,7 +108,7 @@ impl FromBytes for TestData {
     }
 }
 
-const TEST_DATA_PATH: &str = "./src/test_data/precomputed_data";
+const TEST_DATA_PATH: &str = "./../consensus/src/test_data/precomputed_data";
 
 fn generate_or_load_test_data() -> TestData {
     let path = std::env::current_dir().unwrap().join(TEST_DATA_PATH);
