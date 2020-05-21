@@ -141,12 +141,7 @@ impl ConsensusParameters {
         block: &Block<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        let transaction_ids: Vec<Vec<u8>> = block
-            .transactions
-            .to_transaction_ids()?
-            .iter()
-            .map(|id| id.to_vec())
-            .collect();
+        let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids()?;
 
         let mut merkle_root_bytes = [0u8; 32];
         merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));

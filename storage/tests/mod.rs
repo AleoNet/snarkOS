@@ -5,8 +5,8 @@ use snarkos_algorithms::{
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
 use snarkos_storage::LedgerStorage;
-
 use std::sync::Arc;
 
 pub const TEST_DB_PATH: &str = "./test_db";
@@ -111,6 +111,34 @@ mod tests {
         assert_eq!(blockchain.get_latest_block_height(), 0);
 
         let _latest_block = blockchain.get_latest_block().unwrap();
+
+        kill_storage_sync(blockchain, path);
+    }
+
+    #[test]
+    pub fn remove_decrements_height() {
+        let (blockchain, path) = initialize_test_blockchain();
+
+        assert_eq!(blockchain.get_latest_block_height(), 0);
+
+        // insert a block
+        let block = Block {
+            header: BlockHeader {
+                difficulty_target: 100,
+                nonce: 99,
+                merkle_root_hash: MerkleRootHash([0; 32]),
+                previous_block_hash: BlockHeaderHash([0; 32]),
+                time: 123,
+            },
+            transactions: DPCTransactions::new(),
+        };
+
+        blockchain.insert_block(&block).unwrap();
+        assert_eq!(blockchain.get_latest_block_height(), 1);
+
+        // removing it decrements the chain's height
+        blockchain.remove_latest_block().unwrap();
+        assert_eq!(blockchain.get_latest_block_height(), 0);
 
         kill_storage_sync(blockchain, path);
     }

@@ -192,10 +192,22 @@ fn mine_block(
 
     let block = Block { header, transactions };
 
+    let old_block_height = ledger.get_latest_block_height();
+
     // add it to the chain
     consensus
         .receive_block(&parameters, ledger, memory_pool, &block)
         .unwrap();
+
+    let new_block_height = ledger.get_latest_block_height();
+    assert_eq!(old_block_height + 1, new_block_height);
+
+    // Duplicate blocks dont do anything
+    consensus
+        .receive_block(&parameters, ledger, memory_pool, &block)
+        .unwrap();
+    let new_block_height = ledger.get_latest_block_height();
+    assert_eq!(old_block_height + 1, new_block_height);
 
     (block, coinbase_records)
 }
