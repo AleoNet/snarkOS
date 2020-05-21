@@ -128,7 +128,7 @@ fn generate_or_load_test_data() -> TestData {
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (_, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
+    let (block1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
 
     // make a tx which spends 10 to the receiver
     let (records1, tx1) = send(
@@ -142,27 +142,13 @@ fn generate_or_load_test_data() -> TestData {
     );
 
     // mine the block
-    let (block1, coinbase_records2) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx1]);
-
-    // spend 8 to the other receiver
-    let (records2, tx2) = send(
-        &ledger,
-        &parameters,
-        &miner_acc,
-        coinbase_records2,
-        &acc2.public_key,
-        8,
-        &mut rng,
-    );
-
-    // mine the block
-    let (block2, _) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx2]);
+    let (block2, coinbase_records2) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx1]);
 
     let test_data = TestData {
         block1,
         block2,
-        records1,
-        records2,
+        records1: coinbase_records,
+        records2: coinbase_records2,
     };
 
     let file = std::io::BufWriter::new(File::create(path).expect("could not open file"));
