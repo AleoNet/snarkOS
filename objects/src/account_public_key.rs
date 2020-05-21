@@ -25,7 +25,6 @@ pub struct AccountPublicKey<C: DPCComponents> {
 
 impl<C: DPCComponents> AccountPublicKey<C> {
     /// Creates a new account public key from an account private key.
-    // TODO: Add testnet account support.
     pub fn from(parameters: &C::AccountCommitment, private_key: &AccountPrivateKey<C>) -> Result<Self, AccountError> {
         // Construct the commitment input for the account public key.
         let commit_input = to_bytes![private_key.pk_sig, private_key.sk_prf, private_key.metadata]?;
@@ -37,7 +36,6 @@ impl<C: DPCComponents> AccountPublicKey<C> {
 }
 
 impl<C: DPCComponents> ToBytes for AccountPublicKey<C> {
-    // TODO: Add testnet account support.
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.commitment.write(&mut writer)
     }
