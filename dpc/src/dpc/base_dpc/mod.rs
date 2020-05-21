@@ -594,7 +594,7 @@ where
 
         let signature_parameters = &parameters.circuit_parameters.signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(signature_parameters, commitment_parameters, metadata, None, rng)?;
+        let account = Account::new(signature_parameters, commitment_parameters, metadata, rng)?;
 
         end_timer!(time);
 

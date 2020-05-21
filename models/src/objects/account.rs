@@ -14,7 +14,6 @@ pub trait AccountScheme: FromBytes + ToBytes {
         signature_parameters: &Self::SignatureScheme,
         commitment_parameters: &Self::CommitmentScheme,
         metadata: &[u8; 32],
-        is_testnet: Option<bool>,
         rng: &mut R,
     ) -> Result<Self, AccountError>;
 }
