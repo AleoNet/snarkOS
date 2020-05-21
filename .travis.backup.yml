@@ -13,6 +13,8 @@ before_install:
   - mv $TRAVIS_HOME/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $TRAVIS_HOME/.bin/sccache
   - export PATH="$PATH:$TRAVIS_HOME/.bin"
   - export RUSTC_WRAPPER="sccache"
+  - docker build -t snarkos:latest .
+  - docker run -d -p 4130:4130 snarkos:latest
 
 cache:
   directories:
@@ -43,30 +45,28 @@ matrix:
             - binutils-dev
             - libiberty-dev
       script:
-        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
+        - docker ps -a 
+        - docker run -v "$PWD/target:/usr/src/snarkOS/target" snarkos /bin/sh -c "
+          cd /usr/src/snarkOS;
+          RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test;"
       after_success: |
         wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
         tar xzf master.tar.gz && cd kcov-master &&
         mkdir build && cd build && cmake .. && make && sudo make install &&
-        cd ../.. && rm -rf kcov-master &&
-        rm -rf target/debug/base_dpc* && rm -rf target/debug/consensus_dpc*
+        cd ../.. && sudo rm -rf kcov-master && sudo rm -rf master.tar.gz &&
+        sudo rm -rf target/debug/base_dpc* && sudo rm -rf target/debug/consensus_dpc* &&
         for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
         bash <(curl -s https://codecov.io/bash) &&
         echo "Uploaded code coverage"
 
     - rust: nightly-2020-03-18
-      install:
-        - rustup component add rustfmt
       script:
-        - cargo fmt -- --check
-        - RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test
-
+        - docker run snarkos /bin/sh -c "
+          cd /usr/src/snarkOS;
+          rustup component add rustfmt;
+          cargo fmt -- --check;
+          RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test;"
 script:
   - echo "snarkOS"
 
-before_deploy:
-  - docker build -t snarkos:latest .
-
-deploy:
-  - docker run -p 4130:4130 --name snarkos snarkos
 
