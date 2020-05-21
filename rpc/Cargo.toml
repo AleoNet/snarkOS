@@ -28,7 +28,7 @@ jsonrpc-core-client = { version = "14.0.5" }
 jsonrpc-derive = { version = "14.0.5" }
 jsonrpc-http-server = { version = "14.0.5" }
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "0.2.17", features = ["full"] }
 
 [dev-dependencies]
 jsonrpc-test = { version = "14.0.5" }
