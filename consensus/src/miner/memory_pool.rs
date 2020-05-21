@@ -4,7 +4,7 @@
 
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::objects::{Ledger, TransactionScheme};
 use snarkos_objects::dpc::DPCTransactions;
 use snarkos_storage::{has_duplicates, LedgerStorage};
 use snarkos_utilities::{
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 /// Stores a transaction and it's size in the memory pool.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Entry<T: Transaction> {
+pub struct Entry<T: TransactionScheme> {
     pub size: usize,
     pub transaction: T,
 }
@@ -24,7 +24,7 @@ pub struct Entry<T: Transaction> {
 /// Stores transactions received by the server.
 /// Transaction entries will eventually be fetched by the miner and assembled into blocks.
 #[derive(Debug, Clone)]
-pub struct MemoryPool<T: Transaction> {
+pub struct MemoryPool<T: TransactionScheme> {
     pub total_size: usize,
 
     // Hashmap transaction_id -> Entry
@@ -34,7 +34,7 @@ pub struct MemoryPool<T: Transaction> {
 const BLOCK_HEADER_SIZE: usize = 84;
 const COINBASE_TRANSACTION_SIZE: usize = 1889; // TODO Find the value for actual coinbase transaction size
 
-impl<T: Transaction> MemoryPool<T> {
+impl<T: TransactionScheme> MemoryPool<T> {
     #[inline]
     pub fn new() -> Self {
         Self {

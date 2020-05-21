@@ -1,7 +1,7 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::objects::{Ledger, TransactionScheme};
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::bytes::FromBytes;
 
@@ -13,7 +13,7 @@ use std::{
     sync::Arc,
 };
 
-pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
+pub struct LedgerStorage<T: TransactionScheme, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -21,7 +21,7 @@ pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: TransactionScheme, P: MerkleParameters> LedgerStorage<T, P> {
     /// Create a new blockchain storage.
     pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;

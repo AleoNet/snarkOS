@@ -3,7 +3,7 @@ use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, SNARK},
-    objects::Transaction,
+    objects::TransactionScheme,
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -115,18 +115,18 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCStuff<C> {
     PartialEq(bound = "C: BaseDPCComponents"),
     Eq(bound = "C: BaseDPCComponents")
 )]
-pub struct DPCTransaction<C: BaseDPCComponents> {
+pub struct Transaction<C: BaseDPCComponents> {
     old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
     new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
 }
 
-impl<C: BaseDPCComponents> DPCTransaction<C> {
+impl<C: BaseDPCComponents> Transaction<C> {
     pub fn new(
-        old_serial_numbers: Vec<<Self as Transaction>::SerialNumber>,
-        new_commitments: Vec<<Self as Transaction>::Commitment>,
-        memorandum: <Self as Transaction>::Memorandum,
+        old_serial_numbers: Vec<<Self as TransactionScheme>::SerialNumber>,
+        new_commitments: Vec<<Self as TransactionScheme>::Commitment>,
+        memorandum: <Self as TransactionScheme>::Memorandum,
         digest: MerkleTreeDigest<C::MerkleParameters>,
         inner_proof: <C::InnerSNARK as SNARK>::Proof,
         predicate_proof: <C::OuterSNARK as SNARK>::Proof,
@@ -144,7 +144,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             value_balance,
             signatures,
         };
-        DPCTransaction {
+        Transaction {
             old_serial_numbers,
             new_commitments,
             memorandum,
@@ -153,7 +153,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
     }
 }
 
-impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
+impl<C: BaseDPCComponents> TransactionScheme for Transaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
     type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
@@ -208,7 +208,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     }
 }
 
-impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
+impl<C: BaseDPCComponents> ToBytes for Transaction<C> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         variable_length_integer(self.old_serial_numbers.len() as u64).write(&mut writer)?;
@@ -227,7 +227,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
     }
 }
 
-impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
+impl<C: BaseDPCComponents> FromBytes for Transaction<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_old_serial_numbers = read_variable_length_integer(&mut reader)?;
@@ -256,7 +256,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
     }
 }
 
-impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
+impl<C: BaseDPCComponents> fmt::Debug for Transaction<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

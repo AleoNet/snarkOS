@@ -1,6 +1,6 @@
 use crate::{
     dpc::{Predicate, Record},
-    objects::{AccountScheme, Ledger, Transaction},
+    objects::{AccountScheme, Ledger, TransactionScheme},
 };
 use snarkos_errors::dpc::DPCError;
 
@@ -18,7 +18,7 @@ pub trait DPCScheme<L: Ledger> {
         AccountPublicKey = <Self::Account as AccountScheme>::AccountPublicKey,
         Predicate = Self::Predicate,
     >;
-    type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
+    type Transaction: TransactionScheme<SerialNumber = <Self::Record as Record>::SerialNumber>;
     type LocalData;
 
     /// Returns public parameters for the DPC.
@@ -48,7 +48,7 @@ pub trait DPCScheme<L: Ledger> {
         new_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         auxiliary: &Self::Auxiliary,
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        memorandum: &<Self::Transaction as TransactionScheme>::Memorandum,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;

@@ -6,7 +6,7 @@ use snarkos_models::{
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
-    objects::{AccountScheme, Ledger, Transaction},
+    objects::{AccountScheme, Ledger, TransactionScheme},
 };
 use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
@@ -543,7 +543,7 @@ where
     type Predicate = DPCPredicate<Components>;
     type PrivatePredInput = PrivatePredicateInput<Components>;
     type Record = DPCRecord<Components>;
-    type Transaction = DPCTransaction<Components>;
+    type Transaction = Transaction<Components>;
 
     fn setup<R: Rng>(
         ledger_parameters: &Components::MerkleParameters,
@@ -615,7 +615,7 @@ where
         mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
         auxiliary: &Self::Auxiliary,
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        memorandum: &<Self::Transaction as TransactionScheme>::Memorandum,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {

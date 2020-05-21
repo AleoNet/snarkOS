@@ -5,7 +5,7 @@ use crate::dpc::base_dpc::{
     outer_circuit_verifier_input::OuterCircuitVerifierInput,
     payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
     predicate::DPCPredicate,
-    transaction::DPCTransaction,
+    transaction::Transaction,
     BaseDPCComponents,
     LocalData as DPCLocalData,
     DPC,
@@ -169,7 +169,7 @@ pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredic
 pub type PRF = Blake2s;
 
 pub type MerkleTreeLedger = LedgerStorage<Tx, CommitmentMerkleParameters>;
-pub type Tx = DPCTransaction<Components>;
+pub type Tx = Transaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;
 pub type LocalData = DPCLocalData<Components>;

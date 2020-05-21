@@ -1,10 +1,10 @@
 use crate::LedgerStorage;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::storage::StorageError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::objects::TransactionScheme;
 use snarkos_objects::{Block, BlockHeaderHash};
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: TransactionScheme, P: MerkleParameters> LedgerStorage<T, P> {
     /// Returns true if the block for the given block header hash exists.
     pub fn block_hash_exists(&self, block_hash: &BlockHeaderHash) -> bool {
         if self.is_empty() {

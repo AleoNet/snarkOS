@@ -1,7 +1,7 @@
 use crate::LedgerStorage;
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_models::objects::Transaction;
+use snarkos_models::objects::TransactionScheme;
 use snarkos_objects::{BlockHeader, BlockHeaderHash};
 
 #[derive(Clone, Debug)]
@@ -23,7 +23,7 @@ pub struct SideChainPath {
     pub path: Vec<BlockHeaderHash>,
 }
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: TransactionScheme, P: MerkleParameters> LedgerStorage<T, P> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();

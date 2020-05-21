@@ -3,7 +3,7 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::hash::Hash;
 
-pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
+pub trait TransactionScheme: Clone + Eq + FromBytes + ToBytes {
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type Commitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;

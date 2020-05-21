@@ -1,4 +1,4 @@
-use crate::objects::{BlockScheme, Transaction};
+use crate::objects::{BlockScheme, TransactionScheme};
 use snarkos_errors::dpc::LedgerError;
 
 use rand::Rng;
@@ -12,7 +12,7 @@ pub trait Ledger: Sized {
     type MerklePath;
     type MerkleTreeDigest;
     type SerialNumber;
-    type Transaction: Transaction;
+    type Transaction: TransactionScheme;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::MerkleParameters, LedgerError>;
 

@@ -2,7 +2,7 @@ use crate::{rpc_types::*, RpcFunctions};
 use snarkos_consensus::{get_block_reward, miner::MemoryPool, ConsensusParameters};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_errors::rpc::RpcError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::objects::TransactionScheme;
 use snarkos_network::{context::Context, process_transaction_internal};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{

@@ -4,7 +4,7 @@ use snarkos_algorithms::{
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::objects::TransactionScheme;
 use snarkos_storage::LedgerStorage;
 
 use std::sync::Arc;
@@ -14,7 +14,7 @@ pub const TEST_DB_PATH: &str = "./test_db";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
 
-impl Transaction for TestTx {
+impl TransactionScheme for TestTx {
     type Commitment = [u8; 32];
     type Memorandum = [u8; 32];
     type SerialNumber = [u8; 32];

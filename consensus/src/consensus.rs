@@ -14,7 +14,7 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::{DPCComponents, DPCScheme, Record},
-    objects::{Ledger, Transaction},
+    objects::{Ledger, TransactionScheme},
 };
 use snarkos_objects::{
     dpc::DPCTransactions,

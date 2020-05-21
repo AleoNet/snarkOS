@@ -4,7 +4,7 @@ use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     dpc::{DPCScheme, Record},
-    objects::Transaction,
+    objects::TransactionScheme,
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::LedgerStorage;
@@ -37,7 +37,7 @@ impl Miner {
     }
 
     /// Fetches new transactions from the memory pool.
-    pub async fn fetch_memory_pool_transactions<T: Transaction, P: MerkleParameters>(
+    pub async fn fetch_memory_pool_transactions<T: TransactionScheme, P: MerkleParameters>(
         storage: &Arc<LedgerStorage<T, P>>,
         memory_pool: &Arc<Mutex<MemoryPool<T>>>,
         max_size: usize,
