@@ -1,9 +1,11 @@
-use crate::{
-    base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC},
-    DPCScheme,
+use crate::base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC};
+use snarkos_models::{
+    algorithms::CRH,
+    dpc::{DPCScheme, Record},
+    objects::{AccountScheme, Ledger},
+    storage::Storage,
 };
-use snarkos_models::{algorithms::CRH, dpc::Record, objects::AccountScheme, storage::Storage};
-use snarkos_objects::{Account, Ledger};
+use snarkos_objects::Account;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;

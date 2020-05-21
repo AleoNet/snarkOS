@@ -1,5 +1,5 @@
-use crate::dpc::Transaction;
 use snarkos_errors::objects::TransactionError;
+use snarkos_models::objects::Transaction;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

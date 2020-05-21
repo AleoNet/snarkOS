@@ -1,5 +1,4 @@
 use crate::circuit::POSWCircuit;
-use blake2::{digest::Digest, Blake2s};
 use snarkos_algorithms::snark;
 use snarkos_curves::{
     bls12_377::{Bls12_377, Fr},
@@ -12,6 +11,8 @@ use snarkos_objects::pedersen_merkle_tree::{
     PedersenMerkleRootHash,
     PARAMS,
 };
+
+use blake2::{digest::Digest, Blake2s};
 use std::marker::PhantomData;
 
 pub type Curve = Bls12_377;

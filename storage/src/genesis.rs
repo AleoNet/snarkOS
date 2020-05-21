@@ -1,4 +1,4 @@
-// Block Storage genesis components
+// Ledger storage genesis components
 // NOTE: These values must be updated if parameters are changed
 
 pub const GENESIS_RECORD_COMMITMENT: [u8; 32] = [

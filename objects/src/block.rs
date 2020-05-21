@@ -1,8 +1,6 @@
-use crate::{
-    dpc::{DPCTransactions, Transaction},
-    BlockHeader,
-};
+use crate::{dpc::DPCTransactions, BlockHeader};
 use snarkos_errors::objects::BlockError;
+use snarkos_models::objects::{BlockScheme, Transaction};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -18,6 +16,21 @@ pub struct Block<T: Transaction> {
     pub header: BlockHeader,
     /// The block transactions.
     pub transactions: DPCTransactions<T>,
+}
+
+impl<T: Transaction> BlockScheme for Block<T> {
+    type BlockHeader = BlockHeader;
+    type Transaction = T;
+
+    /// Returns the header.
+    fn header(&self) -> &Self::BlockHeader {
+        &self.header
+    }
+
+    /// Returns the transactions.
+    fn transactions(&self) -> &[Self::Transaction] {
+        self.transactions.as_slice()
+    }
 }
 
 impl<T: Transaction> ToBytes for Block<T> {
