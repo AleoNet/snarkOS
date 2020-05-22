@@ -1,9 +1,8 @@
 use crate::miner::MemoryPool;
-use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    payment_circuit::PaymentCircuit,
     predicate::{DPCPredicate, PrivatePredicateInput},
     record::DPCRecord,
     record_payload::PaymentRecordPayload,
@@ -13,12 +12,14 @@ use snarkos_dpc::base_dpc::{
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
+    curves::to_field_vec::ToConstraintField,
     dpc::{DPCComponents, DPCScheme, Record},
     objects::{Ledger, Transaction},
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
-    merkle_root,
+    merkle_root_with_subroots,
+    pedersen_merkle_root,
     Account,
     AccountPrivateKey,
     AccountPublicKey,
@@ -26,11 +27,23 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+    MASKED_TREE_HEIGHT,
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkos_utilities::{bytes::FromBytes, rand::UniformRand};
+
+use snarkos_algorithms::snark::{prepare_verifying_key, verify_proof};
+use snarkos_posw::{commit, Field, Proof, VerifyingKey};
+use snarkos_profiler::{end_timer, start_timer};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
+
+#[cfg(debug_assertions)]
+use snarkos_algorithms::snark::PreparedVerifyingKey;
+#[cfg(debug_assertions)]
+use snarkos_dpc::base_dpc::payment_circuit::PaymentPredicateLocalData;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -45,8 +58,11 @@ pub struct ConsensusParameters {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
+
     // /// Mainnet or testnet
     // network: Network
+    /// The verifying key for the PoSW Merkle Tree SNARK
+    pub verifying_key: VerifyingKey,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -108,10 +124,15 @@ impl ConsensusParameters {
         header: &BlockHeader,
         parent_header: &BlockHeader,
         merkle_root_hash: &MerkleRootHash,
+        pedersen_merkle_root_hash: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
         let hash_result = header.to_difficulty_hash();
-
         let future_timelimit: i64 = Utc::now().timestamp() as i64 + TWO_HOURS_UNIX;
+
+        // Verify the proof
+        let verification_timer = start_timer!(|| "POSW verify");
+        self.verify_proof(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
+        end_timer!(verification_timer);
 
         if parent_header.get_hash() != header.previous_block_hash {
             Err(ConsensusError::NoParent(
@@ -120,6 +141,8 @@ impl ConsensusParameters {
             ))
         } else if header.merkle_root_hash != *merkle_root_hash {
             Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()))
+        } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
+            Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()))
         } else if header.time > future_timelimit {
             Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
         } else if header.time < parent_header.time {
@@ -133,6 +156,30 @@ impl ConsensusParameters {
         }
     }
 
+    fn verify_proof(
+        &self,
+        nonce: u32,
+        proof: &ProofOfSuccinctWork,
+        pedersen_merkle_root: &PedersenMerkleRootHash,
+    ) -> Result<(), ConsensusError> {
+        let mask = commit(nonce, pedersen_merkle_root.clone());
+        let merkle_root = Field::read(&pedersen_merkle_root.0[..])?;
+        let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..])?, vec![
+            merkle_root,
+        ]]
+        .concat();
+
+        // deserialize the snark proof
+        let proof = Proof::read(&proof.0[..])?;
+
+        let res = verify_proof(&prepare_verifying_key(&self.verifying_key), &proof, &inputs)?;
+        if !res {
+            return Err(ConsensusError::PoswVerificationFailed);
+        }
+
+        Ok(())
+    }
+
     /// Check if the block is valid
     /// Check all outpoints, verify signatures, and calculate transaction fees.
     pub fn verify_block(
@@ -143,16 +190,21 @@ impl ConsensusParameters {
     ) -> Result<bool, ConsensusError> {
         let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids()?;
 
+        let (root, subroots) = merkle_root_with_subroots(&transaction_ids, MASKED_TREE_HEIGHT);
         let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+        merkle_root_bytes[..].copy_from_slice(&root);
+
+        let pedersen_merkle_root = pedersen_merkle_root(&subroots);
 
         // Verify the block header
-
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
-            if let Err(err) =
-                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes))
-            {
+            if let Err(err) = self.verify_header(
+                &block.header,
+                &parent_block.header,
+                &MerkleRootHash(merkle_root_bytes),
+                &pedersen_merkle_root,
+            ) {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
             }
@@ -339,6 +391,7 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+        #[cfg(debug_assertions)]
         let pred_nizk_pvk: PreparedVerifyingKey<_> =
             parameters.predicate_snark_parameters.verification_key.clone().into();
 

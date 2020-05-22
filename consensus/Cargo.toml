@@ -19,6 +19,8 @@ snarkos-dpc = { path = "../dpc", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-posw = { path = "../posw", version = "0.8.0" }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 
 bincode = { version="1.2.0" }
 chrono = { version = "0.4", features = ["serde"] }
@@ -32,3 +34,6 @@ tokio = { version = "0.2.13", features = ["full"] }
 
 [dev-dependencies]
 futures-await-test = { version = "0.3.0" }
+
+[features]
+print-trace = [ "snarkos-profiler/print-trace", "snarkos-dpc/print-trace" ]
