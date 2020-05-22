@@ -74,7 +74,9 @@ pub fn setup_or_load_parameters<R: Rng>(
 }
 
 pub fn load_verifying_parameters() -> PublicParameters<Components> {
-    PublicParameters::<Components>::load_vk_direct().unwrap()
+    let mut path = std::env::current_dir().unwrap();
+    path.push("../dpc/src/parameters/");
+    PublicParameters::<Components>::load(&path, true).unwrap()
 }
 
 pub fn generate_test_accounts<R: Rng>(

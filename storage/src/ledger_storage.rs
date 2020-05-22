@@ -7,11 +7,14 @@ use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
 use std::{
-    fs,
+    fs::{self, File},
+    io::BufReader,
     marker::PhantomData,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+const PARAMS_PATH: &str = "../../dpc/src/parameters/ledger.params";
 
 pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
@@ -47,8 +50,8 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
         //        let parameter_path = path.as_ref().join("../dpc/src/parameters/");
         //        let ledger_parameter_path = parameter_path.join("ledger.params");
 
-        let ledger_param_bytes = include_bytes!("../../dpc/src/parameters/ledger.params");
-        let parameters = P::read(&ledger_param_bytes[..])?;
+        let ledger_params = BufReader::new(File::open(PARAMS_PATH)?);
+        let parameters = P::read(ledger_params)?;
 
         match latest_block_number {
             Some(val) => {

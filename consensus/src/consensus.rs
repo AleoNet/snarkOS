@@ -1,15 +1,18 @@
 use crate::miner::MemoryPool;
+#[cfg(debug_assertions)]
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
+    payment_circuit::PaymentCircuit,
     predicate::{DPCPredicate, PrivatePredicateInput},
     record::DPCRecord,
     record_payload::PaymentRecordPayload,
     BaseDPCComponents,
     LocalData,
 };
+#[cfg(debug_assertions)]
+use snarkos_dpc::base_dpc::payment_circuit::PaymentPredicateLocalData;
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
@@ -344,6 +347,7 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+        #[cfg(debug_assertions)]
         let pred_nizk_pvk: PreparedVerifyingKey<_> =
             parameters.predicate_snark_parameters.verification_key.clone().into();
 
