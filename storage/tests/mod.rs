@@ -5,7 +5,15 @@ use snarkos_algorithms::{
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
+use snarkos_objects::{
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    DPCTransactions,
+    MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+};
 use snarkos_storage::{test_data::*, LedgerStorage};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
@@ -107,6 +115,8 @@ mod tests {
                 merkle_root_hash: MerkleRootHash([0; 32]),
                 previous_block_hash: BlockHeaderHash([0; 32]),
                 time: 123,
+                proof: ProofOfSuccinctWork::default(),
+                pedersen_merkle_root_hash: PedersenMerkleRootHash([0; 32]),
             },
             transactions: DPCTransactions::new(),
         };

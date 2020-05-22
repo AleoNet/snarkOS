@@ -11,7 +11,7 @@ mod consensus_integration {
         let consensus = TEST_CONSENSUS.clone();
         let miner_address: AccountPublicKey<Components> = FromBytes::read(&GENESIS_ACCOUNT[..]).unwrap();
         let miner = Miner::new(miner_address, consensus, POSW_PP.0.clone());
-        let mut rng = FIXTURE.rng.clone();
+        let mut rng = rand::thread_rng();
 
         let header = miner.find_block(transactions, parent_header, &mut rng).unwrap();
 
