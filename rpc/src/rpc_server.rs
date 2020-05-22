@@ -1,5 +1,5 @@
 use crate::{RpcFunctions, RpcImpl};
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters, GM17Verifier};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_network::context::Context;
 
@@ -14,7 +14,7 @@ pub async fn start_rpc_server(
     rpc_port: u16,
     storage: Arc<MerkleTreeLedger>,
     server_context: Arc<Context>,
-    consensus: ConsensusParameters,
+    consensus: ConsensusParameters<GM17Verifier>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let rpc_server: SocketAddr = format!("127.0.0.1:{}", rpc_port).parse()?;

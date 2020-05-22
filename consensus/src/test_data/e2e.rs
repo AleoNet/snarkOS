@@ -2,6 +2,7 @@ use super::*;
 use crate::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
+    POSWVerifier,
 };
 use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::PaymentRecordPayload};
 use snarkos_models::dpc::{DPCScheme, Record};
@@ -132,15 +133,7 @@ fn setup_and_store_test_data() -> TestData {
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (block1, coinbase_records) = mine_block(
-        &miner,
-        &ledger,
-        &parameters,
-        &consensus,
-        &mut memory_pool,
-        &mut rng,
-        vec![],
-    );
+    let (block1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &mut memory_pool, &mut rng, vec![]);
 
     // make a tx which spends 10 to the BaseDPCComponentsreceiver
     let (_records1, tx1) = send(
@@ -154,15 +147,7 @@ fn setup_and_store_test_data() -> TestData {
     );
 
     // mine the block
-    let (block2, coinbase_records2) = mine_block(
-        &miner,
-        &ledger,
-        &parameters,
-        &consensus,
-        &mut memory_pool,
-        &mut rng,
-        vec![tx1],
-    );
+    let (block2, coinbase_records2) = mine_block(&miner, &ledger, &parameters, &mut memory_pool, &mut rng, vec![tx1]);
 
     let test_data = TestData {
         block1,
@@ -178,11 +163,10 @@ fn setup_and_store_test_data() -> TestData {
     test_data
 }
 
-fn mine_block<R: Rng>(
-    miner: &Miner,
+fn mine_block<R: Rng, V: POSWVerifier>(
+    miner: &Miner<V>,
     ledger: &MerkleTreeLedger,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-    consensus: &ConsensusParameters,
     memory_pool: &mut MemoryPool<Tx>,
     rng: &mut R,
     txs: Vec<Tx>,
@@ -199,7 +183,8 @@ fn mine_block<R: Rng>(
     let old_block_height = ledger.get_latest_block_height();
 
     // add it to the chain
-    consensus
+    miner
+        .consensus
         .receive_block(&parameters, ledger, memory_pool, &block)
         .unwrap();
 
@@ -207,7 +192,8 @@ fn mine_block<R: Rng>(
     assert_eq!(old_block_height + 1, new_block_height);
 
     // Duplicate blocks dont do anything
-    consensus
+    miner
+        .consensus
         .receive_block(&parameters, ledger, memory_pool, &block)
         .unwrap();
     let new_block_height = ledger.get_latest_block_height();
@@ -251,7 +237,7 @@ fn send<R: Rng>(
     let dummy_flags = vec![false, false];
 
     let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
-    ConsensusParameters::create_transaction(
+    ConsensusParameters::<GM17Verifier>::create_transaction(
         parameters,
         inputs,
         from,

@@ -1,5 +1,5 @@
 use crate::{rpc_types::*, RpcFunctions};
-use snarkos_consensus::{get_block_reward, miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{get_block_reward, miner::MemoryPool, ConsensusParameters, GM17Verifier};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
@@ -24,7 +24,7 @@ pub struct RpcImpl {
     server_context: Arc<Context>,
 
     /// Consensus parameters generated from node config.
-    consensus: ConsensusParameters,
+    consensus: ConsensusParameters<GM17Verifier>,
 
     /// Handle to access the memory pool of transactions.
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
@@ -34,7 +34,7 @@ impl RpcImpl {
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
         server_context: Arc<Context>,
-        consensus: ConsensusParameters,
+        consensus: ConsensusParameters<GM17Verifier>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     ) -> Self {
         Self {

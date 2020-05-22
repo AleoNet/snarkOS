@@ -47,9 +47,47 @@ use snarkos_dpc::base_dpc::payment_circuit::PaymentPredicateLocalData;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
+pub trait POSWVerifier {
+    fn verify_proof(
+        &self,
+        nonce: u32,
+        proof: &ProofOfSuccinctWork,
+        pedersen_merkle_root: &PedersenMerkleRootHash,
+    ) -> Result<(), ConsensusError>;
+}
+
+#[derive(Clone, Debug)]
+pub struct GM17Verifier(pub VerifyingKey);
+
+impl POSWVerifier for GM17Verifier {
+    fn verify_proof(
+        &self,
+        nonce: u32,
+        proof: &ProofOfSuccinctWork,
+        pedersen_merkle_root: &PedersenMerkleRootHash,
+    ) -> Result<(), ConsensusError> {
+        let mask = commit(nonce, pedersen_merkle_root.clone());
+        let merkle_root = Field::read(&pedersen_merkle_root.0[..])?;
+        let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..])?, vec![
+            merkle_root,
+        ]]
+        .concat();
+
+        // deserialize the snark proof
+        let proof = Proof::read(&proof.0[..])?;
+
+        let res = verify_proof(&prepare_verifying_key(&self.0), &proof, &inputs)?;
+        if !res {
+            return Err(ConsensusError::PoswVerificationFailed);
+        }
+
+        Ok(())
+    }
+}
+
 /// Parameters for a proof of work blockchain.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ConsensusParameters {
+pub struct ConsensusParameters<V> {
     /// Maximum block size in bytes
     pub max_block_size: usize,
 
@@ -61,8 +99,8 @@ pub struct ConsensusParameters {
 
     // /// Mainnet or testnet
     // network: Network
-    /// The verifying key for the PoSW Merkle Tree SNARK
-    pub verifying_key: VerifyingKey,
+    /// The verifier for the PoSW Merkle Tree SNARK
+    pub verifier: V,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -97,7 +135,7 @@ pub fn bitcoin_retarget(
     x
 }
 
-impl ConsensusParameters {
+impl<V: POSWVerifier> ConsensusParameters<V> {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
     pub fn get_block_difficulty(&self, prev_header: &BlockHeader, block_timestamp: i64) -> u64 {
         bitcoin_retarget(
@@ -131,7 +169,8 @@ impl ConsensusParameters {
 
         // Verify the proof
         let verification_timer = start_timer!(|| "POSW verify");
-        self.verify_proof(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
+        self.verifier
+            .verify_proof(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
         end_timer!(verification_timer);
 
         if parent_header.get_hash() != header.previous_block_hash {
@@ -154,30 +193,6 @@ impl ConsensusParameters {
         } else {
             Ok(())
         }
-    }
-
-    fn verify_proof(
-        &self,
-        nonce: u32,
-        proof: &ProofOfSuccinctWork,
-        pedersen_merkle_root: &PedersenMerkleRootHash,
-    ) -> Result<(), ConsensusError> {
-        let mask = commit(nonce, pedersen_merkle_root.clone());
-        let merkle_root = Field::read(&pedersen_merkle_root.0[..])?;
-        let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..])?, vec![
-            merkle_root,
-        ]]
-        .concat();
-
-        // deserialize the snark proof
-        let proof = Proof::read(&proof.0[..])?;
-
-        let res = verify_proof(&prepare_verifying_key(&self.verifying_key), &proof, &inputs)?;
-        if !res {
-            return Err(ConsensusError::PoswVerificationFailed);
-        }
-
-        Ok(())
     }
 
     /// Check if the block is valid
@@ -567,12 +582,32 @@ impl ConsensusParameters {
 mod tests {
     use super::*;
 
+    pub struct TestVerifier {
+        pub should_fail: bool,
+    }
+
+    impl POSWVerifier for TestVerifier {
+        fn verify_proof(
+            &self,
+            nonce: u32,
+            proof: &ProofOfSuccinctWork,
+            pedersen_merkle_root: &PedersenMerkleRootHash,
+        ) -> Result<(), ConsensusError> {
+            if self.should_fail {
+                ConsensusError::PoswVerificationFailed
+            } else {
+                Ok(())
+            }
+        }
+    }
+
     #[test]
     fn verify_header() {
         let consensus: ConsensusParameters = ConsensusParameters {
             max_block_size: 1_000_000usize,
             max_nonce: 1000,
             target_block_time: 2i64, //unix seconds
+            verifier: TestVerifier,
         };
 
         let h1 = BlockHeader {
@@ -581,6 +616,8 @@ mod tests {
             difficulty_target: u64::MAX,
             nonce: 100,
             time: 9999999,
+            proof: ProofOfSuccinctWork::default(),
+            pedersen_merkle_root_hash: MerkleRootHash([1; 32]),
         };
         let h1_clone = h1.clone();
 

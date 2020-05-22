@@ -5,7 +5,7 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters, GM17Verifier};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger},
     parameters::PublicParameters,
@@ -51,7 +51,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        verifying_key: vk,
+        verifier: GM17Verifier(vk),
     };
 
     let mut path = std::env::current_dir()?;

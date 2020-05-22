@@ -4,7 +4,7 @@ use crate::{
     message::{Channel, MessageName},
     protocol::*,
 };
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{miner::MemoryPool, ConsensusParameters, GM17Verifier};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger, Tx},
     parameters::PublicParameters,
@@ -25,7 +25,7 @@ use tokio::{
 
 /// The main networking component of a node.
 pub struct Server {
-    pub consensus: ConsensusParameters,
+    pub consensus: ConsensusParameters<GM17Verifier>,
     pub context: Arc<Context>,
     pub storage: Arc<MerkleTreeLedger>,
     pub parameters: PublicParameters<Components>,
@@ -40,7 +40,7 @@ impl Server {
     /// Constructs a new `Server`.
     pub fn new(
         context: Context,
-        consensus: ConsensusParameters,
+        consensus: ConsensusParameters<GM17Verifier>,
         storage: Arc<MerkleTreeLedger>,
         parameters: PublicParameters<Components>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,

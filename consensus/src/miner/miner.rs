@@ -1,4 +1,4 @@
-use crate::{miner::MemoryPool, ConsensusParameters};
+use crate::{miner::MemoryPool, ConsensusParameters, POSWVerifier};
 use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters, snark::create_random_proof};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
@@ -33,19 +33,23 @@ use tokio::sync::Mutex;
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
 #[derive(Clone)]
-pub struct Miner {
+pub struct Miner<V> {
     /// Receiving address that block rewards will be sent to.
     address: AccountPublicKey<Components>,
 
     /// Parameters for current blockchain consensus.
-    pub consensus: ConsensusParameters,
+    pub consensus: ConsensusParameters<V>,
 
     pub proving_key: ProvingKey,
 }
 
-impl Miner {
+impl<V: POSWVerifier> Miner<V> {
     /// Returns a new instance of a miner with consensus params.
-    pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters, proving_key: ProvingKey) -> Self {
+    pub fn new(
+        address: AccountPublicKey<Components>,
+        consensus: ConsensusParameters<V>,
+        proving_key: ProvingKey,
+    ) -> Self {
         Self {
             address,
             consensus,
@@ -77,7 +81,7 @@ impl Miner {
         let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
-        let (records, tx) = ConsensusParameters::create_coinbase_transaction(
+        let (records, tx) = ConsensusParameters::<V>::create_coinbase_transaction(
             storage.get_latest_block_height() + 1,
             transactions,
             parameters,
