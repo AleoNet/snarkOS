@@ -6,7 +6,7 @@ mod consensus_dpc {
         ConsensusParameters,
     };
     use snarkos_dpc::{
-        base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload, BaseDPCComponents},
+        base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload},
         test_data::*,
     };
     use snarkos_models::{
@@ -14,10 +14,10 @@ mod consensus_dpc {
         objects::Ledger,
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
-    use snarkos_storage::LedgerStorage;
+    use snarkos_storage::test_data::*;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-    use rand::{thread_rng, Rng};
+    use rand::thread_rng;
 
     #[test]
     fn base_dpc_multiple_transactions() {
@@ -30,16 +30,22 @@ mod consensus_dpc {
         let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
         // Generate addresses
-        let [genesis_address, miner_address, recipient] = generate_test_accounts(&parameters, &mut rng);
+        let [genesis_account, miner_account, recipient] = generate_test_accounts(&parameters, &mut rng);
 
-        let mut path = std::env::temp_dir();
-        let random_storage_path: usize = rng.gen();
-        path.push(format!("test_multiple_transations_db{}", random_storage_path));
+        // Setup the ledger
+        let (genesis_cm, genesis_sn, genesis_memo, genesis_pred_vk_bytes, genesis_account_bytes) =
+            ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
 
-        let (ledger, genesis_pred_vk_bytes) =
-            setup_ledger(&path, &parameters, ledger_parameters, &genesis_address, &mut rng);
+        let ledger: MerkleTreeLedger = initialize_test_blockchain(
+            ledger_parameters,
+            genesis_cm,
+            genesis_sn,
+            genesis_memo,
+            genesis_pred_vk_bytes.clone(),
+            genesis_account_bytes,
+        );
 
-        let miner = Miner::new(miner_address.public_key, consensus.clone());
+        let miner = Miner::new(miner_account.public_key, consensus.clone());
 
         // Initialize the predicate values
         let new_predicate = Predicate::new(genesis_pred_vk_bytes);
@@ -76,7 +82,7 @@ mod consensus_dpc {
 
         // Add new block spending records from the previous block
 
-        let old_account_private_keys = vec![miner_address.private_key.clone(); NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![miner_account.private_key.clone(); NUM_INPUT_RECORDS];
         let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
 
         let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
@@ -89,7 +95,7 @@ mod consensus_dpc {
 
         let mut transactions = DPCTransactions::new();
 
-        println!("Create a payment transaction transaction");
+        println!("Create a payment transaction");
 
         let (spend_records, transaction) = ConsensusParameters::create_transaction(
             &parameters,
@@ -161,8 +167,6 @@ mod consensus_dpc {
             );
         }
 
-        let path = ledger.storage.storage.path().to_owned();
-        drop(ledger);
-        LedgerStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+        kill_storage(ledger);
     }
 }

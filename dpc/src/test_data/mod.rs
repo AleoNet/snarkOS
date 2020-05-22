@@ -1,15 +1,20 @@
-use crate::base_dpc::{instantiated::*, record_payload::PaymentRecordPayload, BaseDPCComponents, DPC};
+use crate::base_dpc::{
+    instantiated::*,
+    parameters::PublicParameters,
+    record_payload::PaymentRecordPayload,
+    BaseDPCComponents,
+    DPC,
+};
 use snarkos_models::{
     algorithms::CRH,
     dpc::{DPCScheme, Record},
-    objects::{AccountScheme, Ledger},
+    objects::{AccountScheme, Ledger, Transaction},
     storage::Storage,
 };
 use snarkos_objects::Account;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;
-use std::path::PathBuf;
 
 pub struct Wallet {
     pub private_key: &'static str,
@@ -68,6 +73,10 @@ pub fn setup_or_load_parameters<R: Rng>(
     (ledger_parameters, parameters)
 }
 
+pub fn load_verifying_parameters() -> PublicParameters<Components> {
+    PublicParameters::<Components>::load_vk_direct().unwrap()
+}
+
 pub fn generate_test_accounts<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
@@ -79,21 +88,25 @@ pub fn generate_test_accounts<R: Rng>(
     let genesis_account = Account::new(signature_parameters, commitment_parameters, &genesis_metadata, rng).unwrap();
 
     let metadata_1 = [2u8; 32];
-    let address_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, rng).unwrap();
+    let account_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, rng).unwrap();
 
     let metadata_2 = [3u8; 32];
-    let address_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, rng).unwrap();
+    let account_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, rng).unwrap();
 
-    [genesis_account, address_1, address_2]
+    [genesis_account, account_1, account_2]
 }
 
-pub fn setup_ledger<R: Rng>(
-    path: &PathBuf,
+pub fn ledger_genesis_setup<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-    ledger_parameters: <Components as BaseDPCComponents>::MerkleParameters,
     genesis_account: &Account<Components>,
     rng: &mut R,
-) -> (MerkleTreeLedger, Vec<u8>) {
+) -> (
+    <Tx as Transaction>::Commitment,
+    <Tx as Transaction>::SerialNumber,
+    <Tx as Transaction>::Memorandum,
+    Vec<u8>,
+    Vec<u8>,
+) {
     let genesis_sn_nonce =
         SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &[34u8; 1]).unwrap();
     let genesis_predicate_vk_bytes = to_bytes![
@@ -126,17 +139,11 @@ pub fn setup_ledger<R: Rng>(
     .unwrap();
     let genesis_memo = [0u8; 32];
 
-    // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger = MerkleTreeLedger::new(
-        &path,
-        ledger_parameters,
+    (
         genesis_record.commitment(),
-        genesis_sn.clone(),
+        genesis_sn,
         genesis_memo,
         genesis_predicate_vk_bytes.to_vec(),
         to_bytes![genesis_account].unwrap().to_vec(),
     )
-    .unwrap();
-
-    (ledger, genesis_predicate_vk_bytes)
 }

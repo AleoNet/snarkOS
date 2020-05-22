@@ -1,12 +1,13 @@
 mod consensus_blocks {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_dpc::base_dpc::instantiated::Tx;
+    use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::load_verifying_parameters};
     use snarkos_objects::Block;
+    use snarkos_storage::test_data::*;
 
     // Receive two new blocks in order.
     #[test]
     fn new_in_order() {
-        let (mut blockchain, path) = initialize_test_blockchain();
+        let (mut blockchain, _) = test_blockchain();
 
         let parameters = load_verifying_parameters();
 
@@ -45,12 +46,12 @@ mod consensus_blocks {
         let new_block_height = blockchain.get_latest_block_height();
         assert_eq!(old_block_height + 2, new_block_height);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     fn remove_latest_block() {
-        let (mut blockchain, path) = initialize_test_blockchain();
+        let (mut blockchain, _) = test_blockchain();
 
         let parameters = load_verifying_parameters();
 
@@ -77,7 +78,7 @@ mod consensus_blocks {
 
         assert_eq!(old_block_height, new_block_height);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     // TODO Implement Orphan block handling
@@ -88,7 +89,7 @@ mod consensus_blocks {
     //    // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     //    #[test]
     //    fn new_out_of_order() {
-    //        let (mut blockchain, path) = initialize_test_blockchain();
+    //        let (mut blockchain, path) = open_test_blockchain();
     //        let mut memory_pool = MemoryPool::new();
     //
     //        let consensus = TEST_CONSENSUS;
@@ -111,6 +112,6 @@ mod consensus_blocks {
     //
     //        check_block_2_balances(&blockchain);
     //
-    //        kill_storage_sync(blockchain, path);
+    //        kill_storage_sync(blockchain);
     //    }
 }

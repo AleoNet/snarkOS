@@ -213,12 +213,15 @@ impl<T: Transaction> MemoryPool<T> {
 mod tests {
     use super::*;
     use crate::test_data::*;
-    use snarkos_dpc::base_dpc::instantiated::Tx;
+    use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
     use snarkos_objects::Block;
+    use snarkos_storage::test_data::*;
+
+    use std::sync::Arc;
 
     #[test]
     fn push() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -241,12 +244,12 @@ mod tests {
         assert_eq!(1889, mem_pool.total_size);
         assert_eq!(1, mem_pool.transactions.len());
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     fn remove_entry() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -267,12 +270,12 @@ mod tests {
         assert_eq!(0, mem_pool.transactions.len());
         assert_eq!(0, mem_pool.total_size);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     fn remove_transaction_by_hash() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -295,12 +298,12 @@ mod tests {
         assert_eq!(0, mem_pool.transactions.len());
         assert_eq!(0, mem_pool.total_size);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     fn get_candidates() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -315,12 +318,12 @@ mod tests {
 
         assert!(candidates.contains(&expected_transaction));
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     fn store_memory_pool() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -339,12 +342,12 @@ mod tests {
 
         assert_eq!(mem_pool.total_size, new_mem_pool.total_size);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     fn cleanse_memory_pool() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -368,6 +371,6 @@ mod tests {
         assert_eq!(0, mem_pool.transactions.len());
         assert_eq!(0, mem_pool.total_size);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 }

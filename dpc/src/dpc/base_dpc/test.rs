@@ -19,9 +19,10 @@ use snarkos_models::{
     objects::{AccountScheme, Ledger},
 };
 use snarkos_objects::Account;
+use snarkos_storage::test_data::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
-use rand::{thread_rng, Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[test]
@@ -69,22 +70,15 @@ fn test_execute_base_dpc_constraints() {
     let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_account.private_key).unwrap();
     let genesis_memo = [0u8; 32];
 
-    let mut path = std::env::temp_dir();
-    let mut temp_rng = thread_rng();
-    let random_storage_path: usize = temp_rng.gen();
-    path.push(format!("test_execute_base_dpc_constraints{}", random_storage_path));
-
     // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger = MerkleTreeLedger::new(
-        &path,
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(
         ledger_parameters,
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
-        pred_nizk_vk_bytes.to_vec(),
+        pred_nizk_vk_bytes.clone(),
         to_bytes![genesis_account].unwrap().to_vec(),
-    )
-    .unwrap();
+    );
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
@@ -397,7 +391,5 @@ fn test_execute_base_dpc_constraints() {
 
     assert!(verify_binding_signature);
 
-    let path = ledger.storage.storage.path().to_owned();
-    drop(ledger);
-    MerkleTreeLedger::destroy_storage(path).unwrap();
+    kill_storage(ledger);
 }
