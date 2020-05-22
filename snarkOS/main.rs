@@ -17,10 +17,11 @@ use snarkos_network::{
     server::{MinerInstance, Server},
 };
 use snarkos_objects::AccountPublicKey;
+use snarkos_posw::{ProvingKey, VerifyingKey};
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{fs::File, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -40,10 +41,17 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
+    let vk_file = File::open(config.vk_path)?;
+    let vk = VerifyingKey::read(vk_file)?;
+
+    let pk_file = File::open(config.pk_path)?;
+    let pk = <ProvingKey as FromBytes>::read(pk_file)?;
+
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
+        verifying_key: vk,
     };
 
     let mut path = std::env::current_dir()?;
@@ -103,6 +111,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
 
+    let rng = rand::rngs::OsRng;
     if config.miner {
         MinerInstance::new(
             miner_address,
@@ -111,8 +120,9 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             storage.clone(),
             memory_pool_lock.clone(),
             server.context.clone(),
+            pk,
         )
-        .spawn();
+        .spawn(rng);
     }
 
     // Start server thread

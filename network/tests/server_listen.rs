@@ -41,7 +41,7 @@ mod server_listen {
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let sync_handler = SyncHandler::new(bootnode_address);
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
