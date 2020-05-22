@@ -71,6 +71,16 @@ This will generate an executable under the `./target/release` directory. To run 
 ./target/release/snarkos
 ```
 
+### 2.3b Run by Docker
+
+#### Docker build
+docker build -t snarkos:latest .
+(or docker-compose build)
+
+#### Docker run
+docker run -d -p 4130:4130 --name snarkos snarkos
+(or docker-compose up)
+
 ## 3. Usage Guide
 
 \[WIP\]
