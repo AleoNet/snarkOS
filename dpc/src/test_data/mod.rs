@@ -76,20 +76,13 @@ pub fn generate_test_accounts<R: Rng>(
     let commitment_parameters = &parameters.circuit_parameters.account_commitment;
 
     let genesis_metadata = [1u8; 32];
-    let genesis_account = Account::new(
-        signature_parameters,
-        commitment_parameters,
-        &genesis_metadata,
-        None,
-        rng,
-    )
-    .unwrap();
+    let genesis_account = Account::new(signature_parameters, commitment_parameters, &genesis_metadata, rng).unwrap();
 
     let metadata_1 = [2u8; 32];
-    let address_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, None, rng).unwrap();
+    let address_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, rng).unwrap();
 
     let metadata_2 = [3u8; 32];
-    let address_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, None, rng).unwrap();
+    let address_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, rng).unwrap();
 
     [genesis_account, address_1, address_2]
 }
