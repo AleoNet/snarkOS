@@ -1,0 +1,10 @@
+version: "3"
+services:
+    app:
+        container_name: snarkOS
+        image: snarkos:latest
+        build: .
+        ports:
+            - "4130:4130"
+        networks:
+            - default

@@ -1,11 +1,13 @@
 mod sync_integration {
     use snarkos_consensus::test_data::*;
+    use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, MerkleTreeLedger, Tx};
     use snarkos_network::{
         message::{types::*, Channel, Message},
         protocol::sync::*,
         test_data::*,
     };
     use snarkos_objects::BlockHeaderHash;
+    use snarkos_storage::test_data::*;
 
     use serial_test::serial;
     use std::sync::Arc;
@@ -17,8 +19,7 @@ mod sync_integration {
         #[tokio::test]
         #[serial]
         async fn sends_get_block() {
-            let (storage, path) = initialize_test_blockchain();
-
+            let (storage, path): (Arc<MerkleTreeLedger>, _) = test_blockchain();
             let bootnode_address = random_socket_address();
 
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
@@ -54,13 +55,13 @@ mod sync_integration {
             assert_eq!(GetBlock::name(), name);
             assert_eq!(GetBlock::new(block_hash).serialize().unwrap(), bytes);
 
-            kill_storage_async(path);
+            kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
         }
 
         #[tokio::test]
         #[serial]
         async fn sends_get_sync() {
-            let (storage, path) = initialize_test_blockchain();
+            let (storage, path): (Arc<MerkleTreeLedger>, _) = test_blockchain();
 
             let bootnode_address = random_socket_address();
 
@@ -93,7 +94,7 @@ mod sync_integration {
             assert_eq!(GetSync::name(), name);
             assert_eq!(GetSync::new(vec![]).serialize().unwrap(), bytes);
 
-            kill_storage_async(path);
+            kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
         }
     }
 }

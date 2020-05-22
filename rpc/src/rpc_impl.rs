@@ -324,7 +324,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_add() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        assert_eq!(rpc.request("add", &[1, 2]), r#"3"#);
@@ -335,7 +335,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_block_call() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        assert_eq!(
@@ -349,7 +349,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_block_count() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        let method = "getblockcount".to_string();
@@ -363,7 +363,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_best_block_hash() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        let method = "getbestblockhash".to_string();
@@ -377,7 +377,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_block_hash() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        assert_eq!(rpc.request("getblockhash", &[0u32]), format![
@@ -391,7 +391,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_raw_transaction() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        assert_eq!(rpc.request("getrawtransaction", &[GENESIS_TRANSACTION_ID]), format![
@@ -405,7 +405,7 @@ impl RpcImpl {}
 //
 ////    #[test]
 ////    fn test_create_raw_transaction() {
-////        let (storage, path) = initialize_test_blockchain();
+////        let (storage, path) = open_test_blockchain();
 ////        let rpc = initialize_test_rpc(storage);
 ////
 ////        let inputs = RPCTransactionOutpoint {
@@ -429,7 +429,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_decode_raw_transaction() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        assert_eq!(
@@ -443,7 +443,7 @@ impl RpcImpl {}
 //
 ////    #[test]
 ////    fn test_send_raw_transaction() {
-////        let (storage, path) = initialize_test_blockchain();
+////        let (storage, path) = open_test_blockchain();
 ////        let rpc = initialize_test_rpc(storage);
 ////
 ////        assert_eq!(
@@ -457,7 +457,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_connection_count() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        let method = "getconnectioncount".to_string();
@@ -471,7 +471,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_peer_info() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        let method = "getpeerinfo".to_string();
@@ -489,7 +489,7 @@ impl RpcImpl {}
 //
 //    #[test]
 //    fn test_get_block_template() {
-//        let (storage, path) = initialize_test_blockchain();
+//        let (storage, path) = open_test_blockchain();
 //        let rpc = initialize_test_rpc(storage);
 //
 //        let method = "getblocktemplate".to_string();
