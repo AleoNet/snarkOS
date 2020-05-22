@@ -19,9 +19,9 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 derivative = { version = "1" }
-digest = { version = "0.7" }
+digest = { version = "0.8.1" }
 
 [dev-dependencies]
-blake2 = { version = "0.7" }
+blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
 rand_xorshift = { version = "0.2" }

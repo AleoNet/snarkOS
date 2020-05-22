@@ -1,7 +1,7 @@
 use snarkos_errors::algorithms::PRFError;
 use snarkos_models::algorithms::PRF;
 
-use blake2::Blake2s as b2s;
+use blake2::Blake2s as blake2s;
 use digest::Digest;
 
 #[derive(Clone)]
@@ -14,7 +14,7 @@ impl PRF for Blake2s {
 
     fn evaluate(seed: &Self::Seed, input: &Self::Input) -> Result<Self::Output, PRFError> {
         let eval_time = start_timer!(|| "Blake2s::Eval");
-        let mut h = b2s::new();
+        let mut h = blake2s::new();
         h.input(seed.as_ref());
         h.input(input.as_ref());
 
