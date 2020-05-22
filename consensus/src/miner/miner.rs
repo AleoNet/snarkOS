@@ -119,9 +119,9 @@ impl<V: POSWVerifier> Miner<V> {
 
     /// Run proof of work to find block.
     /// Returns BlockHeader with nonce solution.
-    pub fn find_block<R: Rng>(
+    pub fn find_block<R: Rng, T: Transaction>(
         &self,
-        transactions: &DPCTransactions<Tx>,
+        transactions: &DPCTransactions<T>,
         parent_header: &BlockHeader,
         rng: &mut R,
     ) -> Result<BlockHeader, ConsensusError> {
@@ -216,5 +216,33 @@ impl<V: POSWVerifier> Miner<V> {
         storage.store_records(&coinbase_records)?;
 
         Ok((block.serialize()?, coinbase_records))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{miner::Miner, test_data::*};
+    use snarkos_dpc::dpc::base_dpc::instantiated::Components;
+    use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, BlockHeader};
+    use snarkos_storage::genesis::*;
+    use snarkos_utilities::bytes::FromBytes;
+
+    // this test ensures that a block is found by running the proof of work
+    // and that it doesnt loop forever
+    fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
+        let consensus = TEST_CONSENSUS.clone();
+        let miner_address = AccountPublicKey::<Components>::read(&GENESIS_ACCOUNT[..]).unwrap();
+        let miner = Miner::new(miner_address, consensus, POSW_PP.0.clone());
+        let mut rng = rand::thread_rng();
+
+        let header = miner.find_block(transactions, parent_header, &mut rng).unwrap();
+        assert_eq!(header.nonce, 2326363551);
+    }
+
+    #[test]
+    fn find_valid_block() {
+        let transactions = DPCTransactions(vec![TestTx; 3]);
+        let parent_header = genesis().header;
+        test_find_block(&transactions, &parent_header);
     }
 }
