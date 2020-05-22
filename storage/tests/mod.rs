@@ -6,10 +6,9 @@ use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
-use snarkos_storage::LedgerStorage;
-use std::sync::Arc;
+use snarkos_storage::{test_data::*, LedgerStorage};
 
-pub const TEST_DB_PATH: &str = "./test_db";
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
@@ -75,49 +74,24 @@ define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBl
 
 type Store = LedgerStorage<TestTx, TestMerkleParams>;
 
-pub fn initialize_test_blockchain() -> (Arc<Store>, PathBuf) {
-    let mut path = std::env::temp_dir();
-    path.push(random_storage_path());
-
-    Store::destroy_storage(path.clone()).unwrap();
-
-    let blockchain = Arc::new(Store::open_at_path(path.clone()).unwrap());
-
-    (blockchain, path)
-}
-
-pub fn random_storage_path() -> String {
-    let ptr = Box::into_raw(Box::new(123));
-    format!("{}{}", TEST_DB_PATH, ptr as usize)
-}
-
-pub fn kill_storage_async(path: PathBuf) {
-    Store::destroy_storage(path).unwrap();
-}
-
-pub fn kill_storage_sync(storage: Arc<Store>, path: PathBuf) {
-    drop(storage);
-    Store::destroy_storage(path).unwrap();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     pub fn test_initialize_blockchain() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<Store>, _) = test_blockchain();
 
         assert_eq!(blockchain.get_latest_block_height(), 0);
 
         let _latest_block = blockchain.get_latest_block().unwrap();
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     pub fn remove_decrements_height() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<Store>, _) = test_blockchain();
 
         assert_eq!(blockchain.get_latest_block_height(), 0);
 
@@ -140,12 +114,12 @@ mod tests {
         blockchain.remove_latest_block().unwrap();
         assert_eq!(blockchain.get_latest_block_height(), 0);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     pub fn test_storage() {
-        let (blockchain, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<Store>, _) = test_blockchain();
 
         blockchain.storage.storage.put(b"my key", b"my value").unwrap();
 
@@ -157,31 +131,31 @@ mod tests {
 
         assert!(blockchain.storage.storage.get(b"my key").is_ok());
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     pub fn test_storage_memory_pool() {
-        let (storage, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<Store>, _) = test_blockchain();
         let transactions_serialized = vec![0u8];
 
-        assert!(storage.store_to_memory_pool(transactions_serialized.clone()).is_ok());
-        assert!(storage.get_memory_pool().is_ok());
-        assert_eq!(transactions_serialized, storage.get_memory_pool().unwrap());
+        assert!(blockchain.store_to_memory_pool(transactions_serialized.clone()).is_ok());
+        assert!(blockchain.get_memory_pool().is_ok());
+        assert_eq!(transactions_serialized, blockchain.get_memory_pool().unwrap());
 
-        kill_storage_sync(storage, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
     pub fn test_storage_peer_book() {
-        let (storage, path) = initialize_test_blockchain();
+        let (blockchain, _): (Arc<Store>, _) = test_blockchain();
         let peers_serialized = vec![0u8];
 
-        assert!(storage.store_to_peer_book(peers_serialized.clone()).is_ok());
-        assert!(storage.get_peer_book().is_ok());
-        assert_eq!(peers_serialized, storage.get_peer_book().unwrap());
+        assert!(blockchain.store_to_peer_book(peers_serialized.clone()).is_ok());
+        assert!(blockchain.get_peer_book().is_ok());
+        assert_eq!(peers_serialized, blockchain.get_peer_book().unwrap());
 
-        kill_storage_sync(storage, path);
+        kill_storage_sync(blockchain);
     }
 
     #[test]
@@ -197,33 +171,33 @@ mod tests {
 
         #[test]
         pub fn test_invalid_block_addition() {
-            let (blockchain, path) = initialize_test_blockchain();
+            let (blockchain, _): (Arc<Store>, _) = test_blockchain();
 
             let latest_block = blockchain.get_latest_block().unwrap();
 
             assert!(blockchain.insert_block(&latest_block).is_err());
 
-            kill_storage_sync(blockchain, path);
+            kill_storage_sync(blockchain);
         }
 
         #[test]
         pub fn test_invalid_block_removal() {
-            let (blockchain, path) = initialize_test_blockchain();
+            let (blockchain, _): (Arc<Store>, _) = test_blockchain();
 
             assert!(blockchain.remove_latest_block().is_err());
             assert!(blockchain.remove_latest_blocks(5).is_err());
 
-            kill_storage_sync(blockchain, path);
+            kill_storage_sync(blockchain);
         }
 
         #[test]
         pub fn test_invalid_block_retrieval() {
-            let (blockchain, path) = initialize_test_blockchain();
+            let (blockchain, _): (Arc<Store>, _) = test_blockchain();
 
             assert!(blockchain.get_block_from_block_num(2).is_err());
             assert!(blockchain.get_block_from_block_num(10).is_err());
 
-            kill_storage_sync(blockchain, path);
+            kill_storage_sync(blockchain);
         }
     }
 }

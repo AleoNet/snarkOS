@@ -5,18 +5,13 @@ mod consensus_dpc {
         test_data::*,
         ConsensusParameters,
     };
-    use snarkos_dpc::base_dpc::{
-        instantiated::*,
-        record::DPCRecord,
-        record_payload::PaymentRecordPayload,
-        BaseDPCComponents,
-    };
+    use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload};
     use snarkos_models::{
         dpc::{DPCScheme, Record},
         objects::Ledger,
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
-    use snarkos_storage::LedgerStorage;
+    use snarkos_storage::test_data::*;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
     #[test]
@@ -75,7 +70,7 @@ mod consensus_dpc {
         let auxiliary = [5u8; 32];
         let memo = [6u8; 32];
 
-        println!("Create a payment transaction transaction");
+        println!("Create a payment transaction");
         // Create the transaction
         let (spend_records, transaction) = ConsensusParameters::create_transaction(
             &parameters,
@@ -144,8 +139,6 @@ mod consensus_dpc {
             );
         }
 
-        let path = ledger.storage.storage.path().to_owned();
-        drop(ledger);
-        LedgerStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+        kill_storage(ledger);
     }
 }

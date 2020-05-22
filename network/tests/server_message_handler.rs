@@ -1,12 +1,16 @@
 mod server_message_handler {
     use snarkos_consensus::{miner::Entry, test_data::*};
-    use snarkos_dpc::base_dpc::instantiated::Tx;
+    use snarkos_dpc::{
+        base_dpc::instantiated::{CommitmentMerkleParameters, Tx},
+        test_data::load_verifying_parameters,
+    };
     use snarkos_network::{
         message::{types::*, Channel, Message},
         test_data::*,
         PingState,
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
+    use snarkos_storage::test_data::*;
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,
@@ -22,7 +26,7 @@ mod server_message_handler {
     fn receive_block_message() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         let storage_ref = storage.clone();
@@ -70,7 +74,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -78,7 +82,7 @@ mod server_message_handler {
     fn receive_get_block() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         let genesis_block = storage.get_block_from_block_num(0).unwrap();
@@ -134,7 +138,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -142,7 +146,7 @@ mod server_message_handler {
     fn receive_sync_block() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         let storage_ref = Arc::clone(&storage);
@@ -193,7 +197,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -201,7 +205,7 @@ mod server_message_handler {
     fn receive_get_sync() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -275,7 +279,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -283,7 +287,7 @@ mod server_message_handler {
     fn receive_sync() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -342,7 +346,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -350,7 +354,7 @@ mod server_message_handler {
     fn receive_transaction() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -402,7 +406,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -410,7 +414,7 @@ mod server_message_handler {
     fn receive_get_memory_pool_empty() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -452,7 +456,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -460,7 +464,7 @@ mod server_message_handler {
     fn receive_get_memory_pool_normal() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -525,7 +529,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -533,7 +537,7 @@ mod server_message_handler {
     fn receive_memory_pool() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -584,7 +588,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -592,7 +596,7 @@ mod server_message_handler {
     fn receive_get_peers() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -647,7 +651,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -655,7 +659,7 @@ mod server_message_handler {
     fn receive_peers() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -703,7 +707,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -711,7 +715,7 @@ mod server_message_handler {
     fn receive_ping() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -762,7 +766,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -770,7 +774,7 @@ mod server_message_handler {
     fn receive_pong_unknown() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -816,7 +820,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -824,7 +828,7 @@ mod server_message_handler {
     fn receive_pong_rejected() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -896,7 +900,7 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
@@ -904,7 +908,7 @@ mod server_message_handler {
     fn receive_pong_accepted() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -978,6 +982,6 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 }

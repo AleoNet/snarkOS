@@ -1,50 +1,17 @@
-mod fixture;
-pub use fixture::*;
+use crate::ConsensusParameters;
+use snarkos_dpc::base_dpc::instantiated::*;
 
 mod e2e;
 pub use e2e::*;
 
-use crate::ConsensusParameters;
-
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
-use std::{path::PathBuf, sync::Arc};
+mod fixture;
+pub use fixture::*;
 
 pub const TEST_CONSENSUS: ConsensusParameters = ConsensusParameters {
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
 };
-
-pub const TEST_DB_PATH: &str = "./test_db";
-
-pub fn random_storage_path() -> String {
-    let ptr = Box::into_raw(Box::new(123));
-    format!("{}{}", TEST_DB_PATH, ptr as usize)
-}
-
-pub fn initialize_test_blockchain() -> (Arc<MerkleTreeLedger>, PathBuf) {
-    let mut path = std::env::temp_dir();
-    path.push(random_storage_path());
-
-    MerkleTreeLedger::destroy_storage(path.clone()).unwrap();
-
-    let blockchain = Arc::new(MerkleTreeLedger::open_at_path(path.clone()).unwrap());
-
-    (blockchain, path)
-}
-
-pub fn load_verifying_parameters() -> PublicParameters<Components> {
-    PublicParameters::<Components>::load_vk_direct().unwrap()
-}
-
-pub fn kill_storage_async(path: PathBuf) {
-    MerkleTreeLedger::destroy_storage(path).unwrap();
-}
-
-pub fn kill_storage_sync(storage: Arc<MerkleTreeLedger>, path: PathBuf) {
-    drop(storage);
-    MerkleTreeLedger::destroy_storage(path).unwrap();
-}
 
 pub struct Wallet {
     pub private_key: &'static str,

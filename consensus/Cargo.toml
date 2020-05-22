@@ -24,9 +24,9 @@ bincode = { version="1.2.0" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
 log = { version = "0.4.8" }
-once_cell = "1.4.0"
+once_cell = { version = "1.4.0" }
 rand = { version = "0.7.3" }
-rand_xorshift = "0.2.0"
+rand_xorshift = { version = "0.2.0" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.13", features = ["full"] }
 

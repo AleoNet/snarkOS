@@ -18,10 +18,10 @@ use snarkos_models::{
     objects::Ledger,
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
-use snarkos_storage::LedgerStorage;
+use snarkos_storage::test_data::*;
 use snarkos_utilities::rand::UniformRand;
 
-use rand::{thread_rng, Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -35,14 +35,18 @@ fn base_dpc_integration_test() {
     // Generate accounts
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
-    let mut path = std::env::temp_dir();
-    let mut temp_rng = thread_rng();
-    let random_storage_path: usize = temp_rng.gen();
-    path.push(format!("test_execute_base_dpc_constraints-{}", random_storage_path));
-
     // Setup the ledger
-    let (ledger, genesis_pred_vk_bytes) =
-        setup_ledger(&path, &parameters, ledger_parameters, &genesis_account, &mut rng);
+    let (genesis_cm, genesis_sn, genesis_memo, genesis_pred_vk_bytes, genesis_account_bytes) =
+        ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
+
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(
+        ledger_parameters,
+        genesis_cm,
+        genesis_sn,
+        genesis_memo,
+        genesis_pred_vk_bytes.clone(),
+        genesis_account_bytes,
+    );
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
@@ -272,7 +276,5 @@ fn base_dpc_integration_test() {
     ledger.insert_block(&block).unwrap();
     assert_eq!(ledger.len(), 2);
 
-    let path = ledger.storage.storage.path().to_owned();
-    drop(ledger);
-    LedgerStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+    kill_storage(&ledger);
 }

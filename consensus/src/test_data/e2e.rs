@@ -1,11 +1,9 @@
 use super::*;
-
 use crate::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
-
-use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload};
+use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::PaymentRecordPayload};
 use snarkos_models::dpc::{DPCScheme, Record};
 use snarkos_objects::{
     dpc::DPCTransactions,
@@ -210,8 +208,8 @@ fn mine_block(
     (block, coinbase_records)
 }
 
-// spends some value from inputs owned by the sender, to the receiver, and pays back whatever we
-// are left with
+/// Spends some value from inputs owned by the sender, to the receiver,
+/// and pays back whatever we are left with.
 fn send<R: Rng>(
     ledger: &MerkleTreeLedger,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
