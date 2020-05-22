@@ -25,7 +25,7 @@ mod server_message_handler {
     #[serial]
     fn receive_block_message() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -81,7 +81,7 @@ mod server_message_handler {
     #[serial]
     fn receive_get_block() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -145,7 +145,7 @@ mod server_message_handler {
     #[serial]
     fn receive_sync_block() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -204,7 +204,7 @@ mod server_message_handler {
     #[serial]
     fn receive_get_sync() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -286,7 +286,7 @@ mod server_message_handler {
     #[serial]
     fn receive_sync() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -353,7 +353,7 @@ mod server_message_handler {
     #[serial]
     fn receive_transaction() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -413,7 +413,7 @@ mod server_message_handler {
     #[serial]
     fn receive_get_memory_pool_empty() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -463,7 +463,7 @@ mod server_message_handler {
     #[serial]
     fn receive_get_memory_pool_normal() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -536,7 +536,7 @@ mod server_message_handler {
     #[serial]
     fn receive_memory_pool() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -595,7 +595,7 @@ mod server_message_handler {
     #[serial]
     fn receive_get_peers() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -658,7 +658,7 @@ mod server_message_handler {
     #[serial]
     fn receive_peers() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -714,7 +714,7 @@ mod server_message_handler {
     #[serial]
     fn receive_ping() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -773,7 +773,7 @@ mod server_message_handler {
     #[serial]
     fn receive_pong_unknown() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -827,7 +827,7 @@ mod server_message_handler {
     #[serial]
     fn receive_pong_rejected() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -907,7 +907,7 @@ mod server_message_handler {
     #[serial]
     fn receive_pong_accepted() {
         let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 

@@ -11,6 +11,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 pub static FIXTURE: Lazy<Fixture> = Lazy::new(|| setup(false));
+pub static FIXTURE_VK: Lazy<Fixture> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
 pub struct Fixture {

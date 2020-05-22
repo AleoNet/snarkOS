@@ -121,7 +121,7 @@ fn generate_or_load_test_data() -> TestData {
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
-    let [miner_acc, acc1, acc2] = FIXTURE.test_accounts.clone();
+    let [miner_acc, acc1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     let consensus = TEST_CONSENSUS;
 
@@ -132,8 +132,8 @@ fn generate_or_load_test_data() -> TestData {
     // mine an empty block
     let (block1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
 
-    // make a tx which spends 10 to the receiver
-    let (records1, tx1) = send(
+    // make a tx which spends 10 to the BaseDPCComponentsreceiver
+    let (_records1, tx1) = send(
         &ledger,
         &parameters,
         &miner_acc,

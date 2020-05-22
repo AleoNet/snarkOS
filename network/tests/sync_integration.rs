@@ -19,7 +19,7 @@ mod sync_integration {
         #[tokio::test]
         #[serial]
         async fn sends_get_block() {
-            let storage = Arc::new(FIXTURE.ledger());
+            let storage = Arc::new(FIXTURE_VK.ledger());
             let path = storage.storage.storage.path().to_owned();
             let bootnode_address = random_socket_address();
 
@@ -62,7 +62,7 @@ mod sync_integration {
         #[tokio::test]
         #[serial]
         async fn sends_get_sync() {
-            let storage = Arc::new(FIXTURE.ledger());
+            let storage = Arc::new(FIXTURE_VK.ledger());
             let path = storage.storage.storage.path().to_owned();
 
             let bootnode_address = random_socket_address();

@@ -66,7 +66,7 @@ mod server_listen {
     #[test]
     #[serial]
     fn bind_to_port() {
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -101,7 +101,7 @@ mod server_listen {
     #[test]
     #[serial]
     fn startup_handshake_bootnode() {
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
@@ -165,7 +165,7 @@ mod server_listen {
     #[test]
     #[serial]
     fn startup_handshake_stored_peers() {
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
