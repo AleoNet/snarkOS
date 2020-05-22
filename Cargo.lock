@@ -1964,7 +1964,7 @@ dependencies = [
  "criterion",
  "csv",
  "derivative",
- "digest 0.7.6",
+ "digest 0.8.1",
  "rand",
  "rand_chacha",
  "rand_xorshift",
@@ -1982,7 +1982,6 @@ dependencies = [
 name = "snarkos-benchmarks"
 version = "0.8.0"
 dependencies = [
- "blake2",
  "criterion",
  "csv",
  "derivative",
@@ -2083,7 +2082,7 @@ version = "0.8.0"
 dependencies = [
  "blake2",
  "derivative",
- "digest 0.7.6",
+ "digest 0.8.1",
  "rand",
  "rand_xorshift",
  "snarkos-algorithms",

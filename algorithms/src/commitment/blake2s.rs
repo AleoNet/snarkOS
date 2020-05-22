@@ -2,7 +2,7 @@ use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{algorithms::CommitmentScheme, storage::Storage};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use blake2::Blake2s as b2s;
+use blake2::Blake2s as blake2s;
 use digest::Digest;
 use rand::Rng;
 use std::{
@@ -23,7 +23,7 @@ impl CommitmentScheme for Blake2sCommitment {
     }
 
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
-        let mut h = b2s::new();
+        let mut h = blake2s::new();
         h.input(input);
         h.input(randomness.as_ref());
 

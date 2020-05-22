@@ -22,9 +22,9 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
-blake2 = { version = "0.8" }
+blake2 = { version = "0.8.1" }
 derivative = { version = "1" }
-digest = { version = "0.7" }
+digest = { version = "0.8.1" }
 rand = { version = "0.7" }
 rand_chacha = { version = "0.2.2" }
 rayon = { version = "1" }
