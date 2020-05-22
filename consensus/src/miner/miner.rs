@@ -1,12 +1,23 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
-use snarkos_algorithms::merkle_tree::MerkleParameters;
+use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters, snark::create_random_proof};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
+use snarkos_objects::{
+    dpc::DPCTransactions,
+    merkle_root,
+    pedersen_merkle_root,
+    AccountPublicKey,
+    Block,
+    BlockHeader,
+    MerkleRootHash,
+    ProofOfSuccinctWork,
+};
+use snarkos_posw::{ProvingKey, POSW};
+use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::LedgerStorage;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -28,12 +39,18 @@ pub struct Miner {
 
     /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
+
+    pub proving_key: ProvingKey,
 }
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
-    pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters) -> Self {
-        Self { address, consensus }
+    pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters, proving_key: ProvingKey) -> Self {
+        Self {
+            address,
+            consensus,
+            proving_key,
+        }
     }
 
     /// Fetches new transactions from the memory pool.
@@ -98,45 +115,73 @@ impl Miner {
 
     /// Run proof of work to find block.
     /// Returns BlockHeader with nonce solution.
-    pub fn find_block(
+    pub fn find_block<R: Rng>(
         &self,
         transactions: &DPCTransactions<Tx>,
         parent_header: &BlockHeader,
+        rng: &mut R,
     ) -> Result<BlockHeader, ConsensusError> {
+        let transaction_ids = transactions.to_transaction_ids()?;
+
         let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transactions.to_transaction_ids()?));
+        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+
+        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
 
         let time = Utc::now().timestamp();
+        let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
+
+        let mut nonce;
+        let mut proof;
+        loop {
+            nonce = rng.gen_range(0, self.consensus.max_nonce);
+            proof = {
+                // instantiate the circuit with the nonce
+                let circuit = POSW::new(nonce, &transaction_ids);
+
+                // generate the proof
+                let proof_timer = start_timer!(|| "POSW proof");
+                let proof = create_random_proof(circuit, &self.proving_key, rng)?;
+                end_timer!(proof_timer);
+
+                // serialize it
+                let proof_bytes = to_bytes![proof]?;
+                let mut p = [0; ProofOfSuccinctWork::size()];
+                p.copy_from_slice(&proof_bytes);
+                ProofOfSuccinctWork(p)
+            };
+
+            // Hash the proof and parse it as a u64
+            // TODO: replace u64 with bigint
+            let hash_result = sha256d_to_u64(&proof.0[..]);
+
+            // if it passes the difficulty chec, use the proof/nonce pairs and return the header
+            if hash_result <= difficulty_target {
+                break;
+            }
+        }
 
         let header = BlockHeader {
             merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+            pedersen_merkle_root_hash: pedersen_merkle_root,
             previous_block_hash: parent_header.get_hash(),
             time,
-            difficulty_target: self.consensus.get_block_difficulty(parent_header, time),
-            nonce: 0u32,
+            difficulty_target,
+            nonce,
+            proof,
         };
 
-        let mut hash_input = header.serialize();
-
-        loop {
-            let nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
-
-            hash_input[80..84].copy_from_slice(&nonce.to_le_bytes());
-            let hash_result = BlockHeader::deserialize(&hash_input).to_difficulty_hash();
-
-            if hash_result <= header.difficulty_target {
-                return Ok(BlockHeader::deserialize(&hash_input));
-            }
-        }
+        Ok(header)
     }
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(
+    pub async fn mine_block<R: Rng>(
         &self,
         parameters: &PublicParameters<Components>,
         storage: &Arc<MerkleTreeLedger>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
+        rng: &mut R,
     ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
         let mut candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
@@ -153,7 +198,7 @@ impl Miner {
             println!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
         }
 
-        let header = self.find_block(&transactions, &previous_block_header)?;
+        let header = self.find_block(&transactions, &previous_block_header, rng)?;
 
         println!("Miner found block block");
 

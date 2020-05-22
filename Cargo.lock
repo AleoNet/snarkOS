@@ -1999,6 +1999,8 @@ dependencies = [
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-posw",
+ "snarkos-profiler",
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.2.21",

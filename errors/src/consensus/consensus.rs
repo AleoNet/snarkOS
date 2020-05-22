@@ -22,6 +22,9 @@ pub enum ConsensusError {
     #[error("A coinbase transaction already exists in the block")]
     CoinbaseTransactionAlreadyExists(),
 
+    #[error(transparent)]
+    ConstraintFieldError(#[from] crate::curves::ConstraintFieldError),
+
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
@@ -61,11 +64,20 @@ pub enum ConsensusError {
     #[error("expected {:?} actual {:?}", _0, _1)]
     NoParent(String, String),
 
+    #[error(
+        "block transactions do not hash to the correct pedersen hash to merkle root {:?}",
+        _0
+    )]
+    PedersenMerkleRoot(String),
+
     #[error("header greater than difficulty target {:?} actual {:?}", _0, _1)]
     PowInvalid(u64, u64),
 
     #[error("{}", _0)]
     StorageError(StorageError),
+
+    #[error(transparent)]
+    SynthesisError(#[from] crate::gadgets::SynthesisError),
 
     #[error("timestamp {:?} is less than parent timestamp {:?}", _0, _1)]
     TimestampInvalid(i64, i64),
@@ -75,6 +87,9 @@ pub enum ConsensusError {
 
     #[error("Transactions are spending more funds than they have available")]
     TransactionOverspending,
+
+    #[error("POSW Verification failed")]
+    PoswVerificationFailed,
 }
 
 impl From<BlockError> for ConsensusError {

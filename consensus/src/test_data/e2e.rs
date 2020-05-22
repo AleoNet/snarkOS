@@ -13,6 +13,8 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -48,6 +50,8 @@ pub fn genesis() -> Block<Tx> {
         time: 0,
         difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
         nonce: 0,
+        pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+        proof: ProofOfSuccinctWork::default(),
     };
 
     let genesis_block = Block {
@@ -121,14 +125,22 @@ fn setup_and_store_test_data() -> TestData {
     let ledger = FIXTURE.ledger();
     let [miner_acc, acc1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    let consensus = TEST_CONSENSUS;
+    let consensus = TEST_CONSENSUS.clone();
 
     // setup the miner
-    let miner = Miner::new(miner_acc.public_key.clone(), consensus.clone());
+    let miner = Miner::new(miner_acc.public_key.clone(), consensus.clone(), POSW_PP.0.clone());
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (block1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
+    let (block1, coinbase_records) = mine_block(
+        &miner,
+        &ledger,
+        &parameters,
+        &consensus,
+        &mut memory_pool,
+        &mut rng,
+        vec![],
+    );
 
     // make a tx which spends 10 to the BaseDPCComponentsreceiver
     let (_records1, tx1) = send(
@@ -142,7 +154,15 @@ fn setup_and_store_test_data() -> TestData {
     );
 
     // mine the block
-    let (block2, coinbase_records2) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx1]);
+    let (block2, coinbase_records2) = mine_block(
+        &miner,
+        &ledger,
+        &parameters,
+        &consensus,
+        &mut memory_pool,
+        &mut rng,
+        vec![tx1],
+    );
 
     let test_data = TestData {
         block1,
@@ -158,12 +178,13 @@ fn setup_and_store_test_data() -> TestData {
     test_data
 }
 
-fn mine_block(
+fn mine_block<R: Rng>(
     miner: &Miner,
     ledger: &MerkleTreeLedger,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     consensus: &ConsensusParameters,
     memory_pool: &mut MemoryPool<Tx>,
+    rng: &mut R,
     txs: Vec<Tx>,
 ) -> (Block<Tx>, Vec<DPCRecord<Components>>) {
     let transactions = DPCTransactions(txs);
@@ -171,7 +192,7 @@ fn mine_block(
     let (previous_block_header, transactions, coinbase_records) =
         miner.establish_block(&parameters, ledger, &transactions).unwrap();
 
-    let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+    let header = miner.find_block(&transactions, &previous_block_header, rng).unwrap();
 
     let block = Block { header, transactions };
 
