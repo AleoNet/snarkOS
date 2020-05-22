@@ -8,11 +8,12 @@ mod consensus_integration {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<Tx>, parent_header: &BlockHeader) {
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
         let miner_address: AccountPublicKey<Components> = FromBytes::read(&GENESIS_ACCOUNT[..]).unwrap();
-        let miner = Miner::new(miner_address, consensus);
+        let miner = Miner::new(miner_address, consensus, POSW_PP.0.clone());
+        let mut rng = FIXTURE.rng.clone();
 
-        let header = miner.find_block(transactions, parent_header).unwrap();
+        let header = miner.find_block(transactions, parent_header, &mut rng).unwrap();
 
         let expected_prev_block_hash = parent_header.get_hash();
         assert_eq!(header.previous_block_hash, expected_prev_block_hash);

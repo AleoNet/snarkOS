@@ -4,6 +4,7 @@ mod consensus_dpc {
         miner::{MemoryPool, Miner},
         test_data::*,
         ConsensusParameters,
+        GM17Verifier,
     };
     use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload};
     use snarkos_models::{
@@ -22,14 +23,16 @@ mod consensus_dpc {
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
         let mut rng = FIXTURE.rng.clone();
 
-        let consensus = TEST_CONSENSUS;
-        let miner = Miner::new(miner_acc.public_key, consensus.clone());
+        let consensus = TEST_CONSENSUS.clone();
+        let miner = Miner::new(miner_acc.public_key, consensus.clone(), POSW_PP.0.clone());
 
         println!("Creating block with coinbase transaction");
         let transactions = DPCTransactions::<Tx>::new();
         let (previous_block_header, transactions, coinbase_records) =
             miner.establish_block(&parameters, &ledger, &transactions).unwrap();
-        let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+        let header = miner
+            .find_block(&transactions, &previous_block_header, &mut rng)
+            .unwrap();
         let block = Block { header, transactions };
 
         assert!(InstantiatedDPC::verify_transactions(&parameters, &block.transactions, &ledger).unwrap());
@@ -72,7 +75,7 @@ mod consensus_dpc {
 
         println!("Create a payment transaction");
         // Create the transaction
-        let (spend_records, transaction) = ConsensusParameters::create_transaction(
+        let (spend_records, transaction) = ConsensusParameters::<GM17Verifier>::create_transaction(
             &parameters,
             old_records,
             old_account_private_keys,
@@ -105,7 +108,9 @@ mod consensus_dpc {
 
         assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions, &ledger).unwrap());
 
-        let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+        let header = miner
+            .find_block(&transactions, &previous_block_header, &mut rng)
+            .unwrap();
         let new_block = Block { header, transactions };
         let new_block_reward = get_block_reward(ledger.len() as u32);
 

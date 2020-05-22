@@ -3,7 +3,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use snarkos_algorithms::snark::generate_random_parameters;
 use snarkos_objects::pedersen_merkle_tree::PARAMS;
-use std::{marker::PhantomData, path::PathBuf};
+use std::marker::PhantomData;
 
 use snarkos_models::storage::Storage;
 use snarkos_posw::{ProvingKey, VerifyingKey, POSW};
@@ -11,8 +11,10 @@ use snarkos_profiler::{end_timer, start_timer};
 
 // Public parameters for the POSW SNARK
 pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
-    let test_pk_path = PathBuf::from("test_posw.params");
-    let test_vk_path = PathBuf::from("test_posw_vk.params");
+    let mut path = std::env::current_dir().unwrap();
+    path.push("../consensus/src/test_data/");
+    let test_pk_path = path.clone().join("test_posw.params");
+    let test_vk_path = path.clone().join("test_posw_vk.params");
     let generation_timer = start_timer!(|| "POSW setup");
 
     let (params, vk) = if test_pk_path.exists() {

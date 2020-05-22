@@ -589,12 +589,12 @@ mod tests {
     impl POSWVerifier for TestVerifier {
         fn verify_proof(
             &self,
-            nonce: u32,
-            proof: &ProofOfSuccinctWork,
-            pedersen_merkle_root: &PedersenMerkleRootHash,
+            _nonce: u32,
+            _proof: &ProofOfSuccinctWork,
+            _pedersen_merkle_root: &PedersenMerkleRootHash,
         ) -> Result<(), ConsensusError> {
             if self.should_fail {
-                ConsensusError::PoswVerificationFailed
+                Err(ConsensusError::PoswVerificationFailed)
             } else {
                 Ok(())
             }
@@ -603,11 +603,11 @@ mod tests {
 
     #[test]
     fn verify_header() {
-        let consensus: ConsensusParameters = ConsensusParameters {
+        let mut consensus = ConsensusParameters {
             max_block_size: 1_000_000usize,
             max_nonce: 1000,
             target_block_time: 2i64, //unix seconds
-            verifier: TestVerifier,
+            verifier: TestVerifier { should_fail: false },
         };
 
         let h1 = BlockHeader {
@@ -617,48 +617,77 @@ mod tests {
             nonce: 100,
             time: 9999999,
             proof: ProofOfSuccinctWork::default(),
-            pedersen_merkle_root_hash: MerkleRootHash([1; 32]),
+            pedersen_merkle_root_hash: PedersenMerkleRootHash([1; 32]),
         };
         let h1_clone = h1.clone();
 
         let merkle_root_hash = MerkleRootHash([2; 32]);
+        let pedersen_merkle_root_hash = PedersenMerkleRootHash([8; 32]);
         let h2 = BlockHeader {
             previous_block_hash: h1.get_hash(),
             merkle_root_hash: merkle_root_hash.clone(),
+            pedersen_merkle_root_hash: pedersen_merkle_root_hash.clone(),
             ..h1_clone
         };
 
         // OK
-        consensus.verify_header(&h2, &h1, &merkle_root_hash).unwrap();
+        consensus
+            .verify_header(&h2, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap();
 
         // invalid parent hash
         let mut h2_err = h2.clone();
         h2_err.previous_block_hash = BlockHeaderHash([9; 32]);
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
 
         // invalid merkle root hash
         let mut h2_err = h2.clone();
         h2_err.merkle_root_hash = MerkleRootHash([3; 32]);
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
+
+        // invalid pedersen merkle root hash
+        let mut h2_err = h2.clone();
+        h2_err.pedersen_merkle_root_hash = PedersenMerkleRootHash([3; 32]);
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
 
         // past block
         let mut h2_err = h2.clone();
         h2_err.time = 100;
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
 
         // far in the future block
         let mut h2_err = h2.clone();
         h2_err.time = Utc::now().timestamp() as i64 + 7201;
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
 
         // invalid difficulty
         let mut h2_err = h2.clone();
         h2_err.difficulty_target = 100; // set the difficulty very very high
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
 
         // invalid nonce
         let mut h2_err = h2.clone();
         h2_err.nonce = 1001; // over the max nonce
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
+
+        // invalid proof
+        consensus.verifier.should_fail = true;
+        consensus
+            .verify_header(&h2, &h1, &merkle_root_hash, &pedersen_merkle_root_hash)
+            .unwrap_err();
     }
 }
