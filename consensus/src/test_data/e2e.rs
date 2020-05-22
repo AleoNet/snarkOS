@@ -111,9 +111,11 @@ const TEST_DATA_PATH: &str = "./../consensus/src/test_data/precomputed_data";
 fn generate_or_load_test_data() -> TestData {
     let path = std::env::current_dir().unwrap().join(TEST_DATA_PATH);
     if path.exists() {
-        let file = std::io::BufReader::new(File::open(path).expect("could not open file"));
-        let test_data = TestData::read(file).unwrap();
-        return test_data;
+        let file = std::io::BufReader::new(File::open(&path).expect("could not open file"));
+        // if we managed to read the data, return, otherwise regen it
+        if let Ok(test_data) = TestData::read(file) {
+            return test_data;
+        }
     }
 
     // get the params
@@ -135,7 +137,7 @@ fn generate_or_load_test_data() -> TestData {
         &ledger,
         &parameters,
         &miner_acc,
-        coinbase_records,
+        coinbase_records.clone(),
         &acc1.public_key,
         10,
         &mut rng,
