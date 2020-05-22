@@ -1,17 +1,15 @@
-use crate::dpc::{
-    base_dpc::{
-        binding_signature::{gadget_verification_setup, BindingSignature},
-        parameters::CircuitParameters,
-        record::DPCRecord,
-        BaseDPCComponents,
-    },
-    Record,
+use crate::dpc::base_dpc::{
+    binding_signature::{gadget_verification_setup, BindingSignature},
+    parameters::CircuitParameters,
+    record::DPCRecord,
+    BaseDPCComponents,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
+    dpc::Record,
     gadgets::{
         algorithms::{
             BindingSignatureGadget,
@@ -182,7 +180,7 @@ where
     PGadget: PRFGadget<P, C::InnerField>,
 {
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
     let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());

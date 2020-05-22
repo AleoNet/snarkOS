@@ -1,100 +1,36 @@
 use crate::{
-    algorithms::{crh::PedersenCRHGadget, merkle_tree::*},
+    algorithms::{crh::PedersenCompressedCRHGadget, merkle_tree::*},
     curves::edwards_bls12::EdwardsBlsGadget,
 };
 use snarkos_algorithms::{
-    crh::{PedersenCRH, PedersenSize},
-    merkle_tree::{MerkleParameters, MerkleTree},
+    crh::{PedersenCompressedCRH, PedersenSize},
+    define_merkle_tree_parameters,
 };
-use snarkos_curves::edwards_bls12::{EdwardsAffine as Edwards, Fq};
-use snarkos_models::{
-    algorithms::CRH,
-    gadgets::{
-        algorithms::CRHGadget,
-        r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, uint8::UInt8},
-    },
-    storage::Storage,
-};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
-
-use rand::{Rng, SeedableRng};
-use rand_xorshift::XorShiftRng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
+use snarkos_curves::edwards_bls12::{EdwardsProjective as Edwards, Fq};
+use snarkos_models::gadgets::{
+    algorithms::CRHGadget,
+    curves::field::FieldGadget,
+    r1cs::{ConstraintSystem, TestConstraintSystem},
+    utilities::{alloc::AllocGadget, uint8::UInt8},
 };
 
-#[derive(Clone)]
-pub(super) struct Size;
+use blake2::{digest::Digest, Blake2s};
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct Size;
 impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 256;
     const WINDOW_SIZE: usize = 4;
 }
 
-type H = PedersenCRH<Edwards, Size>;
-type HG = PedersenCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
-
-#[derive(Clone)]
-struct EdwardsMerkleParameters(H);
-impl MerkleParameters for EdwardsMerkleParameters {
-    type H = H;
-
-    const HEIGHT: usize = 32;
-
-    fn setup<R: Rng>(rng: &mut R) -> Self {
-        Self(H::setup(rng))
-    }
-
-    fn crh(&self) -> &Self::H {
-        &self.0
-    }
-
-    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
-        self.crh().parameters()
-    }
-}
-
-impl Storage for EdwardsMerkleParameters {
-    /// Store the SNARK proof to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.0.store(path)
-    }
-
-    /// Load the SNARK proof from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        Ok(Self(H::load(path)?))
-    }
-}
-impl Default for EdwardsMerkleParameters {
-    fn default() -> Self {
-        let rng = &mut XorShiftRng::seed_from_u64(9174123u64);
-        Self(H::setup(rng))
-    }
-}
-
-impl ToBytes for EdwardsMerkleParameters {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write(&mut writer)
-    }
-}
-
-impl FromBytes for EdwardsMerkleParameters {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let crh: H = FromBytes::read(&mut reader)?;
-
-        Ok(Self(crh))
-    }
-}
+define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
 
 type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
+type H = PedersenCompressedCRH<Edwards, Size>;
+type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
 fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
-    let mut rng = XorShiftRng::seed_from_u64(9174123u64);
-
-    let parameters = EdwardsMerkleParameters::setup(&mut rng);
+    let parameters = EdwardsMerkleParameters::default();
     let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
     let mut satisfied = true;
@@ -159,6 +95,55 @@ fn generate_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
     assert!(satisfied);
 }
 
+fn generate_masked_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
+    let parameters = EdwardsMerkleParameters::default();
+    let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
+    let root = tree.root();
+
+    let mut cs = TestConstraintSystem::<Fq>::new();
+    let leaf_gadgets = tree
+        .leaves_hashed()
+        .iter()
+        .enumerate()
+        .map(|(i, l)| <HG as CRHGadget<H, Fq>>::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || Ok(l)))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    let nonce: [u8; 4] = rand::random();
+    let mut root_bytes = [0u8; 32];
+    root.write(&mut root_bytes[..]).unwrap();
+
+    let mut h = Blake2s::new();
+    h.input(nonce.as_ref());
+    h.input(root_bytes.as_ref());
+    let mask = h.result().to_vec();
+    let mask_bytes = UInt8::alloc_vec(cs.ns(|| "mask"), &mask).unwrap();
+
+    let crh_parameters = <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
+        Ok(parameters.parameters())
+    })
+    .unwrap();
+
+    let computed_root = compute_root::<H, HG, _, _, _>(
+        cs.ns(|| "compute masked root"),
+        &crh_parameters,
+        &mask_bytes,
+        &leaf_gadgets,
+    )
+    .unwrap();
+
+    if !cs.is_satisfied() {
+        println!("Unsatisfied constraint: {}", cs.which_is_unsatisfied().unwrap());
+    }
+    assert!(cs.is_satisfied());
+    let given_root = if use_bad_root {
+        <H as CRH>::Output::default()
+    } else {
+        root
+    };
+    assert_eq!(given_root, computed_root.get_value().unwrap());
+}
+
 #[test]
 fn good_root_test() {
     let mut leaves = Vec::new();
@@ -178,4 +163,25 @@ fn bad_root_test() {
         leaves.push(input);
     }
     generate_merkle_tree(&leaves, true);
+}
+
+#[test]
+fn good_masked_root_test() {
+    let mut leaves = Vec::new();
+    for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
+        let input = [i; 30];
+        leaves.push(input);
+    }
+    generate_masked_merkle_tree(&leaves, false);
+}
+
+#[should_panic]
+#[test]
+fn bad_masked_root_test() {
+    let mut leaves = Vec::new();
+    for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
+        let input = [i; 30];
+        leaves.push(input);
+    }
+    generate_masked_merkle_tree(&leaves, true);
 }

@@ -1,19 +1,13 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_dpc::{
-    base_dpc::{instantiated::*, parameters::PublicParameters},
-    DPCScheme,
-};
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::dpc::Record;
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions, Transaction},
-    merkle_root,
-    AccountPublicKey,
-    BlockHeader,
-    MerkleRootHash,
+use snarkos_models::{
+    dpc::{DPCScheme, Record},
+    objects::Transaction,
 };
-use snarkos_storage::BlockStorage;
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
+use snarkos_storage::LedgerStorage;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -44,7 +38,7 @@ impl Miner {
 
     /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions<T: Transaction, P: MerkleParameters>(
-        storage: &Arc<BlockStorage<T, P>>,
+        storage: &Arc<LedgerStorage<T, P>>,
         memory_pool: &Arc<Mutex<MemoryPool<T>>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {

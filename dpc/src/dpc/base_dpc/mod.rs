@@ -1,17 +1,14 @@
-use crate::dpc::{
-    base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
-    DPCScheme,
-};
+use crate::dpc::base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
-    dpc::{DPCComponents, Predicate, Record},
+    dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
-    objects::AccountScheme,
+    objects::{AccountScheme, Ledger, Transaction},
 };
-use snarkos_objects::{dpc::Transaction, ledger::*, Account, AccountPrivateKey, AccountPublicKey};
+use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
@@ -120,9 +117,18 @@ pub struct DPC<Components: BaseDPCComponents> {
 /// final transaction after `execute_helper` has created old serial numbers and
 /// ledger witnesses, and new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
+pub(crate) struct ExecuteContext<'a, L, Components: BaseDPCComponents>
+where
+    L: Ledger<
+        Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+        MerkleParameters = Components::MerkleParameters,
+        MerklePath = MerklePath<Components::MerkleParameters>,
+        MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
+        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+    >,
+{
     circuit_parameters: &'a CircuitParameters<Components>,
-    ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
+    ledger_digest: L::MerkleTreeDigest,
 
     // Old record stuff
     old_account_private_keys: &'a [AccountPrivateKey<Components>],
@@ -147,7 +153,16 @@ pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
     value_balance: i64,
 }
 
-impl<Components: BaseDPCComponents> ExecuteContext<'_, Components> {
+impl<L, Components: BaseDPCComponents> ExecuteContext<'_, L, Components>
+where
+    L: Ledger<
+        Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+        MerkleParameters = Components::MerkleParameters,
+        MerklePath = MerklePath<Components::MerkleParameters>,
+        MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
+        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+    >,
+{
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             circuit_parameters: self.circuit_parameters.clone(),
@@ -332,11 +347,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         ledger: &L,
         rng: &mut R,
-    ) -> Result<ExecuteContext<'a, Components>, DPCError>
+    ) -> Result<ExecuteContext<'a, L, Components>, DPCError>
     where
         L: Ledger<
-            Parameters = Components::MerkleParameters,
             Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+            MerkleParameters = Components::MerkleParameters,
+            MerklePath = MerklePath<Components::MerkleParameters>,
+            MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
             SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
         >,
     {
@@ -364,8 +381,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             if record.is_dummy() {
                 old_witnesses.push(MerklePath::default());
             } else {
-                let comm = &record.commitment();
-                let witness = ledger.prove_cm(comm)?;
+                let witness = ledger.prove_cm(&record.commitment())?;
                 old_witnesses.push(witness);
 
                 value_balance += record.payload.balance as i64;
@@ -511,8 +527,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 impl<Components: BaseDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
 where
     L: Ledger<
-        Parameters = Components::MerkleParameters,
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+        MerkleParameters = Components::MerkleParameters,
+        MerklePath = MerklePath<Components::MerkleParameters>,
+        MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
         SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
     >,
 {
@@ -576,7 +594,7 @@ where
 
         let signature_parameters = &parameters.circuit_parameters.signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(signature_parameters, commitment_parameters, metadata, None, rng)?;
+        let account = Account::new(signature_parameters, commitment_parameters, metadata, rng)?;
 
         end_timer!(time);
 

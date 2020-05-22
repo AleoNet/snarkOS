@@ -1,13 +1,8 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions, Transaction},
-    ledger::Ledger,
-    BlockHeader,
-    BlockHeaderHash,
-    MerkleRootHash,
-};
+use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -17,20 +12,23 @@ use parking_lot::RwLock;
 use rand::Rng;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
+    type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;
-    type Parameters = P;
+    type MerkleParameters = P;
+    type MerklePath = MerklePath<Self::MerkleParameters>;
+    type MerkleTreeDigest = MerkleTreeDigest<Self::MerkleParameters>;
     type SerialNumber = T::SerialNumber;
     type Transaction = T;
 
-    fn setup<R: Rng>(rng: &mut R) -> Result<Self::Parameters, LedgerError> {
+    fn setup<R: Rng>(rng: &mut R) -> Result<Self::MerkleParameters, LedgerError> {
         Ok(P::setup(rng))
     }
 
     fn new(
         path: &PathBuf,
-        parameters: Self::Parameters,
+        parameters: Self::MerkleParameters,
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
@@ -49,7 +47,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             }
         }
 
-        let cm_merkle_tree = MerkleTree::<Self::Parameters>::new(parameters.clone(), &[genesis_cm.clone()]).unwrap();
+        let cm_merkle_tree =
+            MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), &[genesis_cm.clone()]).unwrap();
 
         let header = BlockHeader {
             previous_block_hash: BlockHeaderHash([0u8; 32]),
@@ -59,7 +58,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             nonce: 0,
         };
 
-        let genesis_block = Block::<T> {
+        let genesis_block = Self::Block {
             header,
             transactions: DPCTransactions::new(),
         };
@@ -126,7 +125,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             value: genesis_account_bytes,
         });
 
-        let block_storage = Self {
+        let ledger_storage = Self {
             latest_block_height: RwLock::new(0),
             storage: Arc::new(storage),
             cm_merkle_tree: RwLock::new(cm_merkle_tree),
@@ -134,10 +133,10 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
             _transaction: PhantomData,
         };
 
-        block_storage.storage.write(database_transaction)?;
-        block_storage.insert_block(&genesis_block)?;
+        ledger_storage.storage.write(database_transaction)?;
+        ledger_storage.insert_block(&genesis_block)?;
 
-        Ok(block_storage)
+        Ok(ledger_storage)
     }
 
     // Number of blocks including the genesis block
@@ -145,7 +144,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         self.get_latest_block_height() as usize + 1
     }
 
-    fn parameters(&self) -> &Self::Parameters {
+    fn parameters(&self) -> &Self::MerkleParameters {
         &self.ledger_parameters
     }
 
@@ -153,13 +152,13 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         unimplemented!()
     }
 
-    fn digest(&self) -> Option<MerkleTreeDigest<Self::Parameters>> {
-        let digest: MerkleTreeDigest<Self::Parameters> = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
+    fn digest(&self) -> Option<Self::MerkleTreeDigest> {
+        let digest: Self::MerkleTreeDigest = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
 
         Some(digest)
     }
 
-    fn validate_digest(&self, digest: &MerkleTreeDigest<Self::Parameters>) -> bool {
+    fn validate_digest(&self, digest: &Self::MerkleTreeDigest) -> bool {
         self.storage.exists(COL_DIGEST, &to_bytes![digest].unwrap())
     }
 
@@ -175,49 +174,49 @@ impl<T: Transaction, P: MerkleParameters> Ledger for BlockStorage<T, P> {
         self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
     }
 
-    fn prove_cm(&self, cm: &Self::Commitment) -> Result<MerklePath<Self::Parameters>, LedgerError> {
+    fn prove_cm(&self, cm: &Self::Commitment) -> Result<Self::MerklePath, LedgerError> {
         let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
         let result = self.cm_merkle_tree.read().generate_proof(cm_index, cm)?;
 
         Ok(result)
     }
 
-    fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<MerklePath<Self::Parameters>, LedgerError> {
+    fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<Self::MerklePath, LedgerError> {
         Ok(MerklePath::default())
     }
 
-    fn prove_memo(&self, _memo: &Self::Memo) -> Result<MerklePath<Self::Parameters>, LedgerError> {
+    fn prove_memo(&self, _memo: &Self::Memo) -> Result<Self::MerklePath, LedgerError> {
         Ok(MerklePath::default())
     }
 
     fn verify_cm(
-        _parameters: &Self::Parameters,
-        digest: &MerkleTreeDigest<Self::Parameters>,
+        _parameters: &Self::MerkleParameters,
+        digest: &Self::MerkleTreeDigest,
         cm: &Self::Commitment,
-        witness: &MerklePath<Self::Parameters>,
+        witness: &Self::MerklePath,
     ) -> bool {
         witness.verify(&digest, cm).unwrap()
     }
 
     fn verify_sn(
-        _parameters: &Self::Parameters,
-        _digest: &MerkleTreeDigest<Self::Parameters>,
+        _parameters: &Self::MerkleParameters,
+        _digest: &Self::MerkleTreeDigest,
         _sn: &Self::SerialNumber,
-        _witness: &MerklePath<Self::Parameters>,
+        _witness: &Self::MerklePath,
     ) -> bool {
         true
     }
 
     fn verify_memo(
-        _parameters: &Self::Parameters,
-        _digest: &MerkleTreeDigest<Self::Parameters>,
+        _parameters: &Self::MerkleParameters,
+        _digest: &Self::MerkleTreeDigest,
         _memo: &Self::Memo,
-        _witness: &MerklePath<Self::Parameters>,
+        _witness: &Self::MerklePath,
     ) -> bool {
         true
     }
 
-    fn blocks(&self) -> &Vec<Block<Self::Transaction>> {
+    fn blocks(&self) -> &Vec<Self::Block> {
         unimplemented!()
     }
 }

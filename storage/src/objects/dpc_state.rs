@@ -1,12 +1,12 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::dpc::Transaction;
+use snarkos_models::objects::Transaction;
 use snarkos_utilities::bytes::FromBytes;
 
 use std::collections::HashSet;
 
-impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     /// Get the genesis commitment
     pub fn genesis_cm(&self) -> Result<T::Commitment, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {

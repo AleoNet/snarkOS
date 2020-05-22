@@ -1,8 +1,11 @@
 mod server_listen {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_dpc::base_dpc::{
-        instantiated::{Components, MerkleTreeLedger},
-        parameters::PublicParameters,
+    use snarkos_dpc::{
+        base_dpc::{
+            instantiated::{CommitmentMerkleParameters, Components, MerkleTreeLedger, Tx},
+            parameters::PublicParameters,
+        },
+        test_data::load_verifying_parameters,
     };
     use snarkos_network::{
         context::Context,
@@ -15,6 +18,7 @@ mod server_listen {
         test_data::*,
         Handshakes,
     };
+    use snarkos_storage::test_data::*;
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;
@@ -62,7 +66,7 @@ mod server_listen {
     #[test]
     #[serial]
     fn bind_to_port() {
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         // Create a new runtime so we can spawn and block_on threads
@@ -90,13 +94,13 @@ mod server_listen {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
     #[serial]
     fn startup_handshake_bootnode() {
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
@@ -153,13 +157,13 @@ mod server_listen {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
     #[test]
     #[serial]
     fn startup_handshake_stored_peers() {
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
         let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
@@ -205,6 +209,6 @@ mod server_listen {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 }

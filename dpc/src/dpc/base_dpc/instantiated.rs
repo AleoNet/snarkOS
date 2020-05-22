@@ -13,7 +13,7 @@ use crate::dpc::base_dpc::{
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
-    merkle_tree::MerkleParameters,
+    define_merkle_tree_parameters,
     prf::Blake2s,
     signature::SchnorrSignature,
     snark::GM17,
@@ -35,16 +35,10 @@ use snarkos_gadgets::{
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents, storage::Storage};
-use snarkos_storage::BlockStorage;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_models::dpc::DPCComponents;
+use snarkos_storage::LedgerStorage;
 
 use blake2::Blake2s as Blake2sHash;
-use rand::Rng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-};
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
@@ -108,63 +102,7 @@ impl PedersenSize for ValueWindow {
     const WINDOW_SIZE: usize = 350;
 }
 
-type H = MerkleTreeCRH;
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct CommitmentMerkleParameters(H);
-
-impl MerkleParameters for CommitmentMerkleParameters {
-    type H = H;
-
-    const HEIGHT: usize = 32;
-
-    fn setup<R: Rng>(rng: &mut R) -> Self {
-        Self(H::setup(rng))
-    }
-
-    fn crh(&self) -> &Self::H {
-        &self.0
-    }
-
-    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
-        self.crh().parameters()
-    }
-}
-
-impl Storage for CommitmentMerkleParameters {
-    /// Store the SNARK proof to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.0.store(path)
-    }
-
-    /// Load the SNARK proof from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        Ok(Self(H::load(path)?))
-    }
-}
-
-impl ToBytes for CommitmentMerkleParameters {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write(&mut writer)
-    }
-}
-
-impl FromBytes for CommitmentMerkleParameters {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let crh: H = FromBytes::read(&mut reader)?;
-
-        Ok(Self(crh))
-    }
-}
-
-impl Default for CommitmentMerkleParameters {
-    fn default() -> Self {
-        let mut rng = rand::thread_rng();
-        Self(H::setup(&mut rng))
-    }
-}
+define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
 
 pub struct Components;
 
@@ -230,7 +168,7 @@ pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCirc
 pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
-pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = LedgerStorage<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;

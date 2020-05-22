@@ -1,18 +1,17 @@
 // mod miner_instance_integration {
 //     use snarkos_consensus::test_data::*;
 //     use snarkos_network::{server::MinerInstance, test_data::*};
+//     use snarkos_storage::*;
 //
 //     use serial_test::serial;
 //     use std::str::FromStr;
 //     use tokio::runtime;
-//     use wagyu_bitcoin::{BitcoinAddress, Mainnet};
 //
-//     type N = Mainnet;
 //
 //     #[test]
 //     #[serial]
 //     fn spawn_and_mine() {
-//         let (storage, path) = initialize_test_blockchain();
+//         let (storage, ) = test_blockchain();
 //
 //         let mut rt = runtime::Runtime::new().unwrap();
 //
@@ -27,8 +26,9 @@
 //             // 2. Create miner instance
 //
 //             let miner = MinerInstance::new(
-//                 BitcoinAddress::<N>::from_str(TEST_WALLETS[4].address).unwrap(),
+//                 miner_address,
 //                 server.consensus.clone(),
+//                 server.parameters.clone(),
 //                 server.storage.clone(),
 //                 server.memory_pool_lock.clone(),
 //                 server.context.clone(),

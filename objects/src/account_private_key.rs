@@ -32,15 +32,8 @@ pub struct AccountPrivateKey<C: DPCComponents> {
 }
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
-    /// Creates a new account private key. Defaults to a testnet account
-    /// if no network indicator is provided.
-    // TODO: Add testnet account support.
-    pub fn new<R: Rng>(
-        parameters: &C::Signature,
-        metadata: &[u8; 32],
-        _is_testnet: Option<bool>,
-        rng: &mut R,
-    ) -> Result<Self, AccountError> {
+    /// Creates a new account private key.
+    pub fn new<R: Rng>(parameters: &C::Signature, metadata: &[u8; 32], rng: &mut R) -> Result<Self, AccountError> {
         // Sample SIG key pair.
         let sk_sig = C::Signature::generate_private_key(parameters, rng)?;
         let pk_sig = C::Signature::generate_public_key(parameters, &sk_sig)?;
@@ -64,7 +57,6 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
 }
 
 impl<C: DPCComponents> ToBytes for AccountPrivateKey<C> {
-    // TODO: Add testnet account support.
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.pk_sig.write(&mut writer)?;
         self.sk_sig.write(&mut writer)?;
@@ -75,9 +67,7 @@ impl<C: DPCComponents> ToBytes for AccountPrivateKey<C> {
 }
 
 impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
-    /// Reads in an account private key buffer. Defaults to a testnet account
-    /// if no network indicator is provided.
-    // TODO: Add testnet account support.
+    /// Reads in an account private key buffer.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let pk_sig: <C::Signature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
@@ -99,7 +89,7 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut private_key = [0u8; 132];
-        let prefix = account_format::PRIVATE_KEY_MAINNET;
+        let prefix = account_format::PRIVATE_KEY_PREFIX;
 
         private_key[0..4].copy_from_slice(&prefix);
 

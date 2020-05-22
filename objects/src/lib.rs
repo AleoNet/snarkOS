@@ -16,6 +16,9 @@ pub use self::account_public_key::*;
 pub mod amount;
 pub use self::amount::*;
 
+pub mod block;
+pub use self::block::*;
+
 pub mod block_header;
 pub use self::block_header::*;
 
@@ -30,3 +33,6 @@ pub use self::merkle_root_hash::*;
 
 pub mod merkle_tree;
 pub use self::merkle_tree::*;
+
+pub mod pedersen_merkle_tree;
+pub use self::pedersen_merkle_tree::*;
