@@ -64,9 +64,8 @@ matrix:
 script:
   - echo "snarkOS"
 
-before_deploy:
-  - docker build -t snarkos:latest .
+# before_deploy:
+#   - docker build -t snarkos:latest .
 
-deploy:
-  - docker run -p 4130:4130 --name snarkos snarkos
-
+# deploy:
+#   - docker run -p 4130:4130 --name snarkos snarkos
