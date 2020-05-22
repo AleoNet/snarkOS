@@ -120,7 +120,7 @@ fn generate_or_load_test_data() -> TestData {
 
     // get the params
     let parameters = &FIXTURE.parameters;
-    let ledger = &FIXTURE.ledger;
+    let ledger = FIXTURE.ledger();
     let [miner_acc, acc1, acc2] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     let consensus = TEST_CONSENSUS;

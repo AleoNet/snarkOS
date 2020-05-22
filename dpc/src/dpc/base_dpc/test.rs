@@ -391,5 +391,5 @@ fn test_execute_base_dpc_constraints() {
 
     assert!(verify_binding_signature);
 
-    kill_storage(&ledger);
+    kill_storage(ledger);
 }

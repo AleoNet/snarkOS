@@ -213,7 +213,7 @@ impl<T: Transaction> MemoryPool<T> {
 mod tests {
     use super::*;
     use crate::test_data::*;
-    use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
     use snarkos_storage::test_data::*;
 
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn push() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn remove_entry() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn remove_transaction_by_hash() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn get_candidates() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn store_memory_pool() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn cleanse_memory_pool() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();

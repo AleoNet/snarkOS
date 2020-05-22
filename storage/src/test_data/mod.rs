@@ -51,7 +51,7 @@ pub fn test_blockchain<T: Transaction, P: MerkleParameters>() -> (Arc<LedgerStor
     (storage, path)
 }
 
-pub fn kill_storage<T: Transaction, P: MerkleParameters>(ledger: &LedgerStorage<T, P>) {
+pub fn kill_storage<T: Transaction, P: MerkleParameters>(ledger: LedgerStorage<T, P>) {
     let path = ledger.storage.storage.path().to_owned();
 
     drop(ledger);
