@@ -16,7 +16,7 @@ use snarkos_models::gadgets::{
 
 use blake2::{digest::Digest, Blake2s};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Size;
 impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 256;

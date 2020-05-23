@@ -19,7 +19,7 @@ use rand::{thread_rng, Rng};
 type TestCRH = PedersenCRH<EdwardsProjective, Window>;
 type TestCRHGadget = PedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Window;
 
 impl PedersenSize for Window {

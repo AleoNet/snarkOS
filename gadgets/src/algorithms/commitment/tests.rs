@@ -63,7 +63,7 @@ fn blake2s_commitment_gadget_test() {
 fn pedersen_commitment_gadget_test() {
     let mut cs = TestConstraintSystem::<Fq>::new();
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     pub(super) struct Size;
 
     impl PedersenSize for Size {
