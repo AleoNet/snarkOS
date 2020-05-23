@@ -8,9 +8,9 @@ use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
 pub trait CommitmentScheme: Sized + Clone {
-    type Output: Clone + Default + Eq + Hash + Debug + ToBytes + FromBytes;
-    type Parameters: Clone + ToBytes + FromBytes;
-    type Randomness: Clone + Default + Eq + UniformRand + Debug + ToBytes + FromBytes;
+    type Output: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
+    type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
+    type Randomness: Clone + Debug + Default + Eq + UniformRand + ToBytes + FromBytes;
 
     fn setup<R: Rng>(r: &mut R) -> Self;
 

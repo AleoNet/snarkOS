@@ -1,4 +1,7 @@
-use crate::{commitment::PedersenCommitment, crh::PedersenSize};
+use crate::{
+    commitment::{PedersenCommitment, PedersenCompressedCommitment},
+    crh::PedersenSize,
+};
 use snarkos_curves::edwards_bls12::EdwardsProjective;
 use snarkos_models::algorithms::CommitmentScheme;
 use snarkos_utilities::{
@@ -6,7 +9,8 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use rand::thread_rng;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Size;
@@ -16,16 +20,25 @@ impl PedersenSize for Size {
     const WINDOW_SIZE: usize = 4;
 }
 
-type TestCommitment = PedersenCommitment<EdwardsProjective, Size>;
+fn commitment_parameters_serialization<C: CommitmentScheme>() {
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
+
+    let commitment = C::setup(rng);
+    let commitment_parameters = commitment.parameters();
+
+    let commitment_parameters_bytes = to_bytes![commitment_parameters].unwrap();
+    let recovered_commitment_parameters: <C as CommitmentScheme>::Parameters =
+        FromBytes::read(&commitment_parameters_bytes[..]).unwrap();
+
+    assert_eq!(commitment_parameters, &recovered_commitment_parameters);
+}
 
 #[test]
-fn commitment_parameter_serialization() {
-    let rng = &mut thread_rng();
+fn pedersen_commitment_parameters_serialization() {
+    commitment_parameters_serialization::<PedersenCommitment<EdwardsProjective, Size>>();
+}
 
-    let commitment = TestCommitment::setup(rng);
-
-    let commitment_bytes = to_bytes![commitment].unwrap();
-    let recovered_commitment: TestCommitment = FromBytes::read(&commitment_bytes[..]).unwrap();
-
-    assert_eq!(commitment, recovered_commitment);
+#[test]
+fn pedersen_compressed_commitment_parameters_serialization() {
+    commitment_parameters_serialization::<PedersenCompressedCommitment<EdwardsProjective, Size>>();
 }
