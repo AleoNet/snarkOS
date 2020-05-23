@@ -77,8 +77,7 @@ debug-assertions = false
 opt-level = 0
 
 [profile.test]
-opt-level = 1
+opt-level = 3 # necessary for DPC testing
 incremental = true
 debug-assertions = true
 debug = true
-
