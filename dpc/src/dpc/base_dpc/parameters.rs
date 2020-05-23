@@ -206,7 +206,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         fn load_commitment<C: CommitmentScheme>(path: &PathBuf) -> IoResult<C> {
             let mut file = File::open(path)?;
             let parameters: <C as CommitmentScheme>::Parameters = FromBytes::read(&mut file)?;
-            Ok(<C as CommitmentScheme>::from(parameters))
+            Ok(C::from(parameters))
         }
 
         // Circuit Parameters
@@ -323,7 +323,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             /// Temporary
             fn load_commitment<C: CommitmentScheme>(parameter_bytes: &[u8]) -> IoResult<C> {
                 let parameters: <C as CommitmentScheme>::Parameters = FromBytes::read(&parameter_bytes[..])?;
-                Ok(<C as CommitmentScheme>::from(parameters))
+                Ok(C::from(parameters))
             }
 
             let account_commitment = load_commitment::<C::AccountCommitment>(account_commitment_parameters)?;

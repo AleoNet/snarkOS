@@ -17,10 +17,6 @@ impl CommitmentScheme for Blake2sCommitment {
         Self
     }
 
-    fn from(_: Self::Parameters) -> Self {
-        Self
-    }
-
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
         let mut h = blake2s::new();
         h.input(input);
@@ -33,5 +29,11 @@ impl CommitmentScheme for Blake2sCommitment {
 
     fn parameters(&self) -> &Self::Parameters {
         &()
+    }
+}
+
+impl From<()> for Blake2sCommitment {
+    fn from(_: ()) -> Self {
+        Self
     }
 }

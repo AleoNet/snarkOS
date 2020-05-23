@@ -24,10 +24,6 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
         }
     }
 
-    fn from(parameters: Self::Parameters) -> Self {
-        Self { parameters }
-    }
-
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
         // If the input is too long, return an error.
         if input.len() > S::WINDOW_SIZE * S::NUM_WINDOWS {
@@ -51,5 +47,11 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
+    }
+}
+
+impl<G: Group, S: PedersenSize> From<PedersenCommitmentParameters<G, S>> for PedersenCommitment<G, S> {
+    fn from(parameters: PedersenCommitmentParameters<G, S>) -> Self {
+        Self { parameters }
     }
 }

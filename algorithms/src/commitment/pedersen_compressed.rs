@@ -26,10 +26,6 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
         }
     }
 
-    fn from(parameters: Self::Parameters) -> Self {
-        Self { parameters }
-    }
-
     /// Returns the affine x-coordinate as the commitment.
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
         let commitment = PedersenCommitment::<G, S> {
@@ -44,5 +40,13 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
+    }
+}
+
+impl<G: Group + ProjectiveCurve, S: PedersenSize> From<PedersenCommitmentParameters<G, S>>
+    for PedersenCompressedCommitment<G, S>
+{
+    fn from(parameters: PedersenCommitmentParameters<G, S>) -> Self {
+        Self { parameters }
     }
 }
