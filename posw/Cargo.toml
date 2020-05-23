@@ -19,12 +19,14 @@ snarkos-gadgets = { path = "../gadgets", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" } # needed to instantiate with BLS12-377
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
+snarkvm-errors = { path = "../../snarkVM/errors", version = "0.9.0" }
+snarkvm-models = { path = "../../snarkVM/models", version = "0.9.0" }
 
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
 
 [dev-dependencies]
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkvm-utilities = { path = "../../snarkVM/utilities", version = "0.9.0" }
 
 criterion = { version = "0.3.1" }
 rand_xorshift = { version = "0.2" }

@@ -1,5 +1,5 @@
 use snarkos_models::curves::{AffineCurve, Field, FpParameters, PrimeField, ProjectiveCurve};
-use snarkos_utilities::biginteger::BigInteger;
+use snarkvm_utilities::biginteger::BigInteger;
 
 use rayon::prelude::*;
 

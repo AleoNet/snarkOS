@@ -8,12 +8,12 @@ use crate::snark::{
     Proof,
     VerifyingKey,
 };
-use snarkos_errors::algorithms::SNARKError;
 use snarkos_models::{
-    algorithms::SNARK,
     curves::{to_field_vec::ToConstraintField, PairingEngine},
     gadgets::r1cs::ConstraintSynthesizer,
 };
+use snarkvm_errors::algorithms::SNARKError;
+use snarkvm_models::algorithms::SNARK;
 
 use rand::Rng;
 use std::marker::PhantomData;

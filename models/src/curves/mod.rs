@@ -1,4 +1,4 @@
-use snarkos_utilities::biginteger::*;
+use snarkvm_utilities::biginteger::*;
 
 use std::fmt::Debug;
 

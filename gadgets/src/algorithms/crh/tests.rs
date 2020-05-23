@@ -5,7 +5,6 @@ use crate::{
 use snarkos_algorithms::crh::{PedersenCRH, PedersenSize};
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective};
 use snarkos_models::{
-    algorithms::CRH,
     curves::ProjectiveCurve,
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
@@ -13,6 +12,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
+use snarkvm_models::algorithms::CRH;
 
 use rand::{thread_rng, Rng};
 

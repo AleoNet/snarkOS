@@ -1,4 +1,4 @@
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,

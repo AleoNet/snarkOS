@@ -3,7 +3,7 @@ use snarkos_models::{
     curves::fp6_2over3::{Fp6, Fp6Parameters},
     field,
 };
-use snarkos_utilities::biginteger::BigInteger832 as BigInteger;
+use snarkvm_utilities::biginteger::BigInteger832 as BigInteger;
 
 pub type Fq6 = Fp6<Fq6Parameters>;
 

@@ -1,5 +1,5 @@
 use snarkos_models::curves::{Fp384, Fp384Parameters, FpParameters};
-use snarkos_utilities::biginteger::BigInteger384 as BigInteger;
+use snarkvm_utilities::biginteger::BigInteger384 as BigInteger;
 
 pub type Fq = Fp384<FqParameters>;
 

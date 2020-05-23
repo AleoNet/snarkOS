@@ -35,7 +35,7 @@ mod test {
             },
         },
     };
-    use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};
+    use snarkvm_utilities::{bititerator::BitIterator, rand::UniformRand};
 
     use rand::{self, SeedableRng};
     use rand_xorshift::XorShiftRng;

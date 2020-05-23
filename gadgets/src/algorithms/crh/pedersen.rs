@@ -1,5 +1,4 @@
 use snarkos_algorithms::crh::{PedersenCRH, PedersenCRHParameters, PedersenCompressedCRH, PedersenSize};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
@@ -9,6 +8,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::{borrow::Borrow, marker::PhantomData};
 

@@ -2,10 +2,8 @@
 //! which are then used to build a tree instantiated with a masked Pedersen hash. The prover
 //! inputs a mask computed as Blake2s(nonce || root), which the verifier also checks.
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::compute_root;
 use snarkos_models::{
-    algorithms::CRH,
     curves::PrimeField,
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
@@ -13,6 +11,8 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::CRH;
 
 use std::marker::PhantomData;
 

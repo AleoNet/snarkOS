@@ -1,4 +1,4 @@
-use crate::algorithms::{CRHError, CommitmentError, PRFError, SignatureError};
+use snarkvm_errors::algorithms::{CRHError, CommitmentError, PRFError, SignatureError};
 
 #[derive(Debug, Error)]
 pub enum AccountError {

@@ -1,5 +1,5 @@
 use crate::curves::{Field, Fp2, Fp2Parameters};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
 };

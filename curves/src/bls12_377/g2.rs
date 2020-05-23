@@ -3,7 +3,7 @@ use snarkos_models::{
     curves::{Field, ModelParameters, SWModelParameters},
     field,
 };
-use snarkos_utilities::biginteger::{BigInteger256, BigInteger384};
+use snarkvm_utilities::biginteger::{BigInteger256, BigInteger384};
 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct Bls12_377G2Parameters;

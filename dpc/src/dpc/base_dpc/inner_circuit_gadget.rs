@@ -5,10 +5,8 @@ use crate::dpc::base_dpc::{
     BaseDPCComponents,
 };
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
     dpc::Record,
     gadgets::{
         algorithms::{
@@ -23,7 +21,9 @@ use snarkos_models::{
     },
 };
 use snarkos_objects::AccountPrivateKey;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,

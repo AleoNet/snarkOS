@@ -15,7 +15,7 @@ use crate::{
 use snarkos_consensus::miner::{Entry, MemoryPool};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_errors::network::SendError;
-use snarkos_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::FromBytes;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;

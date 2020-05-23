@@ -1,7 +1,8 @@
 use crate::crh::{PedersenCRH, PedersenSize};
 use snarkos_curves::edwards_bls12::EdwardsProjective;
-use snarkos_models::{algorithms::CRH, storage::Storage};
-use snarkos_utilities::{
+use snarkos_models::storage::Storage;
+use snarkvm_models::algorithms::CRH;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

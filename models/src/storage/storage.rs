@@ -1,4 +1,4 @@
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     io::Result as IoResult,
 };

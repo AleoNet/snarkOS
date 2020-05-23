@@ -1,6 +1,4 @@
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::CRH,
     curves::PrimeField,
     gadgets::{
         algorithms::MaskedCRHGadget,
@@ -8,6 +6,8 @@ use snarkos_models::{
         utilities::{uint8::UInt8, ToBytesGadget},
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::CRH;
 
 /// Computes a root given `leaves`. Uses a nonce to mask the computation,
 /// to ensure amortization resistance. Assumes the number of leaves is

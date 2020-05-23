@@ -6,7 +6,6 @@ use snarkos_algorithms::{
 };
 use snarkos_curves::edwards_bls12::{EdwardsProjective, Fq, Fr};
 use snarkos_models::{
-    algorithms::CommitmentScheme,
     curves::ProjectiveCurve,
     gadgets::{
         algorithms::CommitmentGadget,
@@ -14,7 +13,8 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkvm_models::algorithms::CommitmentScheme;
+use snarkvm_utilities::rand::UniformRand;
 
 use rand::{thread_rng, Rng};
 

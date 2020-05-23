@@ -2,14 +2,14 @@ use crate::dpc::base_dpc::{binding_signature::*, record_payload::PaymentRecordPa
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, Ledger, Transaction},
 };
 use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
-use snarkos_utilities::{
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
     to_bytes,

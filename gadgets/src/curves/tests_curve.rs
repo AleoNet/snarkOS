@@ -11,7 +11,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget},
     },
 };
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::ops::Mul;
 

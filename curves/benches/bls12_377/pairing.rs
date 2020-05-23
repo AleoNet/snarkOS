@@ -4,7 +4,7 @@ mod pairing {
         templates::bls12::{G1Prepared, G2Prepared},
     };
     use snarkos_models::curves::{PairingCurve, PairingEngine};
-    use snarkos_utilities::rand::UniformRand;
+    use snarkvm_utilities::rand::UniformRand;
 
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;

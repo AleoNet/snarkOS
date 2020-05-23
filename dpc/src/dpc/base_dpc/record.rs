@@ -1,10 +1,8 @@
 use crate::dpc::base_dpc::{predicate::DPCPredicate, record_payload::PaymentRecordPayload, BaseDPCComponents};
-use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH},
-    dpc::Record,
-};
+use snarkos_models::dpc::Record;
 use snarkos_objects::AccountPublicKey;
-use snarkos_utilities::{
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme, CRH};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
     variable_length_integer::*,

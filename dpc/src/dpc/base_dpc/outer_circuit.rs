@@ -7,12 +7,12 @@ use crate::{
     },
     Assignment,
 };
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::CommitmentScheme,
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::CommitmentScheme;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]

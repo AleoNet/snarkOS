@@ -18,7 +18,7 @@ use snarkos_network::{
 };
 use snarkos_objects::AccountPublicKey;
 use snarkos_rpc::start_rpc_server;
-use snarkos_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::FromBytes;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;

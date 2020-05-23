@@ -1,6 +1,6 @@
-use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_errors::curves::ConstraintFieldError;
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use digest::Digest;
 use std::{

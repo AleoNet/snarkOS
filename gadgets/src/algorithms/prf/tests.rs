@@ -1,19 +1,17 @@
 use crate::algorithms::prf::*;
 use snarkos_algorithms::prf::blake2s::Blake2s as B2SPRF;
 use snarkos_curves::bls12_377::Fr;
-use snarkos_models::{
-    algorithms::PRF,
-    gadgets::{
-        algorithms::PRFGadget,
-        r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{
-            alloc::AllocGadget,
-            boolean::{AllocatedBit, Boolean},
-            eq::EqGadget,
-            uint8::UInt8,
-        },
+use snarkos_models::gadgets::{
+    algorithms::PRFGadget,
+    r1cs::{ConstraintSystem, TestConstraintSystem},
+    utilities::{
+        alloc::AllocGadget,
+        boolean::{AllocatedBit, Boolean},
+        eq::EqGadget,
+        uint8::UInt8,
     },
 };
+use snarkvm_models::algorithms::PRF;
 
 use blake2::VarBlake2s;
 use digest::{Input, VariableOutput};

@@ -4,7 +4,7 @@ use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_models::objects::Transaction;
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     /// Get a block given the block hash.

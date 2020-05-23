@@ -1,6 +1,5 @@
 use crate::curves::templates::bls12::AffineGadget;
 use snarkos_curves::templates::bls12::{Bls12Parameters, G1Prepared};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::ProjectiveCurve,
     gadgets::{
@@ -9,6 +8,7 @@ use snarkos_models::{
         utilities::{uint8::UInt8, ToBytesGadget},
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 

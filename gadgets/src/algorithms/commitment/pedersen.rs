@@ -2,7 +2,6 @@ use snarkos_algorithms::{
     commitment::{PedersenCommitment, PedersenCommitmentParameters, PedersenCompressedCommitment},
     crh::PedersenSize,
 };
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
@@ -12,7 +11,8 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use std::{borrow::Borrow, marker::PhantomData};
 

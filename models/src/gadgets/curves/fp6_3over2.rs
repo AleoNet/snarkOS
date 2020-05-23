@@ -20,7 +20,7 @@ use crate::{
         },
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::{borrow::Borrow, marker::PhantomData};
 

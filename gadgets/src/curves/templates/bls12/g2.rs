@@ -1,6 +1,5 @@
 use crate::curves::templates::bls12::AffineGadget;
 use snarkos_curves::templates::bls12::{Bls12Parameters, TwistType};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::Field,
     gadgets::{
@@ -9,7 +8,8 @@ use snarkos_models::{
         utilities::{eq::NEqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::fmt::Debug;
 

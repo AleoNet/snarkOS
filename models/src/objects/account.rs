@@ -1,6 +1,6 @@
-use crate::algorithms::{CommitmentScheme, SignatureScheme};
 use snarkos_errors::objects::AccountError;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 

@@ -1,11 +1,11 @@
 use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
-use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
-    algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, Group, ProjectiveCurve},
     storage::Storage,
 };
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_errors::{algorithms::CRHError, curves::ConstraintFieldError};
+use snarkvm_models::algorithms::CRH;
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{

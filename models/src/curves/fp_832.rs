@@ -1,5 +1,5 @@
 use crate::curves::{Field, FpParameters, LegendreSymbol, PrimeField, SquareRootField};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     biginteger::{arithmetic as fa, BigInteger as _BigInteger, BigInteger832 as BigInteger},
     bytes::{FromBytes, ToBytes},
 };

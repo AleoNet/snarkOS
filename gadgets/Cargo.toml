@@ -16,7 +16,9 @@ snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkvm-errors = { path = "../../snarkVM/errors", version = "0.9.0" }
+snarkvm-models = { path = "../../snarkVM/models", version = "0.9.0" }
+snarkvm-utilities = { path = "../../snarkVM/utilities", version = "0.9.0" }
 
 derivative = { version = "2" }
 digest = { version = "0.8.1" }

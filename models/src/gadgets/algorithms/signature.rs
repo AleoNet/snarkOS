@@ -1,12 +1,12 @@
 use crate::{
-    algorithms::SignatureScheme,
     curves::Field,
     gadgets::{
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::SignatureScheme;
 
 pub trait SignaturePublicKeyRandomizationGadget<S: SignatureScheme, F: Field> {
     type ParametersGadget: AllocGadget<S::Parameters, F> + Clone;

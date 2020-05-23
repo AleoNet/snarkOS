@@ -6,7 +6,7 @@ use snarkos_models::{
     curves::{ModelParameters, MontgomeryModelParameters, TEModelParameters},
     field,
 };
-use snarkos_utilities::biginteger::BigInteger256;
+use snarkvm_utilities::biginteger::BigInteger256;
 
 use std::str::FromStr;
 

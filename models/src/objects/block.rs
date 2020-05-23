@@ -1,5 +1,5 @@
 use crate::objects::Transaction;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 pub trait BlockScheme: Clone + Eq + FromBytes + ToBytes {
     type BlockHeader: Clone + Eq + FromBytes + ToBytes;

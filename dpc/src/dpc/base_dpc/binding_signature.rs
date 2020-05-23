@@ -1,14 +1,12 @@
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls12;
 use snarkos_errors::dpc::BindingSignatureError;
-use snarkos_models::{
-    algorithms::CommitmentScheme,
-    curves::{
-        pairing_engine::{AffineCurve, ProjectiveCurve},
-        Field,
-        Group,
-    },
+use snarkos_models::curves::{
+    pairing_engine::{AffineCurve, ProjectiveCurve},
+    Field,
+    Group,
 };
-use snarkos_utilities::{
+use snarkvm_models::algorithms::CommitmentScheme;
+use snarkvm_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -345,7 +343,7 @@ mod tests {
         },
     };
 
-    use snarkos_utilities::rand::UniformRand;
+    use snarkvm_utilities::rand::UniformRand;
 
     type G = EdwardsBls12;
 

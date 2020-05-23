@@ -27,7 +27,7 @@ use snarkos_objects::{
     BlockHeaderHash,
     MerkleRootHash,
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkvm_utilities::rand::UniformRand;
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};

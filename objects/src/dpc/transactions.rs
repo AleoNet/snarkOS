@@ -1,6 +1,6 @@
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
     variable_length_integer::{read_variable_length_integer, variable_length_integer},

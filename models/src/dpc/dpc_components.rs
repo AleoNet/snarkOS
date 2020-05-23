@@ -1,8 +1,8 @@
 use crate::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
     curves::PrimeField,
     gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
 };
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF};
 
 pub trait DPCComponents: 'static + Sized {
     const NUM_INPUT_RECORDS: usize;

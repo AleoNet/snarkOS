@@ -6,7 +6,7 @@ use snarkos_models::{
     },
     field,
 };
-use snarkos_utilities::biginteger::BigInteger384;
+use snarkvm_utilities::biginteger::BigInteger384;
 
 pub type Fq6 = Fp6<Fq6Parameters>;
 
@@ -242,7 +242,7 @@ impl Fp6Parameters for Fq6Parameters {
 mod test {
     use super::*;
     use snarkos_models::curves::Field;
-    use snarkos_utilities::rand::UniformRand;
+    use snarkvm_utilities::rand::UniformRand;
 
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;

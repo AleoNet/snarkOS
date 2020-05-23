@@ -1,7 +1,5 @@
 use crate::dpc::base_dpc::{parameters::CircuitParameters, predicate::PrivatePredicateInput, BaseDPCComponents};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH},
     curves::to_field_vec::ToConstraintField,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
@@ -9,7 +7,9 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::{CommitmentScheme, CRH};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,

@@ -10,7 +10,6 @@ use snarkos_curves::templates::bls12::{
     G2Projective,
     TwistType,
 };
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Fp12, ModelParameters, PairingCurve},
     gadgets::{
@@ -18,7 +17,8 @@ use snarkos_models::{
         r1cs::ConstraintSystem,
     },
 };
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::marker::PhantomData;
 

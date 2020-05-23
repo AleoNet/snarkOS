@@ -1,4 +1,5 @@
-use crate::{algorithms::MerkleError, objects::TransactionError, storage::StorageError};
+use crate::{objects::TransactionError, storage::StorageError};
+use snarkvm_errors::algorithms::MerkleError;
 
 #[derive(Debug, Error)]
 pub enum LedgerError {

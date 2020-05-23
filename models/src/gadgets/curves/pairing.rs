@@ -6,7 +6,7 @@ use crate::{
         utilities::ToBytesGadget,
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 

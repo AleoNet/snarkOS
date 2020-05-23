@@ -5,7 +5,7 @@ use crate::{
         utilities::{boolean::Boolean, select::CondSelectGadget},
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
 
 /// If `condition == 1`, then enforces that `self` and `other` are equal;
 /// otherwise, it doesn't enforce anything.

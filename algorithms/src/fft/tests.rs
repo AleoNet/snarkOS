@@ -1,7 +1,7 @@
 use crate::fft::{domain::*, multicore::*};
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_models::curves::PairingEngine;
-use snarkos_utilities::rand::UniformRand;
+use snarkvm_utilities::rand::UniformRand;
 
 use rand;
 use std::cmp::min;

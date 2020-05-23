@@ -27,8 +27,7 @@ members = [
     "posw",
     "profiler",
     "rpc",
-    "storage",
-    "utilities"
+    "storage"
 ]
 
 [lib]
@@ -47,7 +46,7 @@ snarkos-network = { path = "network", version = "0.8.0" }
 snarkos-objects = { path = "objects", version = "0.8.0" }
 snarkos-rpc = { path = "./rpc", version = "0.8.0" }
 snarkos-storage = { path = "storage", version = "0.8.0" }
-snarkos-utilities = { path = "./utilities", version = "0.8.0" }
+snarkvm-utilities = { path = "../snarkVM/utilities", version = "0.9.0" }
 
 clap = { version = "2.33.1" }
 env_logger = { version = "0.7.1" }

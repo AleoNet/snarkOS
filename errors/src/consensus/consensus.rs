@@ -1,9 +1,9 @@
 use crate::{
-    algorithms::CRHError,
     dpc::DPCError,
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
+use snarkvm_errors::algorithms::CRHError;
 
 use std::fmt::Debug;
 

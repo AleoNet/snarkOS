@@ -1,5 +1,4 @@
 use snarkos_algorithms::snark::{Proof, VerifyingKey, GM17};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, PairingEngine},
     gadgets::{
@@ -9,6 +8,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBitsGadget, ToBytesGadget},
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::{borrow::Borrow, marker::PhantomData};
 

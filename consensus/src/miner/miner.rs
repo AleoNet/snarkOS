@@ -8,7 +8,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::LedgerStorage;
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

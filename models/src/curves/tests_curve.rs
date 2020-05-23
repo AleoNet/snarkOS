@@ -1,5 +1,5 @@
 use crate::curves::{AffineCurve, Field, PrimeField, ProjectiveCurve};
-use snarkos_utilities::rand::UniformRand;
+use snarkvm_utilities::rand::UniformRand;
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;

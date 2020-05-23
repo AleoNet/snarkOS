@@ -5,7 +5,7 @@ use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
 use snarkos_network::{context::Context, process_transaction_internal};
 use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

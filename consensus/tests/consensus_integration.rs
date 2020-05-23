@@ -3,7 +3,7 @@ mod consensus_integration {
     use snarkos_dpc::dpc::base_dpc::instantiated::{Components, Tx};
     use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, BlockHeader, BlockHeaderHash, MerkleRootHash};
     use snarkos_storage::genesis::*;
-    use snarkos_utilities::bytes::FromBytes;
+    use snarkvm_utilities::bytes::FromBytes;
 
     fn test_find_block(
         transactions: &DPCTransactions<Tx>,

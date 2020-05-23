@@ -6,7 +6,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, boolean::Boolean},
     },
 };
-use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};
+use snarkvm_utilities::{bititerator::BitIterator, rand::UniformRand};
 
 use rand::{self, thread_rng, SeedableRng};
 use rand_xorshift::XorShiftRng;

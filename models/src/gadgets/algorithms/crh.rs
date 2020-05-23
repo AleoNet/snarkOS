@@ -1,5 +1,4 @@
 use crate::{
-    algorithms::CRH,
     curves::{Field, PrimeField},
     gadgets::{
         r1cs::ConstraintSystem,
@@ -12,7 +11,8 @@ use crate::{
         },
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::CRH;
 
 use std::fmt::Debug;
 

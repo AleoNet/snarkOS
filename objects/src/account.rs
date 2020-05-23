@@ -1,7 +1,7 @@
 use crate::{AccountPrivateKey, AccountPublicKey};
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{dpc::DPCComponents, objects::AccountScheme};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::io::{Read, Result as IoResult, Write};

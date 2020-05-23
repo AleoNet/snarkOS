@@ -1,10 +1,8 @@
 use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTreeDigest};
-use snarkos_errors::curves::ConstraintFieldError;
-use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH},
-    curves::to_field_vec::ToConstraintField,
-};
+use snarkos_models::curves::to_field_vec::ToConstraintField;
+use snarkvm_errors::curves::ConstraintFieldError;
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme, CRH};
 
 pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Commitment, CRH, and signature parameters

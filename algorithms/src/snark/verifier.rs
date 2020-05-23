@@ -1,6 +1,6 @@
 use crate::snark::{PreparedVerifyingKey, Proof, VerifyingKey};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::{AffineCurve, Field, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve};
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::ops::{AddAssign, MulAssign, Neg};
 

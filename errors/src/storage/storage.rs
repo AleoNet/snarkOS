@@ -1,7 +1,5 @@
-use crate::{
-    algorithms::MerkleError,
-    objects::{BlockError, TransactionError},
-};
+use crate::objects::{BlockError, TransactionError};
+use snarkvm_errors::algorithms::MerkleError;
 
 use bincode;
 use rocksdb;

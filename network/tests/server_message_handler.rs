@@ -11,7 +11,7 @@ mod server_message_handler {
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
     use snarkos_storage::test_data::*;
-    use snarkos_utilities::{
+    use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,
     };

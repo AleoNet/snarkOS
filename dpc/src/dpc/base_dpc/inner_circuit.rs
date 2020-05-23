@@ -9,12 +9,10 @@ use crate::{
     Assignment,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme},
-    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
-};
+use snarkos_models::gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem};
 use snarkos_objects::AccountPrivateKey;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]

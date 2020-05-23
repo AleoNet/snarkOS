@@ -6,7 +6,7 @@ use snarkos_models::curves::{
     SWModelParameters as Parameters,
     SquareRootField,
 };
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,

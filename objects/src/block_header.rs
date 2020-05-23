@@ -1,6 +1,6 @@
 use crate::{BlockHeaderHash, MerkleRootHash};
 use snarkos_algorithms::crh::double_sha256;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Result as IoResult, Write};

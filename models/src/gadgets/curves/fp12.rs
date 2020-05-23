@@ -20,8 +20,8 @@ use crate::{
         },
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::{borrow::Borrow, marker::PhantomData};
 

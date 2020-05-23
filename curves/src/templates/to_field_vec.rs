@@ -2,7 +2,6 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine as SWAffine, GroupProjective as SWProjective},
     twisted_edwards_extended::{GroupAffine as TEAffine, GroupProjective as TEProjective},
 };
-use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::curves::{
     to_field_vec::ToConstraintField,
     Field,
@@ -10,6 +9,7 @@ use snarkos_models::curves::{
     SWModelParameters,
     TEModelParameters,
 };
+use snarkvm_errors::curves::ConstraintFieldError;
 
 impl<M: TEModelParameters, F: Field> ToConstraintField<F> for TEAffine<M>
 where

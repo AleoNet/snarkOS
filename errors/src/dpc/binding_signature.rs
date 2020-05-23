@@ -1,4 +1,4 @@
-use crate::algorithms::commitment::CommitmentError;
+use snarkvm_errors::algorithms::commitment::CommitmentError;
 
 #[derive(Debug, Error)]
 pub enum BindingSignatureError {

@@ -11,8 +11,8 @@ use crate::{
         },
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::borrow::Borrow;
 
@@ -747,7 +747,7 @@ mod test {
         curves::{Field, PrimeField},
         gadgets::r1cs::{Fr, TestConstraintSystem},
     };
-    use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};
+    use snarkvm_utilities::{bititerator::BitIterator, rand::UniformRand};
 
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;

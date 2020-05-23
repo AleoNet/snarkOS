@@ -1,6 +1,7 @@
-use snarkos_errors::algorithms::MerkleError;
-use snarkos_models::{algorithms::CRH, storage::Storage};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_models::storage::Storage;
+use snarkvm_errors::algorithms::MerkleError;
+use snarkvm_models::algorithms::CRH;
+use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;
 use std::io::Cursor;

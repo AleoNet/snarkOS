@@ -19,7 +19,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::test_data::*;
-use snarkos_utilities::rand::UniformRand;
+use snarkvm_utilities::rand::UniformRand;
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;

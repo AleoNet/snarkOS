@@ -19,8 +19,8 @@ use crate::{
         },
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes, to_bytes};
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::{bititerator::BitIterator, bytes::ToBytes, to_bytes};
 
 use std::borrow::Borrow;
 

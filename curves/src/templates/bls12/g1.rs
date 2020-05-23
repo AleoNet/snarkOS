@@ -3,7 +3,7 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
 use snarkos_models::curves::pairing_engine::AffineCurve;
-use snarkos_utilities::bytes::ToBytes;
+use snarkvm_utilities::bytes::ToBytes;
 
 use std::io::{Result as IoResult, Write};
 

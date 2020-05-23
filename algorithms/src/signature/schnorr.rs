@@ -1,11 +1,11 @@
 use crate::signature::SchnorrParameters;
-use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
 use snarkos_models::{
-    algorithms::SignatureScheme,
     curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
     storage::Storage,
 };
-use snarkos_utilities::{
+use snarkvm_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
+use snarkvm_models::algorithms::SignatureScheme;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
     to_bytes,

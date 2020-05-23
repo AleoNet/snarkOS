@@ -1,5 +1,5 @@
 use crate::curves::{Field, FpParameters};
-use snarkos_utilities::biginteger::*;
+use snarkvm_utilities::biginteger::*;
 
 use std::str::FromStr;
 

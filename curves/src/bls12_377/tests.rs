@@ -31,7 +31,7 @@ use snarkos_models::curves::{
     SWModelParameters,
     SquareRootField,
 };
-use snarkos_utilities::{
+use snarkvm_utilities::{
     biginteger::{BigInteger, BigInteger384},
     rand::UniformRand,
 };

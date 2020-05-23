@@ -1,11 +1,11 @@
 use crate::{commitment::PedersenCommitmentParameters, crh::PedersenSize};
-use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH},
     curves::{Group, PrimeField},
     storage::Storage,
 };
-use snarkos_utilities::{
+use snarkvm_errors::algorithms::CommitmentError;
+use snarkvm_models::algorithms::{CommitmentScheme, CRH};
+use snarkvm_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
 };

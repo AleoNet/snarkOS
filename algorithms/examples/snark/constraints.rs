@@ -1,8 +1,8 @@
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::Field,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, LinearCombination},
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::marker::PhantomData;
 

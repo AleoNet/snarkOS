@@ -1,5 +1,4 @@
 use snarkos_algorithms::prf::Blake2s;
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::PrimeField,
     gadgets::{
@@ -15,6 +14,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::borrow::Borrow;
 

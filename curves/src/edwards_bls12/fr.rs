@@ -1,5 +1,5 @@
 use snarkos_models::curves::{Fp256, Fp256Parameters, FpParameters};
-use snarkos_utilities::biginteger::BigInteger256 as BigInteger;
+use snarkvm_utilities::biginteger::BigInteger256 as BigInteger;
 
 pub type Fr = Fp256<FrParameters>;
 

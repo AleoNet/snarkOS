@@ -2,13 +2,13 @@ use crate::{
     commitment::{PedersenCommitment, PedersenCommitmentParameters},
     crh::PedersenSize,
 };
-use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
-    algorithms::CommitmentScheme,
     curves::{AffineCurve, Group, ProjectiveCurve},
     storage::Storage,
 };
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_errors::algorithms::CommitmentError;
+use snarkvm_models::algorithms::CommitmentScheme;
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{

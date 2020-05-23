@@ -1,5 +1,4 @@
 use snarkos_curves::templates::twisted_edwards_extended::GroupAffine as TEAffine;
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, MontgomeryModelParameters, TEModelParameters},
     gadgets::{
@@ -16,7 +15,8 @@ use snarkos_models::{
         },
     },
 };
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::{borrow::Borrow, marker::PhantomData};
 

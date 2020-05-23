@@ -2,9 +2,7 @@ use crate::{
     base_dpc::{parameters::CircuitParameters, *},
     Assignment,
 };
-use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
-    algorithms::CommitmentScheme,
     curves::to_field_vec::ToConstraintField,
     gadgets::{
         algorithms::CommitmentGadget,
@@ -12,6 +10,8 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
     },
 };
+use snarkvm_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
+use snarkvm_models::algorithms::CommitmentScheme;
 
 pub struct PaymentPredicateLocalData<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,

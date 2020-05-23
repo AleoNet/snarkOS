@@ -15,7 +15,7 @@ mod consensus_dpc {
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_storage::test_data::*;
-    use snarkos_utilities::{bytes::ToBytes, to_bytes};
+    use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
     use rand::thread_rng;
 

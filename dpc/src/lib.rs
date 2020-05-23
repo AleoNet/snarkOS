@@ -49,7 +49,7 @@ pub use crate::dpc::*;
 #[allow(dead_code)]
 pub mod test_data;
 
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
 
 pub trait Assignment<T> {
     fn get(&self) -> Result<&T, SynthesisError>;

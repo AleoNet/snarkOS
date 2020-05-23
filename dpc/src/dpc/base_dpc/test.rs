@@ -13,14 +13,14 @@ use crate::dpc::base_dpc::{
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, Ledger},
 };
 use snarkos_objects::Account;
 use snarkos_storage::test_data::*;
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkvm_models::algorithms::{CommitmentScheme, CRH, SNARK};
+use snarkvm_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;

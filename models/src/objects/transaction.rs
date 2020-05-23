@@ -1,5 +1,5 @@
 use snarkos_errors::objects::TransactionError;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use std::hash::Hash;
 

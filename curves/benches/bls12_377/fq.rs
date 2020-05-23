@@ -1,6 +1,6 @@
 use snarkos_curves::bls12_377::Fq;
 use snarkos_models::curves::{Field, PrimeField, SquareRootField};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     biginteger::{BigInteger, BigInteger384 as FqRepr},
     rand::UniformRand,
 };

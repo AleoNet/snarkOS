@@ -2,7 +2,7 @@ use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_models::objects::Transaction;
-use snarkos_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::FromBytes;
 
 use std::collections::HashSet;
 

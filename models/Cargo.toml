@@ -13,7 +13,9 @@ edition = "2018"
 
 [dependencies]
 snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkvm-errors = { path = "../../snarkVM/errors", version = "0.9.0" }
+snarkvm-models = { path = "../../snarkVM/models", version = "0.9.0" }
+snarkvm-utilities = { path = "../../snarkVM/utilities", version = "0.9.0" }
 
 derivative = { version = "2" }
 rand = { version = "0.7", default-features = false }

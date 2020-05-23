@@ -1,12 +1,12 @@
 use crate::{
-    algorithms::CommitmentScheme,
     curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         r1cs::ConstraintSystem,
         utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_models::algorithms::CommitmentScheme;
 
 use std::fmt::Debug;
 

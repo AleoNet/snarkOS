@@ -1,4 +1,4 @@
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use std::io::{Read, Result as IoResult, Write};
 

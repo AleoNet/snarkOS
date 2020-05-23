@@ -19,7 +19,7 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-network = { path = "../network", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkvm-utilities = { path = "../../snarkVM/utilities", version = "0.9.0" }
 
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }

@@ -15,7 +15,7 @@ use snarkos_models::curves::{
     SWModelParameters,
     SquareRootField,
 };
-use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_utilities::bititerator::BitIterator;
 
 use std::marker::PhantomData;
 

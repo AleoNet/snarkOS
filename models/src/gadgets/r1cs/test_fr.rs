@@ -1,5 +1,5 @@
 use crate::curves::{Fp256, Fp256Parameters, FpParameters};
-use snarkos_utilities::biginteger::BigInteger256 as BigInteger;
+use snarkvm_utilities::biginteger::BigInteger256 as BigInteger;
 
 /// This field is the scalar field (Fr) of BLS12-377.
 pub type Fr = Fp256<FrParameters>;

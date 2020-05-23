@@ -3,7 +3,7 @@ use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
 use snarkos_models::objects::{Ledger, Transaction};
 use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

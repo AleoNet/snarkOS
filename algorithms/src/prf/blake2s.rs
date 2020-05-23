@@ -1,5 +1,5 @@
-use snarkos_errors::algorithms::PRFError;
-use snarkos_models::algorithms::PRF;
+use snarkvm_errors::algorithms::PRFError;
+use snarkvm_models::algorithms::PRF;
 
 use blake2::Blake2s as blake2s;
 use digest::Digest;

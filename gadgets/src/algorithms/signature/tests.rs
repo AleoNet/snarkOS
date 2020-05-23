@@ -5,7 +5,6 @@ use crate::{
 use snarkos_algorithms::signature::SchnorrSignature;
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsAffine};
 use snarkos_models::{
-    algorithms::SignatureScheme,
     curves::Group,
     gadgets::{
         algorithms::SignaturePublicKeyRandomizationGadget,
@@ -13,7 +12,8 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
     },
 };
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkvm_models::algorithms::SignatureScheme;
+use snarkvm_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use blake2::Blake2s;
 use rand::{thread_rng, Rng};

@@ -10,7 +10,7 @@ use snarkos_models::{
     curves::{Field, FpParameters, PairingCurve, PairingEngine, SWModelParameters},
     field,
 };
-use snarkos_utilities::{biginteger::BigInteger832, bititerator::BitIterator};
+use snarkvm_utilities::{biginteger::BigInteger832, bititerator::BitIterator};
 
 pub type GT = Fq6;
 

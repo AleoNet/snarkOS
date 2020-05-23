@@ -12,8 +12,8 @@ use crate::{
         },
     },
 };
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_utilities::bytes::ToBytes;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::bytes::ToBytes;
 use std::borrow::Borrow;
 
 /// Represents an interpretation of 32 `Boolean` objects as an

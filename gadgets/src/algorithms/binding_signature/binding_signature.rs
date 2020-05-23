@@ -1,7 +1,6 @@
 use crate::algorithms::commitment::pedersen::*;
 
 use snarkos_algorithms::{commitment::PedersenCompressedCommitment, crh::PedersenSize};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
@@ -11,6 +10,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use std::marker::PhantomData;
 

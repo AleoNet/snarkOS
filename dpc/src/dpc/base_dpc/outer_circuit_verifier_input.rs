@@ -1,10 +1,8 @@
 use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
-use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
-use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH},
-    curves::to_field_vec::ToConstraintField,
-};
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_models::curves::to_field_vec::ToConstraintField;
+use snarkvm_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
+use snarkvm_models::algorithms::{CommitmentScheme, CRH};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]

@@ -19,7 +19,7 @@ snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkvm-utilities = { path = "../../snarkVM/utilities", version = "0.9.0" }
 
 bincode = { version = "1.2.0" }
 byteorder = { version = "1" }

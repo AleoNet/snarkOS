@@ -1,8 +1,8 @@
 use crate::{
-    algorithms::{CRHError, CommitmentError, PRFError, SNARKError, SignatureError},
     dpc::{BindingSignatureError, LedgerError},
     objects::AccountError,
 };
+use snarkvm_errors::algorithms::{CRHError, CommitmentError, PRFError, SNARKError, SignatureError};
 
 #[derive(Debug, Error)]
 pub enum DPCError {

@@ -1,7 +1,7 @@
 use crate::merkle_tree::{MerkleParameters, MerklePath};
-use snarkos_errors::algorithms::MerkleError;
-use snarkos_models::algorithms::CRH;
-use snarkos_utilities::bytes::ToBytes;
+use snarkvm_errors::algorithms::MerkleError;
+use snarkvm_models::algorithms::CRH;
+use snarkvm_utilities::bytes::ToBytes;
 
 pub struct MerkleTree<P: MerkleParameters> {
     root: Option<<P::H as CRH>::Output>,

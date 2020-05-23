@@ -6,13 +6,13 @@ use crate::base_dpc::{
     DPC,
 };
 use snarkos_models::{
-    algorithms::CRH,
     dpc::{DPCScheme, Record},
     objects::{AccountScheme, Ledger, Transaction},
     storage::Storage,
 };
 use snarkos_objects::Account;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_models::algorithms::CRH;
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::Rng;
 

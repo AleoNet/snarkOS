@@ -3,12 +3,12 @@ use crate::{
     msm::FixedBaseMSM,
     snark::{r1cs_to_sap::R1CStoSAP, Parameters, VerifyingKey},
 };
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, Field, PairingEngine, PrimeField, ProjectiveCurve},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, Variable},
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_utilities::rand::UniformRand;
 
 use rand::Rng;
 

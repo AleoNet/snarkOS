@@ -1,7 +1,8 @@
 use crate::{account_format, AccountPrivateKey};
 use snarkos_errors::objects::AccountError;
-use snarkos_models::{algorithms::CommitmentScheme, dpc::DPCComponents};
-use snarkos_utilities::{
+use snarkos_models::dpc::DPCComponents;
+use snarkvm_models::algorithms::CommitmentScheme;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

@@ -1,11 +1,9 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
-use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, SNARK},
-    objects::Transaction,
-};
-use snarkos_utilities::{
+use snarkos_models::objects::Transaction;
+use snarkvm_models::algorithms::{CommitmentScheme, SignatureScheme, SNARK};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
     variable_length_integer::{read_variable_length_integer, variable_length_integer},

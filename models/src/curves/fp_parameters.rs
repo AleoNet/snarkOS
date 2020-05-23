@@ -1,4 +1,4 @@
-use snarkos_utilities::biginteger::*;
+use snarkvm_utilities::biginteger::*;
 
 /// A trait that defines parameters for a prime field.
 pub trait FpParameters: 'static + Send + Sync + Sized {

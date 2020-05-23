@@ -1,5 +1,5 @@
 use crate::curves::{Field, LegendreSymbol, PrimeField, SquareRootField};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
 };

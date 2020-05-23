@@ -1,5 +1,4 @@
 use snarkos_algorithms::signature::{SchnorrParameters, SchnorrPublicKey, SchnorrSignature};
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group},
     gadgets::{
@@ -15,6 +14,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 use digest::Digest;
 use std::{borrow::Borrow, marker::PhantomData};

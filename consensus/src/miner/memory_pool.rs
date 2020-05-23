@@ -7,7 +7,7 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::objects::{Ledger, Transaction};
 use snarkos_objects::dpc::DPCTransactions;
 use snarkos_storage::{has_duplicates, LedgerStorage};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

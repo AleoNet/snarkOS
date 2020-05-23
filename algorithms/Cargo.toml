@@ -20,7 +20,9 @@ required-features = ["rand", "snarkos-curves/bls12_377", "snarkos-models/gadgets
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkvm-errors = { path = "../../snarkVM/errors", version = "0.9.0" }
+snarkvm-models = { path = "../../snarkVM/models", version = "0.9.0" }
+snarkvm-utilities = { path = "../../snarkVM/utilities", version = "0.9.0" }
 
 blake2 = { version = "0.8.1" }
 derivative = { version = "2" }

@@ -12,7 +12,7 @@ use snarkos_models::{
         },
     },
 };
-use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};
+use snarkvm_utilities::{bititerator::BitIterator, rand::UniformRand};
 
 use rand::thread_rng;
 

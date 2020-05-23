@@ -27,8 +27,9 @@ pub fn prng() -> impl Rng {
 macro_rules! define_merkle_tree_parameters {
     ($struct_name:ident, $hash:ty, $height:expr) => {
         use rand::Rng;
-        use snarkos_models::{algorithms::crh::CRH, storage::Storage};
-        use snarkos_utilities::bytes::{FromBytes, ToBytes};
+        use snarkos_models::storage::Storage;
+        use snarkvm_models::algorithms::crh::CRH;
+        use snarkvm_utilities::bytes::{FromBytes, ToBytes};
         use std::{
             io::{Read, Result as IoResult, Write},
             path::PathBuf,

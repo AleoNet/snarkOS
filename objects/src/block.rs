@@ -1,7 +1,7 @@
 use crate::{dpc::DPCTransactions, BlockHeader};
 use snarkos_errors::objects::BlockError;
 use snarkos_models::objects::{BlockScheme, Transaction};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
     variable_length_integer::variable_length_integer,

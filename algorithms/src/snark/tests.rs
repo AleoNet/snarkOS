@@ -1,8 +1,8 @@
-use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::Field,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
+use snarkvm_errors::gadgets::SynthesisError;
 
 struct MySillyCircuit<F: Field> {
     a: Option<F>,
@@ -34,7 +34,7 @@ mod bls12_377 {
     use super::*;
     use crate::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
-    use snarkos_utilities::rand::{test_rng, UniformRand};
+    use snarkvm_utilities::rand::{test_rng, UniformRand};
 
     use std::ops::MulAssign;
 
@@ -65,7 +65,7 @@ mod sw6 {
     use crate::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
     use snarkos_curves::sw6::{Fr as SW6Fr, SW6};
     use snarkos_models::curves::Field;
-    use snarkos_utilities::rand::{test_rng, UniformRand};
+    use snarkvm_utilities::rand::{test_rng, UniformRand};
 
     #[test]
     fn prove_and_verify() {
@@ -96,7 +96,7 @@ mod gm17 {
     fn test_gm17() {
         use crate::snark::GM17;
         use snarkos_curves::bls12_377::{Bls12_377, Fr};
-        use snarkos_models::algorithms::SNARK;
+        use snarkvm_models::algorithms::SNARK;
 
         #[derive(Copy, Clone)]
         struct R1CSCircuit {
@@ -152,7 +152,7 @@ mod serialization {
 
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
     use snarkos_models::storage::Storage;
-    use snarkos_utilities::{
+    use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         rand::UniformRand,
         to_bytes,

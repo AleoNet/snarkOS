@@ -10,7 +10,7 @@ use snarkos_consensus::miner::Entry;
 use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_errors::network::ServerError;
 use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

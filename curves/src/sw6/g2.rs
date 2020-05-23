@@ -6,7 +6,7 @@ use snarkos_models::{
     curves::{ModelParameters, PairingCurve, PairingEngine, SWModelParameters},
     field,
 };
-use snarkos_utilities::biginteger::{BigInteger384, BigInteger832};
+use snarkvm_utilities::biginteger::{BigInteger384, BigInteger832};
 
 pub type G2Affine = GroupAffine<SW6G2Parameters>;
 pub type G2Projective = GroupProjective<SW6G2Parameters>;
