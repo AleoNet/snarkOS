@@ -28,7 +28,7 @@ fn blake2s_commitment_gadget_test() {
     let mut randomness = [0u8; 32];
     rng.fill(&mut randomness);
 
-    let commitment = Blake2sCommitment::setup(rng);
+    let commitment = Blake2sCommitment::new(rng);
     let native_result = commitment.commit(&input, &randomness).unwrap();
 
     let mut input_bytes = vec![];
@@ -78,7 +78,7 @@ fn pedersen_commitment_gadget_test() {
 
     let input = [1u8; 4];
     let randomness = Fr::rand(rng);
-    let commitment = PedersenCommitment::<EdwardsProjective, Size>::setup(rng);
+    let commitment = PedersenCommitment::<EdwardsProjective, Size>::new(rng);
     let native_output = commitment.commit(&input, &randomness).unwrap();
 
     let mut input_bytes = vec![];

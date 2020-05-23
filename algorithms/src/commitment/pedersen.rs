@@ -18,10 +18,14 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
     type Parameters = PedersenCommitmentParameters<G, S>;
     type Randomness = G::ScalarField;
 
-    fn setup<R: Rng>(rng: &mut R) -> Self {
+    fn new<R: Rng>(rng: &mut R) -> Self {
         Self {
             parameters: PedersenCommitmentParameters::new(rng),
         }
+    }
+
+    fn from(parameters: Self::Parameters) -> Self {
+        Self { parameters }
     }
 
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {

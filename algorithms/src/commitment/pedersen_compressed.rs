@@ -20,10 +20,14 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
     type Parameters = PedersenCommitmentParameters<G, S>;
     type Randomness = <G as Group>::ScalarField;
 
-    fn setup<R: Rng>(rng: &mut R) -> Self {
+    fn new<R: Rng>(rng: &mut R) -> Self {
         Self {
             parameters: PedersenCommitmentParameters::new(rng),
         }
+    }
+
+    fn from(parameters: Self::Parameters) -> Self {
+        Self { parameters }
     }
 
     /// Returns the affine x-coordinate as the commitment.
