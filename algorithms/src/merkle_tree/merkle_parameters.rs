@@ -1,4 +1,3 @@
-use snarkos_models::storage::Storage;
 use snarkvm_errors::algorithms::MerkleError;
 use snarkvm_models::algorithms::CRH;
 use snarkvm_utilities::bytes::ToBytes;
@@ -6,7 +5,7 @@ use snarkvm_utilities::bytes::ToBytes;
 use rand::Rng;
 use std::io::Cursor;
 
-pub trait MerkleParameters: Clone + Default + Storage {
+pub trait MerkleParameters: Clone + Default + From<<Self as MerkleParameters>::H> {
     type H: CRH;
 
     const HEIGHT: usize;

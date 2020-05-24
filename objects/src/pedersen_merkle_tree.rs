@@ -1,6 +1,6 @@
 use snarkos_algorithms::{crh::PedersenCompressedCRH, define_merkle_tree_parameters, merkle_tree::prng};
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
-use snarkvm_utilities::to_bytes;
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};

@@ -1,5 +1,4 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
-use snarkos_models::storage::Storage;
 use snarkvm_models::algorithms::{CommitmentScheme, SNARK};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},

@@ -5,16 +5,20 @@ use crate::base_dpc::{
     BaseDPCComponents,
     DPC,
 };
+use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::{AccountScheme, Ledger, Transaction},
-    storage::Storage,
 };
 use snarkos_objects::Account;
 use snarkvm_models::algorithms::CRH;
-use snarkvm_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use rand::Rng;
+use std::{fs::File, path::PathBuf};
 
 pub struct Wallet {
     pub private_key: &'static str,
@@ -32,42 +36,56 @@ pub fn setup_or_load_parameters<R: Rng>(
     path.push("../dpc/src/parameters/");
     let ledger_parameter_path = path.join("ledger.params");
 
-    let (ledger_parameters, parameters) =
-        match <Components as BaseDPCComponents>::MerkleParameters::load(&ledger_parameter_path) {
-            Ok(ledger_parameters) => {
-                let parameters =
-                    match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
-                        Ok(parameters) => parameters,
-                        Err(_) => {
-                            println!("Parameter Setup");
-                            let parameters =
-                                <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
-                                    .expect("DPC setup failed");
-
-                            //  parameters.store(&path).unwrap();
-                            parameters
-                        }
-                    };
-
-                (ledger_parameters, parameters)
-            }
-            Err(_) => {
-                println!("Ledger parameter Setup");
-                let ledger_parameters = MerkleTreeLedger::setup(rng).expect("Ledger setup failed");
-
-                println!("Parameter Setup");
-                let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
-                    .expect("DPC setup failed");
-
-                //  ledger_parameters.store(&ledger_parameter_path).unwrap();
-                //  parameters.store(&path).unwrap();
-
-                (ledger_parameters, parameters)
-            }
+    fn load_ledger_parameters(ledger_parameter_path: &PathBuf) -> Option<CommitmentMerkleParameters> {
+        let mut file = match File::open(ledger_parameter_path) {
+            Ok(file) => file,
+            Err(_) => return None,
         };
 
+        let crh_params: <<<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H as CRH>::Parameters = match FromBytes::read(&mut file) {
+            Ok(crh_parameters) => crh_parameters,
+            Err(_) => return None,
+        };
+
+        let crh = <<Components as BaseDPCComponents>::MerkleParameters as MerkleParameters>::H::from(crh_params);
+
+        Some(<Components as BaseDPCComponents>::MerkleParameters::from(crh))
+    }
+
+    let (ledger_parameters, parameters) = match load_ledger_parameters(&ledger_parameter_path) {
+        Some(ledger_parameters) => {
+            let parameters =
+                match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
+                    Ok(parameters) => parameters,
+                    Err(_) => {
+                        println!("Parameter Setup");
+                        let parameters =
+                            <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
+                                .expect("DPC setup failed");
+
+                        //  parameters.store(&path).unwrap();
+                        parameters
+                    }
+                };
+
+            (ledger_parameters, parameters)
+        }
+        None => {
+            println!("Ledger parameter Setup");
+            let ledger_parameters = MerkleTreeLedger::setup(rng).expect("Ledger setup failed");
+
+            println!("Parameter Setup");
+            let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
+                .expect("DPC setup failed");
+
+            (ledger_parameters, parameters)
+        }
+    };
+
     // Store parameters - Uncomment this to store parameters to the specified paths
-    //    ledger_parameters.store(&ledger_parameter_path).unwrap();
+    //    let mut file = File::create(ledger_parameter_path).unwrap();
+    //    file.write_all(&to_bytes![ledger_parameters.parameters()].unwrap()).unwrap();
+    //    drop(file);
     //    parameters.store(&path).unwrap();
 
     (ledger_parameters, parameters)

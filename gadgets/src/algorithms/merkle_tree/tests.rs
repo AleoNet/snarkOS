@@ -13,6 +13,7 @@ use snarkos_models::gadgets::{
     r1cs::{ConstraintSystem, TestConstraintSystem},
     utilities::{alloc::AllocGadget, uint8::UInt8},
 };
+use snarkvm_utilities::bytes::ToBytes;
 
 use blake2::{digest::Digest, Blake2s};
 

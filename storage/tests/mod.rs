@@ -6,8 +6,12 @@ use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
 use snarkos_storage::{test_data::*, LedgerStorage};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
-use std::sync::Arc;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
