@@ -198,6 +198,7 @@ mod server_listen {
             // 4. Check that peer received Version message
 
             let (reader, _peer) = peer_listener.accept().await.unwrap();
+            sleep(1000).await;
 
             // 5. Send handshake response from peer to server
 
