@@ -307,6 +307,7 @@ mod server_connection_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(1000).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Add sync handler to connections
 
