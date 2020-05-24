@@ -2131,6 +2131,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-parameters"
+version = "0.8.0"
+
+[[package]]
 name = "snarkos-posw"
 version = "0.8.0"
 dependencies = [

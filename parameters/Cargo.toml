@@ -1,0 +1,14 @@
+[package]
+name = "snarkos-parameters"
+version = "0.8.0"
+authors = ["The Aleo Team <hello@aleo.org"]
+description = "Parameters for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
