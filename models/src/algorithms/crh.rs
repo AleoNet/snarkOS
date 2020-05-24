@@ -4,7 +4,7 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait CRH: From<<Self as CRH>::Parameters> + Clone {
+pub trait CRH: Clone + From<<Self as CRH>::Parameters> {
     type Output: Clone + Debug + ToBytes + FromBytes + Eq + Hash + Default;
     type Parameters: Clone + Debug + ToBytes + FromBytes + Eq;
 
