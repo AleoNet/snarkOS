@@ -29,7 +29,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     old_records: Option<Vec<DPCRecord<C>>>,
     old_witnesses: Option<Vec<MerklePath<C::MerkleParameters>>>,
     old_account_private_keys: Option<Vec<AccountPrivateKey<C>>>,
-    old_serial_numbers: Option<Vec<<C::Signature as SignatureScheme>::PublicKey>>,
+    old_serial_numbers: Option<Vec<<C::AccountSignature as SignatureScheme>::PublicKey>>,
 
     // Inputs for new records.
     new_records: Option<Vec<DPCRecord<C>>>,
@@ -58,7 +58,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
 
-        let old_serial_numbers = vec![<C::Signature as SignatureScheme>::PublicKey::default(); num_input_records];
+        let old_serial_numbers =
+            vec![<C::AccountSignature as SignatureScheme>::PublicKey::default(); num_input_records];
         let old_records = vec![DPCRecord::default(); num_input_records];
         let old_witnesses = vec![MerklePath::default(); num_input_records];
         let old_account_private_keys = vec![AccountPrivateKey::default(); num_input_records];
@@ -127,7 +128,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         old_records: &[DPCRecord<C>],
         old_witnesses: &[MerklePath<C::MerkleParameters>],
         old_account_private_keys: &[AccountPrivateKey<C>],
-        old_serial_numbers: &[<C::Signature as SignatureScheme>::PublicKey],
+        old_serial_numbers: &[<C::AccountSignature as SignatureScheme>::PublicKey],
 
         // New records
         new_records: &[DPCRecord<C>],

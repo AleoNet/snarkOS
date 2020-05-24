@@ -109,6 +109,8 @@ pub struct Components;
 impl DPCComponents for Components {
     type AccountCommitment = AccountCommitment;
     type AccountCommitmentGadget = AccountCommitmentGadget;
+    type AccountSignature = AccountSignature;
+    type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;
     type LocalDataCommitment = LocalDataCommitment;
     type LocalDataCommitmentGadget = LocalDataCommitmentGadget;
@@ -123,8 +125,6 @@ impl DPCComponents for Components {
     type RecordCommitmentGadget = RecordCommitmentGadget;
     type SerialNumberNonceCRH = SerialNumberNonce;
     type SerialNumberNonceCRHGadget = SerialNumberNonceGadget;
-    type Signature = Signature;
-    type SignatureGadget = SignatureGadget;
 
     const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
@@ -156,7 +156,7 @@ pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
-pub type Signature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
+pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SerialNumberNonce = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -183,7 +183,7 @@ pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsB
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
 pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type SignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
+pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;

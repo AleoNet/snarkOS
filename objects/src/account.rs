@@ -17,7 +17,7 @@ impl<C: DPCComponents> AccountScheme for Account<C> {
     type AccountPrivateKey = AccountPrivateKey<C>;
     type AccountPublicKey = AccountPublicKey<C>;
     type CommitmentScheme = C::AccountCommitment;
-    type SignatureScheme = C::Signature;
+    type SignatureScheme = C::AccountSignature;
 
     /// Creates a new account.
     fn new<R: Rng>(
