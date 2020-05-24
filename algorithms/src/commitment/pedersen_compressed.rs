@@ -20,9 +20,9 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
     type Parameters = PedersenCommitmentParameters<G, S>;
     type Randomness = <G as Group>::ScalarField;
 
-    fn new<R: Rng>(rng: &mut R) -> Self {
+    fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
-            parameters: PedersenCommitmentParameters::new(rng),
+            parameters: PedersenCommitmentParameters::setup(rng),
         }
     }
 

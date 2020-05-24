@@ -23,7 +23,7 @@ impl PedersenSize for Size {
 fn commitment_parameters_serialization<C: CommitmentScheme>() {
     let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
 
-    let commitment = C::new(rng);
+    let commitment = C::setup(rng);
     let commitment_parameters = commitment.parameters();
 
     let commitment_parameters_bytes = to_bytes![commitment_parameters].unwrap();

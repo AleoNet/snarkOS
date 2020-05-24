@@ -14,7 +14,7 @@ pub struct PedersenCommitmentParameters<G: Group, S: PedersenSize> {
 }
 
 impl<G: Group, S: PedersenSize> PedersenCommitmentParameters<G, S> {
-    pub fn new<R: Rng>(rng: &mut R) -> Self {
+    pub fn setup<R: Rng>(rng: &mut R) -> Self {
         let bases = (0..S::NUM_WINDOWS)
             .map(|_| Self::base(S::WINDOW_SIZE, rng))
             .collect::<Vec<Vec<G>>>();

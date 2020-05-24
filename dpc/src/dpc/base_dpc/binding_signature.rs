@@ -437,7 +437,7 @@ mod tests {
 
         // Setup parameters
 
-        let value_comm_pp = ValueCommitment::new(rng);
+        let value_comm_pp = ValueCommitment::setup(rng);
 
         let input_amount: u64 = rng.gen_range(0, 100000000);
         let input_amount_2: u64 = rng.gen_range(0, 100000000);
@@ -479,7 +479,7 @@ mod tests {
 
         // Setup parameters
 
-        let value_comm_pp = ValueCommitment::new(rng);
+        let value_comm_pp = ValueCommitment::setup(rng);
 
         let input_amount: u64 = rng.gen_range(0, 100000000);
         let input_amount_2: u64 = rng.gen_range(0, 100000000);
@@ -510,7 +510,7 @@ mod tests {
 
         // Setup parameters
 
-        let value_comm_pp = ValueCommitment::new(rng);
+        let value_comm_pp = ValueCommitment::setup(rng);
 
         let input_amount: u64 = rng.gen_range(0, 100000000);
         let input_amount_2: u64 = rng.gen_range(0, 100000000);

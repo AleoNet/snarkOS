@@ -12,7 +12,7 @@ pub trait CommitmentScheme: Sized + Clone + From<<Self as CommitmentScheme>::Par
     type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type Randomness: Clone + Debug + Default + Eq + UniformRand + ToBytes + FromBytes;
 
-    fn new<R: Rng>(r: &mut R) -> Self;
+    fn setup<R: Rng>(r: &mut R) -> Self;
 
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError>;
 

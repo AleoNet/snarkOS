@@ -13,7 +13,7 @@ impl CommitmentScheme for Blake2sCommitment {
     type Parameters = ();
     type Randomness = [u8; 32];
 
-    fn new<R: Rng>(_: &mut R) -> Self {
+    fn setup<R: Rng>(_: &mut R) -> Self {
         Self
     }
 

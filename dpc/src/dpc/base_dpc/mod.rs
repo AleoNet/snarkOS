@@ -199,23 +199,23 @@ pub struct LocalData<Components: BaseDPCComponents> {
 impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_circuit_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
         let time = start_timer!(|| "Account commitment scheme setup");
-        let account_commitment = Components::AccountCommitment::new(rng);
+        let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
-        let rec_comm_pp = Components::RecordCommitment::new(rng);
+        let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
-        let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::new(rng);
+        let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
-        let local_data_comm_pp = Components::LocalDataCommitment::new(rng);
+        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Value Commitment setup");
-        let value_comm_pp = Components::ValueCommitment::new(rng);
+        let value_comm_pp = Components::ValueCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");

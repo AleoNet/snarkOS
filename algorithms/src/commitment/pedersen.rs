@@ -18,9 +18,9 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
     type Parameters = PedersenCommitmentParameters<G, S>;
     type Randomness = G::ScalarField;
 
-    fn new<R: Rng>(rng: &mut R) -> Self {
+    fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
-            parameters: PedersenCommitmentParameters::new(rng),
+            parameters: PedersenCommitmentParameters::setup(rng),
         }
     }
 
