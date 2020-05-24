@@ -21,6 +21,8 @@ mod server_message_handler {
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{net::TcpListener, runtime::Runtime, sync::oneshot};
 
+    pub const WAIT_PERIOD: u64 = 1000;
+
     #[test]
     #[serial]
     fn receive_block_message() {
@@ -49,7 +51,7 @@ mod server_message_handler {
 
             simulate_active_node(peer_address).await;
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Block message to server
 
@@ -107,7 +109,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send BlockRequest to server from peer
 
@@ -170,7 +172,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
             accept_channel(&mut bootnode_listener, server_address).await;
@@ -232,7 +234,7 @@ mod server_message_handler {
 
             simulate_active_node(bootnode_address).await;
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Block 1 to server from bootnode
 
@@ -323,7 +325,7 @@ mod server_message_handler {
 
             simulate_active_node(peer_address).await;
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Sync message to server from peer
 
@@ -381,7 +383,7 @@ mod server_message_handler {
 
             simulate_active_node(peer_address).await;
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Transaction message to server from peer
 
@@ -442,7 +444,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send GetMemoryPool to server from peer
 
@@ -506,7 +508,7 @@ mod server_message_handler {
             // 2. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 3. Send GetMemoryPool to server from peer
 
@@ -627,7 +629,7 @@ mod server_message_handler {
 
             start_test_server(server);
             simulate_active_node(bootnode_address).await;
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send GetPeers message to server from peer
 
@@ -746,7 +748,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send ping request to server from peer
 
@@ -861,7 +863,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
@@ -942,7 +944,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
-            sleep(2500).await; // Sleep to give testing server time to spin up on a new thread
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
