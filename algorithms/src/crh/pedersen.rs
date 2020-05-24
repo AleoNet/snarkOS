@@ -3,16 +3,10 @@ use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, Field, Group},
-    storage::Storage,
 };
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use rayon::prelude::*;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-};
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
     let mut bits = Vec::with_capacity(bytes.len() * 8);
@@ -30,21 +24,6 @@ pub struct PedersenCRH<G: Group, S: PedersenSize> {
     pub parameters: PedersenCRHParameters<G, S>,
 }
 
-impl<G: Group, S: PedersenSize> ToBytes for PedersenCRH<G, S> {
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.parameters.write(&mut writer)
-    }
-}
-
-impl<G: Group, S: PedersenSize> FromBytes for PedersenCRH<G, S> {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let parameters: PedersenCRHParameters<G, S> = FromBytes::read(&mut reader)?;
-
-        Ok(Self { parameters })
-    }
-}
-
 impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
     type Output = G;
     type Parameters = PedersenCRHParameters<G, S>;
@@ -53,7 +32,7 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
-            parameters: PedersenCRHParameters::new(rng),
+            parameters: PedersenCRHParameters::setup(rng),
         }
     }
 
@@ -110,22 +89,6 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
-    }
-}
-
-impl<G: Group, S: PedersenSize> Storage for PedersenCRH<G, S> {
-    /// Store the Pedersen CRH parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.parameters.store(path)?;
-
-        Ok(())
-    }
-
-    /// Load the Pedersen CRH parameters from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        let parameters = PedersenCRHParameters::<G, S>::load(path)?;
-
-        Ok(Self { parameters })
     }
 }
 
