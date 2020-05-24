@@ -1,6 +1,6 @@
 use crate::signature::SchnorrSignature;
 use snarkos_curves::edwards_sw6::EdwardsAffine as Edwards;
-use snarkos_models::{algorithms::SignatureScheme, curves::Group, storage::Storage};
+use snarkos_models::{algorithms::SignatureScheme, curves::Group};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
@@ -8,14 +8,13 @@ use snarkos_utilities::{
 };
 
 use blake2::Blake2s;
-use rand::thread_rng;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 type TestSignature = SchnorrSignature<Edwards, Blake2s>;
 
-const TEST_SIGNATURE_PARAMETERS_PATH: &str = "./schnorr_signature.params";
-
 fn sign_and_verify<S: SignatureScheme>(message: &[u8]) {
-    let rng = &mut thread_rng();
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
     let schnorr_signature = S::setup::<_>(rng).unwrap();
     let private_key = schnorr_signature.generate_private_key(rng).unwrap();
     let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
@@ -24,7 +23,7 @@ fn sign_and_verify<S: SignatureScheme>(message: &[u8]) {
 }
 
 fn failed_verification<S: SignatureScheme>(message: &[u8], bad_message: &[u8]) {
-    let rng = &mut thread_rng();
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
     let schnorr_signature = S::setup::<_>(rng).unwrap();
     let private_key = schnorr_signature.generate_private_key(rng).unwrap();
     let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
@@ -33,7 +32,7 @@ fn failed_verification<S: SignatureScheme>(message: &[u8], bad_message: &[u8]) {
 }
 
 fn randomize_and_verify<S: SignatureScheme>(message: &[u8], randomness: &[u8]) {
-    let rng = &mut thread_rng();
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
     let schnorr_signature = S::setup::<_>(rng).unwrap();
     let private_key = schnorr_signature.generate_private_key(rng).unwrap();
     let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
@@ -49,10 +48,23 @@ fn randomize_and_verify<S: SignatureScheme>(message: &[u8], randomness: &[u8]) {
     );
 }
 
+fn signature_scheme_parameter_serialization<S: SignatureScheme>() {
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
+
+    let signature_scheme = S::setup(rng).unwrap();
+    let signature_scheme_parameters = signature_scheme.parameters();
+
+    let signature_scheme_parameters_bytes = to_bytes![signature_scheme_parameters].unwrap();
+    let recovered_signature_scheme_parameters: <S as SignatureScheme>::Parameters =
+        FromBytes::read(&signature_scheme_parameters_bytes[..]).unwrap();
+
+    assert_eq!(signature_scheme_parameters, &recovered_signature_scheme_parameters);
+}
+
 #[test]
 fn schnorr_signature_test() {
     let message = "Hi, I am a Schnorr signature!";
-    let rng = &mut thread_rng();
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
     sign_and_verify::<TestSignature>(message.as_bytes());
     failed_verification::<TestSignature>(message.as_bytes(), "Bad message".as_bytes());
     let random_scalar = to_bytes!(<Edwards as Group>::ScalarField::rand(rng)).unwrap();
@@ -60,31 +72,6 @@ fn schnorr_signature_test() {
 }
 
 #[test]
-fn schnorr_signature_parameter_serialization() {
-    let rng = &mut thread_rng();
-
-    let schnorr_signature = TestSignature::setup(rng).unwrap();
-
-    let schnorr_signature_bytes = to_bytes![schnorr_signature].unwrap();
-
-    let recovered_schnorr_signature: TestSignature = FromBytes::read(&schnorr_signature_bytes[..]).unwrap();
-
-    assert_eq!(schnorr_signature, recovered_schnorr_signature);
-}
-
-#[test]
-fn schnorr_signature_parameter_storage() {
-    let rng = &mut thread_rng();
-    let mut path = std::env::temp_dir();
-    path.push(TEST_SIGNATURE_PARAMETERS_PATH);
-
-    let schnorr_signature = TestSignature::setup(rng).unwrap();
-
-    schnorr_signature.store(&path).unwrap();
-
-    let recovered_schnorr_signature = TestSignature::load(&path).unwrap();
-
-    assert_eq!(schnorr_signature, recovered_schnorr_signature);
-
-    std::fs::remove_file(&path).unwrap();
+fn schnorr_signature_scheme_parameters_serialization() {
+    signature_scheme_parameter_serialization::<TestSignature>();
 }
