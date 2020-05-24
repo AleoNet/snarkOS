@@ -15,6 +15,10 @@ pub trait DPCComponents: 'static + Sized {
     type AccountCommitment: CommitmentScheme;
     type AccountCommitmentGadget: CommitmentGadget<Self::AccountCommitment, Self::InnerField>;
 
+    /// Signature scheme for delegated compute.
+    type AccountSignature: SignatureScheme;
+    type AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Self::AccountSignature, Self::InnerField>;
+
     /// Commitment scheme for committing to predicate input. Invoked inside
     /// `Self::MainN` and every predicate SNARK.
     type LocalDataCommitment: CommitmentScheme;
@@ -43,8 +47,4 @@ pub trait DPCComponents: 'static + Sized {
     /// CRH for computing the serial number nonce. Invoked only over `Self::InnerField`.
     type SerialNumberNonceCRH: CRH;
     type SerialNumberNonceCRHGadget: CRHGadget<Self::SerialNumberNonceCRH, Self::InnerField>;
-
-    /// Signature scheme for delegated compute.
-    type Signature: SignatureScheme;
-    type SignatureGadget: SignaturePublicKeyRandomizationGadget<Self::Signature, Self::InnerField>;
 }

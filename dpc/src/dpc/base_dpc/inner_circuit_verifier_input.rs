@@ -15,7 +15,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Input record serial numbers and death predicate commitments
-    pub old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
 
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
@@ -44,8 +44,8 @@ where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::Signature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::Signature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
+    <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 

@@ -24,7 +24,7 @@ pub struct CircuitParameters<C: BaseDPCComponents> {
     pub local_data_commitment: C::LocalDataCommitment,
     pub value_commitment: C::ValueCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
-    pub signature: C::Signature,
+    pub signature: C::AccountSignature,
 }
 
 #[derive(Derivative)]
@@ -97,7 +97,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.circuit_parameters.serial_number_nonce
     }
 
-    pub fn signature_parameters(&self) -> &C::Signature {
+    pub fn signature_parameters(&self) -> &C::AccountSignature {
         &self.circuit_parameters.signature
     }
 
@@ -248,7 +248,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
                 load_crh::<C::PredicateVerificationKeyHash>(predicate_vk_crh_parameters_path)?;
             let serial_number_nonce = load_crh::<C::SerialNumberNonceCRH>(serial_number_nonce_crh_parameters_path)?;
 
-            let signature = load_signature_scheme::<C::Signature>(signature_parameters_path)?;
+            let signature = load_signature_scheme::<C::AccountSignature>(signature_parameters_path)?;
 
             CircuitParameters::<C> {
                 account_commitment,
@@ -363,7 +363,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
                 load_crh::<C::PredicateVerificationKeyHash>(predicate_vk_crh_parameters)?;
             let serial_number_nonce = load_crh::<C::SerialNumberNonceCRH>(serial_number_nonce_crh_parameters)?;
 
-            let signature = load_signature_scheme::<C::Signature>(signature_parameters)?;
+            let signature = load_signature_scheme::<C::AccountSignature>(signature_parameters)?;
 
             CircuitParameters::<C> {
                 account_commitment,
