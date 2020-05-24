@@ -18,7 +18,7 @@ use snarkos_utilities::{
 };
 
 use rand::Rng;
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{fs::File, path::PathBuf};
 
 pub struct Wallet {
     pub private_key: &'static str,
