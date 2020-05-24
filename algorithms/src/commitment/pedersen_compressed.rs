@@ -2,19 +2,11 @@ use crate::{
     commitment::{PedersenCommitment, PedersenCommitmentParameters},
     crh::PedersenSize,
 };
-use snarkos_models::{
-    curves::{AffineCurve, Group, ProjectiveCurve},
-    storage::Storage,
-};
+use snarkos_models::curves::{AffineCurve, Group, ProjectiveCurve};
 use snarkvm_errors::algorithms::CommitmentError;
 use snarkvm_models::algorithms::CommitmentScheme;
-use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCompressedCommitment<G: Group + ProjectiveCurve, S: PedersenSize> {
@@ -28,7 +20,7 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
-            parameters: PedersenCommitmentParameters::new(rng),
+            parameters: PedersenCommitmentParameters::setup(rng),
         }
     }
 
@@ -49,33 +41,10 @@ impl<G: Group + ProjectiveCurve, S: PedersenSize> CommitmentScheme for PedersenC
     }
 }
 
-impl<G: Group + ProjectiveCurve, S: PedersenSize> Storage for PedersenCompressedCommitment<G, S> {
-    /// Store the Pedersen compressed commitment parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.parameters.store(path)?;
-        Ok(())
-    }
-
-    /// Load the Pedersen compressed commitment parameters from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        let parameters = PedersenCommitmentParameters::<G, S>::load(path)?;
-
-        Ok(Self { parameters })
-    }
-}
-
-impl<G: Group + ProjectiveCurve, S: PedersenSize> ToBytes for PedersenCompressedCommitment<G, S> {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.parameters.write(&mut writer)
-    }
-}
-
-impl<G: Group + ProjectiveCurve, S: PedersenSize> FromBytes for PedersenCompressedCommitment<G, S> {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let parameters: PedersenCommitmentParameters<G, S> = FromBytes::read(&mut reader)?;
-
-        Ok(Self { parameters })
+impl<G: Group + ProjectiveCurve, S: PedersenSize> From<PedersenCommitmentParameters<G, S>>
+    for PedersenCompressedCommitment<G, S>
+{
+    fn from(parameters: PedersenCommitmentParameters<G, S>) -> Self {
+        Self { parameters }
     }
 }

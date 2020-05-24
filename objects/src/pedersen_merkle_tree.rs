@@ -10,7 +10,7 @@ use std::fmt::{self, Display, Formatter};
 mod window {
     use snarkos_algorithms::crh::PedersenSize;
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     pub struct TwoToOneWindow;
 
     impl PedersenSize for TwoToOneWindow {

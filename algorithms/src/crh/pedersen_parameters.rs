@@ -4,13 +4,14 @@ use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{
+    fmt::Debug,
     fs::File,
     io::{Read, Result as IoResult, Write},
     marker::PhantomData,
     path::PathBuf,
 };
 
-pub trait PedersenSize: Clone {
+pub trait PedersenSize: Clone + Debug + Eq {
     const WINDOW_SIZE: usize;
     const NUM_WINDOWS: usize;
 }

@@ -61,7 +61,7 @@ impl FromBytes for TestTx {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Size;
 // `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 bits
 impl PedersenSize for Size {
