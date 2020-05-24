@@ -1,16 +1,9 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
-use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK};
+use snarkos_models::algorithms::SNARK;
 use snarkos_parameters::*;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::bytes::FromBytes;
 
-use std::{
-    fs::File,
-    io::{Result as IoResult, Write},
-    path::PathBuf,
-};
+use std::{fs::File, io::Result as IoResult, path::PathBuf};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -135,107 +128,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn serial_number_nonce_parameters(&self) -> &C::SerialNumberNonceCRH {
         &self.circuit_parameters.serial_number_nonce
-    }
-
-    pub fn store(&self, parameter_dir: &PathBuf) -> IoResult<()> {
-        let circuit_dir = parameter_dir.join("circuit/");
-
-        fn store_bytes(parameters_bytes: Vec<u8>, path: &PathBuf) -> IoResult<()> {
-            let mut file = File::create(path)?;
-            file.write_all(&parameters_bytes)?;
-            drop(file);
-            Ok(())
-        }
-
-        // Circuit Parameters
-
-        let account_commitment_parameters_path = &circuit_dir.join("account_commitment.params");
-        let account_signature_parameters_path = &circuit_dir.join("account_signature.params");
-        let record_commitment_parameters_path = &circuit_dir.join("record_commitment.params");
-        let predicate_vk_commitment_parameters_path = &circuit_dir.join("predicate_vk_commitment.params");
-        let predicate_vk_crh_parameters_path = &circuit_dir.join("predicate_vk_crh.params");
-        let local_data_commitment_parameters_path = &circuit_dir.join("local_data_commitment.params");
-        let value_commitment_parameters_path = &circuit_dir.join("value_commitment.params");
-        let serial_number_nonce_crh_parameters_path = &circuit_dir.join("serial_number_nonce_crh.params");
-
-        let circuit_parameters = &self.circuit_parameters;
-
-        let account_commitment_parameters_bytes = to_bytes![circuit_parameters.account_commitment.parameters()]?;
-        let account_signature_parameters_bytes = to_bytes![circuit_parameters.account_signature.parameters()]?;
-        let record_commitment_parameters_bytes = to_bytes![circuit_parameters.record_commitment.parameters()]?;
-        let predicate_vk_commitment_parameters_bytes =
-            to_bytes![circuit_parameters.predicate_verification_key_commitment.parameters()]?;
-        let predicate_vk_crh_parameters_bytes =
-            to_bytes![circuit_parameters.predicate_verification_key_hash.parameters()]?;
-        let local_data_commitment_parameters_bytes = to_bytes![circuit_parameters.local_data_commitment.parameters()]?;
-        let value_commitment_parameters_bytes = to_bytes![circuit_parameters.value_commitment.parameters()]?;
-        let serial_number_nonce_crh_parameters_bytes = to_bytes![circuit_parameters.serial_number_nonce.parameters()]?;
-
-        store_bytes(account_commitment_parameters_bytes, account_commitment_parameters_path)?;
-        store_bytes(account_signature_parameters_bytes, account_signature_parameters_path)?;
-        store_bytes(record_commitment_parameters_bytes, record_commitment_parameters_path)?;
-        store_bytes(
-            predicate_vk_commitment_parameters_bytes,
-            predicate_vk_commitment_parameters_path,
-        )?;
-        store_bytes(predicate_vk_crh_parameters_bytes, predicate_vk_crh_parameters_path)?;
-        store_bytes(
-            local_data_commitment_parameters_bytes,
-            local_data_commitment_parameters_path,
-        )?;
-        store_bytes(value_commitment_parameters_bytes, value_commitment_parameters_path)?;
-        store_bytes(
-            serial_number_nonce_crh_parameters_bytes,
-            serial_number_nonce_crh_parameters_path,
-        )?;
-
-        // Predicate SNARK Parameters
-
-        let predicate_snark_pk_path = &parameter_dir.join("predicate_snark.params");
-        let predicate_snark_vk_path = &parameter_dir.join("predicate_snark_vk.params");
-        let predicate_snark_proof_path = &parameter_dir.join("predicate_snark.proof");
-
-        let predicate_snark_pk_bytes = to_bytes![self.predicate_snark_parameters.proving_key]?;
-        let predicate_snark_vk_bytes = to_bytes![self.predicate_snark_parameters.verification_key]?;
-        let predicate_snark_proof_bytes = to_bytes![self.predicate_snark_parameters.proof]?;
-
-        store_bytes(predicate_snark_pk_bytes, predicate_snark_pk_path)?;
-        store_bytes(predicate_snark_vk_bytes, predicate_snark_vk_path)?;
-        store_bytes(predicate_snark_proof_bytes, predicate_snark_proof_path)?;
-
-        // Outer SNARK parameters
-
-        let outer_snark_pk_path = &parameter_dir.join("outer_snark.params");
-        let outer_snark_vk_path = &parameter_dir.join("outer_snark_vk.params");
-
-        if let Some(parameters) = &self.outer_snark_parameters.0 {
-            let outer_snark_pk_bytes = to_bytes![parameters]?;
-            store_bytes(outer_snark_pk_bytes, outer_snark_pk_path)?;
-        };
-
-        let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
-            self.outer_snark_parameters.1.clone().into();
-        let outer_snark_vk_bytes = to_bytes![outer_snark_vk]?;
-
-        store_bytes(outer_snark_vk_bytes, outer_snark_vk_path)?;
-
-        // Inner SNARK parameters
-
-        let inner_snark_pk_path = &parameter_dir.join("inner_snark.params");
-        let inner_snark_vk_path = &parameter_dir.join("inner_snark_vk.params");
-
-        if let Some(parameters) = &self.inner_snark_parameters.0 {
-            let inner_snark_pk_parameters_bytes = to_bytes![parameters]?;
-            store_bytes(inner_snark_pk_parameters_bytes, inner_snark_pk_path)?;
-        };
-
-        let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
-            self.inner_snark_parameters.1.clone().into();
-        let inner_snark_vk_bytes = to_bytes![inner_snark_vk]?;
-
-        store_bytes(inner_snark_vk_bytes, inner_snark_vk_path)?;
-
-        Ok(())
     }
 
     pub fn load(dir_path: &PathBuf, verify_only: bool) -> IoResult<Self> {
