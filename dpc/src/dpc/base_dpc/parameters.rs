@@ -223,8 +223,10 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         // SNARK Parameters
 
         let predicate_snark_parameters: PredicateSNARKParameters<C> = {
-            let predicate_snark_pk_bytes = include_bytes!["../../parameters/predicate_snark.params"];
-            let predicate_snark_vk_bytes = include_bytes!["../../parameters/predicate_snark_vk.params"];
+            let predicate_snark_pk_bytes =
+                include_bytes!["../../../../parameters/src/predicate_snark_pk/predicate_snark_pk.params"];
+            let predicate_snark_vk_bytes =
+                include_bytes!["../../../../parameters/src/predicate_snark_vk/predicate_snark_vk.params"];
             let predicate_snark_proof_bytes = include_bytes!["../../parameters/predicate_snark.proof"];
 
             let proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters =
@@ -246,7 +248,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         ) = {
             let outer_snark_pk = None;
 
-            let outer_snark_vk_bytes = include_bytes!["../../parameters/outer_snark_vk.params"];
+            let outer_snark_vk_bytes =
+                include_bytes!["../../../../parameters/src/outer_snark_vk/outer_snark_vk.params"];
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
                 FromBytes::read(&outer_snark_vk_bytes[..])?;
             let outer_snark_prepared_vk = outer_snark_vk.into();
@@ -260,7 +263,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         ) = {
             let inner_snark_pk = None;
 
-            let inner_snark_vk_bytes = include_bytes!["../../parameters/inner_snark_vk.params"];
+            let inner_snark_vk_bytes =
+                include_bytes!["../../../../parameters/src/inner_snark_vk/inner_snark_vk.params"];
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
                 FromBytes::read(&inner_snark_vk_bytes[..])?;
             let inner_snark_prepared_vk = inner_snark_vk.into();
