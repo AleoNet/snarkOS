@@ -1,7 +1,10 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::{
+    algorithms::CRH,
+    objects::{Ledger, Transaction},
+};
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::bytes::FromBytes;
 
@@ -44,11 +47,10 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        //        let parameter_path = path.as_ref().join("../dpc/src/parameters/");
-        //        let ledger_parameter_path = parameter_path.join("ledger.params");
-
         let ledger_param_bytes = include_bytes!("../../dpc/src/parameters/ledger.params");
-        let parameters = P::read(&ledger_param_bytes[..])?;
+        let crh_params: <P::H as CRH>::Parameters = FromBytes::read(&ledger_param_bytes[..])?;
+        let crh = P::H::from(crh_params);
+        let ledger_parameters = P::from(crh);
 
         match latest_block_number {
             Some(val) => {
@@ -73,13 +75,13 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
 
                 assert!(commitments[0] == genesis_cm);
 
-                let merkle_tree = MerkleTree::new(parameters.clone(), &commitments)?;
+                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
 
                 Ok(Self {
                     latest_block_height: RwLock::new(bytes_to_u32(val)),
                     storage: Arc::new(storage),
                     cm_merkle_tree: RwLock::new(merkle_tree),
-                    ledger_parameters: parameters,
+                    ledger_parameters,
                     _transaction: PhantomData,
                 })
             }
@@ -88,7 +90,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
 
                 let ledger_storage = Self::new(
                     &path.as_ref().to_path_buf(),
-                    parameters,
+                    ledger_parameters,
                     FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
                     FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
                     FromBytes::read(&GENESIS_MEMO[..])?,
