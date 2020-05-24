@@ -342,16 +342,21 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn load_vk_direct() -> IoResult<Self> {
         // Circuit Parameters
         let circuit_parameters: CircuitParameters<C> = {
-            let account_commitment_parameters = include_bytes!["../../parameters/circuit/account_commitment.params"];
-            let record_commitment_parameters = include_bytes!["../../parameters/circuit/record_commitment.params"];
+            let account_commitment_parameters =
+                include_bytes!["../../../../parameters/src/account_commitment/account_commitment.params"];
+            let record_commitment_parameters =
+                include_bytes!["../../../../parameters/src/record_commitment/record_commitment.params"];
             let predicate_vk_commitment_parameters = vec![];
-            let predicate_vk_crh_parameters = include_bytes!["../../parameters/circuit/predicate_vk_crh.params"];
+            let predicate_vk_crh_parameters =
+                include_bytes!["../../../../parameters/src/predicate_vk_crh/predicate_vk_crh.params"];
             let local_data_commitment_parameters =
-                include_bytes!["../../parameters/circuit/local_data_commitment.params"];
-            let value_commitment_parameters = include_bytes!["../../parameters/circuit/value_commitment.params"];
+                include_bytes!["../../../../parameters/src/local_data_commitment/local_data_commitment.params"];
+            let value_commitment_parameters =
+                include_bytes!["../../../../parameters/src/value_commitment/value_commitment.params"];
             let serial_number_nonce_crh_parameters =
-                include_bytes!["../../parameters/circuit/serial_number_nonce_crh.params"];
-            let account_signature_parameters = include_bytes!["../../parameters/circuit/account_signature.params"];
+                include_bytes!["../../../../parameters/src/serial_number_nonce_crh/serial_number_nonce_crh.params"];
+            let account_signature_parameters =
+                include_bytes!["../../../../parameters/src/account_signature/account_signature.params"];
 
             fn load_commitment<C: CommitmentScheme>(parameters_bytes: &[u8]) -> IoResult<C> {
                 let parameters: <C as CommitmentScheme>::Parameters = FromBytes::read(&parameters_bytes[..])?;
