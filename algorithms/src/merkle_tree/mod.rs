@@ -59,5 +59,11 @@ macro_rules! define_merkle_tree_parameters {
                 ))
             }
         }
+
+        impl From<$hash> for $struct_name {
+            fn from(crh: $hash) -> Self {
+                Self(crh)
+            }
+        }
     };
 }
