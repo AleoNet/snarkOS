@@ -16,13 +16,13 @@ use snarkos_models::{
 
 use rand::{thread_rng, Rng};
 
-type TestCRH = PedersenCRH<EdwardsProjective, Window>;
+type TestCRH = PedersenCRH<EdwardsProjective, Size>;
 type TestCRHGadget = PedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(super) struct Window;
+pub(super) struct Size;
 
-impl PedersenSize for Window {
+impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 128;
 }
@@ -59,7 +59,7 @@ fn crh_primitive_gadget_test() {
     let crh = TestCRH::setup(rng);
     let native_result = crh.hash(&input).unwrap();
 
-    let parameters_gadget: PedersenCRHParametersGadget<EdwardsProjective, Window, Fr, EdwardsBlsGadget> =
+    let parameters_gadget: PedersenCRHParametersGadget<EdwardsProjective, Size, Fr, EdwardsBlsGadget> =
         <TestCRHGadget as CRHGadget<TestCRH, Fr>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || {
             Ok(&crh.parameters)
         })

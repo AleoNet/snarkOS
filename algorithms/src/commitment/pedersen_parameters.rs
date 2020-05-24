@@ -1,6 +1,9 @@
 use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::curves::ConstraintFieldError;
-use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
+use snarkos_models::{
+    algorithms::CRH,
+    curves::{to_field_vec::ToConstraintField, Field, Group},
+};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
@@ -63,7 +66,7 @@ impl<G: Group, S: PedersenSize> ToBytes for PedersenCommitmentParameters<G, S> {
             g.write(&mut writer)?;
         }
 
-        self.crh.write(&mut writer)?;
+        self.crh.parameters().write(&mut writer)?;
 
         Ok(())
     }
@@ -94,7 +97,8 @@ impl<G: Group, S: PedersenSize> FromBytes for PedersenCommitmentParameters<G, S>
             random_base.push(g);
         }
 
-        let crh: PedersenCRH<G, S> = FromBytes::read(&mut reader)?;
+        let crh_parameters: <PedersenCRH<G, S> as CRH>::Parameters = FromBytes::read(&mut reader)?;
+        let crh = PedersenCRH::<G, S>::from(crh_parameters);
 
         Ok(Self {
             bases,
