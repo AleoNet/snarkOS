@@ -45,7 +45,7 @@ fn test_execute_base_dpc_constraints() {
     ]
     .unwrap();
 
-    let signature_parameters = &circuit_parameters.signature;
+    let signature_parameters = &circuit_parameters.account_signature;
     let commitment_parameters = &circuit_parameters.account_commitment;
 
     // Generate metadata and an account for a dummy initial, or "genesis", record.

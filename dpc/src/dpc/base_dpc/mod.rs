@@ -124,7 +124,7 @@ where
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
         MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
-        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+        SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
     >,
 {
     circuit_parameters: &'a CircuitParameters<Components>,
@@ -134,7 +134,7 @@ where
     old_account_private_keys: &'a [AccountPrivateKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
+    old_serial_numbers: Vec<<Components::AccountSignature as SignatureScheme>::PublicKey>,
     old_randomizers: Vec<Vec<u8>>,
 
     // New record stuff
@@ -160,7 +160,7 @@ where
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
         MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
-        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+        SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
     >,
 {
     fn into_local_data(&self) -> LocalData<Components> {
@@ -184,7 +184,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
-    pub old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<Components::AccountSignature as SignatureScheme>::PublicKey>,
 
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
@@ -202,12 +202,20 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
+        let time = start_timer!(|| "Account signature setup");
+        let account_signature = Components::AccountSignature::setup(rng)?;
+        end_timer!(time);
+
         let time = start_timer!(|| "Record commitment scheme setup");
         let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
         let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Verification Key CRH setup");
+        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -222,25 +230,15 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Signature setup");
-        let sig_pp = Components::Signature::setup(rng)?;
-        end_timer!(time);
-
         let comm_crh_sig_pp = CircuitParameters {
             account_commitment,
+            account_signature,
             record_commitment: rec_comm_pp,
             predicate_verification_key_commitment: pred_vk_comm_pp,
+            predicate_verification_key_hash: pred_vk_crh_pp,
             local_data_commitment: local_data_comm_pp,
             value_commitment: value_comm_pp,
-
             serial_number_nonce: sn_nonce_crh_pp,
-            predicate_verification_key_hash: pred_vk_crh_pp,
-
-            signature: sig_pp,
         };
 
         Ok(comm_crh_sig_pp)
@@ -264,7 +262,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         params: &CircuitParameters<Components>,
         record: &DPCRecord<Components>,
         account_private_key: &AccountPrivateKey<Components>,
-    ) -> Result<(<Components::Signature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
+    ) -> Result<(<Components::AccountSignature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
         let sk_prf = &account_private_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
@@ -273,8 +271,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
         let sig_and_pk_randomizer = to_bytes![Components::PRF::evaluate(&prf_seed, &prf_input)?]?;
 
-        let sn = Components::Signature::randomize_public_key(
-            &params.signature,
+        let sn = Components::AccountSignature::randomize_public_key(
+            &params.account_signature,
             &account_private_key.pk_sig,
             &sig_and_pk_randomizer,
         )?;
@@ -354,7 +352,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             MerkleParameters = Components::MerkleParameters,
             MerklePath = MerklePath<Components::MerkleParameters>,
             MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
-            SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+            SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
@@ -531,7 +529,7 @@ where
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
         MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
-        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+        SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
     >,
 {
     type Account = Account<Components>;
@@ -592,9 +590,9 @@ where
     ) -> Result<Self::Account, DPCError> {
         let time = start_timer!(|| "BaseDPC::create_account");
 
-        let signature_parameters = &parameters.circuit_parameters.signature;
+        let account_signature_parameters = &parameters.circuit_parameters.account_signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(signature_parameters, commitment_parameters, metadata, rng)?;
+        let account = Account::new(account_signature_parameters, commitment_parameters, metadata, rng)?;
 
         end_timer!(time);
 
@@ -768,10 +766,17 @@ where
             let sk_sig = &old_account_private_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
-            let signature =
-                Components::Signature::sign(&circuit_parameters.signature, sk_sig, &signature_message, rng)?;
-            let randomized_signature =
-                Components::Signature::randomize_signature(&circuit_parameters.signature, &signature, randomizer)?;
+            let account_signature = Components::AccountSignature::sign(
+                &circuit_parameters.account_signature,
+                sk_sig,
+                &signature_message,
+                rng,
+            )?;
+            let randomized_signature = Components::AccountSignature::randomize_signature(
+                &circuit_parameters.account_signature,
+                &account_signature,
+                randomizer,
+            )?;
             signatures.push(randomized_signature);
 
             end_timer!(sig_time);
@@ -866,13 +871,13 @@ where
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
-        let sig_pp = &parameters.circuit_parameters.signature;
+        let account_signature = &parameters.circuit_parameters.account_signature;
         for (pk, sig) in transaction
             .old_serial_numbers()
             .iter()
             .zip(&transaction.stuff.signatures)
         {
-            if !Components::Signature::verify(sig_pp, pk, signature_message, sig)? {
+            if !Components::AccountSignature::verify(account_signature, pk, signature_message, sig)? {
                 eprintln!("Signature didn't verify.");
                 return Ok(false);
             }

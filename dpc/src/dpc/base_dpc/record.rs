@@ -50,7 +50,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Payload = PaymentRecordPayload;
     type Predicate = DPCPredicate<C>;
-    type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
+    type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
 
     fn account_public_key(&self) -> &Self::AccountPublicKey {

@@ -24,8 +24,8 @@ use std::{
     Eq(bound = "C: DPCComponents")
 )]
 pub struct AccountPrivateKey<C: DPCComponents> {
-    pub pk_sig: <C::Signature as SignatureScheme>::PublicKey,
-    pub sk_sig: <C::Signature as SignatureScheme>::PrivateKey,
+    pub pk_sig: <C::AccountSignature as SignatureScheme>::PublicKey,
+    pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub metadata: [u8; 32],
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
@@ -33,10 +33,14 @@ pub struct AccountPrivateKey<C: DPCComponents> {
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
     /// Creates a new account private key.
-    pub fn new<R: Rng>(parameters: &C::Signature, metadata: &[u8; 32], rng: &mut R) -> Result<Self, AccountError> {
+    pub fn new<R: Rng>(
+        parameters: &C::AccountSignature,
+        metadata: &[u8; 32],
+        rng: &mut R,
+    ) -> Result<Self, AccountError> {
         // Sample SIG key pair.
-        let sk_sig = C::Signature::generate_private_key(parameters, rng)?;
-        let pk_sig = C::Signature::generate_public_key(parameters, &sk_sig)?;
+        let sk_sig = C::AccountSignature::generate_private_key(parameters, rng)?;
+        let pk_sig = C::AccountSignature::generate_public_key(parameters, &sk_sig)?;
 
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
@@ -70,8 +74,8 @@ impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
     /// Reads in an account private key buffer.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let pk_sig: <C::Signature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
-        let sk_sig: <C::Signature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
+        let pk_sig: <C::AccountSignature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
+        let sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
         let metadata: [u8; 32] = FromBytes::read(&mut reader)?;
         let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;

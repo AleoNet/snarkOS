@@ -3,7 +3,6 @@ use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::SignatureScheme,
     curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
-    storage::Storage,
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -17,7 +16,6 @@ use std::{
     hash::Hash,
     io::{Read, Result as IoResult, Write},
     marker::PhantomData,
-    path::PathBuf,
 };
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
@@ -101,21 +99,6 @@ impl<F: Field, G: Group + ToConstraintField<F>> ToConstraintField<F> for Schnorr
 )]
 pub struct SchnorrSignature<G: Group, D: Digest> {
     pub parameters: SchnorrParameters<G, D>,
-}
-
-impl<G: Group, D: Digest> ToBytes for SchnorrSignature<G, D> {
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.parameters.write(&mut writer)
-    }
-}
-
-impl<G: Group, D: Digest> FromBytes for SchnorrSignature<G, D> {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let parameters: SchnorrParameters<G, D> = FromBytes::read(&mut reader)?;
-
-        Ok(Self { parameters })
-    }
 }
 
 impl<G: Group + Hash, D: Digest + Send + Sync> SignatureScheme for SchnorrSignature<G, D>
@@ -282,18 +265,8 @@ where
     }
 }
 
-impl<G: Group, D: Digest> Storage for SchnorrSignature<G, D> {
-    /// Store the Schnorr signature parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.parameters.store(path)?;
-
-        Ok(())
-    }
-
-    /// Load the Schnorr signature parameters from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        let parameters = SchnorrParameters::<G, D>::load(path)?;
-
-        Ok(Self { parameters })
+impl<G: Group, D: Digest> From<SchnorrParameters<G, D>> for SchnorrSignature<G, D> {
+    fn from(parameters: SchnorrParameters<G, D>) -> Self {
+        Self { parameters }
     }
 }

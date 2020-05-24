@@ -2,17 +2,10 @@
 //! [GM17]: https://eprint.iacr.org/2017/540
 
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::{
-    curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine},
-    storage::Storage,
-};
+use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::{
-    fs::File,
-    io::{self, Read, Result as IoResult, Write},
-    path::PathBuf,
-};
+use std::io::{self, Read, Result as IoResult, Write};
 
 #[macro_use]
 pub mod macros;
@@ -74,26 +67,6 @@ impl<E: PairingEngine> Default for Proof<E> {
             b: E::G2Affine::default(),
             c: E::G1Affine::default(),
         }
-    }
-}
-
-impl<E: PairingEngine> Storage for Proof<E> {
-    /// Store the SNARK proof to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        let mut file = File::create(path)?;
-        let mut parameter_bytes = vec![];
-
-        self.write(&mut parameter_bytes)?;
-        file.write_all(&parameter_bytes)?;
-        drop(file);
-
-        Ok(())
-    }
-
-    /// Load the SNARK proof from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
-        Ok(Self::read(&mut file)?)
     }
 }
 
@@ -161,26 +134,6 @@ impl<E: PairingEngine> PartialEq for VerifyingKey<E> {
             && self.g_gamma_g1 == other.g_gamma_g1
             && self.h_gamma_g2 == other.h_gamma_g2
             && self.query == other.query
-    }
-}
-
-impl<E: PairingEngine> Storage for VerifyingKey<E> {
-    /// Store the SNARK verifying key to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        let mut file = File::create(path)?;
-        let mut parameter_bytes = vec![];
-
-        self.write(&mut parameter_bytes)?;
-        file.write_all(&parameter_bytes)?;
-        drop(file);
-
-        Ok(())
-    }
-
-    /// Load the SNARK verifying key from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
-        Ok(Self::read(&mut file)?)
     }
 }
 
@@ -266,26 +219,6 @@ impl<E: PairingEngine> FromBytes for Parameters<E> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         Self::read(&mut reader, false)
-    }
-}
-
-impl<E: PairingEngine> Storage for Parameters<E> {
-    /// Store the SNARK parameters to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        let mut file = File::create(path)?;
-        let mut parameter_bytes = vec![];
-
-        self.write(&mut parameter_bytes)?;
-        file.write_all(&parameter_bytes)?;
-        drop(file);
-
-        Ok(())
-    }
-
-    /// Load the SNARK parameters from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = std::io::BufReader::new(File::open(path)?);
-        Ok(Self::read(&mut file, false)?)
     }
 }
 

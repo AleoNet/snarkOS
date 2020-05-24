@@ -40,7 +40,7 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     pub value_balance: i64,
 
     #[derivative(PartialEq = "ignore")]
-    pub signatures: Vec<<C::Signature as SignatureScheme>::Output>,
+    pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCStuff<C> {
@@ -77,7 +77,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
         let num_signatures = read_variable_length_integer(&mut reader)?;
         let mut signatures = vec![];
         for _ in 0..num_signatures {
-            let signature: <C::Signature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
+            let signature: <C::AccountSignature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
             signatures.push(signature);
         }
 
@@ -116,7 +116,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCStuff<C> {
     Eq(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCTransaction<C: BaseDPCComponents> {
-    pub old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     pub memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
@@ -133,7 +133,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
         value_balance: i64,
-        signatures: Vec<<C::Signature as SignatureScheme>::Output>,
+        signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
     ) -> Self {
         let stuff = DPCStuff {
             digest,
@@ -156,7 +156,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
 impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
-    type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
+    type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type Stuff = DPCStuff<C>;
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
@@ -233,7 +233,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let num_old_serial_numbers = read_variable_length_integer(&mut reader)?;
         let mut old_serial_numbers = vec![];
         for _ in 0..num_old_serial_numbers {
-            let old_serial_number: <C::Signature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
+            let old_serial_number: <C::AccountSignature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
             old_serial_numbers.push(old_serial_number);
         }
 
