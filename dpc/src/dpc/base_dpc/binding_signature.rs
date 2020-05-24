@@ -349,7 +349,7 @@ mod tests {
 
     type G = EdwardsBls12;
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     struct ValueWindow;
 
     impl PedersenSize for ValueWindow {

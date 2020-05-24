@@ -43,7 +43,7 @@ use blake2::Blake2s as Blake2sHash;
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SnNonceWindow;
 
 // `WINDOW_SIZE * NUM_WINDOWS` = NUM_INPUT_RECORDS * 64 + 1 + 32 = 225 bytes
@@ -53,7 +53,7 @@ impl PedersenSize for SnNonceWindow {
     const WINDOW_SIZE: usize = SN_NONCE_SIZE_BITS / 8;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
@@ -61,7 +61,7 @@ impl PedersenSize for PredVkHashWindow {
     const WINDOW_SIZE: usize = 300;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LocalDataWindow;
 
 impl PedersenSize for LocalDataWindow {
@@ -69,7 +69,7 @@ impl PedersenSize for LocalDataWindow {
     const WINDOW_SIZE: usize = 248;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TwoToOneWindow;
 // `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 bits
 impl PedersenSize for TwoToOneWindow {
@@ -77,21 +77,21 @@ impl PedersenSize for TwoToOneWindow {
     const WINDOW_SIZE: usize = 128;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RecordWindow;
 impl PedersenSize for RecordWindow {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 225;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AccountWindow;
 impl PedersenSize for AccountWindow {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 192;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ValueWindow;
 
 impl PedersenSize for ValueWindow {
