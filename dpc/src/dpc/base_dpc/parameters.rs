@@ -247,7 +247,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let account_commitment_parameters_path = &circuit_dir.join("account_commitment.params");
             let account_signature_parameters_path = &circuit_dir.join("account_signature.params");
             let record_commitment_parameters_path = &circuit_dir.join("record_commitment.params");
-            let predicate_vk_commitment_parameters_path = &circuit_dir.join("predicate_vk_commitment.params");
             let predicate_vk_crh_parameters_path = &circuit_dir.join("predicate_vk_crh.params");
             let local_data_commitment_parameters_path = &circuit_dir.join("local_data_commitment.params");
             let value_commitment_parameters_path = &circuit_dir.join("value_commitment.params");
@@ -257,7 +256,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let account_signature = load_signature_scheme::<C::AccountSignature>(account_signature_parameters_path)?;
             let record_commitment = load_commitment::<C::RecordCommitment>(record_commitment_parameters_path)?;
             let predicate_verification_key_commitment =
-                load_commitment::<C::PredicateVerificationKeyCommitment>(predicate_vk_commitment_parameters_path)?;
+                C::PredicateVerificationKeyCommitment::from(FromBytes::read(vec![].as_slice())?);
             let predicate_verification_key_hash =
                 load_crh::<C::PredicateVerificationKeyHash>(predicate_vk_crh_parameters_path)?;
             let local_data_commitment =
