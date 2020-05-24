@@ -33,6 +33,9 @@ where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
+    <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
+
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
@@ -43,9 +46,6 @@ where
 
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
-
-    <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -92,7 +92,14 @@ where
                 .to_field_elements()?,
         );
 
-        v.extend_from_slice(&self.circuit_parameters.signature.parameters().to_field_elements()?);
+        // TODO (raychu86): Reorder parameter input
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .account_signature
+                .parameters()
+                .to_field_elements()?,
+        );
 
         v.extend_from_slice(
             &self

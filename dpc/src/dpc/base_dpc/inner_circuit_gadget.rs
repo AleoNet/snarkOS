@@ -61,6 +61,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C,
         CS,
         C::AccountCommitment,
+        C::AccountSignatureGadget,
         C::RecordCommitment,
         C::LocalDataCommitment,
         C::SerialNumberNonceCRH,
@@ -70,7 +71,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::RecordCommitmentGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceCRHGadget,
-        C::AccountSignatureGadget,
         C::PRFGadget,
     >(
         cs,
@@ -106,6 +106,7 @@ fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
     AccountCommitment,
+    AccountSignatureGadget,
     RecordCommitment,
     LocalDataCommitment,
     SerialNumberNonceCRH,
@@ -115,7 +116,6 @@ fn base_dpc_execute_gadget_helper<
     RecordCommitmentGadget,
     LocalDataCommitmentGadget,
     SerialNumberNonceCRHGadget,
-    SignatureGadget,
     PGadget,
 >(
     cs: &mut CS,
@@ -153,6 +153,7 @@ fn base_dpc_execute_gadget_helper<
 where
     C: BaseDPCComponents<
         AccountCommitment = AccountCommitment,
+        AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitment = RecordCommitment,
         LocalDataCommitment = LocalDataCommitment,
         SerialNumberNonceCRH = SerialNumberNonceCRH,
@@ -162,10 +163,10 @@ where
         RecordCommitmentGadget = RecordCommitmentGadget,
         LocalDataCommitmentGadget = LocalDataCommitmentGadget,
         SerialNumberNonceCRHGadget = SerialNumberNonceCRHGadget,
-        AccountSignatureGadget = SignatureGadget,
         PRFGadget = PGadget,
     >,
     AccountCommitment: CommitmentScheme,
+    AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Signature, C::InnerField>,
     RecordCommitment: CommitmentScheme,
     LocalDataCommitment: CommitmentScheme,
     SerialNumberNonceCRH: CRH,
@@ -176,7 +177,6 @@ where
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
     LocalDataCommitmentGadget: CommitmentGadget<LocalDataCommitment, C::InnerField>,
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
-    SignatureGadget: SignaturePublicKeyRandomizationGadget<Signature, C::InnerField>,
     PGadget: PRFGadget<P, C::InnerField>,
 {
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
@@ -197,11 +197,11 @@ where
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
-    // 2. record_commitment_parameters
-    // 3. predicate_vk_commitment_parameters
-    // 4. local_data_commitment_parameters
-    // 5. serial_number_nonce_crh_parameters
-    // 6. signature_parameters
+    // 2. account_signature_parameters
+    // 3. record_commitment_parameters
+    // 4. predicate_vk_commitment_parameters
+    // 5. local_data_commitment_parameters
+    // 6. serial_number_nonce_crh_parameters
     // 7. value_commitment_parameters
     // 8. ledger_parameters
     // 9. ledger_digest
@@ -212,11 +212,11 @@ where
     // 14. binding_signature
     let (
         account_commitment_parameters,
+        account_signature_parameters,
         record_commitment_parameters,
         predicate_vk_commitment_parameters,
         local_data_commitment_parameters,
         serial_number_nonce_crh_parameters,
-        signature_parameters,
         value_commitment_parameters,
         ledger_parameters,
     ) = {
@@ -250,10 +250,11 @@ where
             || Ok(circuit_parameters.serial_number_nonce.parameters()),
         )?;
 
-        let signature_parameters =
-            SignatureGadget::ParametersGadget::alloc_input(&mut cs.ns(|| "Declare signature parameters"), || {
-                Ok(circuit_parameters.signature.parameters())
-            })?;
+        // TODO (raychu86): Reorder parameter allocation
+        let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare account signature parameters"),
+            || Ok(circuit_parameters.account_signature.parameters()),
+        )?;
 
         let value_commitment_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
@@ -271,11 +272,11 @@ where
 
         (
             account_commitment_parameters,
+            account_signature_parameters,
             record_commitment_parameters,
             predicate_vk_commitment_parameters,
             local_data_commitment_parameters,
             serial_number_nonce_crh_parameters,
-            signature_parameters,
             value_commitment_parameters,
             ledger_parameters,
         )
@@ -396,9 +397,10 @@ where
             // Declare variables for account contents.
             let account_cs = &mut cs.ns(|| "Check account");
 
-            let pk_sig = SignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
-                Ok(&account_private_key.pk_sig)
-            })?;
+            let pk_sig =
+                AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
+                    Ok(&account_private_key.pk_sig)
+                })?;
 
             let pk_sig_bytes = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
 
@@ -443,17 +445,17 @@ where
             )?;
             let randomizer_bytes = randomizer.to_bytes(&mut sn_cs.ns(|| "Convert randomizer to bytes"))?;
 
-            let candidate_serial_number_gadget = SignatureGadget::check_randomization_gadget(
+            let candidate_serial_number_gadget = AccountSignatureGadget::check_randomization_gadget(
                 &mut sn_cs.ns(|| "Compute serial number"),
-                &signature_parameters,
+                &account_signature_parameters,
                 &pk_sig,
                 &randomizer_bytes,
             )?;
 
-            let given_serial_number_gadget =
-                SignatureGadget::PublicKeyGadget::alloc_input(&mut sn_cs.ns(|| "Declare given serial number"), || {
-                    Ok(given_serial_number)
-                })?;
+            let given_serial_number_gadget = AccountSignatureGadget::PublicKeyGadget::alloc_input(
+                &mut sn_cs.ns(|| "Declare given serial number"),
+                || Ok(given_serial_number),
+            )?;
 
             candidate_serial_number_gadget.enforce_equal(
                 &mut sn_cs.ns(|| "Check that given and computed serial numbers are equal"),

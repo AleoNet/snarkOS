@@ -99,7 +99,7 @@ pub fn generate_test_accounts<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
-    let signature_parameters = &parameters.circuit_parameters.signature;
+    let signature_parameters = &parameters.circuit_parameters.account_signature;
     let commitment_parameters = &parameters.circuit_parameters.account_commitment;
 
     let genesis_metadata = [1u8; 32];
