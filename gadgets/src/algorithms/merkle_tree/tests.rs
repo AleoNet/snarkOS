@@ -13,10 +13,11 @@ use snarkos_models::gadgets::{
     r1cs::{ConstraintSystem, TestConstraintSystem},
     utilities::{alloc::AllocGadget, uint8::UInt8},
 };
+use snarkos_utilities::bytes::ToBytes;
 
 use blake2::{digest::Digest, Blake2s};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Size;
 impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 256;

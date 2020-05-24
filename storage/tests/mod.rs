@@ -7,8 +7,12 @@ use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
 use snarkos_storage::{test_data::*, LedgerStorage};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::sync::Arc;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
@@ -62,7 +66,7 @@ impl FromBytes for TestTx {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Size;
 // `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 bits
 impl PedersenSize for Size {

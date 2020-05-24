@@ -4,8 +4,9 @@ use crate::{
 };
 use snarkos_curves::edwards_bls12::EdwardsAffine as Edwards;
 use snarkos_models::curves::pairing_engine::AffineCurve;
+use snarkos_utilities::bytes::ToBytes;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Size;
 impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 256;

@@ -1,6 +1,6 @@
 use snarkos_algorithms::{crh::PedersenCompressedCRH, define_merkle_tree_parameters, merkle_tree::prng};
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
-use snarkos_utilities::to_bytes;
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::fmt::{self, Display, Formatter};
 mod window {
     use snarkos_algorithms::crh::PedersenSize;
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     pub struct TwoToOneWindow;
 
     impl PedersenSize for TwoToOneWindow {

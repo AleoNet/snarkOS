@@ -1,4 +1,3 @@
-use crate::storage::Storage;
 use snarkos_errors::algorithms::CommitmentError;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -8,10 +7,10 @@ use snarkos_utilities::{
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait CommitmentScheme: Sized + Clone + Storage {
-    type Output: ToBytes + FromBytes + Clone + Default + Eq + Hash + Debug;
-    type Parameters: Clone;
-    type Randomness: Clone + ToBytes + FromBytes + Default + Eq + UniformRand + Debug;
+pub trait CommitmentScheme: Sized + Clone + From<<Self as CommitmentScheme>::Parameters> {
+    type Output: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
+    type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
+    type Randomness: Clone + Debug + Default + Eq + UniformRand + ToBytes + FromBytes;
 
     fn setup<R: Rng>(r: &mut R) -> Self;
 

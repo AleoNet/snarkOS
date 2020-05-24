@@ -102,6 +102,7 @@ mod test {
     };
     use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
     use snarkos_models::curves::to_field_vec::ToConstraintField;
+    use snarkos_utilities::bytes::ToBytes;
 
     use blake2::{digest::Digest, Blake2s};
     use rand::thread_rng;
@@ -113,7 +114,7 @@ mod test {
         const MASK_LENGTH: usize = 32;
     }
 
-    #[derive(Clone, PartialEq, Eq)]
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct Size;
     impl PedersenSize for Size {
         const NUM_WINDOWS: usize = 256;

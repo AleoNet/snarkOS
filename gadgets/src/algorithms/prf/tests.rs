@@ -15,8 +15,8 @@ use snarkos_models::{
     },
 };
 
-use blake2::Blake2s;
-use digest::{FixedOutput, Input};
+use blake2::VarBlake2s;
+use digest::{Input, VariableOutput};
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
@@ -96,13 +96,14 @@ fn test_blake2s() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
     for input_len in (0..32).chain((32..256).filter(|a| a % 8 == 0)) {
-        let mut h = Blake2s::new_keyed(&[], 32);
+        let mut h = VarBlake2s::new(32).unwrap();
 
         let data: Vec<u8> = (0..input_len).map(|_| rng.gen()).collect();
 
-        h.process(&data);
+        h.input(&data);
 
-        let hash_result = h.fixed_result();
+        let mut hash_result = Vec::new();
+        h.variable_result(|output| hash_result.extend_from_slice(output));
 
         let mut cs = TestConstraintSystem::<Fr>::new();
 
@@ -125,7 +126,6 @@ fn test_blake2s() {
         assert!(cs.is_satisfied());
 
         let mut s = hash_result
-            .as_ref()
             .iter()
             .flat_map(|&byte| (0..8).map(move |i| (byte >> i) & 1u8 == 1u8));
 
