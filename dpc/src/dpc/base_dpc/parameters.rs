@@ -1,5 +1,6 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
 use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK};
+use snarkos_parameters::*;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -22,6 +23,40 @@ pub struct CircuitParameters<C: BaseDPCComponents> {
     pub local_data_commitment: C::LocalDataCommitment,
     pub value_commitment: C::ValueCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
+}
+
+impl<C: BaseDPCComponents> CircuitParameters<C> {
+    // TODO (howardwu): Inspect what is going on with predicate_verification_key_commitment.
+    pub fn load() -> IoResult<Self> {
+        let account_commitment: C::AccountCommitment =
+            From::from(FromBytes::read(AccountCommitmentParameters::load_bytes().as_slice())?);
+        let account_signature: C::AccountSignature =
+            From::from(FromBytes::read(AccountSignatureParameters::load_bytes().as_slice())?);
+        let record_commitment: C::RecordCommitment =
+            From::from(FromBytes::read(RecordCommitmentParameters::load_bytes().as_slice())?);
+        let predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment =
+            From::from(FromBytes::read(vec![].as_slice())?);
+        let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
+            From::from(FromBytes::read(PredicateVKCRHParameters::load_bytes().as_slice())?);
+        let local_data_commitment: C::LocalDataCommitment =
+            From::from(FromBytes::read(LocalDataCommitmentParameters::load_bytes().as_slice())?);
+        let value_commitment: C::ValueCommitment =
+            From::from(FromBytes::read(ValueCommitmentParameters::load_bytes().as_slice())?);
+        let serial_number_nonce: C::SerialNumberNonceCRH = From::from(FromBytes::read(
+            SerialNumberNonceCRHParameters::load_bytes().as_slice(),
+        )?);
+
+        Ok(CircuitParameters::<C> {
+            account_commitment,
+            account_signature,
+            record_commitment,
+            predicate_verification_key_commitment,
+            predicate_verification_key_hash,
+            local_data_commitment,
+            value_commitment,
+            serial_number_nonce,
+        })
+    }
 }
 
 #[derive(Derivative)]
@@ -204,26 +239,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn load(dir_path: &PathBuf, verify_only: bool) -> IoResult<Self> {
-        let circuit_dir = dir_path.join("circuit/");
-
-        fn load_commitment<C: CommitmentScheme>(path: &PathBuf) -> IoResult<C> {
-            let mut file = File::open(path)?;
-            let parameters: <C as CommitmentScheme>::Parameters = FromBytes::read(&mut file)?;
-            Ok(C::from(parameters))
-        }
-
-        fn load_crh<C: CRH>(path: &PathBuf) -> IoResult<C> {
-            let mut file = File::open(path)?;
-            let parameters: <C as CRH>::Parameters = FromBytes::read(&mut file)?;
-            Ok(C::from(parameters))
-        }
-
-        fn load_signature_scheme<S: SignatureScheme>(path: &PathBuf) -> IoResult<S> {
-            let mut file = File::open(path)?;
-            let parameters: <S as SignatureScheme>::Parameters = FromBytes::read(&mut file)?;
-            Ok(S::from(parameters))
-        }
-
         fn load_snark_pk<S: SNARK>(path: &PathBuf) -> IoResult<S::ProvingParameters> {
             let mut file = File::open(path)?;
             let proving_parameters: <S as SNARK>::ProvingParameters = FromBytes::read(&mut file)?;
@@ -243,39 +258,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         }
 
         // Circuit Parameters
-        let circuit_parameters: CircuitParameters<C> = {
-            let account_commitment_parameters_path = &circuit_dir.join("account_commitment.params");
-            let account_signature_parameters_path = &circuit_dir.join("account_signature.params");
-            let record_commitment_parameters_path = &circuit_dir.join("record_commitment.params");
-            let predicate_vk_commitment_parameters_path = &circuit_dir.join("predicate_vk_commitment.params");
-            let predicate_vk_crh_parameters_path = &circuit_dir.join("predicate_vk_crh.params");
-            let local_data_commitment_parameters_path = &circuit_dir.join("local_data_commitment.params");
-            let value_commitment_parameters_path = &circuit_dir.join("value_commitment.params");
-            let serial_number_nonce_crh_parameters_path = &circuit_dir.join("serial_number_nonce_crh.params");
 
-            let account_commitment = load_commitment::<C::AccountCommitment>(account_commitment_parameters_path)?;
-            let account_signature = load_signature_scheme::<C::AccountSignature>(account_signature_parameters_path)?;
-            let record_commitment = load_commitment::<C::RecordCommitment>(record_commitment_parameters_path)?;
-            let predicate_verification_key_commitment =
-                load_commitment::<C::PredicateVerificationKeyCommitment>(predicate_vk_commitment_parameters_path)?;
-            let predicate_verification_key_hash =
-                load_crh::<C::PredicateVerificationKeyHash>(predicate_vk_crh_parameters_path)?;
-            let local_data_commitment =
-                load_commitment::<C::LocalDataCommitment>(local_data_commitment_parameters_path)?;
-            let value_commitment = load_commitment::<C::ValueCommitment>(value_commitment_parameters_path)?;
-            let serial_number_nonce = load_crh::<C::SerialNumberNonceCRH>(serial_number_nonce_crh_parameters_path)?;
-
-            CircuitParameters::<C> {
-                account_commitment,
-                account_signature,
-                record_commitment,
-                predicate_verification_key_commitment,
-                predicate_verification_key_hash,
-                local_data_commitment,
-                value_commitment,
-                serial_number_nonce,
-            }
-        };
+        let circuit_parameters = CircuitParameters::<C>::load()?;
 
         // SNARK Parameters
 
@@ -341,60 +325,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn load_vk_direct() -> IoResult<Self> {
         // Circuit Parameters
-        let circuit_parameters: CircuitParameters<C> = {
-            let account_commitment_parameters =
-                include_bytes!["../../../../parameters/src/account_commitment/account_commitment.params"];
-            let record_commitment_parameters =
-                include_bytes!["../../../../parameters/src/record_commitment/record_commitment.params"];
-            let predicate_vk_commitment_parameters = vec![];
-            let predicate_vk_crh_parameters =
-                include_bytes!["../../../../parameters/src/predicate_vk_crh/predicate_vk_crh.params"];
-            let local_data_commitment_parameters =
-                include_bytes!["../../../../parameters/src/local_data_commitment/local_data_commitment.params"];
-            let value_commitment_parameters =
-                include_bytes!["../../../../parameters/src/value_commitment/value_commitment.params"];
-            let serial_number_nonce_crh_parameters =
-                include_bytes!["../../../../parameters/src/serial_number_nonce_crh/serial_number_nonce_crh.params"];
-            let account_signature_parameters =
-                include_bytes!["../../../../parameters/src/account_signature/account_signature.params"];
 
-            fn load_commitment<C: CommitmentScheme>(parameters_bytes: &[u8]) -> IoResult<C> {
-                let parameters: <C as CommitmentScheme>::Parameters = FromBytes::read(&parameters_bytes[..])?;
-                Ok(C::from(parameters))
-            }
-
-            fn load_crh<C: CRH>(parameters_bytes: &[u8]) -> IoResult<C> {
-                let parameters: <C as CRH>::Parameters = FromBytes::read(&parameters_bytes[..])?;
-                Ok(C::from(parameters))
-            }
-
-            fn load_signature_scheme<S: SignatureScheme>(parameters_bytes: &[u8]) -> IoResult<S> {
-                let parameters: <S as SignatureScheme>::Parameters = FromBytes::read(&parameters_bytes[..])?;
-                Ok(S::from(parameters))
-            }
-
-            let account_commitment = load_commitment::<C::AccountCommitment>(account_commitment_parameters)?;
-            let account_signature = load_signature_scheme::<C::AccountSignature>(account_signature_parameters)?;
-            let record_commitment = load_commitment::<C::RecordCommitment>(record_commitment_parameters)?;
-            let predicate_verification_key_commitment =
-                load_commitment::<C::PredicateVerificationKeyCommitment>(&predicate_vk_commitment_parameters)?;
-            let predicate_verification_key_hash =
-                load_crh::<C::PredicateVerificationKeyHash>(predicate_vk_crh_parameters)?;
-            let local_data_commitment = load_commitment::<C::LocalDataCommitment>(local_data_commitment_parameters)?;
-            let value_commitment = load_commitment::<C::ValueCommitment>(value_commitment_parameters)?;
-            let serial_number_nonce = load_crh::<C::SerialNumberNonceCRH>(serial_number_nonce_crh_parameters)?;
-
-            CircuitParameters::<C> {
-                account_commitment,
-                account_signature,
-                record_commitment,
-                predicate_verification_key_commitment,
-                predicate_verification_key_hash,
-                local_data_commitment,
-                value_commitment,
-                serial_number_nonce,
-            }
-        };
+        let circuit_parameters = CircuitParameters::<C>::load()?;
 
         // SNARK Parameters
 
