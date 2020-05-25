@@ -1,7 +1,10 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::{
+    objects::{Ledger, Transaction},
+    parameters::Parameter,
+};
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::bytes::FromBytes;

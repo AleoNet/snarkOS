@@ -12,12 +12,12 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
+snarkos-models = { path = "../models", version = "0.8.0" }
 
 [dev-dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-dpc = { path = "../dpc", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 rand = { version = "0.7" }

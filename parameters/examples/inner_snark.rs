@@ -6,7 +6,7 @@ use snarkos_dpc::base_dpc::{
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::algorithms::SNARK;
+use snarkos_models::{algorithms::SNARK, parameters::Parameter};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
