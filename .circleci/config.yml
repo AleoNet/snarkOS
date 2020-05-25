@@ -1,0 +1,76 @@
+version: 2
+commands:
+  setup_environment:
+    description: "Setup testing environment"
+    parameters:
+      cache_key:
+        type: string
+        default: snark-main
+    steps:
+      - run: set -e
+      - run: export SCCACHE_CACHE_SIZE=200M
+      - run: export SCCACHE_DIR="$TRAVIS_HOME/.cache/sccache"
+      - run: mkdir "CIRCLE_WORKING_DIRECTORY/.bin"
+      - run: wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+      - run: tar -C "CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+      - run: mv CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache CIRCLE_WORKING_DIRECTORY/.bin/sccache
+      - run: export PATH="$PATH:CIRCLE_WORKING_DIRECTORY/.bin"
+      - run: export RUSTC_WRAPPER="sccache"
+      - run: rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
+      - restore_cache:
+          keys:
+            - << parameters.cache_key >>
+  clear_environment:
+    description: "Clear environment"
+    parameters:
+      cache_key:
+        type: string
+        default: snark-main
+    steps:
+      - run: (sccache -s||true)
+      - run: set +e
+      - save_cache:
+          key: << parameters.cache_key >>
+          paths:
+            - $CIRCLE_WORKING_DIRECTORY/.cache/sccache
+            - $CIRCLE_WORKING_DIRECTORY/.cargo
+jobs:
+  rust_stable:
+    docker:
+      - image: rust:stable
+    steps:
+      - checkout
+      - setup_environment:
+          - cache_key: snark-main
+      - run: apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
+      - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip
+      - run: |
+          wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+          tar xzf master.tar.gz && cd kcov-master &&
+          mkdir build && cd build && cmake .. && make && sudo make install &&
+          cd ../.. && rm -rf kcov-master &&
+          rm -rf target/debug/base_dpc* && rm -rf target/debug/consensus_dpc*
+          for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+          bash <(curl -s https://codecov.io/bash) &&
+          echo "Uploaded code coverage"
+      - clear_environment:
+          - cache_key: snark-main
+  rust_nighty:
+    docker:
+      - image: rustlang/rust:nightly-buster
+    steps:
+      - checkout
+      - run: rustup component add rustfmt
+      - run: cargo fmt -- --check
+      - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip
+      - save_cache:
+          key: snark-nightly
+          paths:
+            - $CIRCLE_WORKING_DIRECTORY/.cache/sccache
+            - $CIRCLE_WORKING_DIRECTORY/.cargo
+workflows:
+  version: 2
+  main-workflow:
+    jobs:
+      - rust_stable
+      - rust_nighty
