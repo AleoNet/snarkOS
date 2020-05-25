@@ -244,12 +244,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok(comm_crh_sig_pp)
     }
 
-    pub fn generate_pred_nizk_parameters<R: Rng>(
-        comm_crh_sig_pp: &CircuitParameters<Components>,
+    pub fn generate_predicate_snark_parameters<R: Rng>(
+        circuit_parameters: &CircuitParameters<Components>,
         rng: &mut R,
     ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
-        let proof = Components::PredicateSNARK::prove(&pk, PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
+        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(circuit_parameters), rng)?;
+        let proof = Components::PredicateSNARK::prove(&pk, PaymentCircuit::blank(circuit_parameters), rng)?;
 
         Ok(PredicateSNARKParameters {
             proving_key: pk,
@@ -551,7 +551,7 @@ where
         let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
         let predicate_snark_setup_time = start_timer!(|| "Dummy predicate SNARK setup");
-        let predicate_snark_parameters = Self::generate_pred_nizk_parameters(&circuit_parameters, rng)?;
+        let predicate_snark_parameters = Self::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
         end_timer!(predicate_snark_setup_time);
 
         let private_pred_input = PrivatePredicateInput {
