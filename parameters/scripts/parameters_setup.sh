@@ -15,10 +15,13 @@ cargo run --release --example value_commitment
 
 mv account_commitment.params ../src/account_commitment
 mv account_signature.params ../src/account_signature
-mv inner_snark.params ../src/inner_snark
+mv inner_snark_pk.params ../src/inner_snark_pk
+mv inner_snark_vk.params ../src/inner_snark_vk
 mv local_data_commitment.params ../src/local_data_commitment
-mv outer_snark.params ../src/outer_snark
-mv predicate_snark.params ../src/predicate_snark
+mv outer_snark_pk.params ../src/outer_snark_pk
+mv outer_snark_vk.params ../src/outer_snark_vk
+mv predicate_snark_pk.params ../src/predicate_snark_pk
+mv predicate_snark_vk.params ../src/predicate_snark_vk
 mv predicate_vk_crh.params ../src/predicate_vk_crh
 mv record_commitment.params ../src/record_commitment
 mv serial_number_nonce_crh.params ../src/serial_number_nonce_crh
