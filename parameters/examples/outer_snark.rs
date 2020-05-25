@@ -2,6 +2,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::Components,
     outer_circuit::OuterCircuit,
     parameters::CircuitParameters,
+    payment_circuit::PaymentCircuit,
     predicate::PrivatePredicateInput,
     BaseDPCComponents,
     DPC,
@@ -22,9 +23,14 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let circuit_parameters = CircuitParameters::<C>::load()?;
 
     let predicate_snark_parameters = DPC::<C>::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
+    let predicate_snark_proof = C::PredicateSNARK::prove(
+        &predicate_snark_parameters.proving_key,
+        PaymentCircuit::blank(&circuit_parameters),
+        rng,
+    )?;
     let private_predicate_input = PrivatePredicateInput {
         verification_key: predicate_snark_parameters.verification_key,
-        proof: predicate_snark_parameters.proof,
+        proof: predicate_snark_proof,
         value_commitment: <C::ValueCommitment as CommitmentScheme>::Output::default(),
         value_commitment_randomness: <C::ValueCommitment as CommitmentScheme>::Randomness::default(),
     };

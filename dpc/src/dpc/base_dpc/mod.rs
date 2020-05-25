@@ -249,12 +249,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         rng: &mut R,
     ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
         let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(circuit_parameters), rng)?;
-        let proof = Components::PredicateSNARK::prove(&pk, PaymentCircuit::blank(circuit_parameters), rng)?;
 
         Ok(PredicateSNARKParameters {
             proving_key: pk,
             verification_key: pvk.into(),
-            proof,
         })
     }
 
@@ -552,11 +550,16 @@ where
 
         let predicate_snark_setup_time = start_timer!(|| "Dummy predicate SNARK setup");
         let predicate_snark_parameters = Self::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
+        let predicate_snark_proof = Components::PredicateSNARK::prove(
+            &predicate_snark_parameters.proving_key,
+            PaymentCircuit::blank(&circuit_parameters),
+            rng,
+        )?;
         end_timer!(predicate_snark_setup_time);
 
         let private_pred_input = PrivatePredicateInput {
             verification_key: predicate_snark_parameters.verification_key.clone(),
-            proof: predicate_snark_parameters.proof.clone(),
+            proof: predicate_snark_proof,
             value_commitment: <Components::ValueCommitment as CommitmentScheme>::Output::default(),
             value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };

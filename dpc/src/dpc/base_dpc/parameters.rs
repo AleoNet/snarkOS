@@ -57,7 +57,6 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
 pub struct PredicateSNARKParameters<C: BaseDPCComponents> {
     pub proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters,
     pub verification_key: <C::PredicateSNARK as SNARK>::VerificationParameters,
-    pub proof: <C::PredicateSNARK as SNARK>::Proof,
 }
 
 impl<C: BaseDPCComponents> PredicateSNARKParameters<C> {
@@ -69,14 +68,9 @@ impl<C: BaseDPCComponents> PredicateSNARKParameters<C> {
             PredicateSNARKVKParameters::load_bytes().as_slice(),
         )?);
 
-        // TODO (howardwu): Resolve why a hardcoded proof is included in parameters.
-        let predicate_snark_proof_bytes = include_bytes!["../../parameters/predicate_snark.proof"];
-        let proof: <C::PredicateSNARK as SNARK>::Proof = FromBytes::read(&predicate_snark_proof_bytes[..])?;
-
         Ok(Self {
             proving_key,
             verification_key,
-            proof,
         })
     }
 }
