@@ -35,7 +35,8 @@ fn test_schnorr_signature_gadget() {
     // Native Schnorr signing
 
     let schnorr_signature = Schnorr::setup::<_>(rng).unwrap();
-    let (public_key, private_key) = schnorr_signature.keygen(rng).unwrap();
+    let private_key = schnorr_signature.generate_private_key(rng).unwrap();
+    let public_key = schnorr_signature.generate_public_key(&private_key).unwrap();
     let signature = schnorr_signature.sign(&private_key, &message, rng).unwrap();
     assert!(schnorr_signature.verify(&public_key, &message, &signature).unwrap());
 

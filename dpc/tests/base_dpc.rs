@@ -11,20 +11,14 @@ use snarkos_dpc::{
         DPC,
     },
     test_data::*,
-    DPCScheme,
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::Record,
+    dpc::{DPCScheme, Record},
+    objects::Ledger,
 };
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions},
-    ledger::Ledger,
-    merkle_root,
-    BlockHeader,
-    MerkleRootHash,
-};
-use snarkos_storage::BlockStorage;
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
+use snarkos_storage::test_data::*;
 use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;
@@ -38,34 +32,38 @@ fn base_dpc_integration_test() {
     // Generate or load parameters for the ledger, commitment schemes, and CRH
     let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
 
-    // Generate addresses
-    let [genesis_address, recipient, _] = generate_test_addresses(&parameters, &mut rng);
+    // Generate accounts
+    let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
     // Setup the ledger
-    let (ledger, genesis_pred_vk_bytes) = setup_ledger(
-        "test_dpc_integration_db".to_string(),
-        &parameters,
+    let (genesis_cm, genesis_sn, genesis_memo, genesis_pred_vk_bytes, genesis_account_bytes) =
+        ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
+
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(
         ledger_parameters,
-        &genesis_address,
-        &mut rng,
+        genesis_cm,
+        genesis_sn,
+        genesis_memo,
+        genesis_pred_vk_bytes.clone(),
+        genesis_account_bytes,
     );
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
-    let old_asks = vec![genesis_address.secret_key.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
-            &parameters.circuit_parameters.serial_number_nonce_parameters,
+            &parameters.circuit_parameters.serial_number_nonce,
             &[64u8 + (i as u8); 1],
         )
         .unwrap();
         let old_record = DPC::generate_record(
             &parameters.circuit_parameters,
             &old_sn_nonce,
-            &genesis_address.public_key,
+            &genesis_account.public_key,
             true, // The input record is dummy
             &PaymentRecordPayload::default(),
             &Predicate::new(genesis_pred_vk_bytes.clone()),
@@ -84,7 +82,7 @@ fn base_dpc_integration_test() {
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
 
-    let new_apks = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -110,7 +108,7 @@ fn base_dpc_integration_test() {
             // Generate the value commitment
             let value_commitment = local_data
                 .circuit_parameters
-                .value_commitment_parameters
+                .value_commitment
                 .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
                 .unwrap();
 
@@ -136,15 +134,11 @@ fn base_dpc_integration_test() {
                 let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                     local_data_commitment_parameters: local_data
                         .circuit_parameters
-                        .local_data_commitment_parameters
+                        .local_data_commitment
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data
-                        .circuit_parameters
-                        .value_commitment_parameters
-                        .parameters()
-                        .clone(),
+                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
                     value_commitment_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: i as u8,
@@ -179,7 +173,7 @@ fn base_dpc_integration_test() {
             // Generate the value commitment
             let value_commitment = local_data
                 .circuit_parameters
-                .value_commitment_parameters
+                .value_commitment
                 .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
                 .unwrap();
 
@@ -205,15 +199,11 @@ fn base_dpc_integration_test() {
                 let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
                     local_data_commitment_parameters: local_data
                         .circuit_parameters
-                        .local_data_commitment_parameters
+                        .local_data_commitment
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data
-                        .circuit_parameters
-                        .value_commitment_parameters
-                        .parameters()
-                        .clone(),
+                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
                     value_commitment_randomness: value_commitment_randomness.clone(),
                     value_commitment: value_commitment.clone(),
                     position: j as u8,
@@ -234,9 +224,9 @@ fn base_dpc_integration_test() {
     let (_new_records, transaction) = InstantiatedDPC::execute(
         &parameters,
         &old_records,
-        &old_asks,
+        &old_account_private_keys,
         &old_death_vk_and_proof_generator,
-        &new_apks,
+        &new_account_public_keys,
         &new_dummy_flags,
         &new_payloads,
         &new_birth_predicates,
@@ -286,7 +276,5 @@ fn base_dpc_integration_test() {
     ledger.insert_block(&block).unwrap();
     assert_eq!(ledger.len(), 2);
 
-    let path = ledger.storage.storage.path().to_owned();
-    drop(ledger);
-    BlockStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+    kill_storage(ledger);
 }

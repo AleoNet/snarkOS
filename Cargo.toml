@@ -24,6 +24,7 @@ members = [
     "models",
     "network",
     "objects",
+    "posw",
     "profiler",
     "rpc",
     "storage",
@@ -48,13 +49,13 @@ snarkos-rpc = { path = "./rpc", version = "0.8.0" }
 snarkos-storage = { path = "storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
-clap = { version = "2.33.0" }
+clap = { version = "2.33.1" }
 env_logger = { version = "0.7.1" }
 hex = { version = "0.4.1" }
 log = { version = "0.4.8" }
 rand = { version = "0.7" }
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "0.2.13", features = ["full"] }
 
 [dev-dependencies]
 rusty-hook = { version = "0.10.3" }

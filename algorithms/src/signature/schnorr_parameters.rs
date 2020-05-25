@@ -4,10 +4,8 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use digest::Digest;
 use std::{
-    fs::File,
     io::{Read, Result as IoResult, Write},
     marker::PhantomData,
-    path::PathBuf,
 };
 
 #[derive(Derivative)]
@@ -48,25 +46,5 @@ impl<F: Field, G: Group + ToConstraintField<F>, D: Digest> ToConstraintField<F> 
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.generator.to_field_elements()
-    }
-}
-
-impl<G: Group, D: Digest> SchnorrParameters<G, D> {
-    /// Store the Schnorr parameters to a file at the given path.
-    pub fn store(&self, path: &PathBuf) -> IoResult<()> {
-        let mut file = File::create(path)?;
-        let mut parameter_bytes = vec![];
-
-        self.write(&mut parameter_bytes)?;
-        file.write_all(&parameter_bytes)?;
-        drop(file);
-
-        Ok(())
-    }
-
-    /// Load the Schnorr parameters from a file at the given path.
-    pub fn load(path: &PathBuf) -> IoResult<Self> {
-        let mut file = File::open(path)?;
-        Ok(Self::read(&mut file)?)
     }
 }

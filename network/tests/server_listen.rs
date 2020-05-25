@@ -2,10 +2,10 @@ mod server_listen {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
     use snarkos_dpc::{
         base_dpc::{
-            instantiated::{Components, MerkleTreeLedger},
+            instantiated::{CommitmentMerkleParameters, Components, MerkleTreeLedger, Tx},
             parameters::PublicParameters,
         },
-        test_data::setup_or_load_parameters,
+        test_data::load_verifying_parameters,
     };
     use snarkos_network::{
         context::Context,
@@ -18,9 +18,9 @@ mod server_listen {
         test_data::*,
         Handshakes,
     };
+    use snarkos_storage::test_data::*;
 
     use chrono::{DateTime, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{
@@ -63,8 +63,11 @@ mod server_listen {
         server.listen().await.unwrap();
     }
 
-    fn bind_to_port(parameters: PublicParameters<Components>) {
-        let (storage, path) = initialize_test_blockchain();
+    #[test]
+    #[serial]
+    fn bind_to_port() {
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         // Create a new runtime so we can spawn and block_on threads
 
@@ -80,6 +83,7 @@ mod server_listen {
 
             tokio::spawn(async move {
                 start_server(tx, server_address, bootnode_address, storage, parameters, true).await;
+                sleep(5000).await;
             });
             rx.await.unwrap();
 
@@ -90,11 +94,14 @@ mod server_listen {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn startup_handshake_bootnode(parameters: PublicParameters<Components>) {
-        let (storage, path) = initialize_test_blockchain();
+    #[test]
+    #[serial]
+    fn startup_handshake_bootnode() {
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
 
@@ -111,7 +118,8 @@ mod server_listen {
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                start_server(tx, server_address, bootnode_address, storage, parameters, false).await
+                start_server(tx, server_address, bootnode_address, storage, parameters, false).await;
+                sleep(5000).await;
             });
 
             rx.await.unwrap();
@@ -149,11 +157,14 @@ mod server_listen {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn startup_handshake_stored_peers(parameters: PublicParameters<Components>) {
-        let (storage, path) = initialize_test_blockchain();
+    #[test]
+    #[serial]
+    fn startup_handshake_stored_peers() {
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
 
@@ -161,31 +172,33 @@ mod server_listen {
             let server_address = random_socket_address();
             let peer_address = random_socket_address();
 
-            // 1. Add peer to storage
-            let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
+            // 1. Start peer
 
+            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+
+            // 2. Add peer to storage
+
+            let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
             connected_peers.insert(peer_address, Utc::now());
             storage
                 .store_to_peer_book(bincode::serialize(&connected_peers).unwrap())
                 .unwrap();
 
-            // 2. Start peer
-
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
-
             // 3. Start server
 
             let (tx, rx) = oneshot::channel();
 
-            tokio::spawn(
-                async move { start_server(tx, server_address, peer_address, storage, parameters, true).await },
-            );
+            tokio::spawn(async move {
+                start_server(tx, server_address, peer_address, storage, parameters, false).await;
+                sleep(5000).await;
+            });
 
             rx.await.unwrap();
 
             // 4. Check that peer received Version message
 
             let (reader, _peer) = peer_listener.accept().await.unwrap();
+            sleep(1000).await;
 
             // 5. Send handshake response from peer to server
 
@@ -197,27 +210,6 @@ mod server_listen {
         });
 
         drop(rt);
-        kill_storage_async(path);
-    }
-
-    #[test]
-    #[serial]
-    fn test_server_listen() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-
-        {
-            println!("test bind to port");
-            bind_to_port(parameters.clone());
-        }
-
-        {
-            println!("test startup handshake bootnode");
-            startup_handshake_bootnode(parameters.clone());
-        }
-
-        {
-            println!("test startup handshake bootnode with stored peers");
-            startup_handshake_stored_peers(parameters);
-        }
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 }

@@ -13,7 +13,7 @@ use crate::dpc::base_dpc::{
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
-    merkle_tree::MerkleParameters,
+    define_merkle_tree_parameters,
     prf::Blake2s,
     signature::SchnorrSignature,
     snark::GM17,
@@ -35,21 +35,15 @@ use snarkos_gadgets::{
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents, storage::Storage};
-use snarkos_storage::BlockStorage;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_models::dpc::DPCComponents;
+use snarkos_storage::LedgerStorage;
 
 use blake2::Blake2s as Blake2sHash;
-use rand::Rng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-};
 
 pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SnNonceWindow;
 
 // `WINDOW_SIZE * NUM_WINDOWS` = NUM_INPUT_RECORDS * 64 + 1 + 32 = 225 bytes
@@ -59,7 +53,7 @@ impl PedersenSize for SnNonceWindow {
     const WINDOW_SIZE: usize = SN_NONCE_SIZE_BITS / 8;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
@@ -67,7 +61,7 @@ impl PedersenSize for PredVkHashWindow {
     const WINDOW_SIZE: usize = 300;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LocalDataWindow;
 
 impl PedersenSize for LocalDataWindow {
@@ -75,7 +69,7 @@ impl PedersenSize for LocalDataWindow {
     const WINDOW_SIZE: usize = 248;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TwoToOneWindow;
 // `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 bits
 impl PedersenSize for TwoToOneWindow {
@@ -83,21 +77,21 @@ impl PedersenSize for TwoToOneWindow {
     const WINDOW_SIZE: usize = 128;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RecordWindow;
 impl PedersenSize for RecordWindow {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 225;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct AddressWindow;
-impl PedersenSize for AddressWindow {
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct AccountWindow;
+impl PedersenSize for AccountWindow {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 192;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ValueWindow;
 
 impl PedersenSize for ValueWindow {
@@ -108,69 +102,15 @@ impl PedersenSize for ValueWindow {
     const WINDOW_SIZE: usize = 350;
 }
 
-type H = MerkleTreeCRH;
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct CommitmentMerkleParameters(H);
-
-impl MerkleParameters for CommitmentMerkleParameters {
-    type H = H;
-
-    const HEIGHT: usize = 32;
-
-    fn setup<R: Rng>(rng: &mut R) -> Self {
-        Self(H::setup(rng))
-    }
-
-    fn crh(&self) -> &Self::H {
-        &self.0
-    }
-
-    fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters {
-        self.crh().parameters()
-    }
-}
-
-impl Storage for CommitmentMerkleParameters {
-    /// Store the SNARK proof to a file at the given path.
-    fn store(&self, path: &PathBuf) -> IoResult<()> {
-        self.0.store(path)
-    }
-
-    /// Load the SNARK proof from a file at the given path.
-    fn load(path: &PathBuf) -> IoResult<Self> {
-        Ok(Self(H::load(path)?))
-    }
-}
-
-impl ToBytes for CommitmentMerkleParameters {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write(&mut writer)
-    }
-}
-
-impl FromBytes for CommitmentMerkleParameters {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let crh: H = FromBytes::read(&mut reader)?;
-
-        Ok(Self(crh))
-    }
-}
-
-impl Default for CommitmentMerkleParameters {
-    fn default() -> Self {
-        let mut rng = rand::thread_rng();
-        Self(H::setup(&mut rng))
-    }
-}
+define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
 
 pub struct Components;
 
 impl DPCComponents for Components {
-    type AddressCommitment = AddressCommitment;
-    type AddressCommitmentGadget = AddressCommitmentGadget;
+    type AccountCommitment = AccountCommitment;
+    type AccountCommitmentGadget = AccountCommitmentGadget;
+    type AccountSignature = AccountSignature;
+    type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;
     type LocalDataCommitment = LocalDataCommitment;
     type LocalDataCommitmentGadget = LocalDataCommitmentGadget;
@@ -183,10 +123,8 @@ impl DPCComponents for Components {
     type PredicateVerificationKeyHashGadget = PredicateVerificationKeyHashGadget;
     type RecordCommitment = RecordCommitment;
     type RecordCommitmentGadget = RecordCommitmentGadget;
-    type SerialNumberNonce = SerialNumberNonce;
-    type SerialNumberNonceGadget = SerialNumberNonceGadget;
-    type Signature = Signature;
-    type SignatureGadget = SignatureGadget;
+    type SerialNumberNonceCRH = SerialNumberNonce;
+    type SerialNumberNonceCRHGadget = SerialNumberNonceGadget;
 
     const NUM_INPUT_RECORDS: usize = NUM_INPUT_RECORDS;
     const NUM_OUTPUT_RECORDS: usize = NUM_OUTPUT_RECORDS;
@@ -212,13 +150,13 @@ pub type OuterPairing = SW6;
 pub type InnerField = Bls12_377Fr;
 pub type OuterField = Bls12_377Fq;
 
-pub type AddressCommitment = PedersenCompressedCommitment<EdwardsBls, AddressWindow>;
+pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
-pub type Signature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
+pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SerialNumberNonce = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
@@ -230,7 +168,7 @@ pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCirc
 pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
-pub type MerkleTreeLedger = BlockStorage<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = LedgerStorage<Tx, CommitmentMerkleParameters>;
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;
@@ -238,14 +176,14 @@ pub type LocalData = DPCLocalData<Components>;
 
 // Gadgets
 
-pub type AddressCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
 pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type SignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
+pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;

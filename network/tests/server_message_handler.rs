@@ -1,11 +1,8 @@
 mod server_message_handler {
     use snarkos_consensus::{miner::Entry, test_data::*};
     use snarkos_dpc::{
-        base_dpc::{
-            instantiated::{Components, Tx},
-            parameters::PublicParameters,
-        },
-        test_data::*,
+        base_dpc::instantiated::{CommitmentMerkleParameters, Tx},
+        test_data::load_verifying_parameters,
     };
     use snarkos_network::{
         message::{types::*, Channel, Message},
@@ -13,21 +10,27 @@ mod server_message_handler {
         PingState,
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
+    use snarkos_storage::test_data::*;
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,
     };
 
     use chrono::{DateTime, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::{collections::HashMap, net::SocketAddr, sync::Arc};
     use tokio::{net::TcpListener, runtime::Runtime, sync::oneshot};
 
-    fn receive_block_message(parameters: PublicParameters<Components>) {
+    pub const WAIT_PERIOD: u64 = 1000;
+
+    #[test]
+    #[serial]
+    fn receive_block_message() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
+
         let storage_ref = storage.clone();
 
         rt.block_on(async move {
@@ -48,6 +51,7 @@ mod server_message_handler {
 
             simulate_active_node(peer_address).await;
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Block message to server
 
@@ -73,13 +77,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_get_block(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_block() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         let genesis_block = storage.get_block_from_block_num(0).unwrap();
 
@@ -102,6 +109,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send BlockRequest to server from peer
 
@@ -134,13 +142,17 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_sync_block(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_sync_block() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
+
         let storage_ref = Arc::clone(&storage);
 
         rt.block_on(async move {
@@ -160,6 +172,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
             accept_channel(&mut bootnode_listener, server_address).await;
@@ -189,13 +202,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_get_sync(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_sync() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -218,6 +234,7 @@ mod server_message_handler {
 
             simulate_active_node(bootnode_address).await;
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Block 1 to server from bootnode
 
@@ -268,13 +285,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_sync(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_sync() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -305,6 +325,7 @@ mod server_message_handler {
 
             simulate_active_node(peer_address).await;
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Sync message to server from peer
 
@@ -332,13 +353,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_transaction(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_transaction() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -359,6 +383,7 @@ mod server_message_handler {
 
             simulate_active_node(peer_address).await;
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send Transaction message to server from peer
 
@@ -389,13 +414,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_get_memory_pool_empty(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_memory_pool_empty() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -416,6 +444,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send GetMemoryPool to server from peer
 
@@ -436,13 +465,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_get_memory_pool_normal(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_memory_pool_normal() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -476,6 +508,7 @@ mod server_message_handler {
             // 2. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 3. Send GetMemoryPool to server from peer
 
@@ -506,13 +539,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_memory_pool(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_memory_pool() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -562,13 +598,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_get_peers(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_get_peers() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -590,6 +629,7 @@ mod server_message_handler {
 
             start_test_server(server);
             simulate_active_node(bootnode_address).await;
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send GetPeers message to server from peer
 
@@ -622,13 +662,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_peers(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_peers() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -675,13 +718,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_ping(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_ping() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -702,6 +748,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Send ping request to server from peer
 
@@ -731,13 +778,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_pong_unknown(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_pong_unknown() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -782,13 +832,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_pong_rejected(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_pong_rejected() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -810,6 +863,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
@@ -859,13 +913,16 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn receive_pong_accepted(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn receive_pong_accepted() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -887,6 +944,7 @@ mod server_message_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
@@ -938,96 +996,6 @@ mod server_message_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
-    }
-
-    #[test]
-    #[serial]
-    fn test_message_handler_structs() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-        {
-            println!("test receive block message");
-            receive_block_message(parameters.clone());
-        }
-
-        {
-            println!("test receive get_block");
-            receive_get_block(parameters.clone());
-        }
-
-        {
-            println!("test receive sync block");
-            receive_sync_block(parameters.clone());
-        }
-
-        {
-            println!("test receive get_sync");
-            receive_get_sync(parameters.clone());
-        }
-
-        {
-            println!("test receive receive sync");
-            receive_sync(parameters.clone());
-        }
-
-        {
-            println!("test receive transaction");
-            receive_transaction(parameters.clone());
-        }
-    }
-
-    #[test]
-    #[serial]
-    fn test_message_handler_misc() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-        {
-            println!("test receive get empty memory pool");
-            receive_get_memory_pool_empty(parameters.clone());
-        }
-
-        {
-            println!("test receive get normal memory pool");
-            receive_get_memory_pool_normal(parameters.clone());
-        }
-
-        {
-            println!("test receive memory pool");
-            receive_memory_pool(parameters.clone());
-        }
-
-        {
-            println!("test receive peers");
-            receive_peers(parameters.clone());
-        }
-
-        {
-            println!("test receive get_peers");
-            receive_get_peers(parameters.clone());
-        }
-
-        {
-            println!("test receive ping");
-            receive_ping(parameters.clone());
-        }
-
-        {
-            println!("test receive ping unknown");
-            receive_pong_unknown(parameters.clone());
-        }
-
-        {
-            println!("test receive ping rejected");
-            receive_pong_rejected(parameters.clone());
-        }
-
-        {
-            println!("test receive pong accepted");
-            receive_pong_accepted(parameters.clone());
-        }
-
-        {
-            println!("test receive pong unknown");
-            receive_pong_unknown(parameters.clone());
-        }
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 }

@@ -1,16 +1,15 @@
-mod consensus_receive_block {
+mod consensus_blocks {
     use snarkos_consensus::{miner::MemoryPool, test_data::*};
-    use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::setup_or_load_parameters};
+    use snarkos_dpc::{base_dpc::instantiated::Tx, test_data::load_verifying_parameters};
     use snarkos_objects::Block;
-
-    use rand::thread_rng;
+    use snarkos_storage::test_data::*;
 
     // Receive two new blocks in order.
     #[test]
     fn new_in_order() {
-        let (mut blockchain, path) = initialize_test_blockchain();
+        let (mut blockchain, _) = test_blockchain();
 
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
+        let parameters = load_verifying_parameters();
 
         let mut memory_pool = MemoryPool::new();
 
@@ -20,8 +19,6 @@ mod consensus_receive_block {
 
         // Find first block
 
-        println!("old_block_height: {:?}", old_block_height);
-
         let block_1 = Block::<Tx>::deserialize(&BLOCK_1.to_vec()).unwrap();
         consensus
             .receive_block(&parameters, &mut blockchain, &mut memory_pool, &block_1)
@@ -29,7 +26,6 @@ mod consensus_receive_block {
 
         let new_block_height = blockchain.get_latest_block_height();
 
-        println!("new_block_height: {:?}", old_block_height);
         assert_eq!(old_block_height + 1, new_block_height);
 
         // Duplicate blocks dont do anything
@@ -50,7 +46,39 @@ mod consensus_receive_block {
         let new_block_height = blockchain.get_latest_block_height();
         assert_eq!(old_block_height + 2, new_block_height);
 
-        kill_storage_sync(blockchain, path);
+        kill_storage_sync(blockchain);
+    }
+
+    #[test]
+    fn remove_latest_block() {
+        let (mut blockchain, _) = test_blockchain();
+
+        let parameters = load_verifying_parameters();
+
+        let mut memory_pool = MemoryPool::new();
+
+        let consensus = TEST_CONSENSUS;
+
+        let old_block_height = blockchain.get_latest_block_height();
+
+        // Find first block
+
+        let block_1 = Block::<Tx>::deserialize(&BLOCK_1.to_vec()).unwrap();
+        consensus
+            .receive_block(&parameters, &mut blockchain, &mut memory_pool, &block_1)
+            .unwrap();
+
+        let new_block_height = blockchain.get_latest_block_height();
+
+        assert_eq!(old_block_height + 1, new_block_height);
+
+        blockchain.remove_latest_blocks(1).unwrap();
+
+        let new_block_height = blockchain.get_latest_block_height();
+
+        assert_eq!(old_block_height, new_block_height);
+
+        kill_storage_sync(blockchain);
     }
 
     // TODO Implement Orphan block handling
@@ -61,7 +89,7 @@ mod consensus_receive_block {
     //    // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     //    #[test]
     //    fn new_out_of_order() {
-    //        let (mut blockchain, path) = initialize_test_blockchain();
+    //        let (mut blockchain, path) = open_test_blockchain();
     //        let mut memory_pool = MemoryPool::new();
     //
     //        let consensus = TEST_CONSENSUS;
@@ -84,6 +112,6 @@ mod consensus_receive_block {
     //
     //        check_block_2_balances(&blockchain);
     //
-    //        kill_storage_sync(blockchain, path);
+    //        kill_storage_sync(blockchain);
     //    }
 }

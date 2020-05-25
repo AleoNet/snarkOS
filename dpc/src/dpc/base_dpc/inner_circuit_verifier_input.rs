@@ -15,7 +15,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Input record serial numbers and death predicate commitments
-    pub old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
 
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
@@ -30,22 +30,22 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for InnerCircuitVerifierInput<C>
 where
-    <C::AddressCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::AddressCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::SerialNumberNonce as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
-
-    <C::Signature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::Signature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -58,36 +58,28 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .address_commitment_parameters
+                .account_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .record_commitment_parameters
+                .record_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .local_data_commitment_parameters
+                .local_data_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .predicate_verification_key_commitment_parameters
-                .parameters()
-                .to_field_elements()?,
-        );
-
-        v.extend_from_slice(
-            &self
-                .circuit_parameters
-                .serial_number_nonce_parameters
+                .predicate_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
         );
@@ -95,7 +87,16 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .signature_parameters
+                .serial_number_nonce
+                .parameters()
+                .to_field_elements()?,
+        );
+
+        // TODO (raychu86): Reorder parameter input
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .account_signature
                 .parameters()
                 .to_field_elements()?,
         );
@@ -103,7 +104,7 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .value_commitment_parameters
+                .value_commitment
                 .parameters()
                 .to_field_elements()?,
         );

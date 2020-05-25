@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate failure;
+extern crate thiserror;
 
 pub mod parameters;
 pub use self::parameters::*;
@@ -76,14 +76,8 @@ pub trait CLI {
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CLIError>;
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum CLIError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
-}
-
-impl From<CLIError> for Box<dyn std::error::Error> {
-    fn from(error: CLIError) -> Self {
-        error.into()
-    }
 }

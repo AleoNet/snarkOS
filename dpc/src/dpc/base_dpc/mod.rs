@@ -1,17 +1,14 @@
-use crate::dpc::{
-    address::{AddressPair, AddressPublicKey, AddressSecretKey},
-    base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload},
-    DPCScheme,
-};
+use crate::dpc::base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
-    dpc::{AddressKeyPair, DPCComponents, Predicate, Record},
+    dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
+    objects::{AccountScheme, Ledger, Transaction},
 };
-use snarkos_objects::{dpc::Transaction, ledger::*};
+use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
@@ -120,15 +117,24 @@ pub struct DPC<Components: BaseDPCComponents> {
 /// final transaction after `execute_helper` has created old serial numbers and
 /// ledger witnesses, and new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
+pub(crate) struct ExecuteContext<'a, L, Components: BaseDPCComponents>
+where
+    L: Ledger<
+        Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+        MerkleParameters = Components::MerkleParameters,
+        MerklePath = MerklePath<Components::MerkleParameters>,
+        MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
+        SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
+    >,
+{
     circuit_parameters: &'a CircuitParameters<Components>,
-    ledger_digest: MerkleTreeDigest<Components::MerkleParameters>,
+    ledger_digest: L::MerkleTreeDigest,
 
     // Old record stuff
-    old_address_secret_keys: &'a [AddressSecretKey<Components>],
+    old_account_private_keys: &'a [AccountPrivateKey<Components>],
     old_records: &'a [DPCRecord<Components>],
     old_witnesses: Vec<MerklePath<Components::MerkleParameters>>,
-    old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
+    old_serial_numbers: Vec<<Components::AccountSignature as SignatureScheme>::PublicKey>,
     old_randomizers: Vec<Vec<u8>>,
 
     // New record stuff
@@ -147,7 +153,16 @@ pub(crate) struct ExecuteContext<'a, Components: BaseDPCComponents> {
     value_balance: i64,
 }
 
-impl<Components: BaseDPCComponents> ExecuteContext<'_, Components> {
+impl<L, Components: BaseDPCComponents> ExecuteContext<'_, L, Components>
+where
+    L: Ledger<
+        Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
+        MerkleParameters = Components::MerkleParameters,
+        MerklePath = MerklePath<Components::MerkleParameters>,
+        MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
+        SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
+    >,
+{
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             circuit_parameters: self.circuit_parameters.clone(),
@@ -169,7 +184,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
-    pub old_serial_numbers: Vec<<Components::Signature as SignatureScheme>::PublicKey>,
+    pub old_serial_numbers: Vec<<Components::AccountSignature as SignatureScheme>::PublicKey>,
 
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
@@ -183,8 +198,12 @@ pub struct LocalData<Components: BaseDPCComponents> {
 
 impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_circuit_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
-        let time = start_timer!(|| "Address commitment scheme setup");
-        let addr_comm_pp = Components::AddressCommitment::setup(rng);
+        let time = start_timer!(|| "Account commitment scheme setup");
+        let account_commitment = Components::AccountCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Account signature setup");
+        let account_signature = Components::AccountSignature::setup(rng)?;
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
@@ -193,6 +212,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let time = start_timer!(|| "Verification Key Commitment setup");
         let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Verification Key CRH setup");
+        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -204,28 +227,18 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SerialNumberNonce::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Signature setup");
-        let sig_pp = Components::Signature::setup(rng)?;
+        let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
         let comm_crh_sig_pp = CircuitParameters {
-            address_commitment_parameters: addr_comm_pp,
-            record_commitment_parameters: rec_comm_pp,
-            predicate_verification_key_commitment_parameters: pred_vk_comm_pp,
-            local_data_commitment_parameters: local_data_comm_pp,
-            value_commitment_parameters: value_comm_pp,
-
-            serial_number_nonce_parameters: sn_nonce_crh_pp,
-            predicate_verification_key_hash_parameters: pred_vk_crh_pp,
-
-            signature_parameters: sig_pp,
+            account_commitment,
+            account_signature,
+            record_commitment: rec_comm_pp,
+            predicate_verification_key_commitment: pred_vk_comm_pp,
+            predicate_verification_key_hash: pred_vk_crh_pp,
+            local_data_commitment: local_data_comm_pp,
+            value_commitment: value_comm_pp,
+            serial_number_nonce: sn_nonce_crh_pp,
         };
 
         Ok(comm_crh_sig_pp)
@@ -248,19 +261,19 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_sn(
         params: &CircuitParameters<Components>,
         record: &DPCRecord<Components>,
-        address_secret_key: &AddressSecretKey<Components>,
-    ) -> Result<(<Components::Signature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
+        account_private_key: &AccountPrivateKey<Components>,
+    ) -> Result<(<Components::AccountSignature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
         let sn_time = start_timer!(|| "Generate serial number");
-        let sk_prf = &address_secret_key.sk_prf;
+        let sk_prf = &account_private_key.sk_prf;
         let sn_nonce = to_bytes!(record.serial_number_nonce())?;
         // Compute the serial number.
         let prf_input = FromBytes::read(sn_nonce.as_slice())?;
         let prf_seed = FromBytes::read(to_bytes!(sk_prf)?.as_slice())?;
         let sig_and_pk_randomizer = to_bytes![Components::PRF::evaluate(&prf_seed, &prf_input)?]?;
 
-        let sn = Components::Signature::randomize_public_key(
-            &params.signature_parameters,
-            &address_secret_key.pk_sig,
+        let sn = Components::AccountSignature::randomize_public_key(
+            &params.account_signature,
+            &account_private_key.pk_sig,
             &sig_and_pk_randomizer,
         )?;
         end_timer!(sn_time);
@@ -269,8 +282,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
-        sn_nonce: &<Components::SerialNumberNonce as CRH>::Output,
-        address_public_key: &AddressPublicKey<Components>,
+        sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
+        account_public_key: &AccountPublicKey<Components>,
         is_dummy: bool,
         payload: &PaymentRecordPayload,
         birth_predicate: &DPCPredicate<Components>,
@@ -286,7 +299,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let death_predicate_repr = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 32 + 32 + 32 + 32 = 161 bytes
         let commitment_input = to_bytes![
-            address_public_key.public_key, // 256 bits = 32 bytes
+            account_public_key.commitment, // 256 bits = 32 bytes
             is_dummy,                      // 1 bit = 1 byte
             payload,                       // 256 bits = 32 bytes
             birth_predicate_repr,          // 256 bits = 32 bytes
@@ -295,13 +308,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         ]?;
 
         let commitment = Components::RecordCommitment::commit(
-            &parameters.record_commitment_parameters,
+            &parameters.record_commitment,
             &commitment_input,
             &commitment_randomness,
         )?;
 
         let record = DPCRecord {
-            address_public_key: address_public_key.clone(),
+            account_public_key: account_public_key.clone(),
             is_dummy,
             payload: payload.clone(),
             birth_predicate_repr,
@@ -315,46 +328,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok(record)
     }
 
-    pub fn create_address_helper<R: Rng>(
-        parameters: &CircuitParameters<Components>,
-        metadata: &[u8; 32],
-        rng: &mut R,
-    ) -> Result<AddressPair<Components>, DPCError> {
-        // Sample SIG key pair.
-        let (pk_sig, sk_sig) = Components::Signature::keygen(&parameters.signature_parameters, rng)?;
-        // Sample PRF secret key.
-        let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <Components::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
-
-        // Sample randomness rpk for the commitment scheme.
-        let r_pk = <Components::AddressCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-        // Construct the address public key.
-        let commit_input = to_bytes![pk_sig, sk_prf, metadata]?;
-        let public_key =
-            Components::AddressCommitment::commit(&parameters.address_commitment_parameters, &commit_input, &r_pk)?;
-
-        let public_key = AddressPublicKey { public_key };
-
-        // Construct the address secret key.
-        let secret_key = AddressSecretKey {
-            pk_sig,
-            sk_sig,
-            sk_prf,
-            metadata: *metadata,
-            r_pk,
-        };
-
-        Ok(AddressPair { public_key, secret_key })
-    }
-
     pub(crate) fn execute_helper<'a, L, R: Rng>(
         parameters: &'a CircuitParameters<Components>,
 
         old_records: &'a [<Self as DPCScheme<L>>::Record],
-        old_address_secret_keys: &'a [AddressSecretKey<Components>],
+        old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_address_public_keys: &[AddressPublicKey<Components>],
+        new_account_public_keys: &[AccountPublicKey<Components>],
         new_is_dummy_flags: &[bool],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
         new_birth_predicates: &[<Self as DPCScheme<L>>::Predicate],
@@ -365,18 +345,20 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         ledger: &L,
         rng: &mut R,
-    ) -> Result<ExecuteContext<'a, Components>, DPCError>
+    ) -> Result<ExecuteContext<'a, L, Components>, DPCError>
     where
         L: Ledger<
-            Parameters = Components::MerkleParameters,
             Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-            SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+            MerkleParameters = Components::MerkleParameters,
+            MerklePath = MerklePath<Components::MerkleParameters>,
+            MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
+            SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
-        assert_eq!(Components::NUM_INPUT_RECORDS, old_address_secret_keys.len());
+        assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_address_public_keys.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_public_keys.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -397,14 +379,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             if record.is_dummy() {
                 old_witnesses.push(MerklePath::default());
             } else {
-                let comm = &record.commitment();
-                let witness = ledger.prove_cm(comm)?;
+                let witness = ledger.prove_cm(&record.commitment())?;
                 old_witnesses.push(witness);
 
                 value_balance += record.payload.balance as i64;
             }
 
-            let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_address_secret_keys[i])?;
+            let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
             old_serial_numbers.push(sn);
             old_randomizers.push(randomizer);
@@ -427,14 +408,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let sn_randomness: [u8; 32] = rng.gen();
 
             let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
-            let sn_nonce = Components::SerialNumberNonce::hash(&parameters.serial_number_nonce_parameters, &crh_input)?;
+            let sn_nonce = Components::SerialNumberNonceCRH::hash(&parameters.serial_number_nonce, &crh_input)?;
 
             end_timer!(sn_nonce_time);
 
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_address_public_keys[j],
+                &new_account_public_keys[j],
                 new_is_dummy_flags[j],
                 &new_payloads[j],
                 &new_birth_predicates[j],
@@ -460,7 +441,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = &old_records[i];
             let bytes = to_bytes![
                 record.commitment(),
-                record.address_public_key(),
+                record.account_public_key(),
                 record.is_dummy(),
                 record.payload(),
                 record.birth_predicate_repr(),
@@ -474,7 +455,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = &new_records[j];
             let bytes = to_bytes![
                 record.commitment(),
-                record.address_public_key(),
+                record.account_public_key(),
                 record.is_dummy(),
                 record.payload(),
                 record.birth_predicate_repr(),
@@ -487,7 +468,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
         let local_data_comm = Components::LocalDataCommitment::commit(
-            &parameters.local_data_commitment_parameters,
+            &parameters.local_data_commitment,
             &predicate_input,
             &local_data_rand,
         )?;
@@ -506,7 +487,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let predicate_rand =
                 <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
             let predicate_comm = Components::PredicateVerificationKeyCommitment::commit(
-                &parameters.predicate_verification_key_commitment_parameters,
+                &parameters.predicate_verification_key_commitment,
                 &input,
                 &predicate_rand,
             )?;
@@ -522,7 +503,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             old_records,
             old_witnesses,
-            old_address_secret_keys,
+            old_account_private_keys,
             old_serial_numbers,
             old_randomizers,
 
@@ -544,12 +525,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 impl<Components: BaseDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
 where
     L: Ledger<
-        Parameters = Components::MerkleParameters,
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-        SerialNumber = <Components::Signature as SignatureScheme>::PublicKey,
+        MerkleParameters = Components::MerkleParameters,
+        MerklePath = MerklePath<Components::MerkleParameters>,
+        MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
+        SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
     >,
 {
-    type AddressKeyPair = AddressPair<Components>;
+    type Account = Account<Components>;
     type Auxiliary = [u8; 32];
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
@@ -564,7 +547,7 @@ where
         ledger_parameters: &Components::MerkleParameters,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
-        let setup_time = start_timer!(|| "DPC::Setup");
+        let setup_time = start_timer!(|| "BaseDPC::Setup");
         let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
         let predicate_snark_setup_time = start_timer!(|| "Dummy Predicate SNARK Setup");
@@ -600,24 +583,29 @@ where
         })
     }
 
-    fn create_address<R: Rng>(
+    fn create_account<R: Rng>(
         parameters: &Self::Parameters,
         metadata: &Self::Metadata,
         rng: &mut R,
-    ) -> Result<Self::AddressKeyPair, DPCError> {
-        let time = start_timer!(|| "PlainDPC::CreateAddr");
-        let result = Self::create_address_helper(&parameters.circuit_parameters, metadata, rng)?;
+    ) -> Result<Self::Account, DPCError> {
+        let time = start_timer!(|| "BaseDPC::create_account");
+
+        let account_signature_parameters = &parameters.circuit_parameters.account_signature;
+        let commitment_parameters = &parameters.circuit_parameters.account_commitment;
+        let account = Account::new(account_signature_parameters, commitment_parameters, metadata, rng)?;
+
         end_timer!(time);
-        Ok(result)
+
+        Ok(account)
     }
 
     fn execute<R: Rng>(
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
-        old_address_secret_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressSecretKey],
+        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_address_public_keys: &[<Self::AddressKeyPair as AddressKeyPair>::AddressPublicKey],
+        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
@@ -629,12 +617,12 @@ where
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
-        let exec_time = start_timer!(|| "PlainDPC::Exec");
+        let exec_time = start_timer!(|| "BaseDPC::execute");
         let context = Self::execute_helper(
             &parameters.circuit_parameters,
             old_records,
-            old_address_secret_keys,
-            new_address_public_keys,
+            old_account_private_keys,
+            new_account_public_keys,
             new_is_dummy_flags,
             new_payloads,
             new_birth_predicates,
@@ -655,7 +643,7 @@ where
 
             old_records,
             old_witnesses,
-            old_address_secret_keys,
+            old_account_private_keys,
             old_serial_numbers,
             old_randomizers,
 
@@ -702,7 +690,7 @@ where
 
         let binding_signature =
             create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
-                &circuit_parameters.value_commitment_parameters,
+                &circuit_parameters.value_commitment,
                 &old_value_commits,
                 &new_value_commits,
                 &old_value_commit_randomness,
@@ -719,7 +707,7 @@ where
                 &ledger_digest,
                 old_records,
                 &old_witnesses,
-                old_address_secret_keys,
+                old_account_private_keys,
                 &old_serial_numbers,
                 &new_records,
                 &new_sn_nonce_randomness,
@@ -775,18 +763,18 @@ where
         for i in 0..Components::NUM_INPUT_RECORDS {
             let sig_time = start_timer!(|| format!("Sign and randomize Tx contents {}", i));
 
-            let sk_sig = &old_address_secret_keys[i].sk_sig;
+            let sk_sig = &old_account_private_keys[i].sk_sig;
             let randomizer = &old_randomizers[i];
             // Sign transaction message
-            let signature = Components::Signature::sign(
-                &circuit_parameters.signature_parameters,
+            let account_signature = Components::AccountSignature::sign(
+                &circuit_parameters.account_signature,
                 sk_sig,
                 &signature_message,
                 rng,
             )?;
-            let randomized_signature = Components::Signature::randomize_signature(
-                &circuit_parameters.signature_parameters,
-                &signature,
+            let randomized_signature = Components::AccountSignature::randomize_signature(
+                &circuit_parameters.account_signature,
+                &account_signature,
                 randomizer,
             )?;
             signatures.push(randomized_signature);
@@ -812,7 +800,7 @@ where
     }
 
     fn verify(parameters: &Self::Parameters, transaction: &Self::Transaction, ledger: &L) -> Result<bool, DPCError> {
-        let verify_time = start_timer!(|| "PlainDPC::Verify");
+        let verify_time = start_timer!(|| "BaseDPC::verify");
         let ledger_time = start_timer!(|| "Ledger checks");
         for sn in transaction.old_serial_numbers() {
             if ledger.contains_sn(sn) {
@@ -883,13 +871,13 @@ where
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
-        let sig_pp = &parameters.circuit_parameters.signature_parameters;
+        let account_signature = &parameters.circuit_parameters.account_signature;
         for (pk, sig) in transaction
             .old_serial_numbers()
             .iter()
             .zip(&transaction.stuff.signatures)
         {
-            if !Components::Signature::verify(sig_pp, pk, signature_message, sig)? {
+            if !Components::AccountSignature::verify(account_signature, pk, signature_message, sig)? {
                 eprintln!("Signature didn't verify.");
                 return Ok(false);
             }

@@ -9,6 +9,7 @@ use crate::{
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
             ToBitsGadget,
+            ToBytesGadget,
         },
     },
 };
@@ -847,6 +848,16 @@ impl<F: Field> AllocGadget<u8, F> for UInt8 {
             negated: false,
             value: value.ok(),
         })
+    }
+}
+
+impl<F: Field> ToBytesGadget<F> for Vec<UInt8> {
+    fn to_bytes<CS: ConstraintSystem<F>>(&self, _cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        Ok(self.to_vec())
+    }
+
+    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.to_bytes(cs)
     }
 }
 

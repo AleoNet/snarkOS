@@ -1,24 +1,26 @@
 mod server_connection_handler {
-    use snarkos_consensus::test_data::*;
     use snarkos_dpc::{
-        base_dpc::{instantiated::Components, parameters::PublicParameters},
-        test_data::setup_or_load_parameters,
+        base_dpc::instantiated::{CommitmentMerkleParameters, Tx},
+        test_data::load_verifying_parameters,
     };
     use snarkos_network::{
         message::{types::GetMemoryPool, Message},
         test_data::*,
         Channel,
     };
+    use snarkos_storage::test_data::*;
 
     use chrono::{Duration, Utc};
-    use rand::thread_rng;
     use serial_test::serial;
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};
 
-    fn peer_connect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn peer_connect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -60,12 +62,15 @@ mod server_connection_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn peer_disconnect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -105,12 +110,15 @@ mod server_connection_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn gossiped_peer_connect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn gossiped_peer_connect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -152,12 +160,15 @@ mod server_connection_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn gossiped_peer_disconnect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn gossiped_peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -204,12 +215,15 @@ mod server_connection_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn sync_node_disconnect(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn sync_node_disconnect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -258,13 +272,16 @@ mod server_connection_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 
-    fn memory_pool_interval(parameters: PublicParameters<Components>) {
+    #[test]
+    #[serial]
+    fn memory_pool_interval() {
         let mut rt = Runtime::new().unwrap();
 
-        let (storage, path) = initialize_test_blockchain();
+        let (storage, path) = test_blockchain();
+        let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
@@ -284,6 +301,7 @@ mod server_connection_handler {
             // 1. Start server
 
             start_test_server(server);
+            sleep(1000).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Add sync handler to connections
 
@@ -304,42 +322,6 @@ mod server_connection_handler {
         });
 
         drop(rt);
-        kill_storage_async(path);
-    }
-
-    #[test]
-    #[serial]
-    fn test_peer_searching() {
-        let (_, parameters) = setup_or_load_parameters(true, &mut thread_rng());
-
-        {
-            println!("test peer connect");
-            peer_connect(parameters.clone());
-        }
-
-        {
-            println!("test peer disconnect");
-            peer_disconnect(parameters.clone());
-        }
-
-        {
-            println!("test gossiped peer connect");
-            gossiped_peer_connect(parameters.clone());
-        }
-
-        {
-            println!("test gossiped peer disconnect");
-            gossiped_peer_disconnect(parameters.clone());
-        }
-
-        {
-            println!("test sync node disconnect");
-            sync_node_disconnect(parameters.clone());
-        }
-
-        {
-            println!("test memory pool interval");
-            memory_pool_interval(parameters);
-        }
+        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
     }
 }

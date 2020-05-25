@@ -241,7 +241,6 @@ fn bls12_377_field_gadgets_test() {
     field_test(cs.ns(|| "test_fq12"), c, d);
     random_frobenius_tests::<Fq12, _, Fq12Gadget, _>(cs.ns(|| "test_frob_fq12"), 13);
     if !cs.is_satisfied() {
-        println!("Here!");
         println!("{:?}", cs.which_is_unsatisfied().unwrap());
     }
 

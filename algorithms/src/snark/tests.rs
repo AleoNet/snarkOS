@@ -151,20 +151,18 @@ mod serialization {
     use crate::snark::{create_random_proof, generate_random_parameters, Parameters, Proof, VerifyingKey};
 
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
-    use snarkos_models::storage::Storage;
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         rand::UniformRand,
         to_bytes,
     };
 
-    use rand::thread_rng;
-
-    const TEST_PARAMETERS_PATH: &str = "./snark.params";
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
 
     #[test]
     fn proof_serialization() {
-        let rng = &mut thread_rng();
+        let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
 
         let parameters =
             generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
@@ -182,7 +180,7 @@ mod serialization {
 
     #[test]
     fn parameter_serialization() {
-        let rng = &mut thread_rng();
+        let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
 
         let parameters =
             generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
@@ -196,22 +194,5 @@ mod serialization {
 
         assert_eq!(parameters, recovered_parameters);
         assert_eq!(vk, recovered_vk);
-    }
-
-    #[test]
-    fn parameter_storage() {
-        let rng = &mut thread_rng();
-        let mut path = std::env::current_dir().unwrap();
-        path.push(TEST_PARAMETERS_PATH);
-
-        let parameters =
-            generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
-        parameters.store(&path).unwrap();
-
-        let recovered_parameters = Parameters::<Bls12_377>::load(&path).unwrap();
-
-        assert_eq!(parameters, recovered_parameters);
-
-        std::fs::remove_file(&path).unwrap();
     }
 }

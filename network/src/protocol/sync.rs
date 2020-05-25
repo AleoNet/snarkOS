@@ -4,8 +4,9 @@ use crate::message::{
 };
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::network::SendError;
-use snarkos_objects::{dpc::Transaction, BlockHeaderHash};
-use snarkos_storage::BlockStorage;
+use snarkos_models::objects::Transaction;
+use snarkos_objects::BlockHeaderHash;
+use snarkos_storage::LedgerStorage;
 
 use chrono::{DateTime, Utc};
 use std::{net::SocketAddr, sync::Arc};
@@ -60,7 +61,7 @@ impl SyncHandler {
     pub async fn increment<T: Transaction, P: MerkleParameters>(
         &mut self,
         channel: Arc<Channel>,
-        storage: Arc<BlockStorage<T, P>>,
+        storage: Arc<LedgerStorage<T, P>>,
     ) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
             if self.block_headers.is_empty() {

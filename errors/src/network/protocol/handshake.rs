@@ -1,39 +1,39 @@
 use crate::network::{message::MessageError, ConnectError, SendError};
 use std::net::SocketAddr;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum HandshakeError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "Peer disconnected {}", _0)]
+    #[error("Peer disconnected {}", _0)]
     PeerDisconnect(SocketAddr),
 
-    #[fail(display = "No handshake found for peer: {:?}", _0)]
+    #[error("No handshake found for peer: {:?}", _0)]
     HandshakeMissing(SocketAddr),
 
-    #[fail(display = "Handshake message expected. Got {:?}", _0)]
+    #[error("Handshake message expected. Got {:?}", _0)]
     InvalidMessage(String),
 
-    #[fail(display = "Version message expected. Got {:?}", _0)]
+    #[error("Version message expected. Got {:?}", _0)]
     InvalidVersion(String),
 
-    #[fail(display = "Verack message expected. Got {:?}", _0)]
+    #[error("Verack message expected. Got {:?}", _0)]
     InvalidVerack(String),
 
-    #[fail(display = "Expected nonce {}. Got {}", _0, _1)]
+    #[error("Expected nonce {}. Got {}", _0, _1)]
     InvalidNonce(u64, u64),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ConnectError(ConnectError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     SendError(SendError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MessageError(MessageError),
 }
 

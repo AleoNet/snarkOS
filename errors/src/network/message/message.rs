@@ -1,20 +1,20 @@
 use crate::network::message::{MessageHeaderError, StreamReadError};
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum MessageError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "Invalid message length {}. Expected length of {}", _0, _1)]
+    #[error("Invalid message length {}. Expected length of {}", _0, _1)]
     InvalidLength(usize, usize),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     MessageHeaderError(MessageHeaderError),
 
-    #[fail(display = "{}", 0)]
+    #[error("{}", 0)]
     SteamReadError(StreamReadError),
 }
 

@@ -1,23 +1,23 @@
 use crate::{consensus::ConsensusError, network::ServerError, node::CliError, storage::StorageError};
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum NodeError {
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CLIError(CliError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ConsensusError(ConsensusError),
 
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     ServerError(ServerError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     StorageError(StorageError),
 }
 

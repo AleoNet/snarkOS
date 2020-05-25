@@ -1,12 +1,11 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_objects::{
-    dpc::{DPCTransactions, Transaction},
-    ledger::Ledger,
-    BlockHeader,
-    BlockHeaderHash,
+use snarkos_models::{
+    algorithms::CRH,
+    objects::{Ledger, Transaction},
 };
+use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
@@ -17,7 +16,7 @@ use std::{
     sync::Arc,
 };
 
-pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
+pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -25,7 +24,7 @@ pub struct BlockStorage<T: Transaction, P: MerkleParameters> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     /// Create a new blockchain storage.
     pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;
@@ -48,11 +47,10 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        let parameter_path = path.as_ref().join("../dpc/src/parameters/");
-
-        let ledger_parameter_path = parameter_path.join("ledger.params");
-
-        let parameters = P::load(&ledger_parameter_path)?;
+        let ledger_param_bytes = include_bytes!("../../dpc/src/parameters/ledger.params");
+        let crh_params: <P::H as CRH>::Parameters = FromBytes::read(&ledger_param_bytes[..])?;
+        let crh = P::H::from(crh_params);
+        let ledger_parameters = P::from(crh);
 
         match latest_block_number {
             Some(val) => {
@@ -77,31 +75,31 @@ impl<T: Transaction, P: MerkleParameters> BlockStorage<T, P> {
 
                 assert!(commitments[0] == genesis_cm);
 
-                let merkle_tree = MerkleTree::new(parameters.clone(), &commitments)?;
+                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
 
                 Ok(Self {
                     latest_block_height: RwLock::new(bytes_to_u32(val)),
                     storage: Arc::new(storage),
                     cm_merkle_tree: RwLock::new(merkle_tree),
-                    ledger_parameters: parameters,
+                    ledger_parameters,
                     _transaction: PhantomData,
                 })
             }
             None => {
                 // Add genesis block to database
 
-                let block_storage = Self::new(
+                let ledger_storage = Self::new(
                     &path.as_ref().to_path_buf(),
-                    parameters,
+                    ledger_parameters,
                     FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
                     FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
                     FromBytes::read(&GENESIS_MEMO[..])?,
                     GENESIS_PRED_VK_BYTES.to_vec(),
-                    GENESIS_ADDRESS_PAIR.to_vec(),
+                    GENESIS_ACCOUNT.to_vec(),
                 )
                 .unwrap(); // TODO handle this unwrap. merge storage and ledger error
 
-                Ok(block_storage)
+                Ok(ledger_storage)
             }
         }
     }

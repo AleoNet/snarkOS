@@ -1,21 +1,22 @@
-use crate::storage::Storage;
 use snarkos_errors::algorithms::SignatureError;
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait SignatureScheme: Sized + Clone + Storage {
-    type Parameters: Clone + ToBytes + FromBytes + Send + Sync;
-    type PublicKey: ToBytes + FromBytes + Hash + Eq + Clone + Debug + Default + Send + Sync;
-    type PrivateKey: ToBytes + FromBytes + Clone + Default;
-    type Output: ToBytes + FromBytes + Clone + Debug + Default + Send + Sync;
+pub trait SignatureScheme: Sized + Clone + From<<Self as SignatureScheme>::Parameters> {
+    type Parameters: Clone + Debug + ToBytes + FromBytes + Eq + Send + Sync;
+    type PublicKey: Clone + Debug + Default + ToBytes + FromBytes + Hash + Eq + Send + Sync;
+    type PrivateKey: Clone + Debug + Default + ToBytes + FromBytes + PartialEq + Eq;
+    type Output: Clone + Debug + Default + ToBytes + FromBytes + Send + Sync;
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError>;
 
     fn parameters(&self) -> &Self::Parameters;
 
-    fn keygen<R: Rng>(&self, rng: &mut R) -> Result<(Self::PublicKey, Self::PrivateKey), SignatureError>;
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Result<Self::PrivateKey, SignatureError>;
+
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, SignatureError>;
 
     fn sign<R: Rng>(
         &self,

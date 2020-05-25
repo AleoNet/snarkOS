@@ -1,17 +1,17 @@
 use crate::network::message::StreamReadError;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum MessageHeaderError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "Invalid message header length {}. Expected length of 16", _0)]
+    #[error("Invalid message header length {}. Expected length of 16", _0)]
     InvalidLength(usize),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     StreamReadError(StreamReadError),
 }
 

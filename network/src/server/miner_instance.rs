@@ -3,18 +3,15 @@ use snarkos_consensus::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
-use snarkos_dpc::{
-    address::AddressPublicKey,
-    base_dpc::{instantiated::*, parameters::PublicParameters},
-};
-use snarkos_objects::block::Block;
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkos_objects::{AccountPublicKey, Block};
 
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
-    coinbase_address: AddressPublicKey<Components>,
+    coinbase_address: AccountPublicKey<Components>,
     consensus: ConsensusParameters,
     parameters: PublicParameters<Components>,
     storage: Arc<MerkleTreeLedger>,
@@ -25,7 +22,7 @@ pub struct MinerInstance {
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
     pub fn new(
-        coinbase_address: AddressPublicKey<Components>,
+        coinbase_address: AccountPublicKey<Components>,
         consensus: ConsensusParameters,
         parameters: PublicParameters<Components>,
         storage: Arc<MerkleTreeLedger>,

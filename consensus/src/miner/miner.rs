@@ -1,19 +1,17 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_dpc::{
-    address::AddressPublicKey,
-    base_dpc::{instantiated::*, parameters::PublicParameters},
-    DPCScheme,
-};
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{
-    dpc::{Block, DPCTransactions, Transaction},
-    merkle_root,
-    BlockHeader,
-    MerkleRootHash,
+use snarkos_models::{
+    dpc::{DPCScheme, Record},
+    objects::Transaction,
 };
-use snarkos_storage::BlockStorage;
-use snarkos_utilities::bytes::FromBytes;
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
+use snarkos_storage::LedgerStorage;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -26,7 +24,7 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct Miner {
     /// Receiving address that block rewards will be sent to.
-    address: AddressPublicKey<Components>,
+    address: AccountPublicKey<Components>,
 
     /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
@@ -34,13 +32,13 @@ pub struct Miner {
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
-    pub fn new(address: AddressPublicKey<Components>, consensus: ConsensusParameters) -> Self {
+    pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters) -> Self {
         Self { address, consensus }
     }
 
     /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions<T: Transaction, P: MerkleParameters>(
-        storage: &Arc<BlockStorage<T, P>>,
+        storage: &Arc<LedgerStorage<T, P>>,
         memory_pool: &Arc<Mutex<MemoryPool<T>>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
@@ -56,7 +54,7 @@ impl Miner {
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let genesis_pred_vk_bytes = storage.genesis_pred_vk_bytes()?;
-        let genesis_address_pair = FromBytes::read(&storage.genesis_address_pair_bytes()?[..])?;
+        let genesis_account = FromBytes::read(&storage.genesis_account_bytes()?[..])?;
 
         let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
         let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -69,7 +67,7 @@ impl Miner {
             &genesis_pred_vk_bytes,
             new_birth_predicates,
             new_death_predicates,
-            genesis_address_pair,
+            genesis_account,
             self.address.clone(),
             &storage,
             rng,
@@ -150,6 +148,11 @@ impl Miner {
 
         println!("Miner generated coinbase transaction");
 
+        for (index, record) in coinbase_records.iter().enumerate() {
+            let record_commitment = hex::encode(&to_bytes![record.commitment()]?);
+            println!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
+        }
+
         let header = self.find_block(&transactions, &previous_block_header)?;
 
         println!("Miner found block block");
@@ -160,6 +163,8 @@ impl Miner {
 
         self.consensus
             .receive_block(parameters, storage, &mut memory_pool, &block)?;
+
+        storage.store_records(&coinbase_records)?;
 
         Ok((block.serialize()?, coinbase_records))
     }

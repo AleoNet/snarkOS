@@ -1,8 +1,10 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
-use snarkos_models::algorithms::{CommitmentScheme, SignatureScheme, SNARK};
-use snarkos_objects::dpc::Transaction;
+use snarkos_models::{
+    algorithms::{CommitmentScheme, SignatureScheme, SNARK},
+    objects::Transaction,
+};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -32,10 +34,13 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
+    /// A transaction value balance is the difference between input and output record balances.
+    /// This value effectively becomes the transaction fee for the miner. Only coinbase transactions
+    /// can have a negative value balance representing tokens being minted.
     pub value_balance: i64,
 
     #[derivative(PartialEq = "ignore")]
-    pub signatures: Vec<<C::Signature as SignatureScheme>::Output>,
+    pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCStuff<C> {
@@ -72,7 +77,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
         let num_signatures = read_variable_length_integer(&mut reader)?;
         let mut signatures = vec![];
         for _ in 0..num_signatures {
-            let signature: <C::Signature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
+            let signature: <C::AccountSignature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
             signatures.push(signature);
         }
 
@@ -111,7 +116,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCStuff<C> {
     Eq(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCTransaction<C: BaseDPCComponents> {
-    old_serial_numbers: Vec<<C::Signature as SignatureScheme>::PublicKey>,
+    old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     memorandum: [u8; 32],
     pub stuff: DPCStuff<C>,
@@ -128,7 +133,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
         value_balance: i64,
-        signatures: Vec<<C::Signature as SignatureScheme>::Output>,
+        signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
     ) -> Self {
         let stuff = DPCStuff {
             digest,
@@ -151,7 +156,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
 impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
-    type SerialNumber = <C::Signature as SignatureScheme>::PublicKey;
+    type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type Stuff = DPCStuff<C>;
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
@@ -170,11 +175,22 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         &self.stuff
     }
 
+    /// Transaction id = Hash of (serial numbers || commitments || memo)
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
-        let transaction_bytes = to_bytes![self]?;
+        let mut pre_image_bytes: Vec<u8> = vec![];
+
+        for sn in self.old_serial_numbers() {
+            pre_image_bytes.extend(&to_bytes![sn]?);
+        }
+
+        for cm in self.new_commitments() {
+            pre_image_bytes.extend(&to_bytes![cm]?);
+        }
+
+        pre_image_bytes.extend(self.memorandum());
 
         let mut h = b2s::new();
-        h.input(&transaction_bytes);
+        h.input(&pre_image_bytes);
 
         let mut result = [0u8; 32];
         result.copy_from_slice(&h.result());
@@ -217,7 +233,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let num_old_serial_numbers = read_variable_length_integer(&mut reader)?;
         let mut old_serial_numbers = vec![];
         for _ in 0..num_old_serial_numbers {
-            let old_serial_number: <C::Signature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
+            let old_serial_number: <C::AccountSignature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
             old_serial_numbers.push(old_serial_number);
         }
 

@@ -1,49 +1,40 @@
-use crate::crh::{PedersenCRH, PedersenSize};
+use crate::crh::{PedersenCRH, PedersenCompressedCRH, PedersenSize};
 use snarkos_curves::edwards_bls12::EdwardsProjective;
-use snarkos_models::{algorithms::CRH, storage::Storage};
+use snarkos_models::algorithms::CRH;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
-use rand::thread_rng;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(super) struct Window;
+pub(super) struct Size;
 
-impl PedersenSize for Window {
+impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 128;
 }
 
-type TestCRH = PedersenCRH<EdwardsProjective, Window>;
+fn crh_parameters_serialization<C: CRH>() {
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
 
-const TEST_CRH_PARAMETERS_PATH: &str = "./pedersen_crh.params";
+    let crh = C::setup(rng);
+    let crh_parameters = crh.parameters();
 
-#[test]
-fn crh_parameter_serialization() {
-    let rng = &mut thread_rng();
+    let crh_parameters_bytes = to_bytes![crh_parameters].unwrap();
+    let recovered_crh_parameters: <C as CRH>::Parameters = FromBytes::read(&crh_parameters_bytes[..]).unwrap();
 
-    let crh = TestCRH::setup(rng);
-
-    let crh_bytes = to_bytes![crh].unwrap();
-    let recovered_crh: TestCRH = FromBytes::read(&crh_bytes[..]).unwrap();
-
-    assert_eq!(crh, recovered_crh);
+    assert_eq!(crh_parameters, &recovered_crh_parameters);
 }
 
 #[test]
-fn crh_parameter_storage() {
-    let rng = &mut thread_rng();
-    let mut path = std::env::current_dir().unwrap();
-    path.push(TEST_CRH_PARAMETERS_PATH);
+fn pedersen_crh_parameters_serialization() {
+    crh_parameters_serialization::<PedersenCRH<EdwardsProjective, Size>>();
+}
 
-    let crh = TestCRH::setup(rng);
-    crh.store(&path).unwrap();
-
-    let recovered_crh = TestCRH::load(&path).unwrap();
-
-    assert_eq!(crh, recovered_crh);
-
-    std::fs::remove_file(&path).unwrap();
+#[test]
+fn pedersen_compressed_crh_parameters_serialization() {
+    crh_parameters_serialization::<PedersenCompressedCRH<EdwardsProjective, Size>>();
 }

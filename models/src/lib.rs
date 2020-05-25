@@ -6,4 +6,4 @@ pub mod algorithms;
 pub mod curves;
 pub mod dpc;
 pub mod gadgets;
-pub mod storage;
+pub mod objects;

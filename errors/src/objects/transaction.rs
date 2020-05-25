@@ -1,44 +1,44 @@
 use std::fmt::Debug;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum TransactionError {
-    #[fail(display = "UTXO has already been spent {:?} index: {:?}", _0, _1)]
+    #[error("UTXO has already been spent {:?} index: {:?}", _0, _1)]
     AlreadySpent(Vec<u8>, u32),
 
-    #[fail(display = "there is a double spend occuring with this transaction {}", _0)]
+    #[error("there is a double spend occuring with this transaction {}", _0)]
     DoubleSpend(String),
 
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "insufficient funds from input: {} to spend as output: {}", _0, _1)]
+    #[error("insufficient funds from input: {} to spend as output: {}", _0, _1)]
     InsufficientFunds(u64, u64),
 
-    #[fail(display = "invalid coinbase transaction")]
+    #[error("invalid coinbase transaction")]
     InvalidCoinbaseTransaction,
 
-    #[fail(display = "invalid pub key hash script_pub_key: {} script_sig: {}", _0, _1)]
+    #[error("invalid pub key hash script_pub_key: {} script_sig: {}", _0, _1)]
     InvalidPubKeyHash(String, String),
 
-    #[fail(display = "invalid script pub key for format: {}", _0)]
+    #[error("invalid script pub key for format: {}", _0)]
     InvalidScriptPubKey(String),
 
-    #[fail(display = "invalid transaction id {:?}", _0)]
+    #[error("invalid transaction id {:?}", _0)]
     InvalidTransactionId(usize),
 
-    #[fail(display = "invalid variable size integer: {:?}", _0)]
+    #[error("invalid variable size integer: {:?}", _0)]
     InvalidVariableSizeInteger(usize),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 
-    #[fail(display = "missing outpoint script public key")]
+    #[error("missing outpoint script public key")]
     MissingOutpointScriptPublicKey,
 
-    #[fail(display = "the block has multiple coinbase transactions: {:?}", _0)]
+    #[error("the block has multiple coinbase transactions: {:?}", _0)]
     MultipleCoinbaseTransactions(u32),
 
-    #[fail(display = "Null Error {:?}", _0)]
+    #[error("Null Error {:?}", _0)]
     NullError(()),
 }
 
@@ -75,11 +75,5 @@ impl From<()> for TransactionError {
 impl From<&'static str> for TransactionError {
     fn from(msg: &'static str) -> Self {
         TransactionError::Message(msg.into())
-    }
-}
-
-impl From<TransactionError> for Box<dyn std::error::Error> {
-    fn from(error: TransactionError) -> Self {
-        error.into()
     }
 }

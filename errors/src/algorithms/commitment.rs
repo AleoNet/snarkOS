@@ -2,15 +2,15 @@ use std::io::{Error, ErrorKind};
 
 use crate::algorithms::CRHError;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum CommitmentError {
-    #[fail(display = "{}: {}", _0, _1)]
+    #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     CRHError(CRHError),
 
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Message(String),
 }
 
