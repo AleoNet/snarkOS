@@ -11,6 +11,9 @@ pub use self::account_signature::*;
 pub mod inner_snark_vk;
 pub use self::inner_snark_vk::*;
 
+pub mod ledger_merkle_tree;
+pub use self::ledger_merkle_tree::*;
+
 pub mod local_data_commitment;
 pub use self::local_data_commitment::*;
 

@@ -1,11 +1,9 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::{
-    algorithms::CRH,
-    objects::{Ledger, Transaction},
-};
+use snarkos_models::objects::{Ledger, Transaction};
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
+use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
@@ -47,9 +45,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        let ledger_param_bytes = include_bytes!("../../dpc/src/parameters/ledger.params");
-        let crh_params: <P::H as CRH>::Parameters = FromBytes::read(&ledger_param_bytes[..])?;
-        let crh = P::H::from(crh_params);
+        let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()[..])?);
         let ledger_parameters = P::from(crh);
 
         match latest_block_number {

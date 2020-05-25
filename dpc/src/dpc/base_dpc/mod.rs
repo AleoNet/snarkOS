@@ -547,10 +547,10 @@ where
         ledger_parameters: &Components::MerkleParameters,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
-        let setup_time = start_timer!(|| "BaseDPC::Setup");
+        let setup_time = start_timer!(|| "BaseDPC::setup");
         let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
-        let predicate_snark_setup_time = start_timer!(|| "Dummy Predicate SNARK Setup");
+        let predicate_snark_setup_time = start_timer!(|| "Dummy predicate SNARK setup");
         let predicate_snark_parameters = Self::generate_pred_nizk_parameters(&circuit_parameters, rng)?;
         end_timer!(predicate_snark_setup_time);
 
@@ -561,12 +561,12 @@ where
             value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };
 
-        let snark_setup_time = start_timer!(|| "Execute Inner SNARK Setup");
+        let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
         let inner_snark_parameters =
             Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters), rng)?;
         end_timer!(snark_setup_time);
 
-        let snark_setup_time = start_timer!(|| "Execute Outer SNARK Setup");
+        let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
         let outer_snark_parameters =
             Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
         end_timer!(snark_setup_time);
