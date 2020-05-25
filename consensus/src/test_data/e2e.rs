@@ -24,10 +24,11 @@ use rand::Rng;
 use std::{
     fs::File,
     io::{Read, Result as IoResult, Write},
+    path::PathBuf,
 };
 
 /// Helper providing pre-calculated data for e2e tests
-pub static DATA: Lazy<TestData> = Lazy::new(|| generate_or_load_test_data());
+pub static DATA: Lazy<TestData> = Lazy::new(|| load_test_data());
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
@@ -106,18 +107,15 @@ impl FromBytes for TestData {
     }
 }
 
-const TEST_DATA_PATH: &str = "./../consensus/src/test_data/precomputed_data";
-
-fn generate_or_load_test_data() -> TestData {
-    let path = std::env::current_dir().unwrap().join(TEST_DATA_PATH);
-    if path.exists() {
-        let file = std::io::BufReader::new(File::open(&path).expect("could not open file"));
-        // if we managed to read the data, return, otherwise regen it
-        if let Ok(test_data) = TestData::read(file) {
-            return test_data;
-        }
+fn load_test_data() -> TestData {
+    if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
+        test_data
+    } else {
+        setup_and_store_test_data()
     }
+}
 
+fn setup_and_store_test_data() -> TestData {
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
@@ -153,9 +151,10 @@ fn generate_or_load_test_data() -> TestData {
         records2: coinbase_records2,
     };
 
-    let file = std::io::BufWriter::new(File::create(path).expect("could not open file"));
+    // TODO (howardwu): Remove file generation here in favor of out of scope generation.
+    const TEST_DATA_FILE: &str = "precomputed_data";
+    let file = std::io::BufWriter::new(File::create(PathBuf::from(TEST_DATA_FILE)).expect("could not open file"));
     test_data.write(file).expect("could not write to file");
-
     test_data
 }
 
