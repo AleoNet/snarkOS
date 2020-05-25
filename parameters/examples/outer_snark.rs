@@ -22,6 +22,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let rng = &mut thread_rng();
     let circuit_parameters = CircuitParameters::<C>::load()?;
 
+    // TODO (howardwu): Check why is the PrivatePredicateInput necessary for running the setup? Blank should take option?
     let predicate_snark_parameters = DPC::<C>::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
     let predicate_snark_proof = C::PredicateSNARK::prove(
         &predicate_snark_parameters.proving_key,
