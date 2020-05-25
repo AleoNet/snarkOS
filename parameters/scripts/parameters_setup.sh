@@ -2,16 +2,16 @@
 # to their respective folders under the `src` directory.
 # If the parameter size or checksum has changed, you will need to manually update these in each corresponding struct.
 
-cargo run --example account_commitment
-cargo run --example account_signature
-cargo run --example inner_snark
-cargo run --example local_data_commitment
-cargo run --example outer_snark
-cargo run --example predicate_snark
-cargo run --example predicate_vk_crh
-cargo run --example record_commitment
-cargo run --example serial_number_nonce_crh
-cargo run --example value_commitment
+cargo run --release --example account_commitment
+cargo run --release --example account_signature
+cargo run --release --example inner_snark
+cargo run --release --example local_data_commitment
+cargo run --release --example outer_snark
+cargo run --release --example predicate_snark
+cargo run --release --example predicate_vk_crh
+cargo run --release --example record_commitment
+cargo run --release --example serial_number_nonce_crh
+cargo run --release --example value_commitment
 
 mv account_commitment.params ../src/account_commitment
 mv account_signature.params ../src/account_signature
