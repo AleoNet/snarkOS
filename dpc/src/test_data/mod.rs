@@ -66,8 +66,8 @@ pub fn setup_or_load_parameters<R: Rng>(
             let parameters =
                 match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
                     Ok(parameters) => parameters,
-                    Err(_) => {
-                        println!("Parameter Setup");
+                    Err(err) => {
+                        println!("Err: {}. Path: {:?}. Re-running parameter Setup", err, path);
                         let parameters =
                             <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
                                 .expect("DPC setup failed");
