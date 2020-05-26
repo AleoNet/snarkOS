@@ -10,7 +10,7 @@ commands:
       - run: set -e
       - run: export SCCACHE_CACHE_SIZE=200M
       - run: export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
-      - run: mkdir "$CIRCLE_WORKING_DIRECTORY/.bin"
+      - run: mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
       - run: wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
       - run: tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
       - run: mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache CIRCLE_WORKING_DIRECTORY/.bin/sccache
