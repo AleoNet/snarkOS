@@ -41,7 +41,7 @@ jobs:
     steps:
       - checkout
       - setup_environment:
-          - cache_key: snark-main
+          cache_key: snark-main
       - run: apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip
       - run: |
@@ -54,8 +54,8 @@ jobs:
           bash <(curl -s https://codecov.io/bash) &&
           echo "Uploaded code coverage"
       - clear_environment:
-          - cache_key: snark-main
-  rust_nighty:
+          cache_key: snark-main
+  rust_nightly:
     docker:
       - image: rustlang/rust:nightly-buster
     steps:
@@ -73,5 +73,5 @@ workflows:
   main-workflow:
     jobs:
       - rust_stable
-      - rust_nighty
+      - rust_nightly
 #
