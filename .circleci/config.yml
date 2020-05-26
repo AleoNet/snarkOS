@@ -48,6 +48,7 @@ jobs:
       - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - run: |
+          cd $CIRCLE_WORKING_DIRECTORY &&
           docker run --security-opt seccomp=unconfined -v $(pwd):/source kcov/kcov:latest sh /source/ci/kcov.sh &&
           sudo bash <(curl -s https://codecov.io/bash) &&
           echo "Uploaded code coverage"
