@@ -2142,6 +2142,7 @@ dependencies = [
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-objects",
  "snarkos-utilities",
 ]
 
