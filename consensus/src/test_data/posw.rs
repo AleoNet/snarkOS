@@ -3,9 +3,14 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use snarkos_algorithms::snark::generate_random_parameters;
 use snarkos_objects::pedersen_merkle_tree::PARAMS;
-use std::marker::PhantomData;
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use std::{
+    fs::File,
+    io::{Result as IoResult, Write},
+    marker::PhantomData,
+    path::PathBuf,
+};
 
-use snarkos_models::storage::Storage;
 use snarkos_posw::{ProvingKey, VerifyingKey, POSW};
 use snarkos_profiler::{end_timer, start_timer};
 
@@ -18,8 +23,8 @@ pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
     let generation_timer = start_timer!(|| "POSW setup");
 
     let (params, vk) = if test_pk_path.exists() {
-        let vk = VerifyingKey::load(&test_vk_path).unwrap();
-        let pk = ProvingKey::load(&test_pk_path).unwrap();
+        let vk = VerifyingKey::read(&File::open(test_vk_path).unwrap()).unwrap();
+        let pk = ProvingKey::read(&File::open(test_pk_path).unwrap(), false).unwrap();
 
         (pk, vk)
     } else {
@@ -39,8 +44,8 @@ pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
 
         let vk = params.vk.clone();
 
-        params.store(&test_pk_path).unwrap();
-        vk.store(&test_vk_path).unwrap();
+        store(&params, &test_pk_path).unwrap();
+        store(&vk, &test_vk_path).unwrap();
 
         (params, vk)
     };
@@ -48,3 +53,9 @@ pub static POSW_PP: Lazy<(ProvingKey, VerifyingKey)> = Lazy::new(|| {
     end_timer!(generation_timer);
     (params, vk)
 });
+
+fn store<T: ToBytes>(data: T, path: &PathBuf) -> IoResult<()> {
+    let mut file = File::create(path)?;
+    file.write_all(&to_bytes![data]?)?;
+    Ok(())
+}

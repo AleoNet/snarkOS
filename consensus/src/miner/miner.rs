@@ -226,6 +226,8 @@ mod tests {
     use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, BlockHeader};
     use snarkos_storage::genesis::*;
     use snarkos_utilities::bytes::FromBytes;
+    use rand_xorshift::XorShiftRng;
+    use rand::SeedableRng;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
@@ -233,10 +235,10 @@ mod tests {
         let consensus = TEST_CONSENSUS.clone();
         let miner_address = AccountPublicKey::<Components>::read(&GENESIS_ACCOUNT[..]).unwrap();
         let miner = Miner::new(miner_address, consensus, POSW_PP.0.clone());
-        let mut rng = rand::thread_rng();
+        let mut rng = XorShiftRng::seed_from_u64(2); // use this rng so that a valid solution is found quickly
 
         let header = miner.find_block(transactions, parent_header, &mut rng).unwrap();
-        assert_eq!(header.nonce, 2326363551);
+        assert_eq!(header.nonce, 3146114823);
     }
 
     #[test]
