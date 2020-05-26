@@ -7,7 +7,7 @@ impl Parameter for GenesisPredicateVKBytes {
     const SIZE: u64 = 48;
 
     fn load_bytes() -> Vec<u8> {
-        let buffer = include_bytes!("genesis_predicate_vk_bytes");
+        let buffer = include_bytes!("predicate_vk_bytes.genesis");
         buffer.to_vec()
     }
 }

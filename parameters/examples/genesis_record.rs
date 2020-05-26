@@ -74,9 +74,9 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 
 pub fn main() {
     let (genesis_record_commitment, genesis_record_serial_number) = setup::<Components>().unwrap();
-    store(&PathBuf::from("genesis_record_commitment"), &genesis_record_commitment).unwrap();
+    store(&PathBuf::from("record_commitment.genesis"), &genesis_record_commitment).unwrap();
     store(
-        &PathBuf::from("genesis_record_serial_number"),
+        &PathBuf::from("record_serial_number.genesis"),
         &genesis_record_serial_number,
     )
     .unwrap();

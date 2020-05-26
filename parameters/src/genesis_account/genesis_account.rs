@@ -7,7 +7,7 @@ impl Parameter for GenesisAccount {
     const SIZE: u64 = 224;
 
     fn load_bytes() -> Vec<u8> {
-        let buffer = include_bytes!("genesis_account");
+        let buffer = include_bytes!("account.genesis");
         buffer.to_vec()
     }
 }

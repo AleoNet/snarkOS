@@ -7,7 +7,7 @@ impl Parameter for GenesisMemo {
     const SIZE: u64 = 64;
 
     fn load_bytes() -> Vec<u8> {
-        let buffer = include_bytes!("genesis_memo");
+        let buffer = include_bytes!("memo.genesis");
         buffer.to_vec()
     }
 }

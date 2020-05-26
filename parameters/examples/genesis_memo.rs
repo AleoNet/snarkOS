@@ -24,5 +24,5 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 
 pub fn main() {
     let genesis_memo = setup().unwrap();
-    store(&PathBuf::from("genesis_memo"), &genesis_memo).unwrap();
+    store(&PathBuf::from("memo.genesis"), &genesis_memo).unwrap();
 }

@@ -43,8 +43,8 @@ pub fn setup<C: BaseDPCComponents>() -> Result<Vec<u8>, DPCError> {
     )?;
     let genesis_account = to_bytes![genesis_account]?;
 
-    println!("genesis_account\n\tsize - {}", serial_number_nonce.len());
-    Ok(serial_number_nonce)
+    println!("genesis_account\n\tsize - {}", genesis_account.len());
+    Ok(genesis_account)
 }
 
 pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
@@ -55,6 +55,6 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 }
 
 pub fn main() {
-    let serial_number_nonce = setup::<Components>().unwrap();
-    store(&PathBuf::from("serial_number_nonce"), &serial_number_nonce).unwrap();
+    let genesis_account = setup::<Components>().unwrap();
+    store(&PathBuf::from("account.genesis"), &genesis_account).unwrap();
 }

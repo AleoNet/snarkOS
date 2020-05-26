@@ -7,7 +7,7 @@ impl Parameter for GenesisRecordCommitment {
     const SIZE: u64 = 32;
 
     fn load_bytes() -> Vec<u8> {
-        let buffer = include_bytes!("genesis_record_commitment");
+        let buffer = include_bytes!("record_commitment.genesis");
         buffer.to_vec()
     }
 }

@@ -46,7 +46,7 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 pub fn main() {
     let genesis_predicate_vk_bytes = setup::<Components>().unwrap();
     store(
-        &PathBuf::from("genesis_predicate_vk_bytes"),
+        &PathBuf::from("predicate_vk_bytes.genesis"),
         &genesis_predicate_vk_bytes,
     )
     .unwrap();

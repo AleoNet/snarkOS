@@ -7,7 +7,7 @@ impl Parameter for GenesisRecordSerialNumber {
     const SIZE: u64 = 64;
 
     fn load_bytes() -> Vec<u8> {
-        let buffer = include_bytes!("genesis_record_serial_number");
+        let buffer = include_bytes!("record_serial_number.genesis");
         buffer.to_vec()
     }
 }
