@@ -39,6 +39,7 @@ jobs:
   rust_stable:
     docker:
       - image: cimg/rust:1.43.0
+        user: root
     resource_class: xlarge
     steps:
       - checkout
@@ -52,14 +53,16 @@ jobs:
           mkdir build && cd build && cmake .. && make && sudo make install &&
           cd ../.. && rm -rf kcov-master &&
           rm -rf target/debug/base_dpc* && rm -rf target/debug/consensus_dpc*
-          for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-          bash <(curl -s https://codecov.io/bash) &&
+      - run: |
+          for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; sudo kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+          sudo bash <(curl -s https://codecov.io/bash) &&
           echo "Uploaded code coverage"
       - clear_environment:
           cache_key: snark-main
   rust_nightly:
     docker:
       - image: daniilr/rust-nightly:2020-05-15
+        user: root
     resource_class: xlarge
     steps:
       - checkout
