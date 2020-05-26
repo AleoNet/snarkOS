@@ -38,7 +38,7 @@ commands:
 jobs:
   rust_stable:
     docker:
-      - image: circleci/rust:latest
+      - image: cimg/rust:latest
     steps:
       - checkout
       - setup_environment:
