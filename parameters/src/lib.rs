@@ -11,6 +11,9 @@ pub use self::account_signature::*;
 pub mod inner_snark_vk;
 pub use self::inner_snark_vk::*;
 
+pub mod genesis_memo;
+pub use self::genesis_memo::*;
+
 pub mod ledger_merkle_tree;
 pub use self::ledger_merkle_tree::*;
 
