@@ -65,7 +65,7 @@ jobs:
       - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev cmake pkg-config zlib1g zlib1g-dev
       - run: >
           cd ~/project/project/ &&
-          bash ./ci/kcov.sh
+          docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/ kcov/kcov bash /opt/kcov-source/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
