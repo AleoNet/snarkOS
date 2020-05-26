@@ -3,7 +3,6 @@ FROM buildpack-deps:buster
 
 FROM cimg/base:2020.05
 
-LABEL maintainer="Community & Partner Engineering Team <community-partner@circleci.com>"
 
 ENV RUST_VERSION=nightly-2020-05-15 \
 	PATH=/home/circleci/.cargo/bin:$PATH
