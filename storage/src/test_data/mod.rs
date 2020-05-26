@@ -40,7 +40,7 @@ pub fn initialize_test_blockchain<T: Transaction, P: MerkleParameters>(
 }
 
 // Open a test blockchain from stored genesis attributes
-pub fn test_blockchain<T: Transaction, P: MerkleParameters>() -> (Arc<LedgerStorage<T, P>>, PathBuf) {
+pub fn open_test_blockchain<T: Transaction, P: MerkleParameters>() -> (Arc<LedgerStorage<T, P>>, PathBuf) {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 

@@ -25,6 +25,15 @@ pub struct Wallet {
     pub public_key: &'static str,
 }
 
+/// Attributes used to instantiate a new ledger
+pub struct GenesisAttributes {
+    pub genesis_cm: <Tx as Transaction>::Commitment,
+    pub genesis_sn: <Tx as Transaction>::SerialNumber,
+    pub genesis_memo: <Tx as Transaction>::Memorandum,
+    pub genesis_pred_vk_bytes: Vec<u8>,
+    pub genesis_account_bytes: Vec<u8>,
+}
+
 pub fn setup_or_load_parameters<R: Rng>(
     verify_only: bool,
     rng: &mut R,
@@ -57,8 +66,8 @@ pub fn setup_or_load_parameters<R: Rng>(
             let parameters =
                 match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
                     Ok(parameters) => parameters,
-                    Err(_) => {
-                        println!("Parameter Setup");
+                    Err(err) => {
+                        println!("Err: {}. Path: {:?}. Re-running parameter Setup", err, path);
                         let parameters =
                             <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_parameters, rng)
                                 .expect("DPC setup failed");
@@ -118,13 +127,7 @@ pub fn ledger_genesis_setup<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     genesis_account: &Account<Components>,
     rng: &mut R,
-) -> (
-    <Tx as Transaction>::Commitment,
-    <Tx as Transaction>::SerialNumber,
-    <Tx as Transaction>::Memorandum,
-    Vec<u8>,
-    Vec<u8>,
-) {
+) -> GenesisAttributes {
     let genesis_sn_nonce =
         SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &[34u8; 1]).unwrap();
     let genesis_predicate_vk_bytes = to_bytes![
@@ -157,11 +160,11 @@ pub fn ledger_genesis_setup<R: Rng>(
     .unwrap();
     let genesis_memo = [0u8; 32];
 
-    (
-        genesis_record.commitment(),
+    GenesisAttributes {
+        genesis_cm: genesis_record.commitment(),
         genesis_sn,
         genesis_memo,
-        genesis_predicate_vk_bytes.to_vec(),
-        to_bytes![genesis_account].unwrap().to_vec(),
-    )
+        genesis_pred_vk_bytes: genesis_predicate_vk_bytes.to_vec(),
+        genesis_account_bytes: to_bytes![genesis_account].unwrap(),
+    }
 }

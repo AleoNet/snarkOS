@@ -202,20 +202,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Account signature setup");
-        let account_signature = Components::AccountSignature::setup(rng)?;
-        end_timer!(time);
-
         let time = start_timer!(|| "Record commitment scheme setup");
         let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
         let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -228,6 +220,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
         let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Verification Key CRH setup");
+        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Account signature setup");
+        let account_signature = Components::AccountSignature::setup(rng)?;
         end_timer!(time);
 
         let comm_crh_sig_pp = CircuitParameters {

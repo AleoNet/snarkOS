@@ -1,4 +1,5 @@
 mod server_connection_handler {
+    use snarkos_consensus::test_data::FIXTURE_VK;
     use snarkos_dpc::{
         base_dpc::instantiated::{CommitmentMerkleParameters, Tx},
         test_data::load_verifying_parameters,
@@ -19,7 +20,8 @@ mod server_connection_handler {
     #[serial]
     fn peer_connect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = test_blockchain();
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -69,7 +71,8 @@ mod server_connection_handler {
     #[serial]
     fn peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = test_blockchain();
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -117,7 +120,8 @@ mod server_connection_handler {
     #[serial]
     fn gossiped_peer_connect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = test_blockchain();
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -167,7 +171,8 @@ mod server_connection_handler {
     #[serial]
     fn gossiped_peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = test_blockchain();
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -222,7 +227,8 @@ mod server_connection_handler {
     #[serial]
     fn sync_node_disconnect() {
         let mut rt = Runtime::new().unwrap();
-        let (storage, path) = test_blockchain();
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -279,8 +285,8 @@ mod server_connection_handler {
     #[serial]
     fn memory_pool_interval() {
         let mut rt = Runtime::new().unwrap();
-
-        let (storage, path) = test_blockchain();
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let path = storage.storage.storage.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
