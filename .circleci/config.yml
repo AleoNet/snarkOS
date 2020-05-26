@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 commands:
   setup_environment:
     description: "Setup testing environment"
