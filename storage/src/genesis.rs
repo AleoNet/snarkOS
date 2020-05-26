@@ -1,6 +1,9 @@
-// Ledger storage genesis components
+// Ledger genesis attributes
+// These attributes are used to initialize a ledger with a genesis block
+
 // NOTE: These values must be updated if parameters are changed
 
+//
 pub const GENESIS_RECORD_COMMITMENT: [u8; 32] = [
     68, 219, 216, 255, 40, 209, 127, 9, 244, 74, 65, 140, 246, 179, 9, 107, 145, 226, 175, 252, 229, 134, 53, 156, 196,
     123, 138, 180, 134, 156, 197, 3,

@@ -36,17 +36,18 @@ fn base_dpc_integration_test() {
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
     // Setup the ledger
-    let (genesis_cm, genesis_sn, genesis_memo, genesis_pred_vk_bytes, genesis_account_bytes) =
-        ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
+    let genesis_attributes = ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
 
     let ledger: MerkleTreeLedger = initialize_test_blockchain(
         ledger_parameters,
-        genesis_cm,
-        genesis_sn,
-        genesis_memo,
-        genesis_pred_vk_bytes.clone(),
-        genesis_account_bytes,
+        genesis_attributes.genesis_cm,
+        genesis_attributes.genesis_sn,
+        genesis_attributes.genesis_memo,
+        genesis_attributes.genesis_pred_vk_bytes.clone(),
+        genesis_attributes.genesis_account_bytes,
     );
+
+    let genesis_pred_vk_bytes = genesis_attributes.genesis_pred_vk_bytes;
 
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();

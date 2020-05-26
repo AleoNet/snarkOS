@@ -24,6 +24,7 @@ members = [
     "models",
     "network",
     "objects",
+    "parameters",
     "posw",
     "profiler",
     "rpc",
