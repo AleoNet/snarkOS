@@ -34,8 +34,8 @@ commands:
       - save_cache:
           key: << parameters.cache_key >>
           paths:
-            - $CIRCLE_WORKING_DIRECTORY/.cache/sccache
-            - $CIRCLE_WORKING_DIRECTORY/.cargo
+            - .cache/sccache
+            - .cargo
 jobs:
   rust_stable:
     docker:
@@ -48,7 +48,7 @@ jobs:
       - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - run: |
-          docker run --security-opt seccomp=unconfined -v $(pwd):/source kcov/kcov:latest cd /source && for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+          docker run --security-opt seccomp=unconfined -v $(pwd):/source kcov/kcov:latest sh /source/ci/kcov.sh &&
           sudo bash <(curl -s https://codecov.io/bash) &&
           echo "Uploaded code coverage"
       - clear_environment:
