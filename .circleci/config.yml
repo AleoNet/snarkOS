@@ -8,6 +8,7 @@ commands:
         default: snark-cache-main
     steps:
       - run: set -e
+      - setup_remote_docker
       - run: export SCCACHE_CACHE_SIZE=200M
       - run: export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
       - run: mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
@@ -47,13 +48,7 @@ jobs:
       - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - run: |
-          wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-          tar xzf master.tar.gz && cd kcov-master &&
-          mkdir build && cd build && cmake .. && make && sudo make install &&
-          cd ../.. && rm -rf kcov-master &&
-          rm -rf target/debug/base_dpc* && rm -rf target/debug/consensus_dpc*
-      - run: |
-          for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; sudo kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+          docker run --security-opt seccomp=unconfined -v $(pwd):/source kcov/kcov:latest cd /source && for file in target/debug/*-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
           sudo bash <(curl -s https://codecov.io/bash) &&
           echo "Uploaded code coverage"
       - clear_environment:
