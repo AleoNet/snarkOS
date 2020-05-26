@@ -61,9 +61,9 @@ jobs:
     steps:
       - attach_workspace:
           at: /home/circleci/project/project/
-      - run: |
-        cd ~/project/ &&
-        docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/ kcov/kcov bash /opt/kcov-source/ci/kcov.sh
+      - run: >
+          cd ~/project/ &&
+          docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/ kcov/kcov bash /opt/kcov-source/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
