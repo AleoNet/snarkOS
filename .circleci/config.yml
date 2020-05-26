@@ -10,12 +10,13 @@ commands:
       - run: set -e
       - setup_remote_docker
       - run: export SCCACHE_CACHE_SIZE=200M
+      - run: export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
       - run: export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
       - run: mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
       - run: wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
       - run: tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
       - run: mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
-      - run: export PATH="$PATH:CIRCLE_WORKING_DIRECTORY/.bin"
+      - run: export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
       - run: export RUSTC_WRAPPER="sccache"
       - run: rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
       - run: sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
@@ -45,15 +46,21 @@ jobs:
       - checkout
       - setup_environment:
           cache_key: snark-main
-      - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
+      - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev cmake pkg-config zlib1g zlib1g-dev
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
-      - run: |
-          cd $CIRCLE_WORKING_DIRECTORY &&
-          docker run --security-opt seccomp=unconfined -v $(pwd):/source kcov/kcov:latest sh /source/ci/kcov.sh &&
-          sudo bash <(curl -s https://codecov.io/bash) &&
-          echo "Uploaded code coverage"
-      - clear_environment:
-          cache_key: snark-cache-main
+      - persist_to_workspace:
+          root: ~/
+          paths: project/
+  analyse_and_store_coverage:
+    machine:
+      image: ubuntu-1604:202004-01
+      docker_layer_caching: true
+    resource_class: xlarge
+    steps:
+      - attach_workspace:
+          at: /opt/project/
+      - run: docker run --security-opt seccomp=unconfined -v "/opt/project/:/opt/kcov-source/" kcov/kcov bash ./ci/kcov.sh
+      - run: cd /opt/project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
       - image: daniilr/rust-nightly:2020-05-15
@@ -73,4 +80,6 @@ workflows:
     jobs:
       - rust_stable
       - rust_nightly
-#
+      - analyse_and_store_coverage:
+          requires:
+            - rust_stable
