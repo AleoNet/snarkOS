@@ -39,6 +39,7 @@ jobs:
   rust_stable:
     docker:
       - image: cimg/rust:1.43.0
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
