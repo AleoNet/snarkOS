@@ -3,7 +3,7 @@ use snarkos_models::{algorithms::SNARK, parameters::Parameter};
 use snarkos_parameters::*;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{fs::File, io::Result as IoResult, path::PathBuf};
+use std::{fs, io::Result as IoResult, path::PathBuf};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -148,8 +148,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn load(dir_path: &PathBuf, verify_only: bool) -> IoResult<Self> {
         // TODO (howardwu): Update logic to use parameters module.
         fn load_snark_pk<S: SNARK>(path: &PathBuf) -> IoResult<S::ProvingParameters> {
-            let mut file = File::open(path)?;
-            let proving_parameters: <S as SNARK>::ProvingParameters = FromBytes::read(&mut file)?;
+            let proving_parameters: <S as SNARK>::ProvingParameters = FromBytes::read(&fs::read(path)?[..])?;
             Ok(proving_parameters)
         }
 
