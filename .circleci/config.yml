@@ -17,6 +17,7 @@ commands:
       - run: export PATH="$PATH:CIRCLE_WORKING_DIRECTORY/.bin"
       - run: export RUSTC_WRAPPER="sccache"
       - run: rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
+      - run: apt-get update && apt-get install -y clang
       - restore_cache:
           keys:
             - << parameters.cache_key >>
@@ -42,7 +43,7 @@ jobs:
       - checkout
       - setup_environment:
           cache_key: snark-main
-      - run: apt-get update && apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
+      - run: apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip
       - run: |
           wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
