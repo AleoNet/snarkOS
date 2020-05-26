@@ -2,9 +2,10 @@ use snarkos_dpc::{
     base_dpc::instantiated::*,
     test_data::{generate_test_accounts, ledger_genesis_setup, setup_or_load_parameters, GenesisAttributes},
 };
-use snarkos_models::dpc::DPCScheme;
+use snarkos_models::{algorithms::CRH, dpc::DPCScheme};
 use snarkos_objects::Account;
 use snarkos_storage::test_data::*;
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
@@ -30,7 +31,6 @@ impl Fixture {
             self.genesis_attributes.genesis_cm,
             self.genesis_attributes.genesis_sn,
             self.genesis_attributes.genesis_memo,
-            self.genesis_attributes.genesis_pred_vk_bytes.clone(),
             self.genesis_attributes.genesis_account_bytes.clone(),
         )
     }
@@ -47,7 +47,16 @@ fn setup(verify_only: bool) -> Fixture {
 
     let genesis_attributes = ledger_genesis_setup(&parameters, &test_accounts[0], &mut rng);
 
-    let predicate = Predicate::new(genesis_attributes.genesis_pred_vk_bytes.clone());
+    let predicate_vk_hash = to_bytes![
+        PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let predicate = Predicate::new(predicate_vk_hash);
 
     Fixture {
         parameters,

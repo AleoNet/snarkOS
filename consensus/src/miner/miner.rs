@@ -3,6 +3,7 @@ use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
+    algorithms::CRH,
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
@@ -53,10 +54,14 @@ impl Miner {
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
-        let genesis_pred_vk_bytes = storage.genesis_pred_vk_bytes()?;
+        let predicate_vk_hash = to_bytes![PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &to_bytes![parameters.predicate_snark_parameters.verification_key]?
+        )?]?;
+
         let genesis_account = FromBytes::read(&storage.genesis_account_bytes()?[..])?;
 
-        let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
+        let new_predicate = Predicate::new(predicate_vk_hash.clone());
         let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
@@ -64,7 +69,7 @@ impl Miner {
             storage.get_latest_block_height() + 1,
             transactions,
             parameters,
-            &genesis_pred_vk_bytes,
+            &predicate_vk_hash,
             new_birth_predicates,
             new_death_predicates,
             genesis_account,

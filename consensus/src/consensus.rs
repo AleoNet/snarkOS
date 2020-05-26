@@ -246,7 +246,7 @@ impl ConsensusParameters {
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
-        genesis_pred_vk_bytes: &Vec<u8>,
+        predicate_vk_hash: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         genesis_account: Account<Components>,
@@ -282,8 +282,8 @@ impl ConsensusParameters {
                 true, // The input record is dummy
                 &PaymentRecordPayload::default(),
                 // Filler predicate input
-                &Predicate::new(genesis_pred_vk_bytes.clone()),
-                &Predicate::new(genesis_pred_vk_bytes.clone()),
+                &Predicate::new(predicate_vk_hash.clone()),
+                &Predicate::new(predicate_vk_hash.clone()),
                 rng,
             )?;
 

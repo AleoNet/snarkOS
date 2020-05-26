@@ -93,7 +93,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
                     FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
                     FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
                     FromBytes::read(&GENESIS_MEMO[..])?,
-                    GENESIS_PRED_VK_BYTES.to_vec(),
                     GENESIS_ACCOUNT.to_vec(),
                 )
                 .unwrap(); // TODO handle this unwrap. merge storage and ledger error

@@ -17,7 +17,6 @@ pub fn initialize_test_blockchain<T: Transaction, P: MerkleParameters>(
     genesis_cm: T::Commitment,
     genesis_sn: T::SerialNumber,
     genesis_memo: T::Memorandum,
-    genesis_predicate_vk_bytes: Vec<u8>,
     genesis_account_bytes: Vec<u8>,
 ) -> LedgerStorage<T, P> {
     let mut path = std::env::temp_dir();
@@ -31,7 +30,6 @@ pub fn initialize_test_blockchain<T: Transaction, P: MerkleParameters>(
         genesis_cm,
         genesis_sn,
         genesis_memo,
-        genesis_predicate_vk_bytes,
         genesis_account_bytes,
     )
     .unwrap();

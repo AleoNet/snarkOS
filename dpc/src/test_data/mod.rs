@@ -25,7 +25,6 @@ pub struct GenesisAttributes {
     pub genesis_cm: <Tx as Transaction>::Commitment,
     pub genesis_sn: <Tx as Transaction>::SerialNumber,
     pub genesis_memo: <Tx as Transaction>::Memorandum,
-    pub genesis_pred_vk_bytes: Vec<u8>,
     pub genesis_account_bytes: Vec<u8>,
 }
 
@@ -87,10 +86,10 @@ pub fn ledger_genesis_setup<R: Rng>(
 ) -> GenesisAttributes {
     let genesis_sn_nonce =
         SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &[34u8; 1]).unwrap();
-    let genesis_predicate_vk_bytes = to_bytes![
+    let predicate_vk_hash = to_bytes![
         PredicateVerificationKeyHash::hash(
             &parameters.circuit_parameters.predicate_verification_key_hash,
-            &to_bytes![parameters.predicate_snark_parameters.verification_key].unwrap()
+            &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
         )
         .unwrap()
     ]
@@ -102,8 +101,8 @@ pub fn ledger_genesis_setup<R: Rng>(
         &genesis_account.public_key,
         true, // The inital record should be dummy
         &PaymentRecordPayload::default(),
-        &Predicate::new(genesis_predicate_vk_bytes.clone()),
-        &Predicate::new(genesis_predicate_vk_bytes.clone()),
+        &Predicate::new(predicate_vk_hash.clone()),
+        &Predicate::new(predicate_vk_hash.clone()),
         rng,
     )
     .unwrap();
@@ -121,7 +120,6 @@ pub fn ledger_genesis_setup<R: Rng>(
         genesis_cm: genesis_record.commitment(),
         genesis_sn,
         genesis_memo,
-        genesis_pred_vk_bytes: genesis_predicate_vk_bytes.to_vec(),
         genesis_account_bytes: to_bytes![genesis_account].unwrap(),
     }
 }

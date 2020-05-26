@@ -31,14 +31,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
         }
     }
 
-    /// Get the genesis predicate vk bytes
-    pub fn genesis_pred_vk_bytes(&self) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(COL_META, KEY_GENESIS_PRED_VK.as_bytes())? {
-            Some(genesis_pred_vk_bytes) => Ok(genesis_pred_vk_bytes),
-            None => Err(StorageError::MissingGenesisPredVkBytes),
-        }
-    }
-
     /// Get the genesis account bytes
     pub fn genesis_account_bytes(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_GENESIS_ACCOUNT.as_bytes())? {

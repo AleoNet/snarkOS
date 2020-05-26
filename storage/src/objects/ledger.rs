@@ -32,7 +32,6 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
-        genesis_predicate_vk_bytes: Vec<u8>,
         genesis_account_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError> {
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
@@ -111,12 +110,6 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
             col: COL_META,
             key: KEY_GENESIS_MEMO.as_bytes().to_vec(),
             value: to_bytes![genesis_memo]?.to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_PRED_VK.as_bytes().to_vec(),
-            value: genesis_predicate_vk_bytes,
         });
 
         database_transaction.push(Op::Insert {

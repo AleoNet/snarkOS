@@ -23,7 +23,6 @@ pub trait Ledger: Sized {
         dummy_cm: Self::Commitment,
         dummy_sn: Self::SerialNumber,
         dummy_memo: Self::Memo,
-        dummy_predicate_vk_bytes: Vec<u8>,
         dummy_genesis_account_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError>;
 

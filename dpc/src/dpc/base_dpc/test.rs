@@ -76,7 +76,6 @@ fn test_execute_base_dpc_constraints() {
         genesis_record.commitment(),
         genesis_sn.clone(),
         genesis_memo,
-        pred_nizk_vk_bytes.clone(),
         to_bytes![genesis_account].unwrap().to_vec(),
     );
 
