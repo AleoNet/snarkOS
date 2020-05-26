@@ -51,6 +51,8 @@ jobs:
       - persist_to_workspace:
           root: ~/
           paths: project/
+      - clear_environment:
+         cache_key: snark-main
   analyse_and_store_coverage:
     machine:
       image: ubuntu-1604:202004-01
@@ -58,9 +60,11 @@ jobs:
     resource_class: xlarge
     steps:
       - attach_workspace:
-          at: /home/circleci/project/
-      - run: docker run --security-opt seccomp=unconfined -v "/opt/project/:/opt/kcov-source/" kcov/kcov bash ./ci/kcov.sh
-      - run: cd /opt/project/ && bash <(curl -s https://codecov.io/bash)
+          at: /home/circleci/project/project/
+      - run: |
+        cd ~/project/ &&
+        docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/ kcov/kcov bash /opt/kcov-source/ci/kcov.sh
+      - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
       - image: daniilr/rust-nightly:2020-05-15
