@@ -6,7 +6,14 @@ use snarkos_models::{
     parameters::Parameter,
 };
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
-use snarkos_parameters::LedgerMerkleTreeParameters;
+use snarkos_parameters::{
+    GenesisAccount,
+    GenesisMemo,
+    GenesisPredicateVKBytes,
+    GenesisRecordCommitment,
+    GenesisRecordSerialNumber,
+    LedgerMerkleTreeParameters,
+};
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
@@ -90,11 +97,11 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
                 let ledger_storage = Self::new(
                     &path.as_ref().to_path_buf(),
                     ledger_parameters,
-                    FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
-                    FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
-                    FromBytes::read(&GENESIS_MEMO[..])?,
-                    GENESIS_PRED_VK_BYTES.to_vec(),
-                    GENESIS_ACCOUNT.to_vec(),
+                    FromBytes::read(&GenesisRecordCommitment::load_bytes()[..])?,
+                    FromBytes::read(&GenesisRecordSerialNumber::load_bytes()[..])?,
+                    FromBytes::read(&GenesisMemo::load_bytes()[..])?,
+                    GenesisPredicateVKBytes::load_bytes(),
+                    GenesisAccount::load_bytes(),
                 )
                 .unwrap(); // TODO handle this unwrap. merge storage and ledger error
 
