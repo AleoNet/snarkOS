@@ -39,7 +39,6 @@ jobs:
   rust_stable:
     docker:
       - image: cimg/rust:1.43.0
-        user: root
     resource_class: xlarge
     steps:
       - checkout
@@ -62,7 +61,6 @@ jobs:
   rust_nightly:
     docker:
       - image: daniilr/rust-nightly:2020-05-15
-        user: root
     resource_class: xlarge
     steps:
       - checkout
