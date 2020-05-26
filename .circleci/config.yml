@@ -13,7 +13,7 @@ commands:
       - run: mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
       - run: wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
       - run: tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-      - run: mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache CIRCLE_WORKING_DIRECTORY/.bin/sccache
+      - run: mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
       - run: export PATH="$PATH:CIRCLE_WORKING_DIRECTORY/.bin"
       - run: export RUSTC_WRAPPER="sccache"
       - run: rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
@@ -60,14 +60,13 @@ jobs:
       - image: daniilr/rust-nightly:2020-05-15
     steps:
       - checkout
+      - setup_environment:
+          cache_key: snark-main
       - run: rustup component add rustfmt
       - run: cargo fmt -- --check
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip
-      - save_cache:
-          key: snark-nightly
-          paths:
-            - $CIRCLE_WORKING_DIRECTORY/.cache/sccache
-            - $CIRCLE_WORKING_DIRECTORY/.cargo
+      - clear_environment:
+          cache_key: snark-main
 workflows:
   version: 2
   main-workflow:
