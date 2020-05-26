@@ -1,17 +1,6 @@
-use snarkos_dpc::base_dpc::{
-    inner_circuit::InnerCircuit,
-    instantiated::{Components, Predicate},
-    parameters::CircuitParameters,
-    record_payload::PaymentRecordPayload,
-    BaseDPCComponents,
-    DPC,
-};
+use snarkos_dpc::base_dpc::{instantiated::Components, BaseDPCComponents};
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::{
-    algorithms::{SignatureScheme, CRH},
-    objects::account::AccountScheme,
-    parameters::Parameter,
-};
+use snarkos_models::{objects::account::AccountScheme, parameters::Parameter};
 use snarkos_objects::account::Account;
 use snarkos_parameters::{AccountCommitmentParameters, AccountSignatureParameters};
 use snarkos_utilities::{
@@ -36,8 +25,8 @@ pub fn setup<C: BaseDPCComponents>() -> Result<Vec<u8>, DPCError> {
     let genesis_metadata: [u8; 32] = rng.gen();
 
     let genesis_account = Account::<C>::new(
-        account_signature_parameters,
-        account_commitment_parameters,
+        &account_signature_parameters,
+        &account_commitment_parameters,
         &genesis_metadata,
         rng,
     )?;

@@ -10,7 +10,6 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use rand::{thread_rng, Rng};
 use std::{
     fs::File,
     io::{Result as IoResult, Write},
@@ -18,14 +17,15 @@ use std::{
 };
 
 pub fn setup<C: BaseDPCComponents>() -> Result<Vec<u8>, DPCError> {
-    let rng = &mut thread_rng();
-
     let predicate_vk_crh: C::PredicateVerificationKeyHash =
         From::from(FromBytes::read(&PredicateVKCRHParameters::load_bytes()[..])?);
-    let predicate_snark_vk: <C::PredicateSNARK as SNARK>::VerifcationParameters =
-        From::from(FromBytes::read(&PredicateSNARKVKParameters::load_bytes()[..])?);
 
-    let genesis_predicate_vk_bytes = predicate_vk_crh.hash(&to_bytes![predicate_snark_vk]?)?;
+    let predicate_snark_vk: <C::PredicateSNARK as SNARK>::VerificationParameters =
+        From::from(<C::PredicateSNARK as SNARK>::VerificationParameters::read(
+            PredicateSNARKVKParameters::load_bytes().as_slice(),
+        )?);
+
+    let genesis_predicate_vk = predicate_vk_crh.hash(&to_bytes![predicate_snark_vk]?)?;
     let genesis_predicate_vk_bytes = to_bytes![genesis_predicate_vk]?;
 
     println!(

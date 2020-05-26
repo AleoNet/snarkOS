@@ -1,13 +1,13 @@
 use snarkos_dpc::base_dpc::{
-    inner_circuit::InnerCircuit,
-    instantiated::{Components, Predicate},
+    instantiated::Components,
     parameters::CircuitParameters,
+    predicate::DPCPredicate,
     record_payload::PaymentRecordPayload,
     BaseDPCComponents,
     DPC,
 };
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::{algorithms::CRH, parameters::Parameter};
+use snarkos_models::{algorithms::CRH, dpc::record::Record, parameters::Parameter};
 use snarkos_objects::Account;
 use snarkos_parameters::{GenesisAccount, GenesisPredicateVKBytes, SerialNumberNonceCRHParameters};
 use snarkos_utilities::{
@@ -31,27 +31,26 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let serial_number_nonce_input: [u8; 32] = rng.gen();
 
     let genesis_serial_number_nonce = serial_number_nonce_crh.hash(&serial_number_nonce_input)?;
-    let genesis_serial_number_nonce = to_bytes![genesis_serial_number_nonce]?;
 
     let genesis_predicate_vk_bytes = &GenesisPredicateVKBytes::load_bytes();
     let genesis_account: Account<C> = FromBytes::read(&GenesisAccount::load_bytes()[..])?;
 
-    let genesis_record = DPC::<C>::generate_record(
+    let genesis_record = DPC::generate_record(
         &circuit_parameters,
         &genesis_serial_number_nonce,
         &genesis_account.public_key,
         true, // The inital record should be dummy
         &PaymentRecordPayload::default(),
-        &Predicate::new(genesis_predicate_vk_bytes.to_vec().clone()),
-        &Predicate::new(genesis_predicate_vk_bytes.to_vec().clone()),
+        &DPCPredicate::new(genesis_predicate_vk_bytes.to_vec().clone()),
+        &DPCPredicate::new(genesis_predicate_vk_bytes.to_vec().clone()),
         rng,
     )?;
 
+    let genesis_record_commitment = to_bytes![genesis_record.commitment()]?;
+
     let (genesis_record_serial_number, _) =
         DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_account.private_key).unwrap();
-
-    let genesis_record_commitment = to_bytes![genesis_record.commitment()]?;
-    let genesis_record_serial_number = to_bytes![genesis_sn]?;
+    let genesis_record_serial_number = to_bytes![genesis_record_serial_number]?;
 
     println!(
         "genesis_record_commitment\n\tsize - {}",
