@@ -60,7 +60,7 @@ jobs:
     resource_class: xlarge
     steps:
       - attach_workspace:
-          at: /home/circleci/project/project/
+          at: /home/circleci/project/
       - run: >
           cd ~/project/ &&
           docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/ kcov/kcov bash /opt/kcov-source/ci/kcov.sh
