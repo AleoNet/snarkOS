@@ -57,6 +57,7 @@ jobs:
       docker_layer_caching: true
     resource_class: xlarge
     steps:
+      - run: mkdir -p /opt/project/
       - attach_workspace:
           at: /opt/project/
       - run: docker run --security-opt seccomp=unconfined -v "/opt/project/:/opt/kcov-source/" kcov/kcov bash ./ci/kcov.sh
