@@ -1,4 +1,4 @@
-# This script will run the parameter setup programs in the `examples` folder and move the resulting `.params` files
+# This script will run the parameter setup programs in the `examples` folder and move the resulting `.params` and `.genesis` files
 # to their respective folders under the `src` directory.
 # If the parameter size or checksum has changed, you will need to manually update these in each corresponding struct.
 
@@ -28,3 +28,16 @@ mv inner_snark_pk.params ../src/inner_snark_pk
 mv inner_snark_vk.params ../src/inner_snark_vk
 mv outer_snark_pk.params ../src/outer_snark_pk
 mv outer_snark_vk.params ../src/outer_snark_vk
+
+cargo run --release --example genesis_memo
+cargo run --release --example genesis_predicate_vk_bytes
+cargo run --release --example genesis_account
+
+mv memo.genesis ./src/genesis_memo
+mv predicate_vk_bytes.genesis ./src/genesis_predicate_vk_bytes
+mv account.genesis ./src/genesis_account
+
+cargo run --release --example genesis_record
+
+mv record_commitment.genesis ./src/genesis_record_commitment
+mv record_serial_number.genesis ./src/genesis_record_serial_number
