@@ -5,7 +5,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: snark-main
+        default: snark-cache-main
     steps:
       - run: set -e
       - run: export SCCACHE_CACHE_SIZE=200M
@@ -58,7 +58,7 @@ jobs:
           sudo bash <(curl -s https://codecov.io/bash) &&
           echo "Uploaded code coverage"
       - clear_environment:
-          cache_key: snark-main
+          cache_key: snark-cache-main
   rust_nightly:
     docker:
       - image: daniilr/rust-nightly:2020-05-15
@@ -67,12 +67,12 @@ jobs:
     steps:
       - checkout
       - setup_environment:
-          cache_key: snark-main
+          cache_key: snark-cache-nighty
       - run: rustup component add rustfmt
       - run: cargo fmt -- --check
       - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - clear_environment:
-          cache_key: snark-main
+          cache_key: snark-cache-nighty
 workflows:
   version: 2
   main-workflow:
