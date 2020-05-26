@@ -2044,6 +2044,7 @@ dependencies = [
  "snarkos-gadgets",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-parameters",
  "snarkos-profiler",
  "snarkos-storage",
  "snarkos-utilities",
@@ -2133,6 +2134,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-parameters"
+version = "0.8.0"
+dependencies = [
+ "rand",
+ "snarkos-algorithms",
+ "snarkos-dpc",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-posw"
 version = "0.8.0"
 dependencies = [
@@ -2196,6 +2209,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-parameters",
  "snarkos-utilities",
 ]
 

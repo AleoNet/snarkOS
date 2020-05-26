@@ -307,6 +307,7 @@ mod tests {
 
         let mut mem_pool = MemoryPool::new();
         let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        // TODO (howardwu): This is not correct usage of transaction, fix me.
         // modify the tx a bit so that it does not conflict with the one already inserted
         // in the chain
         transaction.old_serial_numbers.clear();

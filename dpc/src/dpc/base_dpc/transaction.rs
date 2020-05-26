@@ -116,6 +116,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCStuff<C> {
     Eq(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCTransaction<C: BaseDPCComponents> {
+    // TODO (howardwu): Remove the public visibility here
     pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     pub memorandum: [u8; 32],
