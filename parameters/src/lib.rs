@@ -14,6 +14,9 @@ pub use self::inner_snark_vk::*;
 pub mod genesis_memo;
 pub use self::genesis_memo::*;
 
+pub mod genesis_predicate_vk_bytes;
+pub use self::genesis_predicate_vk_bytes::*;
+
 pub mod ledger_merkle_tree;
 pub use self::ledger_merkle_tree::*;
 
