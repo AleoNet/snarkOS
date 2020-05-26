@@ -38,7 +38,7 @@ commands:
 jobs:
   rust_stable:
     docker:
-      - image: cimg/rust:latest
+      - image: cimg/rust:1.43.0
     steps:
       - checkout
       - setup_environment:
