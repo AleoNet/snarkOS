@@ -17,7 +17,7 @@ commands:
       - run: export PATH="$PATH:CIRCLE_WORKING_DIRECTORY/.bin"
       - run: export RUSTC_WRAPPER="sccache"
       - run: rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
-      - run: apt-get update && apt-get install -y clang llvm-dev llvm
+      - run: sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm
       - restore_cache:
           keys:
             - << parameters.cache_key >>
