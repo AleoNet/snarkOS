@@ -70,10 +70,10 @@ impl Parameters for OuterSNARKPKParameters {
 
 impl OuterSNARKPKParameters {
     pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
-        println!("{} - downloading parameters...", module_path!());
+        println!("{} - Downloading parameters...", module_path!());
         let mut buffer = vec![];
         Self::remote_fetch(&mut buffer)?;
-        println!("{} - complete", module_path!());
+        println!("\n{} - Download complete", module_path!());
         Ok(buffer)
     }
 
@@ -83,7 +83,7 @@ impl OuterSNARKPKParameters {
         absolute_path: &PathBuf,
         file_path: &PathBuf,
     ) -> Result<(), ParametersError> {
-        println!("{} - attempting to store parameters ({:?})", module_path!(), file_path);
+        println!("{} - Storing parameters ({:?})", module_path!(), file_path);
         // Attempt to write the parameter buffer to a file.
         if let Ok(mut file) = File::create(relative_path) {
             file.write_all(&buffer)?;
