@@ -79,6 +79,7 @@ opt-level = 0
 
 [profile.test]
 opt-level = 3 # necessary for DPC testing
+lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true

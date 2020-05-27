@@ -3,7 +3,7 @@ use snarkos_models::{algorithms::SNARK, parameters::Parameters};
 use snarkos_parameters::*;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{fs::File, io::Result as IoResult, path::PathBuf};
+use std::{io::Result as IoResult, path::PathBuf};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -147,46 +147,33 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn load(dir_path: &PathBuf, verify_only: bool) -> IoResult<Self> {
-        // TODO (howardwu): Update logic to use parameters module.
-        fn load_snark_pk<S: SNARK>(path: &PathBuf) -> IoResult<S::ProvingParameters> {
-            let mut file = File::open(path)?;
-            let proving_parameters: <S as SNARK>::ProvingParameters = FromBytes::read(&mut file)?;
-            Ok(proving_parameters)
-        }
-
         let circuit_parameters = CircuitParameters::<C>::load()?;
         let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
-            // TODO (howardwu): Update logic to use parameters module.
-            let inner_snark_pk_path = &dir_path.join("inner_snark.params");
-            let inner_snark_pk = match verify_only {
-                true => None,
-                false => Some(load_snark_pk::<C::InnerSNARK>(inner_snark_pk_path)?),
-            };
+            let inner_snark_pk: <C::InnerSNARK as SNARK>::ProvingParameters = From::from(
+                <C::InnerSNARK as SNARK>::ProvingParameters::read(InnerSNARKPKParameters::load_bytes()?.as_slice())?,
+            );
 
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
                 From::from(<C::InnerSNARK as SNARK>::VerificationParameters::read(
                     InnerSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
 
-            (inner_snark_pk, inner_snark_vk.into())
+            (Some(inner_snark_pk), inner_snark_vk.into())
         };
 
         let outer_snark_parameters = {
-            // TODO (howardwu): Update logic to use parameters module.
-            let outer_snark_pk_path = &dir_path.join("outer_snark.params");
-            let outer_snark_pk = match verify_only {
-                true => None,
-                false => Some(load_snark_pk::<C::OuterSNARK>(outer_snark_pk_path)?),
-            };
+            let outer_snark_pk: <C::OuterSNARK as SNARK>::ProvingParameters = From::from(
+                <C::OuterSNARK as SNARK>::ProvingParameters::read(OuterSNARKPKParameters::load_bytes()?.as_slice())?,
+            );
 
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
                 From::from(<C::OuterSNARK as SNARK>::VerificationParameters::read(
                     OuterSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
 
-            (outer_snark_pk, outer_snark_vk.into())
+            (Some(outer_snark_pk), outer_snark_vk.into())
         };
 
         Ok(Self {
