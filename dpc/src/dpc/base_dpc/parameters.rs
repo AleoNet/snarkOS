@@ -31,8 +31,9 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
             From::from(FromBytes::read(vec![].as_slice())?);
         let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
             From::from(FromBytes::read(PredicateVKCRHParameters::load_bytes()?.as_slice())?);
-        let local_data_commitment: C::LocalDataCommitment =
-            From::from(FromBytes::read(LocalDataCommitmentParameters::load_bytes()?.as_slice())?);
+        let local_data_commitment: C::LocalDataCommitment = From::from(FromBytes::read(
+            LocalDataCommitmentParameters::load_bytes()?.as_slice(),
+        )?);
         let value_commitment: C::ValueCommitment =
             From::from(FromBytes::read(ValueCommitmentParameters::load_bytes()?.as_slice())?);
         let serial_number_nonce: C::SerialNumberNonceCRH = From::from(FromBytes::read(

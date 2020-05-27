@@ -2,7 +2,7 @@ use crate::{
     algorithms::{CRHError, CommitmentError, PRFError, SNARKError, SignatureError},
     dpc::{BindingSignatureError, LedgerError},
     objects::AccountError,
-    parameters::ParametersError
+    parameters::ParametersError,
 };
 
 #[derive(Debug, Error)]
