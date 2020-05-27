@@ -3,7 +3,7 @@ use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_models::{
     objects::{Ledger, Transaction},
-    parameters::Parameter,
+    parameters::Parameters,
 };
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
 use snarkos_parameters::LedgerMerkleTreeParameters;
@@ -48,7 +48,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()[..])?);
+        let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
         let ledger_parameters = P::from(crh);
 
         match latest_block_number {

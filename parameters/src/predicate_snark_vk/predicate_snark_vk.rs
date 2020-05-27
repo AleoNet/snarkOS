@@ -1,13 +1,14 @@
-use snarkos_models::parameters::Parameter;
+use snarkos_errors::parameters::ParametersError;
+use snarkos_models::parameters::Parameters;
 
 pub struct PredicateSNARKVKParameters;
 
-impl Parameter for PredicateSNARKVKParameters {
+impl Parameters for PredicateSNARKVKParameters {
     const CHECKSUM: &'static str = "";
     const SIZE: u64 = 1359;
 
-    fn load_bytes() -> Vec<u8> {
+    fn load_bytes() -> Result<Vec<u8>, ParametersError> {
         let buffer = include_bytes!("./predicate_snark_vk.params");
-        buffer.to_vec()
+        Ok(buffer.to_vec())
     }
 }
