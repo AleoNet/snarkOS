@@ -53,7 +53,7 @@ jobs:
           name: Build and run tests
           command: >
             RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
-              --skip dpc_integration_test --skip startup_handshake_stored_peers
+            --skip dpc_integration_test --skip startup_handshake_stored_peers
       - persist_to_workspace:
           root: ~/
           paths: project/
@@ -72,7 +72,7 @@ jobs:
           command: >
             cd ~/project/project/ &&
             docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/
-              daniilr/kcov bash /opt/kcov-source/ci/kcov.sh
+            daniilr/kcov bash /opt/kcov-source/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
