@@ -14,7 +14,7 @@ use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::{DPCComponents, DPCScheme, Record},
-    objects::{Ledger, Transaction},
+    objects::{AccountScheme, Ledger, Transaction},
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
@@ -249,7 +249,6 @@ impl ConsensusParameters {
         predicate_vk_hash: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
-        genesis_account: Account<Components>,
         recipient: AccountPublicKey<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -266,8 +265,18 @@ impl ConsensusParameters {
             total_value_balance += transaction.stuff.value_balance.abs() as u64;
         }
 
+        // Generate a new account that owns the dummy input records
+        let account_metadata: [u8; 32] = rng.gen();
+        let new_account = Account::new(
+            &parameters.circuit_parameters.account_signature,
+            &parameters.circuit_parameters.account_commitment,
+            &account_metadata,
+            rng,
+        )
+        .unwrap();
+
         // Generate dummy input records having as address the genesis address.
-        let old_account_private_keys = vec![genesis_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
         let mut old_records = vec![];
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
@@ -278,7 +287,7 @@ impl ConsensusParameters {
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,
                 &old_sn_nonce,
-                &genesis_account.public_key,
+                &new_account.public_key,
                 true, // The input record is dummy
                 &PaymentRecordPayload::default(),
                 // Filler predicate input

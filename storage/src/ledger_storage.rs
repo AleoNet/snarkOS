@@ -55,6 +55,8 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             Some(val) => {
                 let storage = Storage::open_cf(path.as_ref(), NUM_COLS)?;
 
+                // Build commitment merkle tree
+
                 let mut cm_and_indices = vec![];
 
                 for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
@@ -66,13 +68,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
 
                 cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
                 let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
-
-                let genesis_cm: T::Commitment = match storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
-                    Some(cm_bytes) => FromBytes::read(&cm_bytes[..])?,
-                    None => return Err(StorageError::MissingGenesisCm),
-                };
-
-                assert!(commitments[0] == genesis_cm);
 
                 let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
 
@@ -93,7 +88,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
                     FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
                     FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
                     FromBytes::read(&GENESIS_MEMO[..])?,
-                    GENESIS_ACCOUNT.to_vec(),
                 )
                 .unwrap(); // TODO handle this unwrap. merge storage and ledger error
 

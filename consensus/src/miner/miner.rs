@@ -9,10 +9,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
 use snarkos_storage::LedgerStorage;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -59,8 +56,6 @@ impl Miner {
             &to_bytes![parameters.predicate_snark_parameters.verification_key]?
         )?]?;
 
-        let genesis_account = FromBytes::read(&storage.genesis_account_bytes()?[..])?;
-
         let new_predicate = Predicate::new(predicate_vk_hash.clone());
         let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -72,7 +67,6 @@ impl Miner {
             &predicate_vk_hash,
             new_birth_predicates,
             new_death_predicates,
-            genesis_account,
             self.address.clone(),
             &storage,
             rng,

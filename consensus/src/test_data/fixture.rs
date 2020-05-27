@@ -31,7 +31,6 @@ impl Fixture {
             self.genesis_attributes.genesis_cm,
             self.genesis_attributes.genesis_sn,
             self.genesis_attributes.genesis_memo,
-            self.genesis_attributes.genesis_account_bytes.clone(),
         )
     }
 }

@@ -17,22 +17,13 @@ pub fn initialize_test_blockchain<T: Transaction, P: MerkleParameters>(
     genesis_cm: T::Commitment,
     genesis_sn: T::SerialNumber,
     genesis_memo: T::Memorandum,
-    genesis_account_bytes: Vec<u8>,
 ) -> LedgerStorage<T, P> {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
     LedgerStorage::<T, P>::destroy_storage(path.clone()).unwrap();
 
-    let storage = LedgerStorage::<T, P>::new(
-        &path,
-        parameters,
-        genesis_cm,
-        genesis_sn,
-        genesis_memo,
-        genesis_account_bytes,
-    )
-    .unwrap();
+    let storage = LedgerStorage::<T, P>::new(&path, parameters, genesis_cm, genesis_sn, genesis_memo).unwrap();
 
     storage
 }

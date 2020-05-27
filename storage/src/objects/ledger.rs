@@ -32,7 +32,6 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
         genesis_cm: Self::Commitment,
         genesis_sn: Self::SerialNumber,
         genesis_memo: Self::Memo,
-        genesis_account_bytes: Vec<u8>,
     ) -> Result<Self, LedgerError> {
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
         let storage = match Storage::open_cf(path, NUM_COLS) {
@@ -73,7 +72,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
-            value: (1 as u32).to_le_bytes().to_vec(),
+            value: (0 as u32).to_le_bytes().to_vec(),
         });
 
         database_transaction.push(Op::Insert {
@@ -110,12 +109,6 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
             col: COL_META,
             key: KEY_GENESIS_MEMO.as_bytes().to_vec(),
             value: to_bytes![genesis_memo]?.to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_ACCOUNT.as_bytes().to_vec(),
-            value: genesis_account_bytes,
         });
 
         let ledger_storage = Self {

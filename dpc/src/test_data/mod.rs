@@ -25,7 +25,6 @@ pub struct GenesisAttributes {
     pub genesis_cm: <Tx as Transaction>::Commitment,
     pub genesis_sn: <Tx as Transaction>::SerialNumber,
     pub genesis_memo: <Tx as Transaction>::Memorandum,
-    pub genesis_account_bytes: Vec<u8>,
 }
 
 pub fn setup_or_load_parameters<R: Rng>(
@@ -120,6 +119,5 @@ pub fn ledger_genesis_setup<R: Rng>(
         genesis_cm: genesis_record.commitment(),
         genesis_sn,
         genesis_memo,
-        genesis_account_bytes: to_bytes![genesis_account].unwrap(),
     }
 }

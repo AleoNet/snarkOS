@@ -43,7 +43,6 @@ fn base_dpc_integration_test() {
         genesis_attributes.genesis_cm,
         genesis_attributes.genesis_sn,
         genesis_attributes.genesis_memo,
-        genesis_attributes.genesis_account_bytes,
     );
 
     let predicate_vk_hash = to_bytes![

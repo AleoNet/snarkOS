@@ -31,14 +31,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
         }
     }
 
-    /// Get the genesis account bytes
-    pub fn genesis_account_bytes(&self) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(COL_META, KEY_GENESIS_ACCOUNT.as_bytes())? {
-            Some(genesis_account_bytes) => Ok(genesis_account_bytes),
-            None => Err(StorageError::MissingGenesisAccount),
-        }
-    }
-
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
@@ -56,7 +48,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     pub fn current_sn_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
             Some(sn_index_bytes) => Ok(bytes_to_u32(sn_index_bytes) as usize),
-            None => Err(StorageError::MissingCurrentSnIndex),
+            None => Err(StorageError::MissingCurrentSnIndex), // TODO (raychu86) return 0 if not set
         }
     }
 
@@ -141,7 +133,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
 
         cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
         let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
-        assert!(commitments[0] == self.genesis_cm()?);
 
         Ok(MerkleTree::new(self.ledger_parameters.clone(), &commitments)?)
     }
