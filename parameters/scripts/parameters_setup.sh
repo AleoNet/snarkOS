@@ -5,7 +5,6 @@
 cargo run --release --example account_commitment
 cargo run --release --example account_signature
 cargo run --release --example local_data_commitment
-cargo run --release --example predicate_snark
 cargo run --release --example predicate_vk_crh
 cargo run --release --example record_commitment
 cargo run --release --example serial_number_nonce_crh
@@ -14,7 +13,6 @@ cargo run --release --example value_commitment
 mv account_commitment.params ../src/account_commitment
 mv account_signature.params ../src/account_signature
 mv local_data_commitment.params ../src/local_data_commitment
-
 mv predicate_vk_crh.params ../src/predicate_vk_crh
 mv record_commitment.params ../src/record_commitment
 mv serial_number_nonce_crh.params ../src/serial_number_nonce_crh
@@ -23,7 +21,6 @@ mv value_commitment.params ../src/value_commitment
 cargo run --release --example inner_snark
 cargo run --release --example outer_snark
 cargo run --release --example predicate_snark
-
 
 mv inner_snark_pk.params ../src/inner_snark_pk
 mv inner_snark_vk.params ../src/inner_snark_vk

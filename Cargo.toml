@@ -21,6 +21,7 @@ members = [
     "dpc",
     "errors",
     "gadgets",
+    "genesis",
     "models",
     "network",
     "objects",

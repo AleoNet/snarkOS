@@ -2078,6 +2078,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-genesis"
+version = "0.8.0"
+dependencies = [
+ "hex",
+ "parking_lot 0.10.2",
+ "rand",
+ "snarkos-algorithms",
+ "snarkos-consensus",
+ "snarkos-dpc",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-parameters",
+ "snarkos-storage",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
