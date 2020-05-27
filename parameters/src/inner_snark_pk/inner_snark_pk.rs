@@ -40,10 +40,19 @@ impl Parameters for InnerSNARKPKParameters {
                 file_path.pop();
                 file_path.push(INNER_SNARK_PK_FILENAME);
 
+                // Compute the relative path.
                 let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
+
+                // Compute the absolute path.
+                let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                absolute_path.push(&relative_path);
+
                 if relative_path.exists() {
-                    // Attempts one final try to load the parameter file locally.
+                    // Attempts one final try to load the parameter file locally with a relative path.
                     Ok(fs::read(relative_path)?.to_vec())
+                } else if absolute_path.exists() {
+                    // Attempts one final try to load the parameter file locally with an absolute path.
+                    Ok(fs::read(absolute_path)?.to_vec())
                 } else {
                     // Downloads the missing parameters and stores it in the local directory for use.
                     eprintln!(
@@ -51,7 +60,7 @@ impl Parameters for InnerSNARKPKParameters {
                         INNER_SNARK_PK_FILENAME, INNER_SNARK_PK_FILENAME, file_path
                     );
                     let output = Self::load_remote()?;
-                    Self::store_bytes(&output, &relative_path, &file_path)?;
+                    Self::store_bytes(&output, &relative_path, &absolute_path, &file_path)?;
                     Ok(output)
                 }
             }
@@ -68,12 +77,21 @@ impl InnerSNARKPKParameters {
         Ok(buffer)
     }
 
-    fn store_bytes(buffer: &Vec<u8>, relative_path: &PathBuf, file_path: &PathBuf) -> Result<(), ParametersError> {
+    fn store_bytes(
+        buffer: &Vec<u8>,
+        relative_path: &PathBuf,
+        absolute_path: &PathBuf,
+        file_path: &PathBuf,
+    ) -> Result<(), ParametersError> {
         println!("{} - attempting to store parameters ({:?})", module_path!(), file_path);
         // Attempt to write the parameter buffer to a file.
-        let mut file = File::create(relative_path)?;
-        file.write_all(&buffer)?;
-        drop(file);
+        if let Ok(mut file) = File::create(relative_path) {
+            file.write_all(&buffer)?;
+            drop(file);
+        } else if let Ok(mut file) = File::create(absolute_path) {
+            file.write_all(&buffer)?;
+            drop(file);
+        }
         Ok(())
     }
 
