@@ -11,7 +11,7 @@ commands:
       - setup_remote_docker
       - run:
           name: Prepare envrionment and install dependencies
-          command: >
+          command: |
             export SCCACHE_CACHE_SIZE=200M
             export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
             export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
@@ -52,7 +52,7 @@ jobs:
       - run:
           name: Build and run tests
           command: >
-            RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc \
+            RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
               --skip dpc_integration_test --skip startup_handshake_stored_peers
       - persist_to_workspace:
           root: ~/
@@ -71,7 +71,8 @@ jobs:
           name: Run kcov
           command: >
             cd ~/project/project/ &&
-            docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/ daniilr/kcov bash /opt/kcov-source/ci/kcov.sh
+            docker run --security-opt seccomp=unconfined -v ~/project/project/:/opt/kcov-source/
+              daniilr/kcov bash /opt/kcov-source/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
