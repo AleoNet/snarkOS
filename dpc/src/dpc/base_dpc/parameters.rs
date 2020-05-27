@@ -3,7 +3,7 @@ use snarkos_models::{algorithms::SNARK, parameters::Parameters};
 use snarkos_parameters::*;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{io::Result as IoResult, path::PathBuf};
+use std::io::Result as IoResult;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -146,34 +146,40 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.circuit_parameters.serial_number_nonce
     }
 
-    pub fn load(dir_path: &PathBuf, verify_only: bool) -> IoResult<Self> {
+    pub fn load(verify_only: bool) -> IoResult<Self> {
         let circuit_parameters = CircuitParameters::<C>::load()?;
         let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
-            let inner_snark_pk: <C::InnerSNARK as SNARK>::ProvingParameters = From::from(
-                <C::InnerSNARK as SNARK>::ProvingParameters::read(InnerSNARKPKParameters::load_bytes()?.as_slice())?,
-            );
+            let inner_snark_pk = match verify_only {
+                true => None,
+                false => Some(From::from(<C::InnerSNARK as SNARK>::ProvingParameters::read(
+                    InnerSNARKPKParameters::load_bytes()?.as_slice(),
+                )?)),
+            };
 
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
                 From::from(<C::InnerSNARK as SNARK>::VerificationParameters::read(
                     InnerSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
 
-            (Some(inner_snark_pk), inner_snark_vk.into())
+            (inner_snark_pk, inner_snark_vk.into())
         };
 
         let outer_snark_parameters = {
-            let outer_snark_pk: <C::OuterSNARK as SNARK>::ProvingParameters = From::from(
-                <C::OuterSNARK as SNARK>::ProvingParameters::read(OuterSNARKPKParameters::load_bytes()?.as_slice())?,
-            );
+            let outer_snark_pk = match verify_only {
+                true => None,
+                false => Some(From::from(<C::OuterSNARK as SNARK>::ProvingParameters::read(
+                    OuterSNARKPKParameters::load_bytes()?.as_slice(),
+                )?)),
+            };
 
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
                 From::from(<C::OuterSNARK as SNARK>::VerificationParameters::read(
                     OuterSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
 
-            (Some(outer_snark_pk), outer_snark_vk.into())
+            (outer_snark_pk, outer_snark_vk.into())
         };
 
         Ok(Self {

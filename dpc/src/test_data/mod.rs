@@ -43,13 +43,10 @@ pub fn setup_or_load_parameters<R: Rng>(
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
-    // TODO (howardwu): Remove this hardcoded path.
-    let mut path = std::env::current_dir().unwrap();
-    path.push("../dpc/src/parameters/");
-    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
+    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(verify_only) {
         Ok(parameters) => parameters,
         Err(err) => {
-            println!("Err: {}. Path: {:?}. Re-running parameter Setup", err, path);
+            println!("error - {}, re-running parameter Setup", err);
             <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_merkle_tree_parameters, rng)
                 .expect("DPC setup failed")
         }
