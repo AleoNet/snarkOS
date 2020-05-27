@@ -88,7 +88,11 @@ impl Miner {
         let coinbase_records = self.add_coinbase_transaction(parameters, &storage, &mut transactions, rng)?;
 
         // Verify transactions
-        InstantiatedDPC::verify_transactions(parameters, &transactions.0, storage)?;
+        assert!(InstantiatedDPC::verify_transactions(
+            parameters,
+            &transactions.0,
+            storage
+        )?);
 
         let previous_block_header = storage.get_latest_block()?.header;
 

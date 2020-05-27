@@ -42,7 +42,7 @@ name = "snarkos"
 path = "snarkOS/main.rs"
 
 [dependencies]
-snarkos-consensus = { path = "consensus", version = "0.8.0" }
+snarkos-consensus = { path = "./consensus", version = "0.8.0" }
 snarkos-dpc = { path = "./dpc", version = "0.8.0" }
 snarkos-errors = { path = "./errors", version = "0.8.0" }
 snarkos-network = { path = "network", version = "0.8.0" }
