@@ -2,6 +2,7 @@ use crate::{
     algorithms::{CRHError, CommitmentError, PRFError, SNARKError, SignatureError},
     dpc::{BindingSignatureError, LedgerError},
     objects::AccountError,
+    parameters::ParametersError
 };
 
 #[derive(Debug, Error)]
@@ -32,6 +33,9 @@ pub enum DPCError {
 
     #[error("missing outer snark proving parameters")]
     MissingOuterSnarkProvingParameters,
+
+    #[error("{}", _0)]
+    ParametersError(ParametersError),
 
     #[error("{}", _0)]
     PRFError(PRFError),
@@ -82,6 +86,12 @@ impl From<PRFError> for DPCError {
 impl From<SignatureError> for DPCError {
     fn from(error: SignatureError) -> Self {
         DPCError::SignatureError(error)
+    }
+}
+
+impl From<ParametersError> for DPCError {
+    fn from(error: ParametersError) -> Self {
+        DPCError::ParametersError(error)
     }
 }
 

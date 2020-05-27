@@ -9,5 +9,6 @@ pub mod gadgets;
 pub mod network;
 pub mod node;
 pub mod objects;
+pub mod parameters;
 pub mod rpc;
 pub mod storage;

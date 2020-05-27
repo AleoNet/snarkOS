@@ -1,5 +1,5 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
-use snarkos_models::{algorithms::SNARK, parameters::Parameter};
+use snarkos_models::{algorithms::SNARK, parameters::Parameters};
 use snarkos_parameters::*;
 use snarkos_utilities::bytes::FromBytes;
 
@@ -22,21 +22,21 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
     // TODO (howardwu): Inspect what is going on with predicate_verification_key_commitment.
     pub fn load() -> IoResult<Self> {
         let account_commitment: C::AccountCommitment =
-            From::from(FromBytes::read(AccountCommitmentParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(AccountCommitmentParameters::load_bytes()?.as_slice())?);
         let account_signature: C::AccountSignature =
-            From::from(FromBytes::read(AccountSignatureParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(AccountSignatureParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =
-            From::from(FromBytes::read(RecordCommitmentParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(RecordCommitmentParameters::load_bytes()?.as_slice())?);
         let predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment =
             From::from(FromBytes::read(vec![].as_slice())?);
         let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
-            From::from(FromBytes::read(PredicateVKCRHParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(PredicateVKCRHParameters::load_bytes()?.as_slice())?);
         let local_data_commitment: C::LocalDataCommitment =
-            From::from(FromBytes::read(LocalDataCommitmentParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(LocalDataCommitmentParameters::load_bytes()?.as_slice())?);
         let value_commitment: C::ValueCommitment =
-            From::from(FromBytes::read(ValueCommitmentParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(ValueCommitmentParameters::load_bytes()?.as_slice())?);
         let serial_number_nonce: C::SerialNumberNonceCRH = From::from(FromBytes::read(
-            SerialNumberNonceCRHParameters::load_bytes().as_slice(),
+            SerialNumberNonceCRHParameters::load_bytes()?.as_slice(),
         )?);
 
         Ok(Self {
@@ -63,9 +63,9 @@ impl<C: BaseDPCComponents> PredicateSNARKParameters<C> {
     // TODO (howardwu): Why are we not preparing the VK here?
     pub fn load() -> IoResult<Self> {
         let proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters =
-            From::from(FromBytes::read(PredicateSNARKPKParameters::load_bytes().as_slice())?);
+            From::from(FromBytes::read(PredicateSNARKPKParameters::load_bytes()?.as_slice())?);
         let verification_key = From::from(<C::PredicateSNARK as SNARK>::VerificationParameters::read(
-            PredicateSNARKVKParameters::load_bytes().as_slice(),
+            PredicateSNARKVKParameters::load_bytes()?.as_slice(),
         )?);
 
         Ok(Self {
@@ -166,7 +166,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
                 From::from(<C::InnerSNARK as SNARK>::VerificationParameters::read(
-                    InnerSNARKVKParameters::load_bytes().as_slice(),
+                    InnerSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
 
             (inner_snark_pk, inner_snark_vk.into())
@@ -182,7 +182,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
                 From::from(<C::OuterSNARK as SNARK>::VerificationParameters::read(
-                    OuterSNARKVKParameters::load_bytes().as_slice(),
+                    OuterSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
 
             (outer_snark_pk, outer_snark_vk.into())
@@ -204,7 +204,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let inner_snark_pk = None;
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
                 From::from(<C::InnerSNARK as SNARK>::VerificationParameters::read(
-                    InnerSNARKVKParameters::load_bytes().as_slice(),
+                    InnerSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
             (inner_snark_pk, inner_snark_vk.into())
         };
@@ -213,7 +213,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
             let outer_snark_pk = None;
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
                 From::from(<C::OuterSNARK as SNARK>::VerificationParameters::read(
-                    OuterSNARKVKParameters::load_bytes().as_slice(),
+                    OuterSNARKVKParameters::load_bytes()?.as_slice(),
                 )?);
             (outer_snark_pk, outer_snark_vk.into())
         };
