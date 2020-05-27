@@ -2,7 +2,10 @@ use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
 use snarkos_models::objects::Transaction;
-use snarkos_utilities::bytes::FromBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use std::collections::HashSet;
 
@@ -34,13 +37,8 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
-            Some(cm_index_bytes) => {
-                let mut curr_cm_index = [0u8; 4];
-                curr_cm_index.copy_from_slice(&cm_index_bytes[0..4]);
-
-                Ok(u32::from_le_bytes(curr_cm_index) as usize)
-            }
-            None => Err(StorageError::MissingCurrentCmIndex),
+            Some(cm_index_bytes) => Ok(bytes_to_u32(cm_index_bytes) as usize),
+            None => Ok(0),
         }
     }
 
@@ -48,7 +46,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     pub fn current_sn_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
             Some(sn_index_bytes) => Ok(bytes_to_u32(sn_index_bytes) as usize),
-            None => Err(StorageError::MissingCurrentSnIndex), // TODO (raychu86) return 0 if not set
+            None => Ok(0),
         }
     }
 
@@ -56,7 +54,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     pub fn current_memo_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_MEMO_INDEX.as_bytes())? {
             Some(memo_index_bytes) => Ok(bytes_to_u32(memo_index_bytes) as usize),
-            None => Err(StorageError::MissingCurrentMemoIndex),
+            None => Ok(0),
         }
     }
 
@@ -64,7 +62,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
     pub fn current_digest(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
             Some(current_digest) => Ok(current_digest),
-            None => Err(StorageError::MissingCurrentDigest),
+            None => Ok(to_bytes![self.cm_merkle_tree.read().root()].unwrap()),
         }
     }
 

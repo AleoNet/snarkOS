@@ -15,21 +15,10 @@ pub struct Storage {
 }
 
 impl Storage {
-    //    /// Opens storage from the given path. If storage does not exists,
-    //    /// it creates a new storage file at the given path and opens it.
-    //    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
-    //    #[allow(dead_code)]
-    //    pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
-    //        Ok(Self {
-    //            storage: Arc::new(DB::open_default(path)?),
-    //            cf_names: vec![],
-    //        })
-    //    }
-
     /// Opens storage from the given path with its given names. If storage does not exists,
     /// it creates a new storage file at the given path with its given names, and opens it.
     /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
-    pub(crate) fn open_cf<P: AsRef<Path>>(path: P, num_cfs: u32) -> Result<Self, StorageError> {
+    pub fn open_cf<P: AsRef<Path>>(path: P, num_cfs: u32) -> Result<Self, StorageError> {
         let mut cfs = Vec::with_capacity(num_cfs as usize);
         let mut cf_names: Vec<String> = Vec::with_capacity(cfs.len());
 
