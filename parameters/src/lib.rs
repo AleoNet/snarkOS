@@ -1,8 +1,3 @@
-#[macro_use]
-extern crate lazy_static_include;
-#[macro_use]
-extern crate lazy_static;
-
 pub mod account_commitment;
 pub use self::account_commitment::*;
 
