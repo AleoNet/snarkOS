@@ -1,8 +1,8 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
-use snarkos_models::objects::{Ledger, Transaction};
-use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
+use snarkos_models::objects::{LedgerScheme, Transaction};
+use snarkos_objects::Block;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use rand::Rng;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;
@@ -29,11 +29,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
     fn new(
         path: &PathBuf,
         parameters: Self::MerkleParameters,
-        genesis_cm: Self::Commitment,
-        genesis_sn: Self::SerialNumber,
-        genesis_memo: Self::Memo,
-        genesis_predicate_vk_bytes: Vec<u8>,
-        genesis_account_bytes: Vec<u8>,
+        genesis_block: Self::Block,
     ) -> Result<Self, LedgerError> {
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
         let storage = match Storage::open_cf(path, NUM_COLS) {
@@ -47,93 +43,17 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
             }
         }
 
-        let cm_merkle_tree =
-            MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), &[genesis_cm.clone()]).unwrap();
-
-        let header = BlockHeader {
-            previous_block_hash: BlockHeaderHash([0u8; 32]),
-            merkle_root_hash: MerkleRootHash([0u8; 32]),
-            time: 0,
-            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
-            nonce: 0,
-        };
-
-        let genesis_block = Self::Block {
-            header,
-            transactions: DPCTransactions::new(),
-        };
-
-        let mut database_transaction = DatabaseTransaction::new();
-
-        database_transaction.push(Op::Insert {
-            col: COL_COMMITMENT,
-            key: to_bytes![genesis_cm]?.to_vec(),
-            value: (0 as u32).to_le_bytes().to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
-            value: (1 as u32).to_le_bytes().to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_CURR_SN_INDEX.as_bytes().to_vec(),
-            value: (0 as u32).to_le_bytes().to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
-            value: (0 as u32).to_le_bytes().to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_DIGEST,
-            key: to_bytes![cm_merkle_tree.root()]?.to_vec(),
-            value: (0 as u32).to_le_bytes().to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_CM.as_bytes().to_vec(),
-            value: to_bytes![genesis_cm]?.to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_SN.as_bytes().to_vec(),
-            value: to_bytes![genesis_sn]?.to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_MEMO.as_bytes().to_vec(),
-            value: to_bytes![genesis_memo]?.to_vec(),
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_PRED_VK.as_bytes().to_vec(),
-            value: genesis_predicate_vk_bytes,
-        });
-
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_GENESIS_ACCOUNT.as_bytes().to_vec(),
-            value: genesis_account_bytes,
-        });
+        let leaves: Vec<[u8; 32]> = vec![];
+        let empty_cm_merkle_tree = MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), &leaves)?;
 
         let ledger_storage = Self {
             latest_block_height: RwLock::new(0),
             storage: Arc::new(storage),
-            cm_merkle_tree: RwLock::new(cm_merkle_tree),
+            cm_merkle_tree: RwLock::new(empty_cm_merkle_tree),
             ledger_parameters: parameters,
             _transaction: PhantomData,
         };
 
-        ledger_storage.storage.write(database_transaction)?;
         ledger_storage.insert_block(&genesis_block)?;
 
         Ok(ledger_storage)
@@ -167,7 +87,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
     }
 
     fn contains_sn(&self, sn: &Self::SerialNumber) -> bool {
-        self.storage.exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap()) && sn != &self.genesis_sn().unwrap()
+        self.storage.exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap())
     }
 
     fn contains_memo(&self, memo: &Self::Memo) -> bool {

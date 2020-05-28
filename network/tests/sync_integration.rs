@@ -20,7 +20,7 @@ mod sync_integration {
         #[serial]
         async fn sends_get_block() {
             let storage = Arc::new(FIXTURE_VK.ledger());
-            let path = storage.storage.storage.path().to_owned();
+            let path = storage.storage.db.path().to_owned();
             let bootnode_address = random_socket_address();
 
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
@@ -63,7 +63,7 @@ mod sync_integration {
         #[serial]
         async fn sends_get_sync() {
             let storage = Arc::new(FIXTURE_VK.ledger());
-            let path = storage.storage.storage.path().to_owned();
+            let path = storage.storage.db.path().to_owned();
 
             let bootnode_address = random_socket_address();
 

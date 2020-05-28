@@ -1,11 +1,13 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
+use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
-    objects::{Ledger, Transaction},
+    genesis::Genesis,
+    objects::{LedgerScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
+use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::bytes::FromBytes;
 
@@ -17,7 +19,7 @@ use std::{
     sync::Arc,
 };
 
-pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
+pub struct Ledger<T: Transaction, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -25,7 +27,7 @@ pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Create a new blockchain storage.
     pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;
@@ -55,6 +57,8 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             Some(val) => {
                 let storage = Storage::open_cf(path.as_ref(), NUM_COLS)?;
 
+                // Build commitment merkle tree
+
                 let mut cm_and_indices = vec![];
 
                 for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
@@ -66,13 +70,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
 
                 cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
                 let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
-
-                let genesis_cm: T::Commitment = match storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
-                    Some(cm_bytes) => FromBytes::read(&cm_bytes[..])?,
-                    None => return Err(StorageError::MissingGenesisCm),
-                };
-
-                assert!(commitments[0] == genesis_cm);
 
                 let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
 
@@ -87,16 +84,9 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             None => {
                 // Add genesis block to database
 
-                let ledger_storage = Self::new(
-                    &path.as_ref().to_path_buf(),
-                    ledger_parameters,
-                    FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
-                    FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
-                    FromBytes::read(&GENESIS_MEMO[..])?,
-                    GENESIS_PRED_VK_BYTES.to_vec(),
-                    GENESIS_ACCOUNT.to_vec(),
-                )
-                .unwrap(); // TODO handle this unwrap. merge storage and ledger error
+                let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
+
+                let ledger_storage = Self::new(&path.as_ref().to_path_buf(), ledger_parameters, genesis_block).unwrap(); // TODO handle this unwrap. merge storage and ledger error
 
                 Ok(ledger_storage)
             }

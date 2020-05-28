@@ -16,9 +16,9 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
-    objects::{AccountScheme, Ledger},
+    objects::{AccountScheme, LedgerScheme},
 };
-use snarkos_objects::Account;
+use snarkos_objects::{dpc::DPCTransactions, Account, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_storage::test_data::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
@@ -48,16 +48,29 @@ fn test_execute_base_dpc_constraints() {
     let signature_parameters = &circuit_parameters.account_signature;
     let commitment_parameters = &circuit_parameters.account_commitment;
 
-    // Generate metadata and an account for a dummy initial, or "genesis", record.
-    let genesis_metadata = [1u8; 32];
-    let genesis_account =
-        Account::new(signature_parameters, commitment_parameters, &genesis_metadata, &mut rng).unwrap();
+    // Generate metadata and an account for a dummy initial record.
+    let meta_data = [1u8; 32];
+    let dummy_account = Account::new(signature_parameters, commitment_parameters, &meta_data, &mut rng).unwrap();
 
-    let genesis_sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
-    let genesis_record = DPC::generate_record(
+    let genesis_block = Block {
+        header: BlockHeader {
+            previous_block_hash: BlockHeaderHash([0u8; 32]),
+            merkle_root_hash: MerkleRootHash([0u8; 32]),
+            time: 0,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+            nonce: 0,
+        },
+        transactions: DPCTransactions::new(),
+    };
+
+    // Use genesis record, serial number, and memo to initialize the ledger.
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(ledger_parameters, genesis_block);
+
+    let sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
+    let old_record = DPC::generate_record(
         &circuit_parameters,
-        &genesis_sn_nonce,
-        &genesis_account.public_key,
+        &sn_nonce,
+        &dummy_account.public_key,
         true,
         &PaymentRecordPayload::default(),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
@@ -66,23 +79,9 @@ fn test_execute_base_dpc_constraints() {
     )
     .unwrap();
 
-    // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_account.private_key).unwrap();
-    let genesis_memo = [0u8; 32];
-
-    // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger: MerkleTreeLedger = initialize_test_blockchain(
-        ledger_parameters,
-        genesis_record.commitment(),
-        genesis_sn.clone(),
-        genesis_memo,
-        pred_nizk_vk_bytes.clone(),
-        to_bytes![genesis_account].unwrap().to_vec(),
-    );
-
     // Set the input records for our transaction to be the initial dummy records.
-    let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
-    let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_records = vec![old_record.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![dummy_account.private_key.clone(); NUM_INPUT_RECORDS];
 
     // Construct new records.
 
