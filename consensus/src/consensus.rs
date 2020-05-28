@@ -204,17 +204,14 @@ impl<V: POSWVerifier> ConsensusParameters<V> {
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
         let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids()?;
-        let (merkle_root, pedersen_merkle_root) = txids_to_roots(&transaction_ids);
+        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
 
         // Verify the block header
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
-            if let Err(err) = self.verify_header(
-                &block.header,
-                &parent_block.header,
-                &merkle_root,
-                &pedersen_merkle_root,
-            ) {
+            if let Err(err) =
+                self.verify_header(&block.header, &parent_block.header, &merkle_root, &pedersen_merkle_root)
+            {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
             }
@@ -582,14 +579,17 @@ impl<V: POSWVerifier> ConsensusParameters<V> {
     }
 }
 
-pub fn txids_to_roots(transaction_ids: &[Vec<u8>]) -> (MerkleRootHash, PedersenMerkleRootHash) {
+pub fn txids_to_roots(transaction_ids: &[Vec<u8>]) -> (MerkleRootHash, PedersenMerkleRootHash, Vec<Vec<u8>>) {
     let (root, subroots) = merkle_root_with_subroots(transaction_ids, MASKED_TREE_HEIGHT);
     let mut merkle_root_bytes = [0u8; 32];
     merkle_root_bytes[..].copy_from_slice(&root);
 
-    (MerkleRootHash(merkle_root_bytes), pedersen_merkle_root(&subroots))
+    (
+        MerkleRootHash(merkle_root_bytes),
+        pedersen_merkle_root(&subroots),
+        subroots,
+    )
 }
-
 
 #[cfg(test)]
 mod tests {

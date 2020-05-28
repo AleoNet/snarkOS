@@ -96,7 +96,7 @@ fn load_test_data() -> TestData {
     // if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
     //     test_data
     // } else {
-        setup_and_store_test_data()
+    setup_and_store_test_data()
     // }
 }
 

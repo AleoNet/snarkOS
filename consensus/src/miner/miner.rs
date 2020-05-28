@@ -1,4 +1,4 @@
-use crate::{miner::MemoryPool, ConsensusParameters, POSWVerifier, txids_to_roots};
+use crate::{miner::MemoryPool, txids_to_roots, ConsensusParameters, POSWVerifier};
 use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters, snark::create_random_proof};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
@@ -7,13 +7,7 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{
-    dpc::DPCTransactions,
-    AccountPublicKey,
-    Block,
-    BlockHeader,
-    ProofOfSuccinctWork,
-};
+use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, Block, BlockHeader, ProofOfSuccinctWork};
 use snarkos_posw::{ProvingKey, POSW};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::Ledger;
@@ -126,7 +120,7 @@ impl<V: POSWVerifier> Miner<V> {
         rng: &mut R,
     ) -> Result<BlockHeader, ConsensusError> {
         let transaction_ids = transactions.to_transaction_ids()?;
-        let (merkle_root_hash, pedersen_merkle_root_hash) = txids_to_roots(&transaction_ids);
+        let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&transaction_ids);
 
         let time = Utc::now().timestamp();
         let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
@@ -137,7 +131,7 @@ impl<V: POSWVerifier> Miner<V> {
             nonce = rng.gen_range(0, self.consensus.max_nonce);
             proof = {
                 // instantiate the circuit with the nonce
-                let circuit = POSW::new(nonce, &transaction_ids);
+                let circuit = POSW::new(nonce, &subroots);
 
                 // generate the proof
                 let proof_timer = start_timer!(|| "POSW proof");
@@ -145,10 +139,10 @@ impl<V: POSWVerifier> Miner<V> {
 
                 // FIXME: The PoSW verification fails.
                 {
-                    use snarkos_algorithms::snark::{verify_proof, prepare_verifying_key};
+                    use snarkos_algorithms::snark::{prepare_verifying_key, verify_proof};
+                    use snarkos_models::curves::to_field_vec::ToConstraintField;
                     use snarkos_posw::{commit, Field};
                     use snarkos_utilities::bytes::FromBytes;
-                    use snarkos_models::curves::to_field_vec::ToConstraintField;
 
                     let mask = commit(nonce, pedersen_merkle_root_hash.clone());
                     let merkle_root = Field::read(&pedersen_merkle_root_hash.0[..])?;
@@ -244,7 +238,7 @@ mod tests {
         algorithms::{commitment::CommitmentScheme, signature::SignatureScheme},
         dpc::DPCComponents,
     };
-    use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader, };
+    use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader};
 
     fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
@@ -269,10 +263,12 @@ mod tests {
         // assert_eq!(header.nonce, 3146114823);
 
         // generate the verifier args
-        let (merkle_root, pedersen_merkle_root) = txids_to_roots(&transactions.to_transaction_ids().unwrap());
+        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transactions.to_transaction_ids().unwrap());
 
         // ensure that our POSW proof passes
-        consensus.verify_header(&header, parent_header, &merkle_root, &pedersen_merkle_root).unwrap();
+        consensus
+            .verify_header(&header, parent_header, &merkle_root, &pedersen_merkle_root)
+            .unwrap();
     }
 
     #[test]
