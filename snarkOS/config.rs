@@ -76,8 +76,8 @@ impl Config {
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "connect" => self.connect(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
-            "min_peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
-            "max_peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "min-peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "max-peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             _ => (),
         });
     }
@@ -220,8 +220,8 @@ impl CLI for ConfigCli {
             "connect",
             "miner-address",
             "mempool-interval",
-            "min_peers",
-            "max_peers",
+            "min-peers",
+            "max-peers",
         ]);
 
         Ok(config)

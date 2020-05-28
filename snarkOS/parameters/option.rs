@@ -50,14 +50,14 @@ pub const MEMPOOL_INTERVAL: OptionType = (
 );
 
 pub const MIN_PEERS: OptionType = (
-    "[min_peers] --min_peers=[min_peers] 'Specify the minimum number of peers the node should connect to'",
+    "[min-peers] --min-peers=[min-peers] 'Specify the minimum number of peers the node should connect to'",
     &[],
     &[],
     &[],
 );
 
 pub const MAX_PEERS: OptionType = (
-    "[max_peers] --max_peers=[max_peers] 'Specify the maximum number of peers the node can connect to'",
+    "[max-peers] --max-peers=[max-peers] 'Specify the maximum number of peers the node can connect to'",
     &[],
     &[],
     &[],
