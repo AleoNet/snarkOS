@@ -15,7 +15,7 @@ use snarkos_dpc::{
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::{DPCScheme, Record},
-    objects::Ledger,
+    objects::LedgerScheme,
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
@@ -24,10 +24,11 @@ use snarkos_objects::{
     Block,
     BlockHeader,
     MerkleRootHash,
+    PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
 use snarkos_storage::test_data::*;
-use snarkos_utilities::rand::UniformRand;
+use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
@@ -43,22 +44,35 @@ fn base_dpc_integration_test() {
     // Generate accounts
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
-    // Setup the ledger
-    let genesis_attributes = ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
+    // Create a genesis block
 
-    let ledger: MerkleTreeLedger = initialize_test_blockchain(
-        ledger_parameters,
-        genesis_attributes.genesis_cm,
-        genesis_attributes.genesis_sn,
-        genesis_attributes.genesis_memo,
-        genesis_attributes.genesis_pred_vk_bytes.clone(),
-        genesis_attributes.genesis_account_bytes,
-    );
+    let genesis_block = Block {
+        header: BlockHeader {
+            previous_block_hash: BlockHeaderHash([0u8; 32]),
+            merkle_root_hash: MerkleRootHash([0u8; 32]),
+            pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+            time: 0,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+            nonce: 0,
+            proof: ProofOfSuccinctWork::default(),
+        },
+        transactions: DPCTransactions::new(),
+    };
 
-    let genesis_pred_vk_bytes = genesis_attributes.genesis_pred_vk_bytes;
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(ledger_parameters, genesis_block);
+
+    let predicate_vk_hash = to_bytes![
+        PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
 
     #[cfg(debug_assertions)]
-    let pred_nizk_pvk: PreparedVerifyingKey<_> = parameters.predicate_snark_parameters.verification_key.clone().into();
+    let predicate_nizk_pvk: PreparedVerifyingKey<_> =
+        parameters.predicate_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
     let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
@@ -75,8 +89,8 @@ fn base_dpc_integration_test() {
             &genesis_account.public_key,
             true, // The input record is dummy
             &PaymentRecordPayload::default(),
-            &Predicate::new(genesis_pred_vk_bytes.clone()),
-            &Predicate::new(genesis_pred_vk_bytes.clone()),
+            &Predicate::new(predicate_vk_hash.clone()),
+            &Predicate::new(predicate_vk_hash.clone()),
             &mut rng,
         )
         .unwrap();
@@ -89,7 +103,7 @@ fn base_dpc_integration_test() {
     let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
 
     // Set the new records' predicate to be the "always-accept" predicate.
-    let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
+    let new_predicate = Predicate::new(predicate_vk_hash.clone());
 
     let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
     let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
@@ -152,7 +166,9 @@ fn base_dpc_integration_test() {
                     value_commitment: value_commitment.clone(),
                     position: i as u8,
                 };
-                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(
+                    PredicateSNARK::verify(&predicate_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify")
+                );
             }
 
             let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
@@ -217,7 +233,9 @@ fn base_dpc_integration_test() {
                     value_commitment: value_commitment.clone(),
                     position: j as u8,
                 };
-                assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
+                assert!(
+                    PredicateSNARK::verify(&predicate_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify")
+                );
             }
             let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                 verification_key: parameters.predicate_snark_parameters.verification_key.clone(),

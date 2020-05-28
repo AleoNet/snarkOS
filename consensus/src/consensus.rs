@@ -14,7 +14,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
     dpc::{DPCComponents, DPCScheme, Record},
-    objects::{Ledger, Transaction},
+    objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
@@ -313,10 +313,9 @@ impl<V: POSWVerifier> ConsensusParameters<V> {
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
-        genesis_pred_vk_bytes: &Vec<u8>,
+        predicate_vk_hash: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
-        genesis_account: Account<Components>,
         recipient: AccountPublicKey<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -333,8 +332,18 @@ impl<V: POSWVerifier> ConsensusParameters<V> {
             total_value_balance += transaction.stuff.value_balance.abs() as u64;
         }
 
+        // Generate a new account that owns the dummy input records
+        let account_metadata: [u8; 32] = rng.gen();
+        let new_account = Account::new(
+            &parameters.circuit_parameters.account_signature,
+            &parameters.circuit_parameters.account_commitment,
+            &account_metadata,
+            rng,
+        )
+        .unwrap();
+
         // Generate dummy input records having as address the genesis address.
-        let old_account_private_keys = vec![genesis_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
         let mut old_records = vec![];
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
@@ -345,12 +354,12 @@ impl<V: POSWVerifier> ConsensusParameters<V> {
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,
                 &old_sn_nonce,
-                &genesis_account.public_key,
+                &new_account.public_key,
                 true, // The input record is dummy
                 &PaymentRecordPayload::default(),
                 // Filler predicate input
-                &Predicate::new(genesis_pred_vk_bytes.clone()),
-                &Predicate::new(genesis_pred_vk_bytes.clone()),
+                &Predicate::new(predicate_vk_hash.clone()),
+                &Predicate::new(predicate_vk_hash.clone()),
                 rng,
             )?;
 

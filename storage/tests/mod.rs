@@ -14,6 +14,7 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_storage::{test_data::*, LedgerStorage};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::sync::Arc;
 
@@ -27,7 +28,7 @@ impl PedersenSize for Size {
 
 define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
 
-type Store = LedgerStorage<TestTx, TestMerkleParams>;
+type Store = Ledger<TestTx, TestMerkleParams>;
 
 #[cfg(test)]
 mod tests {
@@ -78,15 +79,15 @@ mod tests {
     pub fn test_storage() {
         let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
 
-        blockchain.storage.storage.put(b"my key", b"my value").unwrap();
+        blockchain.storage.db.put(b"my key", b"my value").unwrap();
 
-        match blockchain.storage.storage.get(b"my key") {
+        match blockchain.storage.db.get(b"my key") {
             Ok(Some(value)) => println!("retrieved value {}", String::from_utf8(value).unwrap()),
             Ok(None) => println!("value not found"),
             Err(e) => println!("operational problem encountered: {}", e),
         }
 
-        assert!(blockchain.storage.storage.get(b"my key").is_ok());
+        assert!(blockchain.storage.db.get(b"my key").is_ok());
 
         kill_storage_sync(blockchain);
     }

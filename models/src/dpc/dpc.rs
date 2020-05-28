@@ -1,12 +1,12 @@
 use crate::{
     dpc::{Predicate, Record},
-    objects::{AccountScheme, Ledger, Transaction},
+    objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_errors::dpc::DPCError;
 
 use rand::Rng;
 
-pub trait DPCScheme<L: Ledger> {
+pub trait DPCScheme<L: LedgerScheme> {
     type Account: AccountScheme;
     type Auxiliary;
     type Metadata: ?Sized;

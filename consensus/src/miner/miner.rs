@@ -3,6 +3,7 @@ use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters, sna
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
+    algorithms::CRH,
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
@@ -59,7 +60,7 @@ impl<V: POSWVerifier> Miner<V> {
 
     /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions<T: Transaction, P: MerkleParameters>(
-        storage: &Arc<LedgerStorage<T, P>>,
+        storage: &Arc<Ledger<T, P>>,
         memory_pool: &Arc<Mutex<MemoryPool<T>>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
@@ -74,10 +75,12 @@ impl<V: POSWVerifier> Miner<V> {
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
-        let genesis_pred_vk_bytes = storage.genesis_pred_vk_bytes()?;
-        let genesis_account = FromBytes::read(&storage.genesis_account_bytes()?[..])?;
+        let predicate_vk_hash = to_bytes![PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &to_bytes![parameters.predicate_snark_parameters.verification_key]?
+        )?]?;
 
-        let new_predicate = Predicate::new(genesis_pred_vk_bytes.clone());
+        let new_predicate = Predicate::new(predicate_vk_hash.clone());
         let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
@@ -85,10 +88,9 @@ impl<V: POSWVerifier> Miner<V> {
             storage.get_latest_block_height() + 1,
             transactions,
             parameters,
-            &genesis_pred_vk_bytes,
+            &predicate_vk_hash,
             new_birth_predicates,
             new_death_predicates,
-            genesis_account,
             self.address.clone(),
             &storage,
             rng,
@@ -110,7 +112,11 @@ impl<V: POSWVerifier> Miner<V> {
         let coinbase_records = self.add_coinbase_transaction(parameters, &storage, &mut transactions, rng)?;
 
         // Verify transactions
-        InstantiatedDPC::verify_transactions(parameters, &transactions.0, storage)?;
+        assert!(InstantiatedDPC::verify_transactions(
+            parameters,
+            &transactions.0,
+            storage
+        )?);
 
         let previous_block_header = storage.get_latest_block()?.header;
 

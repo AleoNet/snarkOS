@@ -1,6 +1,7 @@
 use crate::{
     algorithms::MerkleError,
     objects::{BlockError, TransactionError},
+    parameters::ParametersError,
 };
 
 use bincode;
@@ -103,6 +104,9 @@ pub enum StorageError {
     MerkleError(MerkleError),
 
     #[error("{}", _0)]
+    ParametersError(ParametersError),
+
+    #[error("{}", _0)]
     TransactionError(TransactionError),
 }
 
@@ -151,6 +155,12 @@ impl From<BlockError> for StorageError {
 impl From<MerkleError> for StorageError {
     fn from(error: MerkleError) -> Self {
         StorageError::MerkleError(error)
+    }
+}
+
+impl From<ParametersError> for StorageError {
+    fn from(error: ParametersError) -> Self {
+        StorageError::ParametersError(error)
     }
 }
 

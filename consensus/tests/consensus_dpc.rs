@@ -9,7 +9,7 @@ mod consensus_dpc {
     use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload};
     use snarkos_models::{
         dpc::{DPCScheme, Record},
-        objects::Ledger,
+        objects::LedgerScheme,
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_storage::test_data::kill_storage;

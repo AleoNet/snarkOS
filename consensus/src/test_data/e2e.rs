@@ -5,7 +5,7 @@ use crate::{
     POSWVerifier,
 };
 use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::PaymentRecordPayload};
-use snarkos_models::dpc::{DPCScheme, Record};
+use snarkos_models::dpc::{DPCScheme, Record, Genesis};
 use snarkos_objects::{
     dpc::DPCTransactions,
     Account,
@@ -17,6 +17,7 @@ use snarkos_objects::{
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
+
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -45,22 +46,7 @@ pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block1.tra
 pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block2.transactions.0[0]].unwrap());
 
 pub fn genesis() -> Block<Tx> {
-    let header = BlockHeader {
-        previous_block_hash: BlockHeaderHash([0u8; 32]),
-        merkle_root_hash: MerkleRootHash([0u8; 32]),
-        time: 0,
-        difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
-        nonce: 0,
-        pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
-        proof: ProofOfSuccinctWork::default(),
-    };
-
-    let genesis_block = Block {
-        header,
-        transactions: DPCTransactions::new(),
-    };
-
-    genesis_block
+    FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap()
 }
 
 pub struct TestData {

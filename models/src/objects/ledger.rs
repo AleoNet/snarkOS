@@ -4,7 +4,7 @@ use snarkos_errors::dpc::LedgerError;
 use rand::Rng;
 use std::path::PathBuf;
 
-pub trait Ledger: Sized {
+pub trait LedgerScheme: Sized {
     type Block: BlockScheme;
     type Commitment;
     type Memo;
@@ -17,15 +17,8 @@ pub trait Ledger: Sized {
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::MerkleParameters, LedgerError>;
 
     /// Creates an empty ledger
-    fn new(
-        path: &PathBuf,
-        parameters: Self::MerkleParameters,
-        dummy_cm: Self::Commitment,
-        dummy_sn: Self::SerialNumber,
-        dummy_memo: Self::Memo,
-        dummy_predicate_vk_bytes: Vec<u8>,
-        dummy_genesis_account_bytes: Vec<u8>,
-    ) -> Result<Self, LedgerError>;
+    fn new(path: &PathBuf, parameters: Self::MerkleParameters, genesis_block: Self::Block)
+    -> Result<Self, LedgerError>;
 
     /// Return the current number of transactions on the ledger.
     fn len(&self) -> usize;

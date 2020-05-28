@@ -11,7 +11,6 @@ pub const COL_COMMITMENT: u32 = 5; // Commitment -> index
 pub const COL_SERIAL_NUMBER: u32 = 6; // SN -> index
 pub const COL_MEMO: u32 = 7; // Memo -> index
 pub const COL_DIGEST: u32 = 8; // Ledger digest -> index
-
 pub const COL_RECORDS: u32 = 9; // commitment -> record bytes
 
 pub const NUM_COLS: u32 = 10;
@@ -19,12 +18,6 @@ pub const NUM_COLS: u32 = 10;
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
 pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
 pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
-
-pub const KEY_GENESIS_CM: &str = "GENESIS_CM";
-pub const KEY_GENESIS_SN: &str = "GENESIS_SN";
-pub const KEY_GENESIS_MEMO: &str = "GENESIS_MEMO";
-pub const KEY_GENESIS_PRED_VK: &str = "GENESIS_PREDICATE_VK";
-pub const KEY_GENESIS_ACCOUNT: &str = "GENESIS_ACCOUNT";
 
 pub const KEY_CURR_CM_INDEX: &str = "CURRENT_CM_INDEX";
 pub const KEY_CURR_SN_INDEX: &str = "CURRENT_SN_INDEX";

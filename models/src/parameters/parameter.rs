@@ -1,6 +1,6 @@
 pub trait Parameter {
-    const SIZE: u64;
     const CHECKSUM: &'static str;
+    const SIZE: u64;
 
     fn load_bytes() -> Vec<u8>;
 }

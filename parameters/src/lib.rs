@@ -1,12 +1,16 @@
+#[macro_use]
+extern crate lazy_static_include;
+#[macro_use]
+extern crate lazy_static;
+
 pub mod account_commitment;
 pub use self::account_commitment::*;
 
 pub mod account_signature;
 pub use self::account_signature::*;
 
-// TODO (howardwu): Enable inner_snark_pk with remote fetch functionality.
-// pub mod inner_snark_pk;
-// pub use self::inner_snark_pk::*;
+pub mod inner_snark_pk;
+pub use self::inner_snark_pk::*;
 
 pub mod inner_snark_vk;
 pub use self::inner_snark_vk::*;
@@ -17,9 +21,8 @@ pub use self::ledger_merkle_tree::*;
 pub mod local_data_commitment;
 pub use self::local_data_commitment::*;
 
-// TODO (howardwu): Enable outer_snark_pk with remote fetch functionality.
-// pub mod outer_snark_pk;
-// pub use self::outer_snark_pk::*;
+pub mod outer_snark_pk;
+pub use self::outer_snark_pk::*;
 
 pub mod outer_snark_vk;
 pub use self::outer_snark_vk::*;

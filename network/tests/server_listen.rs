@@ -67,7 +67,7 @@ mod server_listen {
     #[serial]
     fn bind_to_port() {
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         // Create a new runtime so we can spawn and block_on threads
@@ -102,7 +102,7 @@ mod server_listen {
     #[serial]
     fn startup_handshake_bootnode() {
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();
@@ -166,7 +166,7 @@ mod server_listen {
     #[serial]
     fn startup_handshake_stored_peers() {
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         let mut rt = Runtime::new().unwrap();

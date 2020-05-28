@@ -1,13 +1,14 @@
-use snarkos_models::parameters::Parameter;
+use snarkos_errors::parameters::ParametersError;
+use snarkos_models::parameters::Parameters;
 
 pub struct ValueCommitmentParameters;
 
-impl Parameter for ValueCommitmentParameters {
+impl Parameters for ValueCommitmentParameters {
     const CHECKSUM: &'static str = "";
     const SIZE: u64 = 403244;
 
-    fn load_bytes() -> Vec<u8> {
+    fn load_bytes() -> Result<Vec<u8>, ParametersError> {
         let buffer = include_bytes!("./value_commitment.params");
-        buffer.to_vec()
+        Ok(buffer.to_vec())
     }
 }

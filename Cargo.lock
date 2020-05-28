@@ -432,6 +432,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "curl"
+version = "0.4.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "762e34611d2d5233a506a79072be944fddd057db2f18e04c0d6fa79e3fd466fd"
+dependencies = [
+ "curl-sys",
+ "libc",
+ "openssl-probe",
+ "openssl-sys",
+ "schannel",
+ "socket2",
+ "winapi 0.3.8",
+]
+
+[[package]]
+name = "curl-sys"
+version = "0.4.31+curl-7.70.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcd62757cc4f5ab9404bc6ca9f0ae447e729a1403948ce5106bd588ceac6a3b0"
+dependencies = [
+ "cc",
+ "libc",
+ "libz-sys",
+ "openssl-sys",
+ "pkg-config",
+ "vcpkg",
+ "winapi 0.3.8",
+]
+
+[[package]]
 name = "derivative"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1092,6 +1122,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy-static-include"
+version = "2.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd80064440e1d2d057f602460cbf24313e8939e3755aa4ed888bae9a2f582201"
+dependencies = [
+ "lazy_static",
+ "starts-ends-with-caseless",
+ "syn",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1129,6 +1170,18 @@ dependencies = [
  "cc",
  "glob",
  "libc",
+]
+
+[[package]]
+name = "libz-sys"
+version = "1.0.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb5e43362e38e2bca2fd5f5134c4d4564a23a5c28e9b95411652021a8675ebe"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
 ]
 
 [[package]]
@@ -1869,9 +1922,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27044adfd2e1f077f649f59deb9490d3941d674002f7d062870a60ebe9bd47a0"
+checksum = "a256f46ea78a0c0d9ff00077504903ac881a1dafdc20da66545699e7776b3e69"
 dependencies = [
  "block-buffer",
  "digest 0.8.1",
@@ -1998,6 +2051,7 @@ dependencies = [
  "snarkos-algorithms",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-posw",
@@ -2058,6 +2112,7 @@ name = "snarkos-errors"
 version = "0.8.0"
 dependencies = [
  "bincode",
+ "curl",
  "hex",
  "jsonrpc-core",
  "rocksdb",
@@ -2077,6 +2132,25 @@ dependencies = [
  "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-genesis"
+version = "0.8.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "parking_lot 0.10.2",
+ "rand",
+ "snarkos-algorithms",
+ "snarkos-consensus",
+ "snarkos-dpc",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-parameters",
+ "snarkos-storage",
  "snarkos-utilities",
 ]
 
@@ -2142,6 +2216,9 @@ dependencies = [
 name = "snarkos-parameters"
 version = "0.8.0"
 dependencies = [
+ "curl",
+ "lazy-static-include",
+ "lazy_static",
  "rand",
  "snarkos-algorithms",
  "snarkos-dpc",
@@ -2213,6 +2290,7 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-curves",
  "snarkos-errors",
+ "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
@@ -2238,6 +2316,12 @@ dependencies = [
  "redox_syscall",
  "winapi 0.3.8",
 ]
+
+[[package]]
+name = "starts-ends-with-caseless"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "423e8765e5ec86a05cf18aa54cf7fcb53fbf460f5e586c99386e4ae2647ea5b1"
 
 [[package]]
 name = "string"
