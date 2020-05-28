@@ -65,7 +65,7 @@ impl Config {
             // Flags
             "network" => self.network(arguments.is_present(option)),
             "no_jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
-            "is_bootnode" => self.is_bootnode(arguments.is_present(option)),
+            "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "quiet" => self.quiet(arguments.is_present(option)),
             // Options
@@ -210,7 +210,7 @@ impl CLI for ConfigCli {
         config.parse(arguments, &[
             "network",
             "no_jsonrpc",
-            "is_bootnode",
+            "is-bootnode",
             "is-miner",
             "quiet",
             "ip",
