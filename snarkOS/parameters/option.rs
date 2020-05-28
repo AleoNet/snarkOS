@@ -36,14 +36,14 @@ pub const CONNECT: OptionType = (
 );
 
 pub const MINER_ADDRESS: OptionType = (
-    "[miner-address] --miner-address=[miner_address] 'Specify the address that will receive miner rewards'",
+    "[miner-address] --miner-address=[miner-address] 'Specify the address that will receive miner rewards'",
     &[],
     &[],
     &[],
 );
 
 pub const MEMPOOL_INTERVAL: OptionType = (
-    "[mempool_interval] --mempool_interval=[mempool_interval] 'Specify the frequency in seconds x 10 the node should fetch the mempool from sync node'",
+    "[mempool-interval] --mempool-interval=[mempool-interval] 'Specify the frequency in seconds x 10 the node should fetch the mempool from sync node'",
     &[],
     &[],
     &[],

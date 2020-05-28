@@ -75,7 +75,7 @@ impl Config {
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "connect" => self.connect(arguments.value_of(option)),
-            "mempool_interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
+            "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "min_peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "max_peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             _ => (),
@@ -219,7 +219,7 @@ impl CLI for ConfigCli {
             "rpc-port",
             "connect",
             "miner-address",
-            "mempool_interval",
+            "mempool-interval",
             "min_peers",
             "max_peers",
         ]);
