@@ -48,10 +48,9 @@ fn test_execute_base_dpc_constraints() {
     let signature_parameters = &circuit_parameters.account_signature;
     let commitment_parameters = &circuit_parameters.account_commitment;
 
-    // Generate metadata and an account for a dummy initial, or "genesis", record.
-    let genesis_metadata = [1u8; 32];
-    let genesis_account =
-        Account::new(signature_parameters, commitment_parameters, &genesis_metadata, &mut rng).unwrap();
+    // Generate metadata and an account for a dummy initial record.
+    let meta_data = [1u8; 32];
+    let dummy_account = Account::new(signature_parameters, commitment_parameters, &meta_data, &mut rng).unwrap();
 
     let genesis_block = Block {
         header: BlockHeader {
@@ -67,9 +66,22 @@ fn test_execute_base_dpc_constraints() {
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger: MerkleTreeLedger = initialize_test_blockchain(ledger_parameters, genesis_block);
 
+    let sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
+    let old_record = DPC::generate_record(
+        &circuit_parameters,
+        &sn_nonce,
+        &dummy_account.public_key,
+        true,
+        &PaymentRecordPayload::default(),
+        &Predicate::new(pred_nizk_vk_bytes.clone()),
+        &Predicate::new(pred_nizk_vk_bytes.clone()),
+        &mut rng,
+    )
+    .unwrap();
+
     // Set the input records for our transaction to be the initial dummy records.
-    let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];
-    let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_records = vec![old_record.clone(); NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![dummy_account.private_key.clone(); NUM_INPUT_RECORDS];
 
     // Construct new records.
 
