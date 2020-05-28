@@ -10,7 +10,7 @@ use std::{
 /// A low-level struct for storing state used by the system.
 #[derive(Clone)]
 pub struct Storage {
-    pub storage: Arc<DB>,
+    pub db: Arc<DB>,
     pub cf_names: Vec<String>,
 }
 
@@ -39,13 +39,13 @@ impl Storage {
 
         let storage = Arc::new(DB::open_cf_descriptors(&storage_opts, path, cfs)?);
 
-        Ok(Self { storage, cf_names })
+        Ok(Self { db: storage, cf_names })
     }
 
     /// Returns the column family reference from a given index.
     /// If the given index does not exist, returns [None](std::option::Option).
     pub(crate) fn get_cf_ref(&self, index: u32) -> &ColumnFamily {
-        self.storage
+        self.db
             .cf_handle(&self.cf_names[index as usize])
             .expect("the column family exists")
     }
@@ -53,13 +53,13 @@ impl Storage {
     /// Returns the value from a given key and col.
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
-        Ok(self.storage.get_cf(self.get_cf_ref(col), key)?)
+        Ok(self.db.get_cf(self.get_cf_ref(col), key)?)
     }
 
     /// Returns the iterator from a given col.
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn get_iter(&self, col: u32) -> Result<DBIterator, StorageError> {
-        Ok(self.storage.iterator_cf(self.get_cf_ref(col), IteratorMode::Start)?)
+        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start)?)
     }
 
     /// Returns `Ok(())` after executing a database transaction
@@ -80,14 +80,14 @@ impl Storage {
             };
         }
 
-        self.storage.write(batch)?;
+        self.db.write(batch)?;
 
         Ok(())
     }
 
     /// Returns true if a value exists for a key and col pair.
     pub fn exists(&self, col: u32, key: &[u8]) -> bool {
-        match self.storage.get_cf(self.get_cf_ref(col), key) {
+        match self.db.get_cf(self.get_cf_ref(col), key) {
             Ok(val) => val.is_some(),
             Err(_) => false,
         }
@@ -96,8 +96,8 @@ impl Storage {
     /// Returns `Ok(())` after destroying the storage
     /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
     pub fn destroy(&self) -> Result<(), StorageError> {
-        let path = self.storage.path();
-        drop(&self.storage);
+        let path = self.db.path();
+        drop(&self.db);
         Self::destroy_storage(path.into())
     }
 

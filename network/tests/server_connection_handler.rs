@@ -21,7 +21,7 @@ mod server_connection_handler {
     fn peer_connect() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -72,7 +72,7 @@ mod server_connection_handler {
     fn peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -121,7 +121,7 @@ mod server_connection_handler {
     fn gossiped_peer_connect() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -172,7 +172,7 @@ mod server_connection_handler {
     fn gossiped_peer_disconnect() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -228,7 +228,7 @@ mod server_connection_handler {
     fn sync_node_disconnect() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -286,7 +286,7 @@ mod server_connection_handler {
     fn memory_pool_interval() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {

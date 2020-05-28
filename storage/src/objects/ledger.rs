@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use rand::Rng;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-impl<T: Transaction, P: MerkleParameters> LedgerScheme for LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;

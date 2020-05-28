@@ -17,7 +17,7 @@ use snarkos_models::{
     objects::{account::AccountScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountPublicKey};
-use snarkos_storage::{key_value::NUM_COLS, storage::Storage, LedgerStorage};
+use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -39,7 +39,7 @@ use std::{
 fn empty_ledger<T: Transaction, P: MerkleParameters>(
     parameters: P,
     path: &PathBuf,
-) -> Result<LedgerStorage<T, P>, LedgerError> {
+) -> Result<Ledger<T, P>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
     let storage = match Storage::open_cf(path, NUM_COLS) {
         Ok(storage) => storage,
@@ -49,7 +49,7 @@ fn empty_ledger<T: Transaction, P: MerkleParameters>(
     let leaves: Vec<[u8; 32]> = vec![];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
 
-    Ok(LedgerStorage {
+    Ok(Ledger {
         latest_block_height: RwLock::new(0),
         storage: Arc::new(storage),
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
@@ -174,7 +174,7 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
     println!("{}\n\tsize - {}", file_name, size);
 
     drop(ledger);
-    LedgerStorage::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
+    Ledger::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
     Ok(transaction_bytes)
 }
 

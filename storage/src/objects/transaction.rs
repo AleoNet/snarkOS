@@ -1,11 +1,11 @@
-use crate::{has_duplicates, LedgerStorage};
+use crate::{has_duplicates, Ledger};
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::storage::StorageError;
 use snarkos_models::objects::{LedgerScheme, Transaction};
 use snarkos_objects::dpc::DPCTransactions;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Get a transaction bytes given the transaction id.
     pub fn get_transaction_bytes(&self, transaction_id: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
         match self.get_transaction(&transaction_id.clone())? {

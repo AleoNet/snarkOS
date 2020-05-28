@@ -1,7 +1,7 @@
 extern crate rocksdb;
 
-pub mod ledger_storage;
-pub use self::ledger_storage::*;
+pub mod ledger;
+pub use self::ledger::*;
 
 pub mod genesis;
 pub use self::genesis::*;

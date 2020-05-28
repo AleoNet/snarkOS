@@ -19,7 +19,7 @@ use std::{
     sync::Arc,
 };
 
-pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
+pub struct Ledger<T: Transaction, P: MerkleParameters> {
     pub latest_block_height: RwLock<u32>,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -27,7 +27,7 @@ pub struct LedgerStorage<T: Transaction, P: MerkleParameters> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Create a new blockchain storage.
     pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;

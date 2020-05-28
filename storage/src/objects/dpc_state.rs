@@ -9,7 +9,7 @@ use snarkos_utilities::{
 
 use std::collections::HashSet;
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
