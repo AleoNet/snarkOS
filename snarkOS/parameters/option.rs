@@ -35,8 +35,8 @@ pub const CONNECT: OptionType = (
     &[],
 );
 
-pub const COINBASE_ADDRESS: OptionType = (
-    "[coinbase_address] -c --coinbase_address=[coinbase_address] 'Run the node on a specified port'",
+pub const MINER_ADDRESS: OptionType = (
+    "[miner-address] --miner-address=[miner_address] 'Specify the address that will receive miner rewards'",
     &[],
     &[],
     &[],
