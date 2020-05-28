@@ -17,7 +17,7 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Ledger,
 };
-use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, MerkleRootHash};
+use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_storage::test_data::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
@@ -35,15 +35,20 @@ fn base_dpc_integration_test() {
     // Generate accounts
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
-    // Setup the ledger
-    let genesis_attributes = ledger_genesis_setup(&parameters, &genesis_account, &mut rng);
+    // Create a genesis block
 
-    let ledger: MerkleTreeLedger = initialize_test_blockchain(
-        ledger_parameters,
-        genesis_attributes.genesis_cm,
-        genesis_attributes.genesis_sn,
-        genesis_attributes.genesis_memo,
-    );
+    let genesis_block = Block {
+        header: BlockHeader {
+            previous_block_hash: BlockHeaderHash([0u8; 32]),
+            merkle_root_hash: MerkleRootHash([0u8; 32]),
+            time: 0,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+            nonce: 0,
+        },
+        transactions: DPCTransactions::new(),
+    };
+
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(ledger_parameters, genesis_block);
 
     let predicate_vk_hash = to_bytes![
         PredicateVerificationKeyHash::hash(

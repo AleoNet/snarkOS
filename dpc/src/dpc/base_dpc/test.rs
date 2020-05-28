@@ -18,7 +18,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, Ledger},
 };
-use snarkos_objects::Account;
+use snarkos_objects::{dpc::DPCTransactions, Account, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_storage::test_data::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
@@ -53,30 +53,19 @@ fn test_execute_base_dpc_constraints() {
     let genesis_account =
         Account::new(signature_parameters, commitment_parameters, &genesis_metadata, &mut rng).unwrap();
 
-    let genesis_sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
-    let genesis_record = DPC::generate_record(
-        &circuit_parameters,
-        &genesis_sn_nonce,
-        &genesis_account.public_key,
-        true,
-        &PaymentRecordPayload::default(),
-        &Predicate::new(pred_nizk_vk_bytes.clone()),
-        &Predicate::new(pred_nizk_vk_bytes.clone()),
-        &mut rng,
-    )
-    .unwrap();
-
-    // Generate serial number for the genesis record.
-    let (genesis_sn, _) = DPC::generate_sn(&circuit_parameters, &genesis_record, &genesis_account.private_key).unwrap();
-    let genesis_memo = [0u8; 32];
+    let genesis_block = Block {
+        header: BlockHeader {
+            previous_block_hash: BlockHeaderHash([0u8; 32]),
+            merkle_root_hash: MerkleRootHash([0u8; 32]),
+            time: 0,
+            difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
+            nonce: 0,
+        },
+        transactions: DPCTransactions::new(),
+    };
 
     // Use genesis record, serial number, and memo to initialize the ledger.
-    let ledger: MerkleTreeLedger = initialize_test_blockchain(
-        ledger_parameters,
-        genesis_record.commitment(),
-        genesis_sn.clone(),
-        genesis_memo,
-    );
+    let ledger: MerkleTreeLedger = initialize_test_blockchain(ledger_parameters, genesis_block);
 
     // Set the input records for our transaction to be the initial dummy records.
     let old_records = vec![genesis_record.clone(); NUM_INPUT_RECORDS];

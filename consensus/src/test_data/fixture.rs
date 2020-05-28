@@ -1,11 +1,15 @@
 use snarkos_dpc::{
     base_dpc::instantiated::*,
-    test_data::{generate_test_accounts, ledger_genesis_setup, setup_or_load_parameters, GenesisAttributes},
+    test_data::{generate_test_accounts, setup_or_load_parameters},
 };
-use snarkos_models::{algorithms::CRH, dpc::DPCScheme};
-use snarkos_objects::Account;
+use snarkos_genesis::GenesisBlock;
+use snarkos_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
+use snarkos_objects::{Account, Block};
 use snarkos_storage::test_data::*;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
@@ -19,19 +23,14 @@ pub struct Fixture {
     pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
-    pub genesis_attributes: GenesisAttributes,
+    pub genesis_block: Block<Tx>,
     pub predicate: Predicate,
     pub rng: XorShiftRng,
 }
 
 impl Fixture {
     pub fn ledger(&self) -> MerkleTreeLedger {
-        initialize_test_blockchain(
-            self.ledger_parameters.clone(),
-            self.genesis_attributes.genesis_cm,
-            self.genesis_attributes.genesis_sn,
-            self.genesis_attributes.genesis_memo,
-        )
+        initialize_test_blockchain(self.ledger_parameters.clone(), self.genesis_block.clone())
     }
 }
 
@@ -44,7 +43,7 @@ fn setup(verify_only: bool) -> Fixture {
     // Generate addresses
     let test_accounts = generate_test_accounts(&parameters, &mut rng);
 
-    let genesis_attributes = ledger_genesis_setup(&parameters, &test_accounts[0], &mut rng);
+    let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     let predicate_vk_hash = to_bytes![
         PredicateVerificationKeyHash::hash(
@@ -61,7 +60,7 @@ fn setup(verify_only: bool) -> Fixture {
         parameters,
         test_accounts,
         ledger_parameters,
-        genesis_attributes,
+        genesis_block,
         predicate,
         rng,
     }
