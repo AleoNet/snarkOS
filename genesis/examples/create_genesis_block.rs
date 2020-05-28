@@ -1,4 +1,4 @@
-use snarkos_consensus::{ConsensusParameters, POSWVerifier};
+use snarkos_consensus::POSWVerifier;
 use snarkos_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_genesis::Transaction1;
@@ -15,7 +15,6 @@ use snarkos_objects::{
 use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;
-use rand::{thread_rng, Rng};
 use std::{
     fs::File,
     io::{Result as IoResult, Write},
@@ -24,7 +23,7 @@ use std::{
 
 /// Mock struct created for instantiating the genesis block
 #[derive(Clone, Debug)]
-struct GenesisVerifier;
+pub struct GenesisVerifier;
 
 // no-op
 impl POSWVerifier for GenesisVerifier {
@@ -39,15 +38,7 @@ impl POSWVerifier for GenesisVerifier {
 }
 
 pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, ConsensusError> {
-    let consensus = ConsensusParameters {
-        max_block_size: 1_000_000_000usize,
-        max_nonce: u32::max_value(),
-        target_block_time: 10i64,
-        verifier: GenesisVerifier,
-    };
-
     // Add transactions to block
-
     let mut transactions = DPCTransactions::new();
 
     let transaction_1 = DPCTransaction::<C>::read(Transaction1::load_bytes().as_slice())?;
@@ -78,7 +69,7 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
     Ok(())
 }
 
-pub fn main() {
+fn main() {
     let bytes = generate::<Components>().unwrap();
     let filename = PathBuf::from("block_header.genesis");
     store(&filename, &bytes).unwrap();

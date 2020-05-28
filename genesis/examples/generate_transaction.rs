@@ -1,5 +1,5 @@
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
-use snarkos_consensus::ConsensusParameters;
+use snarkos_consensus::{ConsensusParameters, GM17Verifier};
 use snarkos_dpc::{
     base_dpc::{
         instantiated::Components,
@@ -136,7 +136,7 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
     let ledger = empty_ledger(ledger_parameters, &path)?;
 
     // Generate the transaction
-    let (_records, transaction) = ConsensusParameters::create_transaction(
+    let (_records, transaction) = ConsensusParameters::<GM17Verifier>::create_transaction(
         &parameters,
         old_records,
         old_account_private_keys,

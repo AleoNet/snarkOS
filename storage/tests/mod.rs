@@ -13,8 +13,7 @@ use snarkos_objects::{
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
-use snarkos_storage::{test_data::*, LedgerStorage};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_storage::{test_data::*, Ledger};
 
 use std::sync::Arc;
 
