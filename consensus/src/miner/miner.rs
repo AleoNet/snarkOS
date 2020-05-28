@@ -1,4 +1,4 @@
-use crate::{miner::MemoryPool, ConsensusParameters, POSWVerifier};
+use crate::{miner::MemoryPool, ConsensusParameters, POSWVerifier, txids_to_roots};
 use snarkos_algorithms::{crh::sha256d_to_u64, merkle_tree::MerkleParameters, snark::create_random_proof};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
@@ -9,21 +9,15 @@ use snarkos_models::{
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
-    merkle_root,
-    pedersen_merkle_root,
     AccountPublicKey,
     Block,
     BlockHeader,
-    MerkleRootHash,
     ProofOfSuccinctWork,
 };
 use snarkos_posw::{ProvingKey, POSW};
 use snarkos_profiler::{end_timer, start_timer};
-use snarkos_storage::LedgerStorage;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_storage::Ledger;
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -132,11 +126,7 @@ impl<V: POSWVerifier> Miner<V> {
         rng: &mut R,
     ) -> Result<BlockHeader, ConsensusError> {
         let transaction_ids = transactions.to_transaction_ids()?;
-
-        let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
-
-        let pedersen_merkle_root = pedersen_merkle_root(&transaction_ids);
+        let (merkle_root_hash, pedersen_merkle_root_hash) = txids_to_roots(&transaction_ids);
 
         let time = Utc::now().timestamp();
         let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
@@ -152,6 +142,26 @@ impl<V: POSWVerifier> Miner<V> {
                 // generate the proof
                 let proof_timer = start_timer!(|| "POSW proof");
                 let proof = create_random_proof(circuit, &self.proving_key, rng)?;
+
+                // FIXME: The PoSW verification fails.
+                {
+                    use snarkos_algorithms::snark::{verify_proof, prepare_verifying_key};
+                    use snarkos_posw::{commit, Field};
+                    use snarkos_utilities::bytes::FromBytes;
+                    use snarkos_models::curves::to_field_vec::ToConstraintField;
+
+                    let mask = commit(nonce, pedersen_merkle_root_hash.clone());
+                    let merkle_root = Field::read(&pedersen_merkle_root_hash.0[..])?;
+                    let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..])?, vec![
+                        merkle_root,
+                    ]]
+                    .concat();
+
+                    let vk = prepare_verifying_key(&self.proving_key.vk);
+                    assert!(verify_proof(&vk, &proof, &inputs).unwrap());
+                    dbg!("proof passed");
+                }
+
                 end_timer!(proof_timer);
 
                 // serialize it
@@ -172,8 +182,8 @@ impl<V: POSWVerifier> Miner<V> {
         }
 
         let header = BlockHeader {
-            merkle_root_hash: MerkleRootHash(merkle_root_bytes),
-            pedersen_merkle_root_hash: pedersen_merkle_root,
+            merkle_root_hash,
+            pedersen_merkle_root_hash,
             previous_block_hash: parent_header.get_hash(),
             time,
             difficulty_target,
@@ -227,24 +237,42 @@ impl<V: POSWVerifier> Miner<V> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{miner::Miner, test_data::*};
-    use snarkos_dpc::dpc::base_dpc::instantiated::Components;
-    use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, BlockHeader};
-    use snarkos_storage::genesis::*;
-    use snarkos_utilities::bytes::FromBytes;
+    use crate::{miner::Miner, test_data::*, txids_to_roots};
+    use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
-    use rand::SeedableRng;
+    use snarkos_models::{
+        algorithms::{commitment::CommitmentScheme, signature::SignatureScheme},
+        dpc::DPCComponents,
+    };
+    use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader, };
+
+    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
+        let sig_params = C::AccountSignature::setup(rng).unwrap();
+        let comm_params = C::AccountCommitment::setup(rng);
+
+        let key = AccountPrivateKey::<C>::new(&sig_params, &[0; 32], rng).unwrap();
+        let pubkey = AccountPublicKey::from(&comm_params, &key).unwrap();
+
+        (key, pubkey)
+    }
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
         let consensus = TEST_CONSENSUS.clone();
-        let miner_address = AccountPublicKey::<Components>::read(&GENESIS_ACCOUNT[..]).unwrap();
-        let miner = Miner::new(miner_address, consensus, POSW_PP.0.clone());
-        let mut rng = XorShiftRng::seed_from_u64(2); // use this rng so that a valid solution is found quickly
+        let mut rng = XorShiftRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
+
+        let (_, miner_address) = keygen(&mut rng);
+        let miner = Miner::new(miner_address, consensus.clone(), POSW_PP.0.clone());
 
         let header = miner.find_block(transactions, parent_header, &mut rng).unwrap();
-        assert_eq!(header.nonce, 3146114823);
+        // assert_eq!(header.nonce, 3146114823);
+
+        // generate the verifier args
+        let (merkle_root, pedersen_merkle_root) = txids_to_roots(&transactions.to_transaction_ids().unwrap());
+
+        // ensure that our POSW proof passes
+        consensus.verify_header(&header, parent_header, &merkle_root, &pedersen_merkle_root).unwrap();
     }
 
     #[test]

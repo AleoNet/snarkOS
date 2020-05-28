@@ -5,18 +5,12 @@ use crate::{
     POSWVerifier,
 };
 use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::PaymentRecordPayload};
-use snarkos_models::dpc::{DPCScheme, Record, Genesis};
-use snarkos_objects::{
-    dpc::DPCTransactions,
-    Account,
-    AccountPublicKey,
-    Block,
-    BlockHeader,
-    BlockHeaderHash,
-    MerkleRootHash,
-    PedersenMerkleRootHash,
-    ProofOfSuccinctWork,
+use snarkos_genesis::GenesisBlock;
+use snarkos_models::{
+    dpc::{DPCScheme, Record},
+    genesis::Genesis,
 };
+use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
 
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -99,11 +93,11 @@ impl FromBytes for TestData {
 }
 
 fn load_test_data() -> TestData {
-    if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
-        test_data
-    } else {
+    // if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
+    //     test_data
+    // } else {
         setup_and_store_test_data()
-    }
+    // }
 }
 
 fn setup_and_store_test_data() -> TestData {

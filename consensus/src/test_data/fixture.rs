@@ -17,7 +17,6 @@ use rand_xorshift::XorShiftRng;
 
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 use std::io::{Read, Result as IoResult, Write};
 
 pub static FIXTURE: Lazy<Fixture> = Lazy::new(|| setup(false));
