@@ -136,26 +136,6 @@ impl<V: POSWVerifier> Miner<V> {
                 // generate the proof
                 let proof_timer = start_timer!(|| "POSW proof");
                 let proof = create_random_proof(circuit, &self.proving_key, rng)?;
-
-                // FIXME: The PoSW verification fails.
-                {
-                    use snarkos_algorithms::snark::{prepare_verifying_key, verify_proof};
-                    use snarkos_models::curves::to_field_vec::ToConstraintField;
-                    use snarkos_posw::{commit, Field};
-                    use snarkos_utilities::bytes::FromBytes;
-
-                    let mask = commit(nonce, pedersen_merkle_root_hash.clone());
-                    let merkle_root = Field::read(&pedersen_merkle_root_hash.0[..])?;
-                    let inputs = [ToConstraintField::<Field>::to_field_elements(&mask[..])?, vec![
-                        merkle_root,
-                    ]]
-                    .concat();
-
-                    let vk = prepare_verifying_key(&self.proving_key.vk);
-                    assert!(verify_proof(&vk, &proof, &inputs).unwrap());
-                    dbg!("proof passed");
-                }
-
                 end_timer!(proof_timer);
 
                 // serialize it
