@@ -7,6 +7,6 @@ pub const NO_JSONRPC: &str = "[no_jsonrpc] --no_jsonrpc 'Run the node without ru
 pub const IS_BOOTNODE: &str =
     "[is_bootnode] --is_bootnode 'Run the node as a bootnode (IP is hard coded in the protocol)'";
 
-pub const MINER: &str = "[miner] --miner 'Start mining blocks from this node'";
+pub const IS_MINER: &str = "[is-miner] --is-miner 'Start mining blocks from this node'";
 
 pub const QUIET: &str = "[quiet] -q --quiet 'Do not show any logging in the console)'";

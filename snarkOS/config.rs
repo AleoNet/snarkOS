@@ -15,7 +15,7 @@ pub struct Config {
     pub network: String,
     pub jsonrpc: bool,
     pub is_bootnode: bool,
-    pub miner: bool,
+    pub is_miner: bool,
     pub quiet: bool,
     // Options
     pub ip: String,
@@ -39,7 +39,7 @@ impl Default for Config {
             network: "mainnet".into(),
             jsonrpc: true,
             is_bootnode: false,
-            miner: true,
+            is_miner: true,
             quiet: false,
             // Options
             ip: "0.0.0.0".into(),
@@ -66,7 +66,7 @@ impl Config {
             "network" => self.network(arguments.is_present(option)),
             "no_jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "is_bootnode" => self.is_bootnode(arguments.is_present(option)),
-            "miner" => self.miner(arguments.is_present(option)),
+            "is-miner" => self.is_miner(arguments.is_present(option)),
             "quiet" => self.quiet(arguments.is_present(option)),
             // Options
             "ip" => self.ip(arguments.value_of(option)),
@@ -112,8 +112,8 @@ impl Config {
         }
     }
 
-    fn miner(&mut self, argument: bool) {
-        self.miner = argument;
+    fn is_miner(&mut self, argument: bool) {
+        self.is_miner = argument;
     }
 
     fn quiet(&mut self, argument: bool) {
@@ -187,7 +187,7 @@ impl CLI for ConfigCli {
         flag::NETWORK,
         flag::NO_JSONRPC,
         flag::IS_BOOTNODE,
-        flag::MINER,
+        flag::IS_MINER,
         flag::QUIET,
     ];
     const NAME: NameType = "snarkos-node";
@@ -211,7 +211,7 @@ impl CLI for ConfigCli {
             "network",
             "no_jsonrpc",
             "is_bootnode",
-            "miner",
+            "is-miner",
             "quiet",
             "ip",
             "port",
