@@ -47,11 +47,8 @@ jobs:
       - setup_environment:
           cache_key: snark-main
       - run: sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev libiberty-dev cmake pkg-config zlib1g zlib1g-dev
-      - run:
-          name: Generate params & run tests
-          command: |
-              cd parameters && ./scripts/parameters_setup.sh && cd ..
-              RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
+      - run: cd parameters/scripts && ./parameters_setup.sh && cd ..
+      - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - persist_to_workspace:
           root: ~/
           paths: project/
@@ -81,11 +78,8 @@ jobs:
           cache_key: snark-cache-nighty
       - run: rustup component add rustfmt
       - run: cargo fmt -- --check
-      - run:
-          name: Generate params & run tests
-          command: |
-              cd parameters && ./scripts/parameters_setup.sh && cd ..
-              RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
+      - run: cd parameters/scripts && ./parameters_setup.sh && cd ..
+      - run: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - clear_environment:
           cache_key: snark-cache-nighty
 workflows:
