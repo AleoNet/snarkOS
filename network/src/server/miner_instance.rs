@@ -13,7 +13,7 @@ use tokio::{sync::Mutex, task};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
-    coinbase_address: AccountPublicKey<Components>,
+    miner_address: AccountPublicKey<Components>,
     consensus: ConsensusParameters<GM17Verifier>,
     parameters: PublicParameters<Components>,
     storage: Arc<MerkleTreeLedger>,
@@ -25,7 +25,7 @@ pub struct MinerInstance {
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
     pub fn new(
-        coinbase_address: AccountPublicKey<Components>,
+        miner_address: AccountPublicKey<Components>,
         consensus: ConsensusParameters<GM17Verifier>,
         parameters: PublicParameters<Components>,
         storage: Arc<MerkleTreeLedger>,
@@ -34,7 +34,7 @@ impl MinerInstance {
         proving_key: ProvingKey,
     ) -> Self {
         Self {
-            coinbase_address,
+            miner_address,
             consensus,
             parameters,
             storage,
@@ -52,7 +52,7 @@ impl MinerInstance {
         task::spawn(async move {
             let context = self.server_context.clone();
             let local_address = self.server_context.local_address;
-            let miner = Miner::new(self.coinbase_address.clone(), self.consensus.clone(), self.proving_key);
+            let miner = Miner::new(self.miner_address.clone(), self.consensus.clone(), self.proving_key);
 
             loop {
                 info!("Mining new block");

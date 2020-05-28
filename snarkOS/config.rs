@@ -1,6 +1,6 @@
 use crate::{
     cli::CLI,
-    parameters::{flag, option, subcommand, types::*},
+    parameters::{flag, option, types::*},
 };
 use snarkos_errors::node::CliError;
 use snarkos_network::bootnodes::*;
@@ -16,7 +16,7 @@ pub struct Config {
     pub network: String,
     pub jsonrpc: bool,
     pub is_bootnode: bool,
-    pub miner: bool,
+    pub is_miner: bool,
     pub quiet: bool,
     // Options
     pub ip: String,
@@ -24,8 +24,7 @@ pub struct Config {
     pub path: String,
     pub rpc_port: u16,
     pub bootnodes: Vec<String>,
-    pub coinbase_address: String,
-    //    pub genesis: String,
+    pub miner_address: String,
     pub mempool_interval: u8,
     pub min_peers: u16,
     pub max_peers: u16,
@@ -44,7 +43,7 @@ impl Default for Config {
             network: "mainnet".into(),
             jsonrpc: true,
             is_bootnode: false,
-            miner: true,
+            is_miner: true,
             quiet: false,
             // Options
             ip: "0.0.0.0".into(),
@@ -55,8 +54,7 @@ impl Default for Config {
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
-            coinbase_address: "90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900".into(),
-            //            genesis: "".into(),
+            miner_address: "90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900".into(),
             subcommand: None,
             mempool_interval: 5,
             min_peers: 2,
@@ -72,16 +70,16 @@ impl Config {
         options.iter().for_each(|option| match *option {
             // Flags
             "network" => self.network(arguments.is_present(option)),
-            "no_jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
-            "is_bootnode" => self.is_bootnode(arguments.is_present(option)),
-            "miner" => self.miner(arguments.is_present(option)),
+            "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
+            "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
+            "is-miner" => self.is_miner(arguments.is_present(option)),
             "quiet" => self.quiet(arguments.is_present(option)),
             // Options
             "ip" => self.ip(arguments.value_of(option)),
             "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "path" => self.path(arguments.value_of(option)),
-            "rpc_port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
-            "coinbase_address" => self.coinbase_address(arguments.value_of(option)),
+            "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "miner-address" => self.miner_address(arguments.value_of(option)),
             "connect" => self.connect(arguments.value_of(option)),
             "mempool_interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "min_peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
@@ -122,8 +120,8 @@ impl Config {
         }
     }
 
-    fn miner(&mut self, argument: bool) {
-        self.miner = argument;
+    fn is_miner(&mut self, argument: bool) {
+        self.is_miner = argument;
     }
 
     fn quiet(&mut self, argument: bool) {
@@ -161,9 +159,9 @@ impl Config {
         }
     }
 
-    fn coinbase_address(&mut self, argument: Option<&str>) {
-        if let Some(coinbase_address) = argument {
-            self.coinbase_address = coinbase_address.to_string();
+    fn miner_address(&mut self, argument: Option<&str>) {
+        if let Some(miner_address) = argument {
+            self.miner_address = miner_address.to_string();
         }
     }
 
@@ -209,7 +207,7 @@ impl CLI for ConfigCli {
         flag::NETWORK,
         flag::NO_JSONRPC,
         flag::IS_BOOTNODE,
-        flag::MINER,
+        flag::IS_MINER,
         flag::QUIET,
     ];
     const NAME: NameType = "snarkos-node";
@@ -219,56 +217,33 @@ impl CLI for ConfigCli {
         option::PATH,
         option::RPC_PORT,
         option::CONNECT,
-        option::COINBASE_ADDRESS,
+        option::MINER_ADDRESS,
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
         option::MAX_PEERS,
     ];
-    const SUBCOMMANDS: &'static [SubCommandType] = &[subcommand::TEST_SUBCOMMAND];
+    const SUBCOMMANDS: &'static [SubCommandType] = &[];
 
     /// Handle all CLI arguments and flags for skeleton node
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CliError> {
         let mut config = Config::default();
         config.parse(arguments, &[
             "network",
-            "no_jsonrpc",
-            "is_bootnode",
-            "miner",
+            "no-jsonrpc",
+            "is-bootnode",
+            "is-miner",
             "quiet",
             "ip",
             "port",
             "path",
-            "rpc_port",
+            "rpc-port",
             "connect",
-            "coinbase_address",
-            "mempool_interval",
-            "min_peers",
-            "max_peers",
+            "miner-address",
+            "mempool-interval",
+            "min-peers",
+            "max-peers",
         ]);
 
-        // TODO: remove this for release
-        match arguments.subcommand() {
-            ("test", Some(arguments)) => {
-                config.subcommand = Some("test".into());
-                config.parse(arguments, &[
-                    "network",
-                    "no_jsonrpc",
-                    "is_bootnode",
-                    "miner",
-                    "quiet",
-                    "ip",
-                    "port",
-                    "path",
-                    "rpc_port",
-                    "connect",
-                    "coinbase_address",
-                    "mempool_interval",
-                    "min_peers",
-                    "max_peers",
-                ]);
-            }
-            _ => {}
-        }
         Ok(config)
     }
 }
