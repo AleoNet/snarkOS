@@ -22,7 +22,7 @@ pub const PORT: OptionType = (
 );
 
 pub const RPC_PORT: OptionType = (
-    "[rpc_port] --rpc_port=[rpc_port] 'Run the rpc server on a specified port'",
+    "[rpc-port] --rpc-port=[rpc-port] 'Run the rpc server on a specified port'",
     &["no_jsonrpc"],
     &[],
     &[],
