@@ -15,7 +15,7 @@ use snarkos_dpc::{
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::{DPCScheme, Record},
-    objects::Ledger,
+    objects::LedgerScheme,
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_storage::test_data::*;

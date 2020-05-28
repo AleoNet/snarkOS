@@ -4,7 +4,7 @@ use snarkos_errors::storage::StorageError;
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
     genesis::Genesis,
-    objects::{Ledger, Transaction},
+    objects::{LedgerScheme, Transaction},
     parameters::Parameters,
 };
 use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash};

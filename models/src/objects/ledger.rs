@@ -4,7 +4,7 @@ use snarkos_errors::dpc::LedgerError;
 use rand::Rng;
 use std::path::PathBuf;
 
-pub trait Ledger: Sized {
+pub trait LedgerScheme: Sized {
     type Block: BlockScheme;
     type Commitment;
     type Memo;

@@ -16,7 +16,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
-    objects::{AccountScheme, Ledger},
+    objects::{AccountScheme, LedgerScheme},
 };
 use snarkos_objects::{dpc::DPCTransactions, Account, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_storage::test_data::*;

@@ -1,7 +1,7 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::objects::{LedgerScheme, Transaction};
 use snarkos_objects::Block;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use rand::Rng;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-impl<T: Transaction, P: MerkleParameters> Ledger for LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> LedgerScheme for LedgerStorage<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type Memo = T::Memorandum;
