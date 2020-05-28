@@ -4,7 +4,7 @@
 
 # Generate transactions
 
-cargo run --release --example generate_transaction 90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900 100 transaction_1.genesis
+cargo run --release --example generate_transaction 90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900 100 transaction_1.genesis -- --nocapture
 
 mv transaction_1.genesis ../src/transaction_1
 

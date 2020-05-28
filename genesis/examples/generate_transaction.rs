@@ -61,9 +61,13 @@ fn empty_ledger<T: Transaction, P: MerkleParameters>(
 pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
+    println!("1");
     let recipient: AccountPublicKey<Components> = FromBytes::read(&hex::decode(recipient).unwrap()[..])?;
+    println!("2");
 
     let (ledger_parameters, parameters) = setup_or_load_parameters(false, rng);
+
+    println!("3");
 
     let predicate_vk_hash = parameters
         .circuit_parameters
@@ -71,7 +75,11 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
         .hash(&to_bytes![parameters.predicate_snark_parameters.verification_key]?)?;
     let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
 
+    println!("4");
+
     let predicate = DPCPredicate::<Components>::new(predicate_vk_hash_bytes.clone());
+
+    println!("5");
 
     // Generate a new account that owns the dummy input records
     let account_metadata: [u8; 32] = rng.gen();
@@ -129,6 +137,8 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
     let auxiliary: [u8; 32] = rng.gen();
     let memo: [u8; 32] = rng.gen();
 
+    println!("6");
+
     // Instantiate an empty ledger
 
     let mut path = std::env::temp_dir();
@@ -136,6 +146,8 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
     path.push(format!("./empty_ledger-{}", random_path));
 
     let ledger = empty_ledger(ledger_parameters, &path)?;
+
+    println!("7");
 
     // Generate the transaction
     let (_records, transaction) = ConsensusParameters::create_transaction(
@@ -153,6 +165,8 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
         rng,
     )
     .unwrap();
+
+    println!("8");
 
     let transaction_bytes = to_bytes![transaction]?;
 
@@ -174,7 +188,7 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 pub fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() != 4 {
+    if args.len() < 4 {
         println!(
             "Invalid number of arguments.  Given: {} - Required: {}",
             args.len() - 1,
