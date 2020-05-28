@@ -17,7 +17,7 @@ pub async fn start_rpc_server(
     consensus: ConsensusParameters<GM17Verifier>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let rpc_server: SocketAddr = format!("127.0.0.1:{}", rpc_port).parse()?;
+    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse()?;
 
     let rpc_impl = RpcImpl::new(storage, server_context, consensus, memory_pool_lock);
     let mut io = jsonrpc_core::IoHandler::new();
