@@ -22,7 +22,7 @@ pub const PORT: OptionType = (
 );
 
 pub const RPC_PORT: OptionType = (
-    "[rpc_port] --rpc_port=[rpc_port] 'Run the rpc server on a specified port'",
+    "[rpc-port] --rpc-port=[rpc-port] 'Run the rpc server on a specified port'",
     &["no_jsonrpc"],
     &[],
     &[],
@@ -35,29 +35,29 @@ pub const CONNECT: OptionType = (
     &[],
 );
 
-pub const COINBASE_ADDRESS: OptionType = (
-    "[coinbase_address] -c --coinbase_address=[coinbase_address] 'Run the node on a specified port'",
+pub const MINER_ADDRESS: OptionType = (
+    "[miner-address] --miner-address=[miner-address] 'Specify the address that will receive miner rewards'",
     &[],
     &[],
     &[],
 );
 
 pub const MEMPOOL_INTERVAL: OptionType = (
-    "[mempool_interval] --mempool_interval=[mempool_interval] 'Specify the frequency in seconds x 10 the node should fetch the mempool from sync node'",
+    "[mempool-interval] --mempool-interval=[mempool-interval] 'Specify the frequency in seconds x 10 the node should fetch the mempool from sync node'",
     &[],
     &[],
     &[],
 );
 
 pub const MIN_PEERS: OptionType = (
-    "[min_peers] --min_peers=[min_peers] 'Specify the minimum number of peers the node should connect to'",
+    "[min-peers] --min-peers=[min-peers] 'Specify the minimum number of peers the node should connect to'",
     &[],
     &[],
     &[],
 );
 
 pub const MAX_PEERS: OptionType = (
-    "[max_peers] --max_peers=[max_peers] 'Specify the maximum number of peers the node can connect to'",
+    "[max-peers] --max-peers=[max-peers] 'Specify the maximum number of peers the node can connect to'",
     &[],
     &[],
     &[],

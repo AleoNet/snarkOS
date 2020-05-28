@@ -63,7 +63,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
     info!("Loading Aleo parameters...");
-    let parameters = PublicParameters::<Components>::load(!config.miner)?;
+    let parameters = PublicParameters::<Components>::load(!config.is_miner)?;
     info!("Loading complete.");
 
     let server = Server::new(
@@ -98,9 +98,9 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
+    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.miner_address)?[..])?;
 
-    if config.miner {
+    if config.is_miner {
         MinerInstance::new(
             miner_address,
             consensus.clone(),
