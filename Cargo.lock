@@ -2135,6 +2135,7 @@ dependencies = [
 name = "snarkos-genesis"
 version = "0.8.0"
 dependencies = [
+ "chrono",
  "hex",
  "parking_lot 0.10.2",
  "rand",

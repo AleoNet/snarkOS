@@ -112,8 +112,8 @@ impl Miner {
         let time = Utc::now().timestamp();
 
         let header = BlockHeader {
-            merkle_root_hash: MerkleRootHash(merkle_root_bytes),
             previous_block_hash: parent_header.get_hash(),
+            merkle_root_hash: MerkleRootHash(merkle_root_bytes),
             time,
             difficulty_target: self.consensus.get_block_difficulty(parent_header, time),
             nonce: 0u32,
