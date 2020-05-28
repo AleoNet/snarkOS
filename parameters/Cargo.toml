@@ -16,8 +16,6 @@ snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 
 curl = { version = "0.4.29" }
-lazy_static = { version = "1.4.0" }
-lazy-static-include = { version = "2.2.2" }
 
 [dev-dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }

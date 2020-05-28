@@ -1122,17 +1122,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazy-static-include"
-version = "2.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd80064440e1d2d057f602460cbf24313e8939e3755aa4ed888bae9a2f582201"
-dependencies = [
- "lazy_static",
- "starts-ends-with-caseless",
- "syn",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2212,8 +2201,6 @@ name = "snarkos-parameters"
 version = "0.8.0"
 dependencies = [
  "curl",
- "lazy-static-include",
- "lazy_static",
  "rand",
  "snarkos-algorithms",
  "snarkos-dpc",
@@ -2310,12 +2297,6 @@ dependencies = [
  "redox_syscall",
  "winapi 0.3.8",
 ]
-
-[[package]]
-name = "starts-ends-with-caseless"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "423e8765e5ec86a05cf18aa54cf7fcb53fbf460f5e586c99386e4ae2647ea5b1"
 
 [[package]]
 name = "string"
