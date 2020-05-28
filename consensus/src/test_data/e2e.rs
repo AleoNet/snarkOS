@@ -4,16 +4,12 @@ use crate::{
     ConsensusParameters,
 };
 use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::PaymentRecordPayload};
-use snarkos_models::dpc::{DPCScheme, Record};
-use snarkos_objects::{
-    dpc::DPCTransactions,
-    Account,
-    AccountPublicKey,
-    Block,
-    BlockHeader,
-    BlockHeaderHash,
-    MerkleRootHash,
+use snarkos_genesis::GenesisBlock;
+use snarkos_models::{
+    dpc::{DPCScheme, Record},
+    genesis::Genesis,
 };
+use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -42,18 +38,7 @@ pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block1.tra
 pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block2.transactions.0[0]].unwrap());
 
 pub fn genesis() -> Block<Tx> {
-    let header = BlockHeader {
-        previous_block_hash: BlockHeaderHash([0u8; 32]),
-        merkle_root_hash: MerkleRootHash([0u8; 32]),
-        time: 0,
-        difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
-        nonce: 0,
-    };
-
-    let genesis_block = Block {
-        header,
-        transactions: DPCTransactions::new(),
-    };
+    let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     genesis_block
 }
