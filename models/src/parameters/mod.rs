@@ -1,2 +1,2 @@
-pub mod parameter;
-pub use self::parameter::*;
+pub mod parameters;
+pub use self::parameters::*;

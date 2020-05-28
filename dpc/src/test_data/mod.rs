@@ -4,7 +4,7 @@ use snarkos_models::{
     algorithms::CRH,
     dpc::{DPCScheme, Record},
     objects::{AccountScheme, Transaction},
-    parameters::Parameter,
+    parameters::Parameters,
 };
 use snarkos_objects::Account;
 use snarkos_parameters::LedgerMerkleTreeParameters;
@@ -37,18 +37,16 @@ pub fn setup_or_load_parameters<R: Rng>(
     <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
 ) {
     // TODO (howardwu): Resolve this inconsistency on import structure with a new model once MerkleParameters are refactored.
-    let crh_parameters = <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes()[..])
-        .expect("read bytes as hash for MerkleParameters in ledger");
+    let crh_parameters =
+        <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
+            .expect("read bytes as hash for MerkleParameters in ledger");
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
-    // TODO (howardwu): Remove this hardcoded path.
-    let mut path = std::env::current_dir().unwrap();
-    path.push("../dpc/src/parameters/");
-    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(&path, verify_only) {
+    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(verify_only) {
         Ok(parameters) => parameters,
         Err(err) => {
-            println!("Err: {}. Path: {:?}. Re-running parameter Setup", err, path);
+            println!("error - {}, re-running parameter Setup", err);
             <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_merkle_tree_parameters, rng)
                 .expect("DPC setup failed")
         }
