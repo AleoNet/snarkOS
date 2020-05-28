@@ -5,7 +5,6 @@ use curl::easy::Easy;
 use std::{
     fs::{self, File},
     io::Write,
-    panic::{catch_unwind, set_hook},
     path::PathBuf,
 };
 
@@ -25,42 +24,38 @@ impl Parameters for InnerSNARKPKParameters {
     /// if it cannot find the path locally, the method will proceed to download
     /// the parameters file remotely and attempt to store it locally.
     fn load_bytes() -> Result<Vec<u8>, ParametersError> {
-        // Attempts to lazily link the parameters at compile time.
-        set_hook(Box::new(|_info| ()));
-        let output = catch_unwind(|| {
-            lazy_static_include_bytes!(INNER_SNARK_PK, "src/inner_snark_pk/inner_snark_pk.params");
-            *INNER_SNARK_PK
-        });
+        // Compose the correct file path for the parameter file.
+        let mut file_path = PathBuf::from(file!());
+        file_path.pop();
+        file_path.push(INNER_SNARK_PK_FILENAME);
 
-        match output {
-            Ok(buffer) => Ok(buffer.to_vec()),
-            _ => {
-                // Compose the correct file path for the parameter file.
-                let mut file_path = PathBuf::from(file!());
-                file_path.pop();
-                file_path.push(INNER_SNARK_PK_FILENAME);
+        // Compute the relative path.
+        let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
 
-                // Compute the relative path.
-                let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
+        // Compute the absolute path.
+        let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        absolute_path.push(&relative_path);
 
-                // Compute the absolute path.
-                let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                absolute_path.push(&relative_path);
-
-                if relative_path.exists() {
-                    // Attempts one final try to load the parameter file locally with a relative path.
-                    Ok(fs::read(relative_path)?.to_vec())
-                } else if absolute_path.exists() {
-                    // Attempts one final try to load the parameter file locally with an absolute path.
-                    Ok(fs::read(absolute_path)?.to_vec())
-                } else {
-                    // Downloads the missing parameters and stores it in the local directory for use.
+        if relative_path.exists() {
+            // Attempts to load the parameter file locally with a relative path.
+            Ok(fs::read(relative_path)?.to_vec())
+        } else if absolute_path.exists() {
+            // Attempts to load the parameter file locally with an absolute path.
+            Ok(fs::read(absolute_path)?.to_vec())
+        } else {
+            // Downloads the missing parameters and stores it in the local directory for use.
+            eprintln!(
+                "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
+                INNER_SNARK_PK_FILENAME, INNER_SNARK_PK_FILENAME, file_path
+            );
+            let output = Self::load_remote()?;
+            match Self::store_bytes(&output, &relative_path, &absolute_path, &file_path) {
+                Ok(()) => Ok(output),
+                Err(_) => {
                     eprintln!(
-                        "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and attempt to store it locally. Please ensure \"{}\" is stored in {:?} and recompile snarkOS.\n",
-                        INNER_SNARK_PK_FILENAME, INNER_SNARK_PK_FILENAME, file_path
+                        "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\n",
+                        INNER_SNARK_PK_FILENAME, file_path
                     );
-                    let output = Self::load_remote()?;
-                    Self::store_bytes(&output, &relative_path, &absolute_path, &file_path)?;
                     Ok(output)
                 }
             }
