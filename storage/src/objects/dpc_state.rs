@@ -10,30 +10,6 @@ use snarkos_utilities::{
 use std::collections::HashSet;
 
 impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
-    /// Get the genesis commitment
-    pub fn genesis_cm(&self) -> Result<T::Commitment, StorageError> {
-        match self.storage.get(COL_META, KEY_GENESIS_CM.as_bytes())? {
-            Some(cm_bytes) => Ok(FromBytes::read(&cm_bytes[..])?),
-            None => Err(StorageError::MissingGenesisCm),
-        }
-    }
-
-    /// Get the genesis serial number
-    pub fn genesis_sn(&self) -> Result<T::SerialNumber, StorageError> {
-        match self.storage.get(COL_META, KEY_GENESIS_SN.as_bytes())? {
-            Some(genesis_sn_bytes) => Ok(FromBytes::read(&genesis_sn_bytes[..])?),
-            None => Err(StorageError::MissingGenesisSn),
-        }
-    }
-
-    /// Get the genesis memo
-    pub fn genesis_memo(&self) -> Result<T::Memorandum, StorageError> {
-        match self.storage.get(COL_META, KEY_GENESIS_MEMO.as_bytes())? {
-            Some(genesis_memo_bytes) => Ok(FromBytes::read(&genesis_memo_bytes[..])?),
-            None => Err(StorageError::MissingGenesisMemo),
-        }
-    }
-
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {

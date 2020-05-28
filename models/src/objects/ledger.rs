@@ -17,13 +17,8 @@ pub trait Ledger: Sized {
     fn setup<R: Rng>(rng: &mut R) -> Result<Self::MerkleParameters, LedgerError>;
 
     /// Creates an empty ledger
-    fn new(
-        path: &PathBuf,
-        parameters: Self::MerkleParameters,
-        dummy_cm: Self::Commitment,
-        dummy_sn: Self::SerialNumber,
-        dummy_memo: Self::Memo,
-    ) -> Result<Self, LedgerError>;
+    fn new(path: &PathBuf, parameters: Self::MerkleParameters, genesis_block: Self::Block)
+    -> Result<Self, LedgerError>;
 
     /// Return the current number of transactions on the ledger.
     fn len(&self) -> usize;

@@ -29,18 +29,18 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             return Ok(true);
         }
 
-        if transaction_memo == &self.genesis_memo()? {
+        if self.contains_memo(transaction_memo) {
             return Ok(true);
         }
 
         for sn in transaction_serial_numbers {
-            if self.contains_sn(sn) || sn == &self.genesis_sn()? {
+            if self.contains_sn(sn) {
                 return Ok(true);
             }
         }
 
         for cm in transaction_commitments {
-            if self.contains_cm(cm) || cm == &self.genesis_cm()? {
+            if self.contains_cm(cm) {
                 return Ok(true);
             }
         }

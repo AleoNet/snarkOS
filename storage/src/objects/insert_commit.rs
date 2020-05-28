@@ -16,24 +16,22 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
         let mut ops = vec![];
         let mut cms = vec![];
         for sn in transaction.old_serial_numbers() {
-            if sn != &self.genesis_sn()? {
-                let sn_bytes = to_bytes![sn]?;
-                if self.get_sn_index(&sn_bytes)?.is_some() {
-                    return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
-                }
-
-                ops.push(Op::Insert {
-                    col: COL_SERIAL_NUMBER,
-                    key: sn_bytes,
-                    value: (sn_index.clone() as u32).to_le_bytes().to_vec(),
-                });
-                *sn_index += 1;
+            let sn_bytes = to_bytes![sn]?;
+            if self.get_sn_index(&sn_bytes)?.is_some() {
+                return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
             }
+
+            ops.push(Op::Insert {
+                col: COL_SERIAL_NUMBER,
+                key: sn_bytes,
+                value: (sn_index.clone() as u32).to_le_bytes().to_vec(),
+            });
+            *sn_index += 1;
         }
 
         for cm in transaction.new_commitments() {
             let cm_bytes = to_bytes![cm]?;
-            if cm == &self.genesis_cm()? || self.get_cm_index(&cm_bytes)?.is_some() {
+            if self.get_cm_index(&cm_bytes)?.is_some() {
                 return Err(StorageError::ExistingCm(cm_bytes.to_vec()));
             }
 
@@ -47,18 +45,16 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             *cm_index += 1;
         }
 
-        if transaction.memorandum() != &self.genesis_memo()? {
-            let memo_bytes = to_bytes![transaction.memorandum()]?;
-            if self.get_memo_index(&memo_bytes)?.is_some() {
-                return Err(StorageError::ExistingMemo(memo_bytes.to_vec()));
-            } else {
-                ops.push(Op::Insert {
-                    col: COL_MEMO,
-                    key: memo_bytes,
-                    value: (memo_index.clone() as u32).to_le_bytes().to_vec(),
-                });
-                *memo_index += 1;
-            }
+        let memo_bytes = to_bytes![transaction.memorandum()]?;
+        if self.get_memo_index(&memo_bytes)?.is_some() {
+            return Err(StorageError::ExistingMemo(memo_bytes.to_vec()));
+        } else {
+            ops.push(Op::Insert {
+                col: COL_MEMO,
+                key: memo_bytes,
+                value: (memo_index.clone() as u32).to_le_bytes().to_vec(),
+            });
+            *memo_index += 1;
         }
 
         Ok((ops, cms))

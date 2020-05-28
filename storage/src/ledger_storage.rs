@@ -1,11 +1,13 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
 use snarkos_errors::storage::StorageError;
+use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
+    genesis::Genesis,
     objects::{Ledger, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{dpc::DPCTransactions, BlockHeader, BlockHeaderHash};
+use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::bytes::FromBytes;
 
@@ -82,14 +84,9 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             None => {
                 // Add genesis block to database
 
-                let ledger_storage = Self::new(
-                    &path.as_ref().to_path_buf(),
-                    ledger_parameters,
-                    FromBytes::read(&GENESIS_RECORD_COMMITMENT[..])?,
-                    FromBytes::read(&GENESIS_SERIAL_NUMBER[..])?,
-                    FromBytes::read(&GENESIS_MEMO[..])?,
-                )
-                .unwrap(); // TODO handle this unwrap. merge storage and ledger error
+                let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
+
+                let ledger_storage = Self::new(&path.as_ref().to_path_buf(), ledger_parameters, genesis_block).unwrap(); // TODO handle this unwrap. merge storage and ledger error
 
                 Ok(ledger_storage)
             }
