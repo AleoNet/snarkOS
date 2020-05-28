@@ -4,6 +4,7 @@
 
 cargo run --release --example account_commitment
 cargo run --release --example account_signature
+cargo run --release --example ledger_merkle_tree
 cargo run --release --example local_data_commitment
 cargo run --release --example predicate_vk_crh
 cargo run --release --example record_commitment
@@ -12,6 +13,7 @@ cargo run --release --example value_commitment
 
 mv account_commitment.params ../src/account_commitment
 mv account_signature.params ../src/account_signature
+mv ledger_merkle_tree.params ../src/ledger_merkle_tree
 mv local_data_commitment.params ../src/local_data_commitment
 mv predicate_vk_crh.params ../src/predicate_vk_crh
 mv record_commitment.params ../src/record_commitment
