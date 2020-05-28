@@ -10,7 +10,7 @@ use crate::dpc::base_dpc::{
     ExecuteContext,
     DPC,
 };
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::{merkle_tree::MerkleParameters, snark::PreparedVerifyingKey};
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
@@ -30,7 +30,7 @@ fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
-    let ledger_parameters = MerkleTreeLedger::setup(&mut rng).expect("Ledger setup failed");
+    let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
     let circuit_parameters = InstantiatedDPC::generate_circuit_parameters(&mut rng).unwrap();
     let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&circuit_parameters, &mut rng).unwrap();
     #[cfg(debug_assertions)]

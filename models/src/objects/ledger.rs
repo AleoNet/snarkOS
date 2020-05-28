@@ -1,7 +1,6 @@
 use crate::objects::{BlockScheme, Transaction};
 use snarkos_errors::dpc::LedgerError;
 
-use rand::Rng;
 use std::path::PathBuf;
 
 pub trait LedgerScheme: Sized {
@@ -13,8 +12,6 @@ pub trait LedgerScheme: Sized {
     type MerkleTreeDigest;
     type SerialNumber;
     type Transaction: Transaction;
-
-    fn setup<R: Rng>(rng: &mut R) -> Result<Self::MerkleParameters, LedgerError>;
 
     /// Creates an empty ledger
     fn new(path: &PathBuf, parameters: Self::MerkleParameters, genesis_block: Self::Block)
