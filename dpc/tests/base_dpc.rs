@@ -23,6 +23,7 @@ use snarkos_objects::{
     pedersen_merkle_root,
     Block,
     BlockHeader,
+    BlockHeaderHash,
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
