@@ -64,7 +64,7 @@ impl Config {
         options.iter().for_each(|option| match *option {
             // Flags
             "network" => self.network(arguments.is_present(option)),
-            "no_jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
+            "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "quiet" => self.quiet(arguments.is_present(option)),
@@ -209,7 +209,7 @@ impl CLI for ConfigCli {
         let mut config = Config::default();
         config.parse(arguments, &[
             "network",
-            "no_jsonrpc",
+            "no-jsonrpc",
             "is-bootnode",
             "is-miner",
             "quiet",
