@@ -1,7 +1,6 @@
 use crate::address_book::AddressBook;
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::network::ServerError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
 
 use chrono::{DateTime, Utc};
