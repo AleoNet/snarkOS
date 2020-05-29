@@ -1,5 +1,6 @@
+use crate::algorithms::CRH;
+
 use snarkos_errors::algorithms::MerkleError;
-use snarkos_models::algorithms::CRH;
 use snarkos_utilities::bytes::ToBytes;
 
 use rand::Rng;
