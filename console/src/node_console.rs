@@ -1,4 +1,4 @@
-use crate::{option, subcommand, types::*, CLIError, CLI};
+use crate::{option, types::*, CLIError, CLI};
 
 use clap::{ArgMatches, Values};
 use reqwest::Client;

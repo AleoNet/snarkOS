@@ -9,7 +9,6 @@ use snarkos_utilities::{
 };
 
 use parking_lot::RwLock;
-use rand::Rng;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
 impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
@@ -21,10 +20,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     type MerkleTreeDigest = MerkleTreeDigest<Self::MerkleParameters>;
     type SerialNumber = T::SerialNumber;
     type Transaction = T;
-
-    fn setup<R: Rng>(rng: &mut R) -> Result<Self::MerkleParameters, LedgerError> {
-        Ok(P::setup(rng))
-    }
 
     fn new(
         path: &PathBuf,
