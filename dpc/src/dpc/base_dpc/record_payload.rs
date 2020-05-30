@@ -2,59 +2,46 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::io::{Read, Result as IoResult, Write};
 
-//TODO enforce lock condition
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PaymentRecordPayload {
-    /// Attributes
-    pub balance: u64,
-    pub lock: u32,
-}
+pub struct RecordPayload([u8; 32]);
 
-impl Default for PaymentRecordPayload {
+impl Default for RecordPayload {
     fn default() -> Self {
-        Self { balance: 0, lock: 0 }
+        Self([0u8; 32])
     }
 }
 
-impl PaymentRecordPayload {
+impl RecordPayload {
     pub fn to_bytes(&self) -> Vec<u8> {
-        [self.balance.to_le_bytes().to_vec(), self.lock.to_le_bytes().to_vec()].concat()
+        self.0.to_vec()
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), 12);
+        assert_eq!(bytes.len(), 32);
 
-        let mut balance_bytes = [0u8; 8];
-        let mut lock_bytes = [0u8; 4];
+        let mut payload = [0u8; 32];
+        payload.copy_from_slice(&bytes[0..32]);
 
-        balance_bytes.copy_from_slice(&bytes[0..8]);
-        lock_bytes.copy_from_slice(&bytes[8..12]);
-
-        Self {
-            balance: u64::from_le_bytes(balance_bytes),
-            lock: u32::from_le_bytes(lock_bytes),
-        }
+        Self(payload)
     }
 
     pub fn size(&self) -> u64 {
-        12
+        32
     }
 }
 
-impl ToBytes for PaymentRecordPayload {
+impl ToBytes for RecordPayload {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.balance.write(&mut writer)?;
-        self.lock.write(&mut writer)
+        self.0.write(&mut writer)
     }
 }
 
-impl FromBytes for PaymentRecordPayload {
+impl FromBytes for RecordPayload {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let balance: u64 = FromBytes::read(&mut reader)?;
-        let lock: u32 = FromBytes::read(&mut reader)?;
+        let payload: [u8; 32] = FromBytes::read(&mut reader)?;
 
-        Ok(Self { balance, lock })
+        Ok(Self(payload))
     }
 }

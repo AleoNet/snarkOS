@@ -10,6 +10,7 @@ pub trait Record: Default + FromBytes + ToBytes {
     type Predicate;
     type SerialNumberNonce;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
+    type Value;
 
     /// Returns the account public key.
     fn account_public_key(&self) -> &Self::AccountPublicKey;
@@ -34,4 +35,7 @@ pub trait Record: Default + FromBytes + ToBytes {
 
     /// Returns the randomness used for the commitment.
     fn commitment_randomness(&self) -> Self::CommitmentRandomness;
+
+    /// Returns the record value.
+    fn value(&self) -> Self::Value;
 }

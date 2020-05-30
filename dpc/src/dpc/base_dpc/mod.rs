@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload};
+use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -283,7 +283,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
         account_public_key: &AccountPublicKey<Components>,
         is_dummy: bool,
-        payload: &PaymentRecordPayload,
+        value: u64,
+        payload: &RecordPayload,
         birth_predicate: &DPCPredicate<Components>,
         death_predicate: &DPCPredicate<Components>,
         rng: &mut R,
@@ -295,10 +296,11 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         // Construct a record commitment.
         let birth_predicate_repr = birth_predicate.into_compact_repr();
         let death_predicate_repr = death_predicate.into_compact_repr();
-        // Total = 32 + 1 + 32 + 32 + 32 + 32 = 161 bytes
+        // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
             account_public_key.commitment, // 256 bits = 32 bytes
             is_dummy,                      // 1 bit = 1 byte
+            value,                         // 64 bits = 8 bytes
             payload,                       // 256 bits = 32 bytes
             birth_predicate_repr,          // 256 bits = 32 bytes
             death_predicate_repr,          // 256 bits = 32 bytes
@@ -314,6 +316,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let record = DPCRecord {
             account_public_key: account_public_key.clone(),
             is_dummy,
+            value,
             payload: payload.clone(),
             birth_predicate_repr,
             death_predicate_repr,
@@ -334,6 +337,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         new_account_public_keys: &[AccountPublicKey<Components>],
         new_is_dummy_flags: &[bool],
+        new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
         new_birth_predicates: &[<Self as DPCScheme<L>>::Predicate],
         new_death_predicates: &[<Self as DPCScheme<L>>::Predicate],
@@ -380,7 +384,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 let witness = ledger.prove_cm(&record.commitment())?;
                 old_witnesses.push(witness);
 
-                value_balance += record.payload.balance as i64;
+                value_balance += record.value() as i64;
             }
 
             let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
@@ -415,6 +419,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 &sn_nonce,
                 &new_account_public_keys[j],
                 new_is_dummy_flags[j],
+                new_values[j],
                 &new_payloads[j],
                 &new_birth_predicates[j],
                 &new_death_predicates[j],
@@ -422,7 +427,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             )?;
 
             if !record.is_dummy {
-                value_balance -= record.payload.balance as i64;
+                value_balance -= record.value() as i64;
             }
 
             new_commitments.push(record.commitment.clone());
@@ -610,6 +615,7 @@ where
 
         new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
+        new_values: &[u64],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
         new_death_predicates: &[Self::Predicate],
@@ -627,6 +633,7 @@ where
             old_account_private_keys,
             new_account_public_keys,
             new_is_dummy_flags,
+            new_values,
             new_payloads,
             new_birth_predicates,
             new_death_predicates,

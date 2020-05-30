@@ -5,7 +5,7 @@ use crate::dpc::base_dpc::{
     execute_outer_proof_gadget,
     payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
     predicate::PrivatePredicateInput,
-    record_payload::PaymentRecordPayload,
+    record_payload::RecordPayload,
     BaseDPCComponents,
     ExecuteContext,
     DPC,
@@ -72,7 +72,7 @@ fn test_execute_base_dpc_constraints() {
         &sn_nonce,
         &dummy_account.public_key,
         true,
-        &PaymentRecordPayload::default(),
+        &RecordPayload::default(),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &mut rng,
@@ -91,7 +91,7 @@ fn test_execute_base_dpc_constraints() {
     let new_account = Account::new(signature_parameters, commitment_parameters, &new_metadata, &mut rng).unwrap();
 
     // Create a payload.
-    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
+    let new_payload = RecordPayload { balance: 10, lock: 0 };
 
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
@@ -147,7 +147,7 @@ fn test_execute_base_dpc_constraints() {
         // If the record is a dummy, then the value should be 0
         let value = match new_records[i].is_dummy() {
             true => 0,
-            false => old_records[i].payload().balance,
+            false => old_records[i].value(),
         };
 
         let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
@@ -198,7 +198,7 @@ fn test_execute_base_dpc_constraints() {
         // If the record is a dummy, then the value should be 0
         let value = match new_records[j].is_dummy() {
             true => 0,
-            false => new_records[j].payload().balance,
+            false => new_records[j].value(),
         };
 
         let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
