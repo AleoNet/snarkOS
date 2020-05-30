@@ -38,8 +38,8 @@ pub use self::inner_circuit_gadget::*;
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
 
-pub mod payment_circuit;
-use self::payment_circuit::*;
+pub mod predicate_circuit;
+use self::predicate_circuit::*;
 
 pub mod outer_circuit;
 use self::outer_circuit::*;
@@ -98,9 +98,9 @@ pub trait BaseDPCComponents: DPCComponents {
 
     /// SNARK for a "dummy predicate" that does nothing with its input.
     type PredicateSNARK: SNARK<
-        Circuit = PaymentCircuit<Self>,
-        AssignedCircuit = PaymentCircuit<Self>,
-        VerifierInput = PaymentPredicateLocalData<Self>,
+        Circuit = PredicateCircuit<Self>,
+        AssignedCircuit = PredicateCircuit<Self>,
+        VerifierInput = PredicateLocalData<Self>,
     >;
 
     /// SNARK Verifier gadget for the "dummy predicate" that does nothing with its input.
@@ -248,7 +248,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         circuit_parameters: &CircuitParameters<Components>,
         rng: &mut R,
     ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(circuit_parameters), rng)?;
+        let (pk, pvk) = Components::PredicateSNARK::setup(PredicateCircuit::blank(circuit_parameters), rng)?;
 
         Ok(PredicateSNARKParameters {
             proving_key: pk,
@@ -559,7 +559,7 @@ where
         let predicate_snark_parameters = Self::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
         let predicate_snark_proof = Components::PredicateSNARK::prove(
             &predicate_snark_parameters.proving_key,
-            PaymentCircuit::blank(&circuit_parameters),
+            PredicateCircuit::blank(&circuit_parameters),
             rng,
         )?;
         end_timer!(predicate_snark_setup_time);

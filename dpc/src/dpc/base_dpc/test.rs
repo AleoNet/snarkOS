@@ -3,8 +3,8 @@ use crate::dpc::base_dpc::{
     binding_signature::*,
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
-    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
     predicate::PrivatePredicateInput,
+    predicate_circuit::{PredicateCircuit, PredicateLocalData},
     record_payload::RecordPayload,
     BaseDPCComponents,
     ExecuteContext,
@@ -161,25 +161,15 @@ fn test_execute_base_dpc_constraints() {
 
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PaymentCircuit::new(
-                &circuit_parameters,
-                &local_data_comm,
-                &value_commitment_randomness,
-                &value_commitment,
-                i as u8,
-                value,
-            ),
+            PredicateCircuit::new(&circuit_parameters, &local_data_comm, i as u8),
             &mut rng,
         )
         .expect("Proof should work");
         #[cfg(debug_assertions)]
         {
-            let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+            let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
-                value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
-                value_commitment_randomness: value_commitment_randomness.clone(),
-                value_commitment: value_commitment.clone(),
                 position: i as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
@@ -212,26 +202,16 @@ fn test_execute_base_dpc_constraints() {
 
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PaymentCircuit::new(
-                &circuit_parameters,
-                &local_data_comm,
-                &value_commitment_randomness,
-                &value_commitment,
-                j as u8,
-                value,
-            ),
+            PredicateCircuit::new(&circuit_parameters, &local_data_comm, j as u8),
             &mut rng,
         )
         .expect("Proof should work");
 
         #[cfg(debug_assertions)]
         {
-            let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+            let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
-                value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
-                value_commitment_randomness: value_commitment_randomness.clone(),
-                value_commitment: value_commitment.clone(),
                 position: j as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
