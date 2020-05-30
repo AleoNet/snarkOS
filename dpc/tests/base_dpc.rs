@@ -5,7 +5,7 @@ use snarkos_dpc::{
         instantiated::*,
         payment_circuit::*,
         predicate::PrivatePredicateInput,
-        record_payload::PaymentRecordPayload,
+        record_payload::RecordPayload,
         BaseDPCComponents,
         LocalData,
         DPC,
@@ -77,7 +77,8 @@ fn base_dpc_integration_test() {
             &old_sn_nonce,
             &genesis_account.public_key,
             true, // The input record is dummy
-            &PaymentRecordPayload::default(),
+            0,
+            &RecordPayload::default(),
             &Predicate::new(predicate_vk_hash.clone()),
             &Predicate::new(predicate_vk_hash.clone()),
             &mut rng,
@@ -88,17 +89,15 @@ fn base_dpc_integration_test() {
 
     // Construct new records.
 
-    // Create a payload.
-    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
-
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(predicate_vk_hash.clone());
 
     let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
-    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_values = vec![10; NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
 
     let auxiliary = [3u8; 32];
     let memo = [4u8; 32];
@@ -110,7 +109,7 @@ fn base_dpc_integration_test() {
             // If the record is a dummy, then the value should be 0
             let input_value = match local_data.old_records[i].is_dummy() {
                 true => 0,
-                false => local_data.old_records[i].payload().balance,
+                false => local_data.old_records[i].value(),
             };
 
             // Generate value commitment randomness
@@ -177,7 +176,7 @@ fn base_dpc_integration_test() {
             // If the record is a dummy, then the value should be 0
             let output_value = match local_data.new_records[j].is_dummy() {
                 true => 0,
-                false => local_data.new_records[j].payload().balance,
+                false => local_data.new_records[j].value(),
             };
 
             // Generate value commitment randomness
@@ -244,6 +243,7 @@ fn base_dpc_integration_test() {
         &old_death_vk_and_proof_generator,
         &new_account_public_keys,
         &new_dummy_flags,
+        &new_values,
         &new_payloads,
         &new_birth_predicates,
         &new_death_predicates,

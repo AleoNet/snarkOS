@@ -184,6 +184,7 @@ where
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
     let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
     let mut old_birth_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
     let mut old_death_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
@@ -191,6 +192,7 @@ where
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
     let mut new_account_public_keys_gadgets = Vec::with_capacity(new_records.len());
     let mut new_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
     let mut new_birth_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
     let mut new_death_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
@@ -301,6 +303,7 @@ where
             given_account_public_key,
             given_commitment,
             given_is_dummy,
+            given_value,
             given_payload,
             given_birth_predicate_crh,
             given_death_predicate_crh,
@@ -328,6 +331,9 @@ where
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
             old_dummy_flags_gadgets.push(given_is_dummy.clone());
+
+            let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
+            old_value_gadgets.push(given_value.clone());
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             old_payloads_gadgets.push(given_payload.clone());
@@ -357,6 +363,7 @@ where
                 given_account_public_key,
                 given_commitment,
                 given_is_dummy,
+                given_value,
                 given_payload,
                 given_birth_predicate_crh,
                 given_death_predicate_crh,
@@ -486,6 +493,7 @@ where
             let mut commitment_input = Vec::new();
             commitment_input.extend_from_slice(&account_public_key_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
+            commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
             commitment_input.extend_from_slice(&given_birth_predicate_crh);
             commitment_input.extend_from_slice(&given_death_predicate_crh);
@@ -519,6 +527,7 @@ where
             given_record_commitment,
             given_commitment,
             given_is_dummy,
+            given_value,
             given_payload,
             given_birth_predicate_hash,
             given_death_predicate_hash,
@@ -546,6 +555,9 @@ where
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
             new_dummy_flags_gadgets.push(given_is_dummy.clone());
+
+            let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
+            new_value_gadgets.push(given_value.clone());
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             new_payloads_gadgets.push(given_payload.clone());
@@ -577,6 +589,7 @@ where
                 given_record_commitment,
                 given_commitment,
                 given_is_dummy,
+                given_value,
                 given_payload,
                 given_birth_predicate_hash,
                 given_death_predicate_hash,
@@ -629,6 +642,7 @@ where
             let mut commitment_input = Vec::new();
             commitment_input.extend_from_slice(&account_public_key_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
+            commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
             commitment_input.extend_from_slice(&given_birth_predicate_hash);
             commitment_input.extend_from_slice(&given_death_predicate_hash);
@@ -706,6 +720,7 @@ where
                 &old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?,
             );
             local_data_bytes.extend_from_slice(&old_dummy_flags_gadgets[i].to_bytes(&mut cs.ns(|| "is_dummy"))?);
+            local_data_bytes.extend_from_slice(&old_value_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_payloads_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_birth_predicate_hashes_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
@@ -720,6 +735,7 @@ where
             local_data_bytes
                 .extend_from_slice(&new_account_public_keys_gadgets[j].to_bytes(&mut cs.ns(|| "account_public_key"))?);
             local_data_bytes.extend_from_slice(&new_dummy_flags_gadgets[j].to_bytes(&mut cs.ns(|| "is_dummy"))?);
+            local_data_bytes.extend_from_slice(&new_value_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_payloads_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_death_predicate_hashes_gadgets[j]);

@@ -446,6 +446,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.commitment(),
                 record.account_public_key(),
                 record.is_dummy(),
+                record.value(),
                 record.payload(),
                 record.birth_predicate_repr(),
                 record.death_predicate_repr(),
@@ -460,6 +461,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.commitment(),
                 record.account_public_key(),
                 record.is_dummy(),
+                record.value(),
                 record.payload(),
                 record.birth_predicate_repr(),
                 record.death_predicate_repr()

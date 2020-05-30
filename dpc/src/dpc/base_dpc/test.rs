@@ -72,6 +72,7 @@ fn test_execute_base_dpc_constraints() {
         &sn_nonce,
         &dummy_account.public_key,
         true,
+        0,
         &RecordPayload::default(),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
@@ -90,17 +91,15 @@ fn test_execute_base_dpc_constraints() {
     let new_metadata = [1u8; 32];
     let new_account = Account::new(signature_parameters, commitment_parameters, &new_metadata, &mut rng).unwrap();
 
-    // Create a payload.
-    let new_payload = RecordPayload { balance: 10, lock: 0 };
-
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
     let new_account_public_keys = vec![new_account.public_key.clone(); NUM_OUTPUT_RECORDS];
-    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_values = vec![10; NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let auxiliary = [0u8; 32];
     let memo = [0u8; 32];
 
@@ -110,6 +109,7 @@ fn test_execute_base_dpc_constraints() {
         &old_account_private_keys,
         &new_account_public_keys,
         &new_dummy_flags,
+        &new_values,
         &new_payloads,
         &new_birth_predicates,
         &new_death_predicates,

@@ -10,7 +10,7 @@ pub trait Record: Default + FromBytes + ToBytes {
     type Predicate;
     type SerialNumberNonce;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
-    type Value;
+    type Value: FromBytes + ToBytes;
 
     /// Returns the account public key.
     fn account_public_key(&self) -> &Self::AccountPublicKey;
