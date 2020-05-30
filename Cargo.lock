@@ -2201,6 +2201,7 @@ name = "snarkos-parameters"
 version = "0.8.0"
 dependencies = [
  "curl",
+ "hex",
  "rand",
  "snarkos-algorithms",
  "snarkos-dpc",
