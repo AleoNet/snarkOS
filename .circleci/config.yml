@@ -72,7 +72,7 @@ jobs:
           command: >
             cd ~/project/project/ &&
             docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-            daniilr/kcov bash /opt/kcov-source/ci/kcov.sh
+            daniilr/kcov bash /home/circleci/project/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
