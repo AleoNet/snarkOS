@@ -1,6 +1,6 @@
 mod sync_integration {
     use snarkos_consensus::test_data::*;
-    use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, MerkleTreeLedger, Tx};
+    use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
         message::{types::*, Channel, Message},
         protocol::sync::*,
@@ -19,7 +19,8 @@ mod sync_integration {
         #[tokio::test]
         #[serial]
         async fn sends_get_block() {
-            let (storage, path): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+            let storage = Arc::new(FIXTURE_VK.ledger());
+            let path = storage.storage.db.path().to_owned();
             let bootnode_address = random_socket_address();
 
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
@@ -61,7 +62,8 @@ mod sync_integration {
         #[tokio::test]
         #[serial]
         async fn sends_get_sync() {
-            let (storage, path): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+            let storage = Arc::new(FIXTURE_VK.ledger());
+            let path = storage.storage.db.path().to_owned();
 
             let bootnode_address = random_socket_address();
 

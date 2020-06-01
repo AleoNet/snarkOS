@@ -6,7 +6,7 @@ use snarkos_models::{
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
-    objects::{AccountScheme, Ledger, Transaction},
+    objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
@@ -119,7 +119,7 @@ pub struct DPC<Components: BaseDPCComponents> {
 /// stores references to existing information like old records and secret keys.
 pub(crate) struct ExecuteContext<'a, L, Components: BaseDPCComponents>
 where
-    L: Ledger<
+    L: LedgerScheme<
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
@@ -155,7 +155,7 @@ where
 
 impl<L, Components: BaseDPCComponents> ExecuteContext<'_, L, Components>
 where
-    L: Ledger<
+    L: LedgerScheme<
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
@@ -202,20 +202,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Account signature setup");
-        let account_signature = Components::AccountSignature::setup(rng)?;
-        end_timer!(time);
-
         let time = start_timer!(|| "Record commitment scheme setup");
         let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification Key Commitment setup");
         let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Verification Key CRH setup");
-        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local Data Commitment setup");
@@ -228,6 +220,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let time = start_timer!(|| "Serial Nonce CRH setup");
         let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Verification Key CRH setup");
+        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Account signature setup");
+        let account_signature = Components::AccountSignature::setup(rng)?;
         end_timer!(time);
 
         let comm_crh_sig_pp = CircuitParameters {
@@ -244,17 +244,15 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok(comm_crh_sig_pp)
     }
 
-    pub fn generate_pred_nizk_parameters<R: Rng>(
-        comm_crh_sig_pp: &CircuitParameters<Components>,
+    pub fn generate_predicate_snark_parameters<R: Rng>(
+        circuit_parameters: &CircuitParameters<Components>,
         rng: &mut R,
     ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
-        let proof = Components::PredicateSNARK::prove(&pk, PaymentCircuit::blank(comm_crh_sig_pp), rng)?;
+        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(circuit_parameters), rng)?;
 
         Ok(PredicateSNARKParameters {
             proving_key: pk,
             verification_key: pvk.into(),
-            proof,
         })
     }
 
@@ -347,7 +345,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         rng: &mut R,
     ) -> Result<ExecuteContext<'a, L, Components>, DPCError>
     where
-        L: Ledger<
+        L: LedgerScheme<
             Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
             MerkleParameters = Components::MerkleParameters,
             MerklePath = MerklePath<Components::MerkleParameters>,
@@ -522,9 +520,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     }
 }
 
-impl<Components: BaseDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
+impl<Components: BaseDPCComponents, L: LedgerScheme> DPCScheme<L> for DPC<Components>
 where
-    L: Ledger<
+    L: LedgerScheme<
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
@@ -547,26 +545,31 @@ where
         ledger_parameters: &Components::MerkleParameters,
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
-        let setup_time = start_timer!(|| "BaseDPC::Setup");
+        let setup_time = start_timer!(|| "BaseDPC::setup");
         let circuit_parameters = Self::generate_circuit_parameters(rng)?;
 
-        let predicate_snark_setup_time = start_timer!(|| "Dummy Predicate SNARK Setup");
-        let predicate_snark_parameters = Self::generate_pred_nizk_parameters(&circuit_parameters, rng)?;
+        let predicate_snark_setup_time = start_timer!(|| "Dummy predicate SNARK setup");
+        let predicate_snark_parameters = Self::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
+        let predicate_snark_proof = Components::PredicateSNARK::prove(
+            &predicate_snark_parameters.proving_key,
+            PaymentCircuit::blank(&circuit_parameters),
+            rng,
+        )?;
         end_timer!(predicate_snark_setup_time);
 
         let private_pred_input = PrivatePredicateInput {
             verification_key: predicate_snark_parameters.verification_key.clone(),
-            proof: predicate_snark_parameters.proof.clone(),
+            proof: predicate_snark_proof,
             value_commitment: <Components::ValueCommitment as CommitmentScheme>::Output::default(),
             value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };
 
-        let snark_setup_time = start_timer!(|| "Execute Inner SNARK Setup");
+        let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
         let inner_snark_parameters =
             Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters), rng)?;
         end_timer!(snark_setup_time);
 
-        let snark_setup_time = start_timer!(|| "Execute Outer SNARK Setup");
+        let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
         let outer_snark_parameters =
             Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
         end_timer!(snark_setup_time);

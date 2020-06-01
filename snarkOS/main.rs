@@ -62,12 +62,9 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let sync_handler = SyncHandler::new(bootnode);
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
-    let mut parameters_path = std::env::current_dir()?;
-    parameters_path.push("dpc/src/parameters/");
-
-    info!("Loading Parameters");
-    let parameters = PublicParameters::<Components>::load(&parameters_path, !config.miner)?;
-    info!("Parameters Loaded");
+    info!("Loading Aleo parameters...");
+    let parameters = PublicParameters::<Components>::load(!config.is_miner)?;
+    info!("Loading complete.");
 
     let server = Server::new(
         Context::new(
@@ -101,9 +98,9 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.coinbase_address)?[..])?;
+    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.miner_address)?[..])?;
 
-    if config.miner {
+    if config.is_miner {
         MinerInstance::new(
             miner_address,
             consensus.clone(),

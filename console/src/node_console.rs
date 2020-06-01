@@ -1,4 +1,4 @@
-use crate::{option, subcommand, types::*, CLIError, CLI};
+use crate::{option, types::*, CLIError, CLI};
 
 use clap::{ArgMatches, Values};
 use reqwest::Client;
@@ -202,7 +202,7 @@ impl CLI for ConsoleCli {
         option::GET_PEER_INFO,
         option::GET_BLOCK_TEMPLATE,
     ];
-    const SUBCOMMANDS: &'static [SubCommandType] = &[subcommand::TEST_SUBCOMMAND];
+    const SUBCOMMANDS: &'static [SubCommandType] = &[];
 
     /// Handle all CLI arguments and flags for skeleton node
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CLIError> {
@@ -225,30 +225,6 @@ impl CLI for ConsoleCli {
             "getblocktemplate",
         ]);
 
-        // TODO: remove this for release
-        match arguments.subcommand() {
-            ("test", Some(arguments)) => {
-                config.subcommand = Some("test".into());
-                config.parse(arguments, &[
-                    "ip",
-                    "port",
-                    "getbalance",
-                    "getblock",
-                    "getblockcount",
-                    "getbestblockhash",
-                    "listunspent",
-                    "getrawtransaction",
-                    "createrawtransaction",
-                    "decoderawtransaction",
-                    "signrawtransaction",
-                    "sendrawtransaction",
-                    "getconnectioncount",
-                    "getpeerinfo",
-                    "getblocktemplate",
-                ]);
-            }
-            _ => {}
-        }
         Ok(config)
     }
 }

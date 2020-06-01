@@ -4,9 +4,9 @@
 
 use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::objects::{LedgerScheme, Transaction};
 use snarkos_objects::dpc::DPCTransactions;
-use snarkos_storage::{has_duplicates, LedgerStorage};
+use snarkos_storage::{has_duplicates, Ledger};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -44,7 +44,7 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     #[inline]
-    pub fn from_storage<P: MerkleParameters>(storage: &LedgerStorage<T, P>) -> Result<Self, ConsensusError> {
+    pub fn from_storage<P: MerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
         if let Ok(serialized_transactions) = storage.get_memory_pool() {
@@ -61,7 +61,7 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     #[inline]
-    pub fn store<P: MerkleParameters>(&self, storage: &LedgerStorage<T, P>) -> Result<(), ConsensusError> {
+    pub fn store<P: MerkleParameters>(&self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
         let mut transactions = DPCTransactions::<T>::new();
 
         for (_transaction_id, entry) in self.transactions.iter() {
@@ -79,7 +79,7 @@ impl<T: Transaction> MemoryPool<T> {
     #[inline]
     pub fn insert<P: MerkleParameters>(
         &mut self,
-        storage: &LedgerStorage<T, P>,
+        storage: &Ledger<T, P>,
         entry: Entry<T>,
     ) -> Result<Option<Vec<u8>>, ConsensusError> {
         let transaction_serial_numbers = entry.transaction.old_serial_numbers();
@@ -129,7 +129,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Cleanse the memory pool of outdated transactions.
     #[inline]
-    pub fn cleanse<P: MerkleParameters>(&mut self, storage: &LedgerStorage<T, P>) -> Result<(), ConsensusError> {
+    pub fn cleanse<P: MerkleParameters>(&mut self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
         let mut new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.iter() {
@@ -185,7 +185,7 @@ impl<T: Transaction> MemoryPool<T> {
     #[inline]
     pub fn get_candidates<P: MerkleParameters>(
         &self,
-        storage: &LedgerStorage<T, P>,
+        storage: &Ledger<T, P>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);
@@ -213,7 +213,7 @@ impl<T: Transaction> MemoryPool<T> {
 mod tests {
     use super::*;
     use crate::test_data::*;
-    use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
     use snarkos_storage::test_data::*;
 
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn push() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn remove_entry() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn remove_transaction_by_hash() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -303,11 +303,17 @@ mod tests {
 
     #[test]
     fn get_candidates() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let size = TRANSACTION_1.len();
+        let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        // TODO (howardwu): This is not correct usage of transaction, fix me.
+        // modify the tx a bit so that it does not conflict with the one already inserted
+        // in the chain
+        transaction.old_serial_numbers.clear();
+        transaction.new_commitments.clear();
+        transaction.memorandum = [99; 32];
+        let size = to_bytes![transaction].unwrap().len();
 
         let expected_transaction = transaction.clone();
         mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();
@@ -323,7 +329,7 @@ mod tests {
 
     #[test]
     fn store_memory_pool() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -347,7 +353,7 @@ mod tests {
 
     #[test]
     fn cleanse_memory_pool() {
-        let (blockchain, _): (Arc<MerkleTreeLedger>, _) = test_blockchain();
+        let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
