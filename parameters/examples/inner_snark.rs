@@ -1,4 +1,3 @@
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
@@ -6,7 +5,10 @@ use snarkos_dpc::base_dpc::{
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::{algorithms::SNARK, parameters::Parameters};
+use snarkos_models::{
+    algorithms::{MerkleParameters, SNARK},
+    parameters::Parameters,
+};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},

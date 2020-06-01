@@ -1,6 +1,5 @@
-use crate::merkle_tree::MerkleParameters;
 use snarkos_errors::algorithms::MerkleError;
-use snarkos_models::algorithms::CRH;
+use snarkos_models::algorithms::{MerkleParameters, CRH};
 use snarkos_utilities::bytes::ToBytes;
 
 pub type MerkleTreeDigest<P> = <<P as MerkleParameters>::H as CRH>::Output;

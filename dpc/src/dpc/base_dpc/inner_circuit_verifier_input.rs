@@ -1,8 +1,8 @@
 use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH},
+    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
 };
 

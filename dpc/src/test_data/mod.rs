@@ -1,6 +1,10 @@
 use crate::base_dpc::{instantiated::*, parameters::PublicParameters};
-use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_models::{algorithms::CRH, dpc::DPCScheme, objects::AccountScheme, parameters::Parameters};
+use snarkos_models::{
+    algorithms::{MerkleParameters, CRH},
+    dpc::DPCScheme,
+    objects::AccountScheme,
+    parameters::Parameters,
+};
 use snarkos_objects::Account;
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::bytes::FromBytes;
