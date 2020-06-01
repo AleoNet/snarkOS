@@ -1974,6 +1974,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-network",
  "snarkos-objects",
+ "snarkos-posw",
  "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
@@ -2203,9 +2204,11 @@ dependencies = [
  "curl",
  "rand",
  "snarkos-algorithms",
+ "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-posw",
  "snarkos-utilities",
 ]
 
@@ -2223,6 +2226,7 @@ dependencies = [
  "snarkos-gadgets",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-parameters",
  "snarkos-profiler",
  "snarkos-utilities",
  "thiserror",
