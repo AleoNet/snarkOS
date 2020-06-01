@@ -567,8 +567,6 @@ where
         let private_pred_input = PrivatePredicateInput {
             verification_key: predicate_snark_parameters.verification_key.clone(),
             proof: predicate_snark_proof,
-            value_commitment: <Components::ValueCommitment as CommitmentScheme>::Output::default(),
-            value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };
 
         let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
@@ -671,28 +669,67 @@ where
 
         // Generate binding signature
 
+        // Generate value commitments for input records
+
         let mut old_value_commits = vec![];
         let mut old_value_commit_randomness = vec![];
-        let mut new_value_commits = vec![];
-        let mut new_value_commit_randomness = vec![];
 
-        for death_pred_attr in &old_death_pred_attributes {
+        for old_record in old_records {
             let mut commitment = [0u8; 32];
             let mut randomness = [0u8; 32];
 
-            death_pred_attr.value_commitment.write(&mut commitment[..])?;
-            death_pred_attr.value_commitment_randomness.write(&mut randomness[..])?;
+            // If the record is a dummy, then the value should be 0
+            let input_value = match old_record.is_dummy() {
+                true => 0,
+                false => old_record.value(),
+            };
+
+            // Generate value commitment randomness
+            let value_commitment_randomness =
+                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+            // Generate the value commitment
+            let value_commitment = parameters
+                .circuit_parameters
+                .value_commitment
+                .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
+                .unwrap();
+
+            value_commitment.write(&mut commitment[..])?;
+            value_commitment_randomness.write(&mut randomness[..])?;
 
             old_value_commits.push(commitment);
             old_value_commit_randomness.push(randomness);
         }
 
-        for birth_pred_attr in &new_birth_pred_attributes {
+        // Generate value commitments for output records
+
+        let mut new_value_commits = vec![];
+        let mut new_value_commit_randomness = vec![];
+
+        for new_record in &new_records {
             let mut commitment = [0u8; 32];
             let mut randomness = [0u8; 32];
 
-            birth_pred_attr.value_commitment.write(&mut commitment[..])?;
-            birth_pred_attr.value_commitment_randomness.write(&mut randomness[..])?;
+            // If the record is a dummy, then the value should be 0
+            let output_value = match new_record.is_dummy() {
+                true => 0,
+                false => new_record.value(),
+            };
+
+            // Generate value commitment randomness
+            let value_commitment_randomness =
+                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+            // Generate the value commitment
+            let value_commitment = parameters
+                .circuit_parameters
+                .value_commitment
+                .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
+                .unwrap();
+
+            value_commitment.write(&mut commitment[..])?;
+            value_commitment_randomness.write(&mut randomness[..])?;
 
             new_value_commits.push(commitment);
             new_value_commit_randomness.push(randomness);
