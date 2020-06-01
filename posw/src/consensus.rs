@@ -70,7 +70,7 @@ where
 
 impl<S, CP> Posw<S, F, M, HG, CP>
 where
-    S: SNARK<Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
+    S: SNARK<VerifierInput = Vec<F>, Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
     CP: POSWCircuitParameters,
 {
     /// Verification only mode of the circuit (used by non-mining nodes)
@@ -176,20 +176,19 @@ where
         pedersen_merkle_root: &PedersenMerkleRootHash,
     ) -> Result<(), PoswError> {
         // deserialize the snark proof ASAP
-        let _proof = <S as SNARK>::Proof::read(&proof.0[..])?;
+        let proof = <S as SNARK>::Proof::read(&proof.0[..])?;
 
         // commit to it and the nonce
         let mask = commit(nonce, pedersen_merkle_root);
 
         // get the mask and the root in public inputs format
         let merkle_root = F::read(&pedersen_merkle_root.0[..])?;
-        let _inputs = [mask.to_field_elements()?, vec![merkle_root]].concat();
+        let inputs = [mask.to_field_elements()?, vec![merkle_root]].concat();
 
-        // TODO: How can we set the associated type VerifierInput?
-        // let res = S::verify(&self.vk, &inputs, &proof)?;
-        // if !res {
-        //     return Err(ConsensusError::PoswVerificationFailed);
-        // }
+        let res = S::verify(&self.vk, &inputs, &proof)?;
+        if !res {
+            return Err(PoswError::PoswVerificationFailed);
+        }
 
         Ok(())
     }
