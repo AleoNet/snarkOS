@@ -28,7 +28,7 @@ macro_rules! define_merkle_tree_parameters {
 
         use rand::Rng;
 
-        #[derive(Clone, PartialEq, Eq)]
+        #[derive(Clone, PartialEq, Eq, Debug)]
         pub struct $struct_name($hash);
 
         impl MerkleParameters for $struct_name {

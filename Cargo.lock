@@ -2225,6 +2225,7 @@ dependencies = [
  "snarkos-objects",
  "snarkos-profiler",
  "snarkos-utilities",
+ "thiserror",
 ]
 
 [[package]]

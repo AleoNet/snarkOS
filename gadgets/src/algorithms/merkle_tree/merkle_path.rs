@@ -1,7 +1,7 @@
 use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{MerkleParameters, CRH},
+    algorithms::{CRH, MerkleParameters},
     curves::Field,
     gadgets::{
         algorithms::CRHGadget,

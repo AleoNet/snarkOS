@@ -20,6 +20,7 @@ pub trait POSWCircuitParameters {
     const MASK_LENGTH: usize;
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct POSWCircuit<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters> {
     pub leaves: Vec<Option<<M::H as CRH>::Output>>,
     pub merkle_parameters: M,
