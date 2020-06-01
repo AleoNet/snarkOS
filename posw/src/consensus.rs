@@ -5,7 +5,11 @@ use snarkos_curves::{
     bls12_377::Fr,
     edwards_bls12::{EdwardsProjective, Fq},
 };
-use snarkos_errors::{curves::constraint_field::ConstraintFieldError, parameters::ParametersError, algorithms::SNARKError};
+use snarkos_errors::{
+    algorithms::SNARKError,
+    curves::constraint_field::ConstraintFieldError,
+    parameters::ParametersError,
+};
 use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_models::{
     algorithms::{MerkleParameters, SNARK},
@@ -51,7 +55,7 @@ pub enum PoswError {
     IoError(#[from] IoError),
 
     #[error(transparent)]
-    ConstraintFieldError(#[from] ConstraintFieldError)
+    ConstraintFieldError(#[from] ConstraintFieldError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,7 +74,7 @@ where
 
 impl<S, CP> Posw<S, F, M, HG, CP>
 where
-    S: SNARK<VerifierInput = Vec<F>, Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
+    S: SNARK<VerifierInput = [F], Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
     CP: POSWCircuitParameters,
 {
     /// Verification only mode of the circuit (used by non-mining nodes)

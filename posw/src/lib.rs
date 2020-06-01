@@ -22,7 +22,7 @@ pub type Posw = GenericPosw<Bls12_377>;
 type GenericPosw<E> = consensus::Posw<Snark<E>, <E as PairingEngine>::Fr, M, HG, params::PoSWParams>;
 
 /// GM17 type alias for the PoSW circuit
-pub type Snark<E> = GM17<E, Circuit<<E as PairingEngine>::Fr>, <E as PairingEngine>::Fr>;
+pub type Snark<E> = GM17<E, Circuit<<E as PairingEngine>::Fr>, [<E as PairingEngine>::Fr]>;
 
 /// Instantiate the circuit with the CRH to Fq
 type Circuit<F> = circuit::POSWCircuit<F, M, HG, params::PoSWParams>;
