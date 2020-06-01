@@ -1,3 +1,5 @@
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
+
 use hex;
 use serde::{
     de::{Error as DeserializeError, SeqAccess, Visitor},
@@ -7,7 +9,6 @@ use serde::{
     Serialize,
     Serializer,
 };
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 use std::{
     fmt::{self, Debug, Display, Formatter},
     io::{Read, Result as IoResult, Write},

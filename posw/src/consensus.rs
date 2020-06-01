@@ -1,4 +1,5 @@
 //! Generic PoSW Miner and Verifier, compatible with any implementer of the SNARK trait.
+
 use crate::circuit::{POSWCircuit, POSWCircuitParameters};
 use snarkos_algorithms::crh::sha256d_to_u64;
 use snarkos_curves::{
@@ -41,23 +42,30 @@ pub type HG = PedersenCompressedCRHGadget<EdwardsProjective, Fq, EdwardsBlsGadge
 pub type F = Fr;
 
 #[derive(Debug, Error)]
+/// An error when generating/verifying a Proof of Succinct Work
 pub enum PoswError {
+    /// Thrown when the parameters cannot be loaded
     #[error("could not load PoSW parameters: {0}")]
     Parameters(#[from] ParametersError),
 
+    /// Thrown when a proof fails verification
     #[error("could not verify PoSW")]
     PoswVerificationFailed,
 
+    /// Thrown when there's an internal error in the underlying SNARK
     #[error(transparent)]
     SnarkError(#[from] SNARKError),
 
+    /// Thrown when there's an IO error
     #[error(transparent)]
     IoError(#[from] IoError),
 
+    /// Thrown if the mask conversion to a field element fails
     #[error(transparent)]
     ConstraintFieldError(#[from] ConstraintFieldError),
 }
 
+/// A Proof of Succinct Work miner and verifier
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Posw<S, F, M, HG, CP>
 where
@@ -68,7 +76,12 @@ where
     CP: POSWCircuitParameters,
 {
     circuit: PhantomData<POSWCircuit<F, M, HG, CP>>,
+
+    /// The (prepared) verifying key.
     pub vk: S::PreparedVerificationParameters,
+
+    /// The proving key. If not provided, the PoSW runner will work in verify-only
+    /// mode and the `mine` function will panic.
     pub pk: Option<S::ProvingParameters>,
 }
 
@@ -77,7 +90,9 @@ where
     S: SNARK<VerifierInput = [F], Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
     CP: POSWCircuitParameters,
 {
-    /// Verification only mode of the circuit (used by non-mining nodes)
+    /// Loads the PoSW runner from the locally stored parameters. If `verify_only = true`
+    /// is provided, the PoSW runner will work in verify-only mode and any calls to the `mine`
+    /// function will panic.
     pub fn load(verify_only: bool) -> Result<Self, PoswError> {
         let params = PoswVerificationParameters::load_bytes()?;
         let vk = S::VerificationParameters::read(&params[..])?;
@@ -96,8 +111,7 @@ where
         })
     }
 
-    /// Performs a trusted setup for the PoSW circuit and returns an instance of the
-    /// miner
+    /// Performs a trusted setup for the PoSW circuit and returns an instance of the runner
     pub fn setup<R: Rng>(rng: &mut R) -> Result<Self, PoswError> {
         let params = S::setup(
             POSWCircuit {
@@ -112,6 +126,7 @@ where
             },
             rng,
         )?;
+
         Ok(Self {
             pk: Some(params.0),
             vk: params.1,
@@ -119,8 +134,8 @@ where
         })
     }
 
-    /// Given the subroots of the block, it will calculate a POSW and a nonce which fit
-    /// the difficulty target. These can then be used in the block header's field.
+    /// Given the subroots of the block, it will calculate a POSW and a nonce such that they are
+    /// under the difficulty target. These can then be used in the block header's field.
     pub fn mine<R: Rng>(
         &self,
         subroots: Vec<Vec<u8>>,
@@ -129,6 +144,7 @@ where
         max_nonce: u32,
     ) -> Result<(u32, ProofOfSuccinctWork), PoswError> {
         let pk = self.pk.as_ref().expect("tried to mine without a PK set up");
+
         let mut nonce;
         let mut proof;
         loop {
@@ -143,8 +159,7 @@ where
         Ok((nonce, proof))
     }
 
-    /// Given a nonce and the thing you're grinding the nonce over, this should generate
-    /// the proof
+    /// Runs the internal SNARK `prove` function on the POSW circuit
     fn prove<R: Rng>(
         pk: &S::ProvingParameters,
         nonce: u32,
@@ -166,13 +181,9 @@ where
         Ok(ProofOfSuccinctWork(p))
     }
 
-    // hash the proof and check it against the difficulty
-    fn check_difficulty(&self, proof: &ProofOfSuccinctWork, difficulty_target: u64) -> bool {
-        let hash_result = sha256d_to_u64(&proof.0[..]);
-        hash_result <= difficulty_target
-    }
-
-    /// TODO: FIX THIS!
+    /// Verifies the Proof of Succinct Work against the nonce and pedersen merkle
+    /// root hash (produced by running a pedersen hash over the roots of the subtrees
+    /// created by the block's transaction ids)
     pub fn verify(
         &self,
         nonce: u32,
@@ -197,7 +208,8 @@ where
         Ok(())
     }
 
-    pub fn circuit_from(nonce: u32, leaves: &[Vec<u8>]) -> POSWCircuit<F, M, HG, CP> {
+    /// Creates a POSW circuit from the provided transaction ids and nonce.
+    fn circuit_from(nonce: u32, leaves: &[Vec<u8>]) -> POSWCircuit<F, M, HG, CP> {
         let (root, leaves) = pedersen_merkle_root_hash_with_leaves(leaves);
 
         // Generate the mask by committing to the nonce and the root
@@ -215,6 +227,12 @@ where
             crh_gadget_type: PhantomData,
             circuit_parameters_type: PhantomData,
         }
+    }
+
+    /// Hashes the proof and checks it against the difficulty
+    fn check_difficulty(&self, proof: &ProofOfSuccinctWork, difficulty_target: u64) -> bool {
+        let hash_result = sha256d_to_u64(&proof.0[..]);
+        hash_result <= difficulty_target
     }
 }
 
