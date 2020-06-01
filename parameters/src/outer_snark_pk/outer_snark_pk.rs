@@ -1,7 +1,9 @@
+use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_errors::parameters::ParametersError;
 use snarkos_models::parameters::Parameters;
 
 use curl::easy::Easy;
+use hex;
 use std::{
     fs::{self, File},
     io::Write,
@@ -14,7 +16,7 @@ pub const OUTER_SNARK_PK_REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-
 pub struct OuterSNARKPKParameters;
 
 impl Parameters for OuterSNARKPKParameters {
-    const CHECKSUM: &'static str = "";
+    const CHECKSUM: &'static str = include_str!("./outer_snark_pk.checksum");
     const SIZE: u64 = 1806227470;
 
     /// Loads the outer snark proving key bytes by first attempting to lazily load
@@ -36,12 +38,12 @@ impl Parameters for OuterSNARKPKParameters {
         let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         absolute_path.push(&relative_path);
 
-        if relative_path.exists() {
+        let buffer = if relative_path.exists() {
             // Attempts to load the parameter file locally with a relative path.
-            Ok(fs::read(relative_path)?.to_vec())
+            fs::read(relative_path)?.to_vec()
         } else if absolute_path.exists() {
             // Attempts to load the parameter file locally with an absolute path.
-            Ok(fs::read(absolute_path)?.to_vec())
+            fs::read(absolute_path)?.to_vec()
         } else {
             // Downloads the missing parameters and stores it in the local directory for use.
             eprintln!(
@@ -50,15 +52,21 @@ impl Parameters for OuterSNARKPKParameters {
             );
             let output = Self::load_remote()?;
             match Self::store_bytes(&output, &relative_path, &absolute_path, &file_path) {
-                Ok(()) => Ok(output),
+                Ok(()) => output,
                 Err(_) => {
                     eprintln!(
                         "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\n",
                         OUTER_SNARK_PK_FILENAME, file_path
                     );
-                    Ok(output)
+                    output
                 }
             }
+        };
+
+        let checksum = hex::encode(sha256(&buffer));
+        match Self::CHECKSUM == checksum {
+            true => Ok(buffer),
+            false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
         }
     }
 }

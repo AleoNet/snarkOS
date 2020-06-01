@@ -1,6 +1,6 @@
-# This script will run the parameter setup programs in the `examples` folder and move the resulting `.params` files
-# to their respective folders under the `src` directory.
-# If the parameter size or checksum has changed, you will need to manually update these in each corresponding struct.
+# This script will run the parameter setup programs in the `examples` folder and move the resulting `.params`
+# and `.checksum` files to their respective folders under the `src` directory.
+# If the parameter size has changed, you will need to manually update these in each corresponding struct.
 
 cargo run --release --example account_commitment
 cargo run --release --example account_signature

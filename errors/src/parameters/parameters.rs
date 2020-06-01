@@ -2,6 +2,9 @@ use std::fmt::Debug;
 
 #[derive(Debug, Error)]
 pub enum ParametersError {
+    #[error("expected checksum of {}, found checksum of {}", _0, _1)]
+    ChecksumMismatch(String, String),
+
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
