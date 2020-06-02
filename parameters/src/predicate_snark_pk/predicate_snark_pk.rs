@@ -5,7 +5,7 @@ pub struct PredicateSNARKPKParameters;
 
 impl Parameters for PredicateSNARKPKParameters {
     const CHECKSUM: &'static str = "";
-    const SIZE: u64 = 8806582;
+    const SIZE: u64 = 348514;
 
     fn load_bytes() -> Result<Vec<u8>, ParametersError> {
         let buffer = include_bytes!("./predicate_snark_pk.params");
