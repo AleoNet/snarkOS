@@ -358,7 +358,7 @@ impl<E: PairingEngine> Parameters<E> {
 
 /// Preprocessed verification key parameters that enable faster verification
 /// at the expense of larger size in memory.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub vk: VerifyingKey<E>,
     pub g_alpha: E::G1Affine,
