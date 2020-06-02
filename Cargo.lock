@@ -2202,7 +2202,6 @@ version = "0.8.0"
 dependencies = [
  "curl",
  "hex",
- "once_cell",
  "rand",
  "snarkos-algorithms",
  "snarkos-dpc",

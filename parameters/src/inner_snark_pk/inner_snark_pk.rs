@@ -11,7 +11,7 @@ use std::{
 };
 
 pub const INNER_SNARK_PK_FILENAME: &str = "inner_snark_pk.params";
-pub const INNER_SNARK_PK_REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com/inner_snark_pk.params";
+pub const INNER_SNARK_PK_REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com";
 
 pub struct InnerSNARKPKParameters;
 
@@ -75,9 +75,20 @@ impl InnerSNARKPKParameters {
     pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
         println!("{} - Downloading parameters...", module_path!());
         let mut buffer = vec![];
-        Self::remote_fetch(&mut buffer)?;
+        let url = format!(
+            "{}/inner_snark_pk-{}.params",
+            INNER_SNARK_PK_REMOTE_URL,
+            Self::CHECKSUM.get(0..7).unwrap_or_default()
+        );
+        Self::remote_fetch(&mut buffer, &url)?;
         println!("\n{} - Download complete", module_path!());
-        Ok(buffer)
+
+        // Verify the checksum of the remote data before returning
+        let checksum = hex::encode(sha256(&buffer));
+        match Self::CHECKSUM == checksum {
+            true => Ok(buffer),
+            false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
+        }
     }
 
     fn store_bytes(
@@ -98,9 +109,9 @@ impl InnerSNARKPKParameters {
         Ok(())
     }
 
-    fn remote_fetch(buffer: &mut Vec<u8>) -> Result<(), ParametersError> {
+    fn remote_fetch(buffer: &mut Vec<u8>, url: &str) -> Result<(), ParametersError> {
         let mut easy = Easy::new();
-        easy.url(INNER_SNARK_PK_REMOTE_URL)?;
+        easy.url(url)?;
         easy.progress(true)?;
         easy.progress_function(|total_download, current_download, _, _| {
             let percent = (current_download / total_download) * 100.0;
