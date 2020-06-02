@@ -39,3 +39,6 @@ pub use self::serial_number_nonce_crh::*;
 
 pub mod value_commitment;
 pub use self::value_commitment::*;
+
+pub mod posw;
+pub use posw::*;
