@@ -2,9 +2,8 @@ use crate::message::{
     types::{GetBlock, GetSync},
     Channel,
 };
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_errors::network::SendError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_storage::Ledger;
 

@@ -12,7 +12,7 @@ use snarkos_models::{
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PedersenCRHParametersGadget<G: Group, S: PedersenSize, F: Field, GG: GroupGadget<G, F>> {
     parameters: PedersenCRHParameters<G, S>,
     _group: PhantomData<GG>,
@@ -53,6 +53,7 @@ impl<G: Group, S: PedersenSize, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ped
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PedersenCRHGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     _group: PhantomData<*const G>,
     _group_gadget: PhantomData<*const GG>,
@@ -131,6 +132,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
     _group: PhantomData<*const G>,
     _group_gadget: PhantomData<*const GG>,

@@ -248,9 +248,9 @@ dependencies = [
 
 [[package]]
 name = "ci_info"
-version = "0.9.2"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9c4ad4399f16ccee06f6a62acad539f42de4a80fa21cbe994df1bbb51bee3b9"
+checksum = "a19c5f9baeac8a1176ca7fc58a0cc1abadd84d360365a93d1dd31e926f3f502b"
 dependencies = [
  "envmnt",
 ]
@@ -1329,9 +1329,9 @@ dependencies = [
 
 [[package]]
 name = "nias"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f76f01f5c032698d0e4d61dd761213ebfaeb11bb22d558811dd740bf75046376"
+checksum = "ab250442c86f1850815b5d268639dff018c0627022bc1940eb2d642ca1ce12f0"
 
 [[package]]
 name = "nom"
@@ -1765,9 +1765,9 @@ dependencies = [
 
 [[package]]
 name = "rusty-hook"
-version = "0.10.3"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ed2351ba8488923fc94abe445d2f9c667d531a29c8c20dd822670644ad99e19"
+checksum = "27138b73a8ce63ae918707a5e3b57f9b0c0842a57b82f0e43474cf4e3aaf0ff4"
 dependencies = [
  "ci_info",
  "getopts",
@@ -1846,18 +1846,18 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.110"
+version = "1.0.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99e7b308464d16b56eba9964e4972a3eee817760ab60d88c3f86e1fecb08204c"
+checksum = "c9124df5b40cbd380080b2cc6ab894c040a3070d995f5c9dc77e18c34a8ae37d"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.110"
+version = "1.0.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "818fbf6bfa9a42d3bfcaca148547aa00c7b915bec71d1757aa2d44ca68771984"
+checksum = "3f2c3ac8e6ca1e9c80b8be1023940162bf81ae3cffbb1809474152f2ce1eb250"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1974,6 +1974,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-network",
  "snarkos-objects",
+ "snarkos-posw",
  "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
@@ -2204,9 +2205,11 @@ dependencies = [
  "hex",
  "rand",
  "snarkos-algorithms",
+ "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-posw",
  "snarkos-utilities",
 ]
 
@@ -2224,8 +2227,10 @@ dependencies = [
  "snarkos-gadgets",
  "snarkos-models",
  "snarkos-objects",
+ "snarkos-parameters",
  "snarkos-profiler",
  "snarkos-utilities",
+ "thiserror",
 ]
 
 [[package]]

@@ -20,6 +20,7 @@ use std::marker::PhantomData;
 
 /// Note: V should serialize its contents to `Vec<E::Fr>` in the same order as
 /// during the constraint generation.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GM17<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::Fr> + ?Sized> {
     _engine: PhantomData<E>,
     _circuit: PhantomData<C>,

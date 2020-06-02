@@ -1,8 +1,9 @@
 use crate::*;
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerkleTree};
+use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_errors::storage::StorageError;
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
+    algorithms::MerkleParameters,
     genesis::Genesis,
     objects::{LedgerScheme, Transaction},
     parameters::Parameters,

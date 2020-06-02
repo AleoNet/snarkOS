@@ -22,6 +22,7 @@ use crate::{
 };
 use snarkos_models::curves::{PairingCurve, PairingEngine};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bls12_377Parameters;
 
 impl Bls12Parameters for Bls12_377Parameters {

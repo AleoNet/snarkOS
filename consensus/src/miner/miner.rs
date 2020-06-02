@@ -1,9 +1,8 @@
 use crate::{miner::MemoryPool, ConsensusParameters};
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
-    algorithms::CRH,
+    algorithms::{MerkleParameters, CRH},
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };

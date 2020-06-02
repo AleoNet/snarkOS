@@ -47,6 +47,7 @@ snarkos-dpc = { path = "./dpc", version = "0.8.0" }
 snarkos-errors = { path = "./errors", version = "0.8.0" }
 snarkos-network = { path = "network", version = "0.8.0" }
 snarkos-objects = { path = "objects", version = "0.8.0" }
+snarkos-posw = { path = "./posw", version = "0.8.0" }
 snarkos-rpc = { path = "./rpc", version = "0.8.0" }
 snarkos-storage = { path = "storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
@@ -60,7 +61,7 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.13", features = ["full"] }
 
 [dev-dependencies]
-rusty-hook = { version = "0.10.3" }
+rusty-hook = { version = "0.11.1" }
 
 [profile.release]
 opt-level = 3

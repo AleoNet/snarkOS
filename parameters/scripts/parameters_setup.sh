@@ -35,9 +35,13 @@ mv serial_number_nonce_crh.checksum ../src/serial_number_nonce_crh
 mv value_commitment.params ../src/value_commitment
 mv value_commitment.checksum ../src/value_commitment
 
+cargo run --release --example posw
 cargo run --release --example inner_snark
 cargo run --release --example outer_snark
 cargo run --release --example predicate_snark
+
+mv posw_pk.params ../src/posw
+mv posw_vk.params ../src/posw
 
 mv inner_snark_pk.params ../src/inner_snark_pk
 mv inner_snark_pk.checksum ../src/inner_snark_pk

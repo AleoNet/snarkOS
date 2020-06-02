@@ -50,6 +50,7 @@ fn eval<E: PairingEngine>(
     acc
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProvingAssignment<E: PairingEngine> {
     // Constraints
     pub(crate) at: Vec<CoeffVec<(E::Fr, Index)>>,

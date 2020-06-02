@@ -20,7 +20,10 @@ curl = { version = "0.4.29" }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-dpc = { path = "../dpc", version = "0.8.0" }
+snarkos-posw = { path = "../posw", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 rand = { version = "0.7" }
