@@ -111,7 +111,7 @@ mod tests {
             transactions: DPCTransactions::new(),
         };
 
-        blockchain.insert_block(&block).unwrap();
+        blockchain.insert_and_commit(&block).unwrap();
         assert_eq!(blockchain.get_latest_block_height(), 1);
 
         // removing it decrements the chain's height
@@ -179,7 +179,7 @@ mod tests {
 
             let latest_block = blockchain.get_latest_block().unwrap();
 
-            assert!(blockchain.insert_block(&latest_block).is_err());
+            assert!(blockchain.insert_and_commit(&latest_block).is_err());
 
             kill_storage_sync(blockchain);
         }
