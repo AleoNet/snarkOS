@@ -15,7 +15,7 @@ pub struct OuterSNARKPKParameters;
 
 impl Parameters for OuterSNARKPKParameters {
     const CHECKSUM: &'static str = "";
-    const SIZE: u64 = 1806227470;
+    const SIZE: u64 = 1475371646;
 
     /// Loads the outer snark proving key bytes by first attempting to lazily load
     /// from `include_bytes`. If the parameters were not found during compilation

@@ -15,7 +15,7 @@ pub struct InnerSNARKPKParameters;
 
 impl Parameters for InnerSNARKPKParameters {
     const CHECKSUM: &'static str = "";
-    const SIZE: u64 = 517337602;
+    const SIZE: u64 = 518212674;
 
     /// Loads the inner snark proving key bytes by first attempting to lazily load
     /// from `include_bytes`. If the parameters were not found during compilation
