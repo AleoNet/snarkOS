@@ -229,6 +229,11 @@ where
             || Ok(circuit_parameters.account_commitment.parameters()),
         )?;
 
+        let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare account signature parameters"),
+            || Ok(circuit_parameters.account_signature.parameters()),
+        )?;
+
         let record_commitment_parameters = RecordCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record commitment parameters"),
             || Ok(circuit_parameters.record_commitment.parameters()),
@@ -250,12 +255,6 @@ where
         let serial_number_nonce_crh_parameters = SerialNumberNonceCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare serial number nonce CRH parameters"),
             || Ok(circuit_parameters.serial_number_nonce.parameters()),
-        )?;
-
-        // TODO (raychu86): Reorder parameter allocation
-        let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare account signature parameters"),
-            || Ok(circuit_parameters.account_signature.parameters()),
         )?;
 
         let value_commitment_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
