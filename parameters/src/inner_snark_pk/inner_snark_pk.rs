@@ -10,7 +10,6 @@ use std::{
     path::PathBuf,
 };
 
-pub const INNER_SNARK_PK_FILENAME: &str = "inner_snark_pk.params";
 pub const INNER_SNARK_PK_REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com";
 
 pub struct InnerSNARKPKParameters;
@@ -19,17 +18,17 @@ impl Parameters for InnerSNARKPKParameters {
     const CHECKSUM: &'static str = include_str!("./inner_snark_pk.checksum");
     const SIZE: u64 = 517337602;
 
-    /// Loads the inner snark proving key bytes by first attempting to lazily load
-    /// from `include_bytes`. If the parameters were not found during compilation
-    /// (either because the file was missing or the directory path was incorrect),
-    /// the method will attempt to locate the file with a relative path. Finally,
+    /// Loads the inner snark proving key bytes. The method will attempt to locate
+    /// the file with a relative path. If it cannot find the path relatively, the
+    /// method will attempt to locate the file with an absolute path. Finally,
     /// if it cannot find the path locally, the method will proceed to download
     /// the parameters file remotely and attempt to store it locally.
     fn load_bytes() -> Result<Vec<u8>, ParametersError> {
         // Compose the correct file path for the parameter file.
+        let filename = Self::versioned_filename();
         let mut file_path = PathBuf::from(file!());
         file_path.pop();
-        file_path.push(INNER_SNARK_PK_FILENAME);
+        file_path.push(&filename);
 
         // Compute the relative path.
         let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
@@ -48,7 +47,7 @@ impl Parameters for InnerSNARKPKParameters {
             // Downloads the missing parameters and stores it in the local directory for use.
             eprintln!(
                 "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
-                INNER_SNARK_PK_FILENAME, INNER_SNARK_PK_FILENAME, file_path
+                filename, filename, file_path
             );
             let output = Self::load_remote()?;
             match Self::store_bytes(&output, &relative_path, &absolute_path, &file_path) {
@@ -56,7 +55,7 @@ impl Parameters for InnerSNARKPKParameters {
                 Err(_) => {
                     eprintln!(
                         "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\n",
-                        INNER_SNARK_PK_FILENAME, file_path
+                        filename, file_path
                     );
                     output
                 }
@@ -75,11 +74,7 @@ impl InnerSNARKPKParameters {
     pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
         println!("{} - Downloading parameters...", module_path!());
         let mut buffer = vec![];
-        let url = format!(
-            "{}/inner_snark_pk-{}.params",
-            INNER_SNARK_PK_REMOTE_URL,
-            Self::CHECKSUM.get(0..7).unwrap_or_default()
-        );
+        let url = Self::remote_url();
         Self::remote_fetch(&mut buffer, &url)?;
         println!("\n{} - Download complete", module_path!());
 
@@ -89,6 +84,17 @@ impl InnerSNARKPKParameters {
             true => Ok(buffer),
             false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
         }
+    }
+
+    fn versioned_filename() -> String {
+        match Self::CHECKSUM.get(0..7) {
+            Some(sum) => format!("inner_snark_pk-{}.params", sum),
+            _ => format!("inner_snark_pk.params"),
+        }
+    }
+
+    fn remote_url() -> String {
+        format!("{}/{}", INNER_SNARK_PK_REMOTE_URL, Self::versioned_filename())
     }
 
     fn store_bytes(
