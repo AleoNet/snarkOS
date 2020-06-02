@@ -221,6 +221,7 @@ impl ConsensusParameters {
         Ok(())
     }
 
+    /// Receive a block from an external source and process it based on ledger state
     pub fn receive_block(
         &self,
         parameters: &PublicParameters<Components>,
@@ -240,6 +241,7 @@ impl ConsensusParameters {
         Ok(())
     }
 
+    /// Generate a coinbase transaction given candidate block transactions
     pub fn create_coinbase_transaction<R: Rng>(
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
@@ -323,6 +325,7 @@ impl ConsensusParameters {
         )
     }
 
+    /// Generate a transaction by spending old records and specifying new record attributes
     pub fn create_transaction<R: Rng>(
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
