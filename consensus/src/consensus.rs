@@ -208,13 +208,17 @@ impl ConsensusParameters {
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
+        if storage.is_canon(&block.header.get_hash()) {
+            return Ok(());
+        }
+
         // 1. verify that the block valid
         if !self.verify_block(parameters, block, storage)? {
             return Err(ConsensusError::InvalidBlock(block.header.get_hash().0.to_vec()));
         }
 
         // 2. Insert/canonize block
-        storage.insert_and_commit(&block)?;
+        storage.insert_and_commit(block)?;
 
         // 3. Remove transactions from the mempool
         for transaction_id in block.transactions.to_transaction_ids()? {

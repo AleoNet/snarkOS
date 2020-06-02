@@ -93,14 +93,15 @@ impl FromBytes for TestData {
 }
 
 fn load_test_data() -> TestData {
-    // if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
-    //     test_data
-    // } else {
-    setup_and_store_test_data()
-    // }
+    if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
+        test_data
+    } else {
+        setup_and_store_test_data()
+    }
 }
 
 fn setup_and_store_test_data() -> TestData {
+    println!("generating new");
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
