@@ -1,6 +1,7 @@
-use snarkos_algorithms::{crh::sha256::sha256, merkle_tree::MerkleParameters};
+use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_dpc::base_dpc::{instantiated::Components, BaseDPCComponents};
 use snarkos_errors::algorithms::MerkleError;
+use snarkos_models::algorithms::MerkleParameters;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use hex;

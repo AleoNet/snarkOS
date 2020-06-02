@@ -1,6 +1,6 @@
-use crate::merkle_tree::{MerkleParameters, MerklePath};
+use crate::merkle_tree::MerklePath;
 use snarkos_errors::algorithms::MerkleError;
-use snarkos_models::algorithms::CRH;
+use snarkos_models::algorithms::{MerkleParameters, CRH};
 use snarkos_utilities::bytes::ToBytes;
 
 pub struct MerkleTree<P: MerkleParameters> {

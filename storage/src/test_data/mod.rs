@@ -1,7 +1,9 @@
 use crate::Ledger;
 
-use snarkos_algorithms::merkle_tree::MerkleParameters;
-use snarkos_models::objects::{LedgerScheme, Transaction};
+use snarkos_models::{
+    algorithms::MerkleParameters,
+    objects::{LedgerScheme, Transaction},
+};
 use snarkos_objects::Block;
 
 use rand::{thread_rng, Rng};
