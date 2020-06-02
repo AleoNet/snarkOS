@@ -1,4 +1,4 @@
-use snarkos_algorithms::{crh::sha256::sha256, merkle_tree::MerkleParameters};
+use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
