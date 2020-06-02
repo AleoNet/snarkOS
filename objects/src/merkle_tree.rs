@@ -3,12 +3,7 @@ use snarkos_algorithms::crh::double_sha256;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MerkleTreeRootHash([u8; 32]);
 
-/// Calculates the root of the Merkle tree
-pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
-    if hashes.len() == 1 {
-        return hashes[0].clone();
-    }
-
+fn merkle_round(hashes: &[Vec<u8>]) -> Vec<Vec<u8>> {
     let mut pairs = vec![];
 
     for i in (0..hashes.len() - 1).step_by(2) {
@@ -22,6 +17,47 @@ pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
     }
 
     let result: Vec<Vec<u8>> = pairs.iter().map(|x| merkle_hash(x.0, x.1)).collect();
+
+    result
+}
+
+/// Calculates a Merkle root and also returns the subroots at a desired depth. If the tree is too
+/// shallow to have subroots at that depth, returns the root as a single subroot.
+pub fn merkle_root_with_subroots(hashes: &[Vec<u8>], subroots_depth: usize) -> (Vec<u8>, Vec<Vec<u8>>) {
+    merkle_root_with_subroots_inner(hashes, &[], subroots_depth)
+}
+
+fn merkle_root_with_subroots_inner(
+    hashes: &[Vec<u8>],
+    subroots: &[Vec<u8>],
+    subroots_depth: usize,
+) -> (Vec<u8>, Vec<Vec<u8>>) {
+    if hashes.len() == 1 {
+        // Tree was too shallow.
+        let root = hashes[0].clone();
+        let subroots = if subroots.len() == 0 {
+            vec![root.clone()]
+        } else {
+            subroots.to_vec()
+        };
+        return (root, subroots);
+    }
+
+    let result = merkle_round(hashes);
+    if result.len() == 1 << subroots_depth {
+        merkle_root_with_subroots_inner(&result, &result, subroots_depth)
+    } else {
+        merkle_root_with_subroots_inner(&result, subroots, subroots_depth)
+    }
+}
+
+/// Calculates the root of the Merkle tree
+pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
+    if hashes.len() == 1 {
+        return hashes[0].clone();
+    }
+
+    let result = merkle_round(hashes);
 
     merkle_root(&result)
 }
