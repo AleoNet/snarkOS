@@ -52,8 +52,10 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_randomness: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
-    input_value_commitments: &[[u8; 32]],
-    output_value_commitments: &[[u8; 32]],
+    input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
+    output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
@@ -61,13 +63,13 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C,
         CS,
         C::AccountCommitment,
-        C::AccountSignatureGadget,
+        C::AccountSignature,
         C::RecordCommitment,
         C::LocalDataCommitment,
         C::SerialNumberNonceCRH,
-        C::AccountSignature,
         C::PRF,
         C::AccountCommitmentGadget,
+        C::AccountSignatureGadget,
         C::RecordCommitmentGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceCRHGadget,
@@ -96,7 +98,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         memo,
         auxiliary,
         input_value_commitments,
+        input_value_commitment_randomness,
         output_value_commitments,
+        output_value_commitment_randomness,
         value_balance,
         binding_signature,
     )
@@ -106,13 +110,13 @@ fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
     AccountCommitment,
-    AccountSignatureGadget,
+    AccountSignature,
     RecordCommitment,
     LocalDataCommitment,
     SerialNumberNonceCRH,
-    Signature,
     P,
     AccountCommitmentGadget,
+    AccountSignatureGadget,
     RecordCommitmentGadget,
     LocalDataCommitmentGadget,
     SerialNumberNonceCRHGadget,
@@ -131,7 +135,7 @@ fn base_dpc_execute_gadget_helper<
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
     old_account_private_keys: &[AccountPrivateKey<C>],
-    old_serial_numbers: &[Signature::PublicKey],
+    old_serial_numbers: &[AccountSignature::PublicKey],
 
     //
     new_records: &[DPCRecord<C>],
@@ -145,35 +149,37 @@ fn base_dpc_execute_gadget_helper<
     local_data_rand: &LocalDataCommitment::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
-    input_value_commitments: &[[u8; 32]],
-    output_value_commitments: &[[u8; 32]],
+    input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
+    output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
     C: BaseDPCComponents<
         AccountCommitment = AccountCommitment,
-        AccountSignatureGadget = AccountSignatureGadget,
+        AccountSignature = AccountSignature,
         RecordCommitment = RecordCommitment,
         LocalDataCommitment = LocalDataCommitment,
         SerialNumberNonceCRH = SerialNumberNonceCRH,
-        AccountSignature = Signature,
         PRF = P,
         AccountCommitmentGadget = AccountCommitmentGadget,
+        AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitmentGadget = RecordCommitmentGadget,
         LocalDataCommitmentGadget = LocalDataCommitmentGadget,
         SerialNumberNonceCRHGadget = SerialNumberNonceCRHGadget,
         PRFGadget = PGadget,
     >,
     AccountCommitment: CommitmentScheme,
-    AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Signature, C::InnerField>,
+    AccountSignature: SignatureScheme,
     RecordCommitment: CommitmentScheme,
     LocalDataCommitment: CommitmentScheme,
     SerialNumberNonceCRH: CRH,
-    Signature: SignatureScheme,
     P: PRF,
     RecordCommitment::Output: Eq,
     AccountCommitmentGadget: CommitmentGadget<AccountCommitment, C::InnerField>,
+    AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<AccountSignature, C::InnerField>,
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
     LocalDataCommitmentGadget: CommitmentGadget<LocalDataCommitment, C::InnerField>,
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
@@ -257,14 +263,11 @@ where
             || Ok(circuit_parameters.serial_number_nonce.parameters()),
         )?;
 
-        let value_commitment_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
-            _,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare value commitment parameters"),
-            || Ok(circuit_parameters.value_commitment.parameters()),
-        )?;
+        let value_commitment_parameters =
+            <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare value commitment parameters"),
+                || Ok(circuit_parameters.value_commitment.parameters()),
+            )?;
 
         let ledger_parameters = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare ledger parameters"),
@@ -481,7 +484,42 @@ where
         };
         // ********************************************************************
 
+        // ********************************************************************
+        // Check that the value commitment is correct
+        // ********************************************************************
+        {
+            let vc_cs = &mut cs.ns(|| "Check that the value commitment is correct");
+
+            let value_commitment_randomness_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+                    vc_cs.ns(|| "Allocate value commitment randomness"),
+                    || Ok(&input_value_commitment_randomness[i]),
+                )?;
+
+            let declared_value_commitment_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc(
+                    vc_cs.ns(|| "Allocate declared value commitment"),
+                    || Ok(&input_value_commitments[i]),
+                )?;
+
+            let computed_value_commitment_gadget = C::ValueCommitmentGadget::check_commitment_gadget(
+                vc_cs.ns(|| "Generate value commitment"),
+                &value_commitment_parameters,
+                &given_value,
+                &value_commitment_randomness_gadget,
+            )?;
+
+            // Check that the value commitments are equivalent
+            computed_value_commitment_gadget.enforce_equal(
+                &mut vc_cs.ns(|| "Check that declared and computed value commitments are equal"),
+                &declared_value_commitment_gadget,
+            )?;
+        };
+        // ********************************************************************
+
+        // *******************************************************************
         // Check that the record is well-formed.
+        // *******************************************************************
         {
             let commitment_cs = &mut cs.ns(|| "Check that record is well-formed");
 
@@ -519,7 +557,6 @@ where
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
-        let j = j as u8;
 
         let (
             given_account_public_key,
@@ -596,6 +633,7 @@ where
                 serial_number_nonce,
             )
         };
+        // ********************************************************************
 
         // *******************************************************************
         // Check that the serial number nonce is computed correctly.
@@ -603,7 +641,7 @@ where
         {
             let sn_cs = &mut cs.ns(|| "Check that serial number nonce is computed correctly");
 
-            let current_record_number = UInt8::constant(j);
+            let current_record_number = UInt8::constant(j as u8);
             let mut current_record_number_bytes_le = vec![current_record_number];
 
             let serial_number_nonce_randomness = UInt8::alloc_vec(
@@ -625,6 +663,39 @@ where
                 &serial_number_nonce,
             )?;
         }
+        // ********************************************************************
+
+        // ********************************************************************
+        // Check that the value commitment is correct
+        // ********************************************************************
+        {
+            let vc_cs = &mut cs.ns(|| "Check that the value commitment is correct");
+
+            let value_commitment_randomness_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+                    vc_cs.ns(|| "Allocate value commitment randomness"),
+                    || Ok(&output_value_commitment_randomness[j]),
+                )?;
+
+            let declared_value_commitment_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc(
+                    vc_cs.ns(|| "Allocate declared value commitment"),
+                    || Ok(&output_value_commitments[j]),
+                )?;
+
+            let computed_value_commitment_gadget = C::ValueCommitmentGadget::check_commitment_gadget(
+                vc_cs.ns(|| "Generate value commitment"),
+                &value_commitment_parameters,
+                &given_value,
+                &value_commitment_randomness_gadget,
+            )?;
+
+            // Check that the value commitments are equivalent
+            computed_value_commitment_gadget.enforce_equal(
+                &mut vc_cs.ns(|| "Check that declared and computed value commitments are equal"),
+                &declared_value_commitment_gadget,
+            )?;
+        };
         // *******************************************************************
 
         // *******************************************************************
@@ -779,6 +850,15 @@ where
             )
             .unwrap();
 
+        let binding_signature_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
+            _,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::ParametersGadget::alloc(
+            &mut cs.ns(|| "Declare value commitment parameters as binding signature parameters"),
+            || Ok(circuit_parameters.value_commitment.parameters()),
+        )?;
+
         let c_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
             C::InnerField,
@@ -819,7 +899,7 @@ where
             C::BindingSignatureGroup,
         >>::check_value_balance_commitment_gadget(
             &mut cs.ns(|| "value_balance_commitment"),
-            &value_commitment_parameters,
+            &binding_signature_parameters,
             &value_balance_bytes,
         )?;
 
