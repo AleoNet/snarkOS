@@ -27,6 +27,7 @@ use snarkos_objects::{
     BlockHeaderHash,
     MerkleRootHash,
 };
+use snarkos_storage::BlockPath;
 use snarkos_utilities::rand::UniformRand;
 
 use chrono::Utc;
@@ -213,7 +214,7 @@ impl ConsensusParameters {
         }
 
         // 2. Insert/canonize block
-        storage.insert_block(block)?;
+        storage.insert_and_commit(&block)?;
 
         // 3. Remove transactions from the mempool
         for transaction_id in block.transactions.to_transaction_ids()? {
@@ -235,8 +236,46 @@ impl ConsensusParameters {
             return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
         }
 
-        if !storage.block_hash_exists(&block.header.get_hash()) {
-            self.process_block(parameters, &storage, memory_pool, &block)?;
+        // Block is an unknown orphan
+        if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
+            if Self::is_genesis(&block.header) && storage.is_empty() {
+                self.process_block(parameters, &storage, memory_pool, &block)?;
+            } else {
+                storage.insert_only(block)?;
+            }
+        } else {
+            // Find the origin of the block
+            match storage.get_block_path(&block.header)? {
+                BlockPath::ExistingBlock => {}
+                BlockPath::CanonChain(_) => {
+                    self.process_block(parameters, &storage, memory_pool, block)?;
+
+                    let (_, child_path) = storage.longest_child_path(block.header.get_hash())?;
+                    for child_block_hash in child_path {
+                        let new_block = storage.get_block(&child_block_hash)?;
+                        self.process_block(parameters, &storage, memory_pool, &new_block)?;
+                    }
+                }
+                BlockPath::SideChain(side_chain_path) => {
+                    if side_chain_path.new_block_number > storage.get_latest_block_height() {
+                        // Fork to superior chain
+                        storage.revert_for_fork(&side_chain_path)?;
+
+                        if !side_chain_path.path.is_empty() {
+                            for block_hash in side_chain_path.path {
+                                if block_hash == block.header.get_hash() {
+                                    self.process_block(parameters, &storage, memory_pool, &block)?
+                                } else {
+                                    let new_block = storage.get_block(&block_hash)?;
+                                    self.process_block(parameters, &storage, memory_pool, &new_block)?;
+                                }
+                            }
+                        }
+                    } else {
+                        storage.insert_only(block)?;
+                    }
+                }
+            };
         }
 
         Ok(())

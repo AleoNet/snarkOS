@@ -370,7 +370,7 @@ mod tests {
 
         let block = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
 
-        blockchain.insert_block(&block).unwrap();
+        blockchain.insert_and_commit(&block).unwrap();
 
         mem_pool.cleanse(&blockchain).unwrap();
 
