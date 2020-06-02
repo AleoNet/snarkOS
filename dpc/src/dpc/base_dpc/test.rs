@@ -10,10 +10,10 @@ use crate::dpc::base_dpc::{
     ExecuteContext,
     DPC,
 };
-use snarkos_algorithms::{merkle_tree::MerkleParameters, snark::PreparedVerifyingKey};
+use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
+    algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},

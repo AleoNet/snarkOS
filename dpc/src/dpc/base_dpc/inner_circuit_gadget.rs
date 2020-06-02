@@ -4,11 +4,11 @@ use crate::dpc::base_dpc::{
     record::DPCRecord,
     BaseDPCComponents,
 };
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF},
     dpc::Record,
     gadgets::{
         algorithms::{

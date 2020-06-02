@@ -1,6 +1,3 @@
-pub mod merkle_parameters;
-pub use self::merkle_parameters::*;
-
 pub mod merkle_path;
 pub use self::merkle_path::*;
 
@@ -26,8 +23,8 @@ pub fn prng() -> impl Rng {
 /// Defines a Merkle Tree using the provided hash and height.
 macro_rules! define_merkle_tree_parameters {
     ($struct_name:ident, $hash:ty, $height:expr) => {
-        use snarkos_models::algorithms::crh::CRH;
-        use $crate::merkle_tree::{MerkleParameters, MerkleTree};
+        use snarkos_models::algorithms::{MerkleParameters, CRH};
+        use $crate::merkle_tree::MerkleTree;
 
         use rand::Rng;
 

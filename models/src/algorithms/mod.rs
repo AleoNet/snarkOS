@@ -4,6 +4,9 @@ pub use self::commitment::*;
 pub mod crh;
 pub use self::crh::*;
 
+pub mod merkle_parameters;
+pub use self::merkle_parameters::*;
+
 pub mod prf;
 pub use self::prf::*;
 

@@ -1,7 +1,10 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
-use snarkos_models::objects::{LedgerScheme, Transaction};
+use snarkos_models::{
+    algorithms::MerkleParameters,
+    objects::{LedgerScheme, Transaction},
+};
 use snarkos_objects::Block;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},

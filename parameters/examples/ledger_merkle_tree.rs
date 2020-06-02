@@ -1,6 +1,6 @@
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::base_dpc::{instantiated::Components, BaseDPCComponents};
 use snarkos_errors::algorithms::MerkleError;
+use snarkos_models::algorithms::MerkleParameters;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;
