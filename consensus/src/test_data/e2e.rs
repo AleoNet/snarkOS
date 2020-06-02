@@ -3,7 +3,7 @@ use crate::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
-use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::PaymentRecordPayload};
+use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::RecordPayload};
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
     dpc::{DPCScheme, Record},
@@ -193,7 +193,7 @@ fn send<R: Rng>(
 ) -> (Vec<DPCRecord<Components>>, Tx) {
     let mut sum = 0;
     for inp in &inputs {
-        sum += inp.payload().balance;
+        sum += inp.value();
     }
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
@@ -202,17 +202,9 @@ fn send<R: Rng>(
     let out_predicates = vec![FIXTURE.predicate.clone(); NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.public_key.clone()];
-    let output = vec![
-        PaymentRecordPayload {
-            balance: amount,
-            lock: 0,
-        },
-        PaymentRecordPayload {
-            balance: change,
-            lock: 0,
-        },
-    ];
-    let dummy_flags = vec![false, false];
+    let values = vec![amount, change];
+    let output = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
+    let dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
 
     let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
     ConsensusParameters::create_transaction(
@@ -223,6 +215,7 @@ fn send<R: Rng>(
         in_predicates,
         out_predicates,
         dummy_flags,
+        values,
         output,
         [0u8; 32], // TODO: Should we set these to anything?
         [0u8; 32],
