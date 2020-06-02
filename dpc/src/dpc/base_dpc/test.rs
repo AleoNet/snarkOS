@@ -200,9 +200,6 @@ fn test_execute_base_dpc_constraints() {
     let mut old_value_commit_randomness = vec![];
 
     for old_record in old_records {
-        let mut commitment = [0u8; 32];
-        let mut randomness = [0u8; 32];
-
         // If the record is a dummy, then the value should be 0
         let input_value = match old_record.is_dummy() {
             true => 0,
@@ -219,11 +216,8 @@ fn test_execute_base_dpc_constraints() {
             .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
             .unwrap();
 
-        value_commitment.write(&mut commitment[..]).unwrap();
-        value_commitment_randomness.write(&mut randomness[..]).unwrap();
-
-        old_value_commits.push(commitment);
-        old_value_commit_randomness.push(randomness);
+        old_value_commits.push(value_commitment);
+        old_value_commit_randomness.push(value_commitment_randomness);
     }
 
     // Generate value commitments for output records
@@ -232,9 +226,6 @@ fn test_execute_base_dpc_constraints() {
     let mut new_value_commit_randomness = vec![];
 
     for new_record in &new_records {
-        let mut commitment = [0u8; 32];
-        let mut randomness = [0u8; 32];
-
         // If the record is a dummy, then the value should be 0
         let output_value = match new_record.is_dummy() {
             true => 0,
@@ -251,11 +242,8 @@ fn test_execute_base_dpc_constraints() {
             .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
             .unwrap();
 
-        value_commitment.write(&mut commitment[..]).unwrap();
-        value_commitment_randomness.write(&mut randomness[..]).unwrap();
-
-        new_value_commits.push(commitment);
-        new_value_commit_randomness.push(randomness);
+        new_value_commits.push(value_commitment);
+        new_value_commit_randomness.push(value_commitment_randomness);
     }
 
     let sighash = to_bytes![local_data_comm].unwrap();
@@ -299,7 +287,9 @@ fn test_execute_base_dpc_constraints() {
         &memo,
         &auxiliary,
         &old_value_commits,
+        &old_value_commit_randomness,
         &new_value_commits,
+        &new_value_commit_randomness,
         value_balance,
         &binding_signature,
     )
