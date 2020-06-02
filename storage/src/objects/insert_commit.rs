@@ -1,7 +1,7 @@
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
@@ -284,12 +284,12 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     }
 
     /// Returns true if the block exists in the canon chain.
-    pub fn is_canon(&self, _block_hash: &BlockHeaderHash) -> bool {
+    pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
         self.block_hash_exists(block_hash) && self.get_block_num(block_hash).is_ok()
     }
 
     /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.
-    pub fn is_previous_block_canon(&self, block: &Block<T>) -> bool {
+    pub fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
         self.is_canon(&block_header.previous_block_hash)
     }
 

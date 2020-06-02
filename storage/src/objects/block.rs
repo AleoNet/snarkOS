@@ -5,7 +5,7 @@ use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Get a block given the block hash.
     pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
         Ok(Block {
