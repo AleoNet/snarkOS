@@ -1,4 +1,3 @@
-use snarkos_algorithms::merkle_tree::MerkleParameters;
 use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
@@ -6,7 +5,10 @@ use snarkos_dpc::base_dpc::{
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::{algorithms::SNARK, parameters::Parameter};
+use snarkos_models::{
+    algorithms::{MerkleParameters, SNARK},
+    parameters::Parameters,
+};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -25,7 +27,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     // TODO (howardwu): Resolve this inconsistency on import structure with a new model once MerkleParameters are refactored.
     let merkle_tree_hash_parameters: <C::MerkleParameters as MerkleParameters>::H =
-        From::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()[..])?);
+        From::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
     let circuit_parameters = CircuitParameters::<C>::load()?;

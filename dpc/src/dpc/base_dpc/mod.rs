@@ -1,12 +1,12 @@
 use crate::dpc::base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload};
-use snarkos_algorithms::merkle_tree::{MerkleParameters, MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF, SNARK},
+    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
-    objects::{AccountScheme, Ledger, Transaction},
+    objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
@@ -119,7 +119,7 @@ pub struct DPC<Components: BaseDPCComponents> {
 /// stores references to existing information like old records and secret keys.
 pub(crate) struct ExecuteContext<'a, L, Components: BaseDPCComponents>
 where
-    L: Ledger<
+    L: LedgerScheme<
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
@@ -155,7 +155,7 @@ where
 
 impl<L, Components: BaseDPCComponents> ExecuteContext<'_, L, Components>
 where
-    L: Ledger<
+    L: LedgerScheme<
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,
@@ -345,7 +345,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         rng: &mut R,
     ) -> Result<ExecuteContext<'a, L, Components>, DPCError>
     where
-        L: Ledger<
+        L: LedgerScheme<
             Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
             MerkleParameters = Components::MerkleParameters,
             MerklePath = MerklePath<Components::MerkleParameters>,
@@ -520,9 +520,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     }
 }
 
-impl<Components: BaseDPCComponents, L: Ledger> DPCScheme<L> for DPC<Components>
+impl<Components: BaseDPCComponents, L: LedgerScheme> DPCScheme<L> for DPC<Components>
 where
-    L: Ledger<
+    L: LedgerScheme<
         Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
         MerkleParameters = Components::MerkleParameters,
         MerklePath = MerklePath<Components::MerkleParameters>,

@@ -1,11 +1,13 @@
-use crate::{has_duplicates, LedgerStorage};
-use snarkos_algorithms::merkle_tree::MerkleParameters;
+use crate::{has_duplicates, Ledger};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::objects::{Ledger, Transaction};
+use snarkos_models::{
+    algorithms::MerkleParameters,
+    objects::{LedgerScheme, Transaction},
+};
 use snarkos_objects::dpc::DPCTransactions;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
+impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Get a transaction bytes given the transaction id.
     pub fn get_transaction_bytes(&self, transaction_id: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
         match self.get_transaction(&transaction_id.clone())? {
@@ -29,18 +31,18 @@ impl<T: Transaction, P: MerkleParameters> LedgerStorage<T, P> {
             return Ok(true);
         }
 
-        if transaction_memo == &self.genesis_memo()? {
+        if self.contains_memo(transaction_memo) {
             return Ok(true);
         }
 
         for sn in transaction_serial_numbers {
-            if self.contains_sn(sn) || sn == &self.genesis_sn()? {
+            if self.contains_sn(sn) {
                 return Ok(true);
             }
         }
 
         for cm in transaction_commitments {
-            if self.contains_cm(cm) || cm == &self.genesis_cm()? {
+            if self.contains_cm(cm) {
                 return Ok(true);
             }
         }

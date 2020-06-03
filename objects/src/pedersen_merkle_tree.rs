@@ -21,10 +21,10 @@ mod window {
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, window::TwoToOneWindow>;
 
-// We instantiate the tree here with height = 9. This may change in the future.
-const TREE_HEIGHT: usize = 9;
+// We instantiate the tree here with height = 3. This may change in the future.
+pub const MASKED_TREE_HEIGHT: usize = 3;
 
-define_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, TREE_HEIGHT);
+define_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, MASKED_TREE_HEIGHT);
 
 /// A Merkle Tree instantiated with the Masked Pedersen hasher over BLS12-377
 pub type EdwardsMaskedMerkleTree = MerkleTree<MaskedMerkleTreeParameters>;

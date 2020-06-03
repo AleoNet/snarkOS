@@ -1,10 +1,15 @@
 use snarkos_dpc::{
     base_dpc::instantiated::*,
-    test_data::{generate_test_accounts, ledger_genesis_setup, setup_or_load_parameters, GenesisAttributes},
+    test_data::{generate_test_accounts, setup_or_load_parameters},
 };
-use snarkos_models::dpc::DPCScheme;
-use snarkos_objects::Account;
+use snarkos_genesis::GenesisBlock;
+use snarkos_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
+use snarkos_objects::{Account, Block};
 use snarkos_storage::test_data::*;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
@@ -18,21 +23,14 @@ pub struct Fixture {
     pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
-    pub genesis_attributes: GenesisAttributes,
+    pub genesis_block: Block<Tx>,
     pub predicate: Predicate,
     pub rng: XorShiftRng,
 }
 
 impl Fixture {
     pub fn ledger(&self) -> MerkleTreeLedger {
-        initialize_test_blockchain(
-            self.ledger_parameters.clone(),
-            self.genesis_attributes.genesis_cm,
-            self.genesis_attributes.genesis_sn,
-            self.genesis_attributes.genesis_memo,
-            self.genesis_attributes.genesis_pred_vk_bytes.clone(),
-            self.genesis_attributes.genesis_account_bytes.clone(),
-        )
+        initialize_test_blockchain(self.ledger_parameters.clone(), self.genesis_block.clone())
     }
 }
 
@@ -45,15 +43,24 @@ fn setup(verify_only: bool) -> Fixture {
     // Generate addresses
     let test_accounts = generate_test_accounts(&parameters, &mut rng);
 
-    let genesis_attributes = ledger_genesis_setup(&parameters, &test_accounts[0], &mut rng);
+    let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
-    let predicate = Predicate::new(genesis_attributes.genesis_pred_vk_bytes.clone());
+    let predicate_vk_hash = to_bytes![
+        PredicateVerificationKeyHash::hash(
+            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let predicate = Predicate::new(predicate_vk_hash);
 
     Fixture {
         parameters,
         test_accounts,
         ledger_parameters,
-        genesis_attributes,
+        genesis_block,
         predicate,
         rng,
     }

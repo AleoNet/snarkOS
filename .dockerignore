@@ -1,5 +1,5 @@
 .idea/
 **.DS_Store
 **storage_db
-dpc/src/parameters/inner_snark.params
-dpc/src/parameters/outer_snark.params
+**inner_snark_pk.params
+**outer_snark_pk.params

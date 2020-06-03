@@ -28,7 +28,7 @@ mod server_message_handler {
     fn receive_block_message() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         let storage_ref = storage.clone();
@@ -85,7 +85,7 @@ mod server_message_handler {
     fn receive_get_block() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         let genesis_block = storage.get_block_from_block_num(0).unwrap();
@@ -150,7 +150,7 @@ mod server_message_handler {
     fn receive_sync_block() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         let storage_ref = Arc::clone(&storage);
@@ -210,7 +210,7 @@ mod server_message_handler {
     fn receive_get_sync() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -293,7 +293,7 @@ mod server_message_handler {
     fn receive_sync() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -361,7 +361,7 @@ mod server_message_handler {
     fn receive_transaction() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -422,7 +422,7 @@ mod server_message_handler {
     fn receive_get_memory_pool_empty() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -473,7 +473,7 @@ mod server_message_handler {
     fn receive_get_memory_pool_normal() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -547,7 +547,7 @@ mod server_message_handler {
     fn receive_memory_pool() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -606,7 +606,7 @@ mod server_message_handler {
     fn receive_get_peers() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -670,7 +670,7 @@ mod server_message_handler {
     fn receive_peers() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -726,7 +726,7 @@ mod server_message_handler {
     fn receive_ping() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -786,7 +786,7 @@ mod server_message_handler {
     fn receive_pong_unknown() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -840,7 +840,7 @@ mod server_message_handler {
     fn receive_pong_rejected() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
@@ -921,7 +921,7 @@ mod server_message_handler {
     fn receive_pong_accepted() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.storage.path().to_owned();
+        let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
         rt.block_on(async move {
