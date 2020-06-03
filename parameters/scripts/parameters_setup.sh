@@ -46,13 +46,13 @@ mv posw_snark_pk.checksum ../src/posw_snark_pk
 mv posw_snark_vk.params ../src/posw_snark_vk
 mv posw_snark_vk.checksum ../src/posw_snark_vk
 
-mv inner_snark_pk.params ../src/inner_snark_pk
+mv inner_snark_pk*.params ../src/inner_snark_pk
 mv inner_snark_pk.checksum ../src/inner_snark_pk
 
 mv inner_snark_vk.params ../src/inner_snark_vk
 mv inner_snark_vk.checksum ../src/inner_snark_vk
 
-mv outer_snark_pk.params ../src/outer_snark_pk
+mv outer_snark_pk*.params ../src/outer_snark_pk
 mv outer_snark_pk.checksum ../src/outer_snark_pk
 
 mv outer_snark_vk.params ../src/outer_snark_vk
