@@ -2043,6 +2043,7 @@ dependencies = [
  "snarkos-models",
  "snarkos-objects",
  "snarkos-storage",
+ "snarkos-testing",
  "snarkos-utilities",
  "tokio 0.2.21",
 ]
@@ -2090,6 +2091,7 @@ dependencies = [
  "snarkos-parameters",
  "snarkos-profiler",
  "snarkos-storage",
+ "snarkos-testing",
  "snarkos-utilities",
 ]
 
@@ -2287,6 +2289,7 @@ dependencies = [
 name = "snarkos-testing"
 version = "0.8.0"
 dependencies = [
+ "rand",
  "snarkos-algorithms",
  "snarkos-curves",
  "snarkos-dpc",

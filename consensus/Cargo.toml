@@ -32,4 +32,6 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.13", features = ["full"] }
 
 [dev-dependencies]
+snarkos-testing = { path = "../testing", version = "0.8.0" }
+
 futures-await-test = { version = "0.3.0" }
