@@ -37,6 +37,7 @@ const BLOCK_HEADER_SIZE: usize = 84;
 const COINBASE_TRANSACTION_SIZE: usize = 1889; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
+    /// Initialize a new memory pool with no transactions
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -45,6 +46,7 @@ impl<T: Transaction> MemoryPool<T> {
         }
     }
 
+    /// Load the memory pool from previously stored state in storage
     #[inline]
     pub fn from_storage<P: MerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
@@ -62,6 +64,7 @@ impl<T: Transaction> MemoryPool<T> {
         Ok(memory_pool)
     }
 
+    /// Store the memory pool state to the database
     #[inline]
     pub fn store<P: MerkleParameters>(&self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
         let mut transactions = DPCTransactions::<T>::new();

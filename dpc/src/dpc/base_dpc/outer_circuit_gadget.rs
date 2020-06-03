@@ -30,8 +30,6 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
 where
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::ValueCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
-    <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
     let (predicate_vk_commitment_parameters, predicate_vk_crh_parameters) = {
@@ -66,21 +64,15 @@ where
     let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let value_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.value_commitment.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
     // Then we convert these field elements into bytes
     let predicate_input = [
         to_bytes![local_data_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
         to_bytes![local_data_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        to_bytes![value_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
     ];
 
     let predicate_input_bytes = [
         UInt8::alloc_input_vec(cs.ns(|| "Allocate local data pp "), &predicate_input[0])?,
         UInt8::alloc_input_vec(cs.ns(|| "Allocate local data comm"), &predicate_input[1])?,
-        UInt8::alloc_input_vec(cs.ns(|| "Allocate value comm pp"), &predicate_input[2])?,
     ];
 
     let predicate_input_bits = [
@@ -89,10 +81,6 @@ where
             .flat_map(|byte| byte.into_bits_le())
             .collect::<Vec<_>>(),
         predicate_input_bytes[1]
-            .iter()
-            .flat_map(|byte| byte.into_bits_le())
-            .collect::<Vec<_>>(),
-        predicate_input_bytes[2]
             .iter()
             .flat_map(|byte| byte.into_bits_le())
             .collect::<Vec<_>>(),
@@ -130,60 +118,12 @@ where
 
         let position = UInt8::constant(i as u8).into_bits_le();
 
-        // Convert the value commitment and value commitment randomness to bytes
-        let value_commitment_randomness_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            &to_bytes![old_death_predicate_verification_inputs[i].value_commitment_randomness]?[..],
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        let value_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            &old_death_predicate_verification_inputs[i].value_commitment,
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        let value_commitment_inputs = [
-            to_bytes![value_commitment_randomness_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
-            to_bytes![value_commitment_randomness_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
-            to_bytes![value_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        ];
-
-        let value_commitment_input_bytes = [
-            UInt8::alloc_vec(
-                cs.ns(|| format!("Allocate input value commitment randomness x {}", i)),
-                &value_commitment_inputs[0],
-            )?,
-            UInt8::alloc_vec(
-                cs.ns(|| format!("Allocate input value commitment randomness y {}", i)),
-                &value_commitment_inputs[1],
-            )?,
-            UInt8::alloc_vec(
-                cs.ns(|| format!("Allocate input value commitment {}", i)),
-                &value_commitment_inputs[2],
-            )?,
-        ];
-
-        let value_commitment_input_bits = [
-            value_commitment_input_bytes[0]
-                .iter()
-                .flat_map(|byte| byte.into_bits_le())
-                .collect::<Vec<_>>(),
-            value_commitment_input_bytes[1]
-                .iter()
-                .flat_map(|byte| byte.into_bits_le())
-                .collect::<Vec<_>>(),
-            value_commitment_input_bytes[2]
-                .iter()
-                .flat_map(|byte| byte.into_bits_le())
-                .collect::<Vec<_>>(),
-        ];
-
         C::PredicateSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &death_predicate_vk,
             ([position].iter())
                 .chain(predicate_input_bits.iter())
-                .filter(|inp| !inp.is_empty())
-                .chain(value_commitment_input_bits.iter()),
+                .filter(|inp| !inp.is_empty()),
             &death_predicate_proof,
         )?;
     }
@@ -216,60 +156,12 @@ where
 
         let position = UInt8::constant(j as u8).into_bits_le();
 
-        // Convert the value commitment and value commitment randomness to bytes
-        let value_commitment_randomness_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            &to_bytes![new_birth_predicate_verification_inputs[j].value_commitment_randomness]?[..],
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        let value_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            &new_birth_predicate_verification_inputs[j].value_commitment,
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        let value_commitment_inputs = [
-            to_bytes![value_commitment_randomness_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
-            to_bytes![value_commitment_randomness_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
-            to_bytes![value_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        ];
-
-        let value_commitment_input_bytes = [
-            UInt8::alloc_vec(
-                cs.ns(|| format!("Allocate output value commitment randomness x {}", j)),
-                &value_commitment_inputs[0],
-            )?,
-            UInt8::alloc_vec(
-                cs.ns(|| format!("Allocate output value commitment randomness y {}", j)),
-                &value_commitment_inputs[1],
-            )?,
-            UInt8::alloc_vec(
-                cs.ns(|| format!("Allocate output value commitment {}", j)),
-                &value_commitment_inputs[2],
-            )?,
-        ];
-
-        let value_commitment_input_bits = [
-            value_commitment_input_bytes[0]
-                .iter()
-                .flat_map(|byte| byte.into_bits_le())
-                .collect::<Vec<_>>(),
-            value_commitment_input_bytes[1]
-                .iter()
-                .flat_map(|byte| byte.into_bits_le())
-                .collect::<Vec<_>>(),
-            value_commitment_input_bytes[2]
-                .iter()
-                .flat_map(|byte| byte.into_bits_le())
-                .collect::<Vec<_>>(),
-        ];
-
         C::PredicateSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &birth_predicate_vk,
             ([position].iter())
                 .chain(predicate_input_bits.iter())
-                .filter(|inp| !inp.is_empty())
-                .chain(value_commitment_input_bits.iter()),
+                .filter(|inp| !inp.is_empty()),
             &birth_predicate_proof,
         )?;
     }

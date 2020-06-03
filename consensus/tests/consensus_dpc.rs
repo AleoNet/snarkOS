@@ -5,7 +5,7 @@ mod consensus_dpc {
         test_data::*,
         ConsensusParameters,
     };
-    use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::PaymentRecordPayload};
+    use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
     use snarkos_models::{
         dpc::{DPCScheme, Record},
         objects::LedgerScheme,
@@ -40,8 +40,8 @@ mod consensus_dpc {
         assert_eq!(coinbase_records.len(), 2);
         assert!(!coinbase_records[0].is_dummy());
         assert!(coinbase_records[1].is_dummy());
-        assert_eq!(coinbase_records[0].payload().balance, block_reward);
-        assert_eq!(coinbase_records[1].payload().balance, 0);
+        assert_eq!(coinbase_records[0].value(), block_reward);
+        assert_eq!(coinbase_records[1].value(), 0);
 
         println!("Verifying and receiving the block");
         let mut memory_pool = MemoryPool::new();
@@ -60,10 +60,11 @@ mod consensus_dpc {
 
         // OUTPUTS
 
-        let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
         let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![predicate; NUM_OUTPUT_RECORDS];
-        let new_payloads = vec![PaymentRecordPayload { balance: 10, lock: 0 }; NUM_OUTPUT_RECORDS];
+        let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+        let new_values = vec![10; NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
         // Memo + Aux are dummies for now
 
@@ -80,6 +81,7 @@ mod consensus_dpc {
             new_birth_predicates.clone(),
             new_death_predicates.clone(),
             new_dummy_flags,
+            new_values,
             new_payloads,
             auxiliary,
             memo,
@@ -91,8 +93,8 @@ mod consensus_dpc {
         assert_eq!(spend_records.len(), 2);
         assert!(!spend_records[0].is_dummy());
         assert!(!spend_records[1].is_dummy());
-        assert_eq!(spend_records[0].payload().balance, 10);
-        assert_eq!(spend_records[1].payload().balance, 10);
+        assert_eq!(spend_records[0].value(), 10);
+        assert_eq!(spend_records[1].value(), 10);
         assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
 
         assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
@@ -112,11 +114,8 @@ mod consensus_dpc {
         assert_eq!(new_coinbase_records.len(), 2);
         assert!(!new_coinbase_records[0].is_dummy());
         assert!(new_coinbase_records[1].is_dummy());
-        assert_eq!(
-            new_coinbase_records[0].payload().balance,
-            new_block_reward + block_reward - 20
-        );
-        assert_eq!(new_coinbase_records[1].payload().balance, 0);
+        assert_eq!(new_coinbase_records[0].value(), new_block_reward + block_reward - 20);
+        assert_eq!(new_coinbase_records[1].value(), 0);
 
         println!("Verify and receive the block with the new payment transaction");
 

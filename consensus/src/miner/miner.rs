@@ -43,6 +43,7 @@ impl Miner {
         Ok(memory_pool.get_candidates(&storage, max_size)?)
     }
 
+    /// Add a coinbase transaction to a list of candidate block transactions
     pub fn add_coinbase_transaction<R: Rng>(
         &self,
         parameters: &PublicParameters<Components>,

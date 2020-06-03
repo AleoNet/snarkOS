@@ -16,7 +16,7 @@ pub struct InnerSNARKPKParameters;
 
 impl Parameters for InnerSNARKPKParameters {
     const CHECKSUM: &'static str = include_str!("./inner_snark_pk.checksum");
-    const SIZE: u64 = 517337602;
+    const SIZE: u64 = 544855906;
 
     /// Loads the inner snark proving key bytes. The method will attempt to locate
     /// the file with a relative path. If it cannot find the path relatively, the

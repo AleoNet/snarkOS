@@ -65,6 +65,13 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
+                .account_signature
+                .parameters()
+                .to_field_elements()?,
+        );
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
                 .record_commitment
                 .parameters()
                 .to_field_elements()?,
@@ -88,15 +95,6 @@ where
             &self
                 .circuit_parameters
                 .serial_number_nonce
-                .parameters()
-                .to_field_elements()?,
-        );
-
-        // TODO (raychu86): Reorder parameter input
-        v.extend_from_slice(
-            &self
-                .circuit_parameters
-                .account_signature
                 .parameters()
                 .to_field_elements()?,
         );

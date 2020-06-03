@@ -3,10 +3,9 @@ use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::{
     base_dpc::{
         instantiated::*,
-        payment_circuit::*,
         predicate::PrivatePredicateInput,
-        record_payload::PaymentRecordPayload,
-        BaseDPCComponents,
+        predicate_circuit::*,
+        record_payload::RecordPayload,
         LocalData,
         DPC,
     },
@@ -14,12 +13,12 @@ use snarkos_dpc::{
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::{DPCScheme, Record},
+    dpc::DPCScheme,
     objects::LedgerScheme,
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
 use snarkos_storage::test_data::*;
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
@@ -77,7 +76,8 @@ fn base_dpc_integration_test() {
             &old_sn_nonce,
             &genesis_account.public_key,
             true, // The input record is dummy
-            &PaymentRecordPayload::default(),
+            0,
+            &RecordPayload::default(),
             &Predicate::new(predicate_vk_hash.clone()),
             &Predicate::new(predicate_vk_hash.clone()),
             &mut rng,
@@ -88,17 +88,15 @@ fn base_dpc_integration_test() {
 
     // Construct new records.
 
-    // Create a payload.
-    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
-
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(predicate_vk_hash.clone());
 
     let new_account_public_keys = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
-    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_values = vec![10; NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
 
     let auxiliary = [3u8; 32];
     let memo = [4u8; 32];
@@ -107,31 +105,11 @@ fn base_dpc_integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut old_proof_and_vk = vec![];
         for i in 0..NUM_INPUT_RECORDS {
-            // If the record is a dummy, then the value should be 0
-            let input_value = match local_data.old_records[i].is_dummy() {
-                true => 0,
-                false => local_data.old_records[i].payload().balance,
-            };
-
-            // Generate value commitment randomness
-            let value_commitment_randomness =
-                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
-
-            // Generate the value commitment
-            let value_commitment = local_data
-                .circuit_parameters
-                .value_commitment
-                .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
-                .unwrap();
-
             // Instantiate death predicate circuit
-            let death_predicate_circuit = PaymentCircuit::new(
+            let death_predicate_circuit = PredicateCircuit::new(
                 &local_data.circuit_parameters,
                 &local_data.local_data_commitment,
-                &value_commitment_randomness,
-                &value_commitment,
                 i as u8,
-                input_value,
             );
 
             // Generate the predicate proof
@@ -143,16 +121,13 @@ fn base_dpc_integration_test() {
             .expect("Proving should work");
             #[cfg(debug_assertions)]
             {
-                let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                     local_data_commitment_parameters: local_data
                         .circuit_parameters
                         .local_data_commitment
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
-                    value_commitment_randomness: value_commitment_randomness.clone(),
-                    value_commitment: value_commitment.clone(),
                     position: i as u8,
                 };
                 assert!(
@@ -163,8 +138,6 @@ fn base_dpc_integration_test() {
             let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                 verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
                 proof,
-                value_commitment,
-                value_commitment_randomness,
             };
             old_proof_and_vk.push(private_input);
         }
@@ -174,31 +147,11 @@ fn base_dpc_integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut new_proof_and_vk = vec![];
         for j in 0..NUM_OUTPUT_RECORDS {
-            // If the record is a dummy, then the value should be 0
-            let output_value = match local_data.new_records[j].is_dummy() {
-                true => 0,
-                false => local_data.new_records[j].payload().balance,
-            };
-
-            // Generate value commitment randomness
-            let value_commitment_randomness =
-                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
-
-            // Generate the value commitment
-            let value_commitment = local_data
-                .circuit_parameters
-                .value_commitment
-                .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
-                .unwrap();
-
             // Instantiate birth predicate circuit
-            let birth_predicate_circuit = PaymentCircuit::new(
+            let birth_predicate_circuit = PredicateCircuit::new(
                 &local_data.circuit_parameters,
                 &local_data.local_data_commitment,
-                &value_commitment_randomness,
-                &value_commitment,
                 j as u8,
-                output_value,
             );
 
             // Generate the predicate proof
@@ -210,16 +163,13 @@ fn base_dpc_integration_test() {
             .expect("Proving should work");
             #[cfg(debug_assertions)]
             {
-                let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                     local_data_commitment_parameters: local_data
                         .circuit_parameters
                         .local_data_commitment
                         .parameters()
                         .clone(),
                     local_data_commitment: local_data.local_data_commitment.clone(),
-                    value_commitment_parameters: local_data.circuit_parameters.value_commitment.parameters().clone(),
-                    value_commitment_randomness: value_commitment_randomness.clone(),
-                    value_commitment: value_commitment.clone(),
                     position: j as u8,
                 };
                 assert!(
@@ -229,8 +179,6 @@ fn base_dpc_integration_test() {
             let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                 verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
                 proof,
-                value_commitment,
-                value_commitment_randomness,
             };
             new_proof_and_vk.push(private_input);
         }
@@ -244,6 +192,7 @@ fn base_dpc_integration_test() {
         &old_death_vk_and_proof_generator,
         &new_account_public_keys,
         &new_dummy_flags,
+        &new_values,
         &new_payloads,
         &new_birth_predicates,
         &new_death_predicates,

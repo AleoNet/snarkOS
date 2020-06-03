@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::PaymentRecordPayload};
+use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -38,8 +38,8 @@ pub use self::inner_circuit_gadget::*;
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
 
-pub mod payment_circuit;
-use self::payment_circuit::*;
+pub mod predicate_circuit;
+use self::predicate_circuit::*;
 
 pub mod outer_circuit;
 use self::outer_circuit::*;
@@ -98,9 +98,9 @@ pub trait BaseDPCComponents: DPCComponents {
 
     /// SNARK for a "dummy predicate" that does nothing with its input.
     type PredicateSNARK: SNARK<
-        Circuit = PaymentCircuit<Self>,
-        AssignedCircuit = PaymentCircuit<Self>,
-        VerifierInput = PaymentPredicateLocalData<Self>,
+        Circuit = PredicateCircuit<Self>,
+        AssignedCircuit = PredicateCircuit<Self>,
+        VerifierInput = PredicateLocalData<Self>,
     >;
 
     /// SNARK Verifier gadget for the "dummy predicate" that does nothing with its input.
@@ -248,7 +248,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         circuit_parameters: &CircuitParameters<Components>,
         rng: &mut R,
     ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateSNARK::setup(PaymentCircuit::blank(circuit_parameters), rng)?;
+        let (pk, pvk) = Components::PredicateSNARK::setup(PredicateCircuit::blank(circuit_parameters), rng)?;
 
         Ok(PredicateSNARKParameters {
             proving_key: pk,
@@ -283,7 +283,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
         account_public_key: &AccountPublicKey<Components>,
         is_dummy: bool,
-        payload: &PaymentRecordPayload,
+        value: u64,
+        payload: &RecordPayload,
         birth_predicate: &DPCPredicate<Components>,
         death_predicate: &DPCPredicate<Components>,
         rng: &mut R,
@@ -295,10 +296,11 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         // Construct a record commitment.
         let birth_predicate_repr = birth_predicate.into_compact_repr();
         let death_predicate_repr = death_predicate.into_compact_repr();
-        // Total = 32 + 1 + 32 + 32 + 32 + 32 = 161 bytes
+        // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
             account_public_key.commitment, // 256 bits = 32 bytes
             is_dummy,                      // 1 bit = 1 byte
+            value,                         // 64 bits = 8 bytes
             payload,                       // 256 bits = 32 bytes
             birth_predicate_repr,          // 256 bits = 32 bytes
             death_predicate_repr,          // 256 bits = 32 bytes
@@ -314,6 +316,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let record = DPCRecord {
             account_public_key: account_public_key.clone(),
             is_dummy,
+            value,
             payload: payload.clone(),
             birth_predicate_repr,
             death_predicate_repr,
@@ -334,6 +337,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         new_account_public_keys: &[AccountPublicKey<Components>],
         new_is_dummy_flags: &[bool],
+        new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
         new_birth_predicates: &[<Self as DPCScheme<L>>::Predicate],
         new_death_predicates: &[<Self as DPCScheme<L>>::Predicate],
@@ -380,7 +384,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 let witness = ledger.prove_cm(&record.commitment())?;
                 old_witnesses.push(witness);
 
-                value_balance += record.payload.balance as i64;
+                value_balance += record.value() as i64;
             }
 
             let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
@@ -415,6 +419,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 &sn_nonce,
                 &new_account_public_keys[j],
                 new_is_dummy_flags[j],
+                new_values[j],
                 &new_payloads[j],
                 &new_birth_predicates[j],
                 &new_death_predicates[j],
@@ -422,7 +427,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             )?;
 
             if !record.is_dummy {
-                value_balance -= record.payload.balance as i64;
+                value_balance -= record.value() as i64;
             }
 
             new_commitments.push(record.commitment.clone());
@@ -441,6 +446,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.commitment(),
                 record.account_public_key(),
                 record.is_dummy(),
+                record.value(),
                 record.payload(),
                 record.birth_predicate_repr(),
                 record.death_predicate_repr(),
@@ -455,6 +461,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.commitment(),
                 record.account_public_key(),
                 record.is_dummy(),
+                record.value(),
                 record.payload(),
                 record.birth_predicate_repr(),
                 record.death_predicate_repr()
@@ -552,7 +559,7 @@ where
         let predicate_snark_parameters = Self::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
         let predicate_snark_proof = Components::PredicateSNARK::prove(
             &predicate_snark_parameters.proving_key,
-            PaymentCircuit::blank(&circuit_parameters),
+            PredicateCircuit::blank(&circuit_parameters),
             rng,
         )?;
         end_timer!(predicate_snark_setup_time);
@@ -560,8 +567,6 @@ where
         let private_pred_input = PrivatePredicateInput {
             verification_key: predicate_snark_parameters.verification_key.clone(),
             proof: predicate_snark_proof,
-            value_commitment: <Components::ValueCommitment as CommitmentScheme>::Output::default(),
-            value_commitment_randomness: <Components::ValueCommitment as CommitmentScheme>::Randomness::default(),
         };
 
         let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
@@ -610,6 +615,7 @@ where
 
         new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
+        new_values: &[u64],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
         new_death_predicates: &[Self::Predicate],
@@ -627,6 +633,7 @@ where
             old_account_private_keys,
             new_account_public_keys,
             new_is_dummy_flags,
+            new_values,
             new_payloads,
             new_birth_predicates,
             new_death_predicates,
@@ -662,31 +669,58 @@ where
 
         // Generate binding signature
 
+        // Generate value commitments for input records
+
         let mut old_value_commits = vec![];
         let mut old_value_commit_randomness = vec![];
+
+        for old_record in old_records {
+            // If the record is a dummy, then the value should be 0
+            let input_value = match old_record.is_dummy() {
+                true => 0,
+                false => old_record.value(),
+            };
+
+            // Generate value commitment randomness
+            let value_commitment_randomness =
+                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+            // Generate the value commitment
+            let value_commitment = parameters
+                .circuit_parameters
+                .value_commitment
+                .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
+                .unwrap();
+
+            old_value_commits.push(value_commitment);
+            old_value_commit_randomness.push(value_commitment_randomness);
+        }
+
+        // Generate value commitments for output records
+
         let mut new_value_commits = vec![];
         let mut new_value_commit_randomness = vec![];
 
-        for death_pred_attr in &old_death_pred_attributes {
-            let mut commitment = [0u8; 32];
-            let mut randomness = [0u8; 32];
+        for new_record in &new_records {
+            // If the record is a dummy, then the value should be 0
+            let output_value = match new_record.is_dummy() {
+                true => 0,
+                false => new_record.value(),
+            };
 
-            death_pred_attr.value_commitment.write(&mut commitment[..])?;
-            death_pred_attr.value_commitment_randomness.write(&mut randomness[..])?;
+            // Generate value commitment randomness
+            let value_commitment_randomness =
+                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
 
-            old_value_commits.push(commitment);
-            old_value_commit_randomness.push(randomness);
-        }
+            // Generate the value commitment
+            let value_commitment = parameters
+                .circuit_parameters
+                .value_commitment
+                .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
+                .unwrap();
 
-        for birth_pred_attr in &new_birth_pred_attributes {
-            let mut commitment = [0u8; 32];
-            let mut randomness = [0u8; 32];
-
-            birth_pred_attr.value_commitment.write(&mut commitment[..])?;
-            birth_pred_attr.value_commitment_randomness.write(&mut randomness[..])?;
-
-            new_value_commits.push(commitment);
-            new_value_commit_randomness.push(randomness);
+            new_value_commits.push(value_commitment);
+            new_value_commit_randomness.push(value_commitment_randomness);
         }
 
         let sighash = to_bytes![local_data_commitment]?;
@@ -722,7 +756,9 @@ where
                 memorandum,
                 auxiliary,
                 &old_value_commits,
+                &old_value_commit_randomness,
                 &new_value_commits,
+                &new_value_commit_randomness,
                 value_balance,
                 &binding_signature,
             );
