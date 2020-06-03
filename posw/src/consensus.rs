@@ -23,7 +23,7 @@ use snarkos_objects::{
     MaskedMerkleTreeParameters,
     ProofOfSuccinctWork,
 };
-use snarkos_parameters::posw::{PoswProvingParameters, PoswVerificationParameters};
+use snarkos_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -94,13 +94,13 @@ where
     /// is provided, the PoSW runner will work in verify-only mode and any calls to the `mine`
     /// function will panic.
     pub fn load(verify_only: bool) -> Result<Self, PoswError> {
-        let params = PoswVerificationParameters::load_bytes()?;
+        let params = PoswSNARKVKParameters::load_bytes()?;
         let vk = S::VerificationParameters::read(&params[..])?;
 
         let pk = if verify_only {
             None
         } else {
-            let params = PoswProvingParameters::load_bytes()?;
+            let params = PoswSNARKPKParameters::load_bytes()?;
             Some(S::ProvingParameters::read(&params[..])?)
         };
 

@@ -10,7 +10,6 @@ cargo run --release --example predicate_vk_crh
 cargo run --release --example record_commitment
 cargo run --release --example serial_number_nonce_crh
 cargo run --release --example value_commitment
-cargo run --release --example posw
 
 mv account_commitment.params ../src/account_commitment
 mv account_commitment.checksum ../src/account_commitment
@@ -36,20 +35,24 @@ mv serial_number_nonce_crh.checksum ../src/serial_number_nonce_crh
 mv value_commitment.params ../src/value_commitment
 mv value_commitment.checksum ../src/value_commitment
 
-mv posw_pk.params ../src/posw
-mv posw_vk.params ../src/posw
-
+cargo run --release --example posw_snark
 cargo run --release --example inner_snark
 cargo run --release --example outer_snark
 cargo run --release --example predicate_snark
 
-mv inner_snark_pk.params ../src/inner_snark_pk
+mv posw_snark_pk.params ../src/posw_snark_pk
+mv posw_snark_pk.checksum ../src/posw_snark_pk
+
+mv posw_snark_vk.params ../src/posw_snark_vk
+mv posw_snark_vk.checksum ../src/posw_snark_vk
+
+mv inner_snark_pk*.params ../src/inner_snark_pk
 mv inner_snark_pk.checksum ../src/inner_snark_pk
 
 mv inner_snark_vk.params ../src/inner_snark_vk
 mv inner_snark_vk.checksum ../src/inner_snark_vk
 
-mv outer_snark_pk.params ../src/outer_snark_pk
+mv outer_snark_pk*.params ../src/outer_snark_pk
 mv outer_snark_pk.checksum ../src/outer_snark_pk
 
 mv outer_snark_vk.params ../src/outer_snark_vk
