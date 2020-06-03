@@ -2284,6 +2284,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-testing"
+version = "0.8.0"
+dependencies = [
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-dpc",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-objects",
+ "snarkos-parameters",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-utilities"
 version = "0.8.0"
 dependencies = [
