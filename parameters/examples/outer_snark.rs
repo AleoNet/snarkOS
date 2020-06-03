@@ -3,13 +3,13 @@ use snarkos_dpc::base_dpc::{
     instantiated::Components,
     outer_circuit::OuterCircuit,
     parameters::CircuitParameters,
-    payment_circuit::PaymentCircuit,
     predicate::PrivatePredicateInput,
+    predicate_circuit::PredicateCircuit,
     BaseDPCComponents,
     DPC,
 };
 use snarkos_errors::dpc::DPCError;
-use snarkos_models::algorithms::{CommitmentScheme, SNARK};
+use snarkos_models::algorithms::SNARK;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use hex;
@@ -28,14 +28,12 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let predicate_snark_parameters = DPC::<C>::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
     let predicate_snark_proof = C::PredicateSNARK::prove(
         &predicate_snark_parameters.proving_key,
-        PaymentCircuit::blank(&circuit_parameters),
+        PredicateCircuit::blank(&circuit_parameters),
         rng,
     )?;
     let private_predicate_input = PrivatePredicateInput {
         verification_key: predicate_snark_parameters.verification_key,
         proof: predicate_snark_proof,
-        value_commitment: <C::ValueCommitment as CommitmentScheme>::Output::default(),
-        value_commitment_randomness: <C::ValueCommitment as CommitmentScheme>::Randomness::default(),
     };
 
     let outer_snark_parameters =

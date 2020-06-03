@@ -3,9 +3,9 @@ use crate::dpc::base_dpc::{
     binding_signature::*,
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
-    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
     predicate::PrivatePredicateInput,
-    record_payload::PaymentRecordPayload,
+    predicate_circuit::{PredicateCircuit, PredicateLocalData},
+    record_payload::RecordPayload,
     BaseDPCComponents,
     ExecuteContext,
     DPC,
@@ -72,7 +72,8 @@ fn test_execute_base_dpc_constraints() {
         &sn_nonce,
         &dummy_account.public_key,
         true,
-        &PaymentRecordPayload::default(),
+        0,
+        &RecordPayload::default(),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &Predicate::new(pred_nizk_vk_bytes.clone()),
         &mut rng,
@@ -90,17 +91,15 @@ fn test_execute_base_dpc_constraints() {
     let new_metadata = [1u8; 32];
     let new_account = Account::new(signature_parameters, commitment_parameters, &new_metadata, &mut rng).unwrap();
 
-    // Create a payload.
-    let new_payload = PaymentRecordPayload { balance: 10, lock: 0 };
-
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
     let new_account_public_keys = vec![new_account.public_key.clone(); NUM_OUTPUT_RECORDS];
-    let new_payloads = vec![new_payload.clone(); NUM_OUTPUT_RECORDS];
+    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_values = vec![10; NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let auxiliary = [0u8; 32];
     let memo = [0u8; 32];
 
@@ -110,6 +109,7 @@ fn test_execute_base_dpc_constraints() {
         &old_account_private_keys,
         &new_account_public_keys,
         &new_dummy_flags,
+        &new_values,
         &new_payloads,
         &new_birth_predicates,
         &new_death_predicates,
@@ -144,42 +144,17 @@ fn test_execute_base_dpc_constraints() {
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {
-        // If the record is a dummy, then the value should be 0
-        let value = match new_records[i].is_dummy() {
-            true => 0,
-            false => old_records[i].payload().balance,
-        };
-
-        let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
-
-        let value_commitment = ValueCommitment::commit(
-            &circuit_parameters.value_commitment,
-            &value.to_le_bytes(),
-            &value_commitment_randomness,
-        )
-        .unwrap();
-
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PaymentCircuit::new(
-                &circuit_parameters,
-                &local_data_comm,
-                &value_commitment_randomness,
-                &value_commitment,
-                i as u8,
-                value,
-            ),
+            PredicateCircuit::new(&circuit_parameters, &local_data_comm, i as u8),
             &mut rng,
         )
         .expect("Proof should work");
         #[cfg(debug_assertions)]
         {
-            let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+            let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
-                value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
-                value_commitment_randomness: value_commitment_randomness.clone(),
-                value_commitment: value_commitment.clone(),
                 position: i as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
@@ -187,51 +162,24 @@ fn test_execute_base_dpc_constraints() {
         let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
             verification_key: pred_nizk_pp.verification_key.clone(),
             proof,
-            value_commitment,
-            value_commitment_randomness,
         };
         old_proof_and_vk.push(private_input);
     }
 
     let mut new_proof_and_vk = vec![];
     for j in 0..NUM_OUTPUT_RECORDS {
-        // If the record is a dummy, then the value should be 0
-        let value = match new_records[j].is_dummy() {
-            true => 0,
-            false => new_records[j].payload().balance,
-        };
-
-        let value_commitment_randomness = <ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
-
-        let value_commitment = ValueCommitment::commit(
-            &circuit_parameters.value_commitment,
-            &value.to_le_bytes(),
-            &value_commitment_randomness,
-        )
-        .unwrap();
-
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PaymentCircuit::new(
-                &circuit_parameters,
-                &local_data_comm,
-                &value_commitment_randomness,
-                &value_commitment,
-                j as u8,
-                value,
-            ),
+            PredicateCircuit::new(&circuit_parameters, &local_data_comm, j as u8),
             &mut rng,
         )
         .expect("Proof should work");
 
         #[cfg(debug_assertions)]
         {
-            let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+            let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
-                value_commitment_parameters: circuit_parameters.value_commitment.parameters().clone(),
-                value_commitment_randomness: value_commitment_randomness.clone(),
-                value_commitment: value_commitment.clone(),
                 position: j as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
@@ -240,45 +188,62 @@ fn test_execute_base_dpc_constraints() {
         let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
             verification_key: pred_nizk_pp.verification_key.clone(),
             proof,
-            value_commitment,
-            value_commitment_randomness,
         };
         new_proof_and_vk.push(private_input);
     }
 
-    // Generate the binding signature
+    // Generate binding signature
+
+    // Generate value commitments for input records
 
     let mut old_value_commits = vec![];
     let mut old_value_commit_randomness = vec![];
+
+    for old_record in old_records {
+        // If the record is a dummy, then the value should be 0
+        let input_value = match old_record.is_dummy() {
+            true => 0,
+            false => old_record.value(),
+        };
+
+        // Generate value commitment randomness
+        let value_commitment_randomness =
+            <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
+
+        // Generate the value commitment
+        let value_commitment = circuit_parameters
+            .value_commitment
+            .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
+            .unwrap();
+
+        old_value_commits.push(value_commitment);
+        old_value_commit_randomness.push(value_commitment_randomness);
+    }
+
+    // Generate value commitments for output records
+
     let mut new_value_commits = vec![];
     let mut new_value_commit_randomness = vec![];
 
-    for death_pred_attr in &old_proof_and_vk {
-        let mut commitment = [0u8; 32];
-        let mut randomness = [0u8; 32];
+    for new_record in &new_records {
+        // If the record is a dummy, then the value should be 0
+        let output_value = match new_record.is_dummy() {
+            true => 0,
+            false => new_record.value(),
+        };
 
-        death_pred_attr.value_commitment.write(&mut commitment[..]).unwrap();
-        death_pred_attr
-            .value_commitment_randomness
-            .write(&mut randomness[..])
+        // Generate value commitment randomness
+        let value_commitment_randomness =
+            <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
+
+        // Generate the value commitment
+        let value_commitment = circuit_parameters
+            .value_commitment
+            .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
             .unwrap();
 
-        old_value_commits.push(commitment);
-        old_value_commit_randomness.push(randomness);
-    }
-
-    for birth_pred_attr in &new_proof_and_vk {
-        let mut commitment = [0u8; 32];
-        let mut randomness = [0u8; 32];
-
-        birth_pred_attr.value_commitment.write(&mut commitment[..]).unwrap();
-        birth_pred_attr
-            .value_commitment_randomness
-            .write(&mut randomness[..])
-            .unwrap();
-
-        new_value_commits.push(commitment);
-        new_value_commit_randomness.push(randomness);
+        new_value_commits.push(value_commitment);
+        new_value_commit_randomness.push(value_commitment_randomness);
     }
 
     let sighash = to_bytes![local_data_comm].unwrap();
@@ -322,7 +287,9 @@ fn test_execute_base_dpc_constraints() {
         &memo,
         &auxiliary,
         &old_value_commits,
+        &old_value_commit_randomness,
         &new_value_commits,
+        &new_value_commit_randomness,
         value_balance,
         &binding_signature,
     )

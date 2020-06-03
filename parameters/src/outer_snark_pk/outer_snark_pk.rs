@@ -16,7 +16,7 @@ pub struct OuterSNARKPKParameters;
 
 impl Parameters for OuterSNARKPKParameters {
     const CHECKSUM: &'static str = include_str!("./outer_snark_pk.checksum");
-    const SIZE: u64 = 1806227470;
+    const SIZE: u64 = 1475371646;
 
     /// Loads the outer snark proving key bytes. The method will attempt to locate
     /// the file with a relative path. If it cannot find the path relatively, the
