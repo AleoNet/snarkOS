@@ -22,6 +22,12 @@ pub use self::outer_snark_pk::*;
 pub mod outer_snark_vk;
 pub use self::outer_snark_vk::*;
 
+pub mod posw_snark_pk;
+pub use self::posw_snark_pk::*;
+
+pub mod posw_snark_vk;
+pub use self::posw_snark_vk::*;
+
 pub mod predicate_snark_pk;
 pub use self::predicate_snark_pk::*;
 
@@ -39,6 +45,3 @@ pub use self::serial_number_nonce_crh::*;
 
 pub mod value_commitment;
 pub use self::value_commitment::*;
-
-pub mod posw;
-pub use posw::*;

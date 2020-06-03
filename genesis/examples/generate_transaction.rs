@@ -185,6 +185,5 @@ pub fn main() {
 
     let bytes = generate(recipient, balance, file_name).unwrap();
     let filename = PathBuf::from(file_name);
-
     store(&filename, &bytes).unwrap();
 }

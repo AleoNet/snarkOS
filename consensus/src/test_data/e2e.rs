@@ -115,7 +115,7 @@ fn setup_and_store_test_data() -> TestData {
     // mine an empty block
     let (block1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
 
-    // make a tx which spends 10 to the BaseDPCComponentsreceiver
+    // make a tx which spends 10 to the BaseDPCComponents receiver
     let (_records1, tx1) = send(
         &ledger,
         &parameters,
