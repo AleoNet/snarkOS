@@ -18,8 +18,8 @@ pub use self::dpc_state::*;
 pub mod insert_commit;
 pub use self::insert_commit::*;
 
-pub mod ledger;
-pub use self::ledger::*;
+pub mod ledger_scheme;
+pub use self::ledger_scheme::*;
 
 pub mod records;
 pub use self::records::*;

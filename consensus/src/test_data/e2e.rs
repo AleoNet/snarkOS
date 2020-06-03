@@ -130,7 +130,6 @@ fn load_test_data() -> TestData {
 }
 
 fn setup_and_store_test_data() -> TestData {
-    println!("generating new");
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
