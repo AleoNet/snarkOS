@@ -1257,10 +1257,7 @@ mod test {
         let a_bit = UInt128::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
         let b_bit = UInt128::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap();
 
-        println!("num constraints before {}", cs.num_constraints());
-
         let r = a_bit.pow(cs.ns(|| "exponentiation"), &b_bit).unwrap();
-        println!("num constraints after {}\n", cs.num_constraints());
 
         assert!(cs.is_satisfied());
 

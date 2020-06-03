@@ -534,7 +534,7 @@ mod tests {
         let h1 = BlockHeader {
             previous_block_hash: BlockHeaderHash([0; 32]),
             merkle_root_hash: MerkleRootHash([1; 32]),
-            difficulty_target: u64::MAX,
+            difficulty_target: std::u64::MAX,
             nonce: 100,
             time: 9999999,
         };
