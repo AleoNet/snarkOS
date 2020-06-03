@@ -9,7 +9,7 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     genesis::Genesis,
 };
-use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
+use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block, BlockHeader};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -28,14 +28,33 @@ pub static DATA: Lazy<TestData> = Lazy::new(|| load_test_data());
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
-pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block1].unwrap());
-pub static BLOCK_1_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block1.header.get_hash().0);
+pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_1].unwrap());
+pub static BLOCK_1_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_1.header.get_hash().0);
 
-pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block2].unwrap());
-pub static BLOCK_2_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block2.header.get_hash().0);
+pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_2].unwrap());
+pub static BLOCK_2_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_2.header.get_hash().0);
 
-pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block1.transactions.0[0]].unwrap());
-pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block2.transactions.0[0]].unwrap());
+pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_1.transactions.0[0]].unwrap());
+pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_2.transactions.0[0]].unwrap());
+
+// Alternative blocks used for testing syncs and rollbacks
+pub static ALTERNATIVE_BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| {
+    let alternative_block_1 = Block {
+        header: DATA.alternative_block_1_header.clone(),
+        transactions: DATA.block_1.transactions.clone(),
+    };
+
+    to_bytes![alternative_block_1].unwrap()
+});
+
+pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
+    let alternative_block_2 = Block {
+        header: DATA.alternative_block_2_header.clone(),
+        transactions: DATA.block_2.transactions.clone(),
+    };
+
+    to_bytes![alternative_block_2].unwrap()
+});
 
 pub fn genesis() -> Block<Tx> {
     let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
@@ -44,24 +63,29 @@ pub fn genesis() -> Block<Tx> {
 }
 
 pub struct TestData {
-    pub block1: Block<Tx>,
-    pub block2: Block<Tx>,
-    pub records1: Vec<DPCRecord<Components>>,
-    pub records2: Vec<DPCRecord<Components>>,
+    pub block_1: Block<Tx>,
+    pub block_2: Block<Tx>,
+    pub records_1: Vec<DPCRecord<Components>>,
+    pub records_2: Vec<DPCRecord<Components>>,
+    pub alternative_block_1_header: BlockHeader,
+    pub alternative_block_2_header: BlockHeader,
 }
 
 impl ToBytes for TestData {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.block1.write(&mut writer)?;
+        self.block_1.write(&mut writer)?;
 
-        self.block2.write(&mut writer)?;
+        self.block_2.write(&mut writer)?;
 
-        writer.write(&(self.records1.len() as u64).to_le_bytes())?;
-        self.records1.write(&mut writer)?;
+        writer.write(&(self.records_1.len() as u64).to_le_bytes())?;
+        self.records_1.write(&mut writer)?;
 
-        writer.write(&(self.records2.len() as u64).to_le_bytes())?;
-        self.records2.write(&mut writer)?;
+        writer.write(&(self.records_2.len() as u64).to_le_bytes())?;
+        self.records_2.write(&mut writer)?;
+
+        self.alternative_block_1_header.write(&mut writer)?;
+        self.alternative_block_2_header.write(&mut writer)?;
 
         Ok(())
     }
@@ -69,25 +93,30 @@ impl ToBytes for TestData {
 
 impl FromBytes for TestData {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let block1: Block<Tx> = FromBytes::read(&mut reader)?;
+        let block_1: Block<Tx> = FromBytes::read(&mut reader)?;
 
-        let block2: Block<Tx> = FromBytes::read(&mut reader)?;
+        let block_2: Block<Tx> = FromBytes::read(&mut reader)?;
 
         let len = u64::read(&mut reader)? as usize;
-        let records1 = (0..len)
+        let records_1 = (0..len)
             .map(|_| FromBytes::read(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
 
         let len = u64::read(&mut reader)? as usize;
-        let records2 = (0..len)
+        let records_2 = (0..len)
             .map(|_| FromBytes::read(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
+
+        let alternative_block_1_header: BlockHeader = FromBytes::read(&mut reader)?;
+        let alternative_block_2_header: BlockHeader = FromBytes::read(&mut reader)?;
 
         Ok(Self {
-            block1,
-            block2,
-            records1,
-            records2,
+            block_1,
+            block_2,
+            records_1,
+            records_2,
+            alternative_block_1_header,
+            alternative_block_2_header,
         })
     }
 }
@@ -104,7 +133,7 @@ fn setup_and_store_test_data() -> TestData {
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
-    let [miner_acc, acc1, _] = FIXTURE.test_accounts.clone();
+    let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     let consensus = TEST_CONSENSUS;
 
@@ -113,27 +142,42 @@ fn setup_and_store_test_data() -> TestData {
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (block1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
+    let (block_1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
 
     // make a tx which spends 10 to the BaseDPCComponents receiver
-    let (_records1, tx1) = send(
+    let (_records_1, tx_1) = send(
         &ledger,
         &parameters,
         &miner_acc,
         coinbase_records.clone(),
-        &acc1.public_key,
+        &acc_1.public_key,
         10,
         &mut rng,
     );
 
     // mine the block
-    let (block2, coinbase_records2) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx1]);
+    let (block_2, coinbase_records_2) =
+        mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx_1]);
+
+    // Find alternative conflicting/late blocks
+
+    let alternative_block_1_header = miner
+        .find_block(
+            &block_1.transactions,
+            &ledger.get_block_header(&block_1.header.previous_block_hash).unwrap(),
+        )
+        .unwrap();
+    let alternative_block_2_header = miner
+        .find_block(&block_2.transactions, &alternative_block_1_header)
+        .unwrap();
 
     let test_data = TestData {
-        block1,
-        block2,
-        records1: coinbase_records,
-        records2: coinbase_records2,
+        block_1,
+        block_2,
+        records_1: coinbase_records,
+        records_2: coinbase_records_2,
+        alternative_block_1_header,
+        alternative_block_2_header,
     };
 
     // TODO (howardwu): Remove file generation here in favor of out of scope generation.

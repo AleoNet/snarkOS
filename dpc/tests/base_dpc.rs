@@ -238,7 +238,7 @@ fn base_dpc_integration_test() {
 
     let block = Block { header, transactions };
 
-    ledger.insert_block(&block).unwrap();
+    ledger.insert_and_commit(&block).unwrap();
     assert_eq!(ledger.len(), 2);
 
     kill_storage(ledger);

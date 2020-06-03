@@ -52,7 +52,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
             _transaction: PhantomData,
         };
 
-        ledger_storage.insert_block(&genesis_block)?;
+        ledger_storage.insert_and_commit(&genesis_block)?;
 
         Ok(ledger_storage)
     }
@@ -64,10 +64,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
 
     fn parameters(&self) -> &Self::MerkleParameters {
         &self.ledger_parameters
-    }
-
-    fn push(&mut self, _transaction: Self::Transaction) -> Result<(), LedgerError> {
-        unimplemented!()
     }
 
     fn digest(&self) -> Option<Self::MerkleTreeDigest> {
@@ -132,9 +128,5 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
         _witness: &Self::MerklePath,
     ) -> bool {
         true
-    }
-
-    fn blocks(&self) -> &Vec<Self::Block> {
-        unimplemented!()
     }
 }

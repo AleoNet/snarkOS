@@ -181,9 +181,12 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         }
     }
 
-    /// Find the potential child block given a parent block header.
-    pub fn get_child_hash(&self, _parent_header: &BlockHeaderHash) -> Result<BlockHeaderHash, StorageError> {
-        unimplemented!()
+    /// Find the potential child block hashes given a parent block header.
+    pub fn get_child_hashes(&self, parent_header: &BlockHeaderHash) -> Result<Vec<BlockHeaderHash>, StorageError> {
+        match self.storage.get(COL_CHILD_HASHES, &parent_header.0)? {
+            Some(encoded_child_block_hashes) => Ok(bincode::deserialize(&encoded_child_block_hashes[..])?),
+            None => Ok(vec![]),
+        }
     }
 
     /// Get a transaction given the transaction id.
