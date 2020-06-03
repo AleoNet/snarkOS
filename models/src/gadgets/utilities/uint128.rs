@@ -1111,6 +1111,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_uint128_mul() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
@@ -1180,6 +1181,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_uint128_div() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
@@ -1244,6 +1246,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_uint128_pow() {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
