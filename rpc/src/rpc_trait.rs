@@ -5,10 +5,6 @@ use jsonrpc_derive::rpc;
 
 #[rpc]
 pub trait RpcFunctions {
-    /// Adds two numbers and returns a result
-    #[rpc(name = "add")]
-    fn add(&self, a: u64, b: u64) -> Result<u64, RpcError>;
-
     #[rpc(name = "getblock")]
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError>;
 

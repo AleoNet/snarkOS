@@ -47,11 +47,6 @@ impl RpcImpl {
 }
 
 impl RpcFunctions for RpcImpl {
-    /// Dummy function for smoke testing.
-    fn add(&self, a: u64, b: u64) -> Result<u64, RpcError> {
-        Ok(a + b)
-    }
-
     /// Returns all stored information on a block hash.
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
         let block_hash = hex::decode(&block_hash_string)?;
@@ -72,6 +67,7 @@ impl RpcFunctions for RpcImpl {
                 Err(_) => "This is the latest block".to_string(),
             };
 
+            // TODO get block info for non-canon blocks
             Ok(BlockInfo {
                 hash: block_hash_string,
                 height,
@@ -231,10 +227,6 @@ impl RpcFunctions for RpcImpl {
             coinbase_value,
         })
     }
-
-    //    fn stop_node(&self) -> Result<bool, RpcError> {
-    //        unimplemented!()
-    //    }
 }
 
 impl RpcImpl {}
