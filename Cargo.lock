@@ -2299,10 +2299,12 @@ dependencies = [
  "snarkos-errors",
  "snarkos-genesis",
  "snarkos-models",
+ "snarkos-network",
  "snarkos-objects",
  "snarkos-parameters",
  "snarkos-storage",
  "snarkos-utilities",
+ "tokio 0.2.21",
 ]
 
 [[package]]

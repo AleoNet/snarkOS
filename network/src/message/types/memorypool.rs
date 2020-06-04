@@ -33,7 +33,7 @@ impl Message for MemoryPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_consensus::test_data::TRANSACTION_1;
+    use snarkos_testing::consensus::TRANSACTION_1;
 
     #[test]
     fn test_memory_pool() {
