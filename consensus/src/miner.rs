@@ -1,4 +1,4 @@
-use crate::{miner::MemoryPool, ConsensusParameters};
+use crate::{ConsensusParameters, MemoryPool};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
