@@ -2281,6 +2281,7 @@ dependencies = [
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
+ "snarkos-testing",
  "snarkos-utilities",
 ]
 
@@ -2291,7 +2292,9 @@ dependencies = [
  "once_cell",
  "rand",
  "rand_xorshift",
+ "snarkos-algorithms",
  "snarkos-consensus",
+ "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-genesis",

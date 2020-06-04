@@ -11,6 +11,3 @@ pub use self::objects::*;
 
 pub mod storage;
 pub use self::storage::*;
-
-pub mod test_data;
-pub use self::test_data::*;

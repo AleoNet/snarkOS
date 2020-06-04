@@ -12,7 +12,9 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-consensus = { path = "../consensus", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-dpc = { path = "../dpc", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-genesis = { path = "../genesis", version = "0.8.0" }
