@@ -112,6 +112,12 @@ impl RpcFunctions for RpcImpl {
         ))
     }
 
+    #[rpc(name = "gettransactioninfo")]
+    fn get_transaction_info(&self, transaction_id: String) -> Result<TransactionInfo, RpcError> {
+        let transaction_bytes = self.get_raw_transaction(transaction_id)?;
+        self.decode_raw_transaction(transaction_bytes)
+    }
+
     /// Returns information about a transaction from serialized bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
@@ -219,7 +225,7 @@ impl RpcFunctions for RpcImpl {
             get_block_reward(block_height + 1) + self.storage.calculate_transaction_fees(&full_transactions)?;
 
         Ok(BlockTemplate {
-            previous_block_hash: hex::encode(&block.header.previous_block_hash.0),
+            previous_block_hash: hex::encode(&block.header.get_hash().0),
             block_height,
             time,
             difficulty_target: self.consensus.get_block_difficulty(&block.header, time),
