@@ -511,7 +511,7 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_objects::{PedersenMerkleRootHash, ProofOfSuccinctWork};
+    use snarkos_objects::PedersenMerkleRootHash;
 
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
@@ -610,13 +610,6 @@ mod tests {
         // invalid pedersen merkle root hash
         let mut h2_err = h2.clone();
         h2_err.pedersen_merkle_root_hash = PedersenMerkleRootHash([9; 32]);
-        consensus
-            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
-            .unwrap_err();
-
-        // invalid proof
-        let mut h2_err = h2.clone();
-        h2_err.proof = ProofOfSuccinctWork::default();
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
