@@ -4,7 +4,7 @@ use snarkos_dpc::{
     base_dpc::{
         instantiated::Components,
         predicate::DPCPredicate,
-        record_payload::PaymentRecordPayload,
+        record_payload::RecordPayload,
         BaseDPCComponents,
         DPC,
     },
@@ -58,7 +58,7 @@ fn empty_ledger<T: Transaction, P: MerkleParameters>(
     })
 }
 
-pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<Vec<u8>, DPCError> {
+pub fn generate(recipient: &String, value: u64, file_name: &String) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
     let recipient: AccountPublicKey<Components> = FromBytes::read(&hex::decode(recipient).unwrap()[..])?;
@@ -96,7 +96,8 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
             &old_sn_nonce,
             &dummy_account.public_key,
             true, // The input record is dummy
-            &PaymentRecordPayload::default(),
+            0,
+            &RecordPayload::default(),
             &predicate,
             &predicate,
             rng,
@@ -107,20 +108,16 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
 
     // Construct new records
 
-    let new_payload = PaymentRecordPayload { balance, lock: 0 };
-
-    let mut new_payloads = vec![new_payload];
-    new_payloads.extend(vec![
-        PaymentRecordPayload::default();
-        Components::NUM_OUTPUT_RECORDS - 1
-    ]);
-
     let new_account_public_keys = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
 
     let mut new_dummy_flags = vec![false];
     new_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
+
+    let mut new_values = vec![value];
+    new_values.extend(vec![0; Components::NUM_OUTPUT_RECORDS - 1]);
 
     // Memo + Aux are dummies for now
 
@@ -144,6 +141,7 @@ pub fn generate(recipient: &String, balance: u64, file_name: &String) -> Result<
         new_birth_predicates,
         new_death_predicates,
         new_dummy_flags,
+        new_values,
         new_payloads,
         auxiliary,
         memo,
@@ -187,6 +185,5 @@ pub fn main() {
 
     let bytes = generate(recipient, balance, file_name).unwrap();
     let filename = PathBuf::from(file_name);
-
     store(&filename, &bytes).unwrap();
 }

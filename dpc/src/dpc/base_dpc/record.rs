@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{predicate::DPCPredicate, record_payload::PaymentRecordPayload, BaseDPCComponents};
+use crate::dpc::base_dpc::{predicate::DPCPredicate, record_payload::RecordPayload, BaseDPCComponents};
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::Record,
@@ -25,7 +25,8 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) account_public_key: AccountPublicKey<C>,
 
     pub(super) is_dummy: bool,
-    pub(super) payload: PaymentRecordPayload,
+    pub(super) value: u64,
+    pub(super) payload: RecordPayload,
 
     #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
     pub(super) birth_predicate_repr: Vec<u8>,
@@ -48,10 +49,11 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type AccountPublicKey = AccountPublicKey<C>;
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
-    type Payload = PaymentRecordPayload;
+    type Payload = RecordPayload;
     type Predicate = DPCPredicate<C>;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
+    type Value = u64;
 
     fn account_public_key(&self) -> &Self::AccountPublicKey {
         &self.account_public_key
@@ -84,6 +86,10 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     fn commitment_randomness(&self) -> Self::CommitmentRandomness {
         self.commitment_randomness.clone()
     }
+
+    fn value(&self) -> Self::Value {
+        self.value
+    }
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
@@ -92,6 +98,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
         self.account_public_key.write(&mut writer)?;
 
         self.is_dummy.write(&mut writer)?;
+        self.value.write(&mut writer)?;
         self.payload.write(&mut writer)?;
 
         variable_length_integer(self.birth_predicate_repr.len() as u64).write(&mut writer)?;
@@ -111,7 +118,8 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let account_public_key: AccountPublicKey<C> = FromBytes::read(&mut reader)?;
         let is_dummy: bool = FromBytes::read(&mut reader)?;
-        let payload: PaymentRecordPayload = FromBytes::read(&mut reader)?;
+        let value: u64 = FromBytes::read(&mut reader)?;
+        let payload: RecordPayload = FromBytes::read(&mut reader)?;
 
         let birth_pred_repr_size: usize = read_variable_length_integer(&mut reader)?;
 
@@ -138,6 +146,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
         Ok(Self {
             account_public_key,
             is_dummy,
+            value,
             payload,
             birth_predicate_repr: birth_pred_repr.to_vec(),
             death_predicate_repr: death_pred_repr.to_vec(),

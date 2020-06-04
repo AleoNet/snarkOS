@@ -3,17 +3,16 @@ use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
     predicate::{DPCPredicate, PrivatePredicateInput},
+    predicate_circuit::{PredicateCircuit, PredicateLocalData},
     record::DPCRecord,
-    record_payload::PaymentRecordPayload,
-    BaseDPCComponents,
+    record_payload::RecordPayload,
     LocalData,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::{DPCComponents, DPCScheme, Record},
+    dpc::{DPCComponents, DPCScheme},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{
@@ -27,7 +26,7 @@ use snarkos_objects::{
     BlockHeaderHash,
     MerkleRootHash,
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkos_storage::BlockPath;
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -207,13 +206,17 @@ impl ConsensusParameters {
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
+        if storage.is_canon(&block.header.get_hash()) {
+            return Ok(());
+        }
+
         // 1. verify that the block valid
         if !self.verify_block(parameters, block, storage)? {
             return Err(ConsensusError::InvalidBlock(block.header.get_hash().0.to_vec()));
         }
 
         // 2. Insert/canonize block
-        storage.insert_block(block)?;
+        storage.insert_and_commit(block)?;
 
         // 3. Remove transactions from the mempool
         for transaction_id in block.transactions.to_transaction_ids()? {
@@ -223,6 +226,7 @@ impl ConsensusParameters {
         Ok(())
     }
 
+    /// Receive a block from an external source and process it based on ledger state
     pub fn receive_block(
         &self,
         parameters: &PublicParameters<Components>,
@@ -235,13 +239,52 @@ impl ConsensusParameters {
             return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
         }
 
-        if !storage.block_hash_exists(&block.header.get_hash()) {
-            self.process_block(parameters, &storage, memory_pool, &block)?;
+        // Block is an unknown orphan
+        if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
+            if Self::is_genesis(&block.header) && storage.is_empty() {
+                self.process_block(parameters, &storage, memory_pool, &block)?;
+            } else {
+                storage.insert_only(block)?;
+            }
+        } else {
+            // Find the origin of the block
+            match storage.get_block_path(&block.header)? {
+                BlockPath::ExistingBlock => {}
+                BlockPath::CanonChain(_) => {
+                    self.process_block(parameters, &storage, memory_pool, block)?;
+
+                    let (_, child_path) = storage.longest_child_path(block.header.get_hash())?;
+                    for child_block_hash in child_path {
+                        let new_block = storage.get_block(&child_block_hash)?;
+                        self.process_block(parameters, &storage, memory_pool, &new_block)?;
+                    }
+                }
+                BlockPath::SideChain(side_chain_path) => {
+                    if side_chain_path.new_block_number > storage.get_latest_block_height() {
+                        // Fork to superior chain
+                        storage.revert_for_fork(&side_chain_path)?;
+
+                        if !side_chain_path.path.is_empty() {
+                            for block_hash in side_chain_path.path {
+                                if block_hash == block.header.get_hash() {
+                                    self.process_block(parameters, &storage, memory_pool, &block)?
+                                } else {
+                                    let new_block = storage.get_block(&block_hash)?;
+                                    self.process_block(parameters, &storage, memory_pool, &new_block)?;
+                                }
+                            }
+                        }
+                    } else {
+                        storage.insert_only(block)?;
+                    }
+                }
+            };
         }
 
         Ok(())
     }
 
+    /// Generate a coinbase transaction given candidate block transactions
     pub fn create_coinbase_transaction<R: Rng>(
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
@@ -289,7 +332,8 @@ impl ConsensusParameters {
                 &old_sn_nonce,
                 &new_account.public_key,
                 true, // The input record is dummy
-                &PaymentRecordPayload::default(),
+                0,
+                &RecordPayload::default(),
                 // Filler predicate input
                 &Predicate::new(predicate_vk_hash.clone()),
                 &Predicate::new(predicate_vk_hash.clone()),
@@ -299,19 +343,10 @@ impl ConsensusParameters {
             old_records.push(old_record);
         }
 
-        let new_payload = PaymentRecordPayload {
-            balance: total_value_balance,
-            lock: 0,
-        };
-        let dummy_payload = PaymentRecordPayload { balance: 0, lock: 0 };
-
         let new_account_public_keys = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_payloads = [vec![new_payload], vec![
-            dummy_payload;
-            Components::NUM_OUTPUT_RECORDS - 1
-        ]]
-        .concat();
+        let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
+        let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
         let auxiliary: [u8; 32] = rng.gen();
         let memo: [u8; 32] = rng.gen();
@@ -324,6 +359,7 @@ impl ConsensusParameters {
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,
+            new_values,
             new_payloads,
             auxiliary,
             memo,
@@ -332,6 +368,7 @@ impl ConsensusParameters {
         )
     }
 
+    /// Generate a transaction by spending old records and specifying new record attributes
     pub fn create_transaction<R: Rng>(
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
@@ -340,7 +377,8 @@ impl ConsensusParameters {
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         new_dummy_flags: Vec<bool>,
-        new_payloads: Vec<PaymentRecordPayload>,
+        new_values: Vec<u64>,
+        new_payloads: Vec<RecordPayload>,
 
         auxiliary: [u8; 32],
         memo: [u8; 32],
@@ -355,32 +393,11 @@ impl ConsensusParameters {
             let mut rng = thread_rng();
             let mut old_proof_and_vk = vec![];
             for i in 0..Components::NUM_INPUT_RECORDS {
-                // If the record is a dummy, then the value should be 0
-                let input_value = match local_data.old_records[i].is_dummy() {
-                    true => 0,
-                    false => local_data.old_records[i].payload().balance,
-                };
-
-                // Generate value commitment randomness
-                let value_commitment_randomness =
-                    <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(
-                        &mut rng,
-                    );
-
-                // Generate the value commitment
-                let value_commitment = local_data
-                    .circuit_parameters
-                    .value_commitment
-                    .commit(&input_value.to_le_bytes(), &value_commitment_randomness)?;
-
                 // Instantiate death predicate circuit
-                let death_predicate_circuit = PaymentCircuit::new(
+                let death_predicate_circuit = PredicateCircuit::new(
                     &local_data.circuit_parameters,
                     &local_data.local_data_commitment,
-                    &value_commitment_randomness,
-                    &value_commitment,
                     i as u8,
-                    input_value,
                 );
 
                 // Generate the predicate proof
@@ -392,20 +409,13 @@ impl ConsensusParameters {
                 .expect("Proving should work");
                 #[cfg(debug_assertions)]
                 {
-                    let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                    let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
                             .circuit_parameters
                             .local_data_commitment
                             .parameters()
                             .clone(),
                         local_data_commitment: local_data.local_data_commitment.clone(),
-                        value_commitment_parameters: local_data
-                            .circuit_parameters
-                            .value_commitment
-                            .parameters()
-                            .clone(),
-                        value_commitment_randomness: value_commitment_randomness.clone(),
-                        value_commitment: value_commitment.clone(),
                         position: i as u8,
                     };
                     assert!(
@@ -416,8 +426,6 @@ impl ConsensusParameters {
                 let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                     verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
                     proof,
-                    value_commitment,
-                    value_commitment_randomness,
                 };
                 old_proof_and_vk.push(private_input);
             }
@@ -429,32 +437,11 @@ impl ConsensusParameters {
             let mut rng = thread_rng();
             let mut new_proof_and_vk = vec![];
             for j in 0..NUM_OUTPUT_RECORDS {
-                // If the record is a dummy, then the value should be 0
-                let output_value = match local_data.new_records[j].is_dummy() {
-                    true => 0,
-                    false => local_data.new_records[j].payload().balance,
-                };
-
-                // Generate value commitment randomness
-                let value_commitment_randomness =
-                    <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(
-                        &mut rng,
-                    );
-
-                // Generate the value commitment
-                let value_commitment = local_data
-                    .circuit_parameters
-                    .value_commitment
-                    .commit(&output_value.to_le_bytes(), &value_commitment_randomness)?;
-
                 // Instantiate birth predicate circuit
-                let birth_predicate_circuit = PaymentCircuit::new(
+                let birth_predicate_circuit = PredicateCircuit::new(
                     &local_data.circuit_parameters,
                     &local_data.local_data_commitment,
-                    &value_commitment_randomness,
-                    &value_commitment,
                     j as u8,
-                    output_value,
                 );
 
                 // Generate the predicate proof
@@ -466,20 +453,13 @@ impl ConsensusParameters {
                 .expect("Proving should work");
                 #[cfg(debug_assertions)]
                 {
-                    let pred_pub_input: PaymentPredicateLocalData<Components> = PaymentPredicateLocalData {
+                    let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
                             .circuit_parameters
                             .local_data_commitment
                             .parameters()
                             .clone(),
                         local_data_commitment: local_data.local_data_commitment.clone(),
-                        value_commitment_parameters: local_data
-                            .circuit_parameters
-                            .value_commitment
-                            .parameters()
-                            .clone(),
-                        value_commitment_randomness: value_commitment_randomness.clone(),
-                        value_commitment: value_commitment.clone(),
                         position: j as u8,
                     };
                     assert!(
@@ -489,8 +469,6 @@ impl ConsensusParameters {
                 let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
                     verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
                     proof,
-                    value_commitment,
-                    value_commitment_randomness,
                 };
                 new_proof_and_vk.push(private_input);
             }
@@ -505,6 +483,7 @@ impl ConsensusParameters {
             &old_death_vk_and_proof_generator,
             &new_account_public_keys,
             &new_dummy_flags,
+            &new_values,
             &new_payloads,
             &new_birth_predicates,
             &new_death_predicates,

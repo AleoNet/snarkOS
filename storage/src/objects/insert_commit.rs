@@ -1,7 +1,7 @@
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
@@ -59,11 +59,96 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         Ok((ops, cms))
     }
 
-    pub fn insert_block(&self, block: &Block<T>) -> Result<(), StorageError> {
-        if self.block_hash_exists(&block.header.get_hash()) {
+    pub fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
+        let block_hash = block.header.get_hash();
+        if self.block_hash_exists(&block_hash) {
             return Err(StorageError::BlockError(BlockError::BlockExists(
-                block.header.get_hash().to_string(),
+                block_hash.to_string(),
             )));
+        }
+
+        let mut database_transaction = DatabaseTransaction::new();
+
+        let mut transaction_serial_numbers = vec![];
+        let mut transaction_commitments = vec![];
+        let mut transaction_memos = vec![];
+
+        for transaction in &block.transactions.0 {
+            transaction_serial_numbers.push(transaction.transaction_id()?);
+            transaction_commitments.push(transaction.new_commitments());
+            transaction_memos.push(transaction.memorandum());
+        }
+
+        // Sanitize the block inputs
+
+        // Check if the transactions in the block have duplicate serial numbers
+        if has_duplicates(transaction_serial_numbers) {
+            return Err(StorageError::DuplicateSn);
+        }
+
+        // Check if the transactions in the block have duplicate commitments
+        if has_duplicates(transaction_commitments) {
+            return Err(StorageError::DuplicateCm);
+        }
+
+        // Check if the transactions in the block have duplicate memos
+        if has_duplicates(transaction_memos) {
+            return Err(StorageError::DuplicateMemo);
+        }
+
+        for (index, transaction) in block.transactions.0.iter().enumerate() {
+            let transaction_location = TransactionLocation {
+                index: index as u32,
+                block_hash: block.header.get_hash().0,
+            };
+            database_transaction.push(Op::Insert {
+                col: COL_TRANSACTION_LOCATION,
+                key: transaction.transaction_id()?.to_vec(),
+                value: to_bytes![transaction_location]?.to_vec(),
+            });
+        }
+
+        database_transaction.push(Op::Insert {
+            col: COL_BLOCK_HEADER,
+            key: block.header.get_hash().0.to_vec(),
+            value: to_bytes![block.header]?.to_vec(),
+        });
+        database_transaction.push(Op::Insert {
+            col: COL_BLOCK_TRANSACTIONS,
+            key: block.header.get_hash().0.to_vec(),
+            value: to_bytes![block.transactions]?.to_vec(),
+        });
+
+        let mut child_hashes = self.get_child_hashes(&block.header.previous_block_hash)?;
+
+        if !child_hashes.contains(&block_hash) {
+            child_hashes.push(block_hash);
+
+            database_transaction.push(Op::Insert {
+                col: COL_CHILD_HASHES,
+                key: block.header.previous_block_hash.0.to_vec(),
+                value: bincode::serialize(&child_hashes)?,
+            });
+        }
+
+        database_transaction.push(Op::Insert {
+            col: COL_BLOCK_TRANSACTIONS,
+            key: block.header.get_hash().0.to_vec(),
+            value: to_bytes![block.transactions]?.to_vec(),
+        });
+
+        self.storage.write(database_transaction)?;
+
+        Ok(())
+    }
+
+    /// Commit/canonize a particular block.
+    pub fn commit(&self, block_header_hash: &BlockHeaderHash) -> Result<(), StorageError> {
+        let block = self.get_block(block_header_hash)?;
+
+        // Check if the block is already in the canon chain
+        if self.is_canon(block_header_hash) {
+            return Err(StorageError::ExistingCanonBlock(block_header_hash.to_string()));
         }
 
         let mut database_transaction = DatabaseTransaction::new();
@@ -103,20 +188,10 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
 
         let mut transaction_cms = vec![];
 
-        for (index, transaction) in block.transactions.0.iter().enumerate() {
+        for transaction in block.transactions.0.iter() {
             let (tx_ops, cms) = self.process_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
-
-            let transaction_location = TransactionLocation {
-                index: index as u32,
-                block_hash: block.header.get_hash().0,
-            };
-            database_transaction.push(Op::Insert {
-                col: COL_TRANSACTION_LOCATION,
-                key: transaction.transaction_id()?.to_vec(),
-                value: to_bytes![transaction_location]?.to_vec(),
-            });
         }
 
         // Update the database state for current indexes
@@ -154,16 +229,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
             key: KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec(),
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
-        database_transaction.push(Op::Insert {
-            col: COL_BLOCK_HEADER,
-            key: block.header.get_hash().0.to_vec(),
-            value: to_bytes![block.header]?.to_vec(),
-        });
-        database_transaction.push(Op::Insert {
-            col: COL_BLOCK_TRANSACTIONS,
-            key: block.header.get_hash().0.to_vec(),
-            value: to_bytes![block.transactions]?.to_vec(),
-        });
+
+        // Update the block location
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_LOCATOR,
@@ -203,28 +270,39 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         Ok(())
     }
 
-    /// Commit/canonize a particular block.
-    pub fn commit(&self, _block_header_hash: BlockHeaderHash) -> Result<(), StorageError> {
-        unimplemented!()
-    }
-
     /// Insert a block into the storage and commit as part of the longest chain.
-    pub fn insert_and_commit(&self, _block: Block<T>) -> Result<(), StorageError> {
-        unimplemented!()
+    pub fn insert_and_commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+        let block_hash = block.header.get_hash();
+
+        // If the block does not exist in the storage
+        if !self.block_hash_exists(&block_hash) {
+            // Insert it first
+            self.insert_only(&block)?;
+        }
+        // Commit it
+        self.commit(&block_hash)
     }
 
     /// Returns true if the block exists in the canon chain.
-    pub fn is_canon(&self, _block_hash: &BlockHeaderHash) -> bool {
-        true //TODO implement syncs
+    pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
+        self.block_hash_exists(block_hash) && self.get_block_num(block_hash).is_ok()
     }
 
     /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.
-    pub fn is_previous_block_canon(&self, _block: Block<T>) -> bool {
-        unimplemented!()
+    pub fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
+        self.is_canon(&block_header.previous_block_hash)
     }
 
     /// Revert the chain to the state before the fork.
-    pub fn revert_for_fork(&self, _side_chain_path: &SideChainPath) -> Result<(), StorageError> {
-        unimplemented!()
+    pub fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
+        let latest_block_height = self.get_latest_block_height();
+
+        if side_chain_path.new_block_number > latest_block_height {
+            for _ in (side_chain_path.shared_block_number)..latest_block_height {
+                self.decommit_latest_block()?;
+            }
+        }
+
+        Ok(())
     }
 }

@@ -52,8 +52,10 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_randomness: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
-    input_value_commitments: &[[u8; 32]],
-    output_value_commitments: &[[u8; 32]],
+    input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
+    output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError> {
@@ -61,13 +63,13 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C,
         CS,
         C::AccountCommitment,
-        C::AccountSignatureGadget,
+        C::AccountSignature,
         C::RecordCommitment,
         C::LocalDataCommitment,
         C::SerialNumberNonceCRH,
-        C::AccountSignature,
         C::PRF,
         C::AccountCommitmentGadget,
+        C::AccountSignatureGadget,
         C::RecordCommitmentGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceCRHGadget,
@@ -96,7 +98,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         memo,
         auxiliary,
         input_value_commitments,
+        input_value_commitment_randomness,
         output_value_commitments,
+        output_value_commitment_randomness,
         value_balance,
         binding_signature,
     )
@@ -106,13 +110,13 @@ fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
     AccountCommitment,
-    AccountSignatureGadget,
+    AccountSignature,
     RecordCommitment,
     LocalDataCommitment,
     SerialNumberNonceCRH,
-    Signature,
     P,
     AccountCommitmentGadget,
+    AccountSignatureGadget,
     RecordCommitmentGadget,
     LocalDataCommitmentGadget,
     SerialNumberNonceCRHGadget,
@@ -131,7 +135,7 @@ fn base_dpc_execute_gadget_helper<
     old_records: &[DPCRecord<C>],
     old_witnesses: &[MerklePath<C::MerkleParameters>],
     old_account_private_keys: &[AccountPrivateKey<C>],
-    old_serial_numbers: &[Signature::PublicKey],
+    old_serial_numbers: &[AccountSignature::PublicKey],
 
     //
     new_records: &[DPCRecord<C>],
@@ -145,35 +149,37 @@ fn base_dpc_execute_gadget_helper<
     local_data_rand: &LocalDataCommitment::Randomness,
     memo: &[u8; 32],
     auxiliary: &[u8; 32],
-    input_value_commitments: &[[u8; 32]],
-    output_value_commitments: &[[u8; 32]],
+    input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
+    output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
+    output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
 ) -> Result<(), SynthesisError>
 where
     C: BaseDPCComponents<
         AccountCommitment = AccountCommitment,
-        AccountSignatureGadget = AccountSignatureGadget,
+        AccountSignature = AccountSignature,
         RecordCommitment = RecordCommitment,
         LocalDataCommitment = LocalDataCommitment,
         SerialNumberNonceCRH = SerialNumberNonceCRH,
-        AccountSignature = Signature,
         PRF = P,
         AccountCommitmentGadget = AccountCommitmentGadget,
+        AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitmentGadget = RecordCommitmentGadget,
         LocalDataCommitmentGadget = LocalDataCommitmentGadget,
         SerialNumberNonceCRHGadget = SerialNumberNonceCRHGadget,
         PRFGadget = PGadget,
     >,
     AccountCommitment: CommitmentScheme,
-    AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Signature, C::InnerField>,
+    AccountSignature: SignatureScheme,
     RecordCommitment: CommitmentScheme,
     LocalDataCommitment: CommitmentScheme,
     SerialNumberNonceCRH: CRH,
-    Signature: SignatureScheme,
     P: PRF,
     RecordCommitment::Output: Eq,
     AccountCommitmentGadget: CommitmentGadget<AccountCommitment, C::InnerField>,
+    AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<AccountSignature, C::InnerField>,
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
     LocalDataCommitmentGadget: CommitmentGadget<LocalDataCommitment, C::InnerField>,
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
@@ -184,6 +190,7 @@ where
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
     let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
     let mut old_birth_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
     let mut old_death_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
@@ -191,6 +198,7 @@ where
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
     let mut new_account_public_keys_gadgets = Vec::with_capacity(new_records.len());
     let mut new_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
     let mut new_birth_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
     let mut new_death_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
@@ -227,6 +235,11 @@ where
             || Ok(circuit_parameters.account_commitment.parameters()),
         )?;
 
+        let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare account signature parameters"),
+            || Ok(circuit_parameters.account_signature.parameters()),
+        )?;
+
         let record_commitment_parameters = RecordCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record commitment parameters"),
             || Ok(circuit_parameters.record_commitment.parameters()),
@@ -250,20 +263,11 @@ where
             || Ok(circuit_parameters.serial_number_nonce.parameters()),
         )?;
 
-        // TODO (raychu86): Reorder parameter allocation
-        let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare account signature parameters"),
-            || Ok(circuit_parameters.account_signature.parameters()),
-        )?;
-
-        let value_commitment_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
-            _,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare value commitment parameters"),
-            || Ok(circuit_parameters.value_commitment.parameters()),
-        )?;
+        let value_commitment_parameters =
+            <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare value commitment parameters"),
+                || Ok(circuit_parameters.value_commitment.parameters()),
+            )?;
 
         let ledger_parameters = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare ledger parameters"),
@@ -301,6 +305,7 @@ where
             given_account_public_key,
             given_commitment,
             given_is_dummy,
+            given_value,
             given_payload,
             given_birth_predicate_crh,
             given_death_predicate_crh,
@@ -328,6 +333,9 @@ where
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
             old_dummy_flags_gadgets.push(given_is_dummy.clone());
+
+            let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
+            old_value_gadgets.push(given_value.clone());
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             old_payloads_gadgets.push(given_payload.clone());
@@ -357,6 +365,7 @@ where
                 given_account_public_key,
                 given_commitment,
                 given_is_dummy,
+                given_value,
                 given_payload,
                 given_birth_predicate_crh,
                 given_death_predicate_crh,
@@ -475,7 +484,42 @@ where
         };
         // ********************************************************************
 
+        // ********************************************************************
+        // Check that the value commitment is correct
+        // ********************************************************************
+        {
+            let vc_cs = &mut cs.ns(|| "Check that the value commitment is correct");
+
+            let value_commitment_randomness_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+                    vc_cs.ns(|| "Allocate value commitment randomness"),
+                    || Ok(&input_value_commitment_randomness[i]),
+                )?;
+
+            let declared_value_commitment_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc(
+                    vc_cs.ns(|| "Allocate declared value commitment"),
+                    || Ok(&input_value_commitments[i]),
+                )?;
+
+            let computed_value_commitment_gadget = C::ValueCommitmentGadget::check_commitment_gadget(
+                vc_cs.ns(|| "Generate value commitment"),
+                &value_commitment_parameters,
+                &given_value,
+                &value_commitment_randomness_gadget,
+            )?;
+
+            // Check that the value commitments are equivalent
+            computed_value_commitment_gadget.enforce_equal(
+                &mut vc_cs.ns(|| "Check that declared and computed value commitments are equal"),
+                &declared_value_commitment_gadget,
+            )?;
+        };
+        // ********************************************************************
+
+        // *******************************************************************
         // Check that the record is well-formed.
+        // *******************************************************************
         {
             let commitment_cs = &mut cs.ns(|| "Check that record is well-formed");
 
@@ -486,6 +530,7 @@ where
             let mut commitment_input = Vec::new();
             commitment_input.extend_from_slice(&account_public_key_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
+            commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
             commitment_input.extend_from_slice(&given_birth_predicate_crh);
             commitment_input.extend_from_slice(&given_death_predicate_crh);
@@ -512,13 +557,13 @@ where
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
-        let j = j as u8;
 
         let (
             given_account_public_key,
             given_record_commitment,
             given_commitment,
             given_is_dummy,
+            given_value,
             given_payload,
             given_birth_predicate_hash,
             given_death_predicate_hash,
@@ -546,6 +591,9 @@ where
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
             new_dummy_flags_gadgets.push(given_is_dummy.clone());
+
+            let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
+            new_value_gadgets.push(given_value.clone());
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             new_payloads_gadgets.push(given_payload.clone());
@@ -577,6 +625,7 @@ where
                 given_record_commitment,
                 given_commitment,
                 given_is_dummy,
+                given_value,
                 given_payload,
                 given_birth_predicate_hash,
                 given_death_predicate_hash,
@@ -584,6 +633,7 @@ where
                 serial_number_nonce,
             )
         };
+        // ********************************************************************
 
         // *******************************************************************
         // Check that the serial number nonce is computed correctly.
@@ -591,7 +641,7 @@ where
         {
             let sn_cs = &mut cs.ns(|| "Check that serial number nonce is computed correctly");
 
-            let current_record_number = UInt8::constant(j);
+            let current_record_number = UInt8::constant(j as u8);
             let mut current_record_number_bytes_le = vec![current_record_number];
 
             let serial_number_nonce_randomness = UInt8::alloc_vec(
@@ -613,6 +663,39 @@ where
                 &serial_number_nonce,
             )?;
         }
+        // ********************************************************************
+
+        // ********************************************************************
+        // Check that the value commitment is correct
+        // ********************************************************************
+        {
+            let vc_cs = &mut cs.ns(|| "Check that the value commitment is correct");
+
+            let value_commitment_randomness_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+                    vc_cs.ns(|| "Allocate value commitment randomness"),
+                    || Ok(&output_value_commitment_randomness[j]),
+                )?;
+
+            let declared_value_commitment_gadget =
+                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc(
+                    vc_cs.ns(|| "Allocate declared value commitment"),
+                    || Ok(&output_value_commitments[j]),
+                )?;
+
+            let computed_value_commitment_gadget = C::ValueCommitmentGadget::check_commitment_gadget(
+                vc_cs.ns(|| "Generate value commitment"),
+                &value_commitment_parameters,
+                &given_value,
+                &value_commitment_randomness_gadget,
+            )?;
+
+            // Check that the value commitments are equivalent
+            computed_value_commitment_gadget.enforce_equal(
+                &mut vc_cs.ns(|| "Check that declared and computed value commitments are equal"),
+                &declared_value_commitment_gadget,
+            )?;
+        };
         // *******************************************************************
 
         // *******************************************************************
@@ -629,6 +712,7 @@ where
             let mut commitment_input = Vec::new();
             commitment_input.extend_from_slice(&account_public_key_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
+            commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
             commitment_input.extend_from_slice(&given_birth_predicate_hash);
             commitment_input.extend_from_slice(&given_death_predicate_hash);
@@ -706,6 +790,7 @@ where
                 &old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?,
             );
             local_data_bytes.extend_from_slice(&old_dummy_flags_gadgets[i].to_bytes(&mut cs.ns(|| "is_dummy"))?);
+            local_data_bytes.extend_from_slice(&old_value_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_payloads_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_birth_predicate_hashes_gadgets[i]);
             local_data_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
@@ -720,6 +805,7 @@ where
             local_data_bytes
                 .extend_from_slice(&new_account_public_keys_gadgets[j].to_bytes(&mut cs.ns(|| "account_public_key"))?);
             local_data_bytes.extend_from_slice(&new_dummy_flags_gadgets[j].to_bytes(&mut cs.ns(|| "is_dummy"))?);
+            local_data_bytes.extend_from_slice(&new_value_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_payloads_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
             local_data_bytes.extend_from_slice(&new_death_predicate_hashes_gadgets[j]);
@@ -764,6 +850,15 @@ where
             )
             .unwrap();
 
+        let binding_signature_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
+            _,
+            C::InnerField,
+            C::BindingSignatureGroup,
+        >>::ParametersGadget::alloc(
+            &mut cs.ns(|| "Declare value commitment parameters as binding signature parameters"),
+            || Ok(circuit_parameters.value_commitment.parameters()),
+        )?;
+
         let c_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
             _,
             C::InnerField,
@@ -804,7 +899,7 @@ where
             C::BindingSignatureGroup,
         >>::check_value_balance_commitment_gadget(
             &mut cs.ns(|| "value_balance_commitment"),
-            &value_commitment_parameters,
+            &binding_signature_parameters,
             &value_balance_bytes,
         )?;
 

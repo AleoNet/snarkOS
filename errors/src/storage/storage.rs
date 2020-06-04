@@ -22,6 +22,9 @@ pub enum StorageError {
     #[error("duplicate transaction memo")]
     DuplicateMemo,
 
+    #[error("Block has already been committed: {:?}", _0)]
+    ExistingCanonBlock(String),
+
     #[error("existing record commitment {:?}", _0)]
     ExistingCm(Vec<u8>),
 
@@ -30,6 +33,12 @@ pub enum StorageError {
 
     #[error("existing serial number {:?}", _0)]
     ExistingSn(Vec<u8>),
+
+    #[error("Can't decommit the genesis block")]
+    InvalidBlockDecommit,
+
+    #[error("Can't remove a canon block with hash")]
+    InvalidBlockRemovalCanon(String),
 
     #[error("invalid number of blocks to remove {}. There are only {} existing blocks", _0, _1)]
     InvalidBlockRemovalNum(u32, u32),

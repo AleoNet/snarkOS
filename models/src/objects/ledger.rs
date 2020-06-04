@@ -23,9 +23,6 @@ pub trait LedgerScheme: Sized {
     /// Return the parameters used to construct the ledger data structure.
     fn parameters(&self) -> &Self::MerkleParameters;
 
-    /// Append a (valid) transaction tx to the ledger.
-    fn push(&mut self, transaction: Self::Transaction) -> Result<(), LedgerError>;
-
     /// Return a short digest of the current state of the transaction set data
     /// structure.
     fn digest(&self) -> Option<Self::MerkleTreeDigest>;
@@ -61,6 +58,4 @@ pub trait LedgerScheme: Sized {
         memo: &Self::Memo,
         witness: &Self::MerklePath,
     ) -> bool;
-
-    fn blocks(&self) -> &Vec<Self::Block>;
 }

@@ -42,6 +42,7 @@ pub trait DPCScheme<L: LedgerScheme> {
 
         new_account_public_key: &[<Self::Account as AccountScheme>::AccountPublicKey],
         new_is_dummy_flags: &[bool],
+        new_values: &[<Self::Record as Record>::Value],
         new_payloads: &[Self::Payload],
         new_birth_predicates: &[Self::Predicate],
         new_death_predicates: &[Self::Predicate],

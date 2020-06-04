@@ -3,8 +3,8 @@ use crate::dpc::base_dpc::{
     inner_circuit_verifier_input::InnerCircuitVerifierInput,
     outer_circuit::OuterCircuit,
     outer_circuit_verifier_input::OuterCircuitVerifierInput,
-    payment_circuit::{PaymentCircuit, PaymentPredicateLocalData},
     predicate::DPCPredicate,
+    predicate_circuit::{PredicateCircuit, PredicateLocalData},
     transaction::DPCTransaction,
     BaseDPCComponents,
     LocalData as DPCLocalData,
@@ -165,7 +165,7 @@ pub type PredicateVerificationKeyHash = PedersenCompressedCRH<EdwardsSW, PredVkH
 pub type Predicate = DPCPredicate<Components>;
 pub type CoreCheckNIZK = GM17<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
-pub type PredicateSNARK<C> = GM17<InnerPairing, PaymentCircuit<C>, PaymentPredicateLocalData<C>>;
+pub type PredicateSNARK<C> = GM17<InnerPairing, PredicateCircuit<C>, PredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
 pub type MerkleTreeLedger = Ledger<Tx, CommitmentMerkleParameters>;

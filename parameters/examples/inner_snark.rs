@@ -1,3 +1,4 @@
+use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
@@ -15,9 +16,10 @@ use snarkos_utilities::{
     to_bytes,
 };
 
+use hex;
 use rand::thread_rng;
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{Result as IoResult, Write},
     path::PathBuf,
 };
@@ -44,8 +46,19 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     Ok((inner_snark_pk, inner_snark_vk))
 }
 
-pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
-    let mut file = File::create(path)?;
+fn versioned_filename(checksum: &str) -> String {
+    match checksum.get(0..7) {
+        Some(sum) => format!("inner_snark_pk-{}.params", sum),
+        _ => format!("inner_snark_pk.params"),
+    }
+}
+
+fn store(file_path: &PathBuf, checksum_path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
+    // Save checksum to file
+    fs::write(checksum_path, hex::encode(sha256(bytes)))?;
+
+    // Save buffer to file
+    let mut file = File::create(file_path)?;
     file.write_all(&bytes)?;
     drop(file);
     Ok(())
@@ -53,6 +66,17 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 
 pub fn main() {
     let (inner_snark_pk, inner_snark_vk) = setup::<Components>().unwrap();
-    store(&PathBuf::from("inner_snark_pk.params"), &inner_snark_pk).unwrap();
-    store(&PathBuf::from("inner_snark_vk.params"), &inner_snark_vk).unwrap();
+    let inner_snark_pk_checksum = hex::encode(sha256(&inner_snark_pk));
+    store(
+        &PathBuf::from(&versioned_filename(&inner_snark_pk_checksum)),
+        &PathBuf::from("inner_snark_pk.checksum"),
+        &inner_snark_pk,
+    )
+    .unwrap();
+    store(
+        &PathBuf::from("inner_snark_vk.params"),
+        &PathBuf::from("inner_snark_vk.checksum"),
+        &inner_snark_vk,
+    )
+    .unwrap();
 }
