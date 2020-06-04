@@ -1,5 +1,5 @@
 mod server_listen {
-    use snarkos_consensus::{miner::MemoryPool, test_data::*};
+    use snarkos_consensus::miner::MemoryPool;
     use snarkos_dpc::base_dpc::{
         instantiated::{CommitmentMerkleParameters, Components, MerkleTreeLedger, Tx},
         parameters::PublicParameters,
@@ -16,7 +16,7 @@ mod server_listen {
         Handshakes,
     };
     use snarkos_storage::test_data::*;
-    use snarkos_testing::dpc::load_verifying_parameters;
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters};
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;

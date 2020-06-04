@@ -2,7 +2,6 @@ mod consensus_dpc {
     use snarkos_consensus::{
         get_block_reward,
         miner::{MemoryPool, Miner},
-        test_data::*,
         ConsensusParameters,
     };
     use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
@@ -12,6 +11,7 @@ mod consensus_dpc {
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_storage::test_data::kill_storage;
+    use snarkos_testing::consensus::*;
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
     #[test]

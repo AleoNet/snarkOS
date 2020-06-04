@@ -217,10 +217,10 @@ impl<T: Transaction> MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_data::*;
     use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
     use snarkos_storage::test_data::*;
+    use snarkos_testing::consensus::*;
 
     use std::sync::Arc;
 

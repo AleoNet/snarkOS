@@ -1,5 +1,5 @@
 mod server_message_handler {
-    use snarkos_consensus::{miner::Entry, test_data::*};
+    use snarkos_consensus::miner::Entry;
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
         message::{types::*, Channel, Message},
@@ -8,7 +8,7 @@ mod server_message_handler {
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
     use snarkos_storage::test_data::*;
-    use snarkos_testing::dpc::load_verifying_parameters;
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters};
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,

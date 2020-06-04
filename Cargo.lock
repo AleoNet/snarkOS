@@ -2032,9 +2032,7 @@ dependencies = [
  "futures-await-test",
  "hex",
  "log",
- "once_cell",
  "rand",
- "rand_xorshift",
  "serde",
  "snarkos-algorithms",
  "snarkos-dpc",
@@ -2290,14 +2288,17 @@ dependencies = [
 name = "snarkos-testing"
 version = "0.8.0"
 dependencies = [
+ "once_cell",
  "rand",
- "snarkos-algorithms",
- "snarkos-curves",
+ "rand_xorshift",
+ "snarkos-consensus",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
+ "snarkos-storage",
  "snarkos-utilities",
 ]
 

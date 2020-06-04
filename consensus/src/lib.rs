@@ -8,6 +8,3 @@ pub mod difficulty;
 pub use self::difficulty::*;
 
 pub mod miner;
-
-#[allow(dead_code)]
-pub mod test_data;
