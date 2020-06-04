@@ -5,7 +5,7 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_consensus::{MemoryPool, ConsensusParameters};
+use snarkos_consensus::{ConsensusParameters, MemoryPool};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger},
     parameters::PublicParameters,
