@@ -511,6 +511,8 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkos_objects::{ProofOfSuccinctWork, PedersenMerkleRootHash};
+
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
@@ -563,14 +565,14 @@ mod tests {
             .verify_header(&h2, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap();
 
-        // invalid parent hash, &pedersen_merkle_root
+        // invalid parent hash
         let mut h2_err = h2.clone();
         h2_err.previous_block_hash = BlockHeaderHash([9; 32]);
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
 
-        // invalid merkle root hash, &pedersen_merkle_root
+        // invalid merkle root hash
         let mut h2_err = h2.clone();
         h2_err.merkle_root_hash = MerkleRootHash([3; 32]);
         consensus
@@ -605,12 +607,18 @@ mod tests {
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
 
+        // invalid pedersen merkle root hash
+        let mut h2_err = h2.clone();
+        h2_err.pedersen_merkle_root_hash = PedersenMerkleRootHash([9; 32]);
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
+
         // invalid proof
         let mut h2_err = h2.clone();
         h2_err.proof = ProofOfSuccinctWork::default();
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
-
     }
 }
