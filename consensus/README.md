@@ -21,6 +21,3 @@ Contains methods for calculating the next block's difficulty based off the time 
 
 Checks coinbase transaction and verifies all transactions for double spends.
 
-### test_data
-
-Contains helper functions for network unit and integration tests.
