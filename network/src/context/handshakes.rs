@@ -143,7 +143,9 @@ impl Handshakes {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_data::random_socket_address, Message};
+    use crate::Message;
+    use snarkos_testing::network::random_socket_address;
+
     use serial_test::serial;
     use tokio::net::TcpListener;
 

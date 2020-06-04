@@ -3,11 +3,10 @@ mod server_message_handler {
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
         message::{types::*, Channel, Message},
-        test_data::*,
         PingState,
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,

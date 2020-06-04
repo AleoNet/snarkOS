@@ -3,10 +3,9 @@ mod sync_integration {
     use snarkos_network::{
         message::{types::*, Channel, Message},
         protocol::sync::*,
-        test_data::*,
     };
     use snarkos_objects::BlockHeaderHash;
-    use snarkos_testing::{consensus::*, storage::*};
+    use snarkos_testing::{consensus::*, network::*, storage::*};
 
     use serial_test::serial;
     use std::sync::Arc;

@@ -12,10 +12,9 @@ mod server_listen {
         },
         protocol::SyncHandler,
         server::Server,
-        test_data::*,
         Handshakes,
     };
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;

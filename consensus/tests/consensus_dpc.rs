@@ -15,7 +15,7 @@ mod consensus_dpc {
 
     #[test]
     fn base_dpc_multiple_transactions() {
-        let parameters = &FIXTURE.paraeters;
+        let parameters = &FIXTURE.parameters;
         let ledger = FIXTURE.ledger();
         let predicate = FIXTURE.predicate.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();

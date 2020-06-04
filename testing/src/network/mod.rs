@@ -4,7 +4,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger},
     parameters::PublicParameters,
 };
-use snarkos_network::{context::Context, message::Channel, protocol::SyncHandler, server::Server};
+use snarkos_network::{Channel, Context, Server, SyncHandler};
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};

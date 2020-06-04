@@ -117,7 +117,8 @@ mod tests {
     use crate::message::types::{Ping, Pong};
 
     use super::*;
-    use crate::test_data::{random_socket_address, simulate_active_node};
+    use snarkos_testing::network::{random_socket_address, simulate_active_node};
+
     use serial_test::serial;
     use tokio::net::TcpListener;
 
