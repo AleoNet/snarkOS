@@ -13,10 +13,10 @@ use crate::{
         },
     },
 };
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::bytes::ToBytes;
 
 use core::borrow::Borrow;
-use snarkos_errors::gadgets::SynthesisError;
 use std::{cmp::Ordering, fmt::Debug};
 
 uint_impl!(UInt8, u8, 8);
