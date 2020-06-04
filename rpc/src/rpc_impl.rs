@@ -49,15 +49,8 @@ impl RpcImpl {
 impl RpcFunctions for RpcImpl {
     /// Dummy function for smoke testing.
     fn add(&self, a: u64, b: u64) -> Result<u64, RpcError> {
-        // TODO: REMOVE IN PRODUCTION
         Ok(a + b)
     }
-
-    // TODO Implement balance checking by scanning stored records
-    //    /// Returns the total amount of currency in the record
-    //    fn get_balance(&self, _identifier: String) -> Result<u64, RpcError> {
-    //        unimplemented!()
-    //    }
 
     /// Returns all stored information on a block hash.
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
@@ -119,37 +112,6 @@ impl RpcFunctions for RpcImpl {
         Ok(hex::encode(
             &self.storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
         ))
-    }
-
-    /// Returns hex encoded bytes of a transaction from transaction inputs and outputs.
-    fn create_raw_transaction(
-        &self,
-        //        _inputs: Vec<RPCTransactionOutpoint>,
-        //        _outputs: RPCTransactionOutputs,
-    ) -> Result<String, RpcError> {
-        //        let mut transaction_inputs = vec![];
-        //        for input in inputs {
-        //            let transaction_input = TransactionInput::new(hex::decode(&input.txid)?, input.vout, None)?;
-        //            transaction_inputs.push(transaction_input);
-        //        }
-        //
-        //        let mut transaction_outputs = vec![];
-        //        for (address, amount) in outputs.0 {
-        //            let address = BitcoinAddress::<Mainnet>::from_str(&address)?;
-        //            transaction_outputs.push(TransactionOutput::new(&address, amount)?);
-        //        }
-        //
-        //        let transaction_parameters = TransactionParameters {
-        //            version: 1,
-        //            inputs: transaction_inputs,
-        //            outputs: transaction_outputs,
-        //        };
-        //
-        //        let transaction = Transaction::new(&transaction_parameters)?;
-        //        let raw_transaction_bytes = hex::encode(&transaction.serialize()?);
-        //
-        //        Ok(raw_transaction_bytes)
-        unimplemented!()
     }
 
     /// Returns information about a transaction from serialized bytes.

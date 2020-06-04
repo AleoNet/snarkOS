@@ -9,9 +9,6 @@ pub trait RpcFunctions {
     #[rpc(name = "add")]
     fn add(&self, a: u64, b: u64) -> Result<u64, RpcError>;
 
-    //    #[rpc(name = "getbalance")]
-    //    fn get_balance(&self, identifier: String) -> Result<u64, RpcError>;
-
     #[rpc(name = "getblock")]
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError>;
 
@@ -27,13 +24,6 @@ pub trait RpcFunctions {
     #[rpc(name = "getrawtransaction")]
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError>;
 
-    #[rpc(name = "createrawtransaction")]
-    fn create_raw_transaction(
-        &self,
-        //        inputs: Vec<RPCTransactionOutpoint>,
-        //        outputs: RPCTransactionOutputs,
-    ) -> Result<String, RpcError>;
-
     #[rpc(name = "decoderawtransaction")]
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError>;
 
@@ -48,9 +38,6 @@ pub trait RpcFunctions {
 
     #[rpc(name = "getpeerinfo")]
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError>;
-
-    //    #[rpc(name = "stop")]
-    //    fn stop_node(&self) -> Result<bool, RpcError>;
 
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
