@@ -1,4 +1,4 @@
-use crate::miner::MemoryPool;
+use crate::memory_pool::MemoryPool;
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
@@ -17,7 +17,6 @@ use snarkos_models::{
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
-    merkle_root,
     Account,
     AccountPrivateKey,
     AccountPublicKey,
@@ -25,7 +24,10 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    PedersenMerkleRootHash,
 };
+use snarkos_posw::{txids_to_roots, Posw};
+use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
 
 use chrono::Utc;
@@ -34,7 +36,7 @@ use rand::{thread_rng, Rng};
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
 /// Parameters for a proof of work blockchain.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ConsensusParameters {
     /// Maximum block size in bytes
     pub max_block_size: usize,
@@ -46,6 +48,8 @@ pub struct ConsensusParameters {
     pub target_block_time: i64,
     // /// Mainnet or testnet
     // network: Network
+    /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
+    pub verifier: Posw,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -107,10 +111,17 @@ impl ConsensusParameters {
         header: &BlockHeader,
         parent_header: &BlockHeader,
         merkle_root_hash: &MerkleRootHash,
+        pedersen_merkle_root_hash: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
         let hash_result = header.to_difficulty_hash();
 
         let future_timelimit: i64 = Utc::now().timestamp() as i64 + TWO_HOURS_UNIX;
+
+        // Verify the proof
+        let verification_timer = start_timer!(|| "POSW verify");
+        self.verifier
+            .verify(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
+        end_timer!(verification_timer);
 
         if parent_header.get_hash() != header.previous_block_hash {
             Err(ConsensusError::NoParent(
@@ -119,6 +130,8 @@ impl ConsensusParameters {
             ))
         } else if header.merkle_root_hash != *merkle_root_hash {
             Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()))
+        } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
+            Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()))
         } else if header.time > future_timelimit {
             Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
         } else if header.time < parent_header.time {
@@ -141,16 +154,13 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
         let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids()?;
-
-        let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));
+        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
 
         // Verify the block header
-
         if !Self::is_genesis(&block.header) {
             let parent_block = ledger.get_latest_block()?;
             if let Err(err) =
-                self.verify_header(&block.header, &parent_block.header, &MerkleRootHash(merkle_root_bytes))
+                self.verify_header(&block.header, &parent_block.header, &merkle_root, &pedersen_merkle_root)
             {
                 println!("header failed to verify: {:?}", err);
                 return Ok(false);
@@ -501,62 +511,106 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
 
     #[test]
     fn verify_header() {
+        let rng = &mut XorShiftRng::seed_from_u64(1234567);
+        // mine a PoSW proof
+        let posw = Posw::load(false).unwrap();
+        let difficulty_target = u64::MAX;
+
+        // mine PoSW for block 1
+        let transaction_ids = vec![vec![1u8; 32]; 8];
+        let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
+        let (nonce1, proof1) = posw.mine(subroots1, difficulty_target, rng, std::u32::MAX).unwrap();
+
+        // mine PoSW for block 2
+        let other_transaction_ids = vec![vec![2u8; 32]; 8];
+        let (merkle_root_hash, pedersen_merkle_root, subroots) = txids_to_roots(&other_transaction_ids);
+        let (nonce2, proof2) = posw.mine(subroots, difficulty_target, rng, std::u32::MAX).unwrap();
+
         let consensus: ConsensusParameters = ConsensusParameters {
             max_block_size: 1_000_000usize,
-            max_nonce: 1000,
+            max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
+            verifier: posw,
         };
 
         let h1 = BlockHeader {
             previous_block_hash: BlockHeaderHash([0; 32]),
-            merkle_root_hash: MerkleRootHash([1; 32]),
-            difficulty_target: u64::MAX,
-            nonce: 100,
+            merkle_root_hash: merkle_root_hash1,
+            pedersen_merkle_root_hash: pedersen_merkle_root1,
+            difficulty_target,
+            nonce: nonce1,
             time: 9999999,
+            proof: proof1,
         };
-        let h1_clone = h1.clone();
 
-        let merkle_root_hash = MerkleRootHash([2; 32]);
         let h2 = BlockHeader {
             previous_block_hash: h1.get_hash(),
             merkle_root_hash: merkle_root_hash.clone(),
-            ..h1_clone
+            pedersen_merkle_root_hash: pedersen_merkle_root.clone(),
+            nonce: nonce2,
+            proof: proof2,
+            difficulty_target,
+            time: 9999999,
         };
 
         // OK
-        consensus.verify_header(&h2, &h1, &merkle_root_hash).unwrap();
+        consensus
+            .verify_header(&h2, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap();
 
-        // invalid parent hash
+        // invalid parent hash, &pedersen_merkle_root
         let mut h2_err = h2.clone();
         h2_err.previous_block_hash = BlockHeaderHash([9; 32]);
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
 
-        // invalid merkle root hash
+        // invalid merkle root hash, &pedersen_merkle_root
         let mut h2_err = h2.clone();
         h2_err.merkle_root_hash = MerkleRootHash([3; 32]);
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
 
         // past block
         let mut h2_err = h2.clone();
         h2_err.time = 100;
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
 
         // far in the future block
         let mut h2_err = h2.clone();
         h2_err.time = Utc::now().timestamp() as i64 + 7201;
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
 
         // invalid difficulty
         let mut h2_err = h2.clone();
         h2_err.difficulty_target = 100; // set the difficulty very very high
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
 
         // invalid nonce
         let mut h2_err = h2.clone();
-        h2_err.nonce = 1001; // over the max nonce
-        consensus.verify_header(&h2_err, &h1, &merkle_root_hash).unwrap_err();
+        h2_err.nonce = std::u32::MAX; // over the max nonce
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
+
+        // invalid proof
+        let mut h2_err = h2.clone();
+        h2_err.proof = ProofOfSuccinctWork::default();
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
+
     }
 }

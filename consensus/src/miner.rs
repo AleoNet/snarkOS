@@ -109,28 +109,29 @@ impl Miner {
         let mut merkle_root_bytes = [0u8; 32];
         merkle_root_bytes[..].copy_from_slice(&merkle_root(&transactions.to_transaction_ids()?));
 
-        let time = Utc::now().timestamp();
+        unimplemented!()
+        // let time = Utc::now().timestamp();
 
-        let header = BlockHeader {
-            previous_block_hash: parent_header.get_hash(),
-            merkle_root_hash: MerkleRootHash(merkle_root_bytes),
-            time,
-            difficulty_target: self.consensus.get_block_difficulty(parent_header, time),
-            nonce: 0u32,
-        };
+        // let header = BlockHeader {
+        //     previous_block_hash: parent_header.get_hash(),
+        //     merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        //     time,
+        //     difficulty_target: self.consensus.get_block_difficulty(parent_header, time),
+        //     nonce: 0u32,
+        // };
 
-        let mut hash_input = header.serialize();
+        // let mut hash_input = header.serialize();
 
-        loop {
-            let nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
+        // loop {
+        //     let nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
 
-            hash_input[80..84].copy_from_slice(&nonce.to_le_bytes());
-            let hash_result = BlockHeader::deserialize(&hash_input).to_difficulty_hash();
+        //     hash_input[80..84].copy_from_slice(&nonce.to_le_bytes());
+        //     let hash_result = BlockHeader::deserialize(&hash_input).to_difficulty_hash();
 
-            if hash_result <= header.difficulty_target {
-                return Ok(BlockHeader::deserialize(&hash_input));
-            }
-        }
+        //     if hash_result <= header.difficulty_target {
+        //         return Ok(BlockHeader::deserialize(&hash_input));
+        //     }
+        // }
     }
 
     /// Returns a mined block.
