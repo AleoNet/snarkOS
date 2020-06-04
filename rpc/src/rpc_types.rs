@@ -16,6 +16,12 @@ pub struct BlockInfo {
     /// Block Size
     pub size: usize,
 
+    /// Block time
+    pub time: i64,
+
+    /// Block difficulty target
+    pub difficulty_target: u64,
+
     /// Nonce
     pub nonce: u32,
 

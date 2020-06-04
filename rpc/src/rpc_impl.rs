@@ -77,6 +77,8 @@ impl RpcFunctions for RpcImpl {
                 height,
                 confirmations: self.storage.get_latest_block_height() - height,
                 size: block.serialize()?.len(),
+                time: block.header.time,
+                difficulty_target: block.header.difficulty_target,
                 nonce: block.header.nonce,
                 merkle_root: hex::encode(block.header.merkle_root_hash.0),
                 transactions,
