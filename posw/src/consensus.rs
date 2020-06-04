@@ -58,7 +58,7 @@ where
 
 impl<S, CP> Posw<S, F, M, HG, CP>
 where
-    S: SNARK<VerifierInput = [F], Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
+    S: SNARK<VerifierInput = Vec<F>, Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
     CP: POSWCircuitParameters,
 {
     /// Loads the PoSW runner from the locally stored parameters. If `verify_only = true`
