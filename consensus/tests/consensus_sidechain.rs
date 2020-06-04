@@ -2,8 +2,7 @@ mod consensus_sidechain {
     use snarkos_consensus::miner::MemoryPool;
     use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
-    use snarkos_storage::test_data::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
     use snarkos_utilities::bytes::FromBytes;
 
     use std::sync::Arc;

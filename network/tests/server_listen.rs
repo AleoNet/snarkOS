@@ -15,8 +15,7 @@ mod server_listen {
         test_data::*,
         Handshakes,
     };
-    use snarkos_storage::test_data::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;

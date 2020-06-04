@@ -219,8 +219,7 @@ mod tests {
     use super::*;
     use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
-    use snarkos_storage::test_data::*;
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::{consensus::*, storage::*};
 
     use std::sync::Arc;
 

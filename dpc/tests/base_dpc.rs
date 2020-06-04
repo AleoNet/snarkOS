@@ -14,8 +14,7 @@ use snarkos_models::{
     objects::LedgerScheme,
 };
 use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
-use snarkos_storage::test_data::*;
-use snarkos_testing::dpc::*;
+use snarkos_testing::{dpc::*, storage::*};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::SeedableRng;

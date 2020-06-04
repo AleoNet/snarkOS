@@ -19,7 +19,7 @@ use snarkos_models::{
     objects::{AccountScheme, LedgerScheme},
 };
 use snarkos_objects::{dpc::DPCTransactions, Account, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
-use snarkos_storage::test_data::*;
+use snarkos_testing::storage::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::SeedableRng;

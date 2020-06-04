@@ -10,13 +10,12 @@ mod consensus_dpc {
         objects::LedgerScheme,
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
-    use snarkos_storage::test_data::kill_storage;
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::{consensus::*, storage::kill_storage};
     use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
     #[test]
     fn base_dpc_multiple_transactions() {
-        let parameters = &FIXTURE.parameters;
+        let parameters = &FIXTURE.paraeters;
         let ledger = FIXTURE.ledger();
         let predicate = FIXTURE.predicate.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();

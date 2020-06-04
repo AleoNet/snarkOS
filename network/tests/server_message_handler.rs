@@ -7,8 +7,7 @@ mod server_message_handler {
         PingState,
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
-    use snarkos_storage::test_data::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,

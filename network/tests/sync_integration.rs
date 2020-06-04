@@ -1,5 +1,4 @@
 mod sync_integration {
-    use snarkos_consensus::test_data::*;
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
         message::{types::*, Channel, Message},
@@ -7,7 +6,7 @@ mod sync_integration {
         test_data::*,
     };
     use snarkos_objects::BlockHeaderHash;
-    use snarkos_storage::test_data::*;
+    use snarkos_testing::{consensus::*, storage::*};
 
     use serial_test::serial;
     use std::sync::Arc;

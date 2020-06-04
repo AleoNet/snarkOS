@@ -6,8 +6,7 @@ mod server_connection_handler {
         test_data::*,
         Channel,
     };
-    use snarkos_storage::test_data::*;
-    use snarkos_testing::dpc::load_verifying_parameters;
+    use snarkos_testing::{dpc::load_verifying_parameters, storage::*};
 
     use chrono::{Duration, Utc};
     use serial_test::serial;
