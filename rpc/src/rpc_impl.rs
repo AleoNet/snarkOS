@@ -1,5 +1,5 @@
 use crate::{rpc_types::*, RpcFunctions};
-use snarkos_consensus::{get_block_reward, miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{get_block_reward, MemoryPool, ConsensusParameters};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;

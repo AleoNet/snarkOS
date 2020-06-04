@@ -511,7 +511,7 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_objects::{ProofOfSuccinctWork, PedersenMerkleRootHash};
+    use snarkos_objects::{PedersenMerkleRootHash, ProofOfSuccinctWork};
 
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
@@ -520,7 +520,7 @@ mod tests {
     fn verify_header() {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
         // mine a PoSW proof
-        let posw = Posw::load(false).unwrap();
+        let posw = Posw::load().unwrap();
         let difficulty_target = u64::MAX;
 
         // mine PoSW for block 1

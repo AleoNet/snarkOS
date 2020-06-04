@@ -61,22 +61,28 @@ where
     S: SNARK<VerifierInput = Vec<F>, Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
     CP: POSWCircuitParameters,
 {
-    /// Loads the PoSW runner from the locally stored parameters. If `verify_only = true`
-    /// is provided, the PoSW runner will work in verify-only mode and any calls to the `mine`
-    /// function will panic.
-    pub fn load(verify_only: bool) -> Result<Self, PoswError> {
+    /// Loads the PoSW runner from the locally stored parameters.
+    pub fn verify_only() -> Result<Self, PoswError> {
         let params = PoswSNARKVKParameters::load_bytes()?;
         let vk = S::VerificationParameters::read(&params[..])?;
 
-        let pk = if verify_only {
-            None
-        } else {
-            let params = PoswSNARKPKParameters::load_bytes()?;
-            Some(S::ProvingParameters::read(&params[..])?)
-        };
+        Ok(Self {
+            pk: None,
+            vk: vk.into(),
+            circuit: PhantomData,
+        })
+    }
+
+    /// Loads the PoSW runner from the locally stored parameters.
+    pub fn load() -> Result<Self, PoswError> {
+        let params = PoswSNARKVKParameters::load_bytes()?;
+        let vk = S::VerificationParameters::read(&params[..])?;
+
+        let params = PoswSNARKPKParameters::load_bytes()?;
+        let pk = S::ProvingParameters::read(&params[..])?;
 
         Ok(Self {
-            pk,
+            pk: Some(pk),
             vk: vk.into(),
             circuit: PhantomData,
         })

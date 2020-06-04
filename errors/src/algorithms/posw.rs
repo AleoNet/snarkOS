@@ -1,7 +1,7 @@
 use crate::{algorithms::SNARKError, curves::constraint_field::ConstraintFieldError, parameters::ParametersError};
 
-use thiserror::Error;
 use std::io::Error as IoError;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 /// An error when generating/verifying a Proof of Succinct Work

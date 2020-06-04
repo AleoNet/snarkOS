@@ -40,7 +40,7 @@ impl Miner {
             address,
             consensus,
             // load the miner with the proving key, this should never fail
-            miner: Posw::load(false).expect("could not instantiate the miner"),
+            miner: Posw::load().expect("could not instantiate the miner"),
         }
     }
 
@@ -188,7 +188,6 @@ impl Miner {
 #[cfg(test)]
 mod tests {
     use crate::{test_data::*, Miner};
-    use snarkos_posw::txids_to_roots;
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
     use snarkos_models::{
@@ -196,6 +195,7 @@ mod tests {
         dpc::DPCComponents,
     };
     use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader};
+    use snarkos_posw::txids_to_roots;
 
     fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
