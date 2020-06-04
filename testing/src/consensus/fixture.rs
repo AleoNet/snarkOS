@@ -1,7 +1,5 @@
-use snarkos_dpc::{
-    base_dpc::instantiated::*,
-    test_data::{generate_test_accounts, setup_or_load_parameters},
-};
+use crate::dpc::{generate_test_accounts, setup_or_load_parameters};
+use snarkos_dpc::base_dpc::instantiated::*;
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
 use snarkos_objects::{Account, Block};

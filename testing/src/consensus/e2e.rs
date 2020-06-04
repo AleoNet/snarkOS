@@ -1,5 +1,5 @@
 use super::*;
-use crate::{
+use snarkos_consensus::{
     miner::{MemoryPool, Miner},
     ConsensusParameters,
 };
