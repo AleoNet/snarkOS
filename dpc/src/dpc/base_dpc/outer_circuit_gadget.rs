@@ -6,7 +6,12 @@ use snarkos_models::{
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{
+            alloc::AllocGadget,
+            eq::EqGadget,
+            uint::unsigned_integer::{UInt, UInt8},
+            ToBytesGadget,
+        },
     },
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -86,15 +91,15 @@ where
     let predicate_input_bits = [
         predicate_input_bytes[0]
             .iter()
-            .flat_map(|byte| byte.into_bits_le())
+            .flat_map(|byte| byte.to_bits_le())
             .collect::<Vec<_>>(),
         predicate_input_bytes[1]
             .iter()
-            .flat_map(|byte| byte.into_bits_le())
+            .flat_map(|byte| byte.to_bits_le())
             .collect::<Vec<_>>(),
         predicate_input_bytes[2]
             .iter()
-            .flat_map(|byte| byte.into_bits_le())
+            .flat_map(|byte| byte.to_bits_le())
             .collect::<Vec<_>>(),
     ];
     // ************************************************************************
@@ -128,7 +133,7 @@ where
 
         old_death_predicate_hashes.push(claimed_death_predicate_hash_bytes);
 
-        let position = UInt8::constant(i as u8).into_bits_le();
+        let position = UInt8::constant(i as u8).to_bits_le();
 
         // Convert the value commitment and value commitment randomness to bytes
         let value_commitment_randomness_fe = ToConstraintField::<C::InnerField>::to_field_elements(
@@ -165,15 +170,15 @@ where
         let value_commitment_input_bits = [
             value_commitment_input_bytes[0]
                 .iter()
-                .flat_map(|byte| byte.into_bits_le())
+                .flat_map(|byte| byte.to_bits_le())
                 .collect::<Vec<_>>(),
             value_commitment_input_bytes[1]
                 .iter()
-                .flat_map(|byte| byte.into_bits_le())
+                .flat_map(|byte| byte.to_bits_le())
                 .collect::<Vec<_>>(),
             value_commitment_input_bytes[2]
                 .iter()
-                .flat_map(|byte| byte.into_bits_le())
+                .flat_map(|byte| byte.to_bits_le())
                 .collect::<Vec<_>>(),
         ];
 
@@ -214,7 +219,7 @@ where
 
         new_birth_predicate_hashes.push(claimed_birth_predicate_hash_bytes);
 
-        let position = UInt8::constant(j as u8).into_bits_le();
+        let position = UInt8::constant(j as u8).to_bits_le();
 
         // Convert the value commitment and value commitment randomness to bytes
         let value_commitment_randomness_fe = ToConstraintField::<C::InnerField>::to_field_elements(
@@ -251,15 +256,15 @@ where
         let value_commitment_input_bits = [
             value_commitment_input_bytes[0]
                 .iter()
-                .flat_map(|byte| byte.into_bits_le())
+                .flat_map(|byte| byte.to_bits_le())
                 .collect::<Vec<_>>(),
             value_commitment_input_bytes[1]
                 .iter()
-                .flat_map(|byte| byte.into_bits_le())
+                .flat_map(|byte| byte.to_bits_le())
                 .collect::<Vec<_>>(),
             value_commitment_input_bytes[2]
                 .iter()
-                .flat_map(|byte| byte.into_bits_le())
+                .flat_map(|byte| byte.to_bits_le())
                 .collect::<Vec<_>>(),
         ];
 

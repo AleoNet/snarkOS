@@ -19,7 +19,7 @@ use snarkos_models::{
             SignaturePublicKeyRandomizationGadget,
         },
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint::UInt8, ToBytesGadget},
     },
 };
 use snarkos_objects::AccountPrivateKey;

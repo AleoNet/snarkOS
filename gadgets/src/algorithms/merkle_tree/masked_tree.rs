@@ -5,7 +5,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::MaskedCRHGadget,
         r1cs::ConstraintSystem,
-        utilities::{uint8::UInt8, ToBytesGadget},
+        utilities::{uint::unsigned_integer::UInt8, ToBytesGadget},
     },
 };
 

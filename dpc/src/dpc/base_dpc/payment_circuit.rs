@@ -9,7 +9,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::CommitmentGadget,
         r1cs::{ConstraintSynthesizer, ConstraintSystem},
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
 };
 

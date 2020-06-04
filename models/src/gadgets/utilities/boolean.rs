@@ -6,7 +6,7 @@ use crate::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
-            uint8::UInt8,
+            uint::UInt8,
             ToBytesGadget,
         },
     },

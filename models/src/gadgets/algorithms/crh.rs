@@ -7,7 +7,7 @@ use crate::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
-            uint8::UInt8,
+            uint::{UInt, UInt8},
             ToBytesGadget,
         },
     },
@@ -40,7 +40,7 @@ pub trait MaskedCRHGadget<H: CRH, F: PrimeField>: CRHGadget<H, F> {
         let extended_mask = mask
             .iter()
             .flat_map(|m| {
-                m.into_bits_le()
+                m.to_bits_le()
                     .chunks(4)
                     .map(|c| {
                         let new_byte = c.into_iter().flat_map(|b| vec![*b, b.not()]).collect::<Vec<_>>();

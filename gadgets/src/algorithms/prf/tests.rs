@@ -10,7 +10,7 @@ use snarkos_models::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
             eq::EqGadget,
-            uint8::UInt8,
+            uint::unsigned_integer::{UInt, UInt8},
         },
     },
 };

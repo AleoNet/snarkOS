@@ -341,7 +341,7 @@ mod tests {
         gadgets::{
             algorithms::BindingSignatureGadget,
             r1cs::{ConstraintSystem, TestConstraintSystem},
-            utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
+            utilities::{alloc::AllocGadget, boolean::Boolean, uint::UInt8},
         },
     };
 
