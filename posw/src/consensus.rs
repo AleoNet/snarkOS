@@ -6,11 +6,7 @@ use snarkos_curves::{
     bls12_377::Fr,
     edwards_bls12::{EdwardsProjective, Fq},
 };
-use snarkos_errors::{
-    algorithms::SNARKError,
-    curves::constraint_field::ConstraintFieldError,
-    parameters::ParametersError,
-};
+use snarkos_errors::algorithms::PoswError;
 use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_models::{
     algorithms::{MerkleParameters, SNARK},
@@ -32,38 +28,13 @@ use snarkos_utilities::{
 
 use blake2::{digest::Digest, Blake2s};
 use rand::Rng;
-use std::{io::Error as IoError, marker::PhantomData};
-use thiserror::Error;
+use std::marker::PhantomData;
 
 // We need to instantiate the Merkle Tree and the Gadget, but these should not be
 // proving system specific
 pub type M = MaskedMerkleTreeParameters;
 pub type HG = PedersenCompressedCRHGadget<EdwardsProjective, Fq, EdwardsBlsGadget>;
 pub type F = Fr;
-
-#[derive(Debug, Error)]
-/// An error when generating/verifying a Proof of Succinct Work
-pub enum PoswError {
-    /// Thrown when the parameters cannot be loaded
-    #[error("could not load PoSW parameters: {0}")]
-    Parameters(#[from] ParametersError),
-
-    /// Thrown when a proof fails verification
-    #[error("could not verify PoSW")]
-    PoswVerificationFailed,
-
-    /// Thrown when there's an internal error in the underlying SNARK
-    #[error(transparent)]
-    SnarkError(#[from] SNARKError),
-
-    /// Thrown when there's an IO error
-    #[error(transparent)]
-    IoError(#[from] IoError),
-
-    /// Thrown if the mask conversion to a field element fails
-    #[error(transparent)]
-    ConstraintFieldError(#[from] ConstraintFieldError),
-}
 
 /// A Proof of Succinct Work miner and verifier
 #[derive(Clone, Debug, PartialEq, Eq)]
