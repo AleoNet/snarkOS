@@ -422,6 +422,7 @@ fn test_uint128_pow_constants() {
 }
 
 #[test]
+#[ignore]
 fn test_uint128_pow() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
