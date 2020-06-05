@@ -1,5 +1,5 @@
 mod server_message_handler {
-    use snarkos_consensus::{miner::Entry, test_data::*};
+    use snarkos_consensus::{memory_pool::Entry, test_data::*};
     use snarkos_dpc::{
         base_dpc::instantiated::{CommitmentMerkleParameters, Tx},
         test_data::load_verifying_parameters,

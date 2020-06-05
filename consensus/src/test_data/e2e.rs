@@ -1,8 +1,5 @@
 use super::*;
-use crate::{
-    miner::{MemoryPool, Miner},
-    ConsensusParameters,
-};
+use crate::{ConsensusParameters, MemoryPool, Miner};
 use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::RecordPayload};
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
@@ -135,7 +132,7 @@ fn setup_and_store_test_data() -> TestData {
     let ledger = FIXTURE.ledger();
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    let consensus = TEST_CONSENSUS;
+    let consensus = TEST_CONSENSUS.clone();
 
     // setup the miner
     let miner = Miner::new(miner_acc.public_key.clone(), consensus.clone());

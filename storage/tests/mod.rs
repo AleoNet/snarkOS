@@ -2,64 +2,20 @@ use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
 };
+use snarkos_consensus::test_data::TestTx;
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_errors::objects::TransactionError;
-use snarkos_models::objects::Transaction;
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
-use snarkos_storage::{test_data::*, Ledger};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
-
-use std::{
-    io::{Read, Result as IoResult, Write},
-    sync::Arc,
+use snarkos_objects::{
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    DPCTransactions,
+    MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
 };
+use snarkos_storage::{test_data::*, Ledger};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TestTx;
-
-impl Transaction for TestTx {
-    type Commitment = [u8; 32];
-    type Memorandum = [u8; 32];
-    type SerialNumber = [u8; 32];
-
-    fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
-        &[[0u8; 32]]
-    }
-
-    fn new_commitments(&self) -> &[Self::Commitment] {
-        &[[0u8; 32]]
-    }
-
-    fn memorandum(&self) -> &Self::Memorandum {
-        &[0u8; 32]
-    }
-
-    fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
-        Ok([0u8; 32])
-    }
-
-    fn size(&self) -> usize {
-        0
-    }
-
-    fn value_balance(&self) -> i64 {
-        0
-    }
-}
-
-impl ToBytes for TestTx {
-    #[inline]
-    fn write<W: Write>(&self, mut _writer: W) -> IoResult<()> {
-        Ok(())
-    }
-}
-
-impl FromBytes for TestTx {
-    #[inline]
-    fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
-        Ok(Self)
-    }
-}
+use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Size;
@@ -102,6 +58,8 @@ mod tests {
                 merkle_root_hash: MerkleRootHash([0; 32]),
                 previous_block_hash: BlockHeaderHash([0; 32]),
                 time: 123,
+                proof: ProofOfSuccinctWork::default(),
+                pedersen_merkle_root_hash: PedersenMerkleRootHash([0; 32]),
             },
             transactions: DPCTransactions::new(),
         };
