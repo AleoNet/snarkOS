@@ -22,6 +22,7 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-network = { path = "../network", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-parameters = { path = "../parameters", version = "0.8.0" }
+snarkos-posw = { path = "../posw", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 

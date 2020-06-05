@@ -6,7 +6,7 @@ use snarkos_models::{
     gadgets::{
         curves::{FpGadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{uint8::UInt8, ToBytesGadget},
+        utilities::{uint::UInt8, ToBytesGadget},
     },
 };
 

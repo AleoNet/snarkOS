@@ -1,5 +1,5 @@
 mod server_message_handler {
-    use snarkos_consensus::miner::Entry;
+    use snarkos_consensus::memory_pool::Entry;
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
         message::{types::*, Channel, Message},

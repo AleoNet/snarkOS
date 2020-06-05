@@ -1,6 +1,13 @@
 mod test_storage {
-    use snarkos_objects::{Block, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
-
+    use snarkos_objects::{
+        Block,
+        BlockHeader,
+        BlockHeaderHash,
+        DPCTransactions,
+        MerkleRootHash,
+        PedersenMerkleRootHash,
+        ProofOfSuccinctWork,
+    };
     use snarkos_testing::storage::*;
 
     use std::sync::Arc;
@@ -30,6 +37,8 @@ mod test_storage {
                 merkle_root_hash: MerkleRootHash([0; 32]),
                 previous_block_hash: BlockHeaderHash([0; 32]),
                 time: 123,
+                proof: ProofOfSuccinctWork::default(),
+                pedersen_merkle_root_hash: PedersenMerkleRootHash([0; 32]),
             },
             transactions: DPCTransactions::new(),
         };

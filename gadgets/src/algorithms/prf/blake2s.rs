@@ -9,8 +9,7 @@ use snarkos_models::{
             alloc::AllocGadget,
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
-            uint32::UInt32,
-            uint8::UInt8,
+            uint::unsigned_integer::{UInt, UInt32, UInt8},
             ToBytesGadget,
         },
     },
@@ -438,7 +437,7 @@ impl<F: PrimeField> PRFGadget<Blake2s, F> for Blake2sGadget {
         // assert_eq!(input.len(), 32);
         let mut gadget_input = vec![];
         for byte in seed.iter().chain(input) {
-            gadget_input.extend_from_slice(&byte.into_bits_le());
+            gadget_input.extend_from_slice(&byte.to_bits_le());
         }
         let mut result = vec![];
         for (i, int) in blake2s_gadget(cs.ns(|| "blake2s_prf"), &gadget_input)?

@@ -23,7 +23,12 @@ use std::{
     PartialEq(bound = "C: BaseDPCComponents"),
     Eq(bound = "C: BaseDPCComponents")
 )]
-pub struct DPCStuff<C: BaseDPCComponents> {
+pub struct DPCTransaction<C: BaseDPCComponents> {
+    // TODO (howardwu): Remove the public visibility here
+    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
+    pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+    pub memorandum: [u8; 32],
+
     pub digest: MerkleTreeDigest<C::MerkleParameters>,
     #[derivative(PartialEq = "ignore")]
     pub inner_proof: <C::InnerSNARK as SNARK>::Proof,
@@ -43,86 +48,6 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
 }
 
-impl<C: BaseDPCComponents> ToBytes for DPCStuff<C> {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.digest.write(&mut writer)?;
-        self.inner_proof.write(&mut writer)?;
-        self.outer_proof.write(&mut writer)?;
-        self.predicate_commitment.write(&mut writer)?;
-        self.local_data_commitment.write(&mut writer)?;
-        self.value_balance.write(&mut writer)?;
-
-        variable_length_integer(self.signatures.len() as u64).write(&mut writer)?;
-        for signature in &self.signatures {
-            signature.write(&mut writer)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let digest: MerkleTreeDigest<C::MerkleParameters> = FromBytes::read(&mut reader)?;
-        let inner_proof: <C::InnerSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
-        let outer_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
-        let predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output =
-            FromBytes::read(&mut reader)?;
-        let local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
-
-        let value_balance: i64 = FromBytes::read(&mut reader)?;
-
-        let num_signatures = read_variable_length_integer(&mut reader)?;
-        let mut signatures = vec![];
-        for _ in 0..num_signatures {
-            let signature: <C::AccountSignature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
-            signatures.push(signature);
-        }
-
-        Ok(Self {
-            digest,
-            inner_proof,
-            outer_proof,
-            predicate_commitment,
-            local_data_commitment,
-            value_balance,
-            signatures,
-        })
-    }
-}
-
-impl<C: BaseDPCComponents> fmt::Debug for DPCStuff<C> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "DPCStuff {{ digest: {:?}, inner_proof: {:?}, predicate_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?} }}",
-            self.digest,
-            self.inner_proof,
-            self.outer_proof,
-            self.predicate_commitment,
-            self.local_data_commitment,
-            self.value_balance,
-            self.signatures,
-        )
-    }
-}
-
-#[derive(Derivative)]
-#[derivative(
-    Clone(bound = "C: BaseDPCComponents"),
-    PartialEq(bound = "C: BaseDPCComponents"),
-    Eq(bound = "C: BaseDPCComponents")
-)]
-pub struct DPCTransaction<C: BaseDPCComponents> {
-    // TODO (howardwu): Remove the public visibility here
-    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
-    pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    pub memorandum: [u8; 32],
-    pub stuff: DPCStuff<C>,
-}
-
 impl<C: BaseDPCComponents> DPCTransaction<C> {
     pub fn new(
         old_serial_numbers: Vec<<Self as Transaction>::SerialNumber>,
@@ -136,7 +61,10 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         value_balance: i64,
         signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
     ) -> Self {
-        let stuff = DPCStuff {
+        Self {
+            old_serial_numbers,
+            new_commitments,
+            memorandum,
             digest,
             inner_proof,
             outer_proof,
@@ -144,12 +72,6 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             local_data_commitment,
             value_balance,
             signatures,
-        };
-        DPCTransaction {
-            old_serial_numbers,
-            new_commitments,
-            memorandum,
-            stuff,
         }
     }
 }
@@ -158,7 +80,6 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
-    type Stuff = DPCStuff<C>;
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
         self.old_serial_numbers.as_slice()
@@ -170,10 +91,6 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
 
     fn memorandum(&self) -> &Self::Memorandum {
         &self.memorandum
-    }
-
-    fn stuff(&self) -> &Self::Stuff {
-        &self.stuff
     }
 
     /// Transaction id = Hash of (serial numbers || commitments || memo)
@@ -205,7 +122,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     }
 
     fn value_balance(&self) -> i64 {
-        self.stuff().value_balance
+        self.value_balance
     }
 }
 
@@ -224,7 +141,19 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
 
         self.memorandum.write(&mut writer)?;
 
-        self.stuff.write(&mut writer)
+        self.digest.write(&mut writer)?;
+        self.inner_proof.write(&mut writer)?;
+        self.outer_proof.write(&mut writer)?;
+        self.predicate_commitment.write(&mut writer)?;
+        self.local_data_commitment.write(&mut writer)?;
+        self.value_balance.write(&mut writer)?;
+
+        variable_length_integer(self.signatures.len() as u64).write(&mut writer)?;
+        for signature in &self.signatures {
+            signature.write(&mut writer)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -246,13 +175,34 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         }
 
         let memorandum: [u8; 32] = FromBytes::read(&mut reader)?;
-        let stuff: DPCStuff<C> = FromBytes::read(&mut reader)?;
+
+        let digest: MerkleTreeDigest<C::MerkleParameters> = FromBytes::read(&mut reader)?;
+        let inner_proof: <C::InnerSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
+        let outer_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
+        let predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output =
+            FromBytes::read(&mut reader)?;
+        let local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
+
+        let value_balance: i64 = FromBytes::read(&mut reader)?;
+
+        let num_signatures = read_variable_length_integer(&mut reader)?;
+        let mut signatures = vec![];
+        for _ in 0..num_signatures {
+            let signature: <C::AccountSignature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
+            signatures.push(signature);
+        }
 
         Ok(Self {
             old_serial_numbers,
             new_commitments,
             memorandum,
-            stuff,
+            digest,
+            inner_proof,
+            outer_proof,
+            predicate_commitment,
+            local_data_commitment,
+            value_balance,
+            signatures,
         })
     }
 }
@@ -261,8 +211,17 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DPCTransaction {{ old_serial_numbers: {:?}, new_commitments: {:?}, memorandum: {:?}, stuff: {:?} }}",
-            self.old_serial_numbers, self.new_commitments, self.memorandum, self.stuff,
+            "DPCTransaction {{ old_serial_numbers: {:?}, new_commitments: {:?}, memorandum: {:?}, digest: {:?}, inner_proof: {:?}, outer_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?} }}",
+            self.old_serial_numbers,
+            self.new_commitments,
+            self.memorandum,
+            self.digest,
+            self.inner_proof,
+            self.outer_proof,
+            self.predicate_commitment,
+            self.local_data_commitment,
+            self.value_balance,
+            self.signatures,
         )
     }
 }

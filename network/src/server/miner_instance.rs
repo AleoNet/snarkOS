@@ -1,8 +1,5 @@
 use crate::{context::Context, server::propagate_block};
-use snarkos_consensus::{
-    miner::{MemoryPool, Miner},
-    ConsensusParameters,
-};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_objects::{AccountPublicKey, Block};
 

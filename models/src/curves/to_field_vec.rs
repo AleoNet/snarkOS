@@ -22,6 +22,13 @@ impl<F: Field> ToConstraintField<F> for [F] {
     }
 }
 
+impl<F: Field> ToConstraintField<F> for Vec<F> {
+    #[inline]
+    fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
+        Ok(self.to_vec())
+    }
+}
+
 impl<F: Field> ToConstraintField<F> for () {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {

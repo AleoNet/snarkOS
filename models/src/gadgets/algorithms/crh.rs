@@ -7,7 +7,7 @@ use crate::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
-            uint8::UInt8,
+            uint::{UInt, UInt8},
             ToBytesGadget,
         },
     },
@@ -16,7 +16,7 @@ use snarkos_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 
-pub trait CRHGadget<H: CRH, F: Field>: Sized {
+pub trait CRHGadget<H: CRH, F: Field>: Sized + Clone {
     type ParametersGadget: AllocGadget<H::Parameters, F> + Clone;
     type OutputGadget: ConditionalEqGadget<F>
         + EqGadget<F>
@@ -40,7 +40,7 @@ pub trait MaskedCRHGadget<H: CRH, F: PrimeField>: CRHGadget<H, F> {
         let extended_mask = mask
             .iter()
             .flat_map(|m| {
-                m.into_bits_le()
+                m.to_bits_le()
                     .chunks(4)
                     .map(|c| {
                         let new_byte = c.into_iter().flat_map(|b| vec![*b, b.not()]).collect::<Vec<_>>();

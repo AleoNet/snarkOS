@@ -13,7 +13,16 @@ use snarkos_models::{
     dpc::DPCScheme,
     objects::LedgerScheme,
 };
-use snarkos_objects::{dpc::DPCTransactions, merkle_root, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
+use snarkos_objects::{
+    dpc::DPCTransactions,
+    merkle_root,
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+};
 use snarkos_testing::{dpc::*, storage::*};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -37,9 +46,11 @@ fn base_dpc_integration_test() {
         header: BlockHeader {
             previous_block_hash: BlockHeaderHash([0u8; 32]),
             merkle_root_hash: MerkleRootHash([0u8; 32]),
+            pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
             time: 0,
             difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
+            proof: ProofOfSuccinctWork::default(),
         },
         transactions: DPCTransactions::new(),
     };
@@ -229,6 +240,8 @@ fn base_dpc_integration_test() {
         time,
         difficulty_target: previous_block.header.difficulty_target,
         nonce: 0,
+        pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+        proof: ProofOfSuccinctWork::default(),
     };
 
     assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());

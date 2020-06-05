@@ -6,7 +6,11 @@ use snarkos_models::{
     gadgets::{
         algorithms::CommitmentGadget,
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{
+            alloc::AllocGadget,
+            uint::unsigned_integer::{UInt, UInt8},
+            ToBytesGadget,
+        },
     },
 };
 
@@ -28,7 +32,7 @@ impl<F: PrimeField> CommitmentGadget<Blake2sCommitment, F> for Blake2sCommitment
     ) -> Result<Self::OutputGadget, SynthesisError> {
         let mut input_bits = vec![];
         for byte in input.iter().chain(r.0.iter()) {
-            input_bits.extend_from_slice(&byte.into_bits_le());
+            input_bits.extend_from_slice(&byte.to_bits_le());
         }
 
         let mut result = vec![];

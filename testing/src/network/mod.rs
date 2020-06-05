@@ -1,5 +1,5 @@
 use crate::consensus::*;
-use snarkos_consensus::miner::MemoryPool;
+use snarkos_consensus::MemoryPool;
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, MerkleTreeLedger},
     parameters::PublicParameters,
@@ -35,7 +35,7 @@ pub fn initialize_test_server(
     parameters: PublicParameters<Components>,
     connection_frequency: u64,
 ) -> Server {
-    let consensus = TEST_CONSENSUS;
+    let consensus = TEST_CONSENSUS.clone();
     let memory_pool = MemoryPool::new();
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 

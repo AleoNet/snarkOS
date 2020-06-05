@@ -2,7 +2,15 @@ use snarkos_dpc::base_dpc::{instantiated::Components, transaction::DPCTransactio
 use snarkos_errors::objects::TransactionError;
 use snarkos_genesis::Transaction1;
 use snarkos_models::genesis::Genesis;
-use snarkos_objects::{merkle_root, BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash};
+use snarkos_objects::{
+    merkle_root,
+    BlockHeader,
+    BlockHeaderHash,
+    DPCTransactions,
+    MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+};
 use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;
@@ -14,7 +22,6 @@ use std::{
 
 pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
     // Add transactions to block
-
     let mut transactions = DPCTransactions::new();
 
     let transaction_1 = DPCTransaction::<C>::read(Transaction1::load_bytes().as_slice())?;
@@ -31,6 +38,8 @@ pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
         time: Utc::now().timestamp(),
         difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
         nonce: 0,
+        pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+        proof: ProofOfSuccinctWork::default(),
     };
 
     Ok(genesis_header.serialize().to_vec())
@@ -43,7 +52,7 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
     Ok(())
 }
 
-pub fn main() {
+fn main() {
     let bytes = generate::<Components>().unwrap();
     let filename = PathBuf::from("block_header.genesis");
     store(&filename, &bytes).unwrap();

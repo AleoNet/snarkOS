@@ -10,7 +10,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, uint8::UInt8},
+        utilities::{alloc::AllocGadget, uint::UInt8},
     },
 };
 
