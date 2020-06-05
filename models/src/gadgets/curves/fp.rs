@@ -13,7 +13,7 @@ use crate::{
             boolean::{AllocatedBit, Boolean},
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
-            uint8::UInt8,
+            uint::unsigned_integer::{UInt, UInt8},
             ToBitsGadget,
             ToBytesGadget,
         },
@@ -395,7 +395,7 @@ impl<F: PrimeField> ToBytesGadget<F> for FpGadget<F> {
             &mut cs,
             &bytes
                 .iter()
-                .flat_map(|byte_gadget| byte_gadget.into_bits_le())
+                .flat_map(|byte_gadget| byte_gadget.to_bits_le())
                 // This reverse maps the bits into big-endian form, as required by `enforce_in_field`.
                 .rev()
                 .collect::<Vec<_>>(),

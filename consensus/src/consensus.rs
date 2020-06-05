@@ -544,10 +544,10 @@ mod tests {
             previous_block_hash: BlockHeaderHash([0; 32]),
             merkle_root_hash: merkle_root_hash1,
             pedersen_merkle_root_hash: pedersen_merkle_root1,
-            difficulty_target,
             nonce: nonce1,
-            time: 9999999,
             proof: proof1,
+            difficulty_target,
+            time: 9999999,
         };
 
         let h2 = BlockHeader {

@@ -9,7 +9,10 @@ use snarkos_models::{
         algorithms::CommitmentGadget,
         curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, uint8::UInt8},
+        utilities::{
+            alloc::AllocGadget,
+            uint::unsigned_integer::{UInt, UInt8},
+        },
     },
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -125,13 +128,13 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
         assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
 
         // Allocate new variable for commitment output.
-        let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.into_bits_le()).collect();
+        let input_in_bits: Vec<_> = padded_input.iter().flat_map(|byte| byte.to_bits_le()).collect();
         let input_in_bits = input_in_bits.chunks(S::WINDOW_SIZE);
         let mut result =
             GG::precomputed_base_multiscalar_mul(cs.ns(|| "msm"), &parameters.parameters.bases, input_in_bits)?;
 
         // Compute h^r
-        let rand_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
+        let rand_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.to_bits_le()).collect();
         result.precomputed_base_scalar_mul(
             cs.ns(|| "randomizer"),
             rand_bits.iter().zip(&parameters.parameters.random_base),

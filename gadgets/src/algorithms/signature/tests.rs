@@ -10,7 +10,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::SignaturePublicKeyRandomizationGadget,
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
 };
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};

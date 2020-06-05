@@ -2,7 +2,10 @@ use crate::{
     curves::Field,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{boolean::Boolean, uint8::UInt8},
+        utilities::{
+            boolean::Boolean,
+            uint::unsigned_integer::{UInt, UInt8},
+        },
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
@@ -11,8 +14,7 @@ pub mod alloc;
 pub mod boolean;
 pub mod eq;
 pub mod select;
-pub mod uint32;
-pub mod uint8;
+pub mod uint;
 
 pub trait ToBitsGadget<F: Field> {
     fn to_bits<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Vec<Boolean>, SynthesisError>;
@@ -54,7 +56,7 @@ impl<F: Field> ToBitsGadget<F> for [UInt8] {
     fn to_bits<CS: ConstraintSystem<F>>(&self, _cs: CS) -> Result<Vec<Boolean>, SynthesisError> {
         let mut result = Vec::with_capacity(&self.len() * 8);
         for byte in self {
-            result.extend_from_slice(&byte.into_bits_le());
+            result.extend_from_slice(&byte.to_bits_le());
         }
         Ok(result)
     }
@@ -92,6 +94,16 @@ impl<'a, F: Field, T: 'a + ToBytesGadget<F>> ToBytesGadget<F> for &'a T {
 }
 
 impl<'a, F: Field> ToBytesGadget<F> for &'a [UInt8] {
+    fn to_bytes<CS: ConstraintSystem<F>>(&self, _cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        Ok(self.to_vec())
+    }
+
+    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.to_bytes(cs)
+    }
+}
+
+impl<F: Field> ToBytesGadget<F> for Vec<UInt8> {
     fn to_bytes<CS: ConstraintSystem<F>>(&self, _cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
         Ok(self.to_vec())
     }

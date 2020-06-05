@@ -3,7 +3,7 @@ use crate::{
     curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint8::UInt8, ToBytesGadget},
+        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint::UInt8, ToBytesGadget},
     },
 };
 use snarkos_errors::gadgets::SynthesisError;

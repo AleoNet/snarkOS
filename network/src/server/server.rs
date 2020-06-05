@@ -1,5 +1,4 @@
 use crate::{
-    bootnodes::MAINNET_BOOTNODES,
     context::Context,
     message::{Channel, MessageName},
     protocol::*,
@@ -83,19 +82,11 @@ impl Server {
     /// Send a handshake request to all bootnodes from config.
     async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
         let local_address = self.context.local_address;
-        let hardcoded_bootnodes = MAINNET_BOOTNODES
-            .iter()
-            .map(|node| (*node).to_string())
-            .collect::<Vec<String>>();
 
         for bootnode in self.context.bootnodes.clone() {
-            // Bootnodes should not connect to hardcoded bootnodes.
-            if self.context.is_bootnode && hardcoded_bootnodes.contains(&bootnode) {
-                continue;
-            }
-
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
 
+            // This node should not attempt to connect to itself.
             if local_address != bootnode_address {
                 info!("Connecting to bootnode: {:?}", bootnode_address);
 
