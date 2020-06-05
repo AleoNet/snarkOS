@@ -29,8 +29,8 @@ pub trait RpcFunctions {
     #[rpc(name = "sendtransaction")]
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError>;
 
-    //    #[rpc(name = "decoderecord")]
-    //    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
+    #[rpc(name = "decoderecord")]
+    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 
     #[rpc(name = "getconnectioncount")]
     fn get_connection_count(&self) -> Result<usize, RpcError>;
