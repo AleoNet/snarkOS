@@ -95,7 +95,7 @@ mod consensus_dpc {
         assert!(!spend_records[1].is_dummy());
         assert_eq!(spend_records[0].value(), 10);
         assert_eq!(spend_records[1].value(), 10);
-        assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
+        assert_eq!(transaction.value_balance, (block_reward - 20) as i64);
 
         assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
 

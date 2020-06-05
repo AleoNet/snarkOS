@@ -38,31 +38,6 @@ pub struct PeerInfo {
     pub peers: Vec<SocketAddr>,
 }
 
-/// Additional transaction attributes
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionStuff {
-    /// Merkle tree digest
-    pub digest: String,
-
-    /// Inner snark proof
-    pub inner_proof: String,
-
-    /// Predicate proof
-    pub predicate_proof: String,
-
-    /// Predicate verification key commitment
-    pub predicate_commitment: String,
-
-    /// Local data commitment
-    pub local_data_commitment: String,
-
-    /// Transaction value balance
-    pub value_balance: i64,
-
-    /// Transaction signatures (Delegated DPC)
-    pub signatures: Vec<String>,
-}
-
 /// Returned value for the `gettransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionInfo {
@@ -81,8 +56,26 @@ pub struct TransactionInfo {
     /// Transaction Memo
     pub memo: String,
 
-    /// DPC Stuff
-    pub stuff: RPCTransactionStuff,
+    /// Merkle tree digest
+    pub digest: String,
+
+    /// Inner snark proof
+    pub inner_proof: String,
+
+    /// Outer snark proof
+    pub outer_proof: String,
+
+    /// Predicate verification key commitment
+    pub predicate_commitment: String,
+
+    /// Local data commitment
+    pub local_data_commitment: String,
+
+    /// Transaction value balance
+    pub value_balance: i64,
+
+    /// Transaction signatures (Delegated DPC)
+    pub signatures: Vec<String>,
 }
 
 /// Record payload

@@ -21,7 +21,6 @@ impl Transaction for TestTx {
     type Commitment = [u8; 32];
     type Memorandum = [u8; 32];
     type SerialNumber = [u8; 32];
-    type Stuff = [u8; 32];
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
         &[[0u8; 32]]
@@ -32,10 +31,6 @@ impl Transaction for TestTx {
     }
 
     fn memorandum(&self) -> &Self::Memorandum {
-        &[0u8; 32]
-    }
-
-    fn stuff(&self) -> &Self::Stuff {
         &[0u8; 32]
     }
 
