@@ -19,7 +19,7 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 base58 = { version = "0.1" }
-bech32 = { version = "0.6" }
+bech32 = { version = "0.7" }
 chrono = { version = "0.4", features = ["serde"] }
 derivative = { version = "2" }
 hex = { version = "0.4.2" }
