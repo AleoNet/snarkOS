@@ -3,10 +3,14 @@ use crate::{
     parameters::{flag, option, types::*},
 };
 use snarkos_errors::node::CliError;
-use snarkos_network::bootnodes::*;
 
 use clap::ArgMatches;
 use serde::Serialize;
+
+/// Hardcoded bootnodes maintained by Aleo.
+/// A node should try and connect to these first after coming online.
+pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
+pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:14130"
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize)]
