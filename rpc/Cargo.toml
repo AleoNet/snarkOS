@@ -23,7 +23,7 @@ snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
-jsonrpc-core = { version = "14.0.5" }
+jsonrpc-core = { version = "14.2.0" }
 jsonrpc-core-client = { version = "14.0.5" }
 jsonrpc-derive = { version = "14.0.5" }
 jsonrpc-http-server = { version = "14.0.5" }
