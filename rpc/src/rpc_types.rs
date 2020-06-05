@@ -8,13 +8,19 @@ pub struct BlockInfo {
     pub hash: String,
 
     /// Block Height
-    pub height: u32,
+    pub height: Option<u32>,
 
     /// Number of confirmations
     pub confirmations: u32,
 
     /// Block Size
     pub size: usize,
+
+    /// Block time
+    pub time: i64,
+
+    /// Block difficulty target
+    pub difficulty_target: u64,
 
     /// Nonce
     pub nonce: u32,
@@ -27,9 +33,6 @@ pub struct BlockInfo {
 
     /// Previous block hash
     pub previous_block_hash: String,
-
-    /// Next block hash
-    pub next_block_hash: String,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
@@ -81,11 +84,8 @@ pub struct TransactionInfo {
 /// Record payload
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RPCRecordPayload {
-    /// Record balance
-    pub balance: u64,
-
-    /// Record lock
-    pub lock: u32,
+    /// Record payload
+    pub payload: String,
 }
 
 /// Returned value for the `decoderawrecord` rpc call
@@ -97,7 +97,10 @@ pub struct RecordInfo {
     /// Record is dummy flag
     pub is_dummy: bool,
 
-    /// Record Payload
+    /// Record value
+    pub value: u64,
+
+    /// Record payload
     pub payload: RPCRecordPayload,
 
     /// Record birth predicate bytes

@@ -4,7 +4,6 @@ use snarkos_models::{
     algorithms::MerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::dpc::DPCTransactions;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
@@ -48,21 +47,5 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         }
 
         Ok(false)
-    }
-
-    /// Calculate the miner transaction fees from transactions.
-    pub fn calculate_transaction_fees(&self, transactions: &DPCTransactions<T>) -> Result<u64, StorageError> {
-        let mut balance = 0;
-
-        for transaction in transactions.iter() {
-            let value_balance = transaction.value_balance();
-
-            // Only add to the transaction fee if the transaction is not a coinbase transaction
-            if !value_balance.is_negative() {
-                balance += value_balance as u64;
-            }
-        }
-
-        Ok(balance)
     }
 }
