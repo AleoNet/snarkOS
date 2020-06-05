@@ -1,7 +1,8 @@
 use crate::{
-    algorithms::{CRHError, PoswError},
+    algorithms::CRHError,
     dpc::DPCError,
     objects::{BlockError, TransactionError},
+    posw::PoswError,
     storage::StorageError,
 };
 

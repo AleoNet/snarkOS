@@ -15,6 +15,3 @@ pub use self::signature::*;
 
 pub mod snark;
 pub use self::snark::*;
-
-pub mod posw;
-pub use posw::PoswError;

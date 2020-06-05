@@ -171,22 +171,10 @@ impl RpcFunctions for RpcImpl {
 
         let memo = hex::encode(to_bytes![transaction.memorandum()]?);
 
-        let transaction_stuff = &transaction.stuff;
-
         let mut signatures = vec![];
-        for sig in &transaction_stuff.signatures {
+        for sig in &transaction.signatures {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
-
-        let stuff = RPCTransactionStuff {
-            digest: hex::encode(to_bytes![transaction_stuff.digest]?),
-            inner_proof: hex::encode(to_bytes![transaction_stuff.inner_proof]?),
-            predicate_proof: hex::encode(to_bytes![transaction_stuff.predicate_proof]?),
-            predicate_commitment: hex::encode(to_bytes![transaction_stuff.predicate_commitment]?),
-            local_data_commitment: hex::encode(to_bytes![transaction_stuff.local_data_commitment]?),
-            value_balance: transaction_stuff.value_balance,
-            signatures,
-        };
 
         Ok(TransactionInfo {
             txid: hex::encode(&transaction.transaction_id()?),
@@ -194,7 +182,13 @@ impl RpcFunctions for RpcImpl {
             old_serial_numbers,
             new_commitments,
             memo,
-            stuff,
+            digest: hex::encode(to_bytes![transaction.digest]?),
+            inner_proof: hex::encode(to_bytes![transaction.inner_proof]?),
+            outer_proof: hex::encode(to_bytes![transaction.outer_proof]?),
+            predicate_commitment: hex::encode(to_bytes![transaction.predicate_commitment]?),
+            local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
+            value_balance: transaction.value_balance,
+            signatures,
         })
     }
 

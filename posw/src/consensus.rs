@@ -6,7 +6,7 @@ use snarkos_curves::{
     bls12_377::Fr,
     edwards_bls12::{EdwardsProjective, Fq},
 };
-use snarkos_errors::algorithms::PoswError;
+use snarkos_errors::posw::PoswError;
 use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_models::{
     algorithms::{MerkleParameters, SNARK},
