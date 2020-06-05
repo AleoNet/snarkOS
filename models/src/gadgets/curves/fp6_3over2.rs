@@ -14,7 +14,7 @@ use crate::{
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
-            uint8::UInt8,
+            uint::UInt8,
             ToBitsGadget,
             ToBytesGadget,
         },

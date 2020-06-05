@@ -6,7 +6,11 @@ use snarkos_models::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
+        utilities::{
+            alloc::AllocGadget,
+            boolean::Boolean,
+            uint::unsigned_integer::{UInt, UInt8},
+        },
     },
 };
 
@@ -87,7 +91,7 @@ fn pad_input_and_bitify<S: PedersenSize>(input: &[UInt8]) -> Vec<Boolean> {
     let mut padded_input = input.to_vec();
     padded_input.resize(S::WINDOW_SIZE * S::NUM_WINDOWS / 8, UInt8::constant(0u8));
     assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
-    padded_input.into_iter().flat_map(|byte| byte.into_bits_le()).collect()
+    padded_input.into_iter().flat_map(|byte| byte.to_bits_le()).collect()
 }
 
 impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHGadget<PedersenCRH<G, S>, F>

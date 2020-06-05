@@ -10,7 +10,7 @@ use snarkos_models::{
             alloc::AllocGadget,
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
-            uint8::UInt8,
+            uint::unsigned_integer::{UInt, UInt8},
             ToBytesGadget,
         },
     },
@@ -154,7 +154,7 @@ impl<G: Group, GG: GroupGadget<G, F>, D: Digest + Send + Sync, F: Field>
         randomness: &[UInt8],
     ) -> Result<Self::PublicKeyGadget, SynthesisError> {
         let base = parameters.generator.clone();
-        let randomness = randomness.iter().flat_map(|b| b.into_bits_le()).collect::<Vec<_>>();
+        let randomness = randomness.iter().flat_map(|b| b.to_bits_le()).collect::<Vec<_>>();
         let rand_pk = base.mul_bits(
             &mut cs.ns(|| "check_randomization_gadget"),
             &public_key.public_key,
