@@ -8,7 +8,7 @@ use crate::{
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
-            uint8::UInt8,
+            uint::unsigned_integer::UInt8,
             ToBitsGadget,
             ToBytesGadget,
         },

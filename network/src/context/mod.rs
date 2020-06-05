@@ -1,9 +1,6 @@
 pub mod address_book;
 pub use self::address_book::*;
 
-pub mod bootnodes;
-pub use self::bootnodes::*;
-
 pub mod connections;
 pub use self::connections::*;
 

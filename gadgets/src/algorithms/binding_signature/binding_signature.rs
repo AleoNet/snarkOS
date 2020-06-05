@@ -8,7 +8,11 @@ use snarkos_models::{
         algorithms::{BindingSignatureGadget, CommitmentGadget},
         curves::CompressedGroupGadget,
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
+        utilities::{
+            alloc::AllocGadget,
+            boolean::Boolean,
+            uint::unsigned_integer::{UInt, UInt8},
+        },
     },
 };
 
@@ -56,7 +60,7 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
         let negative_bvk = partial_bvk.add(cs.ns(|| "construct_negative_bvk"), &value_balance_comm)?;
         let positive_bvk = partial_bvk.sub(cs.ns(|| "construct_positive_bvk"), &value_balance_comm)?;
 
-        let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.into_bits_le()).collect();
+        let c_bits: Vec<_> = c.0.iter().flat_map(|byte| byte.to_bits_le()).collect();
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
 
         let negative_result = negative_bvk.mul_bits(cs.ns(|| "mul_bits_negative"), &zero, c_bits.iter())?;

@@ -339,7 +339,7 @@ mod tests {
     use snarkos_models::gadgets::{
         algorithms::BindingSignatureGadget,
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
+        utilities::{alloc::AllocGadget, boolean::Boolean, uint::UInt8},
     };
 
     use snarkos_utilities::rand::UniformRand;
