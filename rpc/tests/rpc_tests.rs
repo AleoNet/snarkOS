@@ -1,241 +1,337 @@
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//    use snarkos_dpc_consensus::test_data::*;
-//    use snarkos_dpc_network::test_data::*;
-//    use snarkos_storage::test_data::*;
-//
-//    use jsonrpc_test as json_test;
-//    use jsonrpc_test::Rpc;
-//    use serde_json::Value;
-//    use std::{collections::HashMap, net::SocketAddr};
-//
-//    pub const GENESIS_BLOCK_JSON: &'static str = "{\n  \"confirmations\": 0,\n  \"hash\": \"3a8a5db71a2e00007b47cac0c43e5b96ca6f0107dd98ab568ac51b829856a46a\",\n  \"height\": 0,\n  \"merkle_root\": \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\",\n  \"next_block_hash\": \"This is the latest block\",\n  \"nonce\": 121136,\n  \"previous_block_hash\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"size\": 166,\n  \"transactions\": [\n    \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\"\n  ]\n}";
-//    pub const GENESIS_UNSPENT: &'static str =
-//        "[\n  [\n    \"b3d9ad9de8e21b2b3a9ffb40bae6fefa852026e7fb2e279322cd7589a20ee355\",\n    0\n  ]\n]";
-//
-//    pub const TEST_TRANSACTION_UNSIGNED: &str = "0100000001758103bb958ba3222e96641e1b39d21e640d325146c2c7aa869a926f8369c5c400000000000110270000000000001976a914ba4fecdfa1d8a56dbf248f1337cefdf06cfc1f6a88ac";
-//    pub const TEST_TRANSACTION_SIGNED: &str = "0100000001758103bb958ba3222e96641e1b39d21e640d325146c2c7aa869a926f8369c5c4000000006a473045022100d26dc37d53907d3e28a941e7c192f9d7fdc07644bab79676106d150b9e059301022036bbd1044a566f86b189e8a5f6c428832f67503d9199bc21843f1672cae5daab2103ca64499d857698431e999035fd22d97896b1dff672739ad9acb8643cdd2be9510110270000000000001976a914ba4fecdfa1d8a56dbf248f1337cefdf06cfc1f6a88ac";
-//    pub const TEST_TRANSACTION_JSON: &str = "{\n  \"inputs\": [\n    {\n      \"script_sig\": \"473045022100d26dc37d53907d3e28a941e7c192f9d7fdc07644bab79676106d150b9e059301022036bbd1044a566f86b189e8a5f6c428832f67503d9199bc21843f1672cae5daab2103ca64499d857698431e999035fd22d97896b1dff672739ad9acb8643cdd2be951\",\n      \"txid\": \"758103bb958ba3222e96641e1b39d21e640d325146c2c7aa869a926f8369c5c4\",\n      \"vout\": 0\n    }\n  ],\n  \"outputs\": [\n    {\n      \"amount\": 10000,\n      \"script_pub_key\": \"76a914ba4fecdfa1d8a56dbf248f1337cefdf06cfc1f6a88ac\"\n    }\n  ],\n  \"size\": 183,\n  \"txid\": \"c8cdbf72a885b8382f4789a9005546468bc91263c4dc8d92f3724e11f64487a6\",\n  \"version\": 1\n}";
-//    pub const TEST_TRANSACTION_TXID: &str = "758103bb958ba3222e96641e1b39d21e640d325146c2c7aa869a926f8369c5c4";
-//    pub const TEST_TRANSACTION_PRIVATE_KEY: &str = "1Hz8RzEXYPF6z8o7z5SHVnjzmhqS5At5kU";
-//    pub const TEST_TRANSACTION_SPENDABLE: u64 = 10000u64;
-//
-//    fn initialize_test_rpc(storage: Arc<MerkleTreeLedger>) -> Rpc {
-//        let bootnode_address = random_socket_address();
-//        let server_address = random_socket_address();
-//
-//        let server = initialize_test_server(
-//            server_address,
-//            bootnode_address,
-//            storage.clone(),
-//            CONNECTION_FREQUENCY_LONG,
-//        );
-//
-//        let consensus = TEST_CONSENSUS;
-//
-//        json_test::Rpc::new(
-//            RpcImpl::new(storage, server.context.clone(), consensus, server.memory_pool_lock).to_delegate(),
-//        )
-//    }
-//
-//    fn make_request_no_params(rpc: Rpc, method: String) -> Value {
-//        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method,);
-//
-//        let response = rpc.io.handle_request_sync(&request).unwrap();
-//
-//        let extracted: Value = serde_json::from_str(&response).unwrap();
-//
-//        extracted["result"].clone()
-//    }
-//
-//    #[test]
-//    fn test_add() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        assert_eq!(rpc.request("add", &[1, 2]), r#"3"#);
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_block_call() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        assert_eq!(
-//            rpc.request("getblock", &[GENESIS_BLOCK_HEADER_HASH]),
-//            GENESIS_BLOCK_JSON
-//        );
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_block_count() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let method = "getblockcount".to_string();
-//
-//        let result = make_request_no_params(rpc, method);
-//
-//        assert_eq!(result.as_u64().unwrap(), 1u64);
-//
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_best_block_hash() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let method = "getbestblockhash".to_string();
-//
-//        let result = make_request_no_params(rpc, method);
-//
-//        assert_eq!(result.as_str().unwrap(), GENESIS_BLOCK_HEADER_HASH.to_string());
-//
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_block_hash() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        assert_eq!(rpc.request("getblockhash", &[0u32]), format![
-//            r#""{}""#,
-//            GENESIS_BLOCK_HEADER_HASH
-//        ]);
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_raw_transaction() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        assert_eq!(rpc.request("getrawtransaction", &[GENESIS_TRANSACTION_ID]), format![
-//            r#""{}""#,
-//            GENESIS_TRANSACTION
-//        ]);
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-////    #[test]
-////    fn test_create_raw_transaction() {
-////        let (storage, path) = open_test_blockchain();
-////        let rpc = initialize_test_rpc(storage);
-////
-////        let inputs = RPCTransactionOutpoint {
-////            txid: TEST_TRANSACTION_TXID.into(),
-////            vout: 0,
-////        };
-////
-////        let mut map = HashMap::new();
-////        map.insert(TEST_TRANSACTION_PRIVATE_KEY.to_string(), TEST_TRANSACTION_SPENDABLE);
-////
-////        let outputs = RPCTransactionOutputs(map);
-////
-////        assert_eq!(rpc.request("createrawtransaction", &(vec![inputs], outputs)), format![
-////            r#""{}""#,
-////            TEST_TRANSACTION_UNSIGNED
-////        ]);
-////
-////        drop(rpc);
-////        kill_storage_async(path);
-////    }
-//
-//    #[test]
-//    fn test_decode_raw_transaction() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        assert_eq!(
-//            rpc.request("decoderawtransaction", &[TEST_TRANSACTION_SIGNED]),
-//            TEST_TRANSACTION_JSON
-//        );
-//
-//        drop(rpc);
-//        kill_storage_async(path);
-//    }
-//
-////    #[test]
-////    fn test_send_raw_transaction() {
-////        let (storage, path) = open_test_blockchain();
-////        let rpc = initialize_test_rpc(storage);
-////
-////        assert_eq!(
-////            rpc.request("sendrawtransaction", &[BLOCK_1_TRANSACTION]),
-////            r#""Transaction contains spent outputs""#
-////        );
-////
-////        drop(rpc);
-////        kill_storage_async(path);
-////    }
-//
-//    #[test]
-//    fn test_get_connection_count() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let method = "getconnectioncount".to_string();
-//
-//        let result = make_request_no_params(rpc, method);
-//
-//        assert_eq!(result.as_u64().unwrap(), 0u64);
-//
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_peer_info() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let method = "getpeerinfo".to_string();
-//
-//        let result = make_request_no_params(rpc, method);
-//
-//        let peer_info: PeerInfo = serde_json::from_value(result).unwrap();
-//
-//        let expected_peers: Vec<SocketAddr> = vec![];
-//
-//        assert_eq!(peer_info.peers, expected_peers);
-//
-//        kill_storage_async(path);
-//    }
-//
-//    #[test]
-//    fn test_get_block_template() {
-//        let (storage, path) = open_test_blockchain();
-//        let rpc = initialize_test_rpc(storage);
-//
-//        let method = "getblocktemplate".to_string();
-//
-//        let result = make_request_no_params(rpc, method);
-//
-//        let template: BlockTemplate = serde_json::from_value(result).unwrap();
-//
-//        let expected_transactions: Vec<String> = vec![];
-//
-//        assert_eq!(
-//            template.previous_block_hash,
-//            "0000000000000000000000000000000000000000000000000000000000000000".to_string()
-//        );
-//        assert_eq!(template.block_height, 0);
-//        assert_eq!(template.difficulty_target, 281474976710654);
-//        assert_eq!(template.transactions, expected_transactions);
-//        assert_eq!(template.coinbase_value, 100_000_000);
-//
-//        kill_storage_async(path);
-//    }
-//}
+mod rpc_tests {
+    use snarkos_consensus::get_block_reward;
+    use snarkos_dpc::dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
+    use snarkos_models::objects::Transaction;
+    use snarkos_rpc::*;
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
+    use snarkos_utilities::{
+        bytes::{FromBytes, ToBytes},
+        to_bytes,
+    };
+
+    use jsonrpc_test as json_test;
+    use jsonrpc_test::Rpc;
+    use serde_json::Value;
+    use snarkos_models::dpc::Record;
+    use std::{net::SocketAddr, sync::Arc};
+
+    fn initialize_test_rpc(storage: &Arc<MerkleTreeLedger>) -> Rpc {
+        let bootnode_address = random_socket_address();
+        let server_address = random_socket_address();
+
+        let parameters = load_verifying_parameters();
+
+        let server = initialize_test_server(
+            server_address,
+            bootnode_address,
+            storage.clone(),
+            parameters,
+            CONNECTION_FREQUENCY_LONG,
+        );
+
+        let consensus = TEST_CONSENSUS;
+
+        json_test::Rpc::new(
+            RpcImpl::new(
+                storage.clone(),
+                server.context.clone(),
+                consensus,
+                server.memory_pool_lock,
+            )
+            .to_delegate(),
+        )
+    }
+
+    fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {
+        let transaction = Tx::read(&transaction_bytes[..]).unwrap();
+
+        let transaction_id = hex::encode(transaction.transaction_id().unwrap());
+        let transaction_size = transaction_bytes.len();
+        let old_serial_numbers: Vec<Value> = transaction
+            .old_serial_numbers()
+            .iter()
+            .map(|sn| Value::String(hex::encode(to_bytes![sn].unwrap())))
+            .collect();
+        let new_commitments: Vec<Value> = transaction
+            .new_commitments()
+            .iter()
+            .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
+            .collect();
+        let memo = hex::encode(transaction.memorandum());
+
+        assert_eq!(transaction_id, transaction_info["txid"]);
+        assert_eq!(transaction_size, transaction_info["size"]);
+        assert_eq!(Value::Array(old_serial_numbers), transaction_info["old_serial_numbers"]);
+        assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
+        assert_eq!(memo, transaction_info["memo"]);
+
+        let digest = hex::encode(to_bytes![transaction.stuff.digest].unwrap());
+        let inner_proof = hex::encode(to_bytes![transaction.stuff.inner_proof].unwrap());
+        let outer_proof = hex::encode(to_bytes![transaction.stuff.outer_proof].unwrap());
+        let predicate_commitment = hex::encode(to_bytes![transaction.stuff.predicate_commitment].unwrap());
+        let local_data_commitment = hex::encode(to_bytes![transaction.stuff.local_data_commitment].unwrap());
+        let value_balance = transaction.stuff.value_balance;
+        let signatures: Vec<Value> = transaction
+            .stuff
+            .signatures
+            .iter()
+            .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
+            .collect();
+
+        assert_eq!(digest, transaction_info["stuff"]["digest"]);
+        assert_eq!(inner_proof, transaction_info["stuff"]["inner_proof"]);
+        assert_eq!(outer_proof, transaction_info["stuff"]["outer_proof"]);
+        assert_eq!(predicate_commitment, transaction_info["stuff"]["predicate_commitment"]);
+        assert_eq!(
+            local_data_commitment,
+            transaction_info["stuff"]["local_data_commitment"]
+        );
+        assert_eq!(value_balance, transaction_info["stuff"]["value_balance"]);
+        assert_eq!(Value::Array(signatures), transaction_info["stuff"]["signatures"]);
+    }
+
+    fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
+        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method,);
+
+        let response = rpc.io.handle_request_sync(&request).unwrap();
+
+        let extracted: Value = serde_json::from_str(&response).unwrap();
+
+        extracted["result"].clone()
+    }
+
+    #[test]
+    fn test_get_block_call() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let response = rpc.request("getblock", &[hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]);
+
+        let block_response: Value = serde_json::from_str(&response).unwrap();
+
+        let genesis_block = genesis();
+
+        assert_eq!(hex::encode(genesis_block.header.get_hash().0), block_response["hash"]);
+        assert_eq!(
+            hex::encode(genesis_block.header.merkle_root_hash.0),
+            block_response["merkle_root"]
+        );
+        assert_eq!(
+            hex::encode(genesis_block.header.previous_block_hash.0),
+            block_response["previous_block_hash"]
+        );
+        assert_eq!(genesis_block.header.time, block_response["time"]);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_block_count() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getblockcount".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        assert_eq!(result.as_u64().unwrap(), 1u64);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_best_block_hash() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getbestblockhash".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        assert_eq!(
+            result.as_str().unwrap(),
+            hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())
+        );
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_block_hash() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        assert_eq!(rpc.request("getblockhash", &[0u32]), format![
+            r#""{}""#,
+            hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())
+        ]);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_raw_transaction() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let genesis_block = genesis();
+
+        let transaction = &genesis_block.transactions.0[0];
+        let transaction_id = hex::encode(transaction.transaction_id().unwrap());
+
+        assert_eq!(rpc.request("getrawtransaction", &[transaction_id]), format![
+            r#""{}""#,
+            hex::encode(to_bytes![transaction].unwrap())
+        ]);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_transaction_info() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let genesis_block = genesis();
+        let transaction = &genesis_block.transactions.0[0];
+
+        let response = rpc.request("gettransactioninfo", &[hex::encode(
+            transaction.transaction_id().unwrap(),
+        )]);
+
+        let transaction_info: Value = serde_json::from_str(&response).unwrap();
+
+        verify_transaction_info(to_bytes![transaction].unwrap(), transaction_info);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_decode_raw_transaction() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let response = rpc.request("decoderawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]);
+
+        let transaction_info: Value = serde_json::from_str(&response).unwrap();
+
+        verify_transaction_info(TRANSACTION_1.to_vec(), transaction_info);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_send_raw_transaction() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+
+        assert_eq!(
+            rpc.request("sendtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),
+            format![r#""{}""#, hex::encode(transaction.transaction_id().unwrap())]
+        );
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_decode_record() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let record = &DATA.records_1[0];
+
+        let response = rpc.request("decoderecord", &[hex::encode(to_bytes![record].unwrap())]);
+        let record_info: Value = serde_json::from_str(&response).unwrap();
+
+        let account_public_key = hex::encode(to_bytes![record.account_public_key()].unwrap());
+        let is_dummy = record.is_dummy();
+        let value = record.value();
+        let birth_predicate_repr = hex::encode(to_bytes![record.birth_predicate_repr()].unwrap());
+        let death_predicate_repr = hex::encode(to_bytes![record.death_predicate_repr()].unwrap());
+        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()].unwrap());
+        let commitment = hex::encode(to_bytes![record.commitment()].unwrap());
+        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()].unwrap());
+
+        assert_eq!(account_public_key, record_info["account_public_key"]);
+        assert_eq!(is_dummy, record_info["is_dummy"]);
+        assert_eq!(value, record_info["value"]);
+        assert_eq!(birth_predicate_repr, record_info["birth_predicate_repr"]);
+        assert_eq!(death_predicate_repr, record_info["death_predicate_repr"]);
+        assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
+        assert_eq!(commitment, record_info["commitment"]);
+        assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_connection_count() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getconnectioncount".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        assert_eq!(result.as_u64().unwrap(), 0u64);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_peer_info() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getpeerinfo".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        let peer_info: PeerInfo = serde_json::from_value(result).unwrap();
+
+        let expected_peers: Vec<SocketAddr> = vec![];
+
+        assert_eq!(peer_info.peers, expected_peers);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_get_block_template() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getblocktemplate".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        let template: BlockTemplate = serde_json::from_value(result).unwrap();
+
+        let expected_transactions: Vec<String> = vec![];
+
+        let new_height = storage.get_latest_block_height() + 1;
+        let block_reward = get_block_reward(new_height);
+        let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
+
+        assert_eq!(template.previous_block_hash, latest_block_hash);
+        assert_eq!(template.block_height, new_height);
+        assert_eq!(template.transactions, expected_transactions);
+        assert!(template.coinbase_value >= block_reward);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+}

@@ -50,8 +50,8 @@ pub struct RPCTransactionStuff {
     /// Inner snark proof
     pub inner_proof: String,
 
-    /// Predicate proof
-    pub predicate_proof: String,
+    /// Outer snark proof
+    pub outer_proof: String,
 
     /// Predicate verification key commitment
     pub predicate_commitment: String,

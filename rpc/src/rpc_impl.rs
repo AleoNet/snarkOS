@@ -156,7 +156,7 @@ impl RpcFunctions for RpcImpl {
         let stuff = RPCTransactionStuff {
             digest: hex::encode(to_bytes![transaction_stuff.digest]?),
             inner_proof: hex::encode(to_bytes![transaction_stuff.inner_proof]?),
-            predicate_proof: hex::encode(to_bytes![transaction_stuff.outer_proof]?),
+            outer_proof: hex::encode(to_bytes![transaction_stuff.outer_proof]?),
             predicate_commitment: hex::encode(to_bytes![transaction_stuff.predicate_commitment]?),
             local_data_commitment: hex::encode(to_bytes![transaction_stuff.local_data_commitment]?),
             value_balance: transaction_stuff.value_balance,
@@ -192,7 +192,7 @@ impl RpcFunctions for RpcImpl {
 
                 Ok(hex::encode(transaction.transaction_id()?))
             }
-            Err(_) => Ok("Transaction contains spent outputs".into()),
+            Err(_) => Ok("Transaction contains spent records".into()),
         }
     }
 
@@ -262,7 +262,7 @@ impl RpcFunctions for RpcImpl {
 
         Ok(BlockTemplate {
             previous_block_hash: hex::encode(&block.header.get_hash().0),
-            block_height,
+            block_height: block_height + 1,
             time,
             difficulty_target: self.consensus.get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
