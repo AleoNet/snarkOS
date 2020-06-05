@@ -111,6 +111,22 @@ impl<T: Transaction> DPCTransactions<T> {
 
         false
     }
+
+    /// Calculate the miner transaction fees from transactions.
+    pub fn calculate_transaction_fees(&self) -> u64 {
+        let mut balance = 0;
+
+        for transaction in self.0.iter() {
+            let value_balance = transaction.value_balance();
+
+            // Only add to the transaction fee if the transaction is not a coinbase transaction
+            if !value_balance.is_negative() {
+                balance += value_balance as u64;
+            }
+        }
+
+        balance
+    }
 }
 
 impl<T: Transaction> ToBytes for DPCTransactions<T> {

@@ -906,7 +906,7 @@ where
             transaction.memorandum(),
             transaction.stuff.digest,
             transaction.stuff.inner_proof,
-            transaction.stuff.predicate_proof
+            transaction.stuff.outer_proof
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
