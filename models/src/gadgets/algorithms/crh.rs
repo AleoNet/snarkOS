@@ -16,7 +16,7 @@ use snarkos_errors::gadgets::SynthesisError;
 
 use std::fmt::Debug;
 
-pub trait CRHGadget<H: CRH, F: Field>: Sized {
+pub trait CRHGadget<H: CRH, F: Field>: Sized + Clone {
     type ParametersGadget: AllocGadget<H::Parameters, F> + Clone;
     type OutputGadget: ConditionalEqGadget<F>
         + EqGadget<F>

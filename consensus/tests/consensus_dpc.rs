@@ -1,10 +1,5 @@
 mod consensus_dpc {
-    use snarkos_consensus::{
-        get_block_reward,
-        miner::{MemoryPool, Miner},
-        test_data::*,
-        ConsensusParameters,
-    };
+    use snarkos_consensus::{get_block_reward, test_data::*, ConsensusParameters, MemoryPool, Miner};
     use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
     use snarkos_models::{
         dpc::{DPCScheme, Record},
@@ -22,7 +17,7 @@ mod consensus_dpc {
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
         let mut rng = FIXTURE.rng.clone();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
         let miner = Miner::new(miner_acc.public_key, consensus.clone());
 
         println!("Creating block with coinbase transaction");
@@ -95,7 +90,7 @@ mod consensus_dpc {
         assert!(!spend_records[1].is_dummy());
         assert_eq!(spend_records[0].value(), 10);
         assert_eq!(spend_records[1].value(), 10);
-        assert_eq!(transaction.stuff.value_balance, (block_reward - 20) as i64);
+        assert_eq!(transaction.value_balance, (block_reward - 20) as i64);
 
         assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
 

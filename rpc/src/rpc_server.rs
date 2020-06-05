@@ -1,5 +1,5 @@
 use crate::{RpcFunctions, RpcImpl};
-use snarkos_consensus::{miner::MemoryPool, ConsensusParameters};
+use snarkos_consensus::{ConsensusParameters, MemoryPool};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_network::context::Context;
 
