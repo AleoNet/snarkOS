@@ -4,7 +4,7 @@ pub struct GenesisBlockHeader;
 
 impl Genesis for GenesisBlockHeader {
     const CHECKSUM: &'static str = "";
-    const SIZE: u64 = 84;
+    const SIZE: u64 = 503;
 
     fn load_bytes() -> Vec<u8> {
         let buffer = include_bytes!("block_header.genesis");

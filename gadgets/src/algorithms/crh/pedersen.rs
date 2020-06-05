@@ -134,8 +134,8 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
-    _group: PhantomData<*const G>,
-    _group_gadget: PhantomData<*const GG>,
+    _group: PhantomData<fn() -> G>,
+    _group_gadget: PhantomData<fn() -> GG>,
     _engine: PhantomData<F>,
 }
 

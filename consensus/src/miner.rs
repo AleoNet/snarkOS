@@ -1,18 +1,21 @@
-use crate::{miner::MemoryPool, ConsensusParameters};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use crate::{ConsensusParameters, MemoryPool};
+use snarkos_dpc::{
+    base_dpc::{instantiated::*, parameters::PublicParameters},
+    dpc::base_dpc::record::DPCRecord,
+};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH},
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{dpc::DPCTransactions, merkle_root, AccountPublicKey, Block, BlockHeader, MerkleRootHash};
+use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, Block, BlockHeader};
+use snarkos_posw::{txids_to_roots, Posw};
 use snarkos_storage::Ledger;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
-use snarkos_dpc::dpc::base_dpc::record::DPCRecord;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -25,12 +28,20 @@ pub struct Miner {
 
     /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
+
+    /// The miner instance (must be initialized with a Proving Key)
+    miner: Posw,
 }
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
     pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters) -> Self {
-        Self { address, consensus }
+        Self {
+            address,
+            consensus,
+            // load the miner with the proving key, this should never fail
+            miner: Posw::load().expect("could not instantiate the miner"),
+        }
     }
 
     /// Fetches new transactions from the memory pool.
@@ -101,36 +112,37 @@ impl Miner {
 
     /// Run proof of work to find block.
     /// Returns BlockHeader with nonce solution.
-    pub fn find_block(
+    pub fn find_block<T: Transaction>(
         &self,
-        transactions: &DPCTransactions<Tx>,
+        transactions: &DPCTransactions<T>,
         parent_header: &BlockHeader,
     ) -> Result<BlockHeader, ConsensusError> {
-        let mut merkle_root_bytes = [0u8; 32];
-        merkle_root_bytes[..].copy_from_slice(&merkle_root(&transactions.to_transaction_ids()?));
+        let txids = transactions.to_transaction_ids()?;
+        let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&txids);
 
         let time = Utc::now().timestamp();
+        let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
 
-        let header = BlockHeader {
+        // TODO: Switch this to use a user-provided RNG
+        let (nonce, proof) = self
+            .miner
+            .mine(
+                subroots,
+                difficulty_target,
+                &mut rand::thread_rng(),
+                self.consensus.max_nonce,
+            )
+            .unwrap();
+
+        Ok(BlockHeader {
             previous_block_hash: parent_header.get_hash(),
-            merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+            merkle_root_hash,
+            pedersen_merkle_root_hash,
             time,
-            difficulty_target: self.consensus.get_block_difficulty(parent_header, time),
-            nonce: 0u32,
-        };
-
-        let mut hash_input = header.serialize();
-
-        loop {
-            let nonce = rand::thread_rng().gen_range(0, self.consensus.max_nonce);
-
-            hash_input[80..84].copy_from_slice(&nonce.to_le_bytes());
-            let hash_result = BlockHeader::deserialize(&hash_input).to_difficulty_hash();
-
-            if hash_result <= header.difficulty_target {
-                return Ok(BlockHeader::deserialize(&hash_input));
-            }
-        }
+            difficulty_target,
+            nonce,
+            proof,
+        })
     }
 
     /// Returns a mined block.
@@ -170,5 +182,55 @@ impl Miner {
         storage.store_records(&coinbase_records)?;
 
         Ok((block.serialize()?, coinbase_records))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{test_data::*, Miner};
+    use rand::{Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
+    use snarkos_models::{
+        algorithms::{commitment::CommitmentScheme, signature::SignatureScheme},
+        dpc::DPCComponents,
+    };
+    use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader};
+    use snarkos_posw::txids_to_roots;
+
+    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
+        let sig_params = C::AccountSignature::setup(rng).unwrap();
+        let comm_params = C::AccountCommitment::setup(rng);
+
+        let key = AccountPrivateKey::<C>::new(&sig_params, &[0; 32], rng).unwrap();
+        let pubkey = AccountPublicKey::from(&comm_params, &key).unwrap();
+
+        (key, pubkey)
+    }
+
+    // this test ensures that a block is found by running the proof of work
+    // and that it doesnt loop forever
+    fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
+        let consensus = TEST_CONSENSUS.clone();
+        let mut rng = XorShiftRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
+
+        let (_, miner_address) = keygen(&mut rng);
+        let miner = Miner::new(miner_address, consensus.clone());
+
+        let header = miner.find_block(transactions, parent_header).unwrap();
+
+        // generate the verifier args
+        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transactions.to_transaction_ids().unwrap());
+
+        // ensure that our POSW proof passes
+        consensus
+            .verify_header(&header, parent_header, &merkle_root, &pedersen_merkle_root)
+            .unwrap();
+    }
+
+    #[test]
+    fn find_valid_block() {
+        let transactions = DPCTransactions(vec![TestTx; 3]);
+        let parent_header = genesis().header;
+        test_find_block(&transactions, &parent_header);
     }
 }

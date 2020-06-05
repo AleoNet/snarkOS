@@ -12,7 +12,7 @@ use crate::{
     message::types::{Block, Transaction},
     Context,
 };
-use snarkos_consensus::miner::{Entry, MemoryPool};
+use snarkos_consensus::memory_pool::{Entry, MemoryPool};
 use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
 use snarkos_errors::network::SendError;
 use snarkos_utilities::bytes::FromBytes;
