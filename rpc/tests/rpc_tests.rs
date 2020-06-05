@@ -29,8 +29,7 @@ mod rpc_tests {
             CONNECTION_FREQUENCY_LONG,
         );
 
-        let consensus = TEST_CONSENSUS;
-
+        let consensus = TEST_CONSENSUS.clone();
         json_test::Rpc::new(
             RpcImpl::new(
                 storage.clone(),
@@ -65,29 +64,25 @@ mod rpc_tests {
         assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
         assert_eq!(memo, transaction_info["memo"]);
 
-        let digest = hex::encode(to_bytes![transaction.stuff.digest].unwrap());
-        let inner_proof = hex::encode(to_bytes![transaction.stuff.inner_proof].unwrap());
-        let outer_proof = hex::encode(to_bytes![transaction.stuff.outer_proof].unwrap());
-        let predicate_commitment = hex::encode(to_bytes![transaction.stuff.predicate_commitment].unwrap());
-        let local_data_commitment = hex::encode(to_bytes![transaction.stuff.local_data_commitment].unwrap());
-        let value_balance = transaction.stuff.value_balance;
+        let digest = hex::encode(to_bytes![transaction.digest].unwrap());
+        let inner_proof = hex::encode(to_bytes![transaction.inner_proof].unwrap());
+        let outer_proof = hex::encode(to_bytes![transaction.outer_proof].unwrap());
+        let predicate_commitment = hex::encode(to_bytes![transaction.predicate_commitment].unwrap());
+        let local_data_commitment = hex::encode(to_bytes![transaction.local_data_commitment].unwrap());
+        let value_balance = transaction.value_balance;
         let signatures: Vec<Value> = transaction
-            .stuff
             .signatures
             .iter()
             .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
             .collect();
 
-        assert_eq!(digest, transaction_info["stuff"]["digest"]);
-        assert_eq!(inner_proof, transaction_info["stuff"]["inner_proof"]);
-        assert_eq!(outer_proof, transaction_info["stuff"]["outer_proof"]);
-        assert_eq!(predicate_commitment, transaction_info["stuff"]["predicate_commitment"]);
-        assert_eq!(
-            local_data_commitment,
-            transaction_info["stuff"]["local_data_commitment"]
-        );
-        assert_eq!(value_balance, transaction_info["stuff"]["value_balance"]);
-        assert_eq!(Value::Array(signatures), transaction_info["stuff"]["signatures"]);
+        assert_eq!(digest, transaction_info["digest"]);
+        assert_eq!(inner_proof, transaction_info["inner_proof"]);
+        assert_eq!(outer_proof, transaction_info["outer_proof"]);
+        assert_eq!(predicate_commitment, transaction_info["predicate_commitment"]);
+        assert_eq!(local_data_commitment, transaction_info["local_data_commitment"]);
+        assert_eq!(value_balance, transaction_info["value_balance"]);
+        assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
     }
 
     fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
