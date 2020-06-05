@@ -18,7 +18,7 @@ mod consensus_sidechain {
 
         let mut memory_pool = MemoryPool::new();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let old_block_height = blockchain.get_latest_block_height();
 
@@ -55,7 +55,7 @@ mod consensus_sidechain {
 
         let mut memory_pool = MemoryPool::new();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
         let block_1_side = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
@@ -95,7 +95,7 @@ mod consensus_sidechain {
 
         let mut memory_pool = MemoryPool::new();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let block_1_canon = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
         let block_1_side = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
@@ -140,7 +140,7 @@ mod consensus_sidechain {
 
         let mut memory_pool = MemoryPool::new();
 
-        let consensus = TEST_CONSENSUS;
+        let consensus = TEST_CONSENSUS.clone();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
         let block_2_canon = Block::<Tx>::read(&BLOCK_2[..]).unwrap();

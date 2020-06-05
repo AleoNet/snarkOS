@@ -11,7 +11,7 @@ use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Block<T: Transaction> {
-    /// First 84 bytes of the block as defined by the encoding used by
+    /// First `HEADER_SIZE` bytes of the block as defined by the encoding used by
     /// "block" messages.
     pub header: BlockHeader,
     /// The block transactions.
@@ -65,10 +65,11 @@ impl<T: Transaction> Block<T> {
     }
 
     pub fn deserialize(bytes: &Vec<u8>) -> Result<Self, BlockError> {
-        let (header_bytes, transactions_bytes) = bytes.split_at(84);
+        const HEADER_SIZE: usize = BlockHeader::size();
+        let (header_bytes, transactions_bytes) = bytes.split_at(HEADER_SIZE);
 
-        let mut header_array: [u8; 84] = [0u8; 84];
-        header_array.copy_from_slice(&header_bytes[0..84]);
+        let mut header_array = [0u8; HEADER_SIZE];
+        header_array.copy_from_slice(&header_bytes[0..HEADER_SIZE]);
         let header = BlockHeader::deserialize(&header_array);
 
         let transactions: DPCTransactions<T> = FromBytes::read(transactions_bytes)?;

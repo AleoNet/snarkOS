@@ -2,6 +2,7 @@ use crate::{
     algorithms::CRHError,
     dpc::DPCError,
     objects::{BlockError, TransactionError},
+    posw::PoswError,
     storage::StorageError,
 };
 
@@ -61,8 +62,14 @@ pub enum ConsensusError {
     #[error("expected {:?} actual {:?}", _0, _1)]
     NoParent(String, String),
 
+    #[error("block subroots do not hash to the pedersen merkle root {0}")]
+    PedersenMerkleRoot(String),
+
     #[error("header greater than difficulty target {:?} actual {:?}", _0, _1)]
     PowInvalid(u64, u64),
+
+    #[error(transparent)]
+    PoswError(#[from] PoswError),
 
     #[error("{}", _0)]
     StorageError(StorageError),

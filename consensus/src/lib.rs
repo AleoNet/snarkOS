@@ -8,3 +8,7 @@ pub mod difficulty;
 pub use self::difficulty::*;
 
 pub mod miner;
+pub use miner::Miner;
+
+pub mod memory_pool;
+pub use memory_pool::MemoryPool;

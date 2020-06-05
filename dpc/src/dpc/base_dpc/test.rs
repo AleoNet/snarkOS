@@ -18,7 +18,17 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
-use snarkos_objects::{dpc::DPCTransactions, Account, Block, BlockHeader, BlockHeaderHash, MerkleRootHash};
+
+use snarkos_objects::{
+    dpc::DPCTransactions,
+    Account,
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    MerkleRootHash,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+};
 use snarkos_testing::storage::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
@@ -59,6 +69,8 @@ fn test_execute_base_dpc_constraints() {
             time: 0,
             difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
             nonce: 0,
+            pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
+            proof: ProofOfSuccinctWork::default(),
         },
         transactions: DPCTransactions::new(),
     };
