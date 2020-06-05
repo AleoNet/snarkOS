@@ -28,7 +28,7 @@ pub struct DPCStuff<C: BaseDPCComponents> {
     #[derivative(PartialEq = "ignore")]
     pub inner_proof: <C::InnerSNARK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
-    pub predicate_proof: <C::OuterSNARK as SNARK>::Proof,
+    pub outer_proof: <C::OuterSNARK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     #[derivative(PartialEq = "ignore")]
@@ -48,7 +48,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCStuff<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.digest.write(&mut writer)?;
         self.inner_proof.write(&mut writer)?;
-        self.predicate_proof.write(&mut writer)?;
+        self.outer_proof.write(&mut writer)?;
         self.predicate_commitment.write(&mut writer)?;
         self.local_data_commitment.write(&mut writer)?;
         self.value_balance.write(&mut writer)?;
@@ -67,7 +67,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let digest: MerkleTreeDigest<C::MerkleParameters> = FromBytes::read(&mut reader)?;
         let inner_proof: <C::InnerSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
-        let predicate_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
+        let outer_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
         let predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output =
             FromBytes::read(&mut reader)?;
         let local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
@@ -84,7 +84,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCStuff<C> {
         Ok(Self {
             digest,
             inner_proof,
-            predicate_proof,
+            outer_proof,
             predicate_commitment,
             local_data_commitment,
             value_balance,
@@ -100,7 +100,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCStuff<C> {
             "DPCStuff {{ digest: {:?}, inner_proof: {:?}, predicate_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?} }}",
             self.digest,
             self.inner_proof,
-            self.predicate_proof,
+            self.outer_proof,
             self.predicate_commitment,
             self.local_data_commitment,
             self.value_balance,
@@ -130,7 +130,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         memorandum: <Self as Transaction>::Memorandum,
         digest: MerkleTreeDigest<C::MerkleParameters>,
         inner_proof: <C::InnerSNARK as SNARK>::Proof,
-        predicate_proof: <C::OuterSNARK as SNARK>::Proof,
+        outer_proof: <C::OuterSNARK as SNARK>::Proof,
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
         value_balance: i64,
@@ -139,7 +139,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         let stuff = DPCStuff {
             digest,
             inner_proof,
-            predicate_proof,
+            outer_proof,
             predicate_commitment,
             local_data_commitment,
             value_balance,

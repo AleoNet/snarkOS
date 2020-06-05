@@ -894,7 +894,7 @@ where
         if !Components::OuterSNARK::verify(
             &parameters.outer_snark_parameters.1,
             &input,
-            &transaction.stuff.predicate_proof,
+            &transaction.stuff.outer_proof,
         )? {
             eprintln!("Predicate check NIZK didn't verify.");
             return Ok(false);
