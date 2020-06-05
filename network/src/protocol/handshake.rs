@@ -135,7 +135,9 @@ impl Handshake {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{message::Message, test_data::random_socket_address};
+    use crate::message::Message;
+    use snarkos_testing::network::random_socket_address;
+
     use serial_test::serial;
     use tokio::net::TcpListener;
 

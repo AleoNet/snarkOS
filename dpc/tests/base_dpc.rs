@@ -1,15 +1,12 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::PreparedVerifyingKey;
-use snarkos_dpc::{
-    base_dpc::{
-        instantiated::*,
-        predicate::PrivatePredicateInput,
-        predicate_circuit::*,
-        record_payload::RecordPayload,
-        LocalData,
-        DPC,
-    },
-    test_data::*,
+use snarkos_dpc::base_dpc::{
+    instantiated::*,
+    predicate::PrivatePredicateInput,
+    predicate_circuit::*,
+    record_payload::RecordPayload,
+    LocalData,
+    DPC,
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},
@@ -26,7 +23,7 @@ use snarkos_objects::{
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
-use snarkos_storage::test_data::*;
+use snarkos_testing::{dpc::*, storage::*};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::SeedableRng;

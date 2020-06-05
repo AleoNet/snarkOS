@@ -12,6 +12,3 @@ pub use miner::Miner;
 
 pub mod memory_pool;
 pub use memory_pool::MemoryPool;
-
-#[allow(dead_code)]
-pub mod test_data;

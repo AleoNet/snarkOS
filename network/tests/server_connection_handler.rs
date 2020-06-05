@@ -1,15 +1,10 @@
 mod server_connection_handler {
-    use snarkos_consensus::test_data::FIXTURE_VK;
-    use snarkos_dpc::{
-        base_dpc::instantiated::{CommitmentMerkleParameters, Tx},
-        test_data::load_verifying_parameters,
-    };
+    use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
         message::{types::GetMemoryPool, Message},
-        test_data::*,
         Channel,
     };
-    use snarkos_storage::test_data::*;
+    use snarkos_testing::{consensus::FIXTURE_VK, dpc::load_verifying_parameters, network::*, storage::*};
 
     use chrono::{Duration, Utc};
     use serial_test::serial;

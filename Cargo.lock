@@ -2033,7 +2033,6 @@ dependencies = [
  "futures-await-test",
  "hex",
  "log",
- "once_cell",
  "rand",
  "rand_xorshift",
  "serde",
@@ -2046,6 +2045,7 @@ dependencies = [
  "snarkos-posw",
  "snarkos-profiler",
  "snarkos-storage",
+ "snarkos-testing",
  "snarkos-utilities",
  "tokio 0.2.21",
 ]
@@ -2093,6 +2093,7 @@ dependencies = [
  "snarkos-parameters",
  "snarkos-profiler",
  "snarkos-storage",
+ "snarkos-testing",
  "snarkos-utilities",
 ]
 
@@ -2174,6 +2175,7 @@ dependencies = [
  "snarkos-models",
  "snarkos-objects",
  "snarkos-storage",
+ "snarkos-testing",
  "snarkos-utilities",
  "tokio 0.2.21",
  "tokio-test",
@@ -2285,7 +2287,31 @@ dependencies = [
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
+ "snarkos-testing",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-testing"
+version = "0.8.0"
+dependencies = [
+ "once_cell",
+ "rand",
+ "rand_xorshift",
+ "snarkos-algorithms",
+ "snarkos-consensus",
+ "snarkos-curves",
+ "snarkos-dpc",
+ "snarkos-errors",
+ "snarkos-genesis",
+ "snarkos-models",
+ "snarkos-network",
+ "snarkos-objects",
+ "snarkos-parameters",
+ "snarkos-posw",
+ "snarkos-storage",
+ "snarkos-utilities",
+ "tokio 0.2.21",
 ]
 
 [[package]]

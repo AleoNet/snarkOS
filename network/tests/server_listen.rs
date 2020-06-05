@@ -1,11 +1,8 @@
 mod server_listen {
-    use snarkos_consensus::{test_data::*, MemoryPool};
-    use snarkos_dpc::{
-        base_dpc::{
-            instantiated::{CommitmentMerkleParameters, Components, MerkleTreeLedger, Tx},
-            parameters::PublicParameters,
-        },
-        test_data::load_verifying_parameters,
+    use snarkos_consensus::MemoryPool;
+    use snarkos_dpc::base_dpc::{
+        instantiated::{CommitmentMerkleParameters, Components, MerkleTreeLedger, Tx},
+        parameters::PublicParameters,
     };
     use snarkos_network::{
         context::Context,
@@ -15,10 +12,9 @@ mod server_listen {
         },
         protocol::SyncHandler,
         server::Server,
-        test_data::*,
         Handshakes,
     };
-    use snarkos_storage::test_data::*;
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;

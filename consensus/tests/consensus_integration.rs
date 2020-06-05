@@ -1,7 +1,8 @@
 mod consensus_integration {
-    use snarkos_consensus::{miner::Miner, test_data::*};
+    use snarkos_consensus::miner::Miner;
     use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
+    use snarkos_testing::consensus::*;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever

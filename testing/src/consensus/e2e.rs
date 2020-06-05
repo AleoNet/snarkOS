@@ -1,6 +1,6 @@
 use super::*;
-use crate::{ConsensusParameters, MemoryPool, Miner};
-use snarkos_dpc::base_dpc::{record::DPCRecord, record_payload::RecordPayload};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, Miner};
+use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
     dpc::{DPCScheme, Record},

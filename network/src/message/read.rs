@@ -33,10 +33,9 @@ pub async fn stream_read<'a, T: AsyncRead + Unpin>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        message::{message::Message, types::Ping, MessageHeader},
-        test_data::random_socket_address,
-    };
+    use crate::message::{message::Message, types::Ping, MessageHeader};
+    use snarkos_testing::network::random_socket_address;
+
     use serial_test::serial;
     use tokio::net::{TcpListener, TcpStream};
 

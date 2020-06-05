@@ -33,7 +33,7 @@ impl Message for Block {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_consensus::test_data::BLOCK_1;
+    use snarkos_testing::consensus::BLOCK_1;
 
     #[test]
     fn test_block() {
