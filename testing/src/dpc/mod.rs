@@ -1,4 +1,4 @@
-use crate::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH},
     dpc::DPCScheme,
@@ -10,11 +10,6 @@ use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_utilities::bytes::FromBytes;
 
 use rand::Rng;
-
-pub struct Wallet {
-    pub private_key: &'static str,
-    pub public_key: &'static str,
-}
 
 pub fn setup_or_load_parameters<R: Rng>(
     verify_only: bool,

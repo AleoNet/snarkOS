@@ -50,7 +50,7 @@ impl Message for Verack {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_data::random_socket_address;
+    use snarkos_testing::network::random_socket_address;
 
     #[test]
     fn test_verack() {

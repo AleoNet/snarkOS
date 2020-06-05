@@ -46,9 +46,6 @@ extern crate derivative;
 pub mod dpc;
 pub use crate::dpc::*;
 
-#[allow(dead_code)]
-pub mod test_data;
-
 use snarkos_errors::gadgets::SynthesisError;
 
 pub trait Assignment<T> {

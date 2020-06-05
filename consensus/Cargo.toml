@@ -27,11 +27,12 @@ bincode = { version="1.2.0" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
 log = { version = "0.4.8" }
-once_cell = { version = "1.4.0" }
 rand = { version = "0.7.3" }
-rand_xorshift = { version = "0.2.0" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.13", features = ["full"] }
 
 [dev-dependencies]
+snarkos-testing = { path = "../testing", version = "0.8.0" }
+
 futures-await-test = { version = "0.3.0" }
+rand_xorshift = { version = "0.2" }

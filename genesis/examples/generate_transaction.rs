@@ -1,22 +1,21 @@
 use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_consensus::ConsensusParameters;
-use snarkos_dpc::{
-    base_dpc::{
-        instantiated::Components,
-        predicate::DPCPredicate,
-        record_payload::RecordPayload,
-        BaseDPCComponents,
-        DPC,
-    },
-    test_data::setup_or_load_parameters,
+use snarkos_dpc::base_dpc::{
+    instantiated::*,
+    predicate::DPCPredicate,
+    record_payload::RecordPayload,
+    BaseDPCComponents,
+    DPC,
 };
 use snarkos_errors::dpc::{DPCError, LedgerError};
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH},
-    dpc::DPCComponents,
+    dpc::{DPCComponents, DPCScheme},
     objects::{account::AccountScheme, Transaction},
+    parameters::Parameters,
 };
 use snarkos_objects::{Account, AccountPublicKey};
+use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -62,7 +61,14 @@ pub fn generate(recipient: &String, value: u64, file_name: &String) -> Result<Ve
     let rng = &mut thread_rng();
 
     let recipient: AccountPublicKey<Components> = FromBytes::read(&hex::decode(recipient).unwrap()[..])?;
-    let (ledger_parameters, parameters) = setup_or_load_parameters(false, rng);
+
+    let crh_parameters =
+        <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
+            .expect("read bytes as hash for MerkleParameters in ledger");
+    let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
+    let ledger_parameters = From::from(merkle_tree_hash_parameters);
+
+    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
 
     let predicate_vk_hash = parameters
         .circuit_parameters

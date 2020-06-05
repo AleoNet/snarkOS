@@ -18,6 +18,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
+
 use snarkos_objects::{
     dpc::DPCTransactions,
     Account,
@@ -28,7 +29,7 @@ use snarkos_objects::{
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
-use snarkos_storage::test_data::*;
+use snarkos_testing::storage::*;
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::SeedableRng;

@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-storage"
+name = "snarkos-testing"
 version = "0.8.0"
 authors = ["The Aleo Team <hello@aleo.org"]
-description = "Storage for a decentralized record system"
+description = "Testing suite for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
@@ -13,21 +13,20 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-consensus = { path = "../consensus", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-dpc = { path = "../dpc", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-genesis = { path = "../genesis", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
+snarkos-network = { path = "../network", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-parameters = { path = "../parameters", version = "0.8.0" }
+snarkos-posw = { path = "../posw", version = "0.8.0" }
+snarkos-storage = { path = "../storage", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
-bincode = { version = "1.2.0" }
-hex = { version = "0.4.2" }
-parking_lot = { version = "0.10.0" }
-rand = { version = "0.7" }
-rocksdb = { version = "0.13.0" }
-serde = { version = "1.0", features = ["derive"] }
-
-[dev-dependencies]
-snarkos-consensus = { path = "../consensus", version = "0.8.0" }
-snarkos-curves = { path = "../curves", version = "0.8.0" }
-snarkos-testing = { path = "../testing", version = "0.8.0" }
+once_cell = { version = "1.4.0" }
+rand = { version = "0.7.0" }
+rand_xorshift = { version = "0.2.0" }
+tokio = { version = "0.2.13", features = ["full"] }

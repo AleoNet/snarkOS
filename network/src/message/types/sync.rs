@@ -35,7 +35,7 @@ impl Message for Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_consensus::test_data::BLOCK_1_HEADER_HASH;
+    use snarkos_testing::consensus::BLOCK_1_HEADER_HASH;
 
     #[test]
     fn test_sync() {

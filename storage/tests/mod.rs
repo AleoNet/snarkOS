@@ -1,37 +1,16 @@
-use snarkos_algorithms::{
-    crh::{PedersenCompressedCRH, PedersenSize},
-    define_merkle_tree_parameters,
-};
-use snarkos_consensus::test_data::TestTx;
-use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_objects::{
-    Block,
-    BlockHeader,
-    BlockHeaderHash,
-    DPCTransactions,
-    MerkleRootHash,
-    PedersenMerkleRootHash,
-    ProofOfSuccinctWork,
-};
-use snarkos_storage::{test_data::*, Ledger};
+mod test_storage {
+    use snarkos_objects::{
+        Block,
+        BlockHeader,
+        BlockHeaderHash,
+        DPCTransactions,
+        MerkleRootHash,
+        PedersenMerkleRootHash,
+        ProofOfSuccinctWork,
+    };
+    use snarkos_testing::storage::*;
 
-use std::sync::Arc;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Size;
-// `WINDOW_SIZE * NUM_WINDOWS` = 2 * 256 bits
-impl PedersenSize for Size {
-    const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 128;
-}
-
-define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
-
-type Store = Ledger<TestTx, TestMerkleParams>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
+    use std::sync::Arc;
 
     #[test]
     pub fn test_new_blockchain() {

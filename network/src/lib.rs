@@ -12,6 +12,3 @@ pub use self::protocol::*;
 
 pub mod server;
 pub use self::server::*;
-
-#[allow(dead_code)]
-pub mod test_data;
