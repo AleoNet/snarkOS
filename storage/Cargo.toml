@@ -24,7 +24,7 @@ bincode = { version = "1.2.0" }
 hex = { version = "0.4.2" }
 parking_lot = { version = "0.10.0" }
 rand = { version = "0.7" }
-rocksdb = { version = "0.13.0" }
+rocksdb = { version = "0.14.0" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]

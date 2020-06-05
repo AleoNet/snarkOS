@@ -16,5 +16,5 @@ bincode = { version = "1.2.0" }
 curl = { version = "0.4.29" }
 hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.2.0" }
-rocksdb = { version = "0.13.0" }
+rocksdb = { version = "0.14.0" }
 thiserror = { version = "1.0" }
