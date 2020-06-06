@@ -77,6 +77,7 @@ impl SyncHandler {
             }
 
             if self.block_headers.is_empty() && blocks_synced == 0 {
+                info!("Sync handler is now idle");
                 self.sync_state = SyncState::Idle;
 
                 if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
