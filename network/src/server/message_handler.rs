@@ -251,7 +251,7 @@ impl Server {
                     block_hashes.push(self.storage.get_block_hash(block_num)?);
                 }
 
-                // send serialized blocks to requester
+                // send block hashes to requester
                 channel.write(&Sync::new(block_hashes)).await?;
             }
         }

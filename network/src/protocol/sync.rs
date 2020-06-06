@@ -75,12 +75,7 @@ impl SyncHandler {
             }
 
             if self.block_headers.is_empty() && storage.get_latest_block_height() <= height {
-                info!("Sync handler is now idle");
                 self.sync_state = SyncState::Idle;
-
-                if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
-                    channel.write(&GetSync::new(block_locator_hashes)).await?;
-                }
             } else {
                 // Sync up to 10 blocks at once
                 for _ in 0..10 {
@@ -90,6 +85,12 @@ impl SyncHandler {
 
                     channel.write(&GetBlock::new(self.block_headers.remove(0))).await?;
                 }
+            }
+        }
+
+        if self.block_headers.is_empty() {
+            if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                channel.write(&GetSync::new(block_locator_hashes)).await?;
             }
         }
 
