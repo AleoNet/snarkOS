@@ -77,7 +77,6 @@ impl RpcFunctions for RpcImpl {
                 transactions.push(hex::encode(&transaction.transaction_id()?));
             }
 
-            // TODO get block info for non-canon blocks
             Ok(BlockInfo {
                 hash: block_hash_string,
                 height,

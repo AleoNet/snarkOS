@@ -64,15 +64,16 @@ impl Handshake {
         height: u32,
         channel: Channel,
         peer_message: Version,
-        address_sender: SocketAddr,
+        local_address: SocketAddr,
+        peer_address: SocketAddr,
     ) -> Result<Handshake, HandshakeError> {
-        let peer_address = peer_message.address_sender;
-
         // Connect to the address specified in the peer_message
         let channel = channel.update_writer(peer_address).await?;
 
         // Write Verack response
-        channel.write(&Verack::new(peer_message.clone())).await?;
+        channel
+            .write(&Verack::new(peer_message.nonce, peer_message.address_receiver))
+            .await?;
 
         // Write Version request
         channel
@@ -80,7 +81,7 @@ impl Handshake {
                 version,
                 height,
                 peer_address,
-                address_sender,
+                local_address,
                 peer_message.nonce,
             ))
             .await?;
@@ -97,7 +98,9 @@ impl Handshake {
     /// Receive the Version message for an existing peer handshake.
     /// Send a Verack message.
     pub async fn receive(&mut self, message: Version) -> Result<(), HandshakeError> {
-        self.channel.write(&Verack::new(message)).await?;
+        self.channel
+            .write(&Verack::new(message.nonce, message.address_receiver))
+            .await?;
         Ok(())
     }
 
@@ -196,6 +199,7 @@ mod tests {
             0u32,
             read_channel,
             Version::deserialize(bytes).unwrap(),
+            peer_address,
             server_address,
         )
         .await

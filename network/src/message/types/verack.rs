@@ -1,4 +1,4 @@
-use crate::message::{types::Version, Message, MessageName};
+use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 use std::net::SocketAddr;
@@ -15,11 +15,8 @@ pub struct Verack {
 }
 
 impl Verack {
-    pub fn new(version: Version) -> Self {
-        Self {
-            nonce: version.nonce,
-            address_sender: version.address_receiver,
-        }
+    pub fn new(nonce: u64, address_sender: SocketAddr) -> Self {
+        Self { nonce, address_sender }
     }
 }
 
@@ -50,13 +47,14 @@ impl Message for Verack {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::types::Version;
     use snarkos_testing::network::random_socket_address;
 
     #[test]
     fn test_verack() {
         let version = Version::new(1u64, 1u32, random_socket_address(), random_socket_address());
 
-        let message = Verack::new(version);
+        let message = Verack::new(version.nonce, version.address_receiver);
 
         let serialized = message.serialize().unwrap();
         let deserialized = Verack::deserialize(serialized).unwrap();
