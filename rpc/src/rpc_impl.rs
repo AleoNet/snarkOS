@@ -180,7 +180,7 @@ impl RpcFunctions for RpcImpl {
                     self.storage.clone(),
                     self.memory_pool_lock.clone(),
                     to_bytes![transaction]?.to_vec(),
-                    self.server_context.local_address,
+                    *Runtime::new()?.block_on(self.server_context.local_address.read()),
                 ))?;
 
                 Ok(hex::encode(transaction.transaction_id()?))

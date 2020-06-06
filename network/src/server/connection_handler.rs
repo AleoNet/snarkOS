@@ -50,12 +50,17 @@ impl Server {
 
                     // Try and connect to our gossiped peers.
                     for (address, _last_seen) in peer_book.get_gossiped() {
-                        if address != context.local_address {
+                        if address != *context.local_address.read().await {
                             if let Err(_) = context
                                 .handshakes
                                 .write()
                                 .await
-                                .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                                .send_request(
+                                    1u64,
+                                    storage.get_latest_block_height(),
+                                    *context.local_address.read().await,
+                                    address,
+                                )
                                 .await
                             {
                                 peer_book.disconnect_peer(address);
@@ -67,7 +72,7 @@ impl Server {
                 // Send a ping protocol request to each of our connected peers to maintain the connection.
                 for (address, last_seen) in peer_book.get_connected() {
                     let time_since_last_seen = (Utc::now() - last_seen).num_milliseconds();
-                    if address != context.local_address
+                    if address != *context.local_address.read().await
                         && time_since_last_seen.is_positive()
                         && time_since_last_seen as u64 > connection_frequency
                     {
@@ -115,7 +120,7 @@ impl Server {
                         .unwrap_or_else(|error| info!("Failed to store memory pool transaction in database {}", error));
 
                     // Ask our sync node for more transactions.
-                    if context.local_address != sync_handler.sync_node {
+                    if *context.local_address.read().await != sync_handler.sync_node {
                         if let Some(channel) = connections.get(&sync_handler.sync_node) {
                             if let Err(_) = channel.write(&GetMemoryPool).await {
                                 peer_book.disconnect_peer(sync_handler.sync_node);

@@ -49,8 +49,8 @@ impl Handshake {
         channel.write(&message).await?;
 
         Ok(Self {
-            state: HandshakeState::Waiting,
             channel,
+            state: HandshakeState::Waiting,
             version,
             height,
             nonce: message.nonce,
@@ -71,8 +71,13 @@ impl Handshake {
         let channel = channel.update_writer(peer_address).await?;
 
         // Write Verack response
+
+        // You are the new sender and your peer is the receiver
+        let address_receiver = peer_address;
+        let address_sender = peer_message.address_receiver;
+
         channel
-            .write(&Verack::new(peer_message.nonce, peer_message.address_receiver))
+            .write(&Verack::new(peer_message.nonce, address_receiver, address_sender))
             .await?;
 
         // Write Version request
@@ -87,8 +92,8 @@ impl Handshake {
             .await?;
 
         Ok(Self {
-            state: HandshakeState::Waiting,
             channel: Arc::new(channel),
+            state: HandshakeState::Waiting,
             version,
             height,
             nonce: peer_message.nonce,
@@ -98,8 +103,12 @@ impl Handshake {
     /// Receive the Version message for an existing peer handshake.
     /// Send a Verack message.
     pub async fn receive(&mut self, message: Version) -> Result<(), HandshakeError> {
+        // You are the new sender and your peer is the receiver
+        let address_receiver = self.channel.address;
+        let address_sender = message.address_receiver;
+
         self.channel
-            .write(&Verack::new(message.nonce, message.address_receiver))
+            .write(&Verack::new(message.nonce, address_receiver, address_sender))
             .await?;
         Ok(())
     }

@@ -43,7 +43,7 @@ impl MinerInstance {
     pub fn spawn(self) {
         task::spawn(async move {
             let context = self.server_context.clone();
-            let local_address = self.server_context.local_address;
+            let local_address = *self.server_context.local_address.read().await;
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
 
             loop {

@@ -181,7 +181,7 @@ impl Server {
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
         let peer_book = &mut self.context.peer_book.write().await;
         for (addr, time) in message.addresses.iter() {
-            if &self.context.local_address == addr {
+            if &*self.context.local_address.read().await == addr {
                 continue;
             } else if peer_book.connected_contains(addr) {
                 peer_book.update_connected(addr.clone(), time.clone());
@@ -291,6 +291,7 @@ impl Server {
     /// Check if the Verack matches the last handshake message we sent.
     /// Update our peer book and send a request for more peers.
     async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
+        let reciever_address = message.address_receiver.clone();
         match self
             .context
             .handshakes
@@ -331,7 +332,9 @@ impl Server {
         let peer_address = message.address_sender;
         let peer_book = &mut self.context.peer_book.read().await;
 
-        if peer_book.connected_total() < self.context.max_peers && self.context.local_address != peer_address {
+        if peer_book.connected_total() < self.context.max_peers
+            && *self.context.local_address.read().await != peer_address
+        {
             self.context
                 .handshakes
                 .write()

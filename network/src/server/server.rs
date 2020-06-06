@@ -70,7 +70,12 @@ impl Server {
                 .handshakes
                 .write()
                 .await
-                .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                .send_request(
+                    1u64,
+                    storage.get_latest_block_height(),
+                    *context.local_address.read().await,
+                    address,
+                )
                 .await
                 .unwrap_or_else(|error| {
                     info!("Failed to connect to address: {:?}", error);
@@ -81,7 +86,7 @@ impl Server {
 
     /// Send a handshake request to all bootnodes from config.
     async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
-        let local_address = self.context.local_address;
+        let local_address = *self.context.local_address.read().await;
 
         for bootnode in self.context.bootnodes.clone() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
@@ -157,7 +162,7 @@ impl Server {
     /// 5. Handle all messages sent to this server.
     /// 6. Start connection handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
-        let local_address = self.context.local_address;
+        let local_address = self.context.local_address.read().await.clone();
 
         let address = format! {"{}:{}", "0.0.0.0", local_address.port()};
         let listening_address = address.parse::<SocketAddr>()?;
@@ -184,7 +189,7 @@ impl Server {
                         .expect("Failed to shutdown peer stream");
                 } else {
                     // Follow handshake protocol and drop peer connection if unsuccessful.
-                    if let Ok(handshake) = context
+                    if let Ok((handshake, reciever_address)) = context
                         .handshakes
                         .write()
                         .await
@@ -197,6 +202,15 @@ impl Server {
                         )
                         .await
                     {
+                        {
+                            // Bootstrap discovery of local node ip via VERACK responses
+                            let mut local_address = context.local_address.write().await;
+                            if *local_address != reciever_address {
+                                *local_address = reciever_address;
+                                info!("UPDATE LOCAL ADDRESS TO: {:?}", *local_address);
+                            }
+                        }
+
                         context.connections.write().await.store_channel(&handshake.channel);
 
                         // Inner loop spawns one thread per connection to read messages
