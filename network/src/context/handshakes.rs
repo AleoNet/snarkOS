@@ -125,10 +125,7 @@ impl Handshakes {
 
                 stored_handshake.accept(message).await
             }
-            None => {
-                println!("3333");
-                Err(HandshakeError::HandshakeMissing(address))
-            }
+            None => Err(HandshakeError::HandshakeMissing(address)),
         }
     }
 
