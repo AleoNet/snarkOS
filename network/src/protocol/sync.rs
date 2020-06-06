@@ -66,17 +66,15 @@ impl SyncHandler {
         storage: Arc<Ledger<T, P>>,
     ) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
-            let blocks_synced = storage.get_latest_block_height() - height;
-
-            if blocks_synced > 0 {
+            if storage.get_latest_block_height() > height {
                 info!(
                     "Synced {} Blocks in {:.2} seconds",
-                    blocks_synced,
+                    storage.get_latest_block_height() - height,
                     (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
                 );
             }
 
-            if self.block_headers.is_empty() && blocks_synced == 0 {
+            if self.block_headers.is_empty() && storage.get_latest_block_height() <= height {
                 info!("Sync handler is now idle");
                 self.sync_state = SyncState::Idle;
 
