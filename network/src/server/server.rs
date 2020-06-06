@@ -159,8 +159,11 @@ impl Server {
     pub async fn listen(mut self) -> Result<(), ServerError> {
         let local_address = self.context.local_address;
 
-        let mut listener = TcpListener::bind(&local_address).await?;
-        info!("listening at: {:?}", local_address);
+        let address = format! {"{}:{}", "0.0.0.0", local_address.port()};
+        let listening_address = address.parse::<SocketAddr>()?;
+
+        let mut listener = TcpListener::bind(&listening_address).await?;
+        info!("listening at: {:?}", listening_address);
 
         self.connect_bootnodes().await?;
         self.connect_peers_from_storage().await?;
