@@ -55,8 +55,8 @@ impl Handshakes {
         &mut self,
         version: u64,
         height: u32,
-        address_sender: SocketAddr,
-        _address_receiver: SocketAddr,
+        local_address: SocketAddr,
+        peer_address: SocketAddr,
         reader: TcpStream,
     ) -> Result<Handshake, HandshakeError> {
         let channel = Channel::new_read_only(reader)?;
@@ -66,9 +66,12 @@ impl Handshakes {
 
         if Version::name() == name {
             let peer_message = Version::deserialize(bytes)?;
-            let peer_address = peer_message.address_sender;
 
-            let handshake = Handshake::receive_new(version, height, channel, peer_message, address_sender).await?;
+            // Peer address and specified port from the version message
+            let peer_address = SocketAddr::new(peer_address.ip(), peer_message.address_sender.port());
+
+            let handshake =
+                Handshake::receive_new(version, height, channel, peer_message, local_address, peer_address).await?;
 
             self.addresses.insert(peer_address, handshake.clone());
 

@@ -79,6 +79,8 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
+        info!("Received block with hash: {:?}", block.header.get_hash());
+
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {
             let mut memory_pool = self.memory_pool_lock.lock().await;
@@ -163,9 +165,12 @@ impl Server {
     /// A node has requested our list of peer addresses.
     /// Send an Address message with our current peer list.
     async fn receive_get_peers(&mut self, _message: GetPeers, channel: Arc<Channel>) -> Result<(), ServerError> {
-        channel
-            .write(&Peers::new(self.context.peer_book.read().await.get_connected()))
-            .await?;
+        let mut connected_peers = self.context.peer_book.read().await.get_connected();
+
+        // Remove the requester from list of peers
+        connected_peers.remove(&channel.address);
+
+        channel.write(&Peers::new(connected_peers)).await?;
 
         Ok(())
     }

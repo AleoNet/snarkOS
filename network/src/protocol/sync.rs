@@ -40,7 +40,10 @@ impl SyncHandler {
     /// Set the SyncState to syncing and update the latest block height.
     pub fn update_syncing(&mut self, block_height: u32) {
         match self.sync_state {
-            SyncState::Idle => self.sync_state = SyncState::Syncing(Utc::now(), block_height),
+            SyncState::Idle => {
+                info!("Syncing blocks");
+                self.sync_state = SyncState::Syncing(Utc::now(), block_height)
+            }
             SyncState::Syncing(date_time, _old_height) => self.sync_state = SyncState::Syncing(date_time, block_height),
         }
     }
@@ -63,20 +66,30 @@ impl SyncHandler {
         storage: Arc<Ledger<T, P>>,
     ) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
-            if self.block_headers.is_empty() {
+            if storage.get_latest_block_height() > height {
                 info!(
                     "Synced {} Blocks in {:.2} seconds",
                     storage.get_latest_block_height() - height,
                     (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
                 );
+            }
 
+            if self.block_headers.is_empty() && storage.get_latest_block_height() <= height {
+                info!("Sync handler is now idle");
                 self.sync_state = SyncState::Idle;
 
                 if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
                     channel.write(&GetSync::new(block_locator_hashes)).await?;
                 }
             } else {
-                channel.write(&GetBlock::new(self.block_headers.remove(0))).await?;
+                // Sync up to 10 blocks at once
+                for _ in 0..10 {
+                    if self.block_headers.is_empty() {
+                        break;
+                    }
+
+                    channel.write(&GetBlock::new(self.block_headers.remove(0))).await?;
+                }
             }
         }
 

@@ -65,8 +65,12 @@ impl Server {
                 }
 
                 // Send a ping protocol request to each of our connected peers to maintain the connection.
-                for (address, _last_seen) in peer_book.get_connected() {
-                    if address != context.local_address {
+                for (address, last_seen) in peer_book.get_connected() {
+                    let time_since_last_seen = (Utc::now() - last_seen).num_milliseconds();
+                    if address != context.local_address
+                        && time_since_last_seen.is_positive()
+                        && time_since_last_seen as u64 > connection_frequency
+                    {
                         if let Some(channel) = connections.get(&address) {
                             if let Err(_) = pings.send_ping(channel).await {
                                 peer_book.disconnect_peer(address);
