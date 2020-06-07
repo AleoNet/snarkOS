@@ -198,6 +198,12 @@ impl Server {
     /// A peer has sent us a ping message.
     /// Reply with a pong message.
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
+        let mut peer_book = self.context.peer_book.write().await;
+
+        if peer_book.connected_contains(&channel.address) {
+            peer_book.update_connected(channel.address, Utc::now());
+        }
+
         Pings::send_pong(message, channel).await?;
 
         Ok(())

@@ -209,7 +209,7 @@ impl Server {
                             let mut local_address = context.local_address.write().await;
                             if *local_address != reciever_address {
                                 *local_address = reciever_address;
-                                info!("UPDATE LOCAL ADDRESS TO: {:?}", *local_address);
+                                info!("Discovered local address: {:?}", *local_address);
                             }
                         }
 
