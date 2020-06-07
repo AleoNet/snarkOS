@@ -188,6 +188,8 @@ impl Server {
                         .shutdown(Shutdown::Write)
                         .expect("Failed to shutdown peer stream");
                 } else {
+                    let local_address = context.local_address.read().await.clone();
+
                     // Follow handshake protocol and drop peer connection if unsuccessful.
                     if let Ok((handshake, reciever_address)) = context
                         .handshakes

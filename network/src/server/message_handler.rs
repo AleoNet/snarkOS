@@ -291,7 +291,6 @@ impl Server {
     /// Check if the Verack matches the last handshake message we sent.
     /// Update our peer book and send a request for more peers.
     async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
-        let reciever_address = message.address_receiver.clone();
         match self
             .context
             .handshakes
