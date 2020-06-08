@@ -63,6 +63,7 @@ impl Server {
                 self.receive_verack(Verack::deserialize(bytes)?, channel.clone())
                     .await?;
             } else if name == MessageName::from("disconnect") {
+                info!("Disconnected from peer: {:?}", channel.address);
                 let mut peer_book = self.context.peer_book.write().await;
                 peer_book.disconnect_peer(channel.address);
             } else {

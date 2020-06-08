@@ -134,8 +134,6 @@ impl Server {
 
                 // Read the next message from the channel. This is a blocking operation.
                 let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|_error| {
-                    info!("Disconnected from peer: {:?}", channel.address);
-
                     disconnect = true;
                     (MessageName::from("disconnect"), vec![])
                 });
