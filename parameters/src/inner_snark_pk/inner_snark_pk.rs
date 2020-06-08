@@ -2,6 +2,7 @@ use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_errors::parameters::ParametersError;
 use snarkos_models::parameters::Parameters;
 
+#[cfg(any(test, feature = "remote"))]
 use curl::easy::Easy;
 use hex;
 use std::{
@@ -75,7 +76,10 @@ impl InnerSNARKPKParameters {
         println!("{} - Downloading parameters...", module_path!());
         let mut buffer = vec![];
         let url = Self::remote_url();
-        Self::remote_fetch(&mut buffer, &url)?;
+        #[cfg(any(test, feature = "remote"))]
+        {
+            Self::remote_fetch(&mut buffer, &url)?;
+        }
         println!("\n{} - Download complete", module_path!());
 
         // Verify the checksum of the remote data before returning
@@ -115,6 +119,7 @@ impl InnerSNARKPKParameters {
         Ok(())
     }
 
+    #[cfg(any(test, feature = "remote"))]
     fn remote_fetch(buffer: &mut Vec<u8>, url: &str) -> Result<(), ParametersError> {
         let mut easy = Easy::new();
         easy.url(url)?;

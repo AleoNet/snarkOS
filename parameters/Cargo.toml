@@ -16,7 +16,7 @@ snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 
-curl = { version = "0.4.29" }
+curl = { version = "0.4.29", optional = true }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
@@ -27,3 +27,7 @@ snarkos-posw = { path = "../posw", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 rand = { version = "0.7" }
+
+[features]
+default = []
+remote = [ "curl" ]

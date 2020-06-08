@@ -18,7 +18,7 @@ snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-gadgets = { path = "../gadgets", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" } # needed to instantiate with BLS12-377
-snarkos-parameters = { path = "../parameters", version = "0.8.0" }
+snarkos-parameters = { path = "../parameters", version = "0.8.0", features = ["remote"] }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
