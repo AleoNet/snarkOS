@@ -39,4 +39,6 @@ csv = { version = "1" }
 rand_xorshift = { version = "0.2" }
 
 [features]
+default = []
+pedersen-parallel = []
 print-trace = [ "snarkos-profiler/print-trace" ]

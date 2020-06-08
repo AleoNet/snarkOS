@@ -36,6 +36,8 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::dpc::DPCComponents;
+
+#[cfg(feature = "librocksdb")]
 use snarkos_storage::Ledger;
 
 use blake2::Blake2s as Blake2sHash;
@@ -168,7 +170,10 @@ pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCirc
 pub type PredicateSNARK<C> = GM17<InnerPairing, PredicateCircuit<C>, PredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
+// TODO (howardwu): Refactor this to snarkos-storage.
+#[cfg(feature = "librocksdb")]
 pub type MerkleTreeLedger = Ledger<Tx, CommitmentMerkleParameters>;
+
 pub type Tx = DPCTransaction<Components>;
 
 pub type InstantiatedDPC = DPC<Components>;

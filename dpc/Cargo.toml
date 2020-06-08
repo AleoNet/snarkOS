@@ -20,7 +20,7 @@ snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-parameters = { path = "../parameters", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
-snarkos-storage = { path = "../storage", version = "0.8.0" }
+snarkos-storage = { path = "../storage", version = "0.8.0", optional = true }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 blake2 = { version = "0.8.1" }
@@ -35,4 +35,6 @@ criterion = { version = "0.3.1" }
 rand_xorshift = { version = "0.2" }
 
 [features]
+default = []
+librocksdb = [ "snarkos-storage" ]
 print-trace = [ "snarkos-profiler/print-trace" ]

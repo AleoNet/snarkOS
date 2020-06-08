@@ -6,6 +6,8 @@ use snarkos_models::{
 };
 
 use rand::Rng;
+
+#[cfg(feature = "pedersen-parallel")]
 use rayon::prelude::*;
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
@@ -69,22 +71,44 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
             S::NUM_WINDOWS
         );
 
-        // Compute sum of h_i^{m_i} for all i.
-        let result = bytes_to_bits(input)
-            .par_chunks(S::WINDOW_SIZE)
-            .zip(&self.parameters.bases)
-            .map(|(bits, powers)| {
-                let mut encoded = G::zero();
-                for (bit, base) in bits.iter().zip(powers.iter()) {
-                    if *bit {
-                        encoded += base;
+        #[cfg(feature = "pedersen-parallel")]
+        {
+            // Compute sum of h_i^{m_i} for all i.
+            let result = bytes_to_bits(input)
+                .par_chunks(S::WINDOW_SIZE)
+                .zip(&self.parameters.bases)
+                .map(|(bits, powers)| {
+                    let mut encoded = G::zero();
+                    for (bit, base) in bits.iter().zip(powers.iter()) {
+                        if *bit {
+                            encoded += base;
+                        }
                     }
-                }
-                encoded
-            })
-            .reduce(G::zero, |a, b| a + &b);
+                    encoded
+                })
+                .reduce(G::zero, |a, b| a + &b);
 
-        Ok(result)
+            Ok(result)
+        }
+        #[cfg(not(feature = "pedersen-parallel"))]
+        {
+            // Compute sum of h_i^{m_i} for all i.
+            let result = bytes_to_bits(input)
+                .chunks(S::WINDOW_SIZE)
+                .zip(&self.parameters.bases)
+                .map(|(bits, powers)| {
+                    let mut encoded = G::zero();
+                    for (bit, base) in bits.iter().zip(powers.iter()) {
+                        if *bit {
+                            encoded += base;
+                        }
+                    }
+                    encoded
+                })
+                .fold(G::zero(), |a, b| a + &b);
+
+            Ok(result)
+        }
     }
 
     fn parameters(&self) -> &Self::Parameters {

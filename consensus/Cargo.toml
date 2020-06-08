@@ -13,8 +13,8 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
-snarkos-dpc = { path = "../dpc", version = "0.8.0" }
-snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-dpc = { path = "../dpc", version = "0.8.0", features = ["librocksdb"] }
+snarkos-errors = { path = "../errors", version = "0.8.0", features = ["librocksdb"] }
 snarkos-genesis = { path= "../genesis", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path= "../objects", version = "0.8.0" }
