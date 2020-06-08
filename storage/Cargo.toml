@@ -17,7 +17,7 @@ snarkos-errors = { path = "../errors", version = "0.8.0", features = ["librocksd
 snarkos-genesis = { path = "../genesis", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
-snarkos-parameters = { path = "../parameters", version = "0.8.0", features = ["remote"] }
+snarkos-parameters = { path = "../parameters", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 bincode = { version = "1.2.0" }
@@ -31,3 +31,7 @@ serde = { version = "1.0", features = ["derive"] }
 snarkos-consensus = { path = "../consensus", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-testing = { path = "../testing", version = "0.8.0" }
+
+[features]
+default = []
+remote = [ "snarkos-parameters/remote" ]

@@ -12,6 +12,7 @@ pub enum ParametersError {
     Message(String),
 }
 
+#[cfg(any(test, feature = "remote"))]
 impl From<curl::Error> for ParametersError {
     fn from(error: curl::Error) -> Self {
         ParametersError::Crate("curl::error", format!("{:?}", error))

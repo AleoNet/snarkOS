@@ -38,3 +38,4 @@ rand_xorshift = { version = "0.2" }
 default = []
 librocksdb = [ "snarkos-storage" ]
 print-trace = [ "snarkos-profiler/print-trace" ]
+remote = [ "snarkos-parameters/remote" ]

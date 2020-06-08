@@ -28,3 +28,7 @@ chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
 parking_lot = { version = "0.10.0" }
 rand = { version = "0.7" }
+
+[features]
+default = []
+remote = [ "snarkos-parameters/remote" ]

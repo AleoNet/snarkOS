@@ -75,9 +75,9 @@ impl InnerSNARKPKParameters {
     pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
         println!("{} - Downloading parameters...", module_path!());
         let mut buffer = vec![];
-        let url = Self::remote_url();
         #[cfg(any(test, feature = "remote"))]
         {
+            let url = Self::remote_url();
             Self::remote_fetch(&mut buffer, &url)?;
         }
         println!("\n{} - Download complete", module_path!());
