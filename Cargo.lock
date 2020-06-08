@@ -2075,6 +2075,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-derives"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "snarkos-dpc"
 version = "0.8.0"
 dependencies = [
@@ -2154,6 +2163,7 @@ dependencies = [
  "smallvec 1.4.0",
  "snarkos-errors",
  "snarkos-utilities",
+ "thiserror",
 ]
 
 [[package]]
@@ -2321,6 +2331,8 @@ version = "0.8.0"
 dependencies = [
  "rand",
  "rand_xorshift",
+ "snarkos-derives",
+ "thiserror",
 ]
 
 [[package]]
