@@ -2069,6 +2069,7 @@ dependencies = [
  "derivative",
  "rand",
  "rand_xorshift",
+ "serde",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-utilities",
@@ -2331,7 +2332,6 @@ version = "0.8.0"
 dependencies = [
  "rand",
  "rand_xorshift",
- "serde",
  "snarkos-derives",
  "thiserror",
 ]

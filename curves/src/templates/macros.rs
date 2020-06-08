@@ -37,7 +37,7 @@ macro_rules! impl_sw_curve_serializer {
                 } else {
                     snarkos_utilities::serialize::SWFlags::default()
                 };
-                self.x.serialize(writer)?;
+                CanonicalSerialize::serialize(&self.x, writer)?;
                 self.y.serialize_with_flags(writer, flags)?;
                 Ok(())
             }

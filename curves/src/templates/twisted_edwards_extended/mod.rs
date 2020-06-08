@@ -27,8 +27,9 @@ use std::{
 };
 
 pub mod tests;
+use serde::{Serialize, Deserialize};
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Copy(bound = "P: Parameters"),
     Clone(bound = "P: Parameters"),

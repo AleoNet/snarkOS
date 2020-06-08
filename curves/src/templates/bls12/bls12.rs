@@ -16,6 +16,7 @@ use snarkos_models::curves::{
     SquareRootField,
 };
 use snarkos_utilities::bititerator::BitIterator;
+use serde::{Serialize, Deserialize};
 
 use std::marker::PhantomData;
 
@@ -39,7 +40,7 @@ pub trait Bls12Parameters: 'static {
     >;
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Bls12<P: Bls12Parameters>(PhantomData<fn() -> P>);
 
