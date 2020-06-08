@@ -130,17 +130,15 @@ impl Server {
                 // Use a oneshot channel to give channel control to the message handler after reading from the channel.
                 let (tx, rx) = oneshot::channel();
 
-                // Read the next message from the channel. This is a blocking operation.
-                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|error| {
-                    info!("Peer node disconnected due to error: {:?}", error);
+                let mut disconnect = false;
 
+                // Read the next message from the channel. This is a blocking operation.
+                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|_error| {
+                    info!("Disconnected from peer: {:?}", channel.address);
+
+                    disconnect = true;
                     (MessageName::from("disconnect"), vec![])
                 });
-
-                // Break out of the loop if the peer disconnects.
-                if MessageName::from("disconnect") == message_name {
-                    break;
-                }
 
                 // Send the successful read data to the message handler.
                 message_handler_sender
@@ -150,6 +148,11 @@ impl Server {
 
                 // Wait for the message handler to give back channel control.
                 channel = rx.await.expect("message handler errored");
+
+                // Break out of the loop if the peer disconnects.
+                if disconnect {
+                    break;
+                }
             }
         });
     }

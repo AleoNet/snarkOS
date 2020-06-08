@@ -1,5 +1,5 @@
 use crate::{
-    message::{types::*, Channel, Message},
+    message::{types::*, Channel, Message, MessageName},
     process_transaction_internal,
     propagate_block,
     Pings,
@@ -62,6 +62,9 @@ impl Server {
             } else if name == Verack::name() {
                 self.receive_verack(Verack::deserialize(bytes)?, channel.clone())
                     .await?;
+            } else if name == MessageName::from("disconnect") {
+                let mut peer_book = self.context.peer_book.write().await;
+                peer_book.disconnect_peer(channel.address);
             } else {
                 info!("Name not recognized {:?}", name.to_string());
             }
