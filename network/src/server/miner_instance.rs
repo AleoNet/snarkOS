@@ -49,19 +49,24 @@ impl MinerInstance {
             loop {
                 info!("Mining new block");
 
-                let (block_serialized, _coinbase_records) = miner
+                let (block_serialized, _coinbase_records) = match miner
                     .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
                     .await
-                    .unwrap();
+                {
+                    Ok((serialized_block, coinbase_records)) => ((serialized_block, coinbase_records)),
+                    Err(_) => continue,
+                };
 
-                info!(
-                    "Block found!           {:?}",
-                    Block::<Tx>::deserialize(&block_serialized).unwrap()
-                );
+                match Block::<Tx>::deserialize(&block_serialized) {
+                    Ok(block) => {
+                        info!("Block found!    {:?}", block.header.get_hash());
 
-                propagate_block(context.clone(), block_serialized, local_address)
-                    .await
-                    .unwrap();
+                        if let Err(err) = propagate_block(context.clone(), block_serialized, local_address).await {
+                            info!("Error propagating block to peers: {:?}", err);
+                        }
+                    }
+                    Err(_) => continue,
+                }
             }
         });
     }
