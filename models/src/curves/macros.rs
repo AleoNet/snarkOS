@@ -108,3 +108,93 @@ macro_rules! sqrt_impl {
         }
     }};
 }
+
+macro_rules! impl_prime_field_serializer {
+    ($field: ident, $params: ident, $byte_size: expr) => {
+        impl<P: $params> CanonicalSerializeWithFlags for $field<P> {
+            #[allow(unused_qualifications)]
+            fn serialize_with_flags<W: snarkos_utilities::io::Write, F: snarkos_utilities::serialize::Flags>(
+                &self,
+                writer: &mut W,
+                flags: F,
+            ) -> Result<(), snarkos_utilities::serialize::SerializationError> {
+                const BYTE_SIZE: usize = $byte_size;
+
+                let (output_bit_size, output_byte_size) =
+                    snarkos_utilities::serialize::buffer_bit_byte_size($field::<P>::size_in_bits());
+                if F::len() > (output_bit_size - P::MODULUS_BITS as usize) {
+                    return Err(snarkos_utilities::serialize::SerializationError::NotEnoughSpace);
+                }
+
+                let mut bytes = [0u8; BYTE_SIZE];
+                self.write(&mut bytes[..])?;
+
+                bytes[output_byte_size - 1] |= flags.u8_bitmask();
+
+                writer.write_all(&bytes[..output_byte_size])?;
+                Ok(())
+            }
+        }
+
+        impl<P: $params> ConstantSerializedSize for $field<P> {
+            const SERIALIZED_SIZE: usize = snarkos_utilities::serialize::buffer_byte_size(
+                <$field<P> as crate::curves::PrimeField>::Params::MODULUS_BITS as usize,
+            );
+            const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
+        }
+
+        impl<P: $params> CanonicalSerialize for $field<P> {
+            #[allow(unused_qualifications)]
+            #[inline]
+            fn serialize<W: snarkos_utilities::io::Write>(
+                &self,
+                writer: &mut W,
+            ) -> Result<(), snarkos_utilities::serialize::SerializationError> {
+                self.serialize_with_flags(writer, snarkos_utilities::serialize::EmptyFlags)
+            }
+
+            #[inline]
+            fn serialized_size(&self) -> usize {
+                Self::SERIALIZED_SIZE
+            }
+        }
+
+        impl<P: $params> CanonicalDeserializeWithFlags for $field<P> {
+            #[allow(unused_qualifications)]
+            fn deserialize_with_flags<R: snarkos_utilities::io::Read, F: snarkos_utilities::serialize::Flags>(
+                reader: &mut R,
+            ) -> Result<(Self, F), snarkos_utilities::serialize::SerializationError> {
+                const BYTE_SIZE: usize = $byte_size;
+
+                let (output_bit_size, output_byte_size) =
+                    snarkos_utilities::serialize::buffer_bit_byte_size($field::<P>::size_in_bits());
+                if F::len() > (output_bit_size - P::MODULUS_BITS as usize) {
+                    return Err(snarkos_utilities::serialize::SerializationError::NotEnoughSpace);
+                }
+
+                let mut masked_bytes = [0; BYTE_SIZE];
+                reader.read_exact(&mut masked_bytes[..output_byte_size])?;
+
+                let flags = F::from_u8_remove_flags(&mut masked_bytes[output_byte_size - 1]);
+
+                Ok((Self::read(&masked_bytes[..])?, flags))
+            }
+        }
+
+        impl<P: $params> CanonicalDeserialize for $field<P> {
+            #[allow(unused_qualifications)]
+            fn deserialize<R: snarkos_utilities::io::Read>(
+                reader: &mut R,
+            ) -> Result<Self, snarkos_utilities::serialize::SerializationError> {
+                const BYTE_SIZE: usize = $byte_size;
+
+                let (_, output_byte_size) =
+                    snarkos_utilities::serialize::buffer_bit_byte_size($field::<P>::size_in_bits());
+
+                let mut masked_bytes = [0; BYTE_SIZE];
+                reader.read_exact(&mut masked_bytes[..output_byte_size])?;
+                Ok(Self::read(&masked_bytes[..])?)
+            }
+        }
+    };
+}

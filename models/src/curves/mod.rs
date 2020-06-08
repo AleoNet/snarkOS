@@ -1,4 +1,14 @@
-use snarkos_utilities::biginteger::*;
+use snarkos_utilities::{
+    biginteger::*,
+    bytes::{FromBytes, ToBytes},
+    serialize::{
+        CanonicalDeserialize,
+        CanonicalDeserializeWithFlags,
+        CanonicalSerialize,
+        CanonicalSerializeWithFlags,
+        ConstantSerializedSize,
+    },
+};
 
 use std::fmt::Debug;
 
@@ -122,6 +132,12 @@ impl_field_into_bigint!(Fp320, BigInteger320, Fp320Parameters);
 impl_field_into_bigint!(Fp384, BigInteger384, Fp384Parameters);
 impl_field_into_bigint!(Fp768, BigInteger768, Fp768Parameters);
 impl_field_into_bigint!(Fp832, BigInteger832, Fp832Parameters);
+
+impl_prime_field_serializer!(Fp256, Fp256Parameters, 32);
+impl_prime_field_serializer!(Fp320, Fp320Parameters, 40);
+impl_prime_field_serializer!(Fp384, Fp384Parameters, 48);
+impl_prime_field_serializer!(Fp768, Fp768Parameters, 96);
+impl_prime_field_serializer!(Fp832, Fp832Parameters, 104);
 
 pub fn batch_inversion<F: Field>(v: &mut [F]) {
     // Montgomery’s Trick and Fast Implementation of Masked AES

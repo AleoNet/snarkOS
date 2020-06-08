@@ -2,6 +2,7 @@ use crate::curves::{Field, LegendreSymbol, PrimeField, SquareRootField};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use rand::{
@@ -477,5 +478,52 @@ impl<P: Fp3Parameters> FromStr for Fp3<P> {
 impl<P: Fp3Parameters> ::std::fmt::Display for Fp3<P> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "Fp3({}, {}, {})", self.c0, self.c1, self.c2)
+    }
+}
+
+impl<P: Fp3Parameters> CanonicalSerializeWithFlags for Fp3<P> {
+    #[inline]
+    fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
+        self.c0.serialize(writer)?;
+        self.c1.serialize(writer)?;
+        self.c2.serialize_with_flags(writer, flags)?;
+        Ok(())
+    }
+}
+
+impl<P: Fp3Parameters> CanonicalSerialize for Fp3<P> {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.serialize_with_flags(writer, EmptyFlags)
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        Self::SERIALIZED_SIZE
+    }
+}
+
+impl<P: Fp3Parameters> ConstantSerializedSize for Fp3<P> {
+    const SERIALIZED_SIZE: usize = 3 * <P::Fp as ConstantSerializedSize>::SERIALIZED_SIZE;
+    const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
+}
+
+impl<P: Fp3Parameters> CanonicalDeserializeWithFlags for Fp3<P> {
+    #[inline]
+    fn deserialize_with_flags<R: Read, F: Flags>(reader: &mut R) -> Result<(Self, F), SerializationError> {
+        let c0: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        let c1: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        let (c2, flags): (P::Fp, _) = CanonicalDeserializeWithFlags::deserialize_with_flags(reader)?;
+        Ok((Fp3::new(c0, c1, c2), flags))
+    }
+}
+
+impl<P: Fp3Parameters> CanonicalDeserialize for Fp3<P> {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        let c0: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        let c1: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        let c2: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        Ok(Fp3::new(c0, c1, c2))
     }
 }

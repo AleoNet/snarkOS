@@ -2,6 +2,13 @@ use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::{
+        CanonicalDeserialize,
+        CanonicalDeserializeWithFlags,
+        CanonicalSerialize,
+        CanonicalSerializeWithFlags,
+        ConstantSerializedSize,
+    },
 };
 
 use std::{
@@ -41,6 +48,11 @@ pub trait Field:
     + for<'a> SubAssign<&'a Self>
     + for<'a> MulAssign<&'a Self>
     + for<'a> DivAssign<&'a Self>
+    + CanonicalSerialize
+    + ConstantSerializedSize
+    + CanonicalSerializeWithFlags
+    + CanonicalDeserialize
+    + CanonicalDeserializeWithFlags
 {
     /// Returns the zero element of the field, the additive identity.
     fn zero() -> Self;
