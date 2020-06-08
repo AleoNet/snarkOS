@@ -1,3 +1,4 @@
+use crate::impl_sw_curve_serializer;
 use snarkos_models::curves::{
     AffineCurve,
     Field,
@@ -10,6 +11,7 @@ use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use rand::{
@@ -728,3 +730,5 @@ impl<P: Parameters> From<GroupProjective<P>> for GroupAffine<P> {
         }
     }
 }
+
+impl_sw_curve_serializer!(Parameters);

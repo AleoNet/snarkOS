@@ -1,3 +1,4 @@
+use crate::impl_edwards_curve_serializer;
 use snarkos_models::curves::{
     AffineCurve,
     Field,
@@ -11,6 +12,7 @@ use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use rand::{
@@ -686,3 +688,5 @@ impl<P: MontgomeryParameters> MontgomeryGroupAffine<P> {
         }
     }
 }
+
+impl_edwards_curve_serializer!(Parameters);

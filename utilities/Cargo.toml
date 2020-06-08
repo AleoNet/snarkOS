@@ -21,6 +21,6 @@ snarkos-derives = { path = "derives", optional = true }
 rand_xorshift = { version = "0.2", default-features = false }
 
 [features]
-default = ["std"]
+default = ["std", "derive"]
 std = []
-derive = [ "snarkos-derives" ]
+derive = ["snarkos-derives"]

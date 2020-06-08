@@ -5,8 +5,10 @@ pub use crate::{
 use thiserror::Error;
 
 mod flags;
-
 pub use flags::*;
+
+#[cfg(feature = "derive")]
+pub use snarkos_derives::*;
 
 // Taken from: https://github.com/scipr-lab/zexe/blob/master/algebra-core/src/serialize/
 /// This is an error that could occur during serialization
@@ -46,7 +48,7 @@ pub trait ConstantSerializedSize: CanonicalSerialize {
 /// # Example
 /// ```
 /// // The `derive` feature must be set for the derivation to work.
-/// use algebra_core::serialize::*;
+/// use snarkos_utilities::serialize::*;
 ///
 /// # #[cfg(feature = "derive")]
 /// #[derive(CanonicalSerialize)]
@@ -88,7 +90,7 @@ pub trait CanonicalDeserializeWithFlags: Sized {
 /// # Example
 /// ```
 /// // The `derive` feature must be set for the derivation to work.
-/// use algebra_core::serialize::*;
+/// use snarkos_utilities::serialize::*;
 ///
 /// # #[cfg(feature = "derive")]
 /// #[derive(CanonicalDeserialize)]
