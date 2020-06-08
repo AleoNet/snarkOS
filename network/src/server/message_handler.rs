@@ -263,9 +263,11 @@ impl Server {
 
                 // send block hashes to requester
                 channel.write(&Sync::new(block_hashes)).await?;
+            } else {
+                channel.write(&Sync::new(vec![])).await?;
             }
         }
-        //        }
+
         Ok(())
     }
 

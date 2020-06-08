@@ -49,13 +49,10 @@ impl MinerInstance {
             loop {
                 info!("Mining new block");
 
-                let (block_serialized, _coinbase_records) = match miner
+                let (block_serialized, _coinbase_records) = miner
                     .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
                     .await
-                {
-                    Ok((serialized_block, coinbase_records)) => ((serialized_block, coinbase_records)),
-                    Err(_) => continue,
-                };
+                    .unwrap();
 
                 match Block::<Tx>::deserialize(&block_serialized) {
                     Ok(block) => {
