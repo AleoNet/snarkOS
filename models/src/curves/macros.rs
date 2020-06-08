@@ -196,5 +196,61 @@ macro_rules! impl_prime_field_serializer {
                 Ok(Self::read(&masked_bytes[..])?)
             }
         }
+
+        impl<P: $params> serde::Serialize for $field<P> {
+            fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::ser::Serializer,
+            {
+                use serde::ser::SerializeTuple;
+
+                let len = self.serialized_size();
+                let mut bytes = Vec::with_capacity(len);
+                CanonicalSerialize::serialize(self, &mut bytes).map_err(serde::ser::Error::custom)?;
+
+                let mut tup = s.serialize_tuple(len)?;
+                for byte in &bytes {
+                    tup.serialize_element(byte)?;
+                }
+                tup.end()
+            }
+        }
+
+        impl<'de, P: $params> serde::Deserialize<'de> for $field<P> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct SerVisitor<P>(std::marker::PhantomData<P>);
+
+                impl<'de, P: $params> serde::de::Visitor<'de> for SerVisitor<P> {
+                    type Value = $field<P>;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("a valid field element")
+                    }
+
+                    fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
+                    where
+                        S: serde::de::SeqAccess<'de>,
+                    {
+                        let len = <Self::Value as ConstantSerializedSize>::SERIALIZED_SIZE;
+                        let bytes: Vec<u8> = (0..len)
+                            .map(|_| {
+                                seq.next_element()?
+                                    .ok_or_else(|| serde::de::Error::custom("could not read bytes"))
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+
+                        let res =
+                            CanonicalDeserialize::deserialize(&mut &bytes[..]).map_err(serde::de::Error::custom)?;
+                        Ok(res)
+                    }
+                }
+
+                let visitor = SerVisitor(std::marker::PhantomData);
+                deserializer.deserialize_tuple(Self::SERIALIZED_SIZE, visitor)
+            }
+        }
     };
 }

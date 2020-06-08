@@ -17,6 +17,8 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
+use serde::{Serialize, Deserialize};
+
 /// The interface for a generic field.
 pub trait Field:
     ToBytes
@@ -53,6 +55,8 @@ pub trait Field:
     + CanonicalSerializeWithFlags
     + CanonicalDeserialize
     + CanonicalDeserializeWithFlags
+    + Serialize
+    + for<'a> Deserialize<'a>
 {
     /// Returns the zero element of the field, the additive identity.
     fn zero() -> Self;

@@ -16,6 +16,7 @@ use std::{
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
+use serde::{Serialize, Deserialize};
 
 pub trait Fp6Parameters: 'static + Send + Sync {
     type Fp3Params: Fp3Parameters;
@@ -31,7 +32,7 @@ pub trait Fp6Parameters: 'static + Send + Sync {
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Default(bound = "P: Fp6Parameters"),
     Hash(bound = "P: Fp6Parameters"),
@@ -391,7 +392,7 @@ impl<P: Fp6Parameters> ::std::fmt::Display for Fp6<P> {
 impl<P: Fp6Parameters> CanonicalSerializeWithFlags for Fp6<P> {
     #[inline]
     fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
-        self.c0.serialize(writer)?;
+        CanonicalSerialize::serialize(&self.c0, writer)?;
         self.c1.serialize_with_flags(writer, flags)?;
         Ok(())
     }
@@ -417,7 +418,7 @@ impl<P: Fp6Parameters> ConstantSerializedSize for Fp6<P> {
 impl<P: Fp6Parameters> CanonicalDeserializeWithFlags for Fp6<P> {
     #[inline]
     fn deserialize_with_flags<R: Read, F: Flags>(reader: &mut R) -> Result<(Self, F), SerializationError> {
-        let c0 = Fp3::deserialize(reader)?;
+        let c0 = CanonicalDeserialize::deserialize(reader)?;
         let (c1, flags) = Fp3::deserialize_with_flags(reader)?;
         Ok((Fp6::new(c0, c1), flags))
     }
@@ -426,8 +427,8 @@ impl<P: Fp6Parameters> CanonicalDeserializeWithFlags for Fp6<P> {
 impl<P: Fp6Parameters> CanonicalDeserialize for Fp6<P> {
     #[inline]
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        let c0 = Fp3::deserialize(reader)?;
-        let c1 = Fp3::deserialize(reader)?;
+        let c0 = CanonicalDeserialize::deserialize(reader)?;
+        let c1 = CanonicalDeserialize::deserialize(reader)?;
         Ok(Fp6::new(c0, c1))
     }
 }

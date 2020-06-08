@@ -15,6 +15,7 @@ use std::{
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
+use serde::{Serialize, Deserialize};
 
 pub trait Fp6Parameters: 'static + Send + Sync + Copy {
     type Fp2Params: Fp2Parameters;
@@ -32,7 +33,7 @@ pub trait Fp6Parameters: 'static + Send + Sync + Copy {
 }
 
 /// An element of Fp6, represented by c0 + c1 * v + c2 * v^(2).
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Default(bound = "P: Fp6Parameters"),
     Hash(bound = "P: Fp6Parameters"),
@@ -458,8 +459,8 @@ impl<P: Fp6Parameters> FromBytes for Fp6<P> {
 impl<P: Fp6Parameters> CanonicalSerializeWithFlags for Fp6<P> {
     #[inline]
     fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
-        self.c0.serialize(writer)?;
-        self.c1.serialize(writer)?;
+        CanonicalSerialize::serialize(&self.c0, writer)?;
+        CanonicalSerialize::serialize(&self.c1, writer)?;
         self.c2.serialize_with_flags(writer, flags)?;
         Ok(())
     }
@@ -485,8 +486,8 @@ impl<P: Fp6Parameters> ConstantSerializedSize for Fp6<P> {
 impl<P: Fp6Parameters> CanonicalDeserializeWithFlags for Fp6<P> {
     #[inline]
     fn deserialize_with_flags<R: Read, F: Flags>(reader: &mut R) -> Result<(Self, F), SerializationError> {
-        let c0 = Fp2::deserialize(reader)?;
-        let c1 = Fp2::deserialize(reader)?;
+        let c0 = CanonicalDeserialize::deserialize(reader)?;
+        let c1 = CanonicalDeserialize::deserialize(reader)?;
         let (c2, flags) = Fp2::deserialize_with_flags(reader)?;
         Ok((Fp6::new(c0, c1, c2), flags))
     }
@@ -495,9 +496,9 @@ impl<P: Fp6Parameters> CanonicalDeserializeWithFlags for Fp6<P> {
 impl<P: Fp6Parameters> CanonicalDeserialize for Fp6<P> {
     #[inline]
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        let c0 = Fp2::deserialize(reader)?;
-        let c1 = Fp2::deserialize(reader)?;
-        let c2 = Fp2::deserialize(reader)?;
+        let c0 = CanonicalDeserialize::deserialize(reader)?;
+        let c1 = CanonicalDeserialize::deserialize(reader)?;
+        let c2 = CanonicalDeserialize::deserialize(reader)?;
         Ok(Fp6::new(c0, c1, c2))
     }
 }

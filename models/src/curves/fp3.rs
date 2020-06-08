@@ -16,6 +16,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     str::FromStr,
 };
+use serde::{Serialize, Deserialize};
 
 pub trait Fp3Parameters: 'static + Send + Sync {
     type Fp: PrimeField + SquareRootField;
@@ -35,7 +36,7 @@ pub trait Fp3Parameters: 'static + Send + Sync {
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Default(bound = "P: Fp3Parameters"),
     Hash(bound = "P: Fp3Parameters"),
@@ -484,8 +485,8 @@ impl<P: Fp3Parameters> ::std::fmt::Display for Fp3<P> {
 impl<P: Fp3Parameters> CanonicalSerializeWithFlags for Fp3<P> {
     #[inline]
     fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
-        self.c0.serialize(writer)?;
-        self.c1.serialize(writer)?;
+        CanonicalSerialize::serialize(&self.c0, writer)?;
+        CanonicalSerialize::serialize(&self.c1, writer)?;
         self.c2.serialize_with_flags(writer, flags)?;
         Ok(())
     }

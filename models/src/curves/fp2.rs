@@ -15,8 +15,9 @@ use std::{
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
+use serde::{Serialize, Deserialize};
 
-pub trait Fp2Parameters: 'static + Send + Sync {
+pub trait Fp2Parameters: 'static + Send + Sync + Serialize + for<'a> Deserialize<'a> {
     type Fp: PrimeField;
 
     /// Coefficients for the Frobenius automorphism.
@@ -32,7 +33,7 @@ pub trait Fp2Parameters: 'static + Send + Sync {
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Default(bound = "P: Fp2Parameters"),
     Hash(bound = "P: Fp2Parameters"),
@@ -389,7 +390,7 @@ impl<P: Fp2Parameters> std::fmt::Display for Fp2<P> {
 impl<P: Fp2Parameters> CanonicalSerializeWithFlags for Fp2<P> {
     #[inline]
     fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
-        self.c0.serialize(writer)?;
+        CanonicalSerialize::serialize(&self.c0, writer)?;
         self.c1.serialize_with_flags(writer, flags)?;
         Ok(())
     }
