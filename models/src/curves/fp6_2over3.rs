@@ -10,13 +10,13 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     io::{Read, Result as IoResult, Write},
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-use serde::{Serialize, Deserialize};
 
 pub trait Fp6Parameters: 'static + Send + Sync {
     type Fp3Params: Fp3Parameters;

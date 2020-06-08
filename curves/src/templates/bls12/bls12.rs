@@ -2,6 +2,7 @@ use crate::templates::bls12::{
     g1::{G1Affine, G1Prepared, G1Projective},
     g2::{G2Affine, G2Prepared, G2Projective},
 };
+use serde::{Deserialize, Serialize};
 use snarkos_models::curves::{
     fp12_2over3over2::{Fp12, Fp12Parameters},
     fp2::Fp2Parameters,
@@ -16,7 +17,6 @@ use snarkos_models::curves::{
     SquareRootField,
 };
 use snarkos_utilities::bititerator::BitIterator;
-use serde::{Serialize, Deserialize};
 
 use std::marker::PhantomData;
 

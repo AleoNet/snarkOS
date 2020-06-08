@@ -18,13 +18,13 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter, Result as FmtResult},
     io::{Error, ErrorKind, Read, Result as IoResult, Write},
     marker::PhantomData,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-use serde::{Serialize, Deserialize};
 
 #[derive(Derivative, Serialize, Deserialize)]
 #[derivative(

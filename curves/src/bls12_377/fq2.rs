@@ -1,10 +1,10 @@
 use crate::bls12_377::Fq;
+use serde::{Deserialize, Serialize};
 use snarkos_models::{
     curves::{Field, Fp2, Fp2Parameters},
     field,
 };
 use snarkos_utilities::biginteger::BigInteger384 as BigInteger;
-use serde::{Serialize, Deserialize};
 
 pub type Fq2 = Fp2<Fq2Parameters>;
 

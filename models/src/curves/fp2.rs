@@ -9,13 +9,13 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     io::{Read, Result as IoResult, Write},
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-use serde::{Serialize, Deserialize};
 
 pub trait Fp2Parameters: 'static + Send + Sync + Serialize + for<'a> Deserialize<'a> {
     type Fp: PrimeField;

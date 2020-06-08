@@ -27,7 +27,7 @@ use std::{
 };
 
 pub mod tests;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Derivative, Serialize, Deserialize)]
 #[derivative(

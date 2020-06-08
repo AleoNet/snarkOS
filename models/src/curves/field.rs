@@ -17,7 +17,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// The interface for a generic field.
 pub trait Field:

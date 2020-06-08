@@ -9,6 +9,7 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     io::{Read, Result as IoResult, Write},
@@ -16,7 +17,6 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     str::FromStr,
 };
-use serde::{Serialize, Deserialize};
 
 pub trait Fp3Parameters: 'static + Send + Sync {
     type Fp: PrimeField + SquareRootField;
