@@ -21,3 +21,4 @@ rand_xorshift = { version = "0.2", default-features = false }
 smallvec = { version = "1.4" }
 
 serde = { version = "1.0.111", default-features = false, features = ["derive"] }
+bincode = "1.2.1"

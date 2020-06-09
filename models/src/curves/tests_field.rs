@@ -1,4 +1,8 @@
 use crate::curves::{Field, LegendreSymbol, PrimeField, SquareRootField};
+use snarkos_utilities::{
+    io::Cursor,
+    serialize::{CanonicalDeserialize, CanonicalSerialize, ConstantSerializedSize, Flags, SWFlags},
+};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -346,6 +350,100 @@ pub fn frobenius_test<F: Field, C: AsRef<[u64]>>(characteristic: C, maxpower: us
             assert_eq!(a_qi, a_q);
 
             a_q = a_q.pow(&characteristic);
+        }
+    }
+}
+
+// Taken from https://github.com/scipr-lab/zexe/blob/master/algebra/src/tests/fields.rs#L381
+pub fn field_serialization_test<F: Field>() {
+    let buf_size = F::SERIALIZED_SIZE;
+
+    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+    for _ in 0..ITERATIONS {
+        let a = F::rand(&mut rng);
+        {
+            let mut serialized = vec![0u8; buf_size];
+            let mut cursor = Cursor::new(&mut serialized[..]);
+            CanonicalSerialize::serialize(&a, &mut cursor).unwrap();
+            let serialized2 = bincode::serialize(&a).unwrap();
+            assert_eq!(serialized, serialized2);
+
+            let mut cursor = Cursor::new(&serialized[..]);
+            let b: F = CanonicalDeserialize::deserialize(&mut cursor).unwrap();
+            let c: F = bincode::deserialize(&serialized).unwrap();
+            assert_eq!(a, b);
+            assert_eq!(a, c);
+        }
+
+        {
+            let mut serialized = vec![0u8; a.uncompressed_size()];
+            let mut cursor = Cursor::new(&mut serialized[..]);
+            a.serialize_uncompressed(&mut cursor).unwrap();
+
+            let mut cursor = Cursor::new(&serialized[..]);
+            let b = F::deserialize_uncompressed(&mut cursor).unwrap();
+            assert_eq!(a, b);
+        }
+
+        {
+            let mut serialized = vec![0u8; buf_size];
+            let mut cursor = Cursor::new(&mut serialized[..]);
+            a.serialize_with_flags(&mut cursor, SWFlags::from_y_sign(true)).unwrap();
+            let mut cursor = Cursor::new(&serialized[..]);
+            let (b, flags) = F::deserialize_with_flags::<_, SWFlags>(&mut cursor).unwrap();
+            assert_eq!(flags.is_positive(), Some(true));
+            assert!(!flags.is_infinity());
+            assert_eq!(a, b);
+        }
+
+        #[derive(Default, Clone, Copy, Debug)]
+        struct DummyFlags;
+        impl Flags for DummyFlags {
+            fn u8_bitmask(&self) -> u8 {
+                0
+            }
+
+            fn from_u8(_value: u8) -> Self {
+                DummyFlags
+            }
+
+            fn from_u8_remove_flags(_value: &mut u8) -> Self {
+                DummyFlags
+            }
+
+            fn len() -> usize {
+                200
+            }
+        }
+
+        use snarkos_utilities::serialize::SerializationError;
+        {
+            let mut serialized = vec![0; buf_size];
+            assert!(if let SerializationError::NotEnoughSpace = a
+                .serialize_with_flags(&mut &mut serialized[..], DummyFlags)
+                .unwrap_err()
+            {
+                true
+            } else {
+                false
+            });
+            assert!(if let SerializationError::NotEnoughSpace =
+                F::deserialize_with_flags::<_, DummyFlags>(&mut &serialized[..]).unwrap_err()
+            {
+                true
+            } else {
+                false
+            });
+        }
+
+        {
+            let mut serialized = vec![0; buf_size - 1];
+            let mut cursor = Cursor::new(&mut serialized[..]);
+            CanonicalSerialize::serialize(&a, &mut cursor).unwrap_err();
+
+            let mut cursor = Cursor::new(&serialized[..]);
+            <F as CanonicalDeserialize>::deserialize(&mut cursor).unwrap_err();
         }
     }
 }

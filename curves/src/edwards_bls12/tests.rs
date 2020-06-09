@@ -1,7 +1,7 @@
 use crate::{edwards_bls12::*, templates::twisted_edwards_extended::tests::montgomery_conversion_test};
 use snarkos_models::curves::{
     tests_curve::curve_tests,
-    tests_field::{field_test, primefield_test},
+    tests_field::{field_serialization_test, field_test, primefield_test},
     tests_group::group_test,
     AffineCurve,
     ProjectiveCurve,
@@ -15,6 +15,7 @@ fn test_edwards_bls12_fr() {
     let b: Fr = rand::random();
     field_test(a, b);
     primefield_test::<Fr>();
+    field_serialization_test::<Fr>();
 }
 
 #[test]
@@ -23,6 +24,7 @@ fn test_edwards_bls12_fq() {
     let b: Fq = rand::random();
     field_test(a, b);
     primefield_test::<Fq>();
+    field_serialization_test::<Fq>();
 }
 
 #[test]

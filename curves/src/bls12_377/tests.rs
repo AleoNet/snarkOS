@@ -18,7 +18,7 @@ use crate::bls12_377::{
 use snarkos_models::curves::{
     fp6_3over2::Fp6Parameters,
     tests_curve::curve_tests,
-    tests_field::{field_test, frobenius_test, primefield_test, sqrt_field_test},
+    tests_field::{field_serialization_test, field_test, frobenius_test, primefield_test, sqrt_field_test},
     tests_group::group_test,
     AffineCurve,
     Field,
@@ -53,6 +53,7 @@ fn test_bls12_377_fr() {
         field_test(a, b);
         primefield_test::<Fr>();
         sqrt_field_test(b);
+        field_serialization_test::<Fr>();
     }
 }
 
@@ -64,6 +65,7 @@ fn test_bls12_377_fq() {
         field_test(a, b);
         primefield_test::<Fq>();
         sqrt_field_test(a);
+        field_serialization_test::<Fq>();
     }
 }
 
@@ -76,6 +78,7 @@ fn test_bls12_377_fq2() {
         sqrt_field_test(a);
     }
     frobenius_test::<Fq2, _>(Fq::characteristic(), 13);
+    field_serialization_test::<Fq2>();
 }
 
 #[test]
@@ -86,6 +89,7 @@ fn test_bls12_377_fq6() {
         field_test(g, h);
     }
     frobenius_test::<Fq6, _>(Fq::characteristic(), 13);
+    field_serialization_test::<Fq6>();
 }
 
 #[test]
@@ -96,6 +100,7 @@ fn test_bls12_377_fq12() {
         field_test(g, h);
     }
     frobenius_test::<Fq12, _>(Fq::characteristic(), 13);
+    field_serialization_test::<Fq12>();
 }
 
 #[test]

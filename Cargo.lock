@@ -2158,6 +2158,7 @@ dependencies = [
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
+ "bincode",
  "derivative",
  "rand",
  "rand_xorshift",
