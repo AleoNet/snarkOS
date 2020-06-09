@@ -4,5 +4,5 @@ for file in target/debug/*-*[^\.d];
   do
     mkdir -p "target/cov/$(basename $file)";
     echo "Processing target/cov/$(basename $file)"
-    /usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file";
+    /usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify target/cov/ "$file";
   done
