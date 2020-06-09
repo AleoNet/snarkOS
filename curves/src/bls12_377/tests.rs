@@ -1,19 +1,23 @@
 #![allow(unused_imports)]
-use crate::bls12_377::{
-    g1::Bls12_377G1Parameters,
-    Bls12_377,
-    Fq,
-    Fq12,
-    Fq2,
-    Fq2Parameters,
-    Fq6,
-    Fq6Parameters,
-    FqParameters,
-    Fr,
-    G1Affine,
-    G1Projective,
-    G2Affine,
-    G2Projective,
+use crate::{
+    bls12_377::{
+        g1::Bls12_377G1Parameters,
+        g2::Bls12_377G2Parameters,
+        Bls12_377,
+        Fq,
+        Fq12,
+        Fq2,
+        Fq2Parameters,
+        Fq6,
+        Fq6Parameters,
+        FqParameters,
+        Fr,
+        G1Affine,
+        G1Projective,
+        G2Affine,
+        G2Projective,
+    },
+    templates::{short_weierstrass::tests::sw_tests, twisted_edwards_extended::tests::edwards_test},
 };
 use snarkos_models::curves::{
     fp6_3over2::Fp6Parameters,
@@ -531,6 +535,7 @@ fn test_fq12_mul_by_034() {
 #[test]
 fn test_g1_projective_curve() {
     curve_tests::<G1Projective>();
+    sw_tests::<Bls12_377G1Parameters>();
 }
 
 #[test]
@@ -550,6 +555,7 @@ fn test_g1_generator() {
 #[test]
 fn test_g2_projective_curve() {
     curve_tests::<G2Projective>();
+    sw_tests::<Bls12_377G2Parameters>();
 }
 
 #[test]

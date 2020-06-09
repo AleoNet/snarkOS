@@ -1,4 +1,4 @@
-use crate::sw6::*;
+use crate::{sw6::*, templates::short_weierstrass::tests::sw_tests};
 use snarkos_models::curves::{
     tests_curve::curve_tests,
     tests_field::{field_serialization_test, field_test, frobenius_test, primefield_test, sqrt_field_test},
@@ -53,6 +53,7 @@ fn test_sw6_fq6() {
 #[test]
 fn test_g1_projective_curve() {
     curve_tests::<G1Projective>();
+    sw_tests::<SW6G1Parameters>();
 }
 
 #[test]
@@ -72,6 +73,7 @@ fn test_g1_generator() {
 #[test]
 fn test_g2_projective_curve() {
     curve_tests::<G2Projective>();
+    sw_tests::<SW6G2Parameters>();
 }
 
 #[test]

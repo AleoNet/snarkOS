@@ -1,7 +1,7 @@
 use crate::curves::{Field, LegendreSymbol, PrimeField, SquareRootField};
 use snarkos_utilities::{
     io::Cursor,
-    serialize::{CanonicalDeserialize, CanonicalSerialize, ConstantSerializedSize, Flags, SWFlags},
+    serialize::{CanonicalDeserialize, CanonicalSerialize, Flags, SWFlags},
 };
 
 use rand::{Rng, SeedableRng};
