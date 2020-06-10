@@ -69,10 +69,16 @@ jobs:
       - run: cargo clean
       - run:
           name: Test
-          command: RUST_MIN_STACK=8388608 cargo test --verbose --all-features --no-fail-fast --workspace --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
+          command: |
+            export CARGO_INCREMENTAL=0
+            export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off"
+            RUST_MIN_STACK=8388608 cargo test --verbose --all-features --no-fail-fast --workspace --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - run:
           name: Build
-          command: RUST_MIN_STACK=8388608 cargo build --verbose --all-features --workspace
+          command: |
+            export CARGO_INCREMENTAL=0
+            export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off"
+            RUST_MIN_STACK=8388608 cargo build --verbose --all-features --workspace
       - run:
           name: Download gcov
           command: |
@@ -80,8 +86,6 @@ jobs:
       - run:
           name: Collect coverage
           command: |
-            export CARGO_INCREMENTAL=0
-            export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off"
             ./grcov ./target/debug -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info
       - run:
           name: Send coverage data
