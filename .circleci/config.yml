@@ -74,12 +74,18 @@ jobs:
           name: Build
           command: RUST_MIN_STACK=8388608 cargo build --verbose --all-features --workspace
       - run:
+          name: Download gcov
+          command: |
+            curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+      - run:
           name: Collect coverage
           command: |
             export CARGO_INCREMENTAL=0
             export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off"
-            curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
             ./grcov ./target/debug -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info
+      - run:
+          name: Send coverage data
+          command: |
             bash <(curl -s https://codecov.io/bash) -f lcov.info;
       - clear_environment:
           cache_key: snark-cache-nighty
