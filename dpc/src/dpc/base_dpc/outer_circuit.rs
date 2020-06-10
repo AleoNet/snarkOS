@@ -7,9 +7,10 @@ use crate::{
     },
     Assignment,
 };
+use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::CommitmentScheme,
+    algorithms::{CommitmentScheme, SignatureScheme, SNARK},
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
@@ -18,6 +19,18 @@ use snarkos_models::{
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct OuterCircuit<C: BaseDPCComponents> {
     circuit_parameters: Option<CircuitParameters<C>>,
+
+    // Inner snark verifier public inputs
+    ledger_parameters: Option<C::MerkleParameters>,
+    ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
+    old_serial_numbers: Option<Vec<<C::AccountSignature as SignatureScheme>::PublicKey>>,
+    new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
+    memo: Option<[u8; 32]>,
+    value_balance: Option<i64>,
+
+    // Inner snark verifier private inputs
+    inner_snark_vk: Option<<C::InnerSNARK as SNARK>::VerificationParameters>,
+    inner_snark_proof: Option<<C::InnerSNARK as SNARK>::Proof>,
 
     old_private_predicate_inputs: Option<Vec<PrivatePredicateInput<C>>>,
     new_private_predicate_inputs: Option<Vec<PrivatePredicateInput<C>>>,
@@ -30,10 +43,25 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 impl<C: BaseDPCComponents> OuterCircuit<C> {
     pub fn blank(
         circuit_parameters: &CircuitParameters<C>,
+        ledger_parameters: &C::MerkleParameters,
+        inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
+        inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
         predicate_nizk_vk_and_proof: &PrivatePredicateInput<C>,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
+
+        let ledger_digest = Some(MerkleTreeDigest::<C::MerkleParameters>::default());
+        let old_serial_numbers = Some(vec![
+            <C::AccountSignature as SignatureScheme>::PublicKey::default();
+            num_input_records
+        ]);
+        let new_commitments = Some(vec![
+            <C::RecordCommitment as CommitmentScheme>::Output::default();
+            num_output_records
+        ]);
+        let memo = Some([0u8; 32]);
+        let value_balance = Some(0);
 
         let old_private_predicate_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_input_records]);
         let new_private_predicate_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_output_records]);
@@ -46,6 +74,16 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
 
+            ledger_parameters: Some(ledger_parameters.clone()),
+            ledger_digest,
+            old_serial_numbers,
+            new_commitments,
+            memo,
+            value_balance,
+
+            inner_snark_vk: Some(inner_snark_vk.clone()),
+            inner_snark_proof: Some(inner_snark_proof.clone()),
+
             old_private_predicate_inputs,
             new_private_predicate_inputs,
 
@@ -57,6 +95,19 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
     pub fn new(
         circuit_parameters: &CircuitParameters<C>,
+
+        // Inner snark public inputs
+        ledger_parameters: &C::MerkleParameters,
+        ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
+        old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
+        new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+        memo: &[u8; 32],
+        value_balance: i64,
+
+        // Inner snark private inputs
+        inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
+        inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
+
         // Private predicate input = Verification key and input
         // Commitment contains commitment to hash of death predicate vk.
         old_private_predicate_inputs: &[PrivatePredicateInput<C>],
@@ -77,8 +128,20 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
+
+            ledger_parameters: Some(ledger_parameters.clone()),
+            ledger_digest: Some(ledger_digest.clone()),
+            old_serial_numbers: Some(old_serial_numbers.clone()),
+            new_commitments: Some(new_commitments.clone()),
+            memo: Some(memo.clone()),
+            value_balance: Some(value_balance.clone()),
+
+            inner_snark_vk: Some(inner_snark_vk.clone()),
+            inner_snark_proof: Some(inner_snark_proof.clone()),
+
             old_private_predicate_inputs: Some(old_private_predicate_inputs.to_vec()),
             new_private_predicate_inputs: Some(new_private_predicate_inputs.to_vec()),
+
             predicate_commitment: Some(predicate_commitment.clone()),
             predicate_randomness: Some(predicate_randomness.clone()),
             local_data_commitment: Some(local_data_commitment.clone()),

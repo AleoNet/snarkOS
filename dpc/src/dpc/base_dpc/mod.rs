@@ -575,8 +575,24 @@ where
         end_timer!(snark_setup_time);
 
         let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
-        let outer_snark_parameters =
-            Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
+        let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
+            inner_snark_parameters.1.clone().into();
+        let inner_snark_proof = Components::InnerSNARK::prove(
+            &inner_snark_parameters.0,
+            InnerCircuit::blank(&circuit_parameters, ledger_parameters),
+            rng,
+        )?;
+
+        let outer_snark_parameters = Components::OuterSNARK::setup(
+            OuterCircuit::blank(
+                &circuit_parameters,
+                ledger_parameters,
+                &inner_snark_vk,
+                &inner_snark_proof,
+                &private_pred_input,
+            ),
+            rng,
+        )?;
         end_timer!(snark_setup_time);
         end_timer!(setup_time);
 
@@ -772,8 +788,20 @@ where
         };
 
         let outer_proof = {
+            let ledger_parameters = ledger.parameters();
+            let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
+                parameters.inner_snark_parameters.1.clone().into();
+
             let circuit = OuterCircuit::new(
                 &parameters.circuit_parameters,
+                ledger_parameters,
+                &ledger_digest,
+                &old_serial_numbers,
+                &new_commitments,
+                &memorandum,
+                value_balance,
+                &inner_snark_vk,
+                &inner_proof,
                 old_death_pred_attributes.as_slice(),
                 new_birth_pred_attributes.as_slice(),
                 &predicate_commitment,
