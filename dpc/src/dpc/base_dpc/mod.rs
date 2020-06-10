@@ -89,6 +89,9 @@ pub trait BaseDPCComponents: DPCComponents {
         VerifierInput = InnerCircuitVerifierInput<Self>,
     >;
 
+    /// SNARK Verifier gadget for the inner snark
+    type InnerSNARKGadget: SNARKVerifierGadget<Self::InnerSNARK, Self::OuterField>;
+
     /// SNARK for proof-verification checks
     type OuterSNARK: SNARK<
         Circuit = OuterCircuit<Self>,

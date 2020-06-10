@@ -134,6 +134,7 @@ impl BaseDPCComponents for Components {
     type BindingSignatureGadget = BindingSignatureGadget;
     type BindingSignatureGroup = EdwardsBls;
     type InnerSNARK = CoreCheckNIZK;
+    type InnerSNARKGadget = InnerSNARKGadget;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
     type OuterSNARK = ProofCheckNIZK;
@@ -191,3 +192,4 @@ pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<Edward
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
+pub type InnerSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
