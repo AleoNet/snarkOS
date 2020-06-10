@@ -57,11 +57,6 @@ jobs:
           command: >
             RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
             --skip dpc_integration_test --skip startup_handshake_stored_peers
-      - run:
-          name: Collect coverage
-          command: |
-            ./grcov -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
-            bash <(curl -s https://codecov.io/bash) -f lcov.info;
       - clear_environment:
           cache_key: snark-main
   rust_nightly:
@@ -75,8 +70,17 @@ jobs:
       - run: rustup component add rustfmt
       - run: cargo fmt -- --check
       - run:
-          name: Build and test
+          name: Build
+          command: RUST_MIN_STACK=8388608 cargo build
+      - run:
+          name: Test
           command: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
+      - run:
+          name: Collect coverage
+          command: |
+            curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -;
+            ./grcov ./target/debug -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
+            bash <(curl -s https://codecov.io/bash) -f lcov.info;
       - clear_environment:
           cache_key: snark-cache-nighty
 workflows:
