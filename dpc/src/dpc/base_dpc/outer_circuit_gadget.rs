@@ -155,6 +155,7 @@ where
 
     let value_balance_as_u64 = value_balance.abs() as u64;
 
+    // TODO (raychu86) try Boolean::alloc for the is_negative flag
     let is_negative: bool = value_balance.is_negative();
 
     let value_balance_fe =
@@ -254,7 +255,16 @@ where
     // Verify the InnerSNARK proof
     // ************************************************************************
 
-    // TODO Add allocation of Inner snark vk and proof
+    let inner_snark_proof = <C::InnerSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        &mut cs.ns(|| "Allocate inner snark proof"),
+        || Ok(inner_snark_proof),
+    )?;
+
+    let inner_snark_vk = <C::InnerSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+        &mut cs.ns(|| "Allocate inner snark verification key"),
+        || Ok(inner_snark_vk),
+    )?;
+
     // TODO Verify the inner snark proof
 
     // ************************************************************************
