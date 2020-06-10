@@ -10,7 +10,7 @@ use crate::{
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, SNARK},
+    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
@@ -151,10 +151,27 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
 impl<C: BaseDPCComponents> ConstraintSynthesizer<C::OuterField> for OuterCircuit<C>
 where
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
+
+    <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::ValueCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+
+    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_outer_proof_gadget::<C, CS>(
