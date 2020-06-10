@@ -1,7 +1,8 @@
 use crate::dpc::base_dpc::{parameters::CircuitParameters, predicate::PrivatePredicateInput, BaseDPCComponents};
+use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
@@ -20,6 +21,18 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     cs: &mut CS,
     // Parameters
     circuit_parameters: &CircuitParameters<C>,
+
+    // Inner snark verifier public inputs
+    ledger_parameters: &C::MerkleParameters,
+    ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
+    old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
+    new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+    memo: &[u8; 32],
+    value_balance: &i64,
+
+    // Inner snark verifier private inputs (verification key and proof)
+    inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
+    inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
 
     // Old record death predicate verification keys and proofs
     old_death_predicate_verification_inputs: &[PrivatePredicateInput<C>],
