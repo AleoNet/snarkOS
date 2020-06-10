@@ -22,10 +22,7 @@ commands:
             export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
             export RUSTC_WRAPPER="sccache"
             rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
-            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
-            export CARGO_INCREMENTAL=0
-            export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
-            export RUSTDOCFLAGS="-Cpanic=abort"
+            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev"
       - restore_cache:
           keys:
             - << parameters.cache_key >>
@@ -69,17 +66,20 @@ jobs:
           cache_key: snark-cache-nighty
       - run: rustup component add rustfmt
       - run: cargo fmt -- --check
-      - run:
-          name: Build
-          command: RUST_MIN_STACK=8388608 cargo build
+      - run: cargo clean
       - run:
           name: Test
-          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
+          command: RUST_MIN_STACK=8388608 cargo test --verbose --all-features --no-fail-fast --workspace --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
+      - run:
+          name: Build
+          command: RUST_MIN_STACK=8388608 cargo build --verbose --all-features --workspace
       - run:
           name: Collect coverage
           command: |
-            curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -;
-            ./grcov ./target/debug -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
+            export CARGO_INCREMENTAL=0
+            export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off
+            curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+            ./grcov ./target/debug -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info
             bash <(curl -s https://codecov.io/bash) -f lcov.info;
       - clear_environment:
           cache_key: snark-cache-nighty
