@@ -3,6 +3,7 @@ use crate::dpc::base_dpc::{
     binding_signature::*,
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
+    inner_circuit::InnerCircuit,
     predicate::PrivatePredicateInput,
     predicate_circuit::{PredicateCircuit, PredicateLocalData},
     record_payload::RecordPayload,
@@ -324,12 +325,65 @@ fn test_execute_base_dpc_constraints() {
 
     assert!(core_cs.is_satisfied());
 
+    println!("Setup inner snark parameters");
+    // Generate inner snark parameters and proof for verification in the outer snark
+    let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
+        InnerCircuit::blank(&circuit_parameters, ledger.parameters()),
+        &mut rng,
+    )
+    .unwrap();
+
+    println!("Generate inner snark proof");
+
+    let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
+        &inner_snark_parameters.0,
+        InnerCircuit::new(
+            &circuit_parameters,
+            ledger.parameters(),
+            &ledger_digest,
+            old_records,
+            &old_witnesses,
+            old_account_private_keys,
+            &old_serial_numbers,
+            &new_records,
+            &new_sn_nonce_randomness,
+            &new_commitments,
+            &predicate_comm,
+            &predicate_rand,
+            &local_data_comm,
+            &local_data_rand,
+            &memo,
+            &auxiliary,
+            &old_value_commits,
+            &old_value_commit_randomness,
+            &new_value_commits,
+            &new_value_commit_randomness,
+            value_balance,
+            &binding_signature,
+        ),
+        &mut rng,
+    )
+    .unwrap();
+
+    let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
+        inner_snark_parameters.1.clone().into();
+
+    println!("Execute outer proof gadget");
+
     // Check that the proof check constraint system was satisfied.
     let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
 
     execute_outer_proof_gadget::<_, _>(
         &mut pf_check_cs.ns(|| "Check predicate proofs"),
         &circuit_parameters,
+        ledger.parameters(),
+        &ledger_digest,
+        &old_serial_numbers,
+        &new_commitments,
+        &memo,
+        &value_balance,
+        &inner_snark_vk,
+        &inner_snark_proof,
         &old_proof_and_vk,
         &new_proof_and_vk,
         &predicate_comm,
