@@ -4,6 +4,6 @@
 4. Build and push:
 
 ```bash
-docker build -t daniilr/rust-nightly:2020-05-15 .
-docker push daniilr/rust-nightly:2020-05-15 
+docker build -t daniilr/kcov .
+docker push daniilr/kcov 
 ```

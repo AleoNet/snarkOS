@@ -23,6 +23,9 @@ commands:
             export RUSTC_WRAPPER="sccache"
             rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
             sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+            export CARGO_INCREMENTAL=0
+            export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
+            export RUSTDOCFLAGS="-Cpanic=abort"
       - restore_cache:
           keys:
             - << parameters.cache_key >>
@@ -54,26 +57,13 @@ jobs:
           command: >
             RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
             --skip dpc_integration_test --skip startup_handshake_stored_peers
-      - persist_to_workspace:
-          root: ~/
-          paths: project/
+      - run:
+          name: Collect coverage
+          command: |
+            ./grcov -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
+            bash <(curl -s https://codecov.io/bash) -f lcov.info;
       - clear_environment:
           cache_key: snark-main
-  analyse_and_store_coverage:
-    machine:
-      image: ubuntu-1604:202004-01
-      docker_layer_caching: true
-    resource_class: xlarge
-    steps:
-      - attach_workspace:
-          at: /home/circleci/project/
-      - run:
-          name: Run kcov
-          command: >
-            cd ~/project/project/ &&
-            docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-            daniilr/kcov bash /home/circleci/project/ci/kcov.sh
-      - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
       - image: daniilr/rust-nightly:2020-05-15
@@ -95,6 +85,3 @@ workflows:
     jobs:
       - rust_stable
       - rust_nightly
-      - analyse_and_store_coverage:
-          requires:
-            - rust_stable
