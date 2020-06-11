@@ -67,6 +67,17 @@ where
                 .to_field_elements()?,
         );
 
+        // Convert inner snark verifier inputs into OuterField field elements
+
+        let inner_snark_field_elements = &self.inner_snark_verifier_input.to_field_elements()?;
+
+        for inner_snark_fe in inner_snark_field_elements {
+            let inner_snark_fe_bytes = to_bytes![inner_snark_fe].map_err(|_| SynthesisError::AssignmentMissing)?;
+            v.extend_from_slice(&ToConstraintField::<C::OuterField>::to_field_elements(
+                inner_snark_fe_bytes.as_slice(),
+            )?);
+        }
+
         let local_data_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
             self.circuit_parameters.local_data_commitment.parameters(),
         )
