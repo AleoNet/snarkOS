@@ -620,5 +620,12 @@ mod tests {
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
+
+        // expected difficulty did not match the difficulty target
+        let mut h2_err = h2.clone();
+        h2_err.difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp()) + 1;
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
     }
 }
