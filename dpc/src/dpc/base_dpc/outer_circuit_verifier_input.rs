@@ -1,8 +1,4 @@
-use crate::dpc::base_dpc::{
-    inner_circuit_verifier_input::InnerCircuitVerifierInput,
-    parameters::CircuitParameters,
-    BaseDPCComponents,
-};
+use crate::dpc::base_dpc::{inner_circuit_verifier_input::InnerCircuitVerifierInput, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
@@ -11,14 +7,11 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-// TODO (raychu86) Remove duplicate circuit_parameter attribte in InnerCircuitVerifierInput
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct OuterCircuitVerifierInput<C: BaseDPCComponents> {
-    pub circuit_parameters: CircuitParameters<C>,
     pub inner_snark_verifier_input: InnerCircuitVerifierInput<C>,
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
 
 impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVerifierInput<C>
@@ -54,6 +47,7 @@ where
 
         v.extend_from_slice(
             &self
+                .inner_snark_verifier_input
                 .circuit_parameters
                 .predicate_verification_key_commitment
                 .parameters()
@@ -61,13 +55,14 @@ where
         );
         v.extend_from_slice(
             &self
+                .inner_snark_verifier_input
                 .circuit_parameters
                 .predicate_verification_key_hash
                 .parameters()
                 .to_field_elements()?,
         );
 
-        // Convert inner snark verifier inputs into OuterField field elements
+        // Convert inner snark verifier inputs into `OuterField` field elements
 
         let inner_snark_field_elements = &self.inner_snark_verifier_input.to_field_elements()?;
 
@@ -77,38 +72,6 @@ where
                 inner_snark_fe_bytes.as_slice(),
             )?);
         }
-
-        let local_data_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            self.circuit_parameters.local_data_commitment.parameters(),
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        let local_data_commitment_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(&self.local_data_commitment)
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        let value_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-            self.circuit_parameters.value_commitment.parameters(),
-        )
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        // Then we convert these field elements into bytes
-        let predicate_input = [
-            to_bytes![local_data_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-            to_bytes![local_data_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-            to_bytes![value_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        ];
-
-        // Then we convert them into `C::ProofCheckF::Fr` elements.
-        v.extend_from_slice(&ToConstraintField::<C::OuterField>::to_field_elements(
-            predicate_input[0].as_slice(),
-        )?);
-        v.extend_from_slice(&ToConstraintField::<C::OuterField>::to_field_elements(
-            predicate_input[1].as_slice(),
-        )?);
-        v.extend_from_slice(&ToConstraintField::<C::OuterField>::to_field_elements(
-            predicate_input[2].as_slice(),
-        )?);
 
         v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);
         Ok(v)

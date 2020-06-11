@@ -907,10 +907,8 @@ where
         };
 
         let outer_snark_input = OuterCircuitVerifierInput {
-            circuit_parameters: parameters.circuit_parameters.clone(),
             inner_snark_verifier_input: inner_snark_input,
             predicate_commitment: transaction.predicate_commitment.clone(),
-            local_data_commitment: transaction.local_data_commitment.clone(),
         };
 
         if !Components::OuterSNARK::verify(
