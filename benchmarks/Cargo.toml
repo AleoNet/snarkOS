@@ -28,7 +28,7 @@ derivative = { version = "2" }
 digest = { version = "0.7" }
 rand = { version = "0.7" }
 rayon = { version = "1" }
-sha2 = { version = "0.8" }
+sha2 = { version = "0.9" }
 smallvec = { version = "1.4" }
 
 [dev-dependencies]
