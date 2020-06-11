@@ -790,7 +790,7 @@ where
             Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
         };
 
-        let outer_proof = {
+        let transaction_proof = {
             let ledger_parameters = ledger.parameters();
             let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
                 parameters.inner_snark_parameters.1.clone().into();
@@ -825,7 +825,7 @@ where
             new_commitments,
             memorandum,
             ledger_digest,
-            outer_proof
+            transaction_proof
         ]?;
 
         let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
@@ -856,7 +856,7 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
-            outer_proof,
+            transaction_proof,
             predicate_commitment,
             local_data_commitment,
             value_balance,
@@ -916,7 +916,7 @@ where
         if !Components::OuterSNARK::verify(
             &parameters.outer_snark_parameters.1,
             &outer_snark_input,
-            &transaction.outer_proof,
+            &transaction.transaction_proof,
         )? {
             eprintln!("Predicate check NIZK didn't verify.");
             return Ok(false);
@@ -927,7 +927,7 @@ where
             transaction.new_commitments(),
             transaction.memorandum(),
             transaction.digest,
-            transaction.outer_proof
+            transaction.transaction_proof
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
