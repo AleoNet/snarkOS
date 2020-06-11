@@ -27,6 +27,9 @@ pub mod io;
 #[cfg(feature = "std")]
 pub use std::io;
 
+pub mod serialize;
+pub use self::serialize::*;
+
 #[cfg(not(feature = "std"))]
 fn error(_msg: &'static str) -> io::Error {
     io::Error

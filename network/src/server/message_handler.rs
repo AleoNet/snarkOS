@@ -1,5 +1,5 @@
 use crate::{
-    message::{types::*, Channel, Message},
+    message::{types::*, Channel, Message, MessageName},
     process_transaction_internal,
     propagate_block,
     Pings,
@@ -62,6 +62,10 @@ impl Server {
             } else if name == Verack::name() {
                 self.receive_verack(Verack::deserialize(bytes)?, channel.clone())
                     .await?;
+            } else if name == MessageName::from("disconnect") {
+                info!("Disconnected from peer: {:?}", channel.address);
+                let mut peer_book = self.context.peer_book.write().await;
+                peer_book.disconnect_peer(channel.address);
             } else {
                 info!("Name not recognized {:?}", name.to_string());
             }
@@ -181,7 +185,7 @@ impl Server {
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
         let peer_book = &mut self.context.peer_book.write().await;
         for (addr, time) in message.addresses.iter() {
-            if &self.context.local_address == addr {
+            if &*self.context.local_address.read().await == addr {
                 continue;
             } else if peer_book.connected_contains(addr) {
                 peer_book.update_connected(addr.clone(), time.clone());
@@ -198,6 +202,12 @@ impl Server {
     /// A peer has sent us a ping message.
     /// Reply with a pong message.
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
+        let mut peer_book = self.context.peer_book.write().await;
+
+        if peer_book.connected_contains(&channel.address) {
+            peer_book.update_connected(channel.address, Utc::now());
+        }
+
         Pings::send_pong(message, channel).await?;
 
         Ok(())
@@ -251,11 +261,13 @@ impl Server {
                     block_hashes.push(self.storage.get_block_hash(block_num)?);
                 }
 
-                // send serialized blocks to requester
+                // send block hashes to requester
                 channel.write(&Sync::new(block_hashes)).await?;
+            } else {
+                channel.write(&Sync::new(vec![])).await?;
             }
         }
-        //        }
+
         Ok(())
     }
 
@@ -331,7 +343,9 @@ impl Server {
         let peer_address = message.address_sender;
         let peer_book = &mut self.context.peer_book.read().await;
 
-        if peer_book.connected_total() < self.context.max_peers && self.context.local_address != peer_address {
+        if peer_book.connected_total() < self.context.max_peers
+            && *self.context.local_address.read().await != peer_address
+        {
             self.context
                 .handshakes
                 .write()

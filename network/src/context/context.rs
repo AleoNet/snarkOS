@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 /// All variables are public to allow server components to acquire read/write access.
 pub struct Context {
     /// The ip address/socket of this node.
-    pub local_address: SocketAddr,
+    pub local_address: RwLock<SocketAddr>,
 
     /// Frequency the server requests memory pool transactions.
     pub memory_pool_interval: u8,
@@ -48,7 +48,7 @@ impl Context {
         bootnodes: Vec<String>,
     ) -> Self {
         Self {
-            local_address,
+            local_address: RwLock::new(local_address),
             memory_pool_interval,
             min_peers,
             max_peers,

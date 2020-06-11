@@ -3,12 +3,14 @@ use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     io::{Read, Result as IoResult, Write},
@@ -24,7 +26,7 @@ pub trait Fp12Parameters: 'static + Send + Sync + Copy {
 }
 
 /// An element of Fp12, represented by c0 + c1 * v
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Default(bound = "P: Fp12Parameters"),
     Hash(bound = "P: Fp12Parameters"),
@@ -458,6 +460,50 @@ impl<P: Fp12Parameters> FromBytes for Fp12<P> {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let c0 = Fp6::read(&mut reader)?;
         let c1 = Fp6::read(&mut reader)?;
+        Ok(Fp12::new(c0, c1))
+    }
+}
+
+impl<P: Fp12Parameters> CanonicalSerializeWithFlags for Fp12<P> {
+    #[inline]
+    fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
+        CanonicalSerialize::serialize(&self.c0, writer)?;
+        self.c1.serialize_with_flags(writer, flags)?;
+        Ok(())
+    }
+}
+
+impl<P: Fp12Parameters> CanonicalSerialize for Fp12<P> {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.serialize_with_flags(writer, EmptyFlags)
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        Self::SERIALIZED_SIZE
+    }
+}
+
+impl<P: Fp12Parameters> ConstantSerializedSize for Fp12<P> {
+    const SERIALIZED_SIZE: usize = 2 * <Fp6<P::Fp6Params> as ConstantSerializedSize>::SERIALIZED_SIZE;
+    const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
+}
+
+impl<P: Fp12Parameters> CanonicalDeserializeWithFlags for Fp12<P> {
+    #[inline]
+    fn deserialize_with_flags<R: Read, F: Flags>(reader: &mut R) -> Result<(Self, F), SerializationError> {
+        let c0 = CanonicalDeserialize::deserialize(reader)?;
+        let (c1, flags) = Fp6::deserialize_with_flags(reader)?;
+        Ok((Fp12::new(c0, c1), flags))
+    }
+}
+
+impl<P: Fp12Parameters> CanonicalDeserialize for Fp12<P> {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        let c0 = CanonicalDeserialize::deserialize(reader)?;
+        let c1 = CanonicalDeserialize::deserialize(reader)?;
         Ok(Fp12::new(c0, c1))
     }
 }

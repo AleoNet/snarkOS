@@ -1,7 +1,7 @@
-use crate::sw6::*;
+use crate::{sw6::*, templates::short_weierstrass::tests::sw_tests};
 use snarkos_models::curves::{
     tests_curve::curve_tests,
-    tests_field::{field_test, frobenius_test, primefield_test, sqrt_field_test},
+    tests_field::{field_serialization_test, field_test, frobenius_test, primefield_test, sqrt_field_test},
     tests_group::group_test,
     AffineCurve,
     Field,
@@ -18,6 +18,7 @@ fn test_sw6_fr() {
     field_test(a, b);
     sqrt_field_test(a);
     primefield_test::<Fr>();
+    field_serialization_test::<Fr>();
 }
 
 #[test]
@@ -27,6 +28,7 @@ fn test_sw6_fq() {
     field_test(a, b);
     primefield_test::<Fq>();
     sqrt_field_test(a);
+    field_serialization_test::<Fq>();
 }
 
 #[test]
@@ -36,6 +38,7 @@ fn test_sw6_fq3() {
     field_test(a, b);
     sqrt_field_test(a);
     frobenius_test::<Fq3, _>(Fq::characteristic(), 13);
+    field_serialization_test::<Fq3>();
 }
 
 #[test]
@@ -44,11 +47,13 @@ fn test_sw6_fq6() {
     let b: Fq6 = rand::random();
     field_test(a, b);
     frobenius_test::<Fq6, _>(Fq::characteristic(), 13);
+    field_serialization_test::<Fq6>();
 }
 
 #[test]
 fn test_g1_projective_curve() {
     curve_tests::<G1Projective>();
+    sw_tests::<SW6G1Parameters>();
 }
 
 #[test]
@@ -68,6 +73,7 @@ fn test_g1_generator() {
 #[test]
 fn test_g2_projective_curve() {
     curve_tests::<G2Projective>();
+    sw_tests::<SW6G2Parameters>();
 }
 
 #[test]

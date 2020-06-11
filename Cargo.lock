@@ -135,14 +135,14 @@ dependencies = [
 
 [[package]]
 name = "block-buffer"
-version = "0.7.3"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0940dc441f31689269e10ac70eb1002a3a1d3ad1390e030043662eb7fe4688b"
+checksum = "dbcf92448676f82bb7a334c58bbce8b0d43580fb5362a9d608b18879d12a3d31"
 dependencies = [
  "block-padding",
  "byte-tools",
  "byteorder",
- "generic-array 0.12.3",
+ "generic-array 0.14.1",
 ]
 
 [[package]]
@@ -491,6 +491,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "digest"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
+dependencies = [
+ "generic-array 0.14.1",
+]
+
+[[package]]
 name = "dtoa"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -710,6 +719,15 @@ name = "generic-array"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
+name = "generic-array"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d2664c2cf08049036f31015b04c6ac3671379a1d86f52ed2416893f16022deb"
 dependencies = [
  "typenum",
 ]
@@ -1866,9 +1884,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.53"
+version = "1.0.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "993948e75b189211a9b31a7528f950c6adc21f9720b6438ff80a7fa2f864cea2"
+checksum = "cfe4c1f6427dbc29329c6288e9e748b8b8e0ea42a0aab733e887fa72c22e965d"
 dependencies = [
  "itoa",
  "ryu",
@@ -1911,12 +1929,12 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.8.2"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a256f46ea78a0c0d9ff00077504903ac881a1dafdc20da66545699e7776b3e69"
+checksum = "72377440080fd008550fe9b441e854e43318db116f90181eef92e9ae9aedab48"
 dependencies = [
  "block-buffer",
- "digest 0.8.1",
+ "digest 0.9.0",
  "fake-simd",
  "opaque-debug",
 ]
@@ -2069,9 +2087,19 @@ dependencies = [
  "derivative",
  "rand",
  "rand_xorshift",
+ "serde",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-derives"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -2148,9 +2176,11 @@ dependencies = [
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
+ "bincode",
  "derivative",
  "rand",
  "rand_xorshift",
+ "serde",
  "smallvec 1.4.0",
  "snarkos-errors",
  "snarkos-utilities",
@@ -2321,6 +2351,8 @@ version = "0.8.0"
 dependencies = [
  "rand",
  "rand_xorshift",
+ "snarkos-derives",
+ "thiserror",
 ]
 
 [[package]]

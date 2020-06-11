@@ -2,12 +2,14 @@ use crate::curves::{Field, LegendreSymbol, PrimeField, SquareRootField};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     io::{Read, Result as IoResult, Write},
@@ -15,7 +17,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-pub trait Fp2Parameters: 'static + Send + Sync {
+pub trait Fp2Parameters: 'static + Send + Sync + Serialize + for<'a> Deserialize<'a> {
     type Fp: PrimeField;
 
     /// Coefficients for the Frobenius automorphism.
@@ -31,7 +33,7 @@ pub trait Fp2Parameters: 'static + Send + Sync {
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Default(bound = "P: Fp2Parameters"),
     Hash(bound = "P: Fp2Parameters"),
@@ -382,5 +384,49 @@ impl<'a, P: Fp2Parameters> DivAssign<&'a Self> for Fp2<P> {
 impl<P: Fp2Parameters> std::fmt::Display for Fp2<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Fp2({} + {} * u)", self.c0, self.c1)
+    }
+}
+
+impl<P: Fp2Parameters> CanonicalSerializeWithFlags for Fp2<P> {
+    #[inline]
+    fn serialize_with_flags<W: Write, F: Flags>(&self, writer: &mut W, flags: F) -> Result<(), SerializationError> {
+        CanonicalSerialize::serialize(&self.c0, writer)?;
+        self.c1.serialize_with_flags(writer, flags)?;
+        Ok(())
+    }
+}
+
+impl<P: Fp2Parameters> CanonicalSerialize for Fp2<P> {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.serialize_with_flags(writer, EmptyFlags)
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        Self::SERIALIZED_SIZE
+    }
+}
+
+impl<P: Fp2Parameters> ConstantSerializedSize for Fp2<P> {
+    const SERIALIZED_SIZE: usize = 2 * <P::Fp as ConstantSerializedSize>::SERIALIZED_SIZE;
+    const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
+}
+
+impl<P: Fp2Parameters> CanonicalDeserializeWithFlags for Fp2<P> {
+    #[inline]
+    fn deserialize_with_flags<R: Read, F: Flags>(reader: &mut R) -> Result<(Self, F), SerializationError> {
+        let c0: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        let (c1, flags): (P::Fp, _) = CanonicalDeserializeWithFlags::deserialize_with_flags(reader)?;
+        Ok((Fp2::new(c0, c1), flags))
+    }
+}
+
+impl<P: Fp2Parameters> CanonicalDeserialize for Fp2<P> {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        let c0: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        let c1: P::Fp = CanonicalDeserialize::deserialize(reader)?;
+        Ok(Fp2::new(c0, c1))
     }
 }

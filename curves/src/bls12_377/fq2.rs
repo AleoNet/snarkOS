@@ -1,4 +1,5 @@
 use crate::bls12_377::Fq;
+use serde::{Deserialize, Serialize};
 use snarkos_models::{
     curves::{Field, Fp2, Fp2Parameters},
     field,
@@ -7,6 +8,7 @@ use snarkos_utilities::biginteger::BigInteger384 as BigInteger;
 
 pub type Fq2 = Fp2<Fq2Parameters>;
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fq2Parameters;
 
 impl Fp2Parameters for Fq2Parameters {

@@ -43,7 +43,7 @@ impl MinerInstance {
     pub fn spawn(self) {
         task::spawn(async move {
             let context = self.server_context.clone();
-            let local_address = self.server_context.local_address;
+            let local_address = *self.server_context.local_address.read().await;
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
 
             loop {
@@ -54,14 +54,16 @@ impl MinerInstance {
                     .await
                     .unwrap();
 
-                info!(
-                    "Block found!           {:?}",
-                    Block::<Tx>::deserialize(&block_serialized).unwrap()
-                );
+                match Block::<Tx>::deserialize(&block_serialized) {
+                    Ok(block) => {
+                        info!("Block found!    {:?}", block.header.get_hash());
 
-                propagate_block(context.clone(), block_serialized, local_address)
-                    .await
-                    .unwrap();
+                        if let Err(err) = propagate_block(context.clone(), block_serialized, local_address).await {
+                            info!("Error propagating block to peers: {:?}", err);
+                        }
+                    }
+                    Err(_) => continue,
+                }
             }
         });
     }

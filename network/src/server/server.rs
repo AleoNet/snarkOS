@@ -70,7 +70,12 @@ impl Server {
                 .handshakes
                 .write()
                 .await
-                .send_request(1u64, storage.get_latest_block_height(), context.local_address, address)
+                .send_request(
+                    1u64,
+                    storage.get_latest_block_height(),
+                    *context.local_address.read().await,
+                    address,
+                )
                 .await
                 .unwrap_or_else(|error| {
                     info!("Failed to connect to address: {:?}", error);
@@ -81,7 +86,7 @@ impl Server {
 
     /// Send a handshake request to all bootnodes from config.
     async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
-        let local_address = self.context.local_address;
+        let local_address = *self.context.local_address.read().await;
 
         for bootnode in self.context.bootnodes.clone() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
@@ -125,17 +130,13 @@ impl Server {
                 // Use a oneshot channel to give channel control to the message handler after reading from the channel.
                 let (tx, rx) = oneshot::channel();
 
-                // Read the next message from the channel. This is a blocking operation.
-                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|error| {
-                    info!("Peer node disconnected due to error: {:?}", error);
+                let mut disconnect = false;
 
+                // Read the next message from the channel. This is a blocking operation.
+                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|_error| {
+                    disconnect = true;
                     (MessageName::from("disconnect"), vec![])
                 });
-
-                // Break out of the loop if the peer disconnects.
-                if MessageName::from("disconnect") == message_name {
-                    break;
-                }
 
                 // Send the successful read data to the message handler.
                 message_handler_sender
@@ -145,6 +146,11 @@ impl Server {
 
                 // Wait for the message handler to give back channel control.
                 channel = rx.await.expect("message handler errored");
+
+                // Break out of the loop if the peer disconnects.
+                if disconnect {
+                    break;
+                }
             }
         });
     }
@@ -157,10 +163,13 @@ impl Server {
     /// 5. Handle all messages sent to this server.
     /// 6. Start connection handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
-        let local_address = self.context.local_address;
+        let local_address = self.context.local_address.read().await.clone();
 
-        let mut listener = TcpListener::bind(&local_address).await?;
-        info!("listening at: {:?}", local_address);
+        let address = format! {"{}:{}", "0.0.0.0", local_address.port()};
+        let listening_address = address.parse::<SocketAddr>()?;
+
+        let mut listener = TcpListener::bind(&listening_address).await?;
+        info!("listening at: {:?}", listening_address);
 
         self.connect_bootnodes().await?;
         self.connect_peers_from_storage().await?;
@@ -180,8 +189,10 @@ impl Server {
                         .shutdown(Shutdown::Write)
                         .expect("Failed to shutdown peer stream");
                 } else {
+                    let local_address = context.local_address.read().await.clone();
+
                     // Follow handshake protocol and drop peer connection if unsuccessful.
-                    if let Ok(handshake) = context
+                    if let Ok((handshake, reciever_address)) = context
                         .handshakes
                         .write()
                         .await
@@ -194,6 +205,15 @@ impl Server {
                         )
                         .await
                     {
+                        {
+                            // Bootstrap discovery of local node ip via VERACK responses
+                            let mut local_address = context.local_address.write().await;
+                            if *local_address != reciever_address {
+                                *local_address = reciever_address;
+                                info!("Discovered local address: {:?}", *local_address);
+                            }
+                        }
+
                         context.connections.write().await.store_channel(&handshake.channel);
 
                         // Inner loop spawns one thread per connection to read messages

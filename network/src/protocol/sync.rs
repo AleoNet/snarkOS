@@ -8,7 +8,8 @@ use snarkos_objects::BlockHeaderHash;
 use snarkos_storage::Ledger;
 
 use chrono::{DateTime, Utc};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tokio::time::delay_for;
 
 #[derive(Clone, PartialEq)]
 pub enum SyncState {
@@ -44,18 +45,24 @@ impl SyncHandler {
                 info!("Syncing blocks");
                 self.sync_state = SyncState::Syncing(Utc::now(), block_height)
             }
-            SyncState::Syncing(date_time, _old_height) => self.sync_state = SyncState::Syncing(date_time, block_height),
+            SyncState::Syncing(_date_time, _old_height) => {
+                self.sync_state = SyncState::Syncing(Utc::now(), block_height)
+            }
         }
     }
 
     /// Process a vector of block header hashes.
     /// Push new hashes to the sync handler so we can ask the sync node for them.
     pub fn receive_hashes(&mut self, hashes: Vec<BlockHeaderHash>, height: u32) {
-        for block_hash in hashes {
-            if !self.block_headers.contains(&block_hash) {
-                self.block_headers.push(block_hash.clone());
+        if hashes.len() > 0 {
+            for block_hash in hashes {
+                if !self.block_headers.contains(&block_hash) {
+                    self.block_headers.push(block_hash.clone());
+                }
+                self.update_syncing(height);
             }
-            self.update_syncing(height);
+        } else {
+            self.sync_state = SyncState::Idle;
         }
     }
 
@@ -68,27 +75,26 @@ impl SyncHandler {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
             if storage.get_latest_block_height() > height {
                 info!(
-                    "Synced {} Blocks in {:.2} seconds",
+                    "Synced {} Block(s) in {:.2} seconds",
                     storage.get_latest_block_height() - height,
                     (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
                 );
+                self.update_syncing(storage.get_latest_block_height());
             }
 
-            if self.block_headers.is_empty() && storage.get_latest_block_height() <= height {
-                info!("Sync handler is now idle");
-                self.sync_state = SyncState::Idle;
+            // Sync up to 10 blocks at once
+            for _ in 0..10 {
+                if self.block_headers.is_empty() {
+                    break;
+                }
 
+                channel.write(&GetBlock::new(self.block_headers.remove(0))).await?;
+            }
+
+            if self.block_headers.is_empty() {
+                delay_for(Duration::from_millis(100)).await;
                 if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
                     channel.write(&GetSync::new(block_locator_hashes)).await?;
-                }
-            } else {
-                // Sync up to 10 blocks at once
-                for _ in 0..10 {
-                    if self.block_headers.is_empty() {
-                        break;
-                    }
-
-                    channel.write(&GetBlock::new(self.block_headers.remove(0))).await?;
                 }
             }
         }
