@@ -1,3 +1,4 @@
+use crate::impl_sw_curve_serializer;
 use snarkos_models::curves::{
     AffineCurve,
     Field,
@@ -10,12 +11,14 @@ use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter, Result as FmtResult},
     io::{Error, ErrorKind, Read, Result as IoResult, Write},
@@ -23,7 +26,7 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-#[derive(Derivative)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(
     Copy(bound = "P: Parameters"),
     Clone(bound = "P: Parameters"),
@@ -605,3 +608,5 @@ impl<P: Parameters> From<GroupProjective<P>> for GroupAffine<P> {
         }
     }
 }
+
+impl_sw_curve_serializer!(Parameters);

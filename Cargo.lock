@@ -2069,9 +2069,19 @@ dependencies = [
  "derivative",
  "rand",
  "rand_xorshift",
+ "serde",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-derives"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -2148,9 +2158,11 @@ dependencies = [
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
+ "bincode",
  "derivative",
  "rand",
  "rand_xorshift",
+ "serde",
  "smallvec 1.4.0",
  "snarkos-errors",
  "snarkos-utilities",
@@ -2321,6 +2333,8 @@ version = "0.8.0"
 dependencies = [
  "rand",
  "rand_xorshift",
+ "snarkos-derives",
+ "thiserror",
 ]
 
 [[package]]

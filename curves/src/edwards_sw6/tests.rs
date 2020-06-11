@@ -1,7 +1,10 @@
-use crate::{edwards_sw6::*, templates::twisted_edwards_extended::tests::montgomery_conversion_test};
+use crate::{
+    edwards_sw6::*,
+    templates::twisted_edwards_extended::tests::{edwards_test, montgomery_conversion_test},
+};
 use snarkos_models::curves::{
     tests_curve::curve_tests,
-    tests_field::{field_test, primefield_test},
+    tests_field::{field_serialization_test, field_test, primefield_test},
     tests_group::group_test,
     AffineCurve,
     ProjectiveCurve,
@@ -15,6 +18,7 @@ fn test_edwards_sw6_fr() {
     let b: Fr = rand::random();
     field_test(a, b);
     primefield_test::<Fr>();
+    field_serialization_test::<Fr>();
 }
 
 #[test]
@@ -23,11 +27,13 @@ fn test_edwards_sw6_fq() {
     let b: Fq = rand::random();
     field_test(a, b);
     primefield_test::<Fq>();
+    field_serialization_test::<Fq>();
 }
 
 #[test]
 fn test_projective_curve() {
     curve_tests::<EdwardsProjective>();
+    edwards_test::<EdwardsParameters>();
 }
 
 #[test]

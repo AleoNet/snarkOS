@@ -2,6 +2,13 @@ use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::{
+        CanonicalDeserialize,
+        CanonicalDeserializeWithFlags,
+        CanonicalSerialize,
+        CanonicalSerializeWithFlags,
+        ConstantSerializedSize,
+    },
 };
 
 use std::{
@@ -9,6 +16,8 @@ use std::{
     hash::Hash,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
+
+use serde::{Deserialize, Serialize};
 
 /// The interface for a generic field.
 pub trait Field:
@@ -41,6 +50,13 @@ pub trait Field:
     + for<'a> SubAssign<&'a Self>
     + for<'a> MulAssign<&'a Self>
     + for<'a> DivAssign<&'a Self>
+    + CanonicalSerialize
+    + ConstantSerializedSize
+    + CanonicalSerializeWithFlags
+    + CanonicalDeserialize
+    + CanonicalDeserializeWithFlags
+    + Serialize
+    + for<'a> Deserialize<'a>
 {
     /// Returns the zero element of the field, the additive identity.
     fn zero() -> Self;
