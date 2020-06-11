@@ -6,6 +6,8 @@ use snarkos_models::{
     curves::to_field_vec::ToConstraintField,
 };
 
+#[derive(Derivative)]
+#[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Commitment, CRH, and signature parameters
     pub circuit_parameters: CircuitParameters<C>,

@@ -1,15 +1,22 @@
-use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
+use crate::dpc::base_dpc::{
+    inner_circuit_verifier_input::InnerCircuitVerifierInput,
+    parameters::CircuitParameters,
+    BaseDPCComponents,
+};
+use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH},
+    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
+// TODO (raychu86) Remove duplicate circuit_parameter attribte in InnerCircuitVerifierInput
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct OuterCircuitVerifierInput<C: BaseDPCComponents> {
     pub circuit_parameters: CircuitParameters<C>,
+    pub inner_snark_verifier_input: InnerCircuitVerifierInput<C>,
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 }
@@ -18,12 +25,29 @@ impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVeri
 where
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
-
     <C::PredicateVerificationKeyHash as CRH>::Parameters: ToConstraintField<C::OuterField>,
+
+    <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
+
+    <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+
+    <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::OuterField>, ConstraintFieldError> {
         let mut v = Vec::new();

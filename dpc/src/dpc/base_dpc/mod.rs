@@ -896,7 +896,7 @@ where
         }
         end_timer!(ledger_time);
 
-        let input = InnerCircuitVerifierInput {
+        let inner_snark_input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
             ledger_parameters: ledger.parameters().clone(),
             ledger_digest: transaction.digest.clone(),
@@ -907,18 +907,27 @@ where
             local_data_commitment: transaction.local_data_commitment.clone(),
             value_balance: transaction.value_balance,
         };
-        if !Components::InnerSNARK::verify(&parameters.inner_snark_parameters.1, &input, &transaction.inner_proof)? {
+        if !Components::InnerSNARK::verify(
+            &parameters.inner_snark_parameters.1,
+            &inner_snark_input,
+            &transaction.inner_proof,
+        )? {
             eprintln!("Core NIZK didn't verify.");
             return Ok(false);
         };
 
-        let input = OuterCircuitVerifierInput {
+        let outer_snark_input = OuterCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
+            inner_snark_verifier_input: inner_snark_input,
             predicate_commitment: transaction.predicate_commitment.clone(),
             local_data_commitment: transaction.local_data_commitment.clone(),
         };
 
-        if !Components::OuterSNARK::verify(&parameters.outer_snark_parameters.1, &input, &transaction.outer_proof)? {
+        if !Components::OuterSNARK::verify(
+            &parameters.outer_snark_parameters.1,
+            &outer_snark_input,
+            &transaction.outer_proof,
+        )? {
             eprintln!("Predicate check NIZK didn't verify.");
             return Ok(false);
         }
