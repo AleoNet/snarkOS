@@ -171,8 +171,12 @@ where
             &to_bytes![account_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?,
         UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate account signature pp "),
-            &to_bytes![account_signature_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+            cs.ns(|| "Allocate account signature pp 1"),
+            &to_bytes![account_signature_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
+        )?,
+        UInt8::alloc_input_vec(
+            cs.ns(|| "Allocate account signature pp 2"),
+            &to_bytes![account_signature_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?,
         UInt8::alloc_input_vec(
             cs.ns(|| "Allocate record commitment pp"),
@@ -206,8 +210,13 @@ where
 
     for (index, sn_fe) in serial_numbers_fe.iter().enumerate() {
         inner_snark_input_bytes.push(UInt8::alloc_input_vec(
-            cs.ns(|| format!("Allocate serial number {:?} ", index)),
-            &to_bytes![sn_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+            cs.ns(|| format!("Allocate serial number {:?} 1", index)),
+            &to_bytes![sn_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
+        )?);
+
+        inner_snark_input_bytes.push(UInt8::alloc_input_vec(
+            cs.ns(|| format!("Allocate serial number {:?} 2", index)),
+            &to_bytes![sn_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?);
     }
 
@@ -220,12 +229,20 @@ where
 
     inner_snark_input_bytes.extend(vec![
         UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate predicate commitment"),
-            &to_bytes![predicate_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+            cs.ns(|| "Allocate predicate commitment 1"),
+            &to_bytes![predicate_commitment_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?,
         UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate memo"),
-            &to_bytes![memo_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
+            cs.ns(|| "Allocate predicate commitment 2"),
+            &to_bytes![predicate_commitment_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
+        )?,
+        UInt8::alloc_input_vec(
+            cs.ns(|| "Allocate memo 1"),
+            &to_bytes![memo_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
+        )?,
+        UInt8::alloc_input_vec(
+            cs.ns(|| "Allocate memo 2"),
+            &to_bytes![memo_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?,
         UInt8::alloc_input_vec(
             cs.ns(|| "Allocate local data commitment"),
@@ -251,21 +268,34 @@ where
         inner_snark_input_bits.push(input_bits);
     }
 
+    for (index, bits) in inner_snark_input_bits.iter().enumerate() {
+        println!("Index: {:?}. size: {:?}", index, bits.len());
+    }
+
+    println!("inner_snark_input_bits len: {:?}", inner_snark_input_bits.len());
+
     // ************************************************************************
     // Verify the InnerSNARK proof
     // ************************************************************************
-
-    let inner_snark_proof = <C::InnerSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
-        &mut cs.ns(|| "Allocate inner snark proof"),
-        || Ok(inner_snark_proof),
-    )?;
 
     let inner_snark_vk = <C::InnerSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
         &mut cs.ns(|| "Allocate inner snark verification key"),
         || Ok(inner_snark_vk),
     )?;
 
+    let inner_snark_proof = <C::InnerSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        &mut cs.ns(|| "Allocate inner snark proof"),
+        || Ok(inner_snark_proof),
+    )?;
+
     // TODO Verify the inner snark proof
+
+    C::InnerSNARKGadget::check_verify(
+        &mut cs.ns(|| "Check that proof is satisfied"),
+        &inner_snark_vk,
+        inner_snark_input_bits.iter().filter(|inp| !inp.is_empty()),
+        &inner_snark_proof,
+    )?;
 
     // ************************************************************************
     // Construct predicate input

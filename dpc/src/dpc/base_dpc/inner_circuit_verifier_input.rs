@@ -79,14 +79,15 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .local_data_commitment
+                .predicate_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
         );
+
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .predicate_verification_key_commitment
+                .local_data_commitment
                 .parameters()
                 .to_field_elements()?,
         );
