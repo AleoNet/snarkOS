@@ -40,6 +40,7 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
     Ok(())
 }
 
+// TODO (raychu86) Remove duplicate parameter instantiation
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters

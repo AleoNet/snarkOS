@@ -825,7 +825,6 @@ where
             new_commitments,
             memorandum,
             ledger_digest,
-            inner_proof,
             outer_proof
         ]?;
 
@@ -857,7 +856,6 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
-            inner_proof,
             outer_proof,
             predicate_commitment,
             local_data_commitment,
@@ -907,14 +905,6 @@ where
             local_data_commitment: transaction.local_data_commitment.clone(),
             value_balance: transaction.value_balance,
         };
-        if !Components::InnerSNARK::verify(
-            &parameters.inner_snark_parameters.1,
-            &inner_snark_input,
-            &transaction.inner_proof,
-        )? {
-            eprintln!("Core NIZK didn't verify.");
-            return Ok(false);
-        };
 
         let outer_snark_input = OuterCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
@@ -937,7 +927,6 @@ where
             transaction.new_commitments(),
             transaction.memorandum(),
             transaction.digest,
-            transaction.inner_proof,
             transaction.outer_proof
         ]?;
 

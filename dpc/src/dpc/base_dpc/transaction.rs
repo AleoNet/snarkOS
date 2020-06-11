@@ -31,8 +31,6 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
 
     pub digest: MerkleTreeDigest<C::MerkleParameters>,
     #[derivative(PartialEq = "ignore")]
-    pub inner_proof: <C::InnerSNARK as SNARK>::Proof,
-    #[derivative(PartialEq = "ignore")]
     pub outer_proof: <C::OuterSNARK as SNARK>::Proof,
     #[derivative(PartialEq = "ignore")]
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -54,7 +52,6 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         new_commitments: Vec<<Self as Transaction>::Commitment>,
         memorandum: <Self as Transaction>::Memorandum,
         digest: MerkleTreeDigest<C::MerkleParameters>,
-        inner_proof: <C::InnerSNARK as SNARK>::Proof,
         outer_proof: <C::OuterSNARK as SNARK>::Proof,
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
@@ -66,7 +63,6 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             new_commitments,
             memorandum,
             digest,
-            inner_proof,
             outer_proof,
             predicate_commitment,
             local_data_commitment,
@@ -142,7 +138,6 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
         self.memorandum.write(&mut writer)?;
 
         self.digest.write(&mut writer)?;
-        self.inner_proof.write(&mut writer)?;
         self.outer_proof.write(&mut writer)?;
         self.predicate_commitment.write(&mut writer)?;
         self.local_data_commitment.write(&mut writer)?;
@@ -177,7 +172,6 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let memorandum: [u8; 32] = FromBytes::read(&mut reader)?;
 
         let digest: MerkleTreeDigest<C::MerkleParameters> = FromBytes::read(&mut reader)?;
-        let inner_proof: <C::InnerSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
         let outer_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
         let predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output =
             FromBytes::read(&mut reader)?;
@@ -197,7 +191,6 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             new_commitments,
             memorandum,
             digest,
-            inner_proof,
             outer_proof,
             predicate_commitment,
             local_data_commitment,
@@ -211,12 +204,11 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DPCTransaction {{ old_serial_numbers: {:?}, new_commitments: {:?}, memorandum: {:?}, digest: {:?}, inner_proof: {:?}, outer_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?} }}",
+            "DPCTransaction {{ old_serial_numbers: {:?}, new_commitments: {:?}, memorandum: {:?}, digest: {:?}, outer_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?} }}",
             self.old_serial_numbers,
             self.new_commitments,
             self.memorandum,
             self.digest,
-            self.inner_proof,
             self.outer_proof,
             self.predicate_commitment,
             self.local_data_commitment,
