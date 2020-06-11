@@ -65,8 +65,7 @@ mod rpc_tests {
         assert_eq!(memo, transaction_info["memo"]);
 
         let digest = hex::encode(to_bytes![transaction.digest].unwrap());
-        let inner_proof = hex::encode(to_bytes![transaction.inner_proof].unwrap());
-        let outer_proof = hex::encode(to_bytes![transaction.outer_proof].unwrap());
+        let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
         let predicate_commitment = hex::encode(to_bytes![transaction.predicate_commitment].unwrap());
         let local_data_commitment = hex::encode(to_bytes![transaction.local_data_commitment].unwrap());
         let value_balance = transaction.value_balance;
@@ -77,8 +76,7 @@ mod rpc_tests {
             .collect();
 
         assert_eq!(digest, transaction_info["digest"]);
-        assert_eq!(inner_proof, transaction_info["inner_proof"]);
-        assert_eq!(outer_proof, transaction_info["outer_proof"]);
+        assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(predicate_commitment, transaction_info["predicate_commitment"]);
         assert_eq!(local_data_commitment, transaction_info["local_data_commitment"]);
         assert_eq!(value_balance, transaction_info["value_balance"]);

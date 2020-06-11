@@ -62,11 +62,8 @@ pub struct TransactionInfo {
     /// Merkle tree digest
     pub digest: String,
 
-    /// Inner snark proof
-    pub inner_proof: String,
-
-    /// Outer snark proof
-    pub outer_proof: String,
+    /// Transaction (outer snark) proof
+    pub transaction_proof: String,
 
     /// Predicate verification key commitment
     pub predicate_commitment: String,
