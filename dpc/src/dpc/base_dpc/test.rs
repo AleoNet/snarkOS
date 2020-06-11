@@ -325,15 +325,12 @@ fn test_execute_base_dpc_constraints() {
 
     assert!(core_cs.is_satisfied());
 
-    println!("Setup inner snark parameters");
     // Generate inner snark parameters and proof for verification in the outer snark
     let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
         InnerCircuit::blank(&circuit_parameters, ledger.parameters()),
         &mut rng,
     )
     .unwrap();
-
-    println!("Generate inner snark proof");
 
     let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
         &inner_snark_parameters.0,
@@ -367,8 +364,6 @@ fn test_execute_base_dpc_constraints() {
 
     let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
         inner_snark_parameters.1.clone().into();
-
-    println!("Execute outer proof gadget");
 
     // Check that the proof check constraint system was satisfied.
     let mut pf_check_cs = TestConstraintSystem::<Fq>::new();

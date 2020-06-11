@@ -17,6 +17,29 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
+fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
+    cs: &mut CS,
+    inputs: &mut Vec<Vec<UInt8>>,
+    field_elements: &Vec<C::InnerField>,
+    name: &str,
+) -> Result<(), SynthesisError> {
+    if field_elements.len() <= 1 {
+        inputs.push(UInt8::alloc_input_vec(
+            cs.ns(|| format!("Allocate {}", name)),
+            &to_bytes![field_elements].map_err(|_| SynthesisError::AssignmentMissing)?,
+        )?);
+    } else {
+        for (index, field_element) in field_elements.iter().enumerate() {
+            inputs.push(UInt8::alloc_input_vec(
+                cs.ns(|| format!("Allocate {} - index {} ", name, index)),
+                &to_bytes![field_element].map_err(|_| SynthesisError::AssignmentMissing)?,
+            )?);
+        }
+    }
+
+    Ok(())
+}
+
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
@@ -92,187 +115,174 @@ where
     // ************************************************************************
     // Construct the InnerSNARK input
     // ************************************************************************
+    let inner_snark_input_bits = {
+        let cs = &mut cs.ns(|| "Declare inner snark verifier inputs");
 
-    let account_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_commitment.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let account_commitment_parameters_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_commitment.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let account_signature_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_signature.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let account_signature_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_signature.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let record_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_commitment.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let record_commitment_parameters_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_commitment.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let predicate_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-        circuit_parameters.predicate_verification_key_commitment.parameters(),
-    )
-    .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let local_data_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_commitment.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let serial_number_nonce_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.serial_number_nonce.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let value_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.value_commitment.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let ledger_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_parameters.parameters())
+        let predicate_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+            circuit_parameters.predicate_verification_key_commitment.parameters(),
+        )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let ledger_digest_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_digest)
+        let local_data_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+            circuit_parameters.local_data_commitment.parameters(),
+        )
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let mut serial_numbers_fe = vec![];
-    for sn in old_serial_numbers {
-        let serial_number_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(sn).map_err(|_| SynthesisError::AssignmentMissing)?;
+        let serial_number_nonce_crh_parameters_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.serial_number_nonce.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        serial_numbers_fe.push(serial_number_fe);
-    }
+        let value_commitment_parameters_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.value_commitment.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let mut commitments_fe = vec![];
-    for cm in new_commitments {
-        let commitment_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(cm).map_err(|_| SynthesisError::AssignmentMissing)?;
+        let ledger_parameters_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(ledger_parameters.parameters())
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        commitments_fe.push(commitment_fe);
-    }
-
-    let predicate_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(predicate_commitment)
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let memo_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(memo).map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let value_balance_as_u64 = value_balance.abs() as u64;
-
-    // TODO (raychu86) try Boolean::alloc for the is_negative flag
-    let is_negative: bool = value_balance.is_negative();
-
-    let value_balance_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(&value_balance_as_u64.to_le_bytes()[..])
+        let ledger_digest_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_digest)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let is_negative_fe = ToConstraintField::<C::InnerField>::to_field_elements(&[is_negative as u8][..])
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let mut serial_numbers_fe = vec![];
+        for sn in old_serial_numbers {
+            let serial_number_fe = ToConstraintField::<C::InnerField>::to_field_elements(sn)
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let mut inner_snark_input_bytes = vec![
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate account commitment pp "),
-            &to_bytes![account_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate account signature pp 1"),
-            &to_bytes![account_signature_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate account signature pp 2"),
-            &to_bytes![account_signature_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate record commitment pp"),
-            &to_bytes![record_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate predicate vk commitment pp"),
-            &to_bytes![predicate_vk_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate local data commitment pp"),
-            &to_bytes![local_data_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate serial number nonce crh pp"),
-            &to_bytes![serial_number_nonce_crh_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate value commitment pp"),
-            &to_bytes![value_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate ledger pp"),
-            &to_bytes![ledger_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate ledger digest"),
-            &to_bytes![ledger_digest_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-    ];
+            serial_numbers_fe.push(serial_number_fe);
+        }
 
-    for (index, sn_fe) in serial_numbers_fe.iter().enumerate() {
-        inner_snark_input_bytes.push(UInt8::alloc_input_vec(
-            cs.ns(|| format!("Allocate serial number {:?} 1", index)),
-            &to_bytes![sn_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?);
+        let mut commitments_fe = vec![];
+        for cm in new_commitments {
+            let commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(cm)
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        inner_snark_input_bytes.push(UInt8::alloc_input_vec(
-            cs.ns(|| format!("Allocate serial number {:?} 2", index)),
-            &to_bytes![sn_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?);
-    }
+            commitments_fe.push(commitment_fe);
+        }
 
-    for (index, cm_fe) in commitments_fe.iter().enumerate() {
-        inner_snark_input_bytes.push(UInt8::alloc_input_vec(
-            cs.ns(|| format!("Allocate record commitment number {:?} ", index)),
-            &to_bytes![cm_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?);
-    }
+        let predicate_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(predicate_commitment)
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    inner_snark_input_bytes.extend(vec![
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate predicate commitment 1"),
-            &to_bytes![predicate_commitment_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate predicate commitment 2"),
-            &to_bytes![predicate_commitment_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate memo 1"),
-            &to_bytes![memo_fe[0]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate memo 2"),
-            &to_bytes![memo_fe[1]].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate local data commitment"),
-            &to_bytes![local_data_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate value balance"),
-            &to_bytes![value_balance_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-        UInt8::alloc_input_vec(
-            cs.ns(|| "Allocate is_negative flag"),
-            &to_bytes![is_negative_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        )?,
-    ]);
+        let memo_fe = ToConstraintField::<C::InnerField>::to_field_elements(memo)
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let mut inner_snark_input_bits = vec![];
+        let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    for input_bytes in inner_snark_input_bytes {
-        let input_bits = input_bytes
-            .iter()
-            .flat_map(|byte| byte.to_bits_le())
-            .collect::<Vec<_>>();
-        inner_snark_input_bits.push(input_bits);
-    }
+        let value_balance_as_u64 = value_balance.abs() as u64;
 
-    for (index, bits) in inner_snark_input_bits.iter().enumerate() {
-        println!("Index: {:?}. size: {:?}", index, bits.len());
-    }
+        let value_balance_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(&value_balance_as_u64.to_le_bytes()[..])
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    println!("inner_snark_input_bits len: {:?}", inner_snark_input_bits.len());
+        let is_negative_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(&[value_balance.is_negative() as u8][..])
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
+
+        let mut inner_snark_input_bytes = vec![];
+
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &account_commitment_parameters_fe,
+            "account commitment pp",
+        )?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &account_signature_fe,
+            "account signature pp",
+        )?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &record_commitment_parameters_fe,
+            "record commitment pp",
+        )?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &predicate_vk_commitment_parameters_fe,
+            "predicate vk commitment pp",
+        )?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &local_data_commitment_parameters_fe,
+            "local data commitment pp",
+        )?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &serial_number_nonce_crh_parameters_fe,
+            "serial number nonce crh pp",
+        )?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &value_commitment_parameters_fe,
+            "value commitment pp",
+        )?;
+        field_element_to_bytes::<C, _>(cs, &mut inner_snark_input_bytes, &ledger_parameters_fe, "ledger pp")?;
+        field_element_to_bytes::<C, _>(cs, &mut inner_snark_input_bytes, &ledger_digest_fe, "ledger digest")?;
+
+        for (index, sn_fe) in serial_numbers_fe.iter().enumerate() {
+            field_element_to_bytes::<C, _>(
+                cs,
+                &mut inner_snark_input_bytes,
+                sn_fe,
+                &format!("Allocate serial number {:?}", index),
+            )?;
+        }
+
+        for (index, cm_fe) in commitments_fe.iter().enumerate() {
+            field_element_to_bytes::<C, _>(
+                cs,
+                &mut inner_snark_input_bytes,
+                cm_fe,
+                &format!("Allocate record commitment {:?}", index),
+            )?;
+        }
+
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &predicate_commitment_fe,
+            "predicate commitment",
+        )?;
+        field_element_to_bytes::<C, _>(cs, &mut inner_snark_input_bytes, &memo_fe, "memo")?;
+        field_element_to_bytes::<C, _>(
+            cs,
+            &mut inner_snark_input_bytes,
+            &local_data_commitment_fe,
+            "local data commitment",
+        )?;
+        field_element_to_bytes::<C, _>(cs, &mut inner_snark_input_bytes, &value_balance_fe, "value balance")?;
+        field_element_to_bytes::<C, _>(cs, &mut inner_snark_input_bytes, &is_negative_fe, "is_negative flag")?;
+
+        let mut inner_snark_input_bits = vec![];
+
+        for input_bytes in inner_snark_input_bytes {
+            let input_bits = input_bytes
+                .iter()
+                .flat_map(|byte| byte.to_bits_le())
+                .collect::<Vec<_>>();
+            inner_snark_input_bits.push(input_bits);
+        }
+
+        inner_snark_input_bits
+    };
 
     // ************************************************************************
     // Verify the InnerSNARK proof
@@ -287,8 +297,6 @@ where
         &mut cs.ns(|| "Allocate inner snark proof"),
         || Ok(inner_snark_proof),
     )?;
-
-    // TODO Verify the inner snark proof
 
     C::InnerSNARKGadget::check_verify(
         &mut cs.ns(|| "Check that proof is satisfied"),
@@ -310,26 +318,30 @@ where
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     // Then we convert these field elements into bytes
-    let predicate_input = [
-        to_bytes![local_data_commitment_parameters_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-        to_bytes![local_data_commitment_fe].map_err(|_| SynthesisError::AssignmentMissing)?,
-    ];
+    let mut predicate_input_bytes = vec![];
+    field_element_to_bytes::<C, _>(
+        cs,
+        &mut predicate_input_bytes,
+        &local_data_commitment_parameters_fe,
+        "local data pp",
+    )?;
+    field_element_to_bytes::<C, _>(
+        cs,
+        &mut predicate_input_bytes,
+        &local_data_commitment_fe,
+        "local data commitment",
+    )?;
 
-    let predicate_input_bytes = [
-        UInt8::alloc_input_vec(cs.ns(|| "Allocate local data pp "), &predicate_input[0])?,
-        UInt8::alloc_input_vec(cs.ns(|| "Allocate local data comm"), &predicate_input[1])?,
-    ];
+    let mut predicate_input_bits = vec![];
 
-    let predicate_input_bits = [
-        predicate_input_bytes[0]
+    for input_bytes in predicate_input_bytes {
+        let input_bits = input_bytes
             .iter()
             .flat_map(|byte| byte.to_bits_le())
-            .collect::<Vec<_>>(),
-        predicate_input_bytes[1]
-            .iter()
-            .flat_map(|byte| byte.to_bits_le())
-            .collect::<Vec<_>>(),
-    ];
+            .collect::<Vec<_>>();
+        predicate_input_bits.push(input_bits);
+    }
+
     // ************************************************************************
     // ************************************************************************
 
