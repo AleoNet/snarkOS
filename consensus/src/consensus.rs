@@ -115,7 +115,33 @@ impl ConsensusParameters {
     ) -> Result<(), ConsensusError> {
         let hash_result = header.to_difficulty_hash();
 
-        let future_timelimit: i64 = Utc::now().timestamp() as i64 + TWO_HOURS_UNIX;
+        let now = Utc::now().timestamp();
+        let future_timelimit: i64 = now as i64 + TWO_HOURS_UNIX;
+        let expected_difficulty = self.get_block_difficulty(parent_header, now);
+
+        if parent_header.get_hash() != header.previous_block_hash {
+            return Err(ConsensusError::NoParent(
+                parent_header.get_hash().to_string(),
+                header.previous_block_hash.to_string(),
+            ));
+        } else if header.merkle_root_hash != *merkle_root_hash {
+            return Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()));
+        } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
+            return Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()));
+        } else if header.time > future_timelimit {
+            return Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time));
+        } else if header.time < parent_header.time {
+            return Err(ConsensusError::TimestampInvalid(header.time, parent_header.time));
+        } else if hash_result > header.difficulty_target {
+            return Err(ConsensusError::PowInvalid(header.difficulty_target, hash_result));
+        } else if header.nonce >= self.max_nonce {
+            return Err(ConsensusError::NonceInvalid(header.nonce, self.max_nonce));
+        } else if header.difficulty_target != expected_difficulty {
+            return Err(ConsensusError::DifficultyMismatch(
+                expected_difficulty,
+                header.difficulty_target,
+            ));
+        }
 
         // Verify the proof
         let verification_timer = start_timer!(|| "POSW verify");
@@ -123,26 +149,7 @@ impl ConsensusParameters {
             .verify(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
         end_timer!(verification_timer);
 
-        if parent_header.get_hash() != header.previous_block_hash {
-            Err(ConsensusError::NoParent(
-                parent_header.get_hash().to_string(),
-                header.previous_block_hash.to_string(),
-            ))
-        } else if header.merkle_root_hash != *merkle_root_hash {
-            Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()))
-        } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
-            Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()))
-        } else if header.time > future_timelimit {
-            Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time))
-        } else if header.time < parent_header.time {
-            Err(ConsensusError::TimestampInvalid(header.time, parent_header.time))
-        } else if hash_result > header.difficulty_target {
-            Err(ConsensusError::PowInvalid(header.difficulty_target, hash_result))
-        } else if header.nonce >= self.max_nonce {
-            Err(ConsensusError::NonceInvalid(header.nonce, self.max_nonce))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Check if the block is valid
@@ -556,7 +563,7 @@ mod tests {
             pedersen_merkle_root_hash: pedersen_merkle_root.clone(),
             nonce: nonce2,
             proof: proof2,
-            difficulty_target,
+            difficulty_target: 9223372036854775807,
             time: 9999999,
         };
 
@@ -610,6 +617,13 @@ mod tests {
         // invalid pedersen merkle root hash
         let mut h2_err = h2.clone();
         h2_err.pedersen_merkle_root_hash = PedersenMerkleRootHash([9; 32]);
+        consensus
+            .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
+            .unwrap_err();
+
+        // expected difficulty did not match the difficulty target
+        let mut h2_err = h2.clone();
+        h2_err.difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp()) + 1;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();

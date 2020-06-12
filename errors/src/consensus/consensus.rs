@@ -29,6 +29,9 @@ pub enum ConsensusError {
     #[error("{}", _0)]
     CRHError(CRHError),
 
+    #[error("wrong difficulty, expected {0} got {1}")]
+    DifficultyMismatch(u64, u64),
+
     #[error("{}", _0)]
     DPCError(DPCError),
 
