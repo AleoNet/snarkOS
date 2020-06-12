@@ -2120,7 +2120,6 @@ dependencies = [
  "snarkos-objects",
  "snarkos-parameters",
  "snarkos-profiler",
- "snarkos-storage",
  "snarkos-testing",
  "snarkos-utilities",
 ]
