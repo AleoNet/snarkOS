@@ -1,3 +1,4 @@
+use snarkos_consensus::MerkleTreeLedger;
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH},

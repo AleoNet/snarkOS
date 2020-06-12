@@ -1,9 +1,6 @@
 use crate::consensus::*;
-use snarkos_consensus::MemoryPool;
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, MerkleTreeLedger},
-    parameters::PublicParameters,
-};
+use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
+use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{Channel, Context, Server, SyncHandler};
 
 use rand::Rng;

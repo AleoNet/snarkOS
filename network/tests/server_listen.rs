@@ -1,7 +1,7 @@
 mod server_listen {
-    use snarkos_consensus::MemoryPool;
+    use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
     use snarkos_dpc::base_dpc::{
-        instantiated::{CommitmentMerkleParameters, Components, MerkleTreeLedger, Tx},
+        instantiated::{CommitmentMerkleParameters, Components, Tx},
         parameters::PublicParameters,
     };
     use snarkos_network::{

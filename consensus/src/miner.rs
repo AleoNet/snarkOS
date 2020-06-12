@@ -1,4 +1,4 @@
-use crate::{ConsensusParameters, MemoryPool};
+use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::{
     base_dpc::{instantiated::*, parameters::PublicParameters},
     dpc::base_dpc::record::DPCRecord,
