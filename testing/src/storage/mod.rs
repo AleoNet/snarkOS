@@ -4,18 +4,12 @@ use snarkos_algorithms::{
     define_merkle_tree_parameters,
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::{LedgerScheme, Transaction};
 use snarkos_objects::Block;
 use snarkos_storage::Ledger;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::thread_rng;
-use std::{
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Size;
