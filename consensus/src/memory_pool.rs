@@ -34,7 +34,7 @@ pub struct MemoryPool<T: Transaction> {
 }
 
 const BLOCK_HEADER_SIZE: usize = 84;
-const COINBASE_TRANSACTION_SIZE: usize = 1889; // TODO Find the value for actual coinbase transaction size
+const COINBASE_TRANSACTION_SIZE: usize = 1502; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
@@ -238,14 +238,14 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(1889, mem_pool.total_size);
+        assert_eq!(size, mem_pool.total_size);
         assert_eq!(1, mem_pool.transactions.len());
 
         // Duplicate pushes don't do anything
 
         mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();
 
-        assert_eq!(1889, mem_pool.total_size);
+        assert_eq!(size, mem_pool.total_size);
         assert_eq!(1, mem_pool.transactions.len());
 
         kill_storage_sync(blockchain);
