@@ -1,7 +1,7 @@
 use crate::{rpc_types::*, RpcFunctions};
-use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool};
+use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, MerkleTreeLedger, Tx},
+    instantiated::{Components, Tx},
     record::DPCRecord,
 };
 use snarkos_errors::rpc::RpcError;

@@ -1,6 +1,6 @@
 use crate::{RpcFunctions, RpcImpl};
-use snarkos_consensus::{ConsensusParameters, MemoryPool};
-use snarkos_dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_network::context::Context;
 
 use jsonrpc_http_server::ServerBuilder;
