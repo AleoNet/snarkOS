@@ -55,7 +55,7 @@ fn base_dpc_integration_test() {
         transactions: DPCTransactions::new(),
     };
 
-    let ledger: MerkleTreeLedger = initialize_test_blockchain(ledger_parameters, genesis_block);
+    let ledger = initialize_test_blockchain::<Tx, CommitmentMerkleParameters>(ledger_parameters, genesis_block);
 
     let predicate_vk_hash = to_bytes![
         PredicateVerificationKeyHash::hash(
