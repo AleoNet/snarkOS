@@ -10,8 +10,8 @@ use std::{
 };
 
 pub trait PedersenSize: Clone + Debug + Eq {
-    const WINDOW_SIZE: usize;
     const NUM_WINDOWS: usize;
+    const WINDOW_SIZE: usize;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
