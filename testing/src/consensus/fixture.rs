@@ -2,6 +2,7 @@ use crate::{
     dpc::{generate_test_accounts, setup_or_load_parameters},
     storage::*,
 };
+use snarkos_consensus::MerkleTreeLedger;
 use snarkos_dpc::base_dpc::instantiated::*;
 use snarkos_genesis::GenesisBlock;
 use snarkos_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
