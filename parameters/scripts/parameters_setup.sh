@@ -37,7 +37,6 @@ mv value_commitment.checksum ../src/params
 
 cargo run --release --example posw_snark
 cargo run --release --example inner_snark
-cargo run --release --example outer_snark
 cargo run --release --example predicate_snark
 
 mv posw_snark_pk.params ../src/params
@@ -52,14 +51,16 @@ mv inner_snark_pk.checksum ../src/params
 mv inner_snark_vk.params ../src/params
 mv inner_snark_vk.checksum ../src/params
 
-mv outer_snark_pk*.params ../src/params
-mv outer_snark_pk.checksum ../src/params
-
-mv outer_snark_vk.params ../src/params
-mv outer_snark_vk.checksum ../src/params
-
 mv predicate_snark_pk.params ../src/params
 mv predicate_snark_pk.checksum ../src/params
 
 mv predicate_snark_vk.params ../src/params
 mv predicate_snark_vk.checksum ../src/params
+
+cargo run --release --example outer_snark
+
+mv outer_snark_pk*.params ../src/params
+mv outer_snark_pk.checksum ../src/params
+
+mv outer_snark_vk.params ../src/params
+mv outer_snark_vk.checksum ../src/params

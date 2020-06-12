@@ -89,6 +89,9 @@ pub trait BaseDPCComponents: DPCComponents {
         VerifierInput = InnerCircuitVerifierInput<Self>,
     >;
 
+    /// SNARK Verifier gadget for the inner snark
+    type InnerSNARKGadget: SNARKVerifierGadget<Self::InnerSNARK, Self::OuterField>;
+
     /// SNARK for proof-verification checks
     type OuterSNARK: SNARK<
         Circuit = OuterCircuit<Self>,
@@ -575,8 +578,24 @@ where
         end_timer!(snark_setup_time);
 
         let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
-        let outer_snark_parameters =
-            Components::OuterSNARK::setup(OuterCircuit::blank(&circuit_parameters, &private_pred_input), rng)?;
+        let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
+            inner_snark_parameters.1.clone().into();
+        let inner_snark_proof = Components::InnerSNARK::prove(
+            &inner_snark_parameters.0,
+            InnerCircuit::blank(&circuit_parameters, ledger_parameters),
+            rng,
+        )?;
+
+        let outer_snark_parameters = Components::OuterSNARK::setup(
+            OuterCircuit::blank(
+                &circuit_parameters,
+                ledger_parameters,
+                &inner_snark_vk,
+                &inner_snark_proof,
+                &private_pred_input,
+            ),
+            rng,
+        )?;
         end_timer!(snark_setup_time);
         end_timer!(setup_time);
 
@@ -771,9 +790,21 @@ where
             Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
         };
 
-        let outer_proof = {
+        let transaction_proof = {
+            let ledger_parameters = ledger.parameters();
+            let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
+                parameters.inner_snark_parameters.1.clone().into();
+
             let circuit = OuterCircuit::new(
                 &parameters.circuit_parameters,
+                ledger_parameters,
+                &ledger_digest,
+                &old_serial_numbers,
+                &new_commitments,
+                &memorandum,
+                value_balance,
+                &inner_snark_vk,
+                &inner_proof,
                 old_death_pred_attributes.as_slice(),
                 new_birth_pred_attributes.as_slice(),
                 &predicate_commitment,
@@ -794,8 +825,7 @@ where
             new_commitments,
             memorandum,
             ledger_digest,
-            inner_proof,
-            outer_proof
+            transaction_proof
         ]?;
 
         let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
@@ -826,8 +856,7 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
-            inner_proof,
-            outer_proof,
+            transaction_proof,
             predicate_commitment,
             local_data_commitment,
             value_balance,
@@ -865,7 +894,7 @@ where
         }
         end_timer!(ledger_time);
 
-        let input = InnerCircuitVerifierInput {
+        let inner_snark_input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
             ledger_parameters: ledger.parameters().clone(),
             ledger_digest: transaction.digest.clone(),
@@ -876,18 +905,17 @@ where
             local_data_commitment: transaction.local_data_commitment.clone(),
             value_balance: transaction.value_balance,
         };
-        if !Components::InnerSNARK::verify(&parameters.inner_snark_parameters.1, &input, &transaction.inner_proof)? {
-            eprintln!("Core NIZK didn't verify.");
-            return Ok(false);
-        };
 
-        let input = OuterCircuitVerifierInput {
-            circuit_parameters: parameters.circuit_parameters.clone(),
+        let outer_snark_input = OuterCircuitVerifierInput {
+            inner_snark_verifier_input: inner_snark_input,
             predicate_commitment: transaction.predicate_commitment.clone(),
-            local_data_commitment: transaction.local_data_commitment.clone(),
         };
 
-        if !Components::OuterSNARK::verify(&parameters.outer_snark_parameters.1, &input, &transaction.outer_proof)? {
+        if !Components::OuterSNARK::verify(
+            &parameters.outer_snark_parameters.1,
+            &outer_snark_input,
+            &transaction.transaction_proof,
+        )? {
             eprintln!("Predicate check NIZK didn't verify.");
             return Ok(false);
         }
@@ -897,8 +925,7 @@ where
             transaction.new_commitments(),
             transaction.memorandum(),
             transaction.digest,
-            transaction.inner_proof,
-            transaction.outer_proof
+            transaction.transaction_proof
         ]?;
 
         let sig_time = start_timer!(|| "Signature verification (in parallel)");
