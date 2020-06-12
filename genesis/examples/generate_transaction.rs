@@ -1,5 +1,5 @@
 use snarkos_algorithms::merkle_tree::MerkleTree;
-use snarkos_consensus::ConsensusParameters;
+use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     predicate::DPCPredicate,
