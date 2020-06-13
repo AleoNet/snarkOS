@@ -1,6 +1,6 @@
 mod rpc_tests {
-    use snarkos_consensus::get_block_reward;
-    use snarkos_dpc::dpc::base_dpc::instantiated::{MerkleTreeLedger, Tx};
+    use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
+    use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
     use snarkos_models::objects::Transaction;
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};

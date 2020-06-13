@@ -5,11 +5,8 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
 };
-use snarkos_consensus::{ConsensusParameters, MemoryPool};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, MerkleTreeLedger},
-    parameters::PublicParameters,
-};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_errors::node::NodeError;
 use snarkos_network::{
     context::Context,

@@ -3,9 +3,9 @@ use crate::{
     message::{Channel, MessageName},
     protocol::*,
 };
-use snarkos_consensus::{ConsensusParameters, MemoryPool};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, MerkleTreeLedger, Tx},
+    instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
 use snarkos_errors::network::ServerError;

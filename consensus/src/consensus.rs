@@ -1,4 +1,4 @@
-use crate::memory_pool::MemoryPool;
+use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_algorithms::snark::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
