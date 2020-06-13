@@ -127,7 +127,7 @@ impl<F: Field> Into<DensePolynomial<F>> for SparsePolynomial<F> {
 mod tests {
     use crate::fft::{DensePolynomial, EvaluationDomain, SparsePolynomial};
     use snarkos_curves::bls12_377::Fr;
-    use snarkos_models::curves::Field;
+    use snarkos_models::curves::One;
 
     #[test]
     fn evaluate_over_domain() {

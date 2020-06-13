@@ -1,4 +1,4 @@
-use crate::curves::{fp6_3over2::*, Field, Fp2, Fp2Parameters};
+use crate::curves::{fp6_3over2::*, Field, Fp2, Fp2Parameters, One, Zero};
 use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
@@ -208,23 +208,27 @@ impl<P: Fp12Parameters> Distribution<Fp12<P>> for Standard {
     }
 }
 
-impl<P: Fp12Parameters> Field for Fp12<P> {
+impl<P: Fp12Parameters> Zero for Fp12<P> {
     fn zero() -> Self {
         Self::new(Fp6::zero(), Fp6::zero())
-    }
-
-    fn one() -> Self {
-        Self::new(Fp6::one(), Fp6::zero())
     }
 
     fn is_zero(&self) -> bool {
         self.c0.is_zero() && self.c1.is_zero()
     }
+}
+
+impl<P: Fp12Parameters> One for Fp12<P> {
+    fn one() -> Self {
+        Self::new(Fp6::one(), Fp6::zero())
+    }
 
     fn is_one(&self) -> bool {
         self.c0.is_one() && self.c1.is_zero()
     }
+}
 
+impl<P: Fp12Parameters> Field for Fp12<P> {
     #[inline]
     fn characteristic<'a>() -> &'a [u64] {
         Fp6::<P::Fp6Params>::characteristic()

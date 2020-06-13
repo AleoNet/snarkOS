@@ -366,7 +366,7 @@ impl<'a, 'b, F: PrimeField> Mul<&'a DensePolynomial<F>> for &'b DensePolynomial<
 mod tests {
     use crate::fft::polynomial::*;
     use snarkos_curves::bls12_377::Fr;
-    use snarkos_models::curves::Field;
+    use snarkos_models::curves::{Field, One, Zero};
     use snarkos_utilities::rand::UniformRand;
 
     use rand::thread_rng;

@@ -4,7 +4,7 @@ use crate::curves::{
 };
 use snarkos_curves::bls12_377::{Bls12_377, Fq, Fr, G1Projective, G2Projective};
 use snarkos_models::{
-    curves::{Field, PairingEngine, PrimeField, ProjectiveCurve},
+    curves::{Field, One, PairingEngine, PrimeField, ProjectiveCurve},
     gadgets::{
         curves::{FieldGadget, PairingGadget},
         r1cs::{ConstraintSystem, TestConstraintSystem},

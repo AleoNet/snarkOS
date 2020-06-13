@@ -1,5 +1,5 @@
 use crate::{
-    curves::Field,
+    curves::{One, Zero},
     gadgets::{
         r1cs::{ConstraintSystem, Fr, TestConstraintSystem},
         utilities::{
@@ -199,9 +199,9 @@ fn test_uint32_addmany() {
 
         // Flip a bit_gadget and see if the addition constraint still works
         if cs.get("addition/result bit_gadget 0/boolean").is_zero() {
-            cs.set("addition/result bit_gadget 0/boolean", Field::one());
+            cs.set("addition/result bit_gadget 0/boolean", Fr::one());
         } else {
-            cs.set("addition/result bit_gadget 0/boolean", Field::zero());
+            cs.set("addition/result bit_gadget 0/boolean", Fr::zero());
         }
 
         assert!(!cs.is_satisfied());
@@ -260,9 +260,9 @@ fn test_uint32_sub() {
 
         // Flip a bit_gadget and see if the subtraction constraint still works
         if cs.get("subtraction/add_not/result bit_gadget 0/boolean").is_zero() {
-            cs.set("subtraction/add_not/result bit_gadget 0/boolean", Field::one());
+            cs.set("subtraction/add_not/result bit_gadget 0/boolean", Fr::one());
         } else {
-            cs.set("subtraction/add_not/result bit_gadget 0/boolean", Field::zero());
+            cs.set("subtraction/add_not/result bit_gadget 0/boolean", Fr::zero());
         }
 
         assert!(!cs.is_satisfied());
@@ -324,14 +324,11 @@ fn test_uint32_mul() {
             .get("multiplication/partial_products/result bit_gadget 0/boolean")
             .is_zero()
         {
-            cs.set(
-                "multiplication/partial_products/result bit_gadget 0/boolean",
-                Field::one(),
-            );
+            cs.set("multiplication/partial_products/result bit_gadget 0/boolean", Fr::one());
         } else {
             cs.set(
                 "multiplication/partial_products/result bit_gadget 0/boolean",
-                Field::zero(),
+                Fr::zero(),
             );
         }
 
@@ -394,9 +391,9 @@ fn test_uint32_div() {
             .get("division/subtract_divisor_0/result bit_gadget 0/boolean")
             .is_zero()
         {
-            cs.set("division/subtract_divisor_0/result bit_gadget 0/boolean", Field::one());
+            cs.set("division/subtract_divisor_0/result bit_gadget 0/boolean", Fr::one());
         } else {
-            cs.set("division/subtract_divisor_0/result bit_gadget 0/boolean", Field::zero());
+            cs.set("division/subtract_divisor_0/result bit_gadget 0/boolean", Fr::zero());
         }
 
         assert!(!cs.is_satisfied());
@@ -460,12 +457,12 @@ fn test_uint32_pow() {
         {
             cs.set(
                 "exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean",
-                Field::one(),
+                Fr::one(),
             );
         } else {
             cs.set(
                 "exponentiation/multiply_by_self_0/partial_products/result bit_gadget 0/boolean",
-                Field::zero(),
+                Fr::zero(),
             );
         }
 

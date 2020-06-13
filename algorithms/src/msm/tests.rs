@@ -1,6 +1,6 @@
 use crate::msm::*;
 use snarkos_curves::bls12_377::{Fr, G1Projective};
-use snarkos_models::curves::{AffineCurve, PrimeField, ProjectiveCurve};
+use snarkos_models::curves::{AffineCurve, PrimeField, ProjectiveCurve, Zero};
 use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;

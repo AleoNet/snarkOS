@@ -1,4 +1,4 @@
-use snarkos_models::curves::{AffineCurve, Field, FpParameters, PrimeField, ProjectiveCurve};
+use snarkos_models::curves::{AffineCurve, FpParameters, One, PrimeField, ProjectiveCurve, Zero};
 use snarkos_utilities::biginteger::BigInteger;
 
 use rayon::prelude::*;

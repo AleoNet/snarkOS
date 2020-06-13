@@ -4,6 +4,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
 };
 
+use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -105,7 +106,7 @@ impl<P: Fp256Parameters> Fp256<P> {
     }
 }
 
-impl<P: Fp256Parameters> Field for Fp256<P> {
+impl<P: Fp256Parameters> Zero for Fp256<P> {
     #[inline]
     fn zero() -> Self {
         Fp256::<P>(BigInteger::from(0), PhantomData)
@@ -115,7 +116,21 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
+}
 
+impl<P: Fp256Parameters> One for Fp256<P> {
+    #[inline]
+    fn one() -> Self {
+        Fp256::<P>(P::R, PhantomData)
+    }
+
+    #[inline]
+    fn is_one(&self) -> bool {
+        self == &Self::one()
+    }
+}
+
+impl<P: Fp256Parameters> Field for Fp256<P> {
     #[inline]
     fn double(&self) -> Self {
         let mut temp = *self;
@@ -130,16 +145,6 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
         // However, it may need to be reduced.
         self.reduce();
         self
-    }
-
-    #[inline]
-    fn one() -> Self {
-        Fp256::<P>(P::R, PhantomData)
-    }
-
-    #[inline]
-    fn is_one(&self) -> bool {
-        self == &Self::one()
     }
 
     #[inline]

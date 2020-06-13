@@ -7,7 +7,7 @@ use crate::sw6::{
     Fr,
 };
 use snarkos_models::{
-    curves::{Field, FpParameters, PairingCurve, PairingEngine, SWModelParameters},
+    curves::{Field, FpParameters, One, PairingCurve, PairingEngine, SWModelParameters},
     field,
 };
 use snarkos_utilities::{biginteger::BigInteger832, bititerator::BitIterator};

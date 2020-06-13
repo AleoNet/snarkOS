@@ -6,10 +6,7 @@ use snarkos_utilities::{
     serialize::{CanonicalDeserialize, CanonicalSerialize},
 };
 
-use snarkos_models::curves::{
-    pairing_engine::{AffineCurve, ProjectiveCurve},
-    SWModelParameters,
-};
+use snarkos_models::curves::{pairing_engine::ProjectiveCurve, SWModelParameters, Zero};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;

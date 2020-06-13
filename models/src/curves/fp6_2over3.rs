@@ -6,6 +6,7 @@ use snarkos_utilities::{
     serialize::*,
 };
 
+use crate::curves::{One, Zero};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -164,7 +165,7 @@ impl<P: Fp6Parameters> Fp6<P> {
     }
 }
 
-impl<P: Fp6Parameters> Field for Fp6<P> {
+impl<P: Fp6Parameters> Zero for Fp6<P> {
     fn zero() -> Self {
         Fp6 {
             c0: Fp3::zero(),
@@ -176,7 +177,9 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
     fn is_zero(&self) -> bool {
         self.c0.is_zero() && self.c1.is_zero()
     }
+}
 
+impl<P: Fp6Parameters> One for Fp6<P> {
     fn one() -> Self {
         Fp6 {
             c0: Fp3::one(),
@@ -188,7 +191,9 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
     fn is_one(&self) -> bool {
         self.c0.is_one() && self.c1.is_zero()
     }
+}
 
+impl<P: Fp6Parameters> Field for Fp6<P> {
     #[inline]
     fn characteristic<'a>() -> &'a [u64] {
         Fp3::<P::Fp3Params>::characteristic()

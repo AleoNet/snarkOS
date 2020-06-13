@@ -4,6 +4,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
 };
 
+use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -121,7 +122,7 @@ impl<P: Fp320Parameters> Fp320<P> {
     }
 }
 
-impl<P: Fp320Parameters> Field for Fp320<P> {
+impl<P: Fp320Parameters> Zero for Fp320<P> {
     #[inline]
     fn zero() -> Self {
         Fp320::<P>(BigInteger::from(0), PhantomData)
@@ -131,7 +132,21 @@ impl<P: Fp320Parameters> Field for Fp320<P> {
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
+}
 
+impl<P: Fp320Parameters> One for Fp320<P> {
+    #[inline]
+    fn one() -> Self {
+        Fp320::<P>(P::R, PhantomData)
+    }
+
+    #[inline]
+    fn is_one(&self) -> bool {
+        self.0 == P::R
+    }
+}
+
+impl<P: Fp320Parameters> Field for Fp320<P> {
     #[inline]
     fn double(&self) -> Self {
         let mut temp = *self;
@@ -146,16 +161,6 @@ impl<P: Fp320Parameters> Field for Fp320<P> {
         // However, it may need to be reduced.
         self.reduce();
         self
-    }
-
-    #[inline]
-    fn one() -> Self {
-        Fp320::<P>(P::R, PhantomData)
-    }
-
-    #[inline]
-    fn is_one(&self) -> bool {
-        self.0 == P::R
     }
 
     #[inline]

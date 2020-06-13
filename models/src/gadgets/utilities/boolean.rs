@@ -748,7 +748,7 @@ impl<F: PrimeField> CondSelectGadget<F> for Boolean {
 mod test {
     use super::*;
     use crate::{
-        curves::{Field, PrimeField},
+        curves::{Field, One, PrimeField, Zero},
         gadgets::r1cs::{Fr, TestConstraintSystem},
     };
     use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};

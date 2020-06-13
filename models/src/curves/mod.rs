@@ -171,3 +171,13 @@ pub fn batch_inversion<F: Field>(v: &mut [F]) {
         tmp = newtmp;
     }
 }
+
+pub trait Zero: Sized {
+    fn zero() -> Self;
+    fn is_zero(&self) -> bool;
+}
+
+pub trait One: Sized {
+    fn one() -> Self;
+    fn is_one(&self) -> bool;
+}

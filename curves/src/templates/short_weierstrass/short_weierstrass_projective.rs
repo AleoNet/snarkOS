@@ -2,10 +2,12 @@ use crate::impl_sw_curve_serializer;
 use snarkos_models::curves::{
     AffineCurve,
     Field,
+    One,
     PrimeField,
     ProjectiveCurve,
     SWModelParameters as Parameters,
     SquareRootField,
+    Zero,
 };
 use snarkos_utilities::{
     bititerator::BitIterator,
@@ -109,21 +111,23 @@ impl<P: Parameters> GroupAffine<P> {
     }
 }
 
+impl<P: Parameters> Zero for GroupAffine<P> {
+    fn zero() -> Self {
+        Self::new(P::BaseField::zero(), P::BaseField::one(), true)
+    }
+
+    fn is_zero(&self) -> bool {
+        self.infinity
+    }
+}
+
 impl<P: Parameters> AffineCurve for GroupAffine<P> {
     type BaseField = P::BaseField;
     type Projective = GroupProjective<P>;
     type ScalarField = P::ScalarField;
 
-    fn zero() -> Self {
-        Self::new(Self::BaseField::zero(), Self::BaseField::one(), true)
-    }
-
     fn prime_subgroup_generator() -> Self {
         Self::new(P::AFFINE_GENERATOR_COEFFS.0, P::AFFINE_GENERATOR_COEFFS.1, false)
-    }
-
-    fn is_zero(&self) -> bool {
-        self.infinity
     }
 
     fn add(self, _other: &Self) -> Self {
@@ -135,8 +139,8 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         self.mul_bits(bits)
     }
 
-    fn mul_by_cofactor(&self) -> Self {
-        self.scale_by_cofactor().into()
+    fn mul_by_cofactor_to_projective(&self) -> Self::Projective {
+        self.scale_by_cofactor()
     }
 
     fn mul_by_cofactor_inv(&self) -> Self {
@@ -292,20 +296,11 @@ impl<P: Parameters> GroupProjective<P> {
     }
 }
 
-impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
-    type Affine = GroupAffine<P>;
-    type BaseField = P::BaseField;
-    type ScalarField = P::ScalarField;
-
+impl<P: Parameters> Zero for GroupProjective<P> {
     // The point at infinity is always represented by Z = 0.
     #[inline]
     fn zero() -> Self {
         Self::new(P::BaseField::zero(), P::BaseField::one(), P::BaseField::zero())
-    }
-
-    #[inline]
-    fn prime_subgroup_generator() -> Self {
-        GroupAffine::prime_subgroup_generator().into()
     }
 
     // The point at infinity is always represented by
@@ -313,6 +308,17 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
     #[inline]
     fn is_zero(&self) -> bool {
         self.z.is_zero()
+    }
+}
+
+impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
+    type Affine = GroupAffine<P>;
+    type BaseField = P::BaseField;
+    type ScalarField = P::ScalarField;
+
+    #[inline]
+    fn prime_subgroup_generator() -> Self {
+        GroupAffine::prime_subgroup_generator().into()
     }
 
     #[inline]

@@ -4,6 +4,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
 };
 
+use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -139,7 +140,7 @@ impl<P: Fp384Parameters> Fp384<P> {
     }
 }
 
-impl<P: Fp384Parameters> Field for Fp384<P> {
+impl<P: Fp384Parameters> Zero for Fp384<P> {
     #[inline]
     fn zero() -> Self {
         Fp384::<P>(BigInteger::from(0), PhantomData)
@@ -149,7 +150,21 @@ impl<P: Fp384Parameters> Field for Fp384<P> {
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
+}
 
+impl<P: Fp384Parameters> One for Fp384<P> {
+    #[inline]
+    fn one() -> Self {
+        Fp384::<P>(P::R, PhantomData)
+    }
+
+    #[inline]
+    fn is_one(&self) -> bool {
+        self.0 == P::R
+    }
+}
+
+impl<P: Fp384Parameters> Field for Fp384<P> {
     #[inline]
     fn double(&self) -> Self {
         let mut temp = *self;
@@ -164,16 +179,6 @@ impl<P: Fp384Parameters> Field for Fp384<P> {
         // However, it may need to be reduced.
         self.reduce();
         self
-    }
-
-    #[inline]
-    fn one() -> Self {
-        Fp384::<P>(P::R, PhantomData)
-    }
-
-    #[inline]
-    fn is_one(&self) -> bool {
-        self.0 == P::R
     }
 
     #[inline]

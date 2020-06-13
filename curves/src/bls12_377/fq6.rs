@@ -241,7 +241,7 @@ impl Fp6Parameters for Fq6Parameters {
 #[cfg(test)]
 mod test {
     use super::*;
-    use snarkos_models::curves::Field;
+    use snarkos_models::curves::{One, Zero};
     use snarkos_utilities::rand::UniformRand;
 
     use rand::SeedableRng;

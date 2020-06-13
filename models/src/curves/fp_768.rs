@@ -4,6 +4,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
 };
 
+use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -284,7 +285,7 @@ impl<P: Fp768Parameters> Fp768<P> {
     }
 }
 
-impl<P: Fp768Parameters> Field for Fp768<P> {
+impl<P: Fp768Parameters> Zero for Fp768<P> {
     #[inline]
     fn zero() -> Self {
         Fp768::<P>(BigInteger::from(0), PhantomData)
@@ -294,7 +295,21 @@ impl<P: Fp768Parameters> Field for Fp768<P> {
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
+}
 
+impl<P: Fp768Parameters> One for Fp768<P> {
+    #[inline]
+    fn one() -> Self {
+        Fp768::<P>(P::R, PhantomData)
+    }
+
+    #[inline]
+    fn is_one(&self) -> bool {
+        self.0 == P::R
+    }
+}
+
+impl<P: Fp768Parameters> Field for Fp768<P> {
     #[inline]
     fn double(&self) -> Self {
         let mut temp = *self;
@@ -309,16 +324,6 @@ impl<P: Fp768Parameters> Field for Fp768<P> {
         // However, it may need to be reduced.
         self.reduce();
         self
-    }
-
-    #[inline]
-    fn one() -> Self {
-        Fp768::<P>(P::R, PhantomData)
-    }
-
-    #[inline]
-    fn is_one(&self) -> bool {
-        self.0 == P::R
     }
 
     #[inline]

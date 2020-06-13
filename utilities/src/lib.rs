@@ -18,6 +18,7 @@ pub mod biginteger;
 pub mod bititerator;
 #[macro_use]
 pub mod bytes;
+pub mod error;
 pub mod rand;
 pub mod variable_length_integer;
 
@@ -68,4 +69,14 @@ macro_rules! unwrap_option_or_error {
             None => return Err($err),
         }
     };
+}
+
+/// Returns log2
+pub fn log2(x: usize) -> u32 {
+    if x <= 1 {
+        return 0;
+    }
+
+    let n = x.leading_zeros();
+    core::mem::size_of::<usize>() as u32 * 8 - n
 }

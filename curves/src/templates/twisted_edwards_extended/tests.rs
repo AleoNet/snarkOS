@@ -9,9 +9,10 @@ use snarkos_utilities::{
 use snarkos_models::curves::{
     pairing_engine::ProjectiveCurve,
     Field,
-    Group,
     MontgomeryModelParameters,
+    One,
     TEModelParameters,
+    Zero,
 };
 
 use rand::SeedableRng;

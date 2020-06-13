@@ -1,6 +1,6 @@
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::Field,
+    curves::{Field, Zero},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
@@ -64,7 +64,6 @@ mod sw6 {
     use super::*;
     use crate::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
     use snarkos_curves::sw6::{Fr as SW6Fr, SW6};
-    use snarkos_models::curves::Field;
     use snarkos_utilities::rand::{test_rng, UniformRand};
 
     #[test]
@@ -90,6 +89,7 @@ mod gm17 {
     use super::*;
 
     use rand::thread_rng;
+    use snarkos_models::curves::One;
     use std::ops::AddAssign;
 
     #[test]
