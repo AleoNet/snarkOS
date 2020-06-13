@@ -59,6 +59,70 @@ impl<P: Fp6Parameters> Fp6<P> {
         }
     }
 
+    pub fn conjugate(&mut self) {
+        self.c1 = self.c1.neg();
+    }
+
+    pub fn mul_by_034(
+        &mut self,
+        c0: &<P::Fp3Params as Fp3Parameters>::Fp,
+        c3: &<P::Fp3Params as Fp3Parameters>::Fp,
+        c4: &<P::Fp3Params as Fp3Parameters>::Fp,
+    ) {
+        let z0 = self.c0.c0;
+        let z1 = self.c0.c1;
+        let z2 = self.c0.c2;
+        let z3 = self.c1.c0;
+        let z4 = self.c1.c1;
+        let z5 = self.c1.c2;
+
+        let x0 = *c0;
+        let x3 = *c3;
+        let x4 = *c4;
+
+        let mut tmp1 = x3;
+        tmp1.mul_assign(&<P::Fp3Params as Fp3Parameters>::NONRESIDUE);
+        let mut tmp2 = x4;
+        tmp2.mul_assign(&<P::Fp3Params as Fp3Parameters>::NONRESIDUE);
+
+        self.c0.c0 = x0 * &z0 + &(tmp1 * &z5) + &(tmp2 * &z4);
+        self.c0.c1 = x0 * &z1 + &(x3 * &z3) + &(tmp2 * &z5);
+        self.c0.c2 = x0 * &z2 + &(x3 * &z4) + &(x4 * &z3);
+        self.c1.c0 = x0 * &z3 + &(x3 * &z0) + &(tmp2 * &z2);
+        self.c1.c1 = x0 * &z4 + &(x3 * &z1) + &(x4 * &z0);
+        self.c1.c2 = x0 * &z5 + &(x3 * &z2) + &(x4 * &z1);
+    }
+
+    pub fn mul_by_014(
+        &mut self,
+        c0: &<P::Fp3Params as Fp3Parameters>::Fp,
+        c1: &<P::Fp3Params as Fp3Parameters>::Fp,
+        c4: &<P::Fp3Params as Fp3Parameters>::Fp,
+    ) {
+        let z0 = self.c0.c0;
+        let z1 = self.c0.c1;
+        let z2 = self.c0.c2;
+        let z3 = self.c1.c0;
+        let z4 = self.c1.c1;
+        let z5 = self.c1.c2;
+
+        let x0 = *c0;
+        let x1 = *c1;
+        let x4 = *c4;
+
+        let mut tmp1 = x1;
+        tmp1.mul_assign(&<P::Fp3Params as Fp3Parameters>::NONRESIDUE);
+        let mut tmp2 = x4;
+        tmp2.mul_assign(&<P::Fp3Params as Fp3Parameters>::NONRESIDUE);
+
+        self.c0.c0 = x0 * &z0 + &(tmp1 * &z2) + &(tmp2 * &z4);
+        self.c0.c1 = x0 * &z1 + &(x1 * &z0) + &(tmp2 * &z5);
+        self.c0.c2 = x0 * &z2 + &(x1 * &z1) + &(x4 * &z3);
+        self.c1.c0 = x0 * &z3 + &(tmp1 * &z5) + &(tmp2 * &z2);
+        self.c1.c1 = x0 * &z4 + &(x1 * &z3) + &(x4 * &z0);
+        self.c1.c2 = x0 * &z5 + &(x1 * &z4) + &(x4 * &z1);
+    }
+
     /// Multiply by quadratic nonresidue v.
     pub fn mul_by_nonresidue(value: &Fp3<P::Fp3Params>) -> Fp3<P::Fp3Params> {
         let mut res = *value;
