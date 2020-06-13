@@ -16,5 +16,8 @@ pub use self::g1::*;
 pub mod g2;
 pub use self::g2::*;
 
+pub mod parameters;
+pub use self::parameters::*;
+
 #[cfg(test)]
 mod tests;
