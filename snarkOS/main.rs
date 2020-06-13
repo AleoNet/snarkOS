@@ -18,7 +18,8 @@ use snarkos_posw::Posw;
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::bytes::FromBytes;
 
-use std::{net::SocketAddr, sync::Arc};
+use dirs::home_dir;
+use std::{fs, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -45,7 +46,9 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
-    let mut path = std::env::current_dir()?;
+    let mut path = home_dir().unwrap_or(std::env::current_dir()?);
+    path.push(".snarkOS/");
+    fs::create_dir_all(&path).map_err(|err| NodeError::Message(err.to_string()))?;
     path.push(&config.path);
 
     let storage = Arc::new(MerkleTreeLedger::open_at_path(path)?);
