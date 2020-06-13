@@ -54,6 +54,7 @@ snarkos-storage = { path = "storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
 clap = { version = "2.33.1" }
+dirs = { version = "2.0.2" }
 env_logger = { version = "0.7.1" }
 hex = { version = "0.4.1" }
 log = { version = "0.4.8" }

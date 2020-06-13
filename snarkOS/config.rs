@@ -48,7 +48,7 @@ impl Default for Config {
             // Options
             ip: "0.0.0.0".into(),
             port: 4130,
-            path: "storage_db".into(),
+            path: "snarkos_db".into(),
             rpc_port: 3030,
             bootnodes: MAINNET_BOOTNODES
                 .iter()
@@ -90,7 +90,7 @@ impl Config {
     fn network(&mut self, argument: bool) {
         match argument {
             true => {
-                self.path = "./skeleton_db_testnet".into();
+                self.path = "snarkos_testnet_db".into();
                 self.port = 18080;
                 self.bootnodes = TESTNET_BOOTNODES
                     .iter()
