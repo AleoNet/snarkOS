@@ -1,5 +1,5 @@
-pub mod parameters;
-pub use self::parameters::*;
+pub mod fq;
+pub use self::fq::*;
 
 #[cfg(test)]
 mod tests;
