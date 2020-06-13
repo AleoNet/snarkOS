@@ -10,5 +10,8 @@ pub use self::fq3::*;
 pub mod fq6;
 pub use self::fq6::*;
 
+pub mod g1;
+pub use self::g1::*;
+
 #[cfg(test)]
 mod tests;
