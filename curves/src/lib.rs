@@ -22,6 +22,7 @@
 extern crate derivative;
 
 pub mod bls12_377;
+pub mod bw6_761;
 pub mod edwards_bls12;
 pub mod edwards_sw6;
 pub mod sw6;
