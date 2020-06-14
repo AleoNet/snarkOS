@@ -1,10 +1,10 @@
 use crate::{option, types::*, CLIError, CLI};
 
-use clap::{ArgMatches, Values};
+use clap::ArgMatches;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, json, Map, Value};
-use std::{collections::HashMap, error::Error};
+use serde_json::{from_str, Value};
+use std::error::Error;
 
 /// Represents options for a Bitcoin wallet
 #[derive(Clone, Debug, Serialize)]
@@ -32,23 +32,21 @@ impl Default for ConsoleConfig {
     }
 }
 
-// TODO Update RPC console calls to reflect new RPC IMPL
 impl ConsoleConfig {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Options
             "ip" => self.ip(arguments.value_of(option)),
             "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
-            "getbalance" => self.get_balance(arguments.value_of(option)),
             "getblock" => self.get_block(arguments.value_of(option)),
             "getblockcount" => self.get_block_count(arguments.is_present(option)),
             "getbestblockhash" => self.get_best_block_hash(arguments.is_present(option)),
-            "listunspent" => self.list_unspent(arguments.value_of(option)),
+            "getblockhash" => self.get_block_hash(arguments.value_of(option)),
             "getrawtransaction" => self.get_raw_transaction(arguments.value_of(option)),
-            "createrawtransaction" => self.create_raw_transaction(arguments.values_of(option)),
+            "gettransactioninfo" => self.get_transaction_info(arguments.value_of(option)),
             "decoderawtransaction" => self.decode_raw_transaction(arguments.value_of(option)),
-            "signrawtransaction" => self.sign_raw_transaction(arguments.values_of(option)),
             "sendrawtransaction" => self.send_raw_transaction(arguments.value_of(option)),
+            "decoderecord" => self.decode_record(arguments.value_of(option)),
             "getconnectioncount" => self.get_connection_count(arguments.is_present(option)),
             "getpeerinfo" => self.get_peer_info(arguments.is_present(option)),
             "getblocktemplate" => self.get_block_template(arguments.is_present(option)),
@@ -65,13 +63,6 @@ impl ConsoleConfig {
     fn port(&mut self, argument: Option<u16>) {
         if let Some(port) = argument {
             self.port = port;
-        }
-    }
-
-    fn get_balance(&mut self, argument: Option<&str>) {
-        if let Some(address) = argument {
-            self.method = "getbalance".to_string();
-            self.params = vec![Value::String(address.to_string())];
         }
     }
 
@@ -96,10 +87,10 @@ impl ConsoleConfig {
         }
     }
 
-    fn list_unspent(&mut self, argument: Option<&str>) {
-        if let Some(address) = argument {
-            self.method = "listunspent".to_string();
-            self.params = vec![Value::String(address.to_string())];
+    fn get_block_hash(&mut self, argument: Option<&str>) {
+        if let Some(block_hash) = argument {
+            self.method = "getblockhash".to_string();
+            self.params = vec![Value::String(block_hash.to_string())];
         }
     }
 
@@ -110,22 +101,10 @@ impl ConsoleConfig {
         }
     }
 
-    fn create_raw_transaction(&mut self, argument: Option<Values>) {
-        if let Some(transaction_parameters) = argument {
-            self.method = "createrawtransaction".to_string();
-
-            let params: Vec<&str> = transaction_parameters.collect();
-
-            let raw_inputs: Vec<RPCTransactionOutpoint> = from_str(params[0]).unwrap();
-            let inputs = Value::Array(raw_inputs.iter().map(|input| json![input]).collect::<Vec<Value>>());
-
-            let raw_outputs: HashMap<String, Value> = from_str(params[1]).unwrap();
-            let mut outputs = Map::new();
-            for (address, value) in raw_outputs {
-                outputs.insert(address, value);
-            }
-
-            self.params = vec![inputs, Value::Object(outputs)];
+    fn get_transaction_info(&mut self, argument: Option<&str>) {
+        if let Some(transaction_id) = argument {
+            self.method = "gettransactioninfo".to_string();
+            self.params = vec![Value::String(transaction_id.to_string())];
         }
     }
 
@@ -136,25 +115,17 @@ impl ConsoleConfig {
         }
     }
 
-    fn sign_raw_transaction(&mut self, argument: Option<Values>) {
-        if let Some(transaction_parameters) = argument {
-            self.method = "signrawtransaction".to_string();
-            self.params = vec![];
-            let params: Vec<&str> = transaction_parameters.collect();
-
-            let transaction_bytes = Value::String(params[0].to_string());
-
-            let private_keys: Vec<&str> = from_str(params[1]).unwrap();
-            let private_keys = Value::Array(private_keys.iter().map(|input| json![input]).collect::<Vec<Value>>());
-
-            self.params = vec![transaction_bytes, private_keys];
-        }
-    }
-
     fn send_raw_transaction(&mut self, argument: Option<&str>) {
         if let Some(transaction_bytes) = argument {
             self.method = "sendrawtransaction".to_string();
             self.params = vec![Value::String(transaction_bytes.to_string())];
+        }
+    }
+
+    fn decode_record(&mut self, argument: Option<&str>) {
+        if let Some(record_bytes) = argument {
+            self.method = "decoderecord".to_string();
+            self.params = vec![Value::String(record_bytes.to_string())];
         }
     }
 
@@ -194,10 +165,12 @@ impl CLI for ConsoleCli {
         option::GET_BLOCK,
         option::GET_BLOCK_COUNT,
         option::GET_BEST_BLOCK_HASH,
+        option::GET_BLOCK_HASH,
         option::GET_RAW_TRANSACTION,
-        option::CREATE_RAW_TRANSACTION,
+        option::GET_TRANSACTION_INFO,
         option::DECODE_RAW_TRANSACTION,
         option::SEND_RAW_TRANSACTION,
+        option::DECODE_RECORD,
         option::GET_CONNECTION_COUNT,
         option::GET_PEER_INFO,
         option::GET_BLOCK_TEMPLATE,
@@ -210,16 +183,15 @@ impl CLI for ConsoleCli {
         config.parse(arguments, &[
             "ip",
             "port",
-            "getbalance",
             "getblock",
             "getblockcount",
             "getbestblockhash",
-            "listunspent",
+            "getblockhash",
             "getrawtransaction",
-            "createrawtransaction",
+            "gettransactioninfo",
             "decoderawtransaction",
-            "signrawtransaction",
             "sendrawtransaction",
+            "decoderecord",
             "getconnectioncount",
             "getpeerinfo",
             "getblocktemplate",
@@ -228,20 +200,6 @@ impl CLI for ConsoleCli {
         Ok(config)
     }
 }
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionOutpoint {
-    /// Previous transaction id
-    pub txid: String,
-    /// Previous transaction output index
-    pub vout: u32,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionInputs(pub Vec<RPCTransactionOutpoint>);
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCTransactionOutputs(pub HashMap<String, u64>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RpcRequest {

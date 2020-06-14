@@ -15,44 +15,49 @@ pub const PORT: OptionType = (
 );
 
 pub const GET_BLOCK: OptionType = (
-    "[getblock] --getblock=[block_hash] 'Returns a block for a particular block header hash'",
+    "[getblock] --getblock=[block_hash] 'Returns information about a block from a block hash'",
     &[],
     &[],
     &[],
 );
 
 pub const GET_BLOCK_COUNT: OptionType = (
-    "[getblockcount] --getblockcount 'Returns the number of blocks in the longest chain'",
+    "[getblockcount] --getblockcount ' Returns the number of blocks in the canonical chain'",
     &[],
     &[],
     &[],
 );
 
 pub const GET_BEST_BLOCK_HASH: OptionType = (
-    "[getbestblockhash] --getbestblockhash 'Returns the hash of the best block in the longest chain'",
+    "[getbestblockhash] --getbestblockhash 'Returns the block hash of the head of the canonical chain'",
+    &[],
+    &[],
+    &[],
+);
+
+pub const GET_BLOCK_HASH: OptionType = (
+    "[getblockhash] --getblockhash=[block_number] 'Returns the block hash of the index specified if it exists in the canonical chain'",
     &[],
     &[],
     &[],
 );
 
 pub const GET_RAW_TRANSACTION: OptionType = (
-    "[getrawtransaction] --getrawtransaction=[transaction_id] 'Returns the transaction information for a transaction id'",
+    "[getrawtransaction] --getrawtransaction=[transaction_id] 'Returns hex encoded bytes of a transaction from its transaction id'",
     &[],
     &[],
     &[],
 );
 
-pub const CREATE_RAW_TRANSACTION: OptionType = (
-    "[createrawtransaction] --createrawtransaction= [inputs] [outputs] 'Generates a raw transaction
-    Inputs format: '[{\"txid\":\"txid\", \"vout\":index},...]'
-    Outputs format: '{\"address\":amount,...}''",
+pub const GET_TRANSACTION_INFO: OptionType = (
+    "[gettransactioninfo] --gettransactioninfo=[transaction_id] 'Returns information about a transaction from a transaction id'",
     &[],
     &[],
     &[],
 );
 
 pub const DECODE_RAW_TRANSACTION: OptionType = (
-    "[decoderawtransaction] --decoderawtransaction=[transaction_bytes] 'Returns a decoded transaction from a serialized transaction'",
+    "[decoderawtransaction] --decoderawtransaction=[transaction_bytes] 'Returns information about a transaction from serialized transaction bytes'",
     &[],
     &[],
     &[],
@@ -60,6 +65,13 @@ pub const DECODE_RAW_TRANSACTION: OptionType = (
 
 pub const SEND_RAW_TRANSACTION: OptionType = (
     "[sendrawtransaction] --sendrawtransaction=[transaction_bytes] 'Broadcast a raw transaction'",
+    &[],
+    &[],
+    &[],
+);
+
+pub const DECODE_RECORD: OptionType = (
+    "[decoderecord] --decoderecord=[record_bytes] 'Returns information about a record from serialized record bytes'",
     &[],
     &[],
     &[],
