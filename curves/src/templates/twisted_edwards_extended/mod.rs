@@ -129,6 +129,21 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         Self::new(P::AFFINE_GENERATOR_COEFFS.0, P::AFFINE_GENERATOR_COEFFS.1)
     }
 
+    // Copied from https://github.com/scipr-lab/zexe/blob/4b3f08c6c0a08c5392ed8aa3fd3c32f28da402c4/algebra-core/src/curves/models/twisted_edwards_extended.rs#L144-L156.
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        let x = P::BaseField::from_random_bytes_with_flags(bytes);
+        if let Some((x, flags)) = x {
+            let parsed_flags = EdwardsFlags::from_u8(flags);
+            if x.is_zero() {
+                Some(Self::zero())
+            } else {
+                Self::get_point_from_x(x, parsed_flags.is_positive())
+            }
+        } else {
+            None
+        }
+    }
+
     fn add(self, other: &Self) -> Self {
         let mut copy = self;
         copy += other;

@@ -212,6 +212,11 @@ pub trait AffineCurve:
     #[must_use]
     fn into_projective(&self) -> Self::Projective;
 
+    /// Returns a group element if the set of bytes forms a valid group element,
+    /// otherwise returns None. This function is primarily intended for sampling
+    /// random group elements from a hash-function or RNG output.
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self>;
+
     /// Multiply this element by the cofactor.
     #[must_use]
     fn mul_by_cofactor(&self) -> Self {

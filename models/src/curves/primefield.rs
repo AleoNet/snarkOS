@@ -20,10 +20,6 @@ pub trait PrimeField: Field + FromStr {
     /// Returns the underlying raw representation of the prime field element.
     fn into_repr_raw(&self) -> Self::BigInt;
 
-    /// Returns a field element if the set of bytes forms a valid field element,
-    /// otherwise returns None.
-    fn from_random_bytes(bytes: &[u8]) -> Option<Self>;
-
     /// Returns the multiplicative generator of `char()` - 1 order.
     fn multiplicative_generator() -> Self;
 

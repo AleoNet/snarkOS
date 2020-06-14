@@ -1,4 +1,4 @@
-use crate::impl_sw_curve_serializer;
+use crate::{impl_sw_curve_serializer, impl_sw_from_random_bytes};
 use snarkos_models::curves::{
     AffineCurve,
     Field,
@@ -126,6 +126,8 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     type BaseField = P::BaseField;
     type Projective = GroupProjective<P>;
     type ScalarField = P::ScalarField;
+
+    impl_sw_from_random_bytes!();
 
     #[inline]
     fn prime_subgroup_generator() -> Self {

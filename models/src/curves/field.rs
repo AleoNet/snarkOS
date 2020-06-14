@@ -113,4 +113,17 @@ pub trait Field:
         }
         res
     }
+
+    /// Returns a field element if the set of bytes forms a valid field element,
+    /// otherwise returns None. This function is primarily intended for sampling
+    /// random field elements from a hash-function or RNG output.
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        Self::from_random_bytes_with_flags(bytes).map(|f| f.0)
+    }
+
+    /// Returns a field element with an extra sign bit used for group parsing if
+    /// the set of bytes forms a valid field element, otherwise returns
+    /// None. This function is primarily intended for sampling
+    /// random field elements from a hash-function or RNG output.
+    fn from_random_bytes_with_flags(bytes: &[u8]) -> Option<(Self, u8)>;
 }

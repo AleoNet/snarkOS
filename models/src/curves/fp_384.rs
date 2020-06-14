@@ -2,6 +2,7 @@ use crate::curves::{Field, FpParameters, LegendreSymbol, PrimeField, SquareRootF
 use snarkos_utilities::{
     biginteger::{arithmetic as fa, BigInteger as _BigInteger, BigInteger384 as BigInteger},
     bytes::{FromBytes, ToBytes},
+    serialize::CanonicalDeserialize,
 };
 
 use crate::curves::{One, Zero};
@@ -165,6 +166,9 @@ impl<P: Fp384Parameters> One for Fp384<P> {
 }
 
 impl<P: Fp384Parameters> Field for Fp384<P> {
+    // 384/64 = 6 limbs.
+    impl_field_from_random_bytes_with_flags!(6);
+
     #[inline]
     fn double(&self) -> Self {
         let mut temp = *self;
@@ -362,19 +366,6 @@ impl<P: Fp384Parameters> PrimeField for Fp384<P> {
     #[inline]
     fn into_repr_raw(&self) -> BigInteger {
         self.0
-    }
-
-    #[inline]
-    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
-        let mut result_bytes = vec![0u8; (Self::zero().0).0.len() * 8];
-        for (result_byte, in_byte) in result_bytes.iter_mut().zip(bytes.iter()) {
-            *result_byte = *in_byte;
-        }
-        BigInteger::read(result_bytes.as_slice()).ok().and_then(|mut res| {
-            res.as_mut()[5] &= 0xffffffffffffffff >> P::REPR_SHAVE_BITS;
-            let result = Self::new(res);
-            if result.is_valid() { Some(result) } else { None }
-        })
     }
 
     #[inline]
