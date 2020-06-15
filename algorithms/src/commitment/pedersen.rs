@@ -1,5 +1,5 @@
 use crate::{commitment::PedersenCommitmentParameters, crh::PedersenSize};
-use snarkos_errors::algorithms::{CRHError, CommitmentError};
+use snarkos_errors::algorithms::CommitmentError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{Group, PrimeField},
