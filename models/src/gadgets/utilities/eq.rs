@@ -7,6 +7,10 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
+pub trait EvaluateEqGadget<F: Field> {
+    fn evaluate_equal<CS: ConstraintSystem<F>>(&self, cs: CS, other: &Self) -> Result<Boolean, SynthesisError>;
+}
+
 /// If `condition == 1`, then enforces that `self` and `other` are equal;
 /// otherwise, it doesn't enforce anything.
 pub trait ConditionalEqGadget<F: Field>: Eq {
