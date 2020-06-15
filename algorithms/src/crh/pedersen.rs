@@ -38,7 +38,7 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
 
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS {
-            return Err(CRHError::IncorrectInputSize(
+            return Err(CRHError::IncorrectInputLength(
                 input.len(),
                 S::WINDOW_SIZE,
                 S::NUM_WINDOWS,
