@@ -215,7 +215,6 @@ impl ConsensusParameters {
     /// 1. Verify that the block header is valid.
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
-    /// TODO 4. Check cached blocks to insert/canonize.
     pub fn process_block(
         &self,
         parameters: &PublicParameters<Components>,
