@@ -87,7 +87,8 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
 
                 let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
 
-                let ledger_storage = Self::new(&path.as_ref().to_path_buf(), ledger_parameters, genesis_block).unwrap(); // TODO handle this unwrap. merge storage and ledger error
+                let ledger_storage = Self::new(&path.as_ref().to_path_buf(), ledger_parameters, genesis_block)
+                    .expect("Ledger could not be instantiated");
 
                 Ok(ledger_storage)
             }
