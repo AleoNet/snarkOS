@@ -7,7 +7,7 @@ use snarkos_models::{
     algorithms::MerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::dpc::DPCTransactions;
+use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
 use snarkos_storage::{has_duplicates, Ledger};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -33,7 +33,7 @@ pub struct MemoryPool<T: Transaction> {
     pub transactions: HashMap<Vec<u8>, Entry<T>>,
 }
 
-const BLOCK_HEADER_SIZE: usize = 84;
+const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
 const COINBASE_TRANSACTION_SIZE: usize = 1502; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {

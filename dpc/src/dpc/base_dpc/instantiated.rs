@@ -95,9 +95,6 @@ pub struct ValueWindow;
 
 impl PedersenSize for ValueWindow {
     const NUM_WINDOWS: usize = 4;
-    // TODO fix window size inconsistency -
-    //  Will fail binding signature test a % of the time
-    //  when WINDOW_SIZE is smaller (128, 248, etc.)
     const WINDOW_SIZE: usize = 350;
 }
 
