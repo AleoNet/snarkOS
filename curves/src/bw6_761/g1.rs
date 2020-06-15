@@ -1,6 +1,6 @@
 use crate::bw6_761::{Fq, Fr};
 use snarkos_models::{
-    curves::{Field, ModelParameters, SWModelParameters},
+    curves::{ModelParameters, SWModelParameters, Zero},
     field,
 };
 use snarkos_utilities::biginteger::{BigInteger384, BigInteger768};

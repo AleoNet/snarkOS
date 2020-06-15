@@ -6,6 +6,8 @@ use snarkos_models::{
         pairing_engine::{AffineCurve, ProjectiveCurve},
         Field,
         Group,
+        One,
+        Zero,
     },
 };
 use snarkos_utilities::{

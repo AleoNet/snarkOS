@@ -8,6 +8,7 @@ use snarkos_models::curves::{
     fp6_2over3::{Fp6, Fp6Parameters},
     Field,
     ModelParameters,
+    One,
     PairingCurve,
     PairingEngine,
     PrimeField,

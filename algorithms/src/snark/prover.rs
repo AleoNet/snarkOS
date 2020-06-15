@@ -4,7 +4,7 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{AffineCurve, Field, PairingEngine, PrimeField, ProjectiveCurve},
+    curves::{AffineCurve, One, PairingEngine, PrimeField, ProjectiveCurve, Zero},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, Variable},
 };
 use snarkos_utilities::rand::UniformRand;

@@ -1,4 +1,4 @@
-use crate::curves::{AffineCurve, Field, PrimeField, ProjectiveCurve};
+use crate::curves::{AffineCurve, PrimeField, ProjectiveCurve, Zero};
 use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;

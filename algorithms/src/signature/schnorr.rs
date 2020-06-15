@@ -2,7 +2,7 @@ use crate::signature::SchnorrParameters;
 use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::SignatureScheme,
-    curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
+    curves::{to_field_vec::ToConstraintField, Field, Group, One, PrimeField, Zero},
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -227,7 +227,7 @@ where
 
         let mut randomized_pk = public_key.0.clone();
         let mut base = self.parameters.generator;
-        let mut encoded = <G as Group>::zero();
+        let mut encoded = G::zero();
         for bit in bytes_to_bits(randomness) {
             if bit {
                 encoded += &base;

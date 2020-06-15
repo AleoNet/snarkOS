@@ -2,7 +2,7 @@ use crate::curves::templates::bls12::AffineGadget;
 use snarkos_curves::templates::bls12::{Bls12Parameters, TwistType};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::Field,
+    curves::{Field, One},
     gadgets::{
         curves::{FieldGadget, Fp2Gadget, GroupGadget},
         r1cs::ConstraintSystem,
