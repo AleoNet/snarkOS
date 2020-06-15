@@ -5,8 +5,11 @@ pub enum CRHError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[error("incorrect input length {} for window params {}x{}", _0, _1)]
-    IncorrectInputSize(usize, usize),
+    #[error("incorrect input length {} for window params {}x{}", _0, _1, _2)]
+    IncorrectInputSize(usize, usize, usize),
+
+    #[error("incorrect pp of size {}x{} for window params {}x{}", _0, _1, _2, _3)]
+    IncorrectParameterSize(usize, usize, usize, usize),
 
     #[error("{}", _0)]
     Message(String),
