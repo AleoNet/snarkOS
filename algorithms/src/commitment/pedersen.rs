@@ -1,5 +1,5 @@
 use crate::{commitment::PedersenCommitmentParameters, crh::PedersenSize};
-use snarkos_errors::algorithms::CommitmentError;
+use snarkos_errors::algorithms::{CRHError, CommitmentError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{Group, PrimeField},
@@ -27,8 +27,11 @@ impl<G: Group, S: PedersenSize> CommitmentScheme for PedersenCommitment<G, S> {
     fn commit(&self, input: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, CommitmentError> {
         // If the input is too long, return an error.
         if input.len() > S::WINDOW_SIZE * S::NUM_WINDOWS {
-            // TODO (howardwu): Return a CommitmentError.
-            panic!("incorrect input length: {:?}", input.len());
+            return Err(CommitmentError::IncorrectInputLength(
+                input.len(),
+                S::WINDOW_SIZE,
+                S::NUM_WINDOWS,
+            ));
         }
 
         let mut output = self.parameters.crh.hash(&input)?;
