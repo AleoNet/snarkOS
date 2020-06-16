@@ -58,6 +58,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
+    network_id: u8,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
         C,
@@ -103,6 +104,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         output_value_commitment_randomness,
         value_balance,
         binding_signature,
+        network_id,
     )
 }
 
@@ -155,6 +157,7 @@ fn base_dpc_execute_gadget_helper<
     output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
+    network_id: u8,
 ) -> Result<(), SynthesisError>
 where
     C: BaseDPCComponents<
@@ -735,6 +738,8 @@ where
         }
     }
     // *******************************************************************
+
+    // *******************************************************************
     // Check that predicate commitment is well formed.
     // *******************************************************************
     {
@@ -777,6 +782,11 @@ where
             &given_commitment,
         )?;
     }
+    // ********************************************************************
+
+    // ********************************************************************
+    // Check that the local data commitment is valid
+    // ********************************************************************
     {
         let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
@@ -837,8 +847,14 @@ where
             &mut cs.ns(|| "Check that local data commitment is valid"),
             &declared_local_data_commitment,
         )?;
+    }
+    // *******************************************************************
 
-        // Check the binding signature verification
+    // *******************************************************************
+    // Check that the binding signature is valid
+    // *******************************************************************
+    {
+        let mut cs = cs.ns(|| "Check that the binding signature is valid.");
 
         let (c, partial_bvk, affine_r, recommit) =
             gadget_verification_setup::<C::ValueCommitment, C::BindingSignatureGroup>(
@@ -913,5 +929,16 @@ where
             &recommit_gadget,
         )?;
     }
+    // *******************************************************************
+
+    // *******************************************************************
+    // Check that the network id is correct
+    // *******************************************************************
+    {
+        let mut cs = cs.ns(|| "Check that network id is correct");
+
+        let _network_id = UInt8::alloc_input_vec(cs.ns(|| "network_id"), &[network_id])?;
+    }
+
     Ok(())
 }

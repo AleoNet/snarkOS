@@ -52,6 +52,8 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     output_value_commitment_randomness: Option<Vec<<C::ValueCommitment as CommitmentScheme>::Randomness>>,
     value_balance: Option<i64>,
     binding_signature: Option<BindingSignature>,
+
+    network_id: Option<u8>,
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
@@ -90,6 +92,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let value_balance: i64 = 0;
         let binding_signature = BindingSignature::default();
 
+        let network_id: u8 = 0;
+
         Self {
             // Parameters
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -123,6 +127,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             output_value_commitment_randomness: Some(output_value_commitment_randomness),
             value_balance: Some(value_balance),
             binding_signature: Some(binding_signature),
+
+            network_id: Some(network_id),
         }
     }
 
@@ -161,6 +167,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
         value_balance: i64,
         binding_signature: &BindingSignature,
+
+        network_id: u8,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -213,6 +221,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             output_value_commitment_randomness: Some(output_value_commitment_randomness.to_vec()),
             value_balance: Some(value_balance),
             binding_signature: Some(binding_signature.clone()),
+
+            network_id: Some(network_id),
         }
     }
 }
@@ -248,6 +258,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.output_value_commitment_randomness.get()?,
             *self.value_balance.get()?,
             self.binding_signature.get()?,
+            *self.network_id.get()?,
         )?;
         Ok(())
     }

@@ -642,6 +642,7 @@ where
 
         auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        network_id: u8,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
@@ -780,6 +781,7 @@ where
                 &new_value_commit_randomness,
                 value_balance,
                 &binding_signature,
+                network_id,
             );
 
             let inner_snark_parameters = match &parameters.inner_snark_parameters.0 {
@@ -860,6 +862,7 @@ where
             predicate_commitment,
             local_data_commitment,
             value_balance,
+            network_id,
             signatures,
         );
 
