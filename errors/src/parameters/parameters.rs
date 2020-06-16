@@ -10,8 +10,12 @@ pub enum ParametersError {
 
     #[error("{}", _0)]
     Message(String),
+
+    #[error("Remote fetch is disabled, enable compiler flag for feature")]
+    RemoteFetchDisabled,
 }
 
+#[cfg(any(test, feature = "remote"))]
 impl From<curl::Error> for ParametersError {
     fn from(error: curl::Error) -> Self {
         ParametersError::Crate("curl::error", format!("{:?}", error))

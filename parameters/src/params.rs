@@ -1,3 +1,17 @@
+use snarkos_algorithms::crh::sha256::sha256;
+use snarkos_errors::parameters::ParametersError;
+use snarkos_models::parameters::Parameters;
+
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+};
+
+#[cfg(any(test, feature = "remote"))]
+use curl::easy::Easy;
+
+#[cfg(any(test, feature = "remote"))]
 pub const REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com";
 
 macro_rules! impl_params {
@@ -86,6 +100,7 @@ macro_rules! impl_params_remote {
     }
 
     impl $name {
+        #[cfg(any(test, feature = "remote"))]
         pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
             println!("{} - Downloading parameters...", module_path!());
             let mut buffer = vec![];
@@ -101,6 +116,11 @@ macro_rules! impl_params_remote {
             }
         }
 
+        #[cfg(not(any(test, feature = "remote")))]
+        pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
+            Err(ParametersError::RemoteFetchDisabled)
+        }
+
         fn versioned_filename() -> String {
             match Self::CHECKSUM.get(0..7) {
                 Some(sum) => format!("{}-{}.params", $fname, sum),
@@ -108,6 +128,7 @@ macro_rules! impl_params_remote {
             }
         }
 
+        #[cfg(any(test, feature = "remote"))]
         fn remote_url() -> String {
             format!("{}/{}", REMOTE_URL, Self::versioned_filename())
         }
@@ -130,6 +151,7 @@ macro_rules! impl_params_remote {
             Ok(())
         }
 
+        #[cfg(any(test, feature = "remote"))]
         fn remote_fetch(buffer: &mut Vec<u8>, url: &str) -> Result<(), ParametersError> {
             let mut easy = Easy::new();
             easy.url(url)?;

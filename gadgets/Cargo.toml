@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
-snarkos-curves = { path = "../curves", version = "0.8.0" }
-snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
+snarkos-curves = { path = "../curves", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
 derivative = { version = "2" }
 digest = { version = "0.8.1" }
@@ -25,3 +25,12 @@ digest = { version = "0.8.1" }
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
 rand_xorshift = { version = "0.2" }
+
+[features]
+default = [
+    "snarkos-algorithms/default",
+    "snarkos-curves/default",
+    "snarkos-errors/default",
+    "snarkos-models/default",
+    "snarkos-utilities/default",
+]

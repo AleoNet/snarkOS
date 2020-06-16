@@ -12,12 +12,12 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
-snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
+snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
-curl = { version = "0.4.29" }
+curl = { version = "0.4.29", optional = true }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
@@ -30,6 +30,11 @@ snarkos-posw = { path = "../posw", version = "0.8.0" }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
 
 chrono = { version = "0.4", features = ["serde"] }
+curl = { version = "0.4.29" }
 hex = { version = "0.4.2" }
 parking_lot = { version = "0.10.0" }
 rand = { version = "0.7" }
+
+[features]
+default = [ "remote", "snarkos-algorithms/default", "snarkos-errors/default", "snarkos-models/default" ]
+remote = [ "curl", "snarkos-errors/remote" ]
