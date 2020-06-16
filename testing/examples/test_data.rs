@@ -45,6 +45,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
         coinbase_records.clone(),
         &acc_1.public_key,
         10,
+        network_id,
         &mut rng,
     )?;
 
@@ -123,6 +124,7 @@ fn send<R: Rng>(
     inputs: Vec<DPCRecord<Components>>,
     receiver: &AccountPublicKey<Components>,
     amount: u64,
+    network_id: u8,
     rng: &mut R,
 ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
     let mut sum = 0;
@@ -153,6 +155,7 @@ fn send<R: Rng>(
         output,
         [0u8; 32], // TODO: Should we set these to anything?
         [0u8; 32],
+        network_id,
         &ledger,
         rng,
     )
