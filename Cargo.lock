@@ -2315,15 +2315,20 @@ dependencies = [
 name = "snarkos-parameters"
 version = "0.8.0"
 dependencies = [
+ "chrono",
  "curl",
  "hex",
+ "parking_lot 0.10.2",
  "rand",
  "snarkos-algorithms",
+ "snarkos-consensus",
  "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-objects",
  "snarkos-posw",
+ "snarkos-storage",
  "snarkos-utilities",
 ]
 
