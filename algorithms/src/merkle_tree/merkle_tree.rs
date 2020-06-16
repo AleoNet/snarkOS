@@ -20,8 +20,10 @@ impl<P: MerkleParameters> MerkleTree<P> {
         let last_level_size = leaves.len().next_power_of_two();
         let tree_size = 2 * last_level_size - 1;
         let tree_height = tree_height(tree_size);
-        // TODO (howardwu): Return a MerkleError.
-        assert!(tree_height as u8 <= Self::HEIGHT);
+
+        if tree_height > Self::HEIGHT as usize {
+            return Err(MerkleError::InvalidTreeHeight(tree_height, Self::HEIGHT as usize));
+        }
 
         // Initialize the merkle tree.
         let mut tree = Vec::with_capacity(tree_size);
@@ -127,8 +129,10 @@ impl<P: MerkleParameters> MerkleTree<P> {
         }
 
         // Store the root node. Set boolean as true for consistency with digest location.
-        // TODO (howardwu): Return a MerkleError.
-        assert!(path.len() < Self::HEIGHT as usize);
+        if path.len() >= Self::HEIGHT as usize {
+            return Err(MerkleError::InvalidPathLength(path.len(), Self::HEIGHT as usize));
+        }
+
         if path.len() != (Self::HEIGHT - 1) as usize {
             path.push((self.tree[0].clone(), empty_hash));
             for &(ref hash, ref sibling_hash) in &self.padding_tree {

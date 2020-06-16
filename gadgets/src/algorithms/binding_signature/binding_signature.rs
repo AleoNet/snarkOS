@@ -55,7 +55,7 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
         affine_r: &Self::OutputGadget,
         recommit: &Self::OutputGadget,
     ) -> Result<(), SynthesisError> {
-        // TODO make this circuit more efficient
+        // TODO (raychu86) make this circuit more efficient
 
         let negative_bvk = partial_bvk.add(cs.ns(|| "construct_negative_bvk"), &value_balance_comm)?;
         let positive_bvk = partial_bvk.sub(cs.ns(|| "construct_positive_bvk"), &value_balance_comm)?;

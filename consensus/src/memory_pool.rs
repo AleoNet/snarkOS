@@ -7,7 +7,7 @@ use snarkos_models::{
     algorithms::MerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::dpc::DPCTransactions;
+use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
 use snarkos_storage::{has_duplicates, Ledger};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -33,7 +33,7 @@ pub struct MemoryPool<T: Transaction> {
     pub transactions: HashMap<Vec<u8>, Entry<T>>,
 }
 
-const BLOCK_HEADER_SIZE: usize = 84;
+const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
 const COINBASE_TRANSACTION_SIZE: usize = 1038; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
@@ -311,12 +311,7 @@ mod tests {
 
         let mut mem_pool = MemoryPool::new();
         let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        // TODO (howardwu): This is not correct usage of transaction, fix me.
-        // modify the tx a bit so that it does not conflict with the one already inserted
-        // in the chain
-        transaction.old_serial_numbers.clear();
-        transaction.new_commitments.clear();
-        transaction.memorandum = [99; 32];
+
         let size = to_bytes![transaction].unwrap().len();
 
         let expected_transaction = transaction.clone();

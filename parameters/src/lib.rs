@@ -166,64 +166,13 @@ macro_rules! impl_params_remote {
     }
 }}
 
-// TODO (raychu86) reorder these macro declarations
-
-// Predicate params
-impl_params!(
-    PredicateSNARKPKParameters,
-    predicate_snark_pk_test,
-    "predicate_snark_pk",
-    348514
-);
-impl_params!(
-    PredicateSNARKVKParameters,
-    predicate_snark_vk_test,
-    "predicate_snark_vk",
-    1068
-);
-impl_params!(
-    PredicateVKCRHParameters,
-    predicate_vk_crh_test,
-    "predicate_vk_crh",
-    2188956
-);
-
-// POSW
-impl_params!(PoswSNARKPKParameters, posw_snark_pk_test, "posw_snark_pk", 26204306);
-impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 1165);
-
 // Commitments
-impl_params!(
-    RecordCommitmentParameters,
-    record_commitment_test,
-    "record_commitment",
-    489676
-);
-impl_params!(
-    SerialNumberNonceCRHParameters,
-    serial_number_nonce_crh_test,
-    "serial_number_nonce_crh",
-    295972
-);
-impl_params!(
-    ValueCommitmentParameters,
-    value_commitment_test,
-    "value_commitment",
-    403244
-);
 impl_params!(
     AccountCommitmentParameters,
     account_commitment_test,
     "account_commitment",
     417868
 );
-impl_params!(
-    LocalDataCommitmentParameters,
-    local_data_commitment_test,
-    "local_data_commitment",
-    2317612
-);
-
 impl_params!(
     AccountSignatureParameters,
     account_signature_test,
@@ -236,11 +185,61 @@ impl_params!(
     "ledger_merkle_tree",
     65556
 );
+impl_params!(
+    LocalDataCommitmentParameters,
+    local_data_commitment_test,
+    "local_data_commitment",
+    2317612
+);
+impl_params!(
+    RecordCommitmentParameters,
+    record_commitment_test,
+    "record_commitment",
+    489676
+);
+impl_params!(
+    ValueCommitmentParameters,
+    value_commitment_test,
+    "value_commitment",
+    403244
+);
 
-// SNARK VK's
-impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2426);
-impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);
+// CRH
+impl_params!(
+    PredicateVKCRHParameters,
+    predicate_vk_crh_test,
+    "predicate_vk_crh",
+    2188956
+);
+impl_params!(
+    SerialNumberNonceCRHParameters,
+    serial_number_nonce_crh_test,
+    "serial_number_nonce_crh",
+    295972
+);
 
-// SNARK PK's
+// POSW SNARK
+impl_params!(PoswSNARKPKParameters, posw_snark_pk_test, "posw_snark_pk", 26204306);
+impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 1165);
+
+// Predicate SNARK
+impl_params!(
+    PredicateSNARKPKParameters,
+    predicate_snark_pk_test,
+    "predicate_snark_pk",
+    348514
+);
+impl_params!(
+    PredicateSNARKVKParameters,
+    predicate_snark_vk_test,
+    "predicate_snark_vk",
+    1068
+);
+
+// Inner SNARK
 impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 544855906);
+impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2426);
+
+// Outer SNARK
 impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 1329577410);
+impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);
