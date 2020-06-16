@@ -50,7 +50,8 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     memo: &[u8; 32],
-    value_balance: &i64,
+    value_balance: i64,
+    network_id: u8,
 
     // Inner snark verifier private inputs (verification key and proof)
     inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
@@ -187,6 +188,9 @@ where
         ToConstraintField::<C::InnerField>::to_field_elements(&[value_balance.is_negative() as u8][..])
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
+    let network_id_fe = ToConstraintField::<C::InnerField>::to_field_elements(&[network_id][..])
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
+
     // Allocate field element bytes
 
     let account_commitment_fe_bytes =
@@ -231,6 +235,7 @@ where
         field_element_to_bytes::<C, _>(cs, &local_data_commitment_fe, "local data commitment")?;
     let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
     let is_negative_fe_bytes = field_element_to_bytes::<C, _>(cs, &is_negative_fe, "is_negative flag")?;
+    let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
 
     // Construct inner snark input as bytes
 
@@ -251,6 +256,7 @@ where
     inner_snark_input_bytes.extend(local_data_commitment_fe_bytes.clone());
     inner_snark_input_bytes.extend(value_balance_fe_bytes);
     inner_snark_input_bytes.extend(is_negative_fe_bytes);
+    inner_snark_input_bytes.extend(network_id_fe_bytes);
 
     // Convert inner snark input bytes to bits
 

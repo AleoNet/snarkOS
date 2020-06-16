@@ -805,6 +805,7 @@ where
                 &new_commitments,
                 &memorandum,
                 value_balance,
+                network_id,
                 &inner_snark_vk,
                 &inner_proof,
                 old_death_pred_attributes.as_slice(),
