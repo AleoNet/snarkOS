@@ -1,12 +1,12 @@
 use super::*;
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
-use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
     dpc::{DPCScheme, Record},
     genesis::Genesis,
 };
 use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block, BlockHeader};
+use snarkos_parameters::GenesisBlock;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

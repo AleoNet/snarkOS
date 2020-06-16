@@ -4,9 +4,9 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_dpc::base_dpc::instantiated::*;
-use snarkos_genesis::GenesisBlock;
 use snarkos_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
 use snarkos_objects::{Account, Block};
+use snarkos_parameters::GenesisBlock;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
