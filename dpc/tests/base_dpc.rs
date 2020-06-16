@@ -250,13 +250,6 @@ fn base_dpc_integration_test() {
 
     assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());
 
-    let mut false_transactions = transactions.clone();
-    false_transactions[0].network_id = 15;
-    assert_eq!(
-        false,
-        InstantiatedDPC::verify_transactions(&parameters, &false_transactions.0, &ledger).unwrap()
-    );
-
     let block = Block { header, transactions };
 
     ledger.insert_and_commit(&block).unwrap();

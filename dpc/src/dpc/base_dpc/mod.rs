@@ -908,6 +908,7 @@ where
             predicate_commitment: transaction.predicate_commitment.clone(),
             local_data_commitment: transaction.local_data_commitment.clone(),
             value_balance: transaction.value_balance,
+            network_id: transaction.network_id,
         };
 
         let outer_snark_input = OuterCircuitVerifierInput {
