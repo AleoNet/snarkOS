@@ -40,7 +40,7 @@ mod montgomery_affine_impl {
     use super::*;
     use snarkos_curves::templates::twisted_edwards_extended::GroupAffine;
     use snarkos_models::{
-        curves::{AffineCurve, Field},
+        curves::{Field, One, Zero},
         gadgets::r1cs::Assignment,
     };
     use std::ops::{AddAssign, MulAssign, SubAssign};
@@ -229,7 +229,7 @@ impl<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>> Eq for Af
 mod affine_impl {
     use super::*;
     use snarkos_models::{
-        curves::{AffineCurve, Field, PrimeField},
+        curves::{AffineCurve, Field, One, PrimeField},
         gadgets::r1cs::Assignment,
     };
 
@@ -594,7 +594,7 @@ mod projective_impl {
     use super::*;
     use snarkos_curves::templates::twisted_edwards_extended::GroupProjective as TEProjective;
     use snarkos_models::{
-        curves::{AffineCurve, Field, PrimeField, ProjectiveCurve},
+        curves::{AffineCurve, Field, One, PrimeField, ProjectiveCurve, Zero},
         gadgets::r1cs::Assignment,
     };
     use std::ops::Neg;

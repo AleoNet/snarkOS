@@ -433,7 +433,7 @@ impl<F: PrimeField> Iterator for Elements<F> {
 mod tests {
     use crate::fft::EvaluationDomain;
     use snarkos_curves::bls12_377::Fr;
-    use snarkos_models::curves::Field;
+    use snarkos_models::curves::{Field, Zero};
 
     use rand::{thread_rng, Rng};
 

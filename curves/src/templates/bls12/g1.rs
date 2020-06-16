@@ -2,7 +2,7 @@ use crate::templates::{
     bls12::Bls12Parameters,
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
-use snarkos_models::curves::pairing_engine::AffineCurve;
+use snarkos_models::curves::{pairing_engine::AffineCurve, Zero};
 use snarkos_utilities::bytes::ToBytes;
 
 use std::io::{Result as IoResult, Write};

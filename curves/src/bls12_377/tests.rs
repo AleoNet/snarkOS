@@ -29,11 +29,13 @@ use snarkos_models::curves::{
     Fp2Parameters,
     FpParameters,
     LegendreSymbol::*,
+    One,
     PairingEngine,
     PrimeField,
     ProjectiveCurve,
     SWModelParameters,
     SquareRootField,
+    Zero,
 };
 use snarkos_utilities::{
     biginteger::{BigInteger, BigInteger384},

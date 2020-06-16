@@ -11,6 +11,8 @@ use std::{
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
+use crate::curves::Zero;
+
 pub trait Group:
     ToBytes
     + FromBytes
@@ -26,18 +28,13 @@ pub trait Group:
     + Hash
     + Neg<Output = Self>
     + UniformRand
+    + Zero
     + for<'a> Add<&'a Self, Output = Self>
     + for<'a> Sub<&'a Self, Output = Self>
     + for<'a> AddAssign<&'a Self>
     + for<'a> SubAssign<&'a Self>
 {
     type ScalarField: PrimeField + Into<<Self::ScalarField as PrimeField>::BigInt>;
-
-    /// Returns the additive identity.
-    fn zero() -> Self;
-
-    /// Returns `self == zero`.
-    fn is_zero(&self) -> bool;
 
     /// Returns `self + self`.
     #[must_use]

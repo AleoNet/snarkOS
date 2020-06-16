@@ -4,6 +4,7 @@ use crate::{
         fp6_3over2::{Fp6, Fp6Parameters},
         Field,
         Fp2Parameters,
+        One,
         PrimeField,
     },
     gadgets::{

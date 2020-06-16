@@ -4,7 +4,7 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, PairingEngine},
+    curves::{Field, One, PairingEngine, Zero},
     gadgets::r1cs::Index,
 };
 

@@ -11,6 +11,8 @@ use std::{
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
+use crate::curves::Zero;
+
 pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
     /// This is the scalar field of the G1/G2 groups.
     type Fr: PrimeField + SquareRootField + Into<<Self::Fr as PrimeField>::BigInt>;
@@ -101,32 +103,34 @@ pub trait ProjectiveCurve:
     + Debug
     + Display
     + UniformRand
+    + Zero
     + 'static
     + Neg<Output = Self>
     + for<'a> Add<&'a Self, Output = Self>
     + for<'a> Sub<&'a Self, Output = Self>
     + for<'a> AddAssign<&'a Self>
     + for<'a> SubAssign<&'a Self>
+    + From<<Self as ProjectiveCurve>::Affine>
 {
     type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
     type BaseField: Field;
-    type Affine: AffineCurve<Projective = Self, ScalarField = Self::ScalarField>;
-
-    /// Returns the additive identity.
-    #[must_use]
-    fn zero() -> Self;
+    type Affine: AffineCurve<Projective = Self, ScalarField = Self::ScalarField> + From<Self> + Into<Self>;
 
     /// Returns a fixed generator of unknown exponent.
     #[must_use]
     fn prime_subgroup_generator() -> Self;
 
-    /// Determines if this point is the point at infinity.
-    #[must_use]
-    fn is_zero(&self) -> bool;
-
     /// Normalizes a slice of projective elements so that
     /// conversion to affine is cheap.
     fn batch_normalization(v: &mut [Self]);
+
+    /// Normalizes a slice of projective elements and outputs a vector
+    /// containing the affine equivalents.
+    fn batch_normalization_into_affine(v: &[Self]) -> Vec<Self::Affine> {
+        let mut v = v.to_vec();
+        Self::batch_normalization(&mut v);
+        v.into_iter().map(|v| v.into()).collect()
+    }
 
     /// Checks if the point is already "normalized" so that
     /// cheap affine conversion is possible.
@@ -181,24 +185,17 @@ pub trait AffineCurve:
     + Debug
     + Display
     + Neg<Output = Self>
+    + Zero
     + 'static
+    + From<<Self as AffineCurve>::Projective>
 {
     type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
     type BaseField: Field;
-    type Projective: ProjectiveCurve<Affine = Self, ScalarField = Self::ScalarField>;
-
-    /// Returns the additive identity.
-    #[must_use]
-    fn zero() -> Self;
+    type Projective: ProjectiveCurve<Affine = Self, ScalarField = Self::ScalarField> + From<Self> + Into<Self>;
 
     /// Returns a fixed generator of unknown exponent.
     #[must_use]
     fn prime_subgroup_generator() -> Self;
-
-    /// Determines if this point represents the point at infinity; the
-    /// additive identity.
-    #[must_use]
-    fn is_zero(&self) -> bool;
 
     fn add(self, other: &Self) -> Self;
 
@@ -206,13 +203,25 @@ pub trait AffineCurve:
     #[must_use]
     fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, other: S) -> Self::Projective;
 
+    /// Multiply this element by the cofactor and output the
+    /// resulting projective element.
+    #[must_use]
+    fn mul_by_cofactor_to_projective(&self) -> Self::Projective;
+
     /// Converts this element into its projective representation.
     #[must_use]
     fn into_projective(&self) -> Self::Projective;
 
+    /// Returns a group element if the set of bytes forms a valid group element,
+    /// otherwise returns None. This function is primarily intended for sampling
+    /// random group elements from a hash-function or RNG output.
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self>;
+
     /// Multiply this element by the cofactor.
     #[must_use]
-    fn mul_by_cofactor(&self) -> Self;
+    fn mul_by_cofactor(&self) -> Self {
+        self.mul_by_cofactor_to_projective().into()
+    }
 
     /// Multiply this element by the inverse of the cofactor modulo the size of
     /// `Self::ScalarField`.
@@ -249,16 +258,6 @@ pub trait PairingCurve: AffineCurve {
 
 impl<C: ProjectiveCurve> Group for C {
     type ScalarField = C::ScalarField;
-
-    #[must_use]
-    fn zero() -> Self {
-        <C as ProjectiveCurve>::zero()
-    }
-
-    #[must_use]
-    fn is_zero(&self) -> bool {
-        <C as ProjectiveCurve>::is_zero(&self)
-    }
 
     #[inline]
     #[must_use]

@@ -117,7 +117,7 @@ impl ConsensusParameters {
 
         let now = Utc::now().timestamp();
         let future_timelimit: i64 = now as i64 + TWO_HOURS_UNIX;
-        let expected_difficulty = self.get_block_difficulty(parent_header, now);
+        let expected_difficulty = self.get_block_difficulty(parent_header, header.time);
 
         if parent_header.get_hash() != header.previous_block_hash {
             return Err(ConsensusError::NoParent(
@@ -525,19 +525,10 @@ mod tests {
     #[test]
     fn verify_header() {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
+
         // mine a PoSW proof
         let posw = Posw::load().unwrap();
         let difficulty_target = u64::MAX;
-
-        // mine PoSW for block 1
-        let transaction_ids = vec![vec![1u8; 32]; 8];
-        let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
-        let (nonce1, proof1) = posw.mine(subroots1, difficulty_target, rng, std::u32::MAX).unwrap();
-
-        // mine PoSW for block 2
-        let other_transaction_ids = vec![vec![2u8; 32]; 8];
-        let (merkle_root_hash, pedersen_merkle_root, subroots) = txids_to_roots(&other_transaction_ids);
-        let (nonce2, proof2) = posw.mine(subroots, difficulty_target, rng, std::u32::MAX).unwrap();
 
         let consensus: ConsensusParameters = ConsensusParameters {
             max_block_size: 1_000_000usize,
@@ -545,6 +536,14 @@ mod tests {
             target_block_time: 2i64, //unix seconds
             verifier: posw,
         };
+
+        // mine PoSW for block 1
+        let transaction_ids = vec![vec![1u8; 32]; 8];
+        let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
+        let (nonce1, proof1) = consensus
+            .verifier
+            .mine(subroots1, difficulty_target, rng, std::u32::MAX)
+            .unwrap();
 
         let h1 = BlockHeader {
             previous_block_hash: BlockHeaderHash([0; 32]),
@@ -556,13 +555,22 @@ mod tests {
             time: 9999999,
         };
 
+        // mine PoSW for block 2
+        let other_transaction_ids = vec![vec![2u8; 32]; 8];
+        let (merkle_root_hash, pedersen_merkle_root, subroots) = txids_to_roots(&other_transaction_ids);
+        let new_difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp());
+        let (nonce2, proof2) = consensus
+            .verifier
+            .mine(subroots, new_difficulty_target, rng, std::u32::MAX)
+            .unwrap();
+
         let h2 = BlockHeader {
             previous_block_hash: h1.get_hash(),
             merkle_root_hash: merkle_root_hash.clone(),
             pedersen_merkle_root_hash: pedersen_merkle_root.clone(),
             nonce: nonce2,
             proof: proof2,
-            difficulty_target: 9223372036854775807,
+            difficulty_target: new_difficulty_target,
             time: 9999999,
         };
 
