@@ -5,8 +5,10 @@ use crate::{
 };
 
 use bincode;
-use rocksdb;
 use std::fmt::Debug;
+
+#[cfg(feature = "librocksdb")]
+use rocksdb;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -131,6 +133,7 @@ impl From<hex::FromHexError> for StorageError {
     }
 }
 
+#[cfg(feature = "librocksdb")]
 impl From<rocksdb::Error> for StorageError {
     fn from(error: rocksdb::Error) -> Self {
         StorageError::Crate("rocksdb", format!("{:?}", error))

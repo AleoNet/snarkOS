@@ -1,5 +1,3 @@
-extern crate rocksdb;
-
 pub mod ledger;
 pub use self::ledger::*;
 
