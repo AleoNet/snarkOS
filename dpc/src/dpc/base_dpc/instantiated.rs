@@ -20,9 +20,9 @@ use snarkos_algorithms::{
 };
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
+    bw6_761::BW6_761,
     edwards_bls12::{EdwardsAffine, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
-    sw6::SW6,
 };
 use snarkos_gadgets::{
     algorithms::{
@@ -146,7 +146,7 @@ impl BaseDPCComponents for Components {
 // Native primitives
 
 pub type InnerPairing = Bls12_377;
-pub type OuterPairing = SW6;
+pub type OuterPairing = BW6_761;
 pub type InnerField = Bls12_377Fr;
 pub type OuterField = Bls12_377Fq;
 
