@@ -125,6 +125,10 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     fn value_balance(&self) -> i64 {
         self.value_balance
     }
+
+    fn network_id(&self) -> u8 {
+        self.network_id
+    }
 }
 
 impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {

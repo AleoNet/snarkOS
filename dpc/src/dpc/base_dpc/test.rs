@@ -39,6 +39,10 @@ use rand_xorshift::XorShiftRng;
 #[test]
 fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+    // Specify network_id
+    let network_id: u8 = 0;
+
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
@@ -305,6 +309,7 @@ fn test_execute_base_dpc_constraints() {
         &new_value_commit_randomness,
         value_balance,
         &binding_signature,
+        network_id,
     )
     .unwrap();
 
@@ -357,6 +362,7 @@ fn test_execute_base_dpc_constraints() {
             &new_value_commit_randomness,
             value_balance,
             &binding_signature,
+            network_id,
         ),
         &mut rng,
     )
@@ -376,7 +382,8 @@ fn test_execute_base_dpc_constraints() {
         &old_serial_numbers,
         &new_commitments,
         &memo,
-        &value_balance,
+        value_balance,
+        network_id,
         &inner_snark_vk,
         &inner_snark_proof,
         &old_proof_and_vk,

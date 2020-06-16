@@ -40,6 +40,9 @@ fn base_dpc_integration_test() {
     // Generate accounts
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
+    // Specify network_id
+    let network_id: u8 = 0;
+
     // Create a genesis block
 
     let genesis_block = Block {
@@ -207,6 +210,7 @@ fn base_dpc_integration_test() {
         &new_birth_vk_and_proof_generator,
         &auxiliary,
         &memo,
+        network_id,
         &ledger,
         &mut rng,
     )
@@ -245,6 +249,13 @@ fn base_dpc_integration_test() {
     };
 
     assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions.0, &ledger).unwrap());
+
+    let mut false_transactions = transactions.clone();
+    false_transactions[0].network_id = 15;
+    assert_eq!(
+        false,
+        InstantiatedDPC::verify_transactions(&parameters, &false_transactions.0, &ledger).unwrap()
+    );
 
     let block = Block { header, transactions };
 
