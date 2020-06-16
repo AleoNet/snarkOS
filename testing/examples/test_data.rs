@@ -1,28 +1,15 @@
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
-use snarkos_models::{
-    dpc::{DPCScheme, Record},
-    genesis::Genesis,
-};
-use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block, BlockHeader};
-use snarkos_parameters::GenesisBlock;
+use snarkos_errors::consensus::ConsensusError;
+use snarkos_models::dpc::{DPCScheme, Record};
+use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
 use snarkos_testing::consensus::*;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::bytes::ToBytes;
 
-use once_cell::sync::Lazy;
 use rand::Rng;
-use std::{
-    fs::File,
-    io::{Read, Result as IoResult, Write},
-    path::PathBuf,
-};
+use std::{fs::File, path::PathBuf};
 
-const TEST_DATA_FILE: &str = "test_data";
-
-fn setup_and_store_test_data() -> TestData {
+fn setup_test_data() -> Result<TestData, ConsensusError> {
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
@@ -35,7 +22,7 @@ fn setup_and_store_test_data() -> TestData {
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (block_1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![]);
+    let (block_1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![])?;
 
     // make a tx which spends 10 to the BaseDPCComponents receiver
     let (_records_1, tx_1) = send(
@@ -46,23 +33,19 @@ fn setup_and_store_test_data() -> TestData {
         &acc_1.public_key,
         10,
         &mut rng,
-    );
+    )?;
 
     // mine the block
     let (block_2, coinbase_records_2) =
-        mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx_1]);
+        mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx_1])?;
 
     // Find alternative conflicting/late blocks
 
-    let alternative_block_1_header = miner
-        .find_block(
-            &block_1.transactions,
-            &ledger.get_block_header(&block_1.header.previous_block_hash).unwrap(),
-        )
-        .unwrap();
-    let alternative_block_2_header = miner
-        .find_block(&block_2.transactions, &alternative_block_1_header)
-        .unwrap();
+    let alternative_block_1_header = miner.find_block(
+        &block_1.transactions,
+        &ledger.get_block_header(&block_1.header.previous_block_hash)?,
+    )?;
+    let alternative_block_2_header = miner.find_block(&block_2.transactions, &alternative_block_1_header)?;
 
     let test_data = TestData {
         block_1,
@@ -73,9 +56,7 @@ fn setup_and_store_test_data() -> TestData {
         alternative_block_2_header,
     };
 
-    let file = std::io::BufWriter::new(File::create(PathBuf::from(TEST_DATA_FILE)).expect("could not open file"));
-    test_data.write(file).expect("could not write to file");
-    test_data
+    Ok(test_data)
 }
 
 fn mine_block(
@@ -85,34 +66,31 @@ fn mine_block(
     consensus: &ConsensusParameters,
     memory_pool: &mut MemoryPool<Tx>,
     txs: Vec<Tx>,
-) -> (Block<Tx>, Vec<DPCRecord<Components>>) {
+) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
     let transactions = DPCTransactions(txs);
 
     let (previous_block_header, transactions, coinbase_records) =
-        miner.establish_block(&parameters, ledger, &transactions).unwrap();
+        miner.establish_block(&parameters, ledger, &transactions)?;
 
-    let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+    let header = miner.find_block(&transactions, &previous_block_header)?;
 
     let block = Block { header, transactions };
 
     let old_block_height = ledger.get_latest_block_height();
 
     // add it to the chain
-    consensus
-        .receive_block(&parameters, ledger, memory_pool, &block)
-        .unwrap();
+    consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
 
     let new_block_height = ledger.get_latest_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     // Duplicate blocks dont do anything
-    consensus
-        .receive_block(&parameters, ledger, memory_pool, &block)
-        .unwrap();
+    consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
+
     let new_block_height = ledger.get_latest_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
-    (block, coinbase_records)
+    Ok((block, coinbase_records))
 }
 
 /// Spends some value from inputs owned by the sender, to the receiver,
@@ -125,7 +103,7 @@ fn send<R: Rng>(
     receiver: &AccountPublicKey<Components>,
     amount: u64,
     rng: &mut R,
-) -> (Vec<DPCRecord<Components>>, Tx) {
+) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
         sum += inp.value();
@@ -157,9 +135,13 @@ fn send<R: Rng>(
         &ledger,
         rng,
     )
-    .unwrap()
 }
 
 pub fn main() {
-    setup_and_store_test_data();
+    let test_data = setup_test_data().unwrap();
+
+    const TEST_DATA_FILE: &str = "test_data";
+
+    let file = std::io::BufWriter::new(File::create(PathBuf::from(TEST_DATA_FILE)).expect("could not open file"));
+    test_data.write(file).expect("could not write to file");
 }

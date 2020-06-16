@@ -3,6 +3,6 @@
 
 # Generate test_data
 
-cargo run --release --example generate_test_data
+cargo run --release --example test_data
 
 mv test_data ../src/consensus
