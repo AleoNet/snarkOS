@@ -8,6 +8,12 @@ use std::{
     path::PathBuf,
 };
 
+#[cfg(any(test, feature = "remote"))]
+use curl::easy::Easy;
+
+#[cfg(any(test, feature = "remote"))]
+pub const REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com";
+
 macro_rules! impl_params {
     ($name: ident, $test_name: ident, $fname: tt, $size: tt) => {
         #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,12 +44,6 @@ macro_rules! impl_params {
 
 macro_rules! impl_params_remote {
     ($name: ident, $fname: tt, $size: tt) => {
-
-    #[cfg(any(test, feature = "remote"))]
-    use curl::easy::Easy;
-
-    #[cfg(any(test, feature = "remote"))]
-    pub const REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com";
 
     pub struct $name;
 
