@@ -51,7 +51,7 @@ impl RpcImpl {
 }
 
 impl RpcFunctions for RpcImpl {
-    /// Returns all stored information on a block hash.
+    /// Returns information about a block from a block hash.
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
         let block_hash = hex::decode(&block_hash_string)?;
         assert_eq!(block_hash.len(), 32);
@@ -94,7 +94,7 @@ impl RpcFunctions for RpcImpl {
         }
     }
 
-    /// Returns latest block height + 1 to account for genesis block 0.
+    /// Returns the number of blocks in the canonical chain.
     fn get_block_count(&self) -> Result<u32, RpcError> {
         Ok(self.storage.get_block_count())
     }

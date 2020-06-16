@@ -4,7 +4,7 @@ use snarkos_curves::templates::short_weierstrass::short_weierstrass_jacobian::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{AffineCurve, Field, PrimeField, ProjectiveCurve, SWModelParameters},
+    curves::{AffineCurve, Field, One, PrimeField, ProjectiveCurve, SWModelParameters, Zero},
     gadgets::{
         curves::{FieldGadget, GroupGadget},
         r1cs::{Assignment, ConstraintSystem},

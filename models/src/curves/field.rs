@@ -1,3 +1,4 @@
+use crate::curves::{One, Zero};
 use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
@@ -32,6 +33,7 @@ pub trait Field:
     + Sync
     + 'static
     + Eq
+    + One
     + Ord
     + Neg<Output = Self>
     + UniformRand
@@ -57,19 +59,8 @@ pub trait Field:
     + CanonicalDeserializeWithFlags
     + Serialize
     + for<'a> Deserialize<'a>
+    + Zero
 {
-    /// Returns the zero element of the field, the additive identity.
-    fn zero() -> Self;
-
-    /// Returns true if and only if `self == Self::zero()`.
-    fn is_zero(&self) -> bool;
-
-    /// Returns the one element of the field, a field generator.
-    fn one() -> Self;
-
-    /// Returns true if and only if `self == Self::one()`.
-    fn is_one(&self) -> bool;
-
     /// Returns the characteristic of the field.
     fn characteristic<'a>() -> &'a [u64];
 
@@ -122,4 +113,17 @@ pub trait Field:
         }
         res
     }
+
+    /// Returns a field element if the set of bytes forms a valid field element,
+    /// otherwise returns None. This function is primarily intended for sampling
+    /// random field elements from a hash-function or RNG output.
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        Self::from_random_bytes_with_flags(bytes).map(|f| f.0)
+    }
+
+    /// Returns a field element with an extra sign bit used for group parsing if
+    /// the set of bytes forms a valid field element, otherwise returns
+    /// None. This function is primarily intended for sampling
+    /// random field elements from a hash-function or RNG output.
+    fn from_random_bytes_with_flags(bytes: &[u8]) -> Option<(Self, u8)>;
 }

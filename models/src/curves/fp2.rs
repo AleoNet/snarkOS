@@ -1,10 +1,12 @@
 use crate::curves::{Field, LegendreSymbol, PrimeField, SquareRootField};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    div_ceil,
     rand::UniformRand,
     serialize::*,
 };
 
+use crate::curves::{One, Zero};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -75,7 +77,7 @@ impl<P: Fp2Parameters> Fp2<P> {
     }
 }
 
-impl<P: Fp2Parameters> Field for Fp2<P> {
+impl<P: Fp2Parameters> Zero for Fp2<P> {
     fn zero() -> Self {
         Fp2::new(P::Fp::zero(), P::Fp::zero())
     }
@@ -83,7 +85,8 @@ impl<P: Fp2Parameters> Field for Fp2<P> {
     fn is_zero(&self) -> bool {
         self.c0.is_zero() && self.c1.is_zero()
     }
-
+}
+impl<P: Fp2Parameters> One for Fp2<P> {
     fn one() -> Self {
         Fp2::new(P::Fp::one(), P::Fp::zero())
     }
@@ -91,7 +94,9 @@ impl<P: Fp2Parameters> Field for Fp2<P> {
     fn is_one(&self) -> bool {
         self.c0.is_one() && self.c1.is_zero()
     }
+}
 
+impl<P: Fp2Parameters> Field for Fp2<P> {
     #[inline]
     fn characteristic<'a>() -> &'a [u64] {
         P::Fp::characteristic()
@@ -113,6 +118,25 @@ impl<P: Fp2Parameters> Field for Fp2<P> {
         let mut result = *self;
         result.square_in_place();
         result
+    }
+
+    #[inline]
+    fn from_random_bytes_with_flags(bytes: &[u8]) -> Option<(Self, u8)> {
+        if bytes.len() < 2 * div_ceil(P::Fp::size_in_bits(), 8) {
+            return None;
+        }
+        let split_at = bytes.len() / 2;
+        if let Some(c0) = P::Fp::from_random_bytes(&bytes[..split_at]) {
+            if let Some((c1, flags)) = P::Fp::from_random_bytes_with_flags(&bytes[split_at..]) {
+                return Some((Fp2::new(c0, c1), flags));
+            }
+        }
+        None
+    }
+
+    #[inline]
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        Self::from_random_bytes_with_flags(bytes).map(|f| f.0)
     }
 
     fn square_in_place(&mut self) -> &mut Self {

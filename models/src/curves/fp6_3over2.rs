@@ -1,10 +1,12 @@
-use crate::curves::{Field, Fp2, Fp2Parameters};
+use crate::curves::{Field, Fp2, Fp2Parameters, PrimeField};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    div_ceil,
     rand::UniformRand,
     serialize::*,
 };
 
+use crate::curves::{One, Zero};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -146,7 +148,7 @@ impl<P: Fp6Parameters> Fp6<P> {
     }
 }
 
-impl<P: Fp6Parameters> Field for Fp6<P> {
+impl<P: Fp6Parameters> Zero for Fp6<P> {
     fn zero() -> Self {
         Self::new(Fp2::zero(), Fp2::zero(), Fp2::zero())
     }
@@ -154,7 +156,9 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
     fn is_zero(&self) -> bool {
         self.c0.is_zero() && self.c1.is_zero() && self.c2.is_zero()
     }
+}
 
+impl<P: Fp6Parameters> One for Fp6<P> {
     fn one() -> Self {
         Self::new(Fp2::one(), Fp2::zero(), Fp2::zero())
     }
@@ -162,7 +166,9 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
     fn is_one(&self) -> bool {
         self.c0.is_one() && self.c1.is_zero() && self.c2.is_zero()
     }
+}
 
+impl<P: Fp6Parameters> Field for Fp6<P> {
     #[inline]
     fn characteristic<'a>() -> &'a [u64] {
         Fp2::<P::Fp2Params>::characteristic()
@@ -179,6 +185,27 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
         self.c1.double_in_place();
         self.c2.double_in_place();
         self
+    }
+
+    #[inline]
+    fn from_random_bytes_with_flags(bytes: &[u8]) -> Option<(Self, u8)> {
+        if bytes.len() != 6 * div_ceil(<P::Fp2Params as Fp2Parameters>::Fp::size_in_bits(), 8) {
+            return None;
+        }
+        let split_at = bytes.len() / 3;
+        if let Some(c0) = Fp2::<P::Fp2Params>::from_random_bytes(&bytes[..split_at]) {
+            if let Some(c1) = Fp2::<P::Fp2Params>::from_random_bytes(&bytes[split_at..2 * split_at]) {
+                if let Some((c2, flags)) = Fp2::<P::Fp2Params>::from_random_bytes_with_flags(&bytes[2 * split_at..]) {
+                    return Some((Fp6::new(c0, c1, c2), flags));
+                }
+            }
+        }
+        None
+    }
+
+    #[inline]
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        Self::from_random_bytes_with_flags(bytes).map(|f| f.0)
     }
 
     fn square(&self) -> Self {

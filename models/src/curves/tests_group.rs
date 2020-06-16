@@ -1,4 +1,4 @@
-use crate::curves::{Field, Group};
+use crate::curves::{Group, One, Zero};
 use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;

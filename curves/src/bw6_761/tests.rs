@@ -20,6 +20,7 @@ use snarkos_models::curves::{
     tests_group::group_test,
     AffineCurve,
     Field,
+    One,
     PairingEngine,
     PrimeField,
 };

@@ -10,6 +10,7 @@ use snarkos_models::curves::{
     Field,
     Fp2,
     ModelParameters,
+    One,
     PairingCurve,
     PairingEngine,
     PrimeField,

@@ -2,8 +2,10 @@ use crate::curves::{Field, FpParameters, LegendreSymbol, PrimeField, SquareRootF
 use snarkos_utilities::{
     biginteger::{arithmetic as fa, BigInteger as _BigInteger, BigInteger256 as BigInteger},
     bytes::{FromBytes, ToBytes},
+    serialize::CanonicalDeserialize,
 };
 
+use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -105,7 +107,7 @@ impl<P: Fp256Parameters> Fp256<P> {
     }
 }
 
-impl<P: Fp256Parameters> Field for Fp256<P> {
+impl<P: Fp256Parameters> Zero for Fp256<P> {
     #[inline]
     fn zero() -> Self {
         Fp256::<P>(BigInteger::from(0), PhantomData)
@@ -115,6 +117,23 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
+}
+
+impl<P: Fp256Parameters> One for Fp256<P> {
+    #[inline]
+    fn one() -> Self {
+        Fp256::<P>(P::R, PhantomData)
+    }
+
+    #[inline]
+    fn is_one(&self) -> bool {
+        self == &Self::one()
+    }
+}
+
+impl<P: Fp256Parameters> Field for Fp256<P> {
+    // 256/64 = 4 limbs.
+    impl_field_from_random_bytes_with_flags!(4);
 
     #[inline]
     fn double(&self) -> Self {
@@ -130,16 +149,6 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
         // However, it may need to be reduced.
         self.reduce();
         self
-    }
-
-    #[inline]
-    fn one() -> Self {
-        Fp256::<P>(P::R, PhantomData)
-    }
-
-    #[inline]
-    fn is_one(&self) -> bool {
-        self == &Self::one()
     }
 
     #[inline]
@@ -291,17 +300,6 @@ impl<P: Fp256Parameters> PrimeField for Fp256<P> {
     fn into_repr_raw(&self) -> BigInteger {
         let r = *self;
         r.0
-    }
-
-    #[inline]
-    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
-        let mut result = Self::zero();
-        if result.0.read_le((&bytes[..]).by_ref()).is_ok() {
-            result.0.as_mut()[3] &= 0xffffffffffffffff >> P::REPR_SHAVE_BITS;
-            if result.is_valid() { Some(result) } else { None }
-        } else {
-            None
-        }
     }
 
     #[inline]

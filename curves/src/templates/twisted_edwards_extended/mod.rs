@@ -3,10 +3,12 @@ use snarkos_models::curves::{
     AffineCurve,
     Field,
     MontgomeryModelParameters as MontgomeryParameters,
+    One,
     PrimeField,
     ProjectiveCurve,
     SquareRootField,
     TEModelParameters as Parameters,
+    Zero,
 };
 use snarkos_utilities::{
     bititerator::BitIterator,
@@ -108,21 +110,38 @@ impl<P: Parameters> GroupAffine<P> {
     }
 }
 
+impl<P: Parameters> Zero for GroupAffine<P> {
+    fn zero() -> Self {
+        Self::new(P::BaseField::zero(), P::BaseField::one())
+    }
+
+    fn is_zero(&self) -> bool {
+        self.x.is_zero() & self.y.is_one()
+    }
+}
+
 impl<P: Parameters> AffineCurve for GroupAffine<P> {
     type BaseField = P::BaseField;
     type Projective = GroupProjective<P>;
     type ScalarField = P::ScalarField;
 
-    fn zero() -> Self {
-        Self::new(Self::BaseField::zero(), Self::BaseField::one())
-    }
-
     fn prime_subgroup_generator() -> Self {
         Self::new(P::AFFINE_GENERATOR_COEFFS.0, P::AFFINE_GENERATOR_COEFFS.1)
     }
 
-    fn is_zero(&self) -> bool {
-        self.x.is_zero() & self.y.is_one()
+    // Copied from https://github.com/scipr-lab/zexe/blob/4b3f08c6c0a08c5392ed8aa3fd3c32f28da402c4/algebra-core/src/curves/models/twisted_edwards_extended.rs#L144-L156.
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        let x = P::BaseField::from_random_bytes_with_flags(bytes);
+        if let Some((x, flags)) = x {
+            let parsed_flags = EdwardsFlags::from_u8(flags);
+            if x.is_zero() {
+                Some(Self::zero())
+            } else {
+                Self::get_point_from_x(x, parsed_flags.is_positive())
+            }
+        } else {
+            None
+        }
     }
 
     fn add(self, other: &Self) -> Self {
@@ -135,8 +154,8 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         self.mul_bits(BitIterator::new(by.into()))
     }
 
-    fn mul_by_cofactor(&self) -> Self {
-        self.scale_by_cofactor().into()
+    fn mul_by_cofactor_to_projective(&self) -> Self::Projective {
+        self.scale_by_cofactor()
     }
 
     fn mul_by_cofactor_inv(&self) -> Self {
@@ -273,14 +292,6 @@ mod group_impl {
     impl<P: Parameters> Group for GroupAffine<P> {
         type ScalarField = P::ScalarField;
 
-        fn zero() -> Self {
-            <Self as AffineCurve>::zero()
-        }
-
-        fn is_zero(&self) -> bool {
-            <Self as AffineCurve>::is_zero(&self)
-        }
-
         #[inline]
         #[must_use]
         fn double(&self) -> Self {
@@ -393,11 +404,7 @@ impl<P: Parameters> GroupProjective<P> {
     }
 }
 
-impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
-    type Affine = GroupAffine<P>;
-    type BaseField = P::BaseField;
-    type ScalarField = P::ScalarField;
-
+impl<P: Parameters> Zero for GroupProjective<P> {
     fn zero() -> Self {
         Self::new(
             P::BaseField::zero(),
@@ -407,12 +414,18 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         )
     }
 
-    fn prime_subgroup_generator() -> Self {
-        GroupAffine::prime_subgroup_generator().into()
-    }
-
     fn is_zero(&self) -> bool {
         self.x.is_zero() && self.y == self.z && !self.y.is_zero() && self.t.is_zero()
+    }
+}
+
+impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
+    type Affine = GroupAffine<P>;
+    type BaseField = P::BaseField;
+    type ScalarField = P::ScalarField;
+
+    fn prime_subgroup_generator() -> Self {
+        GroupAffine::prime_subgroup_generator().into()
     }
 
     fn is_normalized(&self) -> bool {
