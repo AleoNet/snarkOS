@@ -119,14 +119,14 @@ impl FromBytes for TestData {
 }
 
 fn load_test_data() -> TestData {
-    if let Ok(test_data) = TestData::read(&include_bytes!("precomputed_data")[..]) {
+    if let Ok(test_data) = TestData::read(&include_bytes!("test_data")[..]) {
         test_data
     } else {
         setup_and_store_test_data()
     }
 }
 
-fn setup_and_store_test_data() -> TestData {
+pub fn setup_and_store_test_data() -> TestData {
     // get the params
     let parameters = &FIXTURE.parameters;
     let ledger = FIXTURE.ledger();
@@ -178,7 +178,7 @@ fn setup_and_store_test_data() -> TestData {
     };
 
     // TODO (howardwu): Remove file generation here in favor of out of scope generation.
-    const TEST_DATA_FILE: &str = "precomputed_data";
+    const TEST_DATA_FILE: &str = "test_data";
     let file = std::io::BufWriter::new(File::create(PathBuf::from(TEST_DATA_FILE)).expect("could not open file"));
     test_data.write(file).expect("could not write to file");
     test_data
