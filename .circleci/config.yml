@@ -70,11 +70,13 @@ jobs:
       - run:
           name: Build
           command: |
+            export CARGO_INCREMENTAL=0
             export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Coverflow-checks=off"
             cargo build --verbose --all-features --workspace
       - run:
           name: Test
           command: |
+            export CARGO_INCREMENTAL=0
             export RUSTFLAGS="-Zprofile -Zmir-opt-level=0 -Ccodegen-units=1 -Copt-level=0 -Coverflow-checks=off"
             cargo test --verbose --all-features --no-fail-fast --workspace --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers
       - run:
