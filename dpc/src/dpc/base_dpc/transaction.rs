@@ -42,6 +42,9 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
     /// can have a negative value balance representing tokens being minted.
     pub value_balance: i64,
 
+    /// The network id of the transaction
+    pub network_id: u8,
+
     #[derivative(PartialEq = "ignore")]
     pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
 }
@@ -56,6 +59,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
         value_balance: i64,
+        network_id: u8,
         signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
     ) -> Self {
         Self {
@@ -67,6 +71,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             predicate_commitment,
             local_data_commitment,
             value_balance,
+            network_id,
             signatures,
         }
     }
@@ -142,6 +147,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
         self.predicate_commitment.write(&mut writer)?;
         self.local_data_commitment.write(&mut writer)?;
         self.value_balance.write(&mut writer)?;
+        self.network_id.write(&mut writer)?;
 
         variable_length_integer(self.signatures.len() as u64).write(&mut writer)?;
         for signature in &self.signatures {
@@ -178,6 +184,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
 
         let value_balance: i64 = FromBytes::read(&mut reader)?;
+        let network_id: u8 = FromBytes::read(&mut reader)?;
 
         let num_signatures = read_variable_length_integer(&mut reader)?;
         let mut signatures = vec![];
@@ -195,6 +202,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             predicate_commitment,
             local_data_commitment,
             value_balance,
+            network_id,
             signatures,
         })
     }
@@ -204,7 +212,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DPCTransaction {{ old_serial_numbers: {:?}, new_commitments: {:?}, memorandum: {:?}, digest: {:?}, transaction_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?} }}",
+            "DPCTransaction {{ old_serial_numbers: {:?}, new_commitments: {:?}, memorandum: {:?}, digest: {:?}, transaction_proof: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, network_id: {:?}, signatures: {:?} }}",
             self.old_serial_numbers,
             self.new_commitments,
             self.memorandum,
@@ -213,6 +221,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
             self.predicate_commitment,
             self.local_data_commitment,
             self.value_balance,
+            self.network_id,
             self.signatures,
         )
     }
