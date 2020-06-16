@@ -2137,7 +2137,6 @@ dependencies = [
  "snarkos-algorithms",
  "snarkos-dpc",
  "snarkos-errors",
- "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-posw",
@@ -2233,25 +2232,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-genesis"
-version = "0.8.0"
-dependencies = [
- "chrono",
- "hex",
- "parking_lot 0.10.2",
- "rand",
- "snarkos-algorithms",
- "snarkos-consensus",
- "snarkos-dpc",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-objects",
- "snarkos-parameters",
- "snarkos-storage",
- "snarkos-utilities",
-]
-
-[[package]]
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
@@ -2315,15 +2295,20 @@ dependencies = [
 name = "snarkos-parameters"
 version = "0.8.0"
 dependencies = [
+ "chrono",
  "curl",
  "hex",
+ "parking_lot 0.10.2",
  "rand",
  "snarkos-algorithms",
+ "snarkos-consensus",
  "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-objects",
  "snarkos-posw",
+ "snarkos-storage",
  "snarkos-utilities",
 ]
 
@@ -2393,7 +2378,6 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-curves",
  "snarkos-errors",
- "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
@@ -2413,7 +2397,6 @@ dependencies = [
  "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
- "snarkos-genesis",
  "snarkos-models",
  "snarkos-network",
  "snarkos-objects",

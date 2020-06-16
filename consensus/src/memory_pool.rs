@@ -310,7 +310,7 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
 
         let size = to_bytes![transaction].unwrap().len();
 

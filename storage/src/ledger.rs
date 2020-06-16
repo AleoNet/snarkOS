@@ -1,7 +1,6 @@
 use crate::*;
 use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_errors::storage::StorageError;
-use snarkos_genesis::GenesisBlock;
 use snarkos_models::{
     algorithms::MerkleParameters,
     genesis::Genesis,
@@ -9,7 +8,7 @@ use snarkos_models::{
     parameters::Parameters,
 };
 use snarkos_objects::{dpc::DPCTransactions, Block, BlockHeader, BlockHeaderHash};
-use snarkos_parameters::LedgerMerkleTreeParameters;
+use snarkos_parameters::{GenesisBlock, LedgerMerkleTreeParameters};
 use snarkos_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
