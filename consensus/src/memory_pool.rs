@@ -34,7 +34,7 @@ pub struct MemoryPool<T: Transaction> {
 }
 
 const BLOCK_HEADER_SIZE: usize = 84;
-const COINBASE_TRANSACTION_SIZE: usize = 1502; // TODO Find the value for actual coinbase transaction size
+const COINBASE_TRANSACTION_SIZE: usize = 1038; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
