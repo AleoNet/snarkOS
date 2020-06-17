@@ -132,6 +132,7 @@ fn test_execute_base_dpc_constraints() {
         &new_death_predicates,
         &memo,
         &auxiliary,
+        network_id,
         &ledger,
         &mut rng,
     )

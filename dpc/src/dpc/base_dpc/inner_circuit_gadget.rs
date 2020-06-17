@@ -826,6 +826,9 @@ where
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
+        let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
+        local_data_bytes.extend_from_slice(&network_id);
+
         let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
             cs.ns(|| "Allocate local data commitment randomness"),
             || Ok(local_data_rand),
@@ -928,16 +931,6 @@ where
             &affine_r_gadget,
             &recommit_gadget,
         )?;
-    }
-    // *******************************************************************
-
-    // *******************************************************************
-    // Check that the network id is correct
-    // *******************************************************************
-    {
-        let mut cs = cs.ns(|| "Check that network id is correct");
-
-        let _network_id = UInt8::alloc_input_vec(cs.ns(|| "network_id"), &[network_id])?;
     }
 
     Ok(())

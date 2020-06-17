@@ -347,6 +347,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
+        network_id: u8,
 
         ledger: &L,
         rng: &mut R,
@@ -473,6 +474,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         }
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
+        predicate_input.push(network_id);
 
         let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
         let local_data_comm = Components::LocalDataCommitment::commit(
@@ -659,6 +661,7 @@ where
             new_death_predicates,
             memorandum,
             auxiliary,
+            network_id,
             ledger,
             rng,
         )?;

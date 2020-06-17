@@ -122,6 +122,9 @@ where
 
         v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(&self.memo)?);
+        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
+            &[self.network_id][..],
+        )?);
         v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
 
         let value_balance_as_u64 = self.value_balance.abs() as u64;
@@ -134,10 +137,6 @@ where
 
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
             &[is_negative as u8][..],
-        )?);
-
-        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &[self.network_id][..],
         )?);
 
         Ok(v)
