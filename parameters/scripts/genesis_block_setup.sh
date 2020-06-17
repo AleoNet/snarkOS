@@ -13,4 +13,4 @@ mv transaction_1.genesis ../src/genesis/transaction_1
 
 cargo run --release --example create_genesis_block
 
-mv block_header.genesis ../src/block_header
+mv block_header.genesis ../src/genesis/block_header
