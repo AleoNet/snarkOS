@@ -243,7 +243,7 @@ pub trait AffineCurve:
 
 pub trait PairingCurve: AffineCurve {
     type Engine: PairingEngine<Fr = Self::ScalarField>;
-    type Prepared: ToBytes + Default + Clone + Send + Sync + Debug + 'static;
+    type Prepared: FromBytes + ToBytes + Default + Clone + Send + Sync + Debug + 'static;
     type PairWith: PairingCurve<PairWith = Self>;
     type PairingResult: Field;
 

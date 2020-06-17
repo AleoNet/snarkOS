@@ -1,0 +1,24 @@
+[package]
+name = "snarkos-marlin"
+version = "0.8.0"
+authors = ["The Aleo Team <hello@aleo.org"]
+description = "Models for a decentralized record system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
+snarkos-models = { path = "../models", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+marlin = { path = "../../marlin" }
+poly-commit = { path = "../../poly-commit" }
+
+blake2 = { version = "0.8", default-features = false }
+rand = { version = "0.7" }
+rand_chacha = { version = "0.2.2" }

@@ -290,11 +290,50 @@ impl FromBytes for bool {
     }
 }
 
+impl<T: FromBytes> FromBytes for Vec<T> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let len = u64::read(&mut reader)?;
+        println!("read len: {}", len);
+        let mut v = vec![];
+        for _ in 0..len {
+            v.push(T::read(&mut reader)?);
+        }
+        Ok(v)
+    }
+}
+
 impl<T: ToBytes> ToBytes for Vec<T> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.len() as u64).write(&mut writer)?;
         for item in self {
             item.write(&mut writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T: FromBytes> FromBytes for Option<T> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let is_exist = bool::read(&mut reader)?;
+        let result = if is_exist { Some(T::read(&mut reader)?) } else { None };
+        Ok(result)
+    }
+}
+
+impl<T: ToBytes> ToBytes for Option<T> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        match self {
+            Some(v) => {
+                true.write(&mut writer)?;
+                v.write(&mut writer)?;
+            }
+            _ => {
+                false.write(&mut writer)?;
+            }
         }
         Ok(())
     }

@@ -3,9 +3,9 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
 use snarkos_models::curves::{pairing_engine::AffineCurve, Zero};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use std::io::{Result as IoResult, Write};
+use std::io::{Read, Result as IoResult, Write};
 
 pub type G1Affine<P> = GroupAffine<<P as Bls12Parameters>::G1Parameters>;
 pub type G1Projective<P> = GroupProjective<<P as Bls12Parameters>::G1Parameters>;
@@ -38,5 +38,11 @@ impl<P: Bls12Parameters> Default for G1Prepared<P> {
 impl<P: Bls12Parameters> ToBytes for G1Prepared<P> {
     fn write<W: Write>(&self, writer: W) -> IoResult<()> {
         self.0.write(writer)
+    }
+}
+
+impl<P: Bls12Parameters> FromBytes for G1Prepared<P> {
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Ok(Self(G1Affine::<P>::read(&mut reader)?))
     }
 }

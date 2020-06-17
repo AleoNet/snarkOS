@@ -3,9 +3,12 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
 use snarkos_models::curves::{AffineCurve, Field, Fp2, One, SWModelParameters, Zero};
-use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes};
+use snarkos_utilities::{
+    bititerator::BitIterator,
+    bytes::{FromBytes, ToBytes},
+};
 
-use std::io::{Result as IoResult, Write};
+use std::io::{Read, Result as IoResult, Write};
 
 pub type G2Affine<P> = GroupAffine<<P as Bls12Parameters>::G2Parameters>;
 pub type G2Projective<P> = GroupProjective<<P as Bls12Parameters>::G2Parameters>;
@@ -44,12 +47,30 @@ impl<P: Bls12Parameters> Default for G2Prepared<P> {
 
 impl<P: Bls12Parameters> ToBytes for G2Prepared<P> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.ell_coeffs.len() as u64).write(&mut writer)?;
         for coeff in &self.ell_coeffs {
             coeff.0.write(&mut writer)?;
             coeff.1.write(&mut writer)?;
             coeff.2.write(&mut writer)?;
         }
         self.infinity.write(writer)
+    }
+}
+
+impl<P: Bls12Parameters> FromBytes for G2Prepared<P> {
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let len = u64::read(&mut reader)?;
+        let ell_coeffs = (0..len)
+            .map(|_| {
+                Ok((
+                    Fp2::<P::Fp2Params>::read(&mut reader)?,
+                    Fp2::<P::Fp2Params>::read(&mut reader)?,
+                    Fp2::<P::Fp2Params>::read(&mut reader)?,
+                ))
+            })
+            .collect::<IoResult<Vec<_>>>()?;
+        let infinity = bool::read(&mut reader)?;
+        Ok(Self { ell_coeffs, infinity })
     }
 }
 

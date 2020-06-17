@@ -22,6 +22,7 @@ members = [
     "errors",
     "gadgets",
     "genesis",
+    "marlin",
     "models",
     "network",
     "objects",

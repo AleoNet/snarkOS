@@ -3,10 +3,13 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
 use snarkos_models::curves::{AffineCurve, Field, One, SWModelParameters, Zero};
-use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes};
+use snarkos_utilities::{
+    bititerator::BitIterator,
+    bytes::{FromBytes, ToBytes},
+};
 
 use std::{
-    io::{Result as IoResult, Write},
+    io::{Read, Result as IoResult, Write},
     ops::Neg,
 };
 
@@ -48,17 +51,50 @@ impl<P: BW6Parameters> Default for G2Prepared<P> {
 
 impl<P: BW6Parameters> ToBytes for G2Prepared<P> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.ell_coeffs_1.len() as u64).write(&mut writer)?;
         for coeff_1 in &self.ell_coeffs_1 {
             coeff_1.0.write(&mut writer)?;
             coeff_1.1.write(&mut writer)?;
             coeff_1.2.write(&mut writer)?;
         }
+        (self.ell_coeffs_2.len() as u64).write(&mut writer)?;
         for coeff_2 in &self.ell_coeffs_2 {
             coeff_2.0.write(&mut writer)?;
             coeff_2.1.write(&mut writer)?;
             coeff_2.2.write(&mut writer)?;
         }
         self.infinity.write(writer)
+    }
+}
+
+impl<P: BW6Parameters> FromBytes for G2Prepared<P> {
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let len_1 = u64::read(&mut reader)?;
+        let ell_coeffs_1 = (0..len_1)
+            .map(|_| {
+                Ok((
+                    P::Fp::read(&mut reader)?,
+                    P::Fp::read(&mut reader)?,
+                    P::Fp::read(&mut reader)?,
+                ))
+            })
+            .collect::<IoResult<Vec<_>>>()?;
+        let len_2 = u64::read(&mut reader)?;
+        let ell_coeffs_2 = (0..len_2)
+            .map(|_| {
+                Ok((
+                    P::Fp::read(&mut reader)?,
+                    P::Fp::read(&mut reader)?,
+                    P::Fp::read(&mut reader)?,
+                ))
+            })
+            .collect::<IoResult<Vec<_>>>()?;
+        let infinity = bool::read(&mut reader)?;
+        Ok(Self {
+            ell_coeffs_1,
+            ell_coeffs_2,
+            infinity,
+        })
     }
 }
 

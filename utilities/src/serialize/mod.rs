@@ -75,7 +75,6 @@ pub trait CanonicalSerialize {
         self.serialized_size()
     }
 }
-
 /// Deserializer in little endian format allowing flags to be encoded.
 pub trait CanonicalDeserializeWithFlags: Sized {
     /// Reads `Self` and `Flags` from `reader`.
@@ -202,6 +201,12 @@ pub fn buffer_bit_byte_size(modulus_bits: usize) -> (usize, usize) {
 #[inline]
 pub const fn buffer_byte_size(modulus_bits: usize) -> usize {
     (modulus_bits + 7) / 8
+}
+
+impl From<SerializationError> for crate::io::Error {
+    fn from(_: SerializationError) -> Self {
+        crate::io::ErrorKind::InvalidData.into()
+    }
 }
 
 #[cfg(test)]
