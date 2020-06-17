@@ -88,9 +88,11 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     // Start rpc thread
 
     if config.jsonrpc {
+        let verifying_parameters = PublicParameters::<Components>::load(true)?;
         start_rpc_server(
             config.rpc_port,
             storage.clone(),
+            verifying_parameters,
             server.context.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
