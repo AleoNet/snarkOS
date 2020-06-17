@@ -2,6 +2,7 @@ use crate::{rpc_types::*, RpcFunctions};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
+    parameters::PublicParameters,
     record::DPCRecord,
 };
 use snarkos_errors::rpc::RpcError;
@@ -24,6 +25,9 @@ pub struct RpcImpl {
     /// Blockchain database storage.
     storage: Arc<MerkleTreeLedger>,
 
+    /// Public Parameters
+    parameters: PublicParameters<Components>,
+
     /// Network context held by the server.
     server_context: Arc<Context>,
 
@@ -37,12 +41,14 @@ pub struct RpcImpl {
 impl RpcImpl {
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
+        parameters: PublicParameters<Components>,
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     ) -> Self {
         Self {
             storage,
+            parameters,
             server_context,
             consensus,
             memory_pool_lock,
@@ -172,10 +178,20 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
+        if !self
+            .consensus
+            .verify_transaction(&self.parameters, &transaction, &self.storage)?
+        {
+            // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
+            return Ok("Transaction did not verify".into());
+        }
+
         match self.storage.transcation_conflicts(&transaction) {
             Ok(_) => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
+                    &self.consensus,
+                    &self.parameters,
                     self.storage.clone(),
                     self.memory_pool_lock.clone(),
                     to_bytes![transaction]?.to_vec(),
