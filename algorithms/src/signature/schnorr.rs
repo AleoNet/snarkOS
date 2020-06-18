@@ -7,6 +7,7 @@ use snarkos_models::{
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
     to_bytes,
 };
 
@@ -57,7 +58,7 @@ impl<G: Group> FromBytes for SchnorrOutput<G> {
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
     Copy(bound = "G: Group"),
     Clone(bound = "G: Group"),
@@ -67,23 +68,37 @@ impl<G: Group> FromBytes for SchnorrOutput<G> {
     Hash(bound = "G: Group"),
     Default(bound = "G: Group")
 )]
-pub struct SchnorrPublicKey<G: Group>(pub G);
+pub struct SchnorrPublicKey<G: Group + CanonicalSerialize + CanonicalDeserialize>(pub G);
 
-impl<G: Group> ToBytes for SchnorrPublicKey<G> {
+//impl<G: Group> CanonicalSerialize for SchnorrPublicKey<G> {
+//    #[inline]
+//    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+//        self.0.serialize(writer)
+//    }
+//
+//    #[inline]
+//    fn serialized_size(&self) -> usize {
+//        Self::SERIALIZED_SIZE
+//    }
+//}
+
+impl<G: Group + CanonicalSerialize + CanonicalDeserialize> ToBytes for SchnorrPublicKey<G> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.0.write(&mut writer)
     }
 }
 
-impl<G: Group> FromBytes for SchnorrPublicKey<G> {
+impl<G: Group + CanonicalSerialize + CanonicalDeserialize> FromBytes for SchnorrPublicKey<G> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         Ok(Self(G::read(&mut reader)?))
     }
 }
 
-impl<F: Field, G: Group + ToConstraintField<F>> ToConstraintField<F> for SchnorrPublicKey<G> {
+impl<F: Field, G: Group + CanonicalSerialize + CanonicalDeserialize + ToConstraintField<F>> ToConstraintField<F>
+    for SchnorrPublicKey<G>
+{
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
         self.0.to_field_elements()
@@ -101,7 +116,8 @@ pub struct SchnorrSignature<G: Group, D: Digest> {
     pub parameters: SchnorrParameters<G, D>,
 }
 
-impl<G: Group + Hash, D: Digest + Send + Sync> SignatureScheme for SchnorrSignature<G, D>
+impl<G: Group + Hash + CanonicalSerialize + CanonicalDeserialize, D: Digest + Send + Sync> SignatureScheme
+    for SchnorrSignature<G, D>
 where
     <G as Group>::ScalarField: PrimeField,
 {

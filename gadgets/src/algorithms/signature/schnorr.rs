@@ -15,6 +15,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkos_utilities::serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use digest::Digest;
 use std::{borrow::Borrow, marker::PhantomData};
@@ -72,8 +73,8 @@ pub struct SchnorrPublicKeyGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     _engine: PhantomData<F>,
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> AllocGadget<SchnorrPublicKey<G>, F>
-    for SchnorrPublicKeyGadget<G, F, GG>
+impl<G: Group + CanonicalSerialize + CanonicalDeserialize, F: Field, GG: GroupGadget<G, F>>
+    AllocGadget<SchnorrPublicKey<G>, F> for SchnorrPublicKeyGadget<G, F, GG>
 {
     fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<SchnorrPublicKey<G>>, CS: ConstraintSystem<F>>(
         cs: CS,
@@ -141,7 +142,7 @@ pub struct SchnorrPublicKeyRandomizationGadget<G: Group, F: Field, GG: GroupGadg
     _engine: PhantomData<*const F>,
 }
 
-impl<G: Group, GG: GroupGadget<G, F>, D: Digest + Send + Sync, F: Field>
+impl<G: Group + CanonicalSerialize + CanonicalDeserialize, GG: GroupGadget<G, F>, D: Digest + Send + Sync, F: Field>
     SignaturePublicKeyRandomizationGadget<SchnorrSignature<G, D>, F> for SchnorrPublicKeyRandomizationGadget<G, F, GG>
 {
     type ParametersGadget = SchnorrParametersGadget<G, F, GG>;
