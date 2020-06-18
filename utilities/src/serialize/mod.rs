@@ -30,6 +30,7 @@ pub trait ConstantSerializedSize: CanonicalSerialize {
 /// ```
 /// // The `derive` feature must be set for the derivation to work.
 /// use snarkos_utilities::serialize::*;
+/// use snarkos_errors::serialization::SerializationError;
 ///
 /// # #[cfg(feature = "derive")]
 /// #[derive(CanonicalSerialize)]
@@ -72,6 +73,7 @@ pub trait CanonicalDeserializeWithFlags: Sized {
 /// ```
 /// // The `derive` feature must be set for the derivation to work.
 /// use snarkos_utilities::serialize::*;
+/// use snarkos_errors::serialization::SerializationError;
 ///
 /// # #[cfg(feature = "derive")]
 /// #[derive(CanonicalDeserialize)]
