@@ -4,7 +4,7 @@ pub struct Transaction1;
 
 impl Genesis for Transaction1 {
     const CHECKSUM: &'static str = "";
-    const SIZE: u64 = 1038;
+    const SIZE: u64 = 974;
 
     fn load_bytes() -> Vec<u8> {
         let buffer = include_bytes!("transaction_1.genesis");
