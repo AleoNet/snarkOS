@@ -2414,7 +2414,7 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "snarkos-derives",
- "thiserror",
+ "snarkos-errors",
 ]
 
 [[package]]

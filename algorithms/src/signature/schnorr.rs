@@ -1,5 +1,5 @@
 use crate::signature::SchnorrParameters;
-use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError};
+use snarkos_errors::{algorithms::SignatureError, curves::ConstraintFieldError, serialization::SerializationError};
 use snarkos_models::{
     algorithms::SignatureScheme,
     curves::{to_field_vec::ToConstraintField, Field, Group, One, PrimeField, Zero},
@@ -69,18 +69,6 @@ impl<G: Group> FromBytes for SchnorrOutput<G> {
     Default(bound = "G: Group")
 )]
 pub struct SchnorrPublicKey<G: Group + CanonicalSerialize + CanonicalDeserialize>(pub G);
-
-//impl<G: Group> CanonicalSerialize for SchnorrPublicKey<G> {
-//    #[inline]
-//    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
-//        self.0.serialize(writer)
-//    }
-//
-//    #[inline]
-//    fn serialized_size(&self) -> usize {
-//        Self::SERIALIZED_SIZE
-//    }
-//}
 
 impl<G: Group + CanonicalSerialize + CanonicalDeserialize> ToBytes for SchnorrPublicKey<G> {
     #[inline]
