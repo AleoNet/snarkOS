@@ -542,7 +542,7 @@ mod tests {
         let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
         let (nonce1, proof1) = consensus
             .verifier
-            .mine(subroots1, difficulty_target, rng, std::u32::MAX)
+            .mine(&subroots1, difficulty_target, rng, std::u32::MAX)
             .unwrap();
 
         let h1 = BlockHeader {
@@ -561,7 +561,7 @@ mod tests {
         let new_difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp());
         let (nonce2, proof2) = consensus
             .verifier
-            .mine(subroots, new_difficulty_target, rng, std::u32::MAX)
+            .mine(&subroots, new_difficulty_target, rng, std::u32::MAX)
             .unwrap();
 
         let h2 = BlockHeader {
