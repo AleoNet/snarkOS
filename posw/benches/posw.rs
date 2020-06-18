@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use snarkos_posw::{txids_to_roots, Posw};
-use rand_xorshift::XorShiftRng;
 use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
+use snarkos_posw::{txids_to_roots, Posw};
 
 fn posw_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("Proof of Succinct Work");
@@ -34,10 +34,6 @@ fn posw_bench(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    benches,
-    posw_bench
-);
+criterion_group!(benches, posw_bench);
 
 criterion_main!(benches);
-
