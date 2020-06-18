@@ -330,6 +330,7 @@ impl ConsensusParameters {
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         recipient: AccountPublicKey<Components>,
+        network_id: u8,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -400,6 +401,7 @@ impl ConsensusParameters {
             new_payloads,
             auxiliary,
             memo,
+            network_id,
             ledger,
             rng,
         )
@@ -419,6 +421,8 @@ impl ConsensusParameters {
 
         auxiliary: [u8; 32],
         memo: [u8; 32],
+
+        network_id: u8,
 
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -527,6 +531,7 @@ impl ConsensusParameters {
             &new_birth_vk_and_proof_generator,
             &auxiliary,
             &memo,
+            network_id,
             ledger,
             rng,
         )?;

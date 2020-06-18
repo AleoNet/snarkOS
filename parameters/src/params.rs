@@ -249,9 +249,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 544855906);
-impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2426);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 545102262);
+impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2523);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 1329577410);
-impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 1334516666);
+impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4636);

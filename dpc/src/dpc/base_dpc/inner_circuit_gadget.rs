@@ -58,6 +58,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
+    network_id: u8,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
         C,
@@ -103,6 +104,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         output_value_commitment_randomness,
         value_balance,
         binding_signature,
+        network_id,
     )
 }
 
@@ -155,6 +157,7 @@ fn base_dpc_execute_gadget_helper<
     output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
     binding_signature: &BindingSignature,
+    network_id: u8,
 ) -> Result<(), SynthesisError>
 where
     C: BaseDPCComponents<
@@ -735,6 +738,8 @@ where
         }
     }
     // *******************************************************************
+
+    // *******************************************************************
     // Check that predicate commitment is well formed.
     // *******************************************************************
     {
@@ -777,6 +782,11 @@ where
             &given_commitment,
         )?;
     }
+    // ********************************************************************
+
+    // ********************************************************************
+    // Check that the local data commitment is valid
+    // ********************************************************************
     {
         let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
@@ -816,6 +826,9 @@ where
         let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
         local_data_bytes.extend_from_slice(&auxiliary);
 
+        let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
+        local_data_bytes.extend_from_slice(&network_id);
+
         let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
             cs.ns(|| "Allocate local data commitment randomness"),
             || Ok(local_data_rand),
@@ -837,8 +850,14 @@ where
             &mut cs.ns(|| "Check that local data commitment is valid"),
             &declared_local_data_commitment,
         )?;
+    }
+    // *******************************************************************
 
-        // Check the binding signature verification
+    // *******************************************************************
+    // Check that the binding signature is valid
+    // *******************************************************************
+    {
+        let mut cs = cs.ns(|| "Check that the binding signature is valid.");
 
         let (c, partial_bvk, affine_r, recommit) =
             gadget_verification_setup::<C::ValueCommitment, C::BindingSignatureGroup>(
@@ -913,5 +932,6 @@ where
             &recommit_gadget,
         )?;
     }
+
     Ok(())
 }

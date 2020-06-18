@@ -104,6 +104,12 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.miner_address)?[..])?;
 
+    let network_id = match config.network.as_str() {
+        "mainnet" => 0,
+        "testnet" => 1,
+        _ => 0,
+    };
+
     if config.is_miner {
         MinerInstance::new(
             miner_address,
@@ -112,6 +118,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             storage.clone(),
             memory_pool_lock.clone(),
             server.context.clone(),
+            network_id,
         )
         .spawn();
     }

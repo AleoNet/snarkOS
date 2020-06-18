@@ -50,6 +50,7 @@ pub trait DPCScheme<L: LedgerScheme> {
 
         auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        network_id: u8,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;

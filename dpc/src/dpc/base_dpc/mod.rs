@@ -347,6 +347,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         memo: &[u8; 32],
         auxiliary: &[u8; 32],
+        network_id: u8,
 
         ledger: &L,
         rng: &mut R,
@@ -473,6 +474,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         }
         predicate_input.extend_from_slice(memo);
         predicate_input.extend_from_slice(auxiliary);
+        predicate_input.push(network_id);
 
         let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
         let local_data_comm = Components::LocalDataCommitment::commit(
@@ -642,6 +644,7 @@ where
 
         auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        network_id: u8,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
@@ -658,6 +661,7 @@ where
             new_death_predicates,
             memorandum,
             auxiliary,
+            network_id,
             ledger,
             rng,
         )?;
@@ -780,6 +784,7 @@ where
                 &new_value_commit_randomness,
                 value_balance,
                 &binding_signature,
+                network_id,
             );
 
             let inner_snark_parameters = match &parameters.inner_snark_parameters.0 {
@@ -803,6 +808,7 @@ where
                 &new_commitments,
                 &memorandum,
                 value_balance,
+                network_id,
                 &inner_snark_vk,
                 &inner_proof,
                 old_death_pred_attributes.as_slice(),
@@ -860,6 +866,7 @@ where
             predicate_commitment,
             local_data_commitment,
             value_balance,
+            network_id,
             signatures,
         );
 
@@ -904,6 +911,7 @@ where
             predicate_commitment: transaction.predicate_commitment.clone(),
             local_data_commitment: transaction.local_data_commitment.clone(),
             value_balance: transaction.value_balance,
+            network_id: transaction.network_id,
         };
 
         let outer_snark_input = OuterCircuitVerifierInput {
