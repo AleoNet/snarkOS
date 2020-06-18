@@ -2,32 +2,13 @@ pub use crate::{
     io::{self, Read, Write},
     Vec,
 };
-use thiserror::Error;
+use snarkos_errors::serialization::SerializationError;
 
 mod flags;
 pub use flags::*;
 
 #[cfg(feature = "derive")]
 pub use snarkos_derives::*;
-
-// Taken from: https://github.com/scipr-lab/zexe/blob/master/algebra-core/src/serialize/
-/// This is an error that could occur during serialization
-#[derive(Error, Debug)]
-pub enum SerializationError {
-    /// During serialization, we didn't have enough space to write extra info.
-    #[error("the last byte does not have enough space to encode the extra info bits")]
-    NotEnoughSpace,
-    /// During serialization, the data was invalid.
-    #[error("the input buffer contained invalid data")]
-    InvalidData,
-    /// During serialization, non-empty flags were given where none were
-    /// expected.
-    #[error("the call expects empty flags")]
-    UnexpectedFlags,
-    /// During serialization, we countered an I/O error.
-    #[error("IoError: {0}")]
-    IoError(#[from] io::Error),
-}
 
 /// Serializer in little endian format allowing to encode flags.
 pub trait CanonicalSerializeWithFlags: CanonicalSerialize {
@@ -49,6 +30,7 @@ pub trait ConstantSerializedSize: CanonicalSerialize {
 /// ```
 /// // The `derive` feature must be set for the derivation to work.
 /// use snarkos_utilities::serialize::*;
+/// use snarkos_errors::serialization::SerializationError;
 ///
 /// # #[cfg(feature = "derive")]
 /// #[derive(CanonicalSerialize)]
@@ -91,6 +73,7 @@ pub trait CanonicalDeserializeWithFlags: Sized {
 /// ```
 /// // The `derive` feature must be set for the derivation to work.
 /// use snarkos_utilities::serialize::*;
+/// use snarkos_errors::serialization::SerializationError;
 ///
 /// # #[cfg(feature = "derive")]
 /// #[derive(CanonicalDeserialize)]
