@@ -89,12 +89,14 @@ impl RpcFunctions for RpcImpl {
                 height,
                 confirmations,
                 size: block.serialize()?.len(),
+                previous_block_hash: block.header.previous_block_hash.to_string(),
+                merkle_root: block.header.merkle_root_hash.to_string(),
+                pedersen_merkle_root_hash: block.header.pedersen_merkle_root_hash.to_string(),
+                proof: block.header.proof.to_string(),
                 time: block.header.time,
                 difficulty_target: block.header.difficulty_target,
                 nonce: block.header.nonce,
-                merkle_root: hex::encode(block.header.merkle_root_hash.0),
                 transactions,
-                previous_block_hash: hex::encode(block.header.previous_block_hash.0),
             })
         } else {
             Err(RpcError::InvalidBlockHash(block_hash_string))

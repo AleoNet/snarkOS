@@ -16,6 +16,18 @@ pub struct BlockInfo {
     /// Block Size
     pub size: usize,
 
+    /// Previous block hash
+    pub previous_block_hash: String,
+
+    /// Merkle root representing the transactions in the block
+    pub merkle_root: String,
+
+    /// Merkle root of the transactions in the block using a Pedersen hash
+    pub pedersen_merkle_root_hash: String,
+
+    /// Proof of Succinct Work
+    pub proof: String,
+
     /// Block time
     pub time: i64,
 
@@ -25,14 +37,8 @@ pub struct BlockInfo {
     /// Nonce
     pub nonce: u32,
 
-    /// Merkle Root
-    pub merkle_root: String,
-
     /// List of transaction ids
     pub transactions: Vec<String>,
-
-    /// Previous block hash
-    pub previous_block_hash: String,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
