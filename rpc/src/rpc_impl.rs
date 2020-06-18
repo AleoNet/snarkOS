@@ -11,6 +11,7 @@ use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
+    CanonicalSerialize,
 };
 
 use chrono::Utc;
@@ -134,7 +135,9 @@ impl RpcFunctions for RpcImpl {
         let mut old_serial_numbers = vec![];
 
         for sn in transaction.old_serial_numbers() {
-            old_serial_numbers.push(hex::encode(to_bytes![sn]?));
+            let mut serial_number: Vec<u8> = vec![];
+            CanonicalSerialize::serialize(sn, &mut serial_number).unwrap();
+            old_serial_numbers.push(hex::encode(serial_number));
         }
 
         let mut new_commitments = vec![];

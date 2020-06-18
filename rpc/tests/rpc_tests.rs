@@ -6,6 +6,7 @@ mod rpc_tests {
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
         bytes::{FromBytes, ToBytes},
+        serialize::CanonicalSerialize,
         to_bytes,
     };
 
@@ -49,7 +50,11 @@ mod rpc_tests {
         let old_serial_numbers: Vec<Value> = transaction
             .old_serial_numbers()
             .iter()
-            .map(|sn| Value::String(hex::encode(to_bytes![sn].unwrap())))
+            .map(|sn| {
+                let mut serial_number: Vec<u8> = vec![];
+                CanonicalSerialize::serialize(sn, &mut serial_number).unwrap();
+                Value::String(hex::encode(serial_number))
+            })
             .collect();
         let new_commitments: Vec<Value> = transaction
             .new_commitments()

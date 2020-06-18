@@ -7,6 +7,7 @@ use snarkos_models::{
 };
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    serialize::{CanonicalDeserialize, CanonicalSerialize},
     to_bytes,
     variable_length_integer::{read_variable_length_integer, variable_length_integer},
 };
@@ -136,7 +137,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         variable_length_integer(self.old_serial_numbers.len() as u64).write(&mut writer)?;
         for old_serial_number in &self.old_serial_numbers {
-            old_serial_number.write(&mut writer)?;
+            CanonicalSerialize::serialize(old_serial_number, &mut writer).unwrap();
         }
 
         variable_length_integer(self.new_commitments.len() as u64).write(&mut writer)?;
@@ -168,7 +169,9 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let num_old_serial_numbers = read_variable_length_integer(&mut reader)?;
         let mut old_serial_numbers = vec![];
         for _ in 0..num_old_serial_numbers {
-            let old_serial_number: <C::AccountSignature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
+            let old_serial_number: <C::AccountSignature as SignatureScheme>::PublicKey =
+                CanonicalDeserialize::deserialize(&mut reader).unwrap();
+
             old_serial_numbers.push(old_serial_number);
         }
 

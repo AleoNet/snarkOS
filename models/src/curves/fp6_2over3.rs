@@ -1,4 +1,5 @@
-use crate::curves::{Field, Fp3, Fp3Parameters, PrimeField};
+use crate::curves::{Field, Fp3, Fp3Parameters, One, PrimeField, Zero};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_utilities::{
     biginteger::BigInteger,
     bytes::{FromBytes, ToBytes},
@@ -7,7 +8,6 @@ use snarkos_utilities::{
     serialize::*,
 };
 
-use crate::curves::{One, Zero};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
