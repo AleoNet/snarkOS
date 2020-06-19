@@ -263,59 +263,62 @@ impl<T: CanonicalDeserialize> CanonicalDeserialize for Vec<T> {
     }
 }
 
-// TODO: Maybe make this a macro for bigger tuples
-impl<A, B> CanonicalSerialize for (A, B)
-where
-    A: CanonicalSerialize,
-    B: CanonicalSerialize,
-{
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
-        self.0.serialize(writer)?;
-        self.1.serialize(writer)?;
+// Implement Serialization for tuples
+macro_rules! impl_tuple {
+    ($( $ty: ident : $no: tt, )+) => {
+        impl<$($ty, )+> CanonicalSerialize for ($($ty,)+) where
+            $($ty: CanonicalSerialize,)+
+        {
+            #[inline]
+            fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+                $(self.$no.serialize(writer)?;)*
+                Ok(())
+            }
 
-        Ok(())
-    }
+            #[inline]
+            fn serialized_size(&self) -> usize {
+                [$(
+                    self.$no.serialized_size(),
+                )*].iter().sum()
+            }
 
-    #[inline]
-    fn serialized_size(&self) -> usize {
-        self.0.serialized_size() + self.1.serialized_size()
-    }
+            #[inline]
+            fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+                $(self.$no.serialize_uncompressed(writer)?;)*
+                Ok(())
+            }
 
-    #[inline]
-    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
-        self.0.serialize_uncompressed(writer)?;
-        self.1.serialize_uncompressed(writer)?;
+            #[inline]
+            fn uncompressed_size(&self) -> usize {
+                [$(
+                    self.$no.uncompressed_size(),
+                )*].iter().sum()
+            }
+        }
 
-        Ok(())
-    }
+        impl<$($ty, )+> CanonicalDeserialize for ($($ty,)+) where
+            $($ty: CanonicalDeserialize,)+
+        {
+            #[inline]
+            fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+                Ok(($(
+                    $ty::deserialize(reader)?,
+                )+))
+            }
 
-    #[inline]
-    fn uncompressed_size(&self) -> usize {
-        self.0.uncompressed_size() + self.1.uncompressed_size()
+            #[inline]
+            fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+                Ok(($(
+                    $ty::deserialize_uncompressed(reader)?,
+                )+))
+            }
+        }
     }
 }
 
-// TODO: Maybe make this a macro for bigger tuples
-impl<A, B> CanonicalDeserialize for (A, B)
-where
-    A: CanonicalDeserialize,
-    B: CanonicalDeserialize,
-{
-    #[inline]
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        let a = A::deserialize(reader)?;
-        let b = B::deserialize(reader)?;
-        Ok((a, b))
-    }
-
-    #[inline]
-    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        let a = A::deserialize_uncompressed(reader)?;
-        let b = B::deserialize_uncompressed(reader)?;
-        Ok((a, b))
-    }
-}
+impl_tuple!(A:0, B:1,);
+impl_tuple!(A:0, B:1, C:2,);
+impl_tuple!(A:0, B:1, C:2, D:3,);
 
 #[inline]
 pub fn buffer_bit_byte_size(modulus_bits: usize) -> (usize, usize) {
