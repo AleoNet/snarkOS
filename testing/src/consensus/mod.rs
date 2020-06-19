@@ -51,6 +51,10 @@ impl Transaction for TestTx {
     fn value_balance(&self) -> i64 {
         0
     }
+
+    fn network_id(&self) -> u8 {
+        0
+    }
 }
 
 impl ToBytes for TestTx {

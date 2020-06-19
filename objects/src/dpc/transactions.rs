@@ -74,6 +74,10 @@ impl<T: Transaction> DPCTransactions<T> {
         let mut holding_memos = vec![];
 
         for tx in &self.0 {
+            if tx.network_id() != transaction.network_id() {
+                return true;
+            };
+
             holding_serial_numbers.extend(tx.old_serial_numbers());
             holding_commitments.extend(tx.new_commitments());
             holding_memos.push(tx.memorandum());

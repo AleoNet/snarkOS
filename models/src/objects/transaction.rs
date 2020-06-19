@@ -25,4 +25,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
 
     /// Returns the value balance of the transaction
     fn value_balance(&self) -> i64;
+
+    /// Returns the network_id of the transaction
+    fn network_id(&self) -> u8;
 }

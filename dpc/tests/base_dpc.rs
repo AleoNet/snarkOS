@@ -40,6 +40,9 @@ fn base_dpc_integration_test() {
     // Generate accounts
     let [genesis_account, recipient, _] = generate_test_accounts(&parameters, &mut rng);
 
+    // Specify network_id
+    let network_id: u8 = 0;
+
     // Create a genesis block
 
     let genesis_block = Block {
@@ -207,6 +210,7 @@ fn base_dpc_integration_test() {
         &new_birth_vk_and_proof_generator,
         &auxiliary,
         &memo,
+        network_id,
         &ledger,
         &mut rng,
     )
