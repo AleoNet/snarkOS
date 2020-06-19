@@ -1,9 +1,10 @@
 pub use crate::{
+    bytes::{FromBytes, ToBytes},
     io::{self, Read, Write},
     Vec,
 };
-use std::borrow::Cow;
 use snarkos_errors::serialization::SerializationError;
+use std::borrow::Cow;
 
 mod flags;
 pub use flags::*;
@@ -97,6 +98,25 @@ pub trait CanonicalDeserialize: Sized {
     }
 }
 
+impl CanonicalSerialize for bool {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        Ok(self.write(writer)?)
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        1
+    }
+}
+
+impl CanonicalDeserialize for bool {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(bool::read(reader)?)
+    }
+}
+
 impl CanonicalSerialize for String {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
@@ -155,6 +175,7 @@ impl_canonical_serialization_uint!(usize);
 impl<T: CanonicalSerialize> CanonicalSerialize for Option<T> {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.is_some().serialize(writer)?;
         if let Some(item) = self {
             item.serialize(writer)?;
         }
@@ -244,16 +265,25 @@ where
     }
 }
 
-// TODO: Is this correct? What if someone is trying to deserialize a struct with a None
 impl<T: CanonicalDeserialize> CanonicalDeserialize for Option<T> {
     #[inline]
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        Ok(Some(T::deserialize(reader)?))
+        let is_some = bool::deserialize(reader)?;
+        let data = if is_some { Some(T::deserialize(reader)?) } else { None };
+
+        Ok(data)
     }
 
     #[inline]
     fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        Ok(Some(T::deserialize_uncompressed(reader)?))
+        let is_some = bool::deserialize(reader)?;
+        let data = if is_some {
+            Some(T::deserialize_uncompressed(reader)?)
+        } else {
+            None
+        };
+
+        Ok(data)
     }
 }
 
@@ -308,6 +338,39 @@ impl<T: CanonicalDeserialize> CanonicalDeserialize for Vec<T> {
             values.push(T::deserialize_uncompressed(reader)?);
         }
         Ok(values)
+    }
+}
+
+// Same impl for slices
+impl<T: CanonicalSerialize> CanonicalSerialize for [T] {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        let len = self.len() as u64;
+        len.serialize(writer)?;
+        for item in self.iter() {
+            item.serialize(writer)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        8 + self.iter().map(|item| item.serialized_size()).sum::<usize>()
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        let len = self.len() as u64;
+        len.serialize(writer)?;
+        for item in self.iter() {
+            item.serialize_uncompressed(writer)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn uncompressed_size(&self) -> usize {
+        8 + self.iter().map(|item| item.uncompressed_size()).sum::<usize>()
     }
 }
 

@@ -181,7 +181,7 @@ pub trait AffineCurve:
     + ToBytes
     + FromBytes
     + CanonicalSerialize
-    + ConstantCanonicalSerialize
+    + ConstantSerializedSize
     + CanonicalDeserialize
     + Copy
     + Clone
