@@ -161,6 +161,36 @@ impl<T: CanonicalSerialize> CanonicalSerialize for Option<T> {
     }
 }
 
+// No-op
+impl<T> CanonicalSerialize for std::marker::PhantomData<T> {
+    #[inline]
+    fn serialize<W: Write>(&self, _writer: &mut W) -> Result<(), SerializationError> {
+        Ok(())
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(&self, _writer: &mut W) -> Result<(), SerializationError> {
+        Ok(())
+    }
+}
+
+impl<T> CanonicalDeserialize for std::marker::PhantomData<T> {
+    #[inline]
+    fn deserialize<R: Read>(_reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(std::marker::PhantomData)
+    }
+
+    #[inline]
+    fn deserialize_uncompressed<R: Read>(_reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(std::marker::PhantomData)
+    }
+}
+
 use std::borrow::Cow;
 
 impl<'a, T: CanonicalSerialize + ToOwned> CanonicalSerialize for Cow<'a, T> {
