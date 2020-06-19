@@ -125,7 +125,7 @@ impl CanonicalSerialize for String {
 
     #[inline]
     fn serialized_size(&self) -> usize {
-        self.len()
+        self.len() + 8
     }
 }
 
@@ -185,7 +185,7 @@ impl<T: CanonicalSerialize> CanonicalSerialize for Option<T> {
 
     #[inline]
     fn serialized_size(&self) -> usize {
-        if let Some(item) = self {
+        8 + if let Some(item) = self {
             item.serialized_size()
         } else {
             0
@@ -194,6 +194,7 @@ impl<T: CanonicalSerialize> CanonicalSerialize for Option<T> {
 
     #[inline]
     fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.is_some().serialize_uncompressed(writer)?;
         if let Some(item) = self {
             item.serialize_uncompressed(writer)?;
         }
@@ -341,8 +342,39 @@ impl<T: CanonicalDeserialize> CanonicalDeserialize for Vec<T> {
     }
 }
 
-// Same impl for slices
 impl<T: CanonicalSerialize> CanonicalSerialize for [T] {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        let len = self.len() as u64;
+        len.serialize(writer)?;
+        for item in self.iter() {
+            item.serialize(writer)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        8 + self.iter().map(|item| item.serialized_size()).sum::<usize>()
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        let len = self.len() as u64;
+        len.serialize(writer)?;
+        for item in self.iter() {
+            item.serialize_uncompressed(writer)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn uncompressed_size(&self) -> usize {
+        8 + self.iter().map(|item| item.uncompressed_size()).sum::<usize>()
+    }
+}
+
+impl<'a, T: CanonicalSerialize> CanonicalSerialize for &'a [T] {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
         let len = self.len() as u64;
@@ -444,23 +476,63 @@ pub const fn buffer_byte_size(modulus_bits: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::{io::Cursor, CanonicalDeserialize, CanonicalSerialize};
+    use super::*;
+
+    fn test_serialize<T: PartialEq + std::fmt::Debug + CanonicalSerialize + CanonicalDeserialize>(data: T) {
+        let mut serialized = vec![0; data.serialized_size()];
+        data.serialize(&mut &mut serialized[..]).unwrap();
+        let de = T::deserialize(&mut &serialized[..]).unwrap();
+        assert_eq!(data, de);
+    }
 
     #[test]
-    fn test_primitives() {
-        let a = 192830918u64;
-        let mut serialized = vec![0u8; a.serialized_size()];
-        let mut cursor = Cursor::new(&mut serialized[..]);
-        a.serialize(&mut cursor).unwrap();
+    fn test_vec() {
+        test_serialize(vec![1u64, 2, 3, 4, 5]);
+        test_serialize(Vec::<u64>::new());
+    }
 
-        let mut cursor = Cursor::new(&serialized[..]);
-        let b = u64::deserialize(&mut cursor).unwrap();
-        assert_eq!(a, b);
+    #[test]
+    fn test_uint() {
+        test_serialize(192830918usize);
+        test_serialize(192830918u64);
+        test_serialize(192830918u32);
+        test_serialize(22313u16);
+        test_serialize(123u8);
+    }
 
-        let a = "asdf".to_string();
-        let mut writer = vec![0; a.len() + 8];
-        CanonicalSerialize::serialize(&a, &mut &mut writer[..]).unwrap();
-        let b = String::deserialize(&mut &writer[..]).unwrap();
-        assert_eq!(a, b);
+    #[test]
+    fn test_string() {
+        test_serialize("asdf".to_owned());
+    }
+
+    #[test]
+    fn test_tuple() {
+        test_serialize((123u64, 234u32, 999u16));
+    }
+
+    #[test]
+    fn test_tuple_vec() {
+        test_serialize(vec![
+            (123u64, 234u32, 999u16),
+            (123u64, 234u32, 999u16),
+            (123u64, 234u32, 999u16),
+        ]);
+    }
+
+    #[test]
+    fn test_option() {
+        test_serialize(Some(3u32));
+        test_serialize(None::<u32>);
+    }
+
+    #[test]
+    fn test_bool() {
+        test_serialize(true);
+        test_serialize(false);
+    }
+
+    #[test]
+    fn test_phantomdata() {
+        test_serialize(std::marker::PhantomData::<u64>);
     }
 }
