@@ -2,6 +2,7 @@ pub use crate::{
     io::{self, Read, Write},
     Vec,
 };
+use std::borrow::Cow;
 use snarkos_errors::serialization::SerializationError;
 
 mod flags;
@@ -93,6 +94,25 @@ pub trait CanonicalDeserialize: Sized {
     #[inline]
     fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
         Self::deserialize(reader)
+    }
+}
+
+impl CanonicalSerialize for String {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        Ok(bincode::serialize_into(writer, self)?)
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        self.len()
+    }
+}
+
+impl CanonicalDeserialize for String {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(bincode::deserialize_from(reader)?)
     }
 }
 
@@ -190,8 +210,6 @@ impl<T> CanonicalDeserialize for std::marker::PhantomData<T> {
         Ok(std::marker::PhantomData)
     }
 }
-
-use std::borrow::Cow;
 
 impl<'a, T: CanonicalSerialize + ToOwned> CanonicalSerialize for Cow<'a, T> {
     #[inline]
@@ -374,6 +392,12 @@ mod test {
 
         let mut cursor = Cursor::new(&serialized[..]);
         let b = u64::deserialize(&mut cursor).unwrap();
+        assert_eq!(a, b);
+
+        let a = "asdf".to_string();
+        let mut writer = vec![0; a.len() + 8];
+        CanonicalSerialize::serialize(&a, &mut &mut writer[..]).unwrap();
+        let b = String::deserialize(&mut &writer[..]).unwrap();
         assert_eq!(a, b);
     }
 }

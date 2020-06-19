@@ -15,4 +15,7 @@ pub enum SerializationError {
     /// During serialization, we countered an I/O error.
     #[error("IoError: {0}")]
     IoError(#[from] io::Error),
+    /// During serialization with bincode, we encountered a serialization issue
+    #[error(transparent)]
+    BincodeError(#[from] bincode::Error),
 }

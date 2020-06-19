@@ -16,6 +16,7 @@ snarkos-derives = { path = "derives", optional = true }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
 
 rand = { version = "0.7", default-features = false }
+bincode = "1.2.1"
 
 [dev-dependencies]
 rand_xorshift = { version = "0.2", default-features = false }
