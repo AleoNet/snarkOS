@@ -209,34 +209,6 @@ impl RpcFunctions for RpcImpl {
         }
     }
 
-    /// Returns information about a record from serialized record bytes.
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
-        let record_bytes = hex::decode(record_bytes)?;
-        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
-
-        let account_public_key = hex::encode(to_bytes![record.account_public_key()]?);
-        let payload = RPCRecordPayload {
-            payload: hex::encode(to_bytes![record.payload()]?),
-        };
-        let birth_predicate_repr = hex::encode(record.birth_predicate_repr());
-        let death_predicate_repr = hex::encode(record.death_predicate_repr());
-        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
-        let commitment = hex::encode(to_bytes![record.commitment()]?);
-        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
-
-        Ok(RecordInfo {
-            account_public_key,
-            is_dummy: record.is_dummy(),
-            value: record.value(),
-            payload,
-            birth_predicate_repr,
-            death_predicate_repr,
-            serial_number_nonce,
-            commitment,
-            commitment_randomness,
-        })
-    }
-
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
@@ -281,6 +253,60 @@ impl RpcFunctions for RpcImpl {
             transactions: transaction_strings,
             coinbase_value,
         })
+    }
+
+    // Record handling
+
+    /// Returns information about a record from serialized record bytes.
+    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
+        let record_bytes = hex::decode(record_bytes)?;
+        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
+
+        let account_public_key = hex::encode(to_bytes![record.account_public_key()]?);
+        let payload = RPCRecordPayload {
+            payload: hex::encode(to_bytes![record.payload()]?),
+        };
+        let birth_predicate_repr = hex::encode(record.birth_predicate_repr());
+        let death_predicate_repr = hex::encode(record.death_predicate_repr());
+        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
+        let commitment = hex::encode(to_bytes![record.commitment()]?);
+        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
+
+        Ok(RecordInfo {
+            account_public_key,
+            is_dummy: record.is_dummy(),
+            value: record.value(),
+            payload,
+            birth_predicate_repr,
+            death_predicate_repr,
+            serial_number_nonce,
+            commitment,
+            commitment_randomness,
+        })
+    }
+
+    // TODO (raychu86) add password guarding
+
+    /// Fetch the node's stored record commitments
+    fn fetch_record_commtiments(&self) -> Result<Vec<String>, RpcError> {
+        let record_commitments = self.storage.get_record_commitments(100)?;
+        let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
+
+        Ok(record_commitment_strings)
+    }
+
+    /// Returns hex encoded bytes of a record from its record commitment
+    fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
+        match self
+            .storage
+            .get_record::<DPCRecord<Components>>(&hex::decode(record_commitment)?)?
+        {
+            Some(record) => {
+                let record_bytes = to_bytes![record]?;
+                Ok(hex::encode(record_bytes))
+            }
+            None => Ok("Record not found".to_string()),
+        }
     }
 }
 
