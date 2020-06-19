@@ -5,7 +5,7 @@
 # Generate transactions
 
 # Inputs: recipient address, amount, network_id, file_path
-cargo run --release --example generate_transaction 90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900 100 0 transaction_1.genesis
+cargo run --release --example generate_transaction 8eba7b1b4be0cd92a4bf77e812d9e48e6804b3bb3971a350105511200554130d 100 0 transaction_1.genesis
 
 mv transaction_1.genesis ../src/genesis/transaction_1
 
