@@ -132,6 +132,83 @@ impl_canonical_serialization_uint!(u32);
 impl_canonical_serialization_uint!(u64);
 impl_canonical_serialization_uint!(usize);
 
+impl<T: CanonicalSerialize> CanonicalSerialize for Option<T> {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        if let Some(item) = self {
+            item.serialize(writer)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        if let Some(item) = self {
+            item.serialized_size()
+        } else {
+            0
+        }
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        if let Some(item) = self {
+            item.serialize_uncompressed(writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+use std::borrow::Cow;
+
+impl<'a, T: CanonicalSerialize + ToOwned> CanonicalSerialize for Cow<'a, T> {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.as_ref().serialize(writer)
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        self.as_ref().serialized_size()
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.as_ref().serialize_uncompressed(writer)
+    }
+}
+
+impl<'a, T> CanonicalDeserialize for Cow<'a, T>
+where
+    T: ToOwned,
+    <T as ToOwned>::Owned: CanonicalDeserialize,
+{
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Cow::Owned(<T as ToOwned>::Owned::deserialize(reader)?))
+    }
+
+    #[inline]
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Cow::Owned(<T as ToOwned>::Owned::deserialize_uncompressed(reader)?))
+    }
+}
+
+// TODO: Is this correct? What if someone is trying to deserialize a struct with a None
+impl<T: CanonicalDeserialize> CanonicalDeserialize for Option<T> {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Some(T::deserialize(reader)?))
+    }
+
+    #[inline]
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        Ok(Some(T::deserialize_uncompressed(reader)?))
+    }
+}
+
 impl<T: CanonicalSerialize> CanonicalSerialize for Vec<T> {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
