@@ -1,8 +1,10 @@
 use crate::curves::{Field, Group, PrimeField, SquareRootField};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_utilities::{
     biginteger::BigInteger,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use std::{
@@ -94,6 +96,9 @@ pub trait ProjectiveCurve:
     + Sized
     + ToBytes
     + FromBytes
+    + CanonicalSerialize
+    + ConstantSerializedSize
+    + CanonicalDeserialize
     + Copy
     + Clone
     + Default
@@ -176,6 +181,9 @@ pub trait AffineCurve:
     + Sized
     + ToBytes
     + FromBytes
+    + CanonicalSerialize
+    + CanonicalSerialize
+    + CanonicalDeserialize
     + Copy
     + Clone
     + Default
