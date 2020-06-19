@@ -1,5 +1,4 @@
 use crate::curves::{Field, Group, PrimeField, SquareRootField};
-use snarkos_errors::serialization::SerializationError;
 use snarkos_utilities::{
     biginteger::BigInteger,
     bytes::{FromBytes, ToBytes},
@@ -182,7 +181,7 @@ pub trait AffineCurve:
     + ToBytes
     + FromBytes
     + CanonicalSerialize
-    + CanonicalSerialize
+    + ConstantCanonicalSerialize
     + CanonicalDeserialize
     + Copy
     + Clone
@@ -251,7 +250,7 @@ pub trait AffineCurve:
 
 pub trait PairingCurve: AffineCurve {
     type Engine: PairingEngine<Fr = Self::ScalarField>;
-    type Prepared: ToBytes + Default + Clone + Send + Sync + Debug + 'static;
+    type Prepared: CanonicalSerialize + CanonicalDeserialize + ToBytes + Default + Clone + Send + Sync + Debug + 'static;
     type PairWith: PairingCurve<PairWith = Self>;
     type PairingResult: Field;
 

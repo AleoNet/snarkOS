@@ -3,14 +3,15 @@ use crate::templates::{
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
 use snarkos_models::curves::{pairing_engine::AffineCurve, Zero};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{serialize::*, bytes::ToBytes};
+use snarkos_errors::serialization::SerializationError;
 
 use std::io::{Result as IoResult, Write};
 
 pub type G1Affine<P> = GroupAffine<<P as BW6Parameters>::G1Parameters>;
 pub type G1Projective<P> = GroupProjective<<P as BW6Parameters>::G1Parameters>;
 
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
     Clone(bound = "P: BW6Parameters"),
     Debug(bound = "P: BW6Parameters"),
