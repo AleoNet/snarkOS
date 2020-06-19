@@ -96,31 +96,41 @@ pub trait CanonicalDeserialize: Sized {
     }
 }
 
-impl CanonicalSerialize for u64 {
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
-        Ok(writer.write_all(&self.to_le_bytes())?)
-    }
+macro_rules! impl_canonical_serialization_uint {
+    ($type:ty) => {
+        impl CanonicalSerialize for $type {
+            #[inline]
+            fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+                Ok(writer.write_all(&self.to_le_bytes())?)
+            }
 
-    #[inline]
-    fn serialized_size(&self) -> usize {
-        Self::SERIALIZED_SIZE
-    }
+            #[inline]
+            fn serialized_size(&self) -> usize {
+                Self::SERIALIZED_SIZE
+            }
+        }
+
+        impl ConstantSerializedSize for $type {
+            const SERIALIZED_SIZE: usize = std::mem::size_of::<$type>();
+            const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
+        }
+
+        impl CanonicalDeserialize for $type {
+            #[inline]
+            fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+                let mut bytes = [0u8; Self::SERIALIZED_SIZE];
+                reader.read_exact(&mut bytes)?;
+                Ok(<$type>::from_le_bytes(bytes))
+            }
+        }
+    };
 }
 
-impl ConstantSerializedSize for u64 {
-    const SERIALIZED_SIZE: usize = 8;
-    const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
-}
-
-impl CanonicalDeserialize for u64 {
-    #[inline]
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
-        let mut bytes = [0u8; 8];
-        reader.read_exact(&mut bytes)?;
-        Ok(u64::from_le_bytes(bytes))
-    }
-}
+impl_canonical_serialization_uint!(u8);
+impl_canonical_serialization_uint!(u16);
+impl_canonical_serialization_uint!(u32);
+impl_canonical_serialization_uint!(u64);
+impl_canonical_serialization_uint!(usize);
 
 impl<T: CanonicalSerialize> CanonicalSerialize for Vec<T> {
     #[inline]
@@ -173,6 +183,60 @@ impl<T: CanonicalDeserialize> CanonicalDeserialize for Vec<T> {
             values.push(T::deserialize_uncompressed(reader)?);
         }
         Ok(values)
+    }
+}
+
+// TODO: Maybe make this a macro for bigger tuples
+impl<A, B> CanonicalSerialize for (A, B)
+where
+    A: CanonicalSerialize,
+    B: CanonicalSerialize,
+{
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.0.serialize(writer)?;
+        self.1.serialize(writer)?;
+
+        Ok(())
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        self.0.serialized_size() + self.1.serialized_size()
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        self.0.serialize_uncompressed(writer)?;
+        self.1.serialize_uncompressed(writer)?;
+
+        Ok(())
+    }
+
+    #[inline]
+    fn uncompressed_size(&self) -> usize {
+        self.0.uncompressed_size() + self.1.uncompressed_size()
+    }
+}
+
+// TODO: Maybe make this a macro for bigger tuples
+impl<A, B> CanonicalDeserialize for (A, B)
+where
+    A: CanonicalDeserialize,
+    B: CanonicalDeserialize,
+{
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        let a = A::deserialize(reader)?;
+        let b = B::deserialize(reader)?;
+        Ok((a, b))
+    }
+
+    #[inline]
+    fn deserialize_uncompressed<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        let a = A::deserialize_uncompressed(reader)?;
+        let b = B::deserialize_uncompressed(reader)?;
+        Ok((a, b))
     }
 }
 
