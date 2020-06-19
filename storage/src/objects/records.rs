@@ -7,6 +7,21 @@ use snarkos_utilities::{
 };
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+    /// Get all stored record commitments of the node
+    pub fn get_record_commitments(&self, limit: usize) -> Result<Vec<Vec<u8>>, StorageError> {
+        let mut record_commitments = vec![];
+
+        for (commitment_key, _record) in self.storage.get_iter(COL_RECORDS)? {
+            if record_commitments.len() >= limit {
+                break;
+            }
+
+            record_commitments.push(commitment_key.to_vec());
+        }
+
+        Ok(record_commitments)
+    }
+
     /// Get a transaction bytes given the transaction id.
     pub fn get_record<R: Record>(&self, record_commitment: &Vec<u8>) -> Result<Option<R>, StorageError> {
         match self.storage.get(COL_RECORDS, &record_commitment)? {
