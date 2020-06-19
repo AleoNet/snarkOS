@@ -2351,6 +2351,7 @@ dependencies = [
  "jsonrpc-derive",
  "jsonrpc-http-server",
  "jsonrpc-test",
+ "rand",
  "serde",
  "serde_json",
  "snarkos-consensus",

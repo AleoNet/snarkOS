@@ -143,3 +143,24 @@ pub struct BlockTemplate {
     /// Amount spendable by the coinbase transaction (block rewards + transaction fees)
     pub coinbase_value: u64,
 }
+
+/// Input for the `createrawtransaction` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionInputs {
+    pub old_records: Vec<String>,
+    pub old_account_private_keys: Vec<String>,
+    //    pub new_birth_predicates: Vec<String>,
+    //    pub new_death_predicates: Vec<String>,
+    //    pub new_payloads: Vec<String>,
+    pub recipients: Vec<TransactionRecipient>,
+    pub auxiliary: Option<String>,
+    pub memo: Option<String>,
+    pub network_id: u8,
+}
+
+/// Recipient used in
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionRecipient {
+    pub address: String,
+    pub amount: u64,
+}

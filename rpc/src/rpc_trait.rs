@@ -23,6 +23,9 @@ pub trait RpcFunctions {
     #[rpc(name = "gettransactioninfo")]
     fn get_transaction_info(&self, transaction_id: String) -> Result<TransactionInfo, RpcError>;
 
+    #[rpc(name = "createrawtransaction")]
+    fn create_raw_transaction(&self, transaction_input: TransactionInputs) -> Result<(String, Vec<String>), RpcError>;
+
     #[rpc(name = "decoderawtransaction")]
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError>;
 
