@@ -175,7 +175,7 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
-        match self.storage.transcation_conflicts(&transaction) {
+        match !self.storage.transcation_conflicts(&transaction) {
             true => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
