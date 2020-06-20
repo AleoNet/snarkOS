@@ -176,7 +176,7 @@ impl RpcFunctions for RpcImpl {
         let transaction = Tx::read(&transaction_bytes[..])?;
 
         match self.storage.transcation_conflicts(&transaction) {
-            Ok(_) => {
+            true => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
                     self.storage.clone(),
@@ -187,7 +187,7 @@ impl RpcFunctions for RpcImpl {
 
                 Ok(hex::encode(transaction.transaction_id()?))
             }
-            Err(_) => Ok("Transaction contains spent records".into()),
+            false => Ok("Transaction contains spent records".into()),
         }
     }
 

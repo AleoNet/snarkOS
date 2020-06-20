@@ -7,7 +7,7 @@ use snarkos_models::{
     objects::{LedgerScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkos_objects::Block;
 use snarkos_parameters::{GenesisBlock, LedgerMerkleTreeParameters};
 use snarkos_utilities::bytes::FromBytes;
 
@@ -56,6 +56,21 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Get the latest number of blocks in the chain.
     pub fn get_block_count(&self) -> u32 {
         *self.latest_block_height.read() + 1
+    }
+
+    /// Get the stored old connected peers.
+    pub fn get_peer_book(&self) -> Result<Vec<u8>, StorageError> {
+        Ok(self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())?)
+    }
+
+    /// Store the connected peers.
+    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+        let op = Op::Insert {
+            col: COL_META,
+            key: KEY_PEER_BOOK.as_bytes().to_vec(),
+            value: peers_serialized,
+        };
+        self.storage.write(DatabaseTransaction(vec![op]))
     }
 
     /// Destroy the storage given a path.
@@ -120,37 +135,5 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
             Some(data) => Ok(data),
             None => Err(StorageError::MissingValue(hex::encode(key))),
         }
-    }
-
-    // KEY VALUE GETTERS ===========================================================================
-
-    /// Get the stored memory pool transactions.
-    pub fn get_memory_pool(&self) -> Result<Vec<u8>, StorageError> {
-        Ok(self.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())?)
-    }
-
-    /// Store the memory pool transactions.
-    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
-        let op = Op::Insert {
-            col: COL_META,
-            key: KEY_MEMORY_POOL.as_bytes().to_vec(),
-            value: transactions_serialized,
-        };
-        self.storage.write(DatabaseTransaction(vec![op]))
-    }
-
-    /// Get the stored old connected peers.
-    pub fn get_peer_book(&self) -> Result<Vec<u8>, StorageError> {
-        Ok(self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())?)
-    }
-
-    /// Store the connected peers.
-    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
-        let op = Op::Insert {
-            col: COL_META,
-            key: KEY_PEER_BOOK.as_bytes().to_vec(),
-            value: peers_serialized,
-        };
-        self.storage.write(DatabaseTransaction(vec![op]))
     }
 }

@@ -202,7 +202,7 @@ impl<T: Transaction> MemoryPool<T> {
         // TODO Change naive transaction selection
         for (_transaction_id, entry) in self.transactions.clone() {
             if block_size + entry.size <= max_size {
-                if storage.transcation_conflicts(&entry.transaction)? || transactions.conflicts(&entry.transaction) {
+                if storage.transcation_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
                     continue;
                 }
 

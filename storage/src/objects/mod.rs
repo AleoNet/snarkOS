@@ -17,6 +17,9 @@ pub use self::insert_commit::*;
 pub mod ledger_scheme;
 pub use self::ledger_scheme::*;
 
+pub mod memory_pool;
+pub use self::memory_pool::*;
+
 pub mod records;
 pub use self::records::*;
 

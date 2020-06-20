@@ -34,37 +34,40 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     }
 
     /// Returns true if the transaction has internal parameters that already exist in the ledger.
-    pub fn transcation_conflicts(&self, transaction: &T) -> Result<bool, StorageError> {
+    pub fn transcation_conflicts(&self, transaction: &T) -> bool {
         let transaction_serial_numbers = transaction.old_serial_numbers();
         let transaction_commitments = transaction.new_commitments();
         let transaction_memo = transaction.memorandum();
 
         // Check if the transactions in the block have duplicate serial numbers
         if has_duplicates(transaction_serial_numbers) {
-            return Ok(true);
+            return true;
         }
 
         // Check if the transactions in the block have duplicate commitments
         if has_duplicates(transaction_commitments) {
-            return Ok(true);
+            return true;
         }
 
+        // Check if the transaction memo previously existed in the ledger
         if self.contains_memo(transaction_memo) {
-            return Ok(true);
+            return true;
         }
 
+        // Check if each transaction serial number previously existed in the ledger
         for sn in transaction_serial_numbers {
             if self.contains_sn(sn) {
-                return Ok(true);
+                return true;
             }
         }
 
+        // Check if each transaction commitment previously existed in the ledger
         for cm in transaction_commitments {
             if self.contains_cm(cm) {
-                return Ok(true);
+                return true;
             }
         }
 
-        Ok(false)
+        false
     }
 }
