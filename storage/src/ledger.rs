@@ -189,11 +189,24 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         }
     }
 
-    /// Get a transaction given the transaction id.
-    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Result<Option<T>, StorageError> {
+    /// Get a transaction location the transaction id.
+    pub fn get_transaction_location(
+        &self,
+        transaction_id: &Vec<u8>,
+    ) -> Result<Option<TransactionLocation>, StorageError> {
         match self.storage.get(COL_TRANSACTION_LOCATION, &transaction_id)? {
             Some(transaction_locator) => {
                 let transaction_location = TransactionLocation::read(&transaction_locator[..])?;
+                Ok(Some(transaction_location))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get a transaction given the transaction id.
+    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Result<Option<T>, StorageError> {
+        match self.get_transaction_location(&transaction_id)? {
+            Some(transaction_location) => {
                 let block_transactions =
                     self.get_block_transactions(&BlockHeaderHash(transaction_location.block_hash))?;
                 Ok(Some(block_transactions.0[transaction_location.index as usize].clone()))
