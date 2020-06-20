@@ -5,14 +5,14 @@ printf "\nParameter generation starting...\n\n"
 
 # Generate parameters
 
-../parameters/scripts/parameters_setup.sh
+./parameters/scripts/parameters_setup.sh
 
 # Generate genesis block
 
-../parameters/scripts/genesis_block_setup.sh
+./parameters/scripts/genesis_block_setup.sh
 
 # Generate test data
 
-../testing/scripts/generate_test_data.sh
+./testing/scripts/generate_test_data.sh
 
 printf "\nParameter generation completed.\n\n"
