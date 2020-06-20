@@ -139,7 +139,7 @@ impl Miner {
             .mine(
                 &subroots,
                 difficulty_target,
-                &mut rand::thread_rng(),
+                &mut thread_rng(),
                 self.consensus.max_nonce,
             )
             .unwrap();

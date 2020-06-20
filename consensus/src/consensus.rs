@@ -116,7 +116,7 @@ impl ConsensusParameters {
         let hash_result = header.to_difficulty_hash();
 
         let now = Utc::now().timestamp();
-        let future_timelimit: i64 = now as i64 + TWO_HOURS_UNIX;
+        let future_timelimit: i64 = now + TWO_HOURS_UNIX;
         let expected_difficulty = self.get_block_difficulty(parent_header, header.time);
 
         if parent_header.get_hash() != header.previous_block_hash {
@@ -603,7 +603,7 @@ mod tests {
 
         // far in the future block
         let mut h2_err = h2.clone();
-        h2_err.time = Utc::now().timestamp() as i64 + 7201;
+        h2_err.time = Utc::now().timestamp() + 7201;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
