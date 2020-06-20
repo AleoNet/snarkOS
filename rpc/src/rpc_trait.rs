@@ -41,3 +41,14 @@ pub trait RpcFunctions {
     #[rpc(name = "decoderecord")]
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 }
+
+pub trait GuardedRpcFunctions {
+    fn create_raw_transaction(
+        &self,
+        transaction_input: TransactionInputs,
+    ) -> Result<CreateRawTransactionOuput, RpcError>;
+
+    fn fetch_record_commtiments(&self) -> Result<Vec<String>, RpcError>;
+
+    fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
+}

@@ -1,4 +1,4 @@
-use crate::{rpc_types::*, RpcImpl};
+use crate::{rpc_trait::GuardedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_consensus::ConsensusParameters;
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, InstantiatedDPC, Predicate},
@@ -94,7 +94,7 @@ impl RpcImpl {
     }
 }
 
-impl RpcImpl {
+impl GuardedRpcFunctions for RpcImpl {
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
