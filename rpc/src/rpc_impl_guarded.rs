@@ -22,25 +22,24 @@ use std::sync::Arc;
 type JsonrpcError = jsonrpc_core::Error;
 
 impl RpcImpl {
-    pub fn validate_auth(&self, meta: Meta) -> bool {
-        match &self.credentials {
-            Some(credentials) => {
-                let auth = meta.auth.unwrap_or_else(String::new);
-                let basic_auth_encoding = format!(
-                    "Basic {}",
-                    base64::encode(format!("{}:{}", credentials.username, credentials.password))
-                );
+    pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonrpcError> {
+        if let Some(credentials) = &self.credentials {
+            let auth = meta.auth.unwrap_or_else(String::new);
+            let basic_auth_encoding = format!(
+                "Basic {}",
+                base64::encode(format!("{}:{}", credentials.username, credentials.password))
+            );
 
-                basic_auth_encoding == auth
+            if basic_auth_encoding != auth {
+                return Err(JsonrpcError::invalid_params("Authentication Error"));
             }
-            None => true,
         }
+
+        Ok(())
     }
 
     pub fn create_raw_transaction_guarded(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        if !self.validate_auth(meta) {
-            return Err(JsonrpcError::invalid_params("Authentication Error"));
-        }
+        self.validate_auth(meta)?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -53,9 +52,7 @@ impl RpcImpl {
     }
 
     pub fn fetch_record_commitments_guarded(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        if !self.validate_auth(meta) {
-            return Err(JsonrpcError::invalid_params("Authentication Error"));
-        }
+        self.validate_auth(meta)?;
 
         params.expect_no_params()?;
 
@@ -63,9 +60,7 @@ impl RpcImpl {
     }
 
     pub fn get_raw_record_guarded(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        if !self.validate_auth(meta) {
-            return Err(JsonrpcError::invalid_params("Authentication Error"));
-        }
+        self.validate_auth(meta)?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -86,6 +81,7 @@ impl RpcImpl {
 
     pub fn add_guarded(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
+
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_guarded);
         d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_guarded);
         d.add_method_with_meta("getrawrecord", Self::get_raw_record_guarded);

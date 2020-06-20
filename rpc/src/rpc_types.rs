@@ -97,6 +97,9 @@ pub struct TransactionInfo {
 
     /// Transaction signatures (Delegated DPC)
     pub signatures: Vec<String>,
+
+    /// Block the transaction lives in
+    pub block_number: Option<u32>,
 }
 
 /// Record payload
