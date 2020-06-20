@@ -1,3 +1,4 @@
+/// Test unguarded rpc endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
     use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
@@ -38,6 +39,7 @@ mod rpc_tests {
                 server.context.clone(),
                 consensus,
                 server.memory_pool_lock,
+                None,
             )
             .to_delegate(),
         )
