@@ -42,13 +42,16 @@ pub trait RpcFunctions {
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 }
 
-pub trait GuardedRpcFunctions {
+pub trait ProtectedRpcFunctions {
+    /// Create a transaction and return encoded transaction and output records
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError>;
 
-    fn fetch_record_commtiments(&self) -> Result<Vec<String>, RpcError>;
+    /// Fetch the node's stored record commitments
+    fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError>;
 
+    /// Returns hex encoded bytes of a record from its record commitment
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 }

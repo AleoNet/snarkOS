@@ -165,21 +165,36 @@ pub struct BlockTemplate {
 /// Input for the `createrawtransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionInputs {
+    /// Encoded records that are being spent
     pub old_records: Vec<String>,
+
+    /// Account private keys owning the spent records
     pub old_account_private_keys: Vec<String>,
+
+    /// Transaction recipent and amounts
+    pub recipients: Vec<TransactionRecipient>,
+
+    /// Transaction auxiliary
+    pub auxiliary: Option<String>,
+
+    /// Transaction memo
+    pub memo: Option<String>,
+
+    /// Network id of the transaction
+    pub network_id: u8,
+    // Attributes that will be relevant for custom predicates
     //    pub new_birth_predicates: Vec<String>,
     //    pub new_death_predicates: Vec<String>,
     //    pub new_payloads: Vec<String>,
-    pub recipients: Vec<TransactionRecipient>,
-    pub auxiliary: Option<String>,
-    pub memo: Option<String>,
-    pub network_id: u8,
 }
 
-/// Recipient used in
+/// Recipient of a transaction
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionRecipient {
+    /// Recipient account public key
     pub address: String,
+
+    /// Amount being sent
     pub amount: u64,
 }
 

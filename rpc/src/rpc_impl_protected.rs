@@ -1,4 +1,4 @@
-use crate::{rpc_trait::GuardedRpcFunctions, rpc_types::*, RpcImpl};
+use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_consensus::ConsensusParameters;
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, InstantiatedDPC, Predicate},
@@ -22,6 +22,7 @@ use std::sync::Arc;
 type JsonrpcError = jsonrpc_core::Error;
 
 impl RpcImpl {
+    /// Validate the authentication header in the request metadata
     pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonrpcError> {
         if let Some(credentials) = &self.credentials {
             let auth = meta.auth.unwrap_or_else(String::new);
@@ -38,6 +39,10 @@ impl RpcImpl {
         Ok(())
     }
 
+    /// The following `*_protected` functions wrap an authentication check around sensitive functions
+    /// before being exposed as an RPC endpoint
+
+    /// Wrap authentication around `create_raw_transaction`
     pub fn create_raw_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
@@ -51,14 +56,16 @@ impl RpcImpl {
         Ok(serde_json::to_value(self.create_raw_transaction(val).unwrap()).unwrap())
     }
 
+    /// Wrap authentication around `fetch_record_commitments`
     pub fn fetch_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
 
-        Ok(Value::from(self.fetch_record_commtiments().unwrap()))
+        Ok(Value::from(self.fetch_record_commitments().unwrap()))
     }
 
+    /// Wrap authentication around `get_raw_record`
     pub fn get_raw_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
@@ -79,6 +86,7 @@ impl RpcImpl {
         Ok(Value::from(self.get_raw_record(record_commitment).unwrap()))
     }
 
+    /// Expose the protected functions as RPC enpoints
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
@@ -90,7 +98,10 @@ impl RpcImpl {
     }
 }
 
-impl GuardedRpcFunctions for RpcImpl {
+/// Functions that are sensitive and need to be protected with authentication.
+/// The authentication logic is defined in `validate_auth`
+impl ProtectedRpcFunctions for RpcImpl {
+    /// Create a transaction and return encoded transaction and output records
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
@@ -234,7 +245,7 @@ impl GuardedRpcFunctions for RpcImpl {
     }
 
     /// Fetch the node's stored record commitments
-    fn fetch_record_commtiments(&self) -> Result<Vec<String>, RpcError> {
+    fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError> {
         let record_commitments = self.storage.get_record_commitments(100)?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
 
