@@ -117,7 +117,6 @@ fn test_execute_base_dpc_constraints() {
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let auxiliary = [0u8; 32];
     let memo = [0u8; 32];
 
     let context = DPC::execute_helper(
@@ -131,7 +130,6 @@ fn test_execute_base_dpc_constraints() {
         &new_birth_predicates,
         &new_death_predicates,
         &memo,
-        &auxiliary,
         network_id,
         &ledger,
         &mut rng,
@@ -303,7 +301,6 @@ fn test_execute_base_dpc_constraints() {
         &local_data_comm,
         &local_data_rand,
         &memo,
-        &auxiliary,
         &old_value_commits,
         &old_value_commit_randomness,
         &new_value_commits,
@@ -356,7 +353,6 @@ fn test_execute_base_dpc_constraints() {
             &local_data_comm,
             &local_data_rand,
             &memo,
-            &auxiliary,
             &old_value_commits,
             &old_value_commit_randomness,
             &new_value_commits,

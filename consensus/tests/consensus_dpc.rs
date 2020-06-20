@@ -63,9 +63,8 @@ mod consensus_dpc {
         let new_values = vec![10; NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
-        // Memo + Aux are dummies for now
+        // Memo is a dummy for now
 
-        let auxiliary = [5u8; 32];
         let memo = [6u8; 32];
 
         println!("Create a payment transaction");
@@ -80,7 +79,6 @@ mod consensus_dpc {
             new_dummy_flags,
             new_values,
             new_payloads,
-            auxiliary,
             memo,
             network_id,
             &ledger,

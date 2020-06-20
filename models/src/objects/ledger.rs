@@ -6,7 +6,6 @@ use std::path::PathBuf;
 pub trait LedgerScheme: Sized {
     type Block: BlockScheme;
     type Commitment;
-    type Memo;
     type MerkleParameters;
     type MerklePath;
     type MerkleTreeDigest;
@@ -35,8 +34,8 @@ pub trait LedgerScheme: Sized {
     /// Returns true if the given serial number exists in the ledger.
     fn contains_sn(&self, sn: &Self::SerialNumber) -> bool;
 
-    /// Returns true if the given memo exists in the ledger.
-    fn contains_memo(&self, memo: &Self::Memo) -> bool;
+    /// Returns true if the given memorandum exists in the ledger.
+    fn contains_memo(&self, memo: &<Self::Transaction as Transaction>::Memorandum) -> bool;
 
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
