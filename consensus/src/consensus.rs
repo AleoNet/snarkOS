@@ -448,7 +448,6 @@ impl ConsensusParameters {
                     &mut rng,
                 )
                 .expect("Proving should work");
-                #[cfg(debug_assertions)]
                 {
                     let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
@@ -492,7 +491,6 @@ impl ConsensusParameters {
                     &mut rng,
                 )
                 .expect("Proving should work");
-                #[cfg(debug_assertions)]
                 {
                     let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
