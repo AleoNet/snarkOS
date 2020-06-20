@@ -99,6 +99,8 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             server.context.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
+            config.rpc_username,
+            config.rpc_password,
         )
         .await?;
     }

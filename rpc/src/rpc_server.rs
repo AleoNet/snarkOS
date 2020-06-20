@@ -24,14 +24,14 @@ pub async fn start_rpc_server(
     server_context: Arc<Context>,
     consensus: ConsensusParameters,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    //    username: Option<String>,
-    //    password: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse()?;
 
-    let credentials = RpcCredentials {
-        username: "username".to_string(),
-        password: "password".to_string(),
+    let credentials = match (username, password) {
+        (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
+        _ => None,
     };
 
     let rpc_impl = RpcImpl::new(
@@ -40,7 +40,7 @@ pub async fn start_rpc_server(
         server_context,
         consensus,
         memory_pool_lock,
-        Some(credentials),
+        credentials,
     );
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
