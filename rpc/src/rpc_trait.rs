@@ -23,9 +23,6 @@ pub trait RpcFunctions {
     #[rpc(name = "gettransactioninfo")]
     fn get_transaction_info(&self, transaction_id: String) -> Result<TransactionInfo, RpcError>;
 
-    #[rpc(name = "createrawtransaction")]
-    fn create_raw_transaction(&self, transaction_input: TransactionInputs) -> Result<(String, Vec<String>), RpcError>;
-
     #[rpc(name = "decoderawtransaction")]
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError>;
 
@@ -41,14 +38,6 @@ pub trait RpcFunctions {
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
 
-    // Record access
-
     #[rpc(name = "decoderecord")]
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
-
-    #[rpc(name = "fetchrecordcommitments")]
-    fn fetch_record_commtiments(&self) -> Result<Vec<String>, RpcError>;
-
-    #[rpc(name = "getrawrecord")]
-    fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 }
