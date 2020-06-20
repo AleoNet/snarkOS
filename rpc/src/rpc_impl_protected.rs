@@ -140,7 +140,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_account_private_keys.push(AccountPrivateKey::<Components>::read(&private_key_bytes[..])?);
         }
 
-        // Fill with dummy records
+        // Fill any unused old_record indices with dummy records
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
                 .parameters
@@ -184,7 +184,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values.push(recipient.amount);
         }
 
-        // Fill dummy output values
+        // Fill any unused new_record indices with dummy output values
         while new_account_public_keys.len() < Components::NUM_OUTPUT_RECORDS {
             new_account_public_keys.push(new_account_public_keys[0].clone());
             new_dummy_flags.push(true);
