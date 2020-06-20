@@ -166,8 +166,17 @@ impl RpcFunctions for RpcImpl {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
 
+        let transaction_id = transaction.transaction_id()?;
+        let block_number = match self.storage.get_transaction_location(&transaction_id.to_vec())? {
+            Some(block_location) => Some(
+                self.storage
+                    .get_block_num(&BlockHeaderHash(block_location.block_hash))?,
+            ),
+            None => None,
+        };
+
         Ok(TransactionInfo {
-            txid: hex::encode(&transaction.transaction_id()?),
+            txid: hex::encode(&transaction_id),
             size: transaction_bytes.len(),
             old_serial_numbers,
             new_commitments,
@@ -178,6 +187,7 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
+            block_number,
         })
     }
 
