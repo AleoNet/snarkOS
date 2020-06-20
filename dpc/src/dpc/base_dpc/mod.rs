@@ -347,7 +347,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         new_death_predicates: &[<Self as DPCScheme<L>>::Predicate],
 
         memo: &[u8; 32],
-        auxiliary: &[u8; 32],
         network_id: u8,
 
         ledger: &L,
@@ -475,7 +474,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             predicate_input.extend_from_slice(&bytes);
         }
         predicate_input.extend_from_slice(memo);
-        predicate_input.extend_from_slice(auxiliary);
         predicate_input.push(network_id);
 
         let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -546,7 +544,6 @@ where
     >,
 {
     type Account = Account<Components>;
-    type Auxiliary = [u8; 32];
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
@@ -645,7 +642,6 @@ where
         new_death_predicates: &[Self::Predicate],
         mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         ledger: &L,
@@ -663,7 +659,6 @@ where
             new_birth_predicates,
             new_death_predicates,
             memorandum,
-            auxiliary,
             network_id,
             ledger,
             rng,
@@ -780,7 +775,6 @@ where
                 &local_data_commitment,
                 &local_data_randomness,
                 memorandum,
-                auxiliary,
                 &old_value_commits,
                 &old_value_commit_randomness,
                 &new_value_commits,

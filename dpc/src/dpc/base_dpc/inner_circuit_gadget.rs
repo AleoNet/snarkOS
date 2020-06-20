@@ -51,7 +51,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     local_data_randomness: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
     memo: &[u8; 32],
-    auxiliary: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
     input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -97,7 +96,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         local_data_commitment,
         local_data_randomness,
         memo,
-        auxiliary,
         input_value_commitments,
         input_value_commitment_randomness,
         output_value_commitments,
@@ -150,7 +148,6 @@ fn base_dpc_execute_gadget_helper<
     local_data_comm: &LocalDataCommitment::Output,
     local_data_rand: &LocalDataCommitment::Randomness,
     memo: &[u8; 32],
-    auxiliary: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
     input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -822,9 +819,6 @@ where
         }
         let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
         local_data_bytes.extend_from_slice(&memo);
-
-        let auxiliary = UInt8::alloc_vec(cs.ns(|| "Allocate auxiliary input"), auxiliary)?;
-        local_data_bytes.extend_from_slice(&auxiliary);
 
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
         local_data_bytes.extend_from_slice(&network_id);
