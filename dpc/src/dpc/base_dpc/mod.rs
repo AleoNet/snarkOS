@@ -11,6 +11,7 @@ use snarkos_models::{
 use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    has_duplicates,
     rand::UniformRand,
     to_bytes,
 };
@@ -359,6 +360,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             MerklePath = MerklePath<Components::MerkleParameters>,
             MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
             SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
+            Transaction = DPCTransaction<Components>,
         >,
     {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
@@ -540,6 +542,7 @@ where
         MerklePath = MerklePath<Components::MerkleParameters>,
         MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
         SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
+        Transaction = DPCTransaction<Components>,
     >,
 {
     type Account = Account<Components>;
@@ -876,29 +879,49 @@ where
 
     fn verify(parameters: &Self::Parameters, transaction: &Self::Transaction, ledger: &L) -> Result<bool, DPCError> {
         let verify_time = start_timer!(|| "BaseDPC::verify");
+
+        // Returns false if there are duplicate serial numbers in the transaction.
+        if has_duplicates(transaction.old_serial_numbers().iter()) {
+            eprintln!("Transaction contains duplicate serial numbers");
+            return Ok(false);
+        }
+
+        // Returns false if there are duplicate serial numbers in the transaction.
+        if has_duplicates(transaction.new_commitments().iter()) {
+            eprintln!("Transaction contains duplicate commitments");
+            return Ok(false);
+        }
+
         let ledger_time = start_timer!(|| "Ledger checks");
+
+        // Returns false if the transaction memo previously existed in the ledger.
+        if ledger.contains_memo(transaction.memorandum()) {
+            eprintln!("Ledger already contains this transaction memo.");
+            return Ok(false);
+        }
+
+        // Returns false if any transaction serial number previously existed in the ledger.
         for sn in transaction.old_serial_numbers() {
             if ledger.contains_sn(sn) {
-                eprintln!("Ledger contains this serial number already.");
+                eprintln!("Ledger already contains this transaction serial number.");
                 return Ok(false);
             }
         }
 
-        // This is quadratic, but doesn't really matter.
-        for (i, sn_i) in transaction.old_serial_numbers().iter().enumerate() {
-            for (j, sn_j) in transaction.old_serial_numbers().iter().enumerate() {
-                if i != j && sn_i == sn_j {
-                    eprintln!("Transaction contains duplicate serial numbers");
-                    return Ok(false);
-                }
+        // Returns false if any transaction commitment previously existed in the ledger.
+        for cm in transaction.new_commitments() {
+            if ledger.contains_cm(cm) {
+                eprintln!("Ledger already contains this transaction commitment.");
+                return Ok(false);
             }
         }
 
-        // Check that the record commitment digest is valid.
+        // Returns false if the ledger digest in the transaction is invalid.
         if !ledger.validate_digest(&transaction.digest) {
             eprintln!("Ledger digest is invalid.");
             return Ok(false);
         }
+
         end_timer!(ledger_time);
 
         let inner_snark_input = InnerCircuitVerifierInput {
@@ -928,6 +951,8 @@ where
             return Ok(false);
         }
 
+        let signature_time = start_timer!(|| "Signature checks");
+
         let signature_message = &to_bytes![
             transaction.old_serial_numbers(),
             transaction.new_commitments(),
@@ -936,7 +961,6 @@ where
             transaction.transaction_proof
         ]?;
 
-        let sig_time = start_timer!(|| "Signature verification (in parallel)");
         let account_signature = &parameters.circuit_parameters.account_signature;
         for (pk, sig) in transaction.old_serial_numbers().iter().zip(&transaction.signatures) {
             if !Components::AccountSignature::verify(account_signature, pk, signature_message, sig)? {
@@ -944,9 +968,11 @@ where
                 return Ok(false);
             }
         }
-        end_timer!(sig_time);
+
+        end_timer!(signature_time);
 
         end_timer!(verify_time);
+
         Ok(true)
     }
 

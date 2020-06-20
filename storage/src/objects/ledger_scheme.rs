@@ -17,7 +17,6 @@ use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
-    type Memo = T::Memorandum;
     type MerkleParameters = P;
     type MerklePath = MerklePath<Self::MerkleParameters>;
     type MerkleTreeDigest = MerkleTreeDigest<Self::MerkleParameters>;
@@ -90,7 +89,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     }
 
     /// Returns true if the given memo exists in the ledger.
-    fn contains_memo(&self, memo: &Self::Memo) -> bool {
+    fn contains_memo(&self, memo: &<Self::Transaction as Transaction>::Memorandum) -> bool {
         self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
     }
 
