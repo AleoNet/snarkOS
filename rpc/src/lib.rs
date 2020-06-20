@@ -4,6 +4,9 @@
 pub mod rpc_impl;
 pub use self::rpc_impl::*;
 
+pub mod rpc_impl_guarded;
+pub use self::rpc_impl_guarded::*;
+
 pub mod rpc_server;
 pub use self::rpc_server::*;
 

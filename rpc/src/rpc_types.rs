@@ -1,5 +1,20 @@
+use jsonrpc_http_server::jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+/// Returned value for the `getblock` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RpcCredentials {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Default, Clone)]
+pub struct Meta {
+    pub auth: Option<String>,
+}
+
+impl Metadata for Meta {}
 
 /// Returned value for the `getblock` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -163,4 +178,11 @@ pub struct TransactionInputs {
 pub struct TransactionRecipient {
     pub address: String,
     pub amount: u64,
+}
+
+/// Output for the `createrawtransaction` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CreateRawTransactionOuput {
+    pub encoded_transaction: String,
+    pub encoded_records: Vec<String>,
 }
