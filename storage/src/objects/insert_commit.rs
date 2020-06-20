@@ -2,7 +2,7 @@ use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     pub(crate) fn process_transaction(
@@ -119,7 +119,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
-        let mut child_hashes = self.get_child_hashes(&block.header.previous_block_hash)?;
+        let mut child_hashes = self.get_child_block_hashes(&block.header.previous_block_hash)?;
 
         if !child_hashes.contains(&block_hash) {
             child_hashes.push(block_hash);
@@ -285,7 +285,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
 
     /// Returns true if the block exists in the canon chain.
     pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
-        self.block_hash_exists(block_hash) && self.get_block_num(block_hash).is_ok()
+        self.block_hash_exists(block_hash) && self.get_block_number(block_hash).is_ok()
     }
 
     /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.

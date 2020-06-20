@@ -58,7 +58,7 @@ impl RpcFunctions for RpcImpl {
         assert_eq!(block_hash.len(), 32);
 
         let block_header_hash = BlockHeaderHash::new(block_hash);
-        let height = match self.storage.get_block_num(&block_header_hash) {
+        let height = match self.storage.get_block_number(&block_header_hash) {
             Ok(block_num) => match self.storage.is_canon(&block_header_hash) {
                 true => Some(block_num),
                 false => None,
@@ -175,8 +175,8 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
-        match self.storage.transcation_conflicts(&transaction) {
-            Ok(_) => {
+        match !self.storage.transcation_conflicts(&transaction) {
+            true => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
                     self.storage.clone(),
@@ -187,7 +187,7 @@ impl RpcFunctions for RpcImpl {
 
                 Ok(hex::encode(transaction.transaction_id()?))
             }
-            Err(_) => Ok("Transaction contains spent records".into()),
+            false => Ok("Transaction contains spent records".into()),
         }
     }
 
@@ -244,7 +244,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns the current mempool and consensus information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         let block_height = self.storage.get_latest_block_height();
-        let block = self.storage.get_block_from_block_num(block_height)?;
+        let block = self.storage.get_block_from_block_number(block_height)?;
 
         let time = Utc::now().timestamp();
 

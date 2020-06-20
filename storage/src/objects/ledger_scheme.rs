@@ -24,6 +24,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     type SerialNumber = T::SerialNumber;
     type Transaction = T;
 
+    /// Instantiates a new ledger with a genesis block.
     fn new(
         path: &PathBuf,
         parameters: Self::MerkleParameters,
@@ -57,37 +58,44 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
         Ok(ledger_storage)
     }
 
-    // Number of blocks including the genesis block
+    /// Returns the number of blocks including the genesis block
     fn len(&self) -> usize {
         self.get_latest_block_height() as usize + 1
     }
 
+    /// Return the parameters used to construct the ledger Merkle tree.
     fn parameters(&self) -> &Self::MerkleParameters {
         &self.ledger_parameters
     }
 
+    /// Return a digest of the latest ledger Merkle tree.
     fn digest(&self) -> Option<Self::MerkleTreeDigest> {
         let digest: Self::MerkleTreeDigest = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
-
         Some(digest)
     }
 
+    /// Check that st_{ts} is a valid digest for some (past) ledger state.
     fn validate_digest(&self, digest: &Self::MerkleTreeDigest) -> bool {
         self.storage.exists(COL_DIGEST, &to_bytes![digest].unwrap())
     }
 
+    /// Returns true if the given commitment exists in the ledger.
     fn contains_cm(&self, cm: &Self::Commitment) -> bool {
         self.storage.exists(COL_COMMITMENT, &to_bytes![cm].unwrap())
     }
 
+    /// Returns true if the given serial number exists in the ledger.
     fn contains_sn(&self, sn: &Self::SerialNumber) -> bool {
         self.storage.exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap())
     }
 
+    /// Returns true if the given memo exists in the ledger.
     fn contains_memo(&self, memo: &Self::Memo) -> bool {
         self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
     }
 
+    /// Returns the Merkle path to the latest ledger digest
+    /// for a given commitment, if it exists in the ledger.
     fn prove_cm(&self, cm: &Self::Commitment) -> Result<Self::MerklePath, LedgerError> {
         let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
         let result = self.cm_merkle_tree.read().generate_proof(cm_index, cm)?;
@@ -95,14 +103,8 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
         Ok(result)
     }
 
-    fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<Self::MerklePath, LedgerError> {
-        Ok(MerklePath::default())
-    }
-
-    fn prove_memo(&self, _memo: &Self::Memo) -> Result<Self::MerklePath, LedgerError> {
-        Ok(MerklePath::default())
-    }
-
+    /// Returns true if the given Merkle path is a valid witness for
+    /// the given ledger digest and commitment.
     fn verify_cm(
         _parameters: &Self::MerkleParameters,
         digest: &Self::MerkleTreeDigest,
@@ -110,23 +112,5 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
         witness: &Self::MerklePath,
     ) -> bool {
         witness.verify(&digest, cm).unwrap()
-    }
-
-    fn verify_sn(
-        _parameters: &Self::MerkleParameters,
-        _digest: &Self::MerkleTreeDigest,
-        _sn: &Self::SerialNumber,
-        _witness: &Self::MerklePath,
-    ) -> bool {
-        true
-    }
-
-    fn verify_memo(
-        _parameters: &Self::MerkleParameters,
-        _digest: &Self::MerkleTreeDigest,
-        _memo: &Self::Memo,
-        _witness: &Self::MerklePath,
-    ) -> bool {
-        true
     }
 }
