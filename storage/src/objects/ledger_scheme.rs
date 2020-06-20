@@ -68,7 +68,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
 
     fn digest(&self) -> Option<Self::MerkleTreeDigest> {
         let digest: Self::MerkleTreeDigest = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
-
         Some(digest)
     }
 
@@ -96,11 +95,11 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
     }
 
     fn prove_sn(&self, _sn: &Self::SerialNumber) -> Result<Self::MerklePath, LedgerError> {
-        Ok(MerklePath::default())
+        unimplemented!()
     }
 
     fn prove_memo(&self, _memo: &Self::Memo) -> Result<Self::MerklePath, LedgerError> {
-        Ok(MerklePath::default())
+        unimplemented!()
     }
 
     fn verify_cm(
@@ -118,7 +117,7 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
         _sn: &Self::SerialNumber,
         _witness: &Self::MerklePath,
     ) -> bool {
-        true
+        unimplemented!()
     }
 
     fn verify_memo(
@@ -127,6 +126,6 @@ impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
         _memo: &Self::Memo,
         _witness: &Self::MerklePath,
     ) -> bool {
-        true
+        unimplemented!()
     }
 }
