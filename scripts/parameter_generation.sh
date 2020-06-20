@@ -5,7 +5,8 @@ printf "\nParameter generation starting...\n\n"
 
 # Generate parameters
 
-./parameters/scripts/parameters_setup.sh
+cd parameters/scripts || printf "\nError - cannot find 'parameters/scripts' folder\n\n"
+./parameters_setup.sh
 
 # Generate genesis block
 
@@ -13,6 +14,7 @@ printf "\nParameter generation starting...\n\n"
 
 # Generate test data
 
-./testing/scripts/generate_test_data.sh
+cd ../..testing/scripts || printf "\nError - cannot find 'testing/scripts' folder\n\n"
+./generate_test_data.sh
 
 printf "\nParameter generation completed.\n\n"
