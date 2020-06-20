@@ -44,7 +44,7 @@ pub async fn start_rpc_server(
     );
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
-    rpc_impl.add_guarded(&mut io);
+    rpc_impl.add_protected(&mut io);
     io.extend_with(rpc_impl.to_delegate());
 
     let server = ServerBuilder::new(io)

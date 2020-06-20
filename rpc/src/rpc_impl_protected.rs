@@ -38,7 +38,7 @@ impl RpcImpl {
         Ok(())
     }
 
-    pub fn create_raw_transaction_guarded(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
+    pub fn create_raw_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -51,7 +51,7 @@ impl RpcImpl {
         Ok(serde_json::to_value(self.create_raw_transaction(val).unwrap()).unwrap())
     }
 
-    pub fn fetch_record_commitments_guarded(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
+    pub fn fetch_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
@@ -59,7 +59,7 @@ impl RpcImpl {
         Ok(Value::from(self.fetch_record_commtiments().unwrap()))
     }
 
-    pub fn get_raw_record_guarded(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
+    pub fn get_raw_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -79,12 +79,12 @@ impl RpcImpl {
         Ok(Value::from(self.get_raw_record(record_commitment).unwrap()))
     }
 
-    pub fn add_guarded(&self, io: &mut MetaIoHandler<Meta>) {
+    pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
-        d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_guarded);
-        d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_guarded);
-        d.add_method_with_meta("getrawrecord", Self::get_raw_record_guarded);
+        d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
+        d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
+        d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
 
         io.extend_with(d)
     }
