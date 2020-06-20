@@ -2208,6 +2208,8 @@ dependencies = [
 name = "snarkos-errors"
 version = "0.8.0"
 dependencies = [
+ "base58",
+ "bech32",
  "bincode",
  "curl",
  "hex",
@@ -2306,6 +2308,7 @@ dependencies = [
  "sha2",
  "snarkos-algorithms",
  "snarkos-curves",
+ "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-utilities",

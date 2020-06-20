@@ -6,10 +6,11 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use bech32::{Bech32, ToBase32};
+use bech32::{Bech32, FromBase32, ToBase32};
 use std::{
     fmt,
     io::{Read, Result as IoResult, Write},
+    str::FromStr,
 };
 
 #[derive(Derivative)]
@@ -48,6 +49,29 @@ impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
         let commitment: <C::AccountCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
 
         Ok(Self { commitment })
+    }
+}
+
+impl<C: DPCComponents> FromStr for AccountPublicKey<C> {
+    type Err = AccountError;
+
+    fn from_str(public_key: &str) -> Result<Self, Self::Err> {
+        if public_key.len() != 63 {
+            return Err(AccountError::InvalidCharacterLength(public_key.len()));
+        }
+
+        let prefix = &public_key.to_lowercase()[0..4];
+        if prefix != account_format::PUBLIC_KEY_PREFIX.to_string() {
+            return Err(AccountError::InvalidPrefix(prefix.to_string()));
+        };
+
+        let bech32 = Bech32::from_str(&public_key)?;
+        if bech32.data().is_empty() {
+            return Err(AccountError::InvalidByteLength(0));
+        }
+
+        let buffer = Vec::from_base32(&bech32.data())?;
+        Ok(Self::read(&buffer[..])?)
     }
 }
 

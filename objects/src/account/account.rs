@@ -4,13 +4,16 @@ use snarkos_models::{dpc::DPCComponents, objects::AccountScheme};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
-use std::io::{Read, Result as IoResult, Write};
+use std::{
+    fmt,
+    io::{Read, Result as IoResult, Write},
+};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct Account<C: DPCComponents> {
-    pub public_key: AccountPublicKey<C>,
     pub private_key: AccountPrivateKey<C>,
+    pub public_key: AccountPublicKey<C>,
 }
 
 impl<C: DPCComponents> AccountScheme for Account<C> {
@@ -54,5 +57,25 @@ impl<C: DPCComponents> FromBytes for Account<C> {
             private_key,
             public_key,
         })
+    }
+}
+
+impl<C: DPCComponents> fmt::Display for Account<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Account {{ private_key: {}, public_key: {} }}",
+            self.private_key, self.public_key,
+        )
+    }
+}
+
+impl<C: DPCComponents> fmt::Debug for Account<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Account {{ private_key: {:?}, public_key: {:?} }}",
+            self.private_key, self.public_key,
+        )
     }
 }
