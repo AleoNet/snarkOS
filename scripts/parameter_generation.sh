@@ -10,11 +10,11 @@ cd parameters/scripts || printf "\nError - cannot find 'parameters/scripts' fold
 
 # Generate genesis block
 
-./parameters/scripts/genesis_block_setup.sh
+./genesis_block_setup.sh
 
 # Generate test data
 
-cd ../..testing/scripts || printf "\nError - cannot find 'testing/scripts' folder\n\n"
+cd ../../testing/scripts || printf "\nError - cannot find 'testing/scripts' folder\n\n"
 ./generate_test_data.sh
 
 printf "\nParameter generation completed.\n\n"
