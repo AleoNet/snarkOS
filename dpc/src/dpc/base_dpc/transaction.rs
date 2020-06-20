@@ -24,17 +24,25 @@ use std::{
     PartialEq(bound = "C: BaseDPCComponents"),
     Eq(bound = "C: BaseDPCComponents")
 )]
+// TODO (howardwu): Remove the public visibility here
 pub struct DPCTransaction<C: BaseDPCComponents> {
-    // TODO (howardwu): Remove the public visibility here
-    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
-    pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    pub memorandum: [u8; 32],
+    /// The network this transaction is included in
+    pub network_id: u8,
 
     pub digest: MerkleTreeDigest<C::MerkleParameters>,
+
+    pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
+
+    pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+
+    pub memorandum: [u8; 32],
+
     #[derivative(PartialEq = "ignore")]
     pub transaction_proof: <C::OuterSNARK as SNARK>::Proof,
+
     #[derivative(PartialEq = "ignore")]
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+
     #[derivative(PartialEq = "ignore")]
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
 
@@ -42,9 +50,6 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
     /// This value effectively becomes the transaction fee for the miner. Only coinbase transactions
     /// can have a negative value balance representing tokens being minted.
     pub value_balance: i64,
-
-    /// The network id of the transaction
-    pub network_id: u8,
 
     #[derivative(PartialEq = "ignore")]
     pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
@@ -80,20 +85,11 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
 
 impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
+    type Digest = MerkleTreeDigest<C::MerkleParameters>;
+    type LocalDataCommitment = <C::LocalDataCommitment as CommitmentScheme>::Output;
     type Memorandum = [u8; 32];
+    type PredicateCommitment = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
-
-    fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
-        self.old_serial_numbers.as_slice()
-    }
-
-    fn new_commitments(&self) -> &[Self::Commitment] {
-        self.new_commitments.as_slice()
-    }
-
-    fn memorandum(&self) -> &Self::Memorandum {
-        &self.memorandum
-    }
 
     /// Transaction id = Hash of (serial numbers || commitments || memo)
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -117,18 +113,41 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         Ok(result)
     }
 
-    fn size(&self) -> usize {
-        let transaction_bytes = to_bytes![self].unwrap();
+    fn network_id(&self) -> u8 {
+        self.network_id
+    }
 
-        transaction_bytes.len()
+    fn ledger_digest(&self) -> &Self::Digest {
+        &self.digest
+    }
+
+    fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
+        self.old_serial_numbers.as_slice()
+    }
+
+    fn new_commitments(&self) -> &[Self::Commitment] {
+        self.new_commitments.as_slice()
+    }
+
+    fn predicate_commitment(&self) -> &Self::PredicateCommitment {
+        &self.predicate_commitment
+    }
+
+    fn local_data_commitment(&self) -> &Self::LocalDataCommitment {
+        &self.local_data_commitment
     }
 
     fn value_balance(&self) -> i64 {
         self.value_balance
     }
 
-    fn network_id(&self) -> u8 {
-        self.network_id
+    fn memorandum(&self) -> &Self::Memorandum {
+        &self.memorandum
+    }
+
+    fn size(&self) -> usize {
+        let transaction_bytes = to_bytes![self].unwrap();
+        transaction_bytes.len()
     }
 }
 
