@@ -2,8 +2,9 @@ use crate::templates::{
     bw6::{BW6Parameters, TwistType},
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{AffineCurve, Field, One, SWModelParameters, Zero};
-use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes};
+use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes, serialize::*};
 
 use std::{
     io::{Result as IoResult, Write},
@@ -13,7 +14,7 @@ use std::{
 pub type G2Affine<P> = GroupAffine<<P as BW6Parameters>::G2Parameters>;
 pub type G2Projective<P> = GroupProjective<<P as BW6Parameters>::G2Parameters>;
 
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
     Clone(bound = "P: BW6Parameters"),
     Debug(bound = "P: BW6Parameters"),

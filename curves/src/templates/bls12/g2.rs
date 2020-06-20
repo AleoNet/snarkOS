@@ -2,15 +2,16 @@ use crate::templates::{
     bls12::{Bls12Parameters, TwistType},
     short_weierstrass::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
 };
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{AffineCurve, Field, Fp2, One, SWModelParameters, Zero};
-use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes};
+use snarkos_utilities::{bititerator::BitIterator, bytes::ToBytes, serialize::*};
 
 use std::io::{Result as IoResult, Write};
 
 pub type G2Affine<P> = GroupAffine<<P as Bls12Parameters>::G2Parameters>;
 pub type G2Projective<P> = GroupProjective<<P as Bls12Parameters>::G2Parameters>;
 
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
     Clone(bound = "P: Bls12Parameters"),
     Debug(bound = "P: Bls12Parameters"),
