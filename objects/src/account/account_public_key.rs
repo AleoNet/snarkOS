@@ -26,12 +26,20 @@ pub struct AccountPublicKey<C: DPCComponents> {
 
 impl<C: DPCComponents> AccountPublicKey<C> {
     /// Creates a new account public key from an account private key.
-    pub fn from(parameters: &C::AccountCommitment, private_key: &AccountPrivateKey<C>) -> Result<Self, AccountError> {
+    pub fn from(
+        commitment_parameters: &C::AccountCommitment,
+        signature_parameters: &C::AccountSignature,
+        private_key: &AccountPrivateKey<C>,
+    ) -> Result<Self, AccountError> {
         // Construct the commitment input for the account public key.
-        let commit_input = to_bytes![private_key.pk_sig, private_key.sk_prf, private_key.metadata]?;
+        let commit_input = to_bytes![
+            private_key.pk_sig(signature_parameters)?,
+            private_key.sk_prf,
+            private_key.metadata
+        ]?;
 
         Ok(Self {
-            commitment: C::AccountCommitment::commit(parameters, &commit_input, &private_key.r_pk)?,
+            commitment: C::AccountCommitment::commit(commitment_parameters, &commit_input, &private_key.r_pk)?,
         })
     }
 }
@@ -55,6 +63,7 @@ impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
 impl<C: DPCComponents> FromStr for AccountPublicKey<C> {
     type Err = AccountError;
 
+    /// Reads in an account public key string.
     fn from_str(public_key: &str) -> Result<Self, Self::Err> {
         if public_key.len() != 63 {
             return Err(AccountError::InvalidCharacterLength(public_key.len()));
@@ -91,6 +100,6 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
 
 impl<C: DPCComponents> fmt::Debug for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "AccountPublicKey {{ commitment: {:?} }}", self.commitment,)
+        write!(f, "AccountPublicKey {{ commitment: {:?} }}", self.commitment)
     }
 }
