@@ -198,14 +198,6 @@ impl ProtectedRpcFunctions for RpcImpl {
         // Default record payload
         let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
 
-        // Decode auxiliary
-        let mut auxiliary = [0u8; 32];
-        if let Some(auxiliary_string) = transaction_input.auxiliary {
-            if let Ok(bytes) = hex::decode(auxiliary_string) {
-                bytes.write(&mut auxiliary[..])?;
-            }
-        }
-
         // Decode memo
         let mut memo = [0u8; 32];
         if let Some(memo_string) = transaction_input.memo {
@@ -225,7 +217,6 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_dummy_flags,
             new_values,
             new_payloads,
-            auxiliary,
             memo,
             transaction_input.network_id,
             &self.storage,

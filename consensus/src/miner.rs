@@ -137,9 +137,9 @@ impl Miner {
         let (nonce, proof) = self
             .miner
             .mine(
-                subroots,
+                &subroots,
                 difficulty_target,
-                &mut rand::thread_rng(),
+                &mut thread_rng(),
                 self.consensus.max_nonce,
             )
             .unwrap();

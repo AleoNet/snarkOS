@@ -245,7 +245,7 @@ impl Server {
         let latest_shared_hash = self.storage.get_latest_shared_hash(message.block_locator_hashes)?;
         let current_height = self.storage.get_latest_block_height();
 
-        if let Ok(height) = self.storage.get_block_num(&latest_shared_hash) {
+        if let Ok(height) = self.storage.get_block_number(&latest_shared_hash) {
             if height < current_height {
                 let mut max_height = current_height;
 

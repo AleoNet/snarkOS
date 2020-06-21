@@ -153,7 +153,6 @@ fn send<R: Rng>(
         dummy_flags,
         values,
         output,
-        [0u8; 32], // TODO: Should we set these to anything?
         [0u8; 32],
         network_id,
         &ledger,

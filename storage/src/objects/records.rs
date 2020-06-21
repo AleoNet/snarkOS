@@ -6,6 +6,8 @@ use snarkos_utilities::{
     to_bytes,
 };
 
+// TODO (howardwu): Remove this from `Ledger` as it is not used for ledger state.
+//  This is merely for local node / miner functionality.
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Get all stored record commitments of the node
     pub fn get_record_commitments(&self, limit: usize) -> Result<Vec<Vec<u8>>, StorageError> {
@@ -62,7 +64,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         self.storage.write(database_transaction)
     }
 
-    /// Remove a record from storage
+    /// Removes a record from storage.
     pub fn delete_record<R: Record>(&self, record: R) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 

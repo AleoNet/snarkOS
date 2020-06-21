@@ -1,12 +1,14 @@
 //! A polynomial represented in evaluations form.
 
 use crate::fft::{DensePolynomial, EvaluationDomain};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::PrimeField;
+use snarkos_utilities::serialize::*;
 
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 /// Stores a polynomial in evaluation form.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Evaluations<F: PrimeField> {
     /// The evaluations of a polynomial over the domain `D`
     pub evals: Vec<F>,

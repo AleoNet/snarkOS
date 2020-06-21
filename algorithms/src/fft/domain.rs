@@ -11,7 +11,9 @@
 //! by performing an O(n log n) FFT over such a domain.
 
 use crate::fft::{multicore::Worker, SparsePolynomial};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{batch_inversion, FpParameters, PrimeField};
+use snarkos_utilities::serialize::*;
 
 use rand::Rng;
 use rayon::prelude::*;
@@ -20,7 +22,7 @@ use std::fmt;
 /// Defines a domain over which finite field (I)FFTs can be performed. Works
 /// only for fields that have a large multiplicative subgroup of size that is
 /// a power-of-2.
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct EvaluationDomain<F: PrimeField> {
     /// The size of the domain.
     pub size: u64,

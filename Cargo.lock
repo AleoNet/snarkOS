@@ -2414,6 +2414,7 @@ dependencies = [
 name = "snarkos-utilities"
 version = "0.8.0"
 dependencies = [
+ "bincode",
  "rand",
  "rand_xorshift",
  "snarkos-derives",

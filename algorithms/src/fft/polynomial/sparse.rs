@@ -1,12 +1,14 @@
 //! A sparse polynomial represented in coefficient form.
 
 use crate::fft::{DenseOrSparsePolynomial, DensePolynomial, EvaluationDomain, Evaluations};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{Field, PrimeField};
+use snarkos_utilities::serialize::*;
 
 use std::fmt;
 
 /// Stores a sparse polynomial in coefficient form.
-#[derive(Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Default, CanonicalSerialize, CanonicalDeserialize)]
 pub struct SparsePolynomial<F: Field> {
     /// The coefficient a_i of `x^i` is stored as (i, a_i) in `self.coeffs`.
     /// the entries in `self.coeffs` are sorted in increasing order of `i`.

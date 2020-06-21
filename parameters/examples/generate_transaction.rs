@@ -125,9 +125,8 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let mut new_values = vec![value];
     new_values.extend(vec![0; Components::NUM_OUTPUT_RECORDS - 1]);
 
-    // Memo + Aux are dummies for now
+    // Memo is a dummy for now
 
-    let auxiliary: [u8; 32] = rng.gen();
     let memo: [u8; 32] = rng.gen();
 
     // Instantiate an empty ledger
@@ -149,7 +148,6 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         new_dummy_flags,
         new_values,
         new_payloads,
-        auxiliary,
         memo,
         network_id,
         &ledger,

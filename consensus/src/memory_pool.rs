@@ -8,9 +8,10 @@ use snarkos_models::{
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
-use snarkos_storage::{has_duplicates, Ledger};
+use snarkos_storage::Ledger;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    has_duplicates,
     to_bytes,
 };
 
@@ -80,7 +81,7 @@ impl<T: Transaction> MemoryPool<T> {
         Ok(())
     }
 
-    /// Adds entry to memory pool if valid in the current blockchain.
+    /// Adds entry to memory pool if valid in the current ledger.
     #[inline]
     pub fn insert<P: MerkleParameters>(
         &mut self,
@@ -201,7 +202,7 @@ impl<T: Transaction> MemoryPool<T> {
         // TODO Change naive transaction selection
         for (_transaction_id, entry) in self.transactions.clone() {
             if block_size + entry.size <= max_size {
-                if storage.transcation_conflicts(&entry.transaction)? || transactions.conflicts(&entry.transaction) {
+                if storage.transcation_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
                     continue;
                 }
 

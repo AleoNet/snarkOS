@@ -84,7 +84,7 @@ mod server_message_handler {
         let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
-        let genesis_block = storage.get_block_from_block_num(0).unwrap();
+        let genesis_block = storage.get_block_from_block_number(0).unwrap();
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();

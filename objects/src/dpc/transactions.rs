@@ -2,26 +2,15 @@ use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    has_duplicates,
     to_bytes,
     variable_length_integer::{read_variable_length_integer, variable_length_integer},
 };
 
 use std::{
-    collections::HashSet,
-    hash::Hash,
     io::{Read, Result as IoResult, Write},
     ops::{Deref, DerefMut},
 };
-
-/// Check if an iterator has duplicate elements
-pub fn has_duplicates<T>(iter: T) -> bool
-where
-    T: IntoIterator,
-    T::Item: Eq + Hash,
-{
-    let mut uniq = HashSet::new();
-    !iter.into_iter().all(move |x| uniq.insert(x))
-}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DPCTransactions<T: Transaction>(pub Vec<T>);

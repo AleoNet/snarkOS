@@ -174,9 +174,6 @@ pub struct TransactionInputs {
     /// Transaction recipent and amounts
     pub recipients: Vec<TransactionRecipient>,
 
-    /// Transaction auxiliary
-    pub auxiliary: Option<String>,
-
     /// Transaction memo
     pub memo: Option<String>,
 

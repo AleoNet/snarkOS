@@ -109,7 +109,6 @@ fn base_dpc_integration_test() {
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
 
-    let auxiliary = [3u8; 32];
     let memo = [4u8; 32];
 
     let old_death_vk_and_proof_generator = |local_data: &LocalData<Components>| {
@@ -208,7 +207,6 @@ fn base_dpc_integration_test() {
         &new_birth_predicates,
         &new_death_predicates,
         &new_birth_vk_and_proof_generator,
-        &auxiliary,
         &memo,
         network_id,
         &ledger,

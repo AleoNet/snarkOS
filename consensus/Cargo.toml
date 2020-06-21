@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-consensus"
 version = "0.8.0"
-authors = ["The Aleo Team <hello@aleo.org"]
+authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Consensus for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"

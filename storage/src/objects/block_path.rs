@@ -41,7 +41,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
 
         for _ in 0..=OLDEST_FORK_THRESHOLD {
             // check if the part is part of the canon chain
-            match &self.get_block_num(&parent_hash) {
+            match &self.get_block_number(&parent_hash) {
                 // This is a canon parent
                 Ok(block_num) => {
                     // Add the children from the latest block
@@ -74,7 +74,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         &self,
         block_hash: BlockHeaderHash,
     ) -> Result<(usize, Vec<BlockHeaderHash>), StorageError> {
-        let children = self.get_child_hashes(&block_hash)?;
+        let children = self.get_child_block_hashes(&block_hash)?;
 
         let mut final_path = vec![block_hash];
 

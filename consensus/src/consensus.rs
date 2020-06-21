@@ -116,7 +116,7 @@ impl ConsensusParameters {
         let hash_result = header.to_difficulty_hash();
 
         let now = Utc::now().timestamp();
-        let future_timelimit: i64 = now as i64 + TWO_HOURS_UNIX;
+        let future_timelimit: i64 = now + TWO_HOURS_UNIX;
         let expected_difficulty = self.get_block_difficulty(parent_header, header.time);
 
         if parent_header.get_hash() != header.previous_block_hash {
@@ -386,7 +386,6 @@ impl ConsensusParameters {
         let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
-        let auxiliary: [u8; 32] = rng.gen();
         let memo: [u8; 32] = rng.gen();
 
         Self::create_transaction(
@@ -399,7 +398,6 @@ impl ConsensusParameters {
             new_dummy_flags,
             new_values,
             new_payloads,
-            auxiliary,
             memo,
             network_id,
             ledger,
@@ -419,7 +417,6 @@ impl ConsensusParameters {
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
 
-        auxiliary: [u8; 32],
         memo: [u8; 32],
 
         network_id: u8,
@@ -527,7 +524,6 @@ impl ConsensusParameters {
             &new_birth_predicates,
             &new_death_predicates,
             &new_birth_vk_and_proof_generator,
-            &auxiliary,
             &memo,
             network_id,
             ledger,
@@ -566,7 +562,7 @@ mod tests {
         let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
         let (nonce1, proof1) = consensus
             .verifier
-            .mine(subroots1, difficulty_target, rng, std::u32::MAX)
+            .mine(&subroots1, difficulty_target, rng, std::u32::MAX)
             .unwrap();
 
         let h1 = BlockHeader {
@@ -585,7 +581,7 @@ mod tests {
         let new_difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp());
         let (nonce2, proof2) = consensus
             .verifier
-            .mine(subroots, new_difficulty_target, rng, std::u32::MAX)
+            .mine(&subroots, new_difficulty_target, rng, std::u32::MAX)
             .unwrap();
 
         let h2 = BlockHeader {
@@ -626,7 +622,7 @@ mod tests {
 
         // far in the future block
         let mut h2_err = h2.clone();
-        h2_err.time = Utc::now().timestamp() as i64 + 7201;
+        h2_err.time = Utc::now().timestamp() + 7201;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();

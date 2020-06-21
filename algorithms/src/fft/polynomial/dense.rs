@@ -1,7 +1,9 @@
 //! A polynomial represented in coefficient form.
 
 use crate::fft::{DenseOrSparsePolynomial, EvaluationDomain, Evaluations};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{Field, PrimeField};
+use snarkos_utilities::serialize::*;
 
 use rand::Rng;
 use rayon::prelude::*;
@@ -11,7 +13,7 @@ use std::{
 };
 
 /// Stores a polynomial in coefficient form.
-#[derive(Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Default, CanonicalSerialize, CanonicalDeserialize)]
 pub struct DensePolynomial<F: Field> {
     /// The coefficient of `x^i` is stored at location `i` in `self.coeffs`.
     pub coeffs: Vec<F>,

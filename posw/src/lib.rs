@@ -69,7 +69,7 @@ mod tests {
         let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
 
         // generate the proof
-        let (nonce, proof) = posw.mine(subroots, difficulty_target, rng, std::u32::MAX).unwrap();
+        let (nonce, proof) = posw.mine(&subroots, difficulty_target, rng, std::u32::MAX).unwrap();
 
         posw.verify(nonce, &proof, &pedersen_merkle_root).unwrap();
     }

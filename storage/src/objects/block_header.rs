@@ -1,7 +1,8 @@
-use crate::Ledger;
+use crate::{Ledger, COL_BLOCK_HEADER};
 use snarkos_errors::storage::StorageError;
 use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
-use snarkos_objects::{Block, BlockHeaderHash};
+use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkos_utilities::FromBytes;
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     /// Returns true if the block for the given block header hash exists.
@@ -13,6 +14,14 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         match self.get_block_header(block_hash) {
             Ok(_block_header) => true,
             Err(_) => false,
+        }
+    }
+
+    /// Get a block header given the block hash.
+    pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
+        match self.storage.get(COL_BLOCK_HEADER, &block_hash.0)? {
+            Some(block_header_bytes) => Ok(BlockHeader::read(&block_header_bytes[..])?),
+            None => Err(StorageError::MissingBlockHeader(block_hash.to_string())),
         }
     }
 
@@ -37,24 +46,30 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
         self.get_block_hash(0)
     }
 
-    /// Get the list of block locator hashes (Bitcoin protocol).
+    /// Returns a list of block locator hashes. The purpose of this method is to detect
+    /// wrong branches in the caller's canon chain.
     pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
-        let mut step = 1;
+        // Start from the latest block and work backwards
         let mut index = self.get_latest_block_height();
+
+        // Update the step size with each iteration
+        let mut step = 1;
+
+        // The output list of block locator hashes
         let mut block_locator_hashes = vec![];
 
         while index > 0 {
             block_locator_hashes.push(self.get_block_hash(index)?);
-
             if block_locator_hashes.len() >= 10 {
                 step *= 2;
             }
 
+            // Check whether it is appropriate to terminate
             if index < step {
+                // If the genesis block has not already been include, add it to the final output
                 if index != 1 {
                     block_locator_hashes.push(self.get_block_hash(0)?);
                 }
-
                 break;
             }
 

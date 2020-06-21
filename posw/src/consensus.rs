@@ -115,7 +115,7 @@ where
     /// under the difficulty target. These can then be used in the block header's field.
     pub fn mine<R: Rng>(
         &self,
-        subroots: Vec<Vec<u8>>,
+        subroots: &[Vec<u8>],
         difficulty_target: u64, // TODO: Change to Bignum?
         rng: &mut R,
         max_nonce: u32,
@@ -126,7 +126,7 @@ where
         let mut proof;
         loop {
             nonce = rng.gen_range(0, max_nonce);
-            proof = Self::prove(&pk, nonce, &subroots, rng)?;
+            proof = Self::prove(&pk, nonce, subroots, rng)?;
 
             if self.check_difficulty(&proof, difficulty_target) {
                 break;

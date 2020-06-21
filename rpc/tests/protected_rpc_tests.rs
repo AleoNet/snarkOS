@@ -181,7 +181,6 @@ mod protected_rpc_tests {
             old_records,
             old_account_private_keys,
             recipients,
-            auxiliary: None,
             memo: None,
             network_id,
         };
