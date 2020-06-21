@@ -688,6 +688,46 @@ where
             value_balance,
         } = context;
 
+        // Generate Schnorr signature on transaction data
+
+        let signature_time = start_timer!(|| format!("Sign and randomize transaction contents {}", i));
+
+        let signature_message = to_bytes![
+            network_id,
+            ledger_digest,
+            old_serial_numbers,
+            new_commitments,
+            predicate_commitment,
+            local_data_commitment,
+            value_balance,
+            memorandum
+        ]?;
+
+        let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        for i in 0..Components::NUM_INPUT_RECORDS {
+            let sk_sig = &old_account_private_keys[i].sk_sig;
+            let randomizer = &old_randomizers[i];
+
+            // Sign the transaction data
+            let account_signature = Components::AccountSignature::sign(
+                &circuit_parameters.account_signature,
+                sk_sig,
+                &signature_message,
+                rng,
+            )?;
+
+            // Randomize the signature
+            let randomized_signature = Components::AccountSignature::randomize_signature(
+                &circuit_parameters.account_signature,
+                &account_signature,
+                randomizer,
+            )?;
+
+            signatures.push(randomized_signature);
+        }
+
+        end_timer!(signature_time);
+
         // Generate binding signature
 
         // Generate value commitments for input records
@@ -823,37 +863,6 @@ where
             Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
 
-        let signature_message = to_bytes![
-            old_serial_numbers,
-            new_commitments,
-            memorandum,
-            ledger_digest,
-            transaction_proof
-        ]?;
-
-        let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
-        for i in 0..Components::NUM_INPUT_RECORDS {
-            let sig_time = start_timer!(|| format!("Sign and randomize Tx contents {}", i));
-
-            let sk_sig = &old_account_private_keys[i].sk_sig;
-            let randomizer = &old_randomizers[i];
-            // Sign transaction message
-            let account_signature = Components::AccountSignature::sign(
-                &circuit_parameters.account_signature,
-                sk_sig,
-                &signature_message,
-                rng,
-            )?;
-            let randomized_signature = Components::AccountSignature::randomize_signature(
-                &circuit_parameters.account_signature,
-                &account_signature,
-                randomizer,
-            )?;
-            signatures.push(randomized_signature);
-
-            end_timer!(sig_time);
-        }
-
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
@@ -868,6 +877,7 @@ where
         );
 
         end_timer!(exec_time);
+
         Ok((new_records, transaction))
     }
 
@@ -911,48 +921,24 @@ where
         }
 
         // Returns false if the ledger digest in the transaction is invalid.
-        if !ledger.validate_digest(&transaction.digest) {
+        if !ledger.validate_digest(&transaction.ledger_digest) {
             eprintln!("Ledger digest is invalid.");
             return Ok(false);
         }
 
         end_timer!(ledger_time);
 
-        let inner_snark_input = InnerCircuitVerifierInput {
-            circuit_parameters: parameters.circuit_parameters.clone(),
-            ledger_parameters: ledger.parameters().clone(),
-            ledger_digest: transaction.digest.clone(),
-            old_serial_numbers: transaction.old_serial_numbers().to_vec(),
-            new_commitments: transaction.new_commitments().to_vec(),
-            memo: transaction.memorandum().clone(),
-            predicate_commitment: transaction.predicate_commitment.clone(),
-            local_data_commitment: transaction.local_data_commitment.clone(),
-            value_balance: transaction.value_balance,
-            network_id: transaction.network_id,
-        };
-
-        let outer_snark_input = OuterCircuitVerifierInput {
-            inner_snark_verifier_input: inner_snark_input,
-            predicate_commitment: transaction.predicate_commitment.clone(),
-        };
-
-        if !Components::OuterSNARK::verify(
-            &parameters.outer_snark_parameters.1,
-            &outer_snark_input,
-            &transaction.transaction_proof,
-        )? {
-            eprintln!("Predicate check NIZK didn't verify.");
-            return Ok(false);
-        }
-
         let signature_time = start_timer!(|| "Signature checks");
 
         let signature_message = &to_bytes![
+            transaction.network_id(),
+            transaction.ledger_digest(),
             transaction.old_serial_numbers(),
             transaction.new_commitments(),
-            transaction.memorandum(),
-            transaction.digest,
-            transaction.transaction_proof
+            transaction.predicate_commitment(),
+            transaction.local_data_commitment(),
+            transaction.value_balance(),
+            transaction.memorandum()
         ]?;
 
         let account_signature = &parameters.circuit_parameters.account_signature;
@@ -964,6 +950,33 @@ where
         }
 
         end_timer!(signature_time);
+
+        let inner_snark_input = InnerCircuitVerifierInput {
+            circuit_parameters: parameters.circuit_parameters.clone(),
+            ledger_parameters: ledger.parameters().clone(),
+            ledger_digest: transaction.ledger_digest().clone(),
+            old_serial_numbers: transaction.old_serial_numbers().to_vec(),
+            new_commitments: transaction.new_commitments().to_vec(),
+            memo: transaction.memorandum().clone(),
+            predicate_commitment: transaction.predicate_commitment().clone(),
+            local_data_commitment: transaction.local_data_commitment().clone(),
+            value_balance: transaction.value_balance(),
+            network_id: transaction.network_id(),
+        };
+
+        let outer_snark_input = OuterCircuitVerifierInput {
+            inner_snark_verifier_input: inner_snark_input,
+            predicate_commitment: transaction.predicate_commitment().clone(),
+        };
+
+        if !Components::OuterSNARK::verify(
+            &parameters.outer_snark_parameters.1,
+            &outer_snark_input,
+            &transaction.transaction_proof,
+        )? {
+            eprintln!("Transaction proof failed to verify.");
+            return Ok(false);
+        }
 
         end_timer!(verify_time);
 
