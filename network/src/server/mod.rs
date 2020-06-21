@@ -41,7 +41,7 @@ pub async fn process_transaction_internal(
         let mut memory_pool = memory_pool_lock.lock().await;
 
         if !consensus.verify_transaction(parameters, &transaction, &storage)? {
-            info!("Received transaction was invalid");
+            error!("Received transaction was invalid");
             return Ok(());
         }
 
