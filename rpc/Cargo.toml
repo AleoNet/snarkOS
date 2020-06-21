@@ -37,4 +37,3 @@ tokio = { version = "0.2.13", features = ["full"] }
 snarkos-testing = { path = "../testing", version = "0.8.0" }
 
 jsonrpc-test = { version = "14.2.0" }
-serde_json = { version = "1.0.55" }

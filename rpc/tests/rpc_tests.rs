@@ -11,7 +11,6 @@ mod rpc_tests {
         to_bytes,
     };
 
-    use jsonrpc_test as json_test;
     use jsonrpc_test::Rpc;
     use serde_json::Value;
     use snarkos_models::dpc::Record;
@@ -32,7 +31,7 @@ mod rpc_tests {
         );
 
         let consensus = TEST_CONSENSUS.clone();
-        json_test::Rpc::new(
+        Rpc::new(
             RpcImpl::new(
                 storage.clone(),
                 parameters,
@@ -102,7 +101,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_block_call() {
+    fn test_rpc_get_block() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -138,7 +137,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_block_count() {
+    fn test_rpc_get_block_count() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -153,7 +152,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_best_block_hash() {
+    fn test_rpc_get_best_block_hash() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -171,7 +170,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_block_hash() {
+    fn test_rpc_get_block_hash() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -185,7 +184,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_raw_transaction() {
+    fn test_rpc_get_raw_transaction() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -204,7 +203,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_transaction_info() {
+    fn test_rpc_get_transaction_info() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -224,7 +223,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_decode_raw_transaction() {
+    fn test_rpc_decode_raw_transaction() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -239,7 +238,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_send_raw_transaction() {
+    fn test_rpc_send_raw_transaction() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -255,7 +254,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_decode_record() {
+    fn test_rpc_decode_record() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -287,7 +286,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_connection_count() {
+    fn test_rpc_get_connection_count() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -302,7 +301,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_peer_info() {
+    fn test_rpc_get_peer_info() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
@@ -321,7 +320,7 @@ mod rpc_tests {
     }
 
     #[test]
-    fn test_get_block_template() {
+    fn test_rpc_get_block_template() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);
 
