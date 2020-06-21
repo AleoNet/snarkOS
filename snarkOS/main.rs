@@ -39,10 +39,17 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
+    let network_id = match config.network.as_str() {
+        "mainnet" => 0,
+        "testnet" => 1,
+        _ => 0,
+    };
+
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
+        network_id,
         verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
@@ -101,12 +108,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     // Start miner thread
 
     let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.miner_address)?[..])?;
-
-    let network_id = match config.network.as_str() {
-        "mainnet" => 0,
-        "testnet" => 1,
-        _ => 0,
-    };
 
     if config.is_miner {
         MinerInstance::new(

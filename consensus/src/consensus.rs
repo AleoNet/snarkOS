@@ -46,8 +46,10 @@ pub struct ConsensusParameters {
 
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
-    // /// Mainnet or testnet
-    // network: Network
+
+    /// Network identifier
+    pub network_id: u8,
+
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
     pub verifier: Posw,
 }
@@ -535,6 +537,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
+            network_id: 0,
             verifier: posw,
         };
 
