@@ -3,6 +3,7 @@ use snarkos_utilities::{
     biginteger::BigInteger,
     bytes::{FromBytes, ToBytes},
     rand::UniformRand,
+    serialize::*,
 };
 
 use std::{
@@ -94,6 +95,9 @@ pub trait ProjectiveCurve:
     + Sized
     + ToBytes
     + FromBytes
+    + CanonicalSerialize
+    + ConstantSerializedSize
+    + CanonicalDeserialize
     + Copy
     + Clone
     + Default
@@ -176,6 +180,9 @@ pub trait AffineCurve:
     + Sized
     + ToBytes
     + FromBytes
+    + CanonicalSerialize
+    + ConstantSerializedSize
+    + CanonicalDeserialize
     + Copy
     + Clone
     + Default
@@ -243,7 +250,7 @@ pub trait AffineCurve:
 
 pub trait PairingCurve: AffineCurve {
     type Engine: PairingEngine<Fr = Self::ScalarField>;
-    type Prepared: ToBytes + Default + Clone + Send + Sync + Debug + 'static;
+    type Prepared: CanonicalSerialize + CanonicalDeserialize + ToBytes + Default + Clone + Send + Sync + Debug + 'static;
     type PairWith: PairingCurve<PairWith = Self>;
     type PairingResult: Field;
 

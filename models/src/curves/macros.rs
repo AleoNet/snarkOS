@@ -117,13 +117,13 @@ macro_rules! impl_prime_field_serializer {
                 &self,
                 writer: &mut W,
                 flags: F,
-            ) -> Result<(), snarkos_utilities::serialize::SerializationError> {
+            ) -> Result<(), snarkos_errors::serialization::SerializationError> {
                 const BYTE_SIZE: usize = $byte_size;
 
                 let (output_bit_size, output_byte_size) =
                     snarkos_utilities::serialize::buffer_bit_byte_size($field::<P>::size_in_bits());
                 if F::len() > (output_bit_size - P::MODULUS_BITS as usize) {
-                    return Err(snarkos_utilities::serialize::SerializationError::NotEnoughSpace);
+                    return Err(snarkos_errors::serialization::SerializationError::NotEnoughSpace);
                 }
 
                 let mut bytes = [0u8; BYTE_SIZE];
@@ -149,7 +149,7 @@ macro_rules! impl_prime_field_serializer {
             fn serialize<W: snarkos_utilities::io::Write>(
                 &self,
                 writer: &mut W,
-            ) -> Result<(), snarkos_utilities::serialize::SerializationError> {
+            ) -> Result<(), snarkos_errors::serialization::SerializationError> {
                 self.serialize_with_flags(writer, snarkos_utilities::serialize::EmptyFlags)
             }
 
@@ -163,13 +163,13 @@ macro_rules! impl_prime_field_serializer {
             #[allow(unused_qualifications)]
             fn deserialize_with_flags<R: snarkos_utilities::io::Read, F: snarkos_utilities::serialize::Flags>(
                 reader: &mut R,
-            ) -> Result<(Self, F), snarkos_utilities::serialize::SerializationError> {
+            ) -> Result<(Self, F), snarkos_errors::serialization::SerializationError> {
                 const BYTE_SIZE: usize = $byte_size;
 
                 let (output_bit_size, output_byte_size) =
                     snarkos_utilities::serialize::buffer_bit_byte_size($field::<P>::size_in_bits());
                 if F::len() > (output_bit_size - P::MODULUS_BITS as usize) {
-                    return Err(snarkos_utilities::serialize::SerializationError::NotEnoughSpace);
+                    return Err(snarkos_errors::serialization::SerializationError::NotEnoughSpace);
                 }
 
                 let mut masked_bytes = [0; BYTE_SIZE];
@@ -185,7 +185,7 @@ macro_rules! impl_prime_field_serializer {
             #[allow(unused_qualifications)]
             fn deserialize<R: snarkos_utilities::io::Read>(
                 reader: &mut R,
-            ) -> Result<Self, snarkos_utilities::serialize::SerializationError> {
+            ) -> Result<Self, snarkos_errors::serialization::SerializationError> {
                 const BYTE_SIZE: usize = $byte_size;
 
                 let (_, output_byte_size) =

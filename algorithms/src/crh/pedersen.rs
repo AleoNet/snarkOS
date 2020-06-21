@@ -40,13 +40,11 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
 
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS {
-            // TODO (howardwu): Return a CRHError.
-            panic!(
-                "incorrect input length {:?} for window params {:?}x{:?}",
+            return Err(CRHError::IncorrectInputLength(
                 input.len(),
                 S::WINDOW_SIZE,
-                S::NUM_WINDOWS
-            );
+                S::NUM_WINDOWS,
+            ));
         }
 
         let mut padded_input = vec![];
@@ -60,16 +58,14 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
             input = padded_input.as_slice();
         }
 
-        // TODO (howardwu): Return a CRHError.
-        assert_eq!(
-            self.parameters.bases.len(),
-            S::NUM_WINDOWS,
-            "Incorrect pp of size {:?}x{:?} for window params {:?}x{:?}",
-            self.parameters.bases[0].len(),
-            self.parameters.bases.len(),
-            S::WINDOW_SIZE,
-            S::NUM_WINDOWS
-        );
+        if self.parameters.bases.len() != S::NUM_WINDOWS {
+            return Err(CRHError::IncorrectParameterSize(
+                self.parameters.bases[0].len(),
+                self.parameters.bases.len(),
+                S::WINDOW_SIZE,
+                S::NUM_WINDOWS,
+            ));
+        }
 
         // Compute sum of h_i^{m_i} for all i.
         let result = {

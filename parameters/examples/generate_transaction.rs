@@ -57,7 +57,7 @@ fn empty_ledger<T: Transaction, P: MerkleParameters>(
     })
 }
 
-pub fn generate(recipient: &String, value: u64, file_name: &String) -> Result<Vec<u8>, DPCError> {
+pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &String) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
     let recipient: AccountPublicKey<Components> = FromBytes::read(&hex::decode(recipient).unwrap()[..])?;
@@ -125,9 +125,8 @@ pub fn generate(recipient: &String, value: u64, file_name: &String) -> Result<Ve
     let mut new_values = vec![value];
     new_values.extend(vec![0; Components::NUM_OUTPUT_RECORDS - 1]);
 
-    // Memo + Aux are dummies for now
+    // Memo is a dummy for now
 
-    let auxiliary: [u8; 32] = rng.gen();
     let memo: [u8; 32] = rng.gen();
 
     // Instantiate an empty ledger
@@ -149,8 +148,8 @@ pub fn generate(recipient: &String, value: u64, file_name: &String) -> Result<Ve
         new_dummy_flags,
         new_values,
         new_payloads,
-        auxiliary,
         memo,
+        network_id,
         &ledger,
         rng,
     )
@@ -176,20 +175,21 @@ pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
 pub fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() < 4 {
+    if args.len() < 5 {
         println!(
             "Invalid number of arguments.  Given: {} - Required: {}",
             args.len() - 1,
-            3
+            4
         );
         return;
     }
 
     let recipient = &args[1];
     let balance = args[2].parse::<u64>().unwrap();
-    let file_name = &args[3];
+    let network_id = args[3].parse::<u8>().unwrap();
+    let file_name = &args[4];
 
-    let bytes = generate(recipient, balance, file_name).unwrap();
+    let bytes = generate(recipient, balance, network_id, file_name).unwrap();
     let filename = PathBuf::from(file_name);
     store(&filename, &bytes).unwrap();
 }

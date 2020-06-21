@@ -18,12 +18,14 @@ mod consensus_dpc {
         let mut rng = FIXTURE.rng.clone();
 
         let consensus = TEST_CONSENSUS.clone();
+        let network_id = 0;
         let miner = Miner::new(miner_acc.public_key, consensus.clone());
 
         println!("Creating block with coinbase transaction");
         let transactions = DPCTransactions::<Tx>::new();
-        let (previous_block_header, transactions, coinbase_records) =
-            miner.establish_block(&parameters, &ledger, &transactions).unwrap();
+        let (previous_block_header, transactions, coinbase_records) = miner
+            .establish_block(&parameters, &ledger, &transactions, network_id)
+            .unwrap();
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let block = Block { header, transactions };
 
@@ -61,9 +63,8 @@ mod consensus_dpc {
         let new_values = vec![10; NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
-        // Memo + Aux are dummies for now
+        // Memo is a dummy for now
 
-        let auxiliary = [5u8; 32];
         let memo = [6u8; 32];
 
         println!("Create a payment transaction");
@@ -78,8 +79,8 @@ mod consensus_dpc {
             new_dummy_flags,
             new_values,
             new_payloads,
-            auxiliary,
             memo,
+            network_id,
             &ledger,
             &mut rng,
         )
@@ -97,8 +98,9 @@ mod consensus_dpc {
         println!("Create a new block with the payment transaction");
         let mut transactions = DPCTransactions::new();
         transactions.push(transaction);
-        let (previous_block_header, transactions, new_coinbase_records) =
-            miner.establish_block(&parameters, &ledger, &transactions).unwrap();
+        let (previous_block_header, transactions, new_coinbase_records) = miner
+            .establish_block(&parameters, &ledger, &transactions, network_id)
+            .unwrap();
 
         assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions, &ledger).unwrap());
 

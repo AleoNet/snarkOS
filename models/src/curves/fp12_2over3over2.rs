@@ -1,4 +1,5 @@
 use crate::curves::{fp6_3over2::*, Field, Fp2, Fp2Parameters, One, PrimeField, Zero};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_utilities::{
     bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},

@@ -12,4 +12,5 @@ pub mod objects;
 pub mod parameters;
 pub mod posw;
 pub mod rpc;
+pub mod serialization;
 pub mod storage;

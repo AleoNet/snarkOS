@@ -23,6 +23,9 @@ pub enum ConsensusError {
     #[error("A coinbase transaction already exists in the block")]
     CoinbaseTransactionAlreadyExists(),
 
+    #[error("conflicting network ids: {}, {}", _0, _1)]
+    ConflictingNetworkId(u8, u8),
+
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 

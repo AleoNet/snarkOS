@@ -7,10 +7,11 @@ use snarkos_models::{
     algorithms::MerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::dpc::DPCTransactions;
-use snarkos_storage::{has_duplicates, Ledger};
+use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
+use snarkos_storage::Ledger;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
+    has_duplicates,
     to_bytes,
 };
 
@@ -33,8 +34,8 @@ pub struct MemoryPool<T: Transaction> {
     pub transactions: HashMap<Vec<u8>, Entry<T>>,
 }
 
-const BLOCK_HEADER_SIZE: usize = 84;
-const COINBASE_TRANSACTION_SIZE: usize = 1502; // TODO Find the value for actual coinbase transaction size
+const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
+const COINBASE_TRANSACTION_SIZE: usize = 975; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
@@ -80,7 +81,7 @@ impl<T: Transaction> MemoryPool<T> {
         Ok(())
     }
 
-    /// Adds entry to memory pool if valid in the current blockchain.
+    /// Adds entry to memory pool if valid in the current ledger.
     #[inline]
     pub fn insert<P: MerkleParameters>(
         &mut self,
@@ -201,7 +202,7 @@ impl<T: Transaction> MemoryPool<T> {
         // TODO Change naive transaction selection
         for (_transaction_id, entry) in self.transactions.clone() {
             if block_size + entry.size <= max_size {
-                if storage.transcation_conflicts(&entry.transaction)? || transactions.conflicts(&entry.transaction) {
+                if storage.transcation_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
                     continue;
                 }
 
@@ -310,13 +311,8 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let mut transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        // TODO (howardwu): This is not correct usage of transaction, fix me.
-        // modify the tx a bit so that it does not conflict with the one already inserted
-        // in the chain
-        transaction.old_serial_numbers.clear();
-        transaction.new_commitments.clear();
-        transaction.memorandum = [99; 32];
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+
         let size = to_bytes![transaction].unwrap().len();
 
         let expected_transaction = transaction.clone();

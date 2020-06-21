@@ -1,6 +1,5 @@
 use snarkos_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
 use snarkos_errors::objects::TransactionError;
-use snarkos_genesis::Transaction1;
 use snarkos_models::genesis::Genesis;
 use snarkos_objects::{
     merkle_root,
@@ -11,6 +10,7 @@ use snarkos_objects::{
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
+use snarkos_parameters::Transaction1;
 use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;

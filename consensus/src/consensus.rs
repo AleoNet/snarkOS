@@ -116,8 +116,8 @@ impl ConsensusParameters {
         let hash_result = header.to_difficulty_hash();
 
         let now = Utc::now().timestamp();
-        let future_timelimit: i64 = now as i64 + TWO_HOURS_UNIX;
-        let expected_difficulty = self.get_block_difficulty(parent_header, now);
+        let future_timelimit: i64 = now + TWO_HOURS_UNIX;
+        let expected_difficulty = self.get_block_difficulty(parent_header, header.time);
 
         if parent_header.get_hash() != header.previous_block_hash {
             return Err(ConsensusError::NoParent(
@@ -215,7 +215,6 @@ impl ConsensusParameters {
     /// 1. Verify that the block header is valid.
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
-    /// TODO 4. Check cached blocks to insert/canonize.
     pub fn process_block(
         &self,
         parameters: &PublicParameters<Components>,
@@ -310,6 +309,7 @@ impl ConsensusParameters {
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         recipient: AccountPublicKey<Components>,
+        network_id: u8,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -365,7 +365,6 @@ impl ConsensusParameters {
         let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
-        let auxiliary: [u8; 32] = rng.gen();
         let memo: [u8; 32] = rng.gen();
 
         Self::create_transaction(
@@ -378,8 +377,8 @@ impl ConsensusParameters {
             new_dummy_flags,
             new_values,
             new_payloads,
-            auxiliary,
             memo,
+            network_id,
             ledger,
             rng,
         )
@@ -397,8 +396,9 @@ impl ConsensusParameters {
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
 
-        auxiliary: [u8; 32],
         memo: [u8; 32],
+
+        network_id: u8,
 
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -505,8 +505,8 @@ impl ConsensusParameters {
             &new_birth_predicates,
             &new_death_predicates,
             &new_birth_vk_and_proof_generator,
-            &auxiliary,
             &memo,
+            network_id,
             ledger,
             rng,
         )?;
@@ -526,19 +526,10 @@ mod tests {
     #[test]
     fn verify_header() {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
+
         // mine a PoSW proof
         let posw = Posw::load().unwrap();
         let difficulty_target = u64::MAX;
-
-        // mine PoSW for block 1
-        let transaction_ids = vec![vec![1u8; 32]; 8];
-        let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
-        let (nonce1, proof1) = posw.mine(subroots1, difficulty_target, rng, std::u32::MAX).unwrap();
-
-        // mine PoSW for block 2
-        let other_transaction_ids = vec![vec![2u8; 32]; 8];
-        let (merkle_root_hash, pedersen_merkle_root, subroots) = txids_to_roots(&other_transaction_ids);
-        let (nonce2, proof2) = posw.mine(subroots, difficulty_target, rng, std::u32::MAX).unwrap();
 
         let consensus: ConsensusParameters = ConsensusParameters {
             max_block_size: 1_000_000usize,
@@ -546,6 +537,14 @@ mod tests {
             target_block_time: 2i64, //unix seconds
             verifier: posw,
         };
+
+        // mine PoSW for block 1
+        let transaction_ids = vec![vec![1u8; 32]; 8];
+        let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
+        let (nonce1, proof1) = consensus
+            .verifier
+            .mine(&subroots1, difficulty_target, rng, std::u32::MAX)
+            .unwrap();
 
         let h1 = BlockHeader {
             previous_block_hash: BlockHeaderHash([0; 32]),
@@ -557,13 +556,22 @@ mod tests {
             time: 9999999,
         };
 
+        // mine PoSW for block 2
+        let other_transaction_ids = vec![vec![2u8; 32]; 8];
+        let (merkle_root_hash, pedersen_merkle_root, subroots) = txids_to_roots(&other_transaction_ids);
+        let new_difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp());
+        let (nonce2, proof2) = consensus
+            .verifier
+            .mine(&subroots, new_difficulty_target, rng, std::u32::MAX)
+            .unwrap();
+
         let h2 = BlockHeader {
             previous_block_hash: h1.get_hash(),
             merkle_root_hash: merkle_root_hash.clone(),
             pedersen_merkle_root_hash: pedersen_merkle_root.clone(),
             nonce: nonce2,
             proof: proof2,
-            difficulty_target: 9223372036854775807,
+            difficulty_target: new_difficulty_target,
             time: 9999999,
         };
 
@@ -595,7 +603,7 @@ mod tests {
 
         // far in the future block
         let mut h2_err = h2.clone();
-        h2_err.time = Utc::now().timestamp() as i64 + 7201;
+        h2_err.time = Utc::now().timestamp() + 7201;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();

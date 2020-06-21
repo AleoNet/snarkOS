@@ -1707,10 +1707,11 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6ce3297f9c85e16621bb8cca38a06779ffc31bb8184e1be4bed2be4678a098"
+checksum = "62f02856753d04e03e26929f820d0a0a337ebe71f849801eea335d464b349080"
 dependencies = [
+ "autocfg",
  "crossbeam-deque",
  "either",
  "rayon-core",
@@ -1718,9 +1719,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.7.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a89b46efaf957e52b18062fb2f4660f8b8a4dde1807ca002690868ef2c85a9"
+checksum = "e92e15d89083484e11353891f1af602cc661426deb9564c298b270c726973280"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-queue",
@@ -1943,18 +1944,18 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.111"
+version = "1.0.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9124df5b40cbd380080b2cc6ab894c040a3070d995f5c9dc77e18c34a8ae37d"
+checksum = "736aac72d1eafe8e5962d1d1c3d99b0df526015ba40915cb3c49d042e92ec243"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.111"
+version = "1.0.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f2c3ac8e6ca1e9c80b8be1023940162bf81ae3cffbb1809474152f2ce1eb250"
+checksum = "bf0343ce212ac0d3d6afd9391ac8e9c9efe06b533c8d33f660f6390cc4093f57"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2137,7 +2138,6 @@ dependencies = [
  "snarkos-algorithms",
  "snarkos-dpc",
  "snarkos-errors",
- "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-posw",
@@ -2235,25 +2235,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-genesis"
-version = "0.8.0"
-dependencies = [
- "chrono",
- "hex",
- "parking_lot 0.10.2",
- "rand",
- "snarkos-algorithms",
- "snarkos-consensus",
- "snarkos-dpc",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-objects",
- "snarkos-parameters",
- "snarkos-storage",
- "snarkos-utilities",
-]
-
-[[package]]
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
@@ -2318,15 +2299,20 @@ dependencies = [
 name = "snarkos-parameters"
 version = "0.8.0"
 dependencies = [
+ "chrono",
  "curl",
  "hex",
+ "parking_lot 0.10.2",
  "rand",
  "snarkos-algorithms",
+ "snarkos-consensus",
  "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-objects",
  "snarkos-posw",
+ "snarkos-storage",
  "snarkos-utilities",
 ]
 
@@ -2396,7 +2382,6 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-curves",
  "snarkos-errors",
- "snarkos-genesis",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
@@ -2416,7 +2401,6 @@ dependencies = [
  "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
- "snarkos-genesis",
  "snarkos-models",
  "snarkos-network",
  "snarkos-objects",
@@ -2431,10 +2415,11 @@ dependencies = [
 name = "snarkos-utilities"
 version = "0.8.0"
 dependencies = [
+ "bincode",
  "rand",
  "rand_xorshift",
  "snarkos-derives",
- "thiserror",
+ "snarkos-errors",
 ]
 
 [[package]]
@@ -2527,18 +2512,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b13f926965ad00595dd129fa12823b04bbf866e9085ab0a5f2b05b850fbfc344"
+checksum = "7dfdd070ccd8ccb78f4ad66bf1982dc37f620ef696c6b5028fe2ed83dd3d0d08"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "893582086c2f98cde18f906265a65b5030a074b1046c674ae898be6519a7f479"
+checksum = "bd80fc12f73063ac132ac92aceea36734f04a1d93c1240c6944e23a3b8841793"
 dependencies = [
  "proc-macro2",
  "quote",

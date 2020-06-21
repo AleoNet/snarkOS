@@ -39,6 +39,10 @@ use rand_xorshift::XorShiftRng;
 #[test]
 fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+    // Specify network_id
+    let network_id: u8 = 0;
+
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
@@ -113,7 +117,6 @@ fn test_execute_base_dpc_constraints() {
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let auxiliary = [0u8; 32];
     let memo = [0u8; 32];
 
     let context = DPC::execute_helper(
@@ -127,7 +130,7 @@ fn test_execute_base_dpc_constraints() {
         &new_birth_predicates,
         &new_death_predicates,
         &memo,
-        &auxiliary,
+        network_id,
         &ledger,
         &mut rng,
     )
@@ -298,13 +301,13 @@ fn test_execute_base_dpc_constraints() {
         &local_data_comm,
         &local_data_rand,
         &memo,
-        &auxiliary,
         &old_value_commits,
         &old_value_commit_randomness,
         &new_value_commits,
         &new_value_commit_randomness,
         value_balance,
         &binding_signature,
+        network_id,
     )
     .unwrap();
 
@@ -350,13 +353,13 @@ fn test_execute_base_dpc_constraints() {
             &local_data_comm,
             &local_data_rand,
             &memo,
-            &auxiliary,
             &old_value_commits,
             &old_value_commit_randomness,
             &new_value_commits,
             &new_value_commit_randomness,
             value_balance,
             &binding_signature,
+            network_id,
         ),
         &mut rng,
     )
@@ -376,7 +379,8 @@ fn test_execute_base_dpc_constraints() {
         &old_serial_numbers,
         &new_commitments,
         &memo,
-        &value_balance,
+        value_balance,
+        network_id,
         &inner_snark_vk,
         &inner_snark_proof,
         &old_proof_and_vk,

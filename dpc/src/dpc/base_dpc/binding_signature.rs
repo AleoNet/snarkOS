@@ -145,7 +145,6 @@ impl Default for BindingSignature {
         }
     }
 }
-// TODO (raychu86) wrap these functions into the binding signature impl
 
 pub fn create_binding_signature<C: CommitmentScheme, G: Group + ProjectiveCurve, R: Rng>(
     parameters: &C,

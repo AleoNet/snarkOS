@@ -417,7 +417,7 @@ pub fn field_serialization_test<F: Field>() {
             }
         }
 
-        use snarkos_utilities::serialize::SerializationError;
+        use snarkos_errors::serialization::SerializationError;
         {
             let mut serialized = vec![0; buf_size];
             assert!(if let SerializationError::NotEnoughSpace = a

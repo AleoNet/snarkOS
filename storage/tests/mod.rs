@@ -130,8 +130,8 @@ mod test_storage {
         pub fn test_invalid_block_retrieval() {
             let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
 
-            assert!(blockchain.get_block_from_block_num(2).is_err());
-            assert!(blockchain.get_block_from_block_num(10).is_err());
+            assert!(blockchain.get_block_from_block_number(2).is_err());
+            assert!(blockchain.get_block_from_block_number(10).is_err());
 
             kill_storage_sync(blockchain);
         }

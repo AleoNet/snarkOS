@@ -8,7 +8,6 @@ use rand::Rng;
 
 pub trait DPCScheme<L: LedgerScheme> {
     type Account: AccountScheme;
-    type Auxiliary;
     type Metadata: ?Sized;
     type Payload;
     type Parameters;
@@ -48,8 +47,8 @@ pub trait DPCScheme<L: LedgerScheme> {
         new_death_predicates: &[Self::Predicate],
         new_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        auxiliary: &Self::Auxiliary,
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        network_id: u8,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;

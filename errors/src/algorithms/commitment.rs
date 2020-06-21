@@ -7,6 +7,9 @@ pub enum CommitmentError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[error("incorrect input length {} for window params {}x{}", _0, _1, _2)]
+    IncorrectInputLength(usize, usize, usize),
+
     #[error("{}", _0)]
     CRHError(CRHError),
 

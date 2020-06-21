@@ -15,6 +15,8 @@ mod miner_instance_integration {
         let path = storage.storage.db.path().to_owned();
         let parameters = load_verifying_parameters();
 
+        let network_id = 0;
+
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
             let server_address = random_socket_address();
@@ -40,6 +42,7 @@ mod miner_instance_integration {
                 server.storage.clone(),
                 server.memory_pool_lock.clone(),
                 server.context.clone(),
+                network_id,
             );
 
             // 3. Spawn miner

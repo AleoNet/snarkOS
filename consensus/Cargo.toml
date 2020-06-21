@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-consensus"
 version = "0.8.0"
-authors = ["The Aleo Team <hello@aleo.org"]
+authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Consensus for a decentralized record system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
@@ -15,7 +15,6 @@ edition = "2018"
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-dpc = { path = "../dpc", version = "0.8.0" }
 snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-genesis = { path= "../genesis", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-objects = { path= "../objects", version = "0.8.0" }
 snarkos-posw = { path = "../posw", version = "0.8.0" }

@@ -1,11 +1,15 @@
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
 use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
-
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_objects::{Block, BlockHeaderHash, DPCTransactions};
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
 impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+    /// Get the latest block in the chain.
+    pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
+        self.get_block_from_block_number(self.get_latest_block_height())
+    }
+
     /// Get a block given the block hash.
     pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
         Ok(Block {
@@ -15,40 +19,60 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
     }
 
     /// Get a block given the block number.
-    pub fn get_block_from_block_num(&self, block_num: u32) -> Result<Block<T>, StorageError> {
-        if block_num > self.get_latest_block_height() {
-            return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_num)));
+    pub fn get_block_from_block_number(&self, block_number: u32) -> Result<Block<T>, StorageError> {
+        if block_number > self.get_latest_block_height() {
+            return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_number)));
         }
 
-        let block_hash = self.get_block_hash(block_num)?;
+        let block_hash = self.get_block_hash(block_number)?;
 
         self.get_block(&block_hash)
     }
 
-    /// Get the latest block in the chain.
-    pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
-        self.get_block_from_block_num(self.get_latest_block_height())
+    /// Get the block hash given a block number.
+    pub fn get_block_hash(&self, block_number: u32) -> Result<BlockHeaderHash, StorageError> {
+        match self.storage.get(COL_BLOCK_LOCATOR, &block_number.to_le_bytes())? {
+            Some(block_header_hash) => Ok(BlockHeaderHash::new(block_header_hash)),
+            None => Err(StorageError::MissingBlockHash(block_number)),
+        }
     }
 
-    /// Returns true if there are no blocks in the chain.
-    pub fn is_empty(&self) -> bool {
-        self.get_latest_block().is_err()
+    /// Get the block number given a block hash.
+    pub fn get_block_number(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
+        match self.storage.get(COL_BLOCK_LOCATOR, &block_hash.0)? {
+            Some(block_num_bytes) => Ok(bytes_to_u32(block_num_bytes)),
+            None => Err(StorageError::MissingBlockNumber(block_hash.to_string())),
+        }
     }
 
-    /// Find the potential parent block given a block header.
-    pub fn find_parent_block(&self, block_header: &BlockHeader) -> Result<Block<T>, StorageError> {
-        self.get_block(&block_header.previous_block_hash)
+    /// Get the list of transaction ids given a block hash.
+    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<DPCTransactions<T>, StorageError> {
+        match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0)? {
+            Some(encoded_block_transactions) => Ok(DPCTransactions::read(&encoded_block_transactions[..])?),
+            None => Err(StorageError::MissingBlockTransactions(block_hash.to_string())),
+        }
+    }
+
+    /// Find the potential child block hashes given a parent block header.
+    pub fn get_child_block_hashes(
+        &self,
+        parent_header: &BlockHeaderHash,
+    ) -> Result<Vec<BlockHeaderHash>, StorageError> {
+        match self.storage.get(COL_CHILD_HASHES, &parent_header.0)? {
+            Some(encoded_child_block_hashes) => Ok(bincode::deserialize(&encoded_child_block_hashes[..])?),
+            None => Ok(vec![]),
+        }
     }
 
     /// Returns the block number of a conflicting block that has already been mined.
     pub fn already_mined(&self, block: &Block<T>) -> Result<Option<u32>, StorageError> {
         // look up new block's previous block by hash
         // if the block after previous_block_number exists, then someone has already mined this new block
-        let previous_block_number = self.get_block_num(&block.header.previous_block_hash)?;
+        let previous_block_number = self.get_block_number(&block.header.previous_block_hash)?;
 
         let existing_block_number = previous_block_number + 1;
 
-        if self.get_block_from_block_num(existing_block_number).is_ok() {
+        if self.get_block_from_block_number(existing_block_number).is_ok() {
             // the storage has a conflicting block with the same previous_block_hash
             Ok(Some(existing_block_number))
         } else {
@@ -83,7 +107,7 @@ impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
 
         let block_header = self.get_block_header(&block_hash)?;
 
-        let mut child_hashes = self.get_child_hashes(&block_header.previous_block_hash)?;
+        let mut child_hashes = self.get_child_block_hashes(&block_header.previous_block_hash)?;
 
         if child_hashes.contains(&block_hash) {
             // Remove the block hash from the parent's potential children

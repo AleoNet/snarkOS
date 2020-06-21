@@ -15,21 +15,38 @@ pub use alloc::{boxed::Box, format, vec, vec::Vec};
 pub use std::{boxed::Box, format, vec, vec::Vec};
 
 pub mod biginteger;
+pub use self::biginteger::*;
+
 pub mod bititerator;
+pub use self::bititerator::*;
+
 #[macro_use]
 pub mod bytes;
+pub use self::bytes::*;
+
 pub mod error;
+pub use self::error::*;
+
+pub mod iterator;
+pub use self::iterator::*;
+
+pub mod math;
+pub use self::math::*;
+
 pub mod rand;
+pub use self::rand::*;
+
+pub mod serialize;
+pub use self::serialize::*;
+
 pub mod variable_length_integer;
+pub use self::variable_length_integer::*;
 
 #[cfg(not(feature = "std"))]
 pub mod io;
 
 #[cfg(feature = "std")]
 pub use std::io;
-
-pub mod serialize;
-pub use self::serialize::*;
 
 #[cfg(not(feature = "std"))]
 fn error(_msg: &'static str) -> io::Error {
@@ -69,19 +86,4 @@ macro_rules! unwrap_option_or_error {
             None => return Err($err),
         }
     };
-}
-
-/// Returns log2
-pub fn log2(x: usize) -> u32 {
-    if x <= 1 {
-        return 0;
-    }
-
-    let n = x.leading_zeros();
-    core::mem::size_of::<usize>() as u32 * 8 - n
-}
-
-/// Return ceil(x/y)
-pub fn div_ceil(x: usize, y: usize) -> usize {
-    (x + y - 1) / y
 }

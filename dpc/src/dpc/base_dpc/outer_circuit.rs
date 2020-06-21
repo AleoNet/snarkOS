@@ -27,6 +27,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
     memo: Option<[u8; 32]>,
     value_balance: Option<i64>,
+    network_id: Option<u8>,
 
     // Inner snark verifier private inputs
     inner_snark_vk: Option<<C::InnerSNARK as SNARK>::VerificationParameters>,
@@ -62,6 +63,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         ]);
         let memo = Some([0u8; 32]);
         let value_balance = Some(0);
+        let network_id = Some(0);
 
         let old_private_predicate_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_input_records]);
         let new_private_predicate_inputs = Some(vec![predicate_nizk_vk_and_proof.clone(); num_output_records]);
@@ -80,6 +82,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             new_commitments,
             memo,
             value_balance,
+            network_id,
 
             inner_snark_vk: Some(inner_snark_vk.clone()),
             inner_snark_proof: Some(inner_snark_proof.clone()),
@@ -103,6 +106,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
         memo: &[u8; 32],
         value_balance: i64,
+        network_id: u8,
 
         // Inner snark private inputs
         inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
@@ -134,7 +138,8 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             old_serial_numbers: Some(old_serial_numbers.clone()),
             new_commitments: Some(new_commitments.clone()),
             memo: Some(memo.clone()),
-            value_balance: Some(value_balance.clone()),
+            value_balance: Some(value_balance),
+            network_id: Some(network_id),
 
             inner_snark_vk: Some(inner_snark_vk.clone()),
             inner_snark_proof: Some(inner_snark_proof.clone()),
@@ -182,7 +187,8 @@ where
             self.old_serial_numbers.get()?,
             self.new_commitments.get()?,
             self.memo.get()?,
-            self.value_balance.get()?,
+            *self.value_balance.get()?,
+            *self.network_id.get()?,
             self.inner_snark_vk.get()?,
             self.inner_snark_proof.get()?,
             self.old_private_predicate_inputs.get()?.as_slice(),
