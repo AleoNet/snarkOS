@@ -921,7 +921,7 @@ where
         }
 
         // Returns false if the ledger digest in the transaction is invalid.
-        if !ledger.validate_digest(&transaction.digest) {
+        if !ledger.validate_digest(&transaction.ledger_digest) {
             eprintln!("Ledger digest is invalid.");
             return Ok(false);
         }
