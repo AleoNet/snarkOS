@@ -304,6 +304,7 @@ impl ConsensusParameters {
 
     /// Generate a coinbase transaction given candidate block transactions
     pub fn create_coinbase_transaction<R: Rng>(
+        &self,
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
@@ -311,7 +312,6 @@ impl ConsensusParameters {
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         recipient: AccountPublicKey<Components>,
-        network_id: u8,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -369,7 +369,7 @@ impl ConsensusParameters {
 
         let memo: [u8; 32] = rng.gen();
 
-        Self::create_transaction(
+        self.create_transaction(
             parameters,
             old_records,
             old_account_private_keys,
@@ -380,7 +380,6 @@ impl ConsensusParameters {
             new_values,
             new_payloads,
             memo,
-            network_id,
             ledger,
             rng,
         )
@@ -388,6 +387,7 @@ impl ConsensusParameters {
 
     /// Generate a transaction by spending old records and specifying new record attributes
     pub fn create_transaction<R: Rng>(
+        &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
@@ -397,11 +397,7 @@ impl ConsensusParameters {
         new_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
-
         memo: [u8; 32],
-
-        network_id: u8,
-
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -508,7 +504,7 @@ impl ConsensusParameters {
             &new_death_predicates,
             &new_birth_vk_and_proof_generator,
             &memo,
-            network_id,
+            self.network_id,
             ledger,
             rng,
         )?;

@@ -16,6 +16,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{Account, AccountPublicKey};
 use snarkos_parameters::LedgerMerkleTreeParameters;
+use snarkos_posw::Posw;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -59,6 +60,14 @@ fn empty_ledger<T: Transaction, P: MerkleParameters>(
 
 pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &String) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
+
+    let consensus = ConsensusParameters {
+        max_block_size: 1_000_000_000usize,
+        max_nonce: u32::max_value(),
+        target_block_time: 10i64,
+        network_id,
+        verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
+    };
 
     let recipient: AccountPublicKey<Components> = FromBytes::read(&hex::decode(recipient).unwrap()[..])?;
 
@@ -138,22 +147,22 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let ledger = empty_ledger(ledger_parameters, &path)?;
 
     // Generate the transaction
-    let (_records, transaction) = ConsensusParameters::create_transaction(
-        &parameters,
-        old_records,
-        old_account_private_keys,
-        new_account_public_keys,
-        new_birth_predicates,
-        new_death_predicates,
-        new_dummy_flags,
-        new_values,
-        new_payloads,
-        memo,
-        network_id,
-        &ledger,
-        rng,
-    )
-    .unwrap();
+    let (_records, transaction) = consensus
+        .create_transaction(
+            &parameters,
+            old_records,
+            old_account_private_keys,
+            new_account_public_keys,
+            new_birth_predicates,
+            new_death_predicates,
+            new_dummy_flags,
+            new_values,
+            new_payloads,
+            memo,
+            &ledger,
+            rng,
+        )
+        .unwrap();
 
     let transaction_bytes = to_bytes![transaction]?;
 

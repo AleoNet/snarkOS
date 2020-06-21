@@ -14,7 +14,6 @@ pub struct MinerInstance {
     storage: Arc<MerkleTreeLedger>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     server_context: Arc<Context>,
-    network_id: u8,
 }
 
 impl MinerInstance {
@@ -26,7 +25,6 @@ impl MinerInstance {
         storage: Arc<MerkleTreeLedger>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
         server_context: Arc<Context>,
-        network_id: u8,
     ) -> Self {
         Self {
             miner_address,
@@ -35,7 +33,6 @@ impl MinerInstance {
             storage,
             memory_pool_lock,
             server_context,
-            network_id,
         }
     }
 
@@ -53,7 +50,7 @@ impl MinerInstance {
                 info!("Mining new block");
 
                 let (block_serialized, _coinbase_records) = miner
-                    .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock, self.network_id)
+                    .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
                     .await
                     .unwrap();
 

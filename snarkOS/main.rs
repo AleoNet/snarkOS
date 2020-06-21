@@ -117,7 +117,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             storage.clone(),
             memory_pool_lock.clone(),
             server.context.clone(),
-            network_id,
         )
         .spawn();
     }

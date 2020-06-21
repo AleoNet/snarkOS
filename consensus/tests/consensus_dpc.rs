@@ -1,5 +1,5 @@
 mod consensus_dpc {
-    use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, Miner};
+    use snarkos_consensus::{get_block_reward, MemoryPool, Miner};
     use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
     use snarkos_models::{
         dpc::{DPCScheme, Record},
@@ -18,14 +18,12 @@ mod consensus_dpc {
         let mut rng = FIXTURE.rng.clone();
 
         let consensus = TEST_CONSENSUS.clone();
-        let network_id = 0;
         let miner = Miner::new(miner_acc.public_key, consensus.clone());
 
         println!("Creating block with coinbase transaction");
         let transactions = DPCTransactions::<Tx>::new();
-        let (previous_block_header, transactions, coinbase_records) = miner
-            .establish_block(&parameters, &ledger, &transactions, network_id)
-            .unwrap();
+        let (previous_block_header, transactions, coinbase_records) =
+            miner.establish_block(&parameters, &ledger, &transactions).unwrap();
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let block = Block { header, transactions };
 
@@ -69,22 +67,22 @@ mod consensus_dpc {
 
         println!("Create a payment transaction");
         // Create the transaction
-        let (spend_records, transaction) = ConsensusParameters::create_transaction(
-            &parameters,
-            old_records,
-            old_account_private_keys,
-            new_account_public_keys,
-            new_birth_predicates.clone(),
-            new_death_predicates.clone(),
-            new_dummy_flags,
-            new_values,
-            new_payloads,
-            memo,
-            network_id,
-            &ledger,
-            &mut rng,
-        )
-        .unwrap();
+        let (spend_records, transaction) = consensus
+            .create_transaction(
+                &parameters,
+                old_records,
+                old_account_private_keys,
+                new_account_public_keys,
+                new_birth_predicates.clone(),
+                new_death_predicates.clone(),
+                new_dummy_flags,
+                new_values,
+                new_payloads,
+                memo,
+                &ledger,
+                &mut rng,
+            )
+            .unwrap();
 
         assert_eq!(spend_records.len(), 2);
         assert!(!spend_records[0].is_dummy());
@@ -98,9 +96,8 @@ mod consensus_dpc {
         println!("Create a new block with the payment transaction");
         let mut transactions = DPCTransactions::new();
         transactions.push(transaction);
-        let (previous_block_header, transactions, new_coinbase_records) = miner
-            .establish_block(&parameters, &ledger, &transactions, network_id)
-            .unwrap();
+        let (previous_block_header, transactions, new_coinbase_records) =
+            miner.establish_block(&parameters, &ledger, &transactions).unwrap();
 
         assert!(InstantiatedDPC::verify_transactions(&parameters, &transactions, &ledger).unwrap());
 
