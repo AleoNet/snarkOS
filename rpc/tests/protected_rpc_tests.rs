@@ -168,7 +168,7 @@ mod protected_rpc_tests {
         let [sender, receiver, _] = &FIXTURE_VK.test_accounts;
 
         let old_records = vec![hex::encode(to_bytes![DATA.records_1[0]].unwrap())];
-        let old_account_private_keys = vec![hex::encode(to_bytes![sender.private_key].unwrap())];
+        let old_account_private_keys = vec![sender.private_key.to_string()];
 
         let recipients = vec![TransactionRecipient {
             address: hex::encode(to_bytes![receiver.public_key].unwrap()),
