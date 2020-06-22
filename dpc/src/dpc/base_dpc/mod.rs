@@ -690,7 +690,7 @@ where
 
         // Generate Schnorr signature on transaction data
 
-        let signature_time = start_timer!(|| format!("Sign and randomize transaction contents {}", i));
+        let signature_time = start_timer!(|| "Sign and randomize transaction contents");
 
         let signature_message = to_bytes![
             network_id,
