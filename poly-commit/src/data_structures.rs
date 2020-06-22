@@ -1,6 +1,8 @@
 use crate::{Cow, String, Vec};
-use core::borrow::Borrow;
-use core::ops::{AddAssign, MulAssign, SubAssign};
+use core::{
+    borrow::Borrow,
+    ops::{AddAssign, MulAssign, SubAssign},
+};
 use rand_core::RngCore;
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
 use snarkos_models::curves::Field;
@@ -189,10 +191,7 @@ impl<C: PCCommitment> LabeledCommitment<C> {
 
 impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
-        &self,
-        writer: W,
-    ) -> snarkos_utilities::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(&self, writer: W) -> snarkos_utilities::io::Result<()> {
         self.commitment.write(writer)
     }
 }
@@ -210,11 +209,7 @@ impl LCTerm {
     /// Returns `true` if `self == LCTerm::One`
     #[inline]
     pub fn is_one(&self) -> bool {
-        if let LCTerm::One = self {
-            true
-        } else {
-            false
-        }
+        if let LCTerm::One = self { true } else { false }
     }
 }
 
@@ -232,6 +227,7 @@ impl<'a> From<&'a str> for LCTerm {
 
 impl core::convert::TryInto<PolynomialLabel> for LCTerm {
     type Error = ();
+
     fn try_into(self) -> Result<PolynomialLabel, ()> {
         match self {
             Self::One => Err(()),
@@ -284,7 +280,7 @@ impl<F: Field> LinearCombination<F> {
         let terms = terms.into_iter().map(|(c, t)| (c, t.into())).collect();
         Self {
             label: label.into(),
-            terms: terms,
+            terms,
         }
     }
 
@@ -327,8 +323,7 @@ impl<'a, F: Field> AddAssign<&'a LinearCombination<F>> for LinearCombination<F> 
 
 impl<'a, F: Field> SubAssign<&'a LinearCombination<F>> for LinearCombination<F> {
     fn sub_assign(&mut self, other: &'a LinearCombination<F>) {
-        self.terms
-            .extend(other.terms.iter().map(|(c, t)| (-*c, t.clone())));
+        self.terms.extend(other.terms.iter().map(|(c, t)| (-*c, t.clone())));
     }
 }
 

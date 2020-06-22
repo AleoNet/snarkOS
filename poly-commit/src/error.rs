@@ -97,14 +97,9 @@ impl core::fmt::Display for Error {
                 "`QuerySet` refers to polynomial \"{}\", but `Evaluations` does not contain an evaluation for it.",
                 label
             ),
-            Error::MissingLHS { label } => {
-                write!(f, "Equation \"{}\" does not have a LHS.", label)
-            },
+            Error::MissingLHS { label } => write!(f, "Equation \"{}\" does not have a LHS.", label),
             Error::MissingRng => write!(f, "hiding commitments require `Some(rng)`"),
-            Error::DegreeIsZero => write!(
-                f,
-                "this scheme does not support committing to degree 0 polynomials"
-            ),
+            Error::DegreeIsZero => write!(f, "this scheme does not support committing to degree 0 polynomials"),
             Error::TooManyCoefficients {
                 num_coefficients,
                 num_powers,
@@ -114,10 +109,7 @@ impl core::fmt::Display for Error {
                  the maximum number of powers in `Powers` ({:?})",
                 num_coefficients, num_powers
             ),
-            Error::HidingBoundIsZero => write!(
-                f,
-                "this scheme does not support non-`None` hiding bounds that are 0"
-            ),
+            Error::HidingBoundIsZero => write!(f, "this scheme does not support non-`None` hiding bounds that are 0"),
             Error::HidingBoundToolarge {
                 hiding_poly_degree,
                 num_powers,
@@ -126,22 +118,14 @@ impl core::fmt::Display for Error {
                 "the degree of the hiding poly ({:?}) is not less than the maximum number of powers in `Powers` ({:?})",
                 hiding_poly_degree, num_powers
             ),
-            Error::TrimmingDegreeTooLarge => {
-                write!(f, "the degree provided to `trim` was too large")
+            Error::TrimmingDegreeTooLarge => write!(f, "the degree provided to `trim` was too large"),
+            Error::EmptyDegreeBounds => write!(f, "provided `enforced_degree_bounds` was `Some<&[]>`"),
+            Error::EquationHasDegreeBounds(e) => {
+                write!(f, "the eqaution \"{}\" contained degree-bounded polynomials", e)
             }
-            Error::EmptyDegreeBounds => {
-                write!(f, "provided `enforced_degree_bounds` was `Some<&[]>`")
+            Error::UnsupportedDegreeBound(bound) => {
+                write!(f, "the degree bound ({:?}) is not supported by the parameters", bound,)
             }
-            Error::EquationHasDegreeBounds(e) => write!(
-                f,
-                "the eqaution \"{}\" contained degree-bounded polynomials",
-                e
-            ),
-            Error::UnsupportedDegreeBound(bound) => write!(
-                f,
-                "the degree bound ({:?}) is not supported by the parameters",
-                bound,
-            ),
             Error::IncorrectDegreeBound {
                 poly_degree,
                 degree_bound,
@@ -155,7 +139,7 @@ impl core::fmt::Display for Error {
                 degree_bound, label, poly_degree, supported_degree
             ),
             Error::IncorrectInputLength(err) => write!(f, "{}", err),
-            Error::MalformedCommitment(err) => write!(f, "{}", err)
+            Error::MalformedCommitment(err) => write!(f, "{}", err),
         }
     }
 }

@@ -1,8 +1,6 @@
 use crate::*;
 use core::ops::{Add, AddAssign};
-use snarkos_models::curves::{
-    AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero,
-};
+use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
@@ -36,12 +34,7 @@ impl<E: PairingEngine> PCUniversalParams for UniversalParams<E> {
 /// `Powers` is used to commit to and create evaluation proofs for a given
 /// polynomial.
 #[derive(Derivative)]
-#[derivative(
-    Default(bound = ""),
-    Hash(bound = ""),
-    Clone(bound = ""),
-    Debug(bound = "")
-)]
+#[derivative(Default(bound = ""), Hash(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 pub struct Powers<'a, E: PairingEngine> {
     /// Group elements of the form `β^i G`, for different values of `i`.
     pub powers_of_g: Cow<'a, [E::G1Affine]>,
@@ -94,10 +87,7 @@ pub struct Commitment<E: PairingEngine>(
 
 impl<E: PairingEngine> ToBytes for Commitment<E> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
-        &self,
-        writer: W,
-    ) -> snarkos_utilities::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(&self, writer: W) -> snarkos_utilities::io::Result<()> {
         self.0.write(writer)
     }
 }
@@ -237,14 +227,8 @@ impl<E: PairingEngine> PCProof for Proof<E> {
 
 impl<E: PairingEngine> ToBytes for Proof<E> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
-        &self,
-        mut writer: W,
-    ) -> snarkos_utilities::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(&self, mut writer: W) -> snarkos_utilities::io::Result<()> {
         self.w.write(&mut writer)?;
-        self.random_v
-            .as_ref()
-            .unwrap_or(&E::Fr::zero())
-            .write(&mut writer)
+        self.random_v.as_ref().unwrap_or(&E::Fr::zero()).write(&mut writer)
     }
 }

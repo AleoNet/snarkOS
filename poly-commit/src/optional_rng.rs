@@ -38,9 +38,7 @@ impl<R: RngCore> RngCore for OptionalRng<R> {
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
         match &mut self.0 {
             Some(r) => r.try_fill_bytes(dest),
-            None => Err(NonZeroU32::new(rand_core::Error::CUSTOM_START)
-                .unwrap()
-                .into()),
+            None => Err(NonZeroU32::new(rand_core::Error::CUSTOM_START).unwrap().into()),
         }
     }
 }
