@@ -71,7 +71,7 @@ mod rpc_tests {
         assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
         assert_eq!(memo, transaction_info["memo"]);
 
-        let digest = hex::encode(to_bytes![transaction.digest].unwrap());
+        let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
         let predicate_commitment = hex::encode(to_bytes![transaction.predicate_commitment].unwrap());
         let local_data_commitment = hex::encode(to_bytes![transaction.local_data_commitment].unwrap());

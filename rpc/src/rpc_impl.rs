@@ -181,7 +181,7 @@ impl RpcFunctions for RpcImpl {
             old_serial_numbers,
             new_commitments,
             memo,
-            digest: hex::encode(to_bytes![transaction.digest]?),
+            digest: hex::encode(to_bytes![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
             predicate_commitment: hex::encode(to_bytes![transaction.predicate_commitment]?),
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
