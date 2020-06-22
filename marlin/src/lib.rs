@@ -6,7 +6,7 @@ use snarkos_models::{
     gadgets::r1cs::ConstraintSynthesizer,
 };
 
-use snarkos_errors::{algorithms::SNARKError, gadgets::SynthesisError};
+use snarkos_errors::algorithms::SNARKError;
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::{thread_rng, Rng};
@@ -38,7 +38,7 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> Parameters<'a, E, C>
         let universal_srs = Box::new(MarlinInst::universal_setup(10000, 10000, 100000, rng).unwrap());
         let universal_srs = Box::leak(universal_srs);
         let (index_pk, index_vk) = MarlinInst::index(universal_srs, circuit).unwrap();
-        let mut params = Self {
+        let params = Self {
             index_prover_key: index_pk,
             index_verifier_key: index_vk,
         };

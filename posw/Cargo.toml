@@ -34,4 +34,4 @@ criterion = { version = "0.3.1" }
 rand_xorshift = { version = "0.2" }
 
 [features]
-print-trace = [ "snarkos-profiler/print-trace" ]
+print-trace = [ "snarkos-profiler/print-trace", "snarkos-marlin/print-trace" ]

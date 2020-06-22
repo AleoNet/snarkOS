@@ -22,3 +22,7 @@ poly-commit = { path = "../../poly-commit" }
 blake2 = { version = "0.8", default-features = false }
 rand = { version = "0.7" }
 rand_chacha = { version = "0.2.2" }
+
+[features]
+default = [ "print-trace" ]
+print-trace = [ "marlin/print-trace" ]

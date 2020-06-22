@@ -32,8 +32,12 @@ pub struct FpGadget<F: PrimeField> {
 
 impl<F: PrimeField> FpGadget<F> {
     #[inline]
-    pub fn from<CS: ConstraintSystem<F>>(mut cs: CS, value: &F) -> Self {
-        Self::alloc(cs.ns(|| "from"), || Ok(*value)).unwrap()
+    pub fn from<CS: ConstraintSystem<F>>(value: &F) -> Self {
+        let value = value.clone();
+        Self {
+            value: Some(value),
+            variable: LinearCombination::from((value, CS::one())).into(),
+        }
     }
 }
 

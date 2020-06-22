@@ -294,7 +294,6 @@ impl<T: FromBytes> FromBytes for Vec<T> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let len = u64::read(&mut reader)?;
-        println!("read len: {}", len);
         let mut v = vec![];
         for _ in 0..len {
             v.push(T::read(&mut reader)?);
@@ -342,6 +341,7 @@ impl<T: ToBytes> ToBytes for Option<T> {
 impl<'a, T: 'a + ToBytes> ToBytes for &'a [T] {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.len() as u64).write(&mut writer)?;
         for item in *self {
             item.write(&mut writer)?;
         }
