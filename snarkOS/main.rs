@@ -16,10 +16,9 @@ use snarkos_network::{
 use snarkos_objects::AccountPublicKey;
 use snarkos_posw::Posw;
 use snarkos_rpc::start_rpc_server;
-use snarkos_utilities::bytes::FromBytes;
 
 use dirs::home_dir;
-use std::{fs, net::SocketAddr, sync::Arc};
+use std::{fs, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -107,7 +106,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.miner_address)?[..])?;
+    let miner_address = AccountPublicKey::<Components>::from_str(&config.miner_address)?;
 
     let network_id = match config.network.as_str() {
         "mainnet" => 0,

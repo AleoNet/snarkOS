@@ -275,7 +275,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let sn = Components::AccountSignature::randomize_public_key(
             &params.account_signature,
-            &account_private_key.pk_sig,
+            &account_private_key.pk_sig(&params.account_signature)?,
             &sig_and_pk_randomizer,
         )?;
         end_timer!(sn_time);

@@ -406,9 +406,12 @@ where
             // Declare variables for account contents.
             let account_cs = &mut cs.ns(|| "Check account");
 
+            let pk_sig_native = account_private_key
+                .pk_sig(&circuit_parameters.account_signature)
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
             let pk_sig =
                 AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
-                    Ok(&account_private_key.pk_sig)
+                    Ok(&pk_sig_native)
                 })?;
 
             let pk_sig_bytes = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
