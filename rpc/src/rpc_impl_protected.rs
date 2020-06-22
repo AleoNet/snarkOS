@@ -1,5 +1,4 @@
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
-use snarkos_consensus::ConsensusParameters;
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, InstantiatedDPC, Predicate},
     record::DPCRecord,
@@ -205,7 +204,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         }
 
         // Generate transaction
-        let (records, transaction) = ConsensusParameters::create_transaction(
+        let (records, transaction) = self.consensus.create_transaction(
             &self.parameters,
             old_records,
             old_account_private_keys,
@@ -216,7 +215,6 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values,
             new_payloads,
             memo,
-            transaction_input.network_id,
             &self.storage,
             rng,
         )?;
