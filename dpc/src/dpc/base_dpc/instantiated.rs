@@ -14,6 +14,7 @@ use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
+    define_merkle_tree_parameters_alternate,
     prf::Blake2s,
     signature::SchnorrSignature,
     snark::GM17,
@@ -60,6 +61,7 @@ impl PedersenSize for PredVkHashWindow {
     const WINDOW_SIZE: usize = 300;
 }
 
+// TODO (raychu86) Update the window size
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LocalDataWindow;
 
@@ -99,6 +101,7 @@ impl PedersenSize for ValueWindow {
 }
 
 define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
+define_merkle_tree_parameters_alternate!(LocalDataCommitmentMerkleParameters, LocalDataMerkleTreeCRH, 4);
 
 pub struct Components;
 
@@ -110,6 +113,8 @@ impl DPCComponents for Components {
     type InnerField = InnerField;
     type LocalDataCommitment = LocalDataCommitment;
     type LocalDataCommitmentGadget = LocalDataCommitmentGadget;
+    type LocalDataMerkleHashGadget = LocalDataMerkleTreeCRHGadget;
+    type LocalDataMerkleParameters = LocalDataCommitmentMerkleParameters;
     type OuterField = OuterField;
     type PRF = PRF;
     type PRFGadget = PRFGadget;
@@ -156,6 +161,8 @@ pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
+pub type LocalDataMerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
+
 pub type SerialNumberNonce = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredicateVerificationKeyHash = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
@@ -182,6 +189,7 @@ pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls,
 pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type LocalDataMerkleTreeCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
 
