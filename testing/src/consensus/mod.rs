@@ -26,8 +26,23 @@ pub struct TestTx;
 
 impl Transaction for TestTx {
     type Commitment = [u8; 32];
+    type Digest = [u8; 32];
+    type LocalDataCommitment = [u8; 32];
     type Memorandum = [u8; 32];
+    type PredicateCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
+
+    fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
+        Ok([0u8; 32])
+    }
+
+    fn network_id(&self) -> u8 {
+        0
+    }
+
+    fn ledger_digest(&self) -> &Self::Digest {
+        &[0u8; 32]
+    }
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
         &[[0u8; 32]]
@@ -37,23 +52,23 @@ impl Transaction for TestTx {
         &[[0u8; 32]]
     }
 
-    fn memorandum(&self) -> &Self::Memorandum {
+    fn predicate_commitment(&self) -> &Self::PredicateCommitment {
         &[0u8; 32]
     }
 
-    fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
-        Ok([0u8; 32])
-    }
-
-    fn size(&self) -> usize {
-        0
+    fn local_data_commitment(&self) -> &Self::LocalDataCommitment {
+        &[0u8; 32]
     }
 
     fn value_balance(&self) -> i64 {
         0
     }
 
-    fn network_id(&self) -> u8 {
+    fn memorandum(&self) -> &Self::Memorandum {
+        &[0u8; 32]
+    }
+
+    fn size(&self) -> usize {
         0
     }
 }

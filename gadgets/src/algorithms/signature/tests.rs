@@ -19,7 +19,7 @@ use blake2::Blake2s;
 use rand::{thread_rng, Rng};
 
 #[test]
-fn test_schnorr_signature_gadget() {
+fn test_schnorr_signature_randomize_public_key_gadget() {
     type Schnorr = SchnorrSignature<EdwardsAffine, Blake2s>;
 
     // Setup environment
