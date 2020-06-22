@@ -18,7 +18,7 @@ snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features
 
 derivative = { version = "2" }
 rand = { version = "0.7" }
-serde = { version = "1.0.112", default-features = false, features = ["derive"] }
+serde = { version = "1.0.114", default-features = false, features = ["derive"] }
 rand_xorshift = { version = "0.2", default-features = false }
 
 [features]
