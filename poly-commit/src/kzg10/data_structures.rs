@@ -1,11 +1,13 @@
-use crate::*;
+use crate::{delegate, *};
 use core::ops::{Add, AddAssign};
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, error, serialize::*, to_bytes};
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct UniversalParams<E: PairingEngine> {
     /// Group elements of the form `{ \beta^i G }`, where `i` ranges from 0 to `degree`.
     pub powers_of_g: Vec<E::G1Affine>,
@@ -24,6 +26,8 @@ pub struct UniversalParams<E: PairingEngine> {
     #[derivative(Debug = "ignore")]
     pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
+
+delegate!(UniversalParams);
 
 impl<E: PairingEngine> PCUniversalParams for UniversalParams<E> {
     fn max_degree(&self) -> usize {
@@ -52,6 +56,7 @@ impl<E: PairingEngine> Powers<'_, E> {
 /// `VerifierKey` is used to check evaluation proofs for a given commitment.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct VerifierKey<E: PairingEngine> {
     /// The generator of G1.
     pub g: E::G1Affine,
@@ -68,6 +73,7 @@ pub struct VerifierKey<E: PairingEngine> {
     #[derivative(Debug = "ignore")]
     pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
+delegate!(VerifierKey);
 
 /// `Commitment` commits to a polynomial. It is output by `KZG10::commit`.
 #[derive(Derivative)]
@@ -80,17 +86,13 @@ pub struct VerifierKey<E: PairingEngine> {
     PartialEq(bound = ""),
     Eq(bound = "")
 )]
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct Commitment<E: PairingEngine>(
     /// The commitment is a group element.
     pub E::G1Affine,
 );
 
-impl<E: PairingEngine> ToBytes for Commitment<E> {
-    #[inline]
-    fn write<W: snarkos_utilities::io::Write>(&self, writer: W) -> snarkos_utilities::io::Result<()> {
-        self.0.write(writer)
-    }
-}
+delegate!(Commitment);
 
 impl<E: PairingEngine> PCCommitment for Commitment<E> {
     #[inline]
@@ -126,10 +128,12 @@ impl<'a, E: PairingEngine> AddAssign<(E::Fr, &'a Commitment<E>)> for Commitment<
     PartialEq(bound = ""),
     Eq(bound = "")
 )]
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct Randomness<E: PairingEngine> {
     /// For KZG10, the commitment randomness is a random polynomial.
     pub blinding_polynomial: Polynomial<E::Fr>,
 }
+delegate!(Randomness);
 
 impl<E: PairingEngine> Randomness<E> {
     /// Does `self` provide any hiding properties to the corresponding commitment?
@@ -206,6 +210,7 @@ impl<'a, E: PairingEngine> AddAssign<(E::Fr, &'a Randomness<E>)> for Randomness<
     PartialEq(bound = ""),
     Eq(bound = "")
 )]
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<E: PairingEngine> {
     /// This is a commitment to the witness polynomial; see [KZG10] for more details.
     pub w: E::G1Affine,
@@ -213,6 +218,7 @@ pub struct Proof<E: PairingEngine> {
     /// the evaluation proof was produced.
     pub random_v: Option<E::Fr>,
 }
+delegate!(Proof);
 
 impl<E: PairingEngine> PCProof for Proof<E> {
     fn size_in_bytes(&self) -> usize {
@@ -222,13 +228,5 @@ impl<E: PairingEngine> PCProof for Proof<E> {
             0
         };
         to_bytes![E::G1Affine::zero()].unwrap().len() / 2 + hiding_size
-    }
-}
-
-impl<E: PairingEngine> ToBytes for Proof<E> {
-    #[inline]
-    fn write<W: snarkos_utilities::io::Write>(&self, mut writer: W) -> snarkos_utilities::io::Result<()> {
-        self.w.write(&mut writer)?;
-        self.random_v.as_ref().unwrap_or(&E::Fr::zero()).write(&mut writer)
     }
 }

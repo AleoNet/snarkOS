@@ -85,6 +85,7 @@ pub type QuerySet<'a, F> = BTreeSet<(String, F)>;
 pub type Evaluations<'a, F> = BTreeMap<(String, F), F>;
 
 /// A proof of satisfaction of linear combinations.
+#[derive(Clone, Debug)]
 pub struct BatchLCProof<F: Field, PC: PolynomialCommitment<F>> {
     /// Evaluation proof.
     pub proof: PC::BatchProof,

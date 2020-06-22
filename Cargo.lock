@@ -1628,6 +1628,7 @@ dependencies = [
  "rayon",
  "snarkos-algorithms",
  "snarkos-curves",
+ "snarkos-errors",
  "snarkos-models",
  "snarkos-profiler",
  "snarkos-utilities",

@@ -21,6 +21,7 @@ edition = "2018"
 
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0" }
 snarkos-models = { path = "../models", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }

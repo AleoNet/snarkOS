@@ -352,3 +352,21 @@ impl<F: Field> core::ops::Deref for LinearCombination<F> {
         &self.terms
     }
 }
+
+/// Helper macro to forward all derived implementations to the ToBytes and FromBytes traits
+#[macro_export]
+macro_rules! delegate {
+    ($ty: ident) => {
+        impl<E: PairingEngine> FromBytes for $ty<E> {
+            fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+                CanonicalDeserialize::deserialize(&mut reader).map_err(|_| error("could not deserialize struct"))
+            }
+        }
+
+        impl<E: PairingEngine> ToBytes for $ty<E> {
+            fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+                CanonicalSerialize::serialize(self, &mut writer).map_err(|_| error("could not serialize struct"))
+            }
+        }
+    };
+}

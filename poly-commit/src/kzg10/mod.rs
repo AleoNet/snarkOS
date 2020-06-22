@@ -25,6 +25,7 @@ pub use data_structures::*;
 /// [Kate, Zaverucha and Goldbgerg][kzg10]
 ///
 /// [kzg10]: http://cacr.uwaterloo.ca/techreports/2010/cacr2010-10.pdf
+#[derive(Clone, Debug)]
 pub struct KZG10<E: PairingEngine> {
     _engine: PhantomData<E>,
 }
