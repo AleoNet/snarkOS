@@ -192,12 +192,6 @@ impl_params!(
     96
 );
 impl_params!(
-    LedgerMerkleTreeParameters,
-    ledger_merkle_tree_test,
-    "ledger_merkle_tree",
-    65556
-);
-impl_params!(
     LocalDataCommitmentParameters,
     local_data_commitment_test,
     "local_data_commitment",
@@ -228,6 +222,20 @@ impl_params!(
     serial_number_nonce_crh_test,
     "serial_number_nonce_crh",
     295972
+);
+
+// Merkle Tree
+impl_params!(
+    LedgerMerkleTreeParameters,
+    ledger_merkle_tree_test,
+    "ledger_merkle_tree",
+    65556
+);
+impl_params!(
+    LocalDataMerkleTreeParameters,
+    local_data_merkle_tree_test,
+    "local_data_merkle_tree",
+    65556
 );
 
 // POSW SNARK
