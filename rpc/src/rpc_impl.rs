@@ -2,10 +2,11 @@ use crate::{rpc_types::*, RpcFunctions};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
+    parameters::PublicParameters,
     record::DPCRecord,
 };
 use snarkos_errors::rpc::RpcError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::{dpc::Record, objects::Transaction};
 use snarkos_network::{context::Context, process_transaction_internal};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
@@ -15,38 +16,48 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use snarkos_models::dpc::Record;
 use std::sync::Arc;
 use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
+#[derive(Clone)]
 pub struct RpcImpl {
     /// Blockchain database storage.
-    storage: Arc<MerkleTreeLedger>,
+    pub(crate) storage: Arc<MerkleTreeLedger>,
+
+    /// Public Parameters
+    pub(crate) parameters: PublicParameters<Components>,
 
     /// Network context held by the server.
-    server_context: Arc<Context>,
+    pub(crate) server_context: Arc<Context>,
 
     /// Consensus parameters generated from node config.
-    consensus: ConsensusParameters,
+    pub(crate) consensus: ConsensusParameters,
 
     /// Handle to access the memory pool of transactions.
-    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
+    pub(crate) memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
+
+    /// RPC credentials for accessing guarded endpoints
+    pub(crate) credentials: Option<RpcCredentials>,
 }
 
 impl RpcImpl {
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
+        parameters: PublicParameters<Components>,
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
+        credentials: Option<RpcCredentials>,
     ) -> Self {
         Self {
             storage,
+            parameters,
             server_context,
             consensus,
             memory_pool_lock,
+            credentials,
         }
     }
 }
@@ -83,12 +94,14 @@ impl RpcFunctions for RpcImpl {
                 height,
                 confirmations,
                 size: block.serialize()?.len(),
+                previous_block_hash: block.header.previous_block_hash.to_string(),
+                merkle_root: block.header.merkle_root_hash.to_string(),
+                pedersen_merkle_root_hash: block.header.pedersen_merkle_root_hash.to_string(),
+                proof: block.header.proof.to_string(),
                 time: block.header.time,
                 difficulty_target: block.header.difficulty_target,
                 nonce: block.header.nonce,
-                merkle_root: hex::encode(block.header.merkle_root_hash.0),
                 transactions,
-                previous_block_hash: hex::encode(block.header.previous_block_hash.0),
             })
         } else {
             Err(RpcError::InvalidBlockHash(block_hash_string))
@@ -153,8 +166,17 @@ impl RpcFunctions for RpcImpl {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
 
+        let transaction_id = transaction.transaction_id()?;
+        let block_number = match self.storage.get_transaction_location(&transaction_id.to_vec())? {
+            Some(block_location) => Some(
+                self.storage
+                    .get_block_number(&BlockHeaderHash(block_location.block_hash))?,
+            ),
+            None => None,
+        };
+
         Ok(TransactionInfo {
-            txid: hex::encode(&transaction.transaction_id()?),
+            txid: hex::encode(&transaction_id),
             size: transaction_bytes.len(),
             old_serial_numbers,
             new_commitments,
@@ -165,6 +187,7 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
+            block_number,
         })
     }
 
@@ -175,10 +198,20 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
+        if !self
+            .consensus
+            .verify_transaction(&self.parameters, &transaction, &self.storage)?
+        {
+            // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
+            return Ok("Transaction did not verify".into());
+        }
+
         match !self.storage.transcation_conflicts(&transaction) {
             true => {
                 Runtime::new()?.block_on(process_transaction_internal(
                     self.server_context.clone(),
+                    &self.consensus,
+                    &self.parameters,
                     self.storage.clone(),
                     self.memory_pool_lock.clone(),
                     to_bytes![transaction]?.to_vec(),
@@ -189,34 +222,6 @@ impl RpcFunctions for RpcImpl {
             }
             false => Ok("Transaction contains spent records".into()),
         }
-    }
-
-    /// Returns information about a record from serialized record bytes.
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
-        let record_bytes = hex::decode(record_bytes)?;
-        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
-
-        let account_public_key = hex::encode(to_bytes![record.account_public_key()]?);
-        let payload = RPCRecordPayload {
-            payload: hex::encode(to_bytes![record.payload()]?),
-        };
-        let birth_predicate_repr = hex::encode(record.birth_predicate_repr());
-        let death_predicate_repr = hex::encode(record.death_predicate_repr());
-        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
-        let commitment = hex::encode(to_bytes![record.commitment()]?);
-        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
-
-        Ok(RecordInfo {
-            account_public_key,
-            is_dummy: record.is_dummy(),
-            value: record.value(),
-            payload,
-            birth_predicate_repr,
-            death_predicate_repr,
-            serial_number_nonce,
-            commitment,
-            commitment_randomness,
-        })
     }
 
     /// Fetch the number of connected peers this node has.
@@ -264,6 +269,34 @@ impl RpcFunctions for RpcImpl {
             coinbase_value,
         })
     }
-}
 
-impl RpcImpl {}
+    // Record handling
+
+    /// Returns information about a record from serialized record bytes.
+    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
+        let record_bytes = hex::decode(record_bytes)?;
+        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
+
+        let account_public_key = hex::encode(to_bytes![record.account_public_key()]?);
+        let payload = RPCRecordPayload {
+            payload: hex::encode(to_bytes![record.payload()]?),
+        };
+        let birth_predicate_repr = hex::encode(record.birth_predicate_repr());
+        let death_predicate_repr = hex::encode(record.death_predicate_repr());
+        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
+        let commitment = hex::encode(to_bytes![record.commitment()]?);
+        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
+
+        Ok(RecordInfo {
+            account_public_key,
+            is_dummy: record.is_dummy(),
+            value: record.value(),
+            payload,
+            birth_predicate_repr,
+            death_predicate_repr,
+            serial_number_nonce,
+            commitment,
+            commitment_randomness,
+        })
+    }
+}

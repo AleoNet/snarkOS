@@ -289,6 +289,8 @@ impl Server {
     async fn receive_transaction(&mut self, message: Transaction, channel: Arc<Channel>) -> Result<(), ServerError> {
         process_transaction_internal(
             self.context.clone(),
+            &self.consensus,
+            &self.parameters,
             self.storage.clone(),
             self.memory_pool_lock.clone(),
             message.bytes,

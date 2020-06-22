@@ -1,7 +1,9 @@
 use crate::{
+    algorithms::CRHError,
     consensus::ConsensusError,
+    dpc::DPCError,
     network::SendError,
-    objects::{BlockError, TransactionError},
+    objects::{AccountError, BlockError, TransactionError},
     storage::StorageError,
 };
 
@@ -10,6 +12,9 @@ use std::fmt::Debug;
 #[derive(Debug, Error)]
 pub enum RpcError {
     #[error("{}", _0)]
+    AccountError(AccountError),
+
+    #[error("{}", _0)]
     BlockError(BlockError),
 
     #[error("{}", _0)]
@@ -17,6 +22,12 @@ pub enum RpcError {
 
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[error("{}", _0)]
+    CRHError(CRHError),
+
+    #[error("{}", _0)]
+    DPCError(DPCError),
 
     #[error("invalid block hash: {}", _0)]
     InvalidBlockHash(String),
@@ -34,6 +45,12 @@ pub enum RpcError {
     TransactionError(TransactionError),
 }
 
+impl From<AccountError> for RpcError {
+    fn from(error: AccountError) -> Self {
+        RpcError::AccountError(error)
+    }
+}
+
 impl From<BlockError> for RpcError {
     fn from(error: BlockError) -> Self {
         RpcError::BlockError(error)
@@ -43,6 +60,18 @@ impl From<BlockError> for RpcError {
 impl From<ConsensusError> for RpcError {
     fn from(error: ConsensusError) -> Self {
         RpcError::ConsensusError(error)
+    }
+}
+
+impl From<CRHError> for RpcError {
+    fn from(error: CRHError) -> Self {
+        RpcError::CRHError(error)
+    }
+}
+
+impl From<DPCError> for RpcError {
+    fn from(error: DPCError) -> Self {
+        RpcError::DPCError(error)
     }
 }
 

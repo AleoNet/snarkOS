@@ -25,18 +25,22 @@ pub struct Config {
     pub ip: String,
     pub port: u16,
     pub path: String,
-    pub rpc_port: u16,
     pub bootnodes: Vec<String>,
     pub miner_address: String,
     pub mempool_interval: u8,
     pub min_peers: u16,
     pub max_peers: u16,
 
+    pub rpc_port: u16,
+    pub rpc_username: Option<String>,
+    pub rpc_password: Option<String>,
+
     //Subcommand
     subcommand: Option<String>,
 }
 
 impl Default for Config {
+    // TODO (raychu86) Parse from a snarkos config file
     fn default() -> Self {
         Self {
             // Flags
@@ -49,16 +53,20 @@ impl Default for Config {
             ip: "0.0.0.0".into(),
             port: 4130,
             path: "snarkos_db".into(),
-            rpc_port: 3030,
             bootnodes: MAINNET_BOOTNODES
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
-            miner_address: "90c0290b0913f0679ae6b27dde990a22863e14bced9125da7f446e5e953af900".into(),
-            subcommand: None,
+            miner_address: "8eba7b1b4be0cd92a4bf77e812d9e48e6804b3bb3971a350105511200554130d".into(),
             mempool_interval: 5,
             min_peers: 2,
             max_peers: 20,
+
+            rpc_port: 3030,
+            rpc_username: None,
+            rpc_password: None,
+
+            subcommand: None,
         }
     }
 }
@@ -76,12 +84,14 @@ impl Config {
             "ip" => self.ip(arguments.value_of(option)),
             "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "path" => self.path(arguments.value_of(option)),
-            "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "connect" => self.connect(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "min-peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "max-peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "rpc-username" => self.rpc_username(arguments.value_of(option)),
+            "rpc-password" => self.rpc_password(arguments.value_of(option)),
             _ => (),
         });
     }
@@ -143,12 +153,6 @@ impl Config {
         };
     }
 
-    fn rpc_port(&mut self, argument: Option<u16>) {
-        if let Some(rpc_port) = argument {
-            self.rpc_port = rpc_port;
-        }
-    }
-
     fn connect(&mut self, argument: Option<&str>) {
         if let Some(bootnode) = argument {
             self.bootnodes = vec![bootnode.to_string()];
@@ -178,6 +182,24 @@ impl Config {
             self.max_peers = num_peers;
         }
     }
+
+    fn rpc_port(&mut self, argument: Option<u16>) {
+        if let Some(rpc_port) = argument {
+            self.rpc_port = rpc_port;
+        }
+    }
+
+    fn rpc_username(&mut self, argument: Option<&str>) {
+        if let Some(username) = argument {
+            self.rpc_username = Some(username.to_string());
+        }
+    }
+
+    fn rpc_password(&mut self, argument: Option<&str>) {
+        if let Some(password) = argument {
+            self.rpc_password = Some(password.to_string());
+        }
+    }
 }
 
 /// Parses command line arguments into node configuration parameters.
@@ -199,12 +221,14 @@ impl CLI for ConfigCli {
         option::IP,
         option::PORT,
         option::PATH,
-        option::RPC_PORT,
         option::CONNECT,
         option::MINER_ADDRESS,
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
         option::MAX_PEERS,
+        option::RPC_PORT,
+        option::RPC_USERNAME,
+        option::RPC_PASSWORD,
     ];
     const SUBCOMMANDS: &'static [SubCommandType] = &[];
 
@@ -220,12 +244,14 @@ impl CLI for ConfigCli {
             "ip",
             "port",
             "path",
-            "rpc-port",
             "connect",
             "miner-address",
             "mempool-interval",
             "min-peers",
             "max-peers",
+            "rpc-port",
+            "rpc-username",
+            "rpc-password",
         ]);
 
         Ok(config)

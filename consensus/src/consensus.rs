@@ -152,8 +152,33 @@ impl ConsensusParameters {
         Ok(())
     }
 
-    /// Check if the block is valid
+    /// Check if the transaction is valid
+    pub fn verify_transaction(
+        &self,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        transaction: &Tx,
+        ledger: &MerkleTreeLedger,
+    ) -> Result<bool, ConsensusError> {
+        // TODO (raychu86) add network_id check
+
+        // Check that all the transaction proofs verify
+        Ok(InstantiatedDPC::verify(parameters, transaction, ledger)?)
+    }
+
+    /// Check if the block transactions are valid
     /// Check all outpoints, verify signatures, and calculate transaction fees.
+    pub fn verify_transactions(
+        &self,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        transactions: &Vec<Tx>,
+        ledger: &MerkleTreeLedger,
+    ) -> Result<bool, ConsensusError> {
+        // Check that all the transaction proofs verify
+        Ok(InstantiatedDPC::verify_transactions(parameters, transactions, ledger)?)
+    }
+
+    /// Check if the block is valid
+    /// Verify signatures, and calculate transaction fees.
     pub fn verify_block(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
@@ -204,11 +229,7 @@ impl ConsensusParameters {
         }
 
         // Check that all the transction proofs verify
-        Ok(InstantiatedDPC::verify_transactions(
-            parameters,
-            &block.transactions.0,
-            ledger,
-        )?)
+        Ok(self.verify_transactions(parameters, &block.transactions.0, ledger)?)
     }
 
     /// Return whether or not the given block is valid and insert it.
@@ -424,7 +445,6 @@ impl ConsensusParameters {
                     &mut rng,
                 )
                 .expect("Proving should work");
-                #[cfg(debug_assertions)]
                 {
                     let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
@@ -468,7 +488,6 @@ impl ConsensusParameters {
                     &mut rng,
                 )
                 .expect("Proving should work");
-                #[cfg(debug_assertions)]
                 {
                     let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data

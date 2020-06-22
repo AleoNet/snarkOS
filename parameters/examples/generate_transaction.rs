@@ -138,7 +138,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let ledger = empty_ledger(ledger_parameters, &path)?;
 
     // Generate the transaction
-    let (_records, transaction) = ConsensusParameters::create_transaction(
+    let (records, transaction) = ConsensusParameters::create_transaction(
         &parameters,
         old_records,
         old_account_private_keys,
@@ -158,7 +158,12 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let transaction_bytes = to_bytes![transaction]?;
 
     let size = transaction_bytes.len();
-    println!("{}\n\tsize - {}", file_name, size);
+    println!("{}\n\tsize - {}\n", file_name, size);
+
+    for (i, record) in records.iter().enumerate() {
+        let record_bytes = to_bytes![record]?;
+        println!("record {}: {:?}\n", i, hex::encode(record_bytes));
+    }
 
     drop(ledger);
     Ledger::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
