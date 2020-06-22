@@ -1,0 +1,41 @@
+[package]
+name = "poly-commit"
+version = "0.1.0"
+authors = [
+  "Alessandro Chiesa <alexch@berkeley.edu>",
+  "Mary Maller <mary.maller.15@ucl.ac.uk>",
+  "Yuncong Hu <huyuncongh@gmail.com>",
+  "William Lin",
+  "Pratyush Mishra <pratyush@berkeley.edu>",
+  "Noah Vesely <noah.vesely.18@ucl.ac.uk>",
+  "Nicholas Ward <npward@berkeley.edu>",
+]
+description = "A library for constructing polynomial commitment schemes for use in zkSNARKs"
+repository = "https://github.com/scipr/poly-commit"
+documentation = "https://docs.rs/poly-commit/"
+keywords = ["cryptography", "polynomial commitments", "elliptic curves", "pairing"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+license = "MIT/Apache-2.0"
+edition = "2018"
+
+[dependencies]
+snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
+snarkos-models = { path = "../models", version = "0.8.0" }
+snarkos-profiler = { path = "../profiler", version = "0.8.0" }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+
+derivative = { version = "2", features = [ "use_core" ] }
+digest = "0.8"
+rand_core = { version = "0.5", default-features = false }
+rayon = { version = "1", optional = true }
+
+[dev-dependencies]
+snarkos-curves = { path = "../curves", version = "0.8.0" }
+
+rand = { version = "0.7", default-features = false }
+blake2 = { version = "0.8", default-features = false }
+
+[features]
+default = ["std"]
+std = []

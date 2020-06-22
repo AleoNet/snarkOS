@@ -1617,6 +1617,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "poly-commit"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "rand",
+ "rand_core",
+ "rayon",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-models",
+ "snarkos-profiler",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
