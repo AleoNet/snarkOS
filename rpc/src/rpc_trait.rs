@@ -29,9 +29,6 @@ pub trait RpcFunctions {
     #[rpc(name = "sendtransaction")]
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError>;
 
-    #[rpc(name = "decoderecord")]
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
-
     #[rpc(name = "getconnectioncount")]
     fn get_connection_count(&self) -> Result<usize, RpcError>;
 
@@ -40,4 +37,21 @@ pub trait RpcFunctions {
 
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
+
+    #[rpc(name = "decoderecord")]
+    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
+}
+
+pub trait ProtectedRpcFunctions {
+    /// Create a transaction and return encoded transaction and output records
+    fn create_raw_transaction(
+        &self,
+        transaction_input: TransactionInputs,
+    ) -> Result<CreateRawTransactionOuput, RpcError>;
+
+    /// Fetch the node's stored record commitments
+    fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError>;
+
+    /// Returns hex encoded bytes of a record from its record commitment
+    fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 }

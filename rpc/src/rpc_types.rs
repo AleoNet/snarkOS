@@ -1,5 +1,20 @@
+use jsonrpc_http_server::jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+/// Returned value for the `getblock` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RpcCredentials {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Default, Clone)]
+pub struct Meta {
+    pub auth: Option<String>,
+}
+
+impl Metadata for Meta {}
 
 /// Returned value for the `getblock` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -16,6 +31,18 @@ pub struct BlockInfo {
     /// Block Size
     pub size: usize,
 
+    /// Previous block hash
+    pub previous_block_hash: String,
+
+    /// Merkle root representing the transactions in the block
+    pub merkle_root: String,
+
+    /// Merkle root of the transactions in the block using a Pedersen hash
+    pub pedersen_merkle_root_hash: String,
+
+    /// Proof of Succinct Work
+    pub proof: String,
+
     /// Block time
     pub time: i64,
 
@@ -25,14 +52,8 @@ pub struct BlockInfo {
     /// Nonce
     pub nonce: u32,
 
-    /// Merkle Root
-    pub merkle_root: String,
-
     /// List of transaction ids
     pub transactions: Vec<String>,
-
-    /// Previous block hash
-    pub previous_block_hash: String,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
@@ -76,6 +97,9 @@ pub struct TransactionInfo {
 
     /// Transaction signatures (Delegated DPC)
     pub signatures: Vec<String>,
+
+    /// Block the transaction lives in
+    pub block_number: Option<u32>,
 }
 
 /// Record payload
@@ -136,4 +160,44 @@ pub struct BlockTemplate {
 
     /// Amount spendable by the coinbase transaction (block rewards + transaction fees)
     pub coinbase_value: u64,
+}
+
+/// Input for the `createrawtransaction` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionInputs {
+    /// Encoded records that are being spent
+    pub old_records: Vec<String>,
+
+    /// Account private keys owning the spent records
+    pub old_account_private_keys: Vec<String>,
+
+    /// Transaction recipent and amounts
+    pub recipients: Vec<TransactionRecipient>,
+
+    /// Transaction memo
+    pub memo: Option<String>,
+
+    /// Network id of the transaction
+    pub network_id: u8,
+    // Attributes that will be relevant for custom predicates
+    //    pub new_birth_predicates: Vec<String>,
+    //    pub new_death_predicates: Vec<String>,
+    //    pub new_payloads: Vec<String>,
+}
+
+/// Recipient of a transaction
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionRecipient {
+    /// Recipient account public key
+    pub address: String,
+
+    /// Amount being sent
+    pub amount: u64,
+}
+
+/// Output for the `createrawtransaction` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CreateRawTransactionOuput {
+    pub encoded_transaction: String,
+    pub encoded_records: Vec<String>,
 }

@@ -95,12 +95,19 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     // Start rpc thread
 
     if config.jsonrpc {
+        info!("Loading Aleo parameters for RPC...");
+        let proving_parameters = PublicParameters::<Components>::load(false)?;
+        info!("Loading complete.");
+
         start_rpc_server(
             config.rpc_port,
             storage.clone(),
+            proving_parameters,
             server.context.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
+            config.rpc_username,
+            config.rpc_password,
         )
         .await?;
     }

@@ -1,4 +1,5 @@
 use crate::{
+    consensus::ConsensusError,
     network::{message::MessageError, ConnectError},
     objects::BlockError,
 };
@@ -10,6 +11,9 @@ pub enum SendError {
 
     #[error("{}", _0)]
     ConnectError(ConnectError),
+
+    #[error("{}", _0)]
+    ConsensusError(ConsensusError),
 
     #[error("{}", _0)]
     Message(String),
@@ -30,6 +34,12 @@ impl From<BlockError> for SendError {
 impl From<ConnectError> for SendError {
     fn from(error: ConnectError) -> Self {
         SendError::ConnectError(error)
+    }
+}
+
+impl From<ConsensusError> for SendError {
+    fn from(error: ConsensusError) -> Self {
+        SendError::ConsensusError(error)
     }
 }
 

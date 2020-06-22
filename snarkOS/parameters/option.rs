@@ -21,13 +21,6 @@ pub const PORT: OptionType = (
     &[],
 );
 
-pub const RPC_PORT: OptionType = (
-    "[rpc-port] --rpc-port=[rpc-port] 'Run the rpc server on a specified port'",
-    &["no_jsonrpc"],
-    &[],
-    &[],
-);
-
 pub const CONNECT: OptionType = (
     "[connect] --connect=[ip] 'Specify a node ip address to connect to on startup'",
     &[],
@@ -61,4 +54,25 @@ pub const MAX_PEERS: OptionType = (
     &[],
     &[],
     &[],
+);
+
+pub const RPC_PORT: OptionType = (
+    "[rpc-port] --rpc-port=[rpc-port] 'Run the rpc server on a specified port'",
+    &["no_jsonrpc"],
+    &[],
+    &[],
+);
+
+pub const RPC_USERNAME: OptionType = (
+    "[rpc-username] --rpc-username=[rpc-username] 'Specify a username for rpc authentication'",
+    &["no-jsonrpc"],
+    &[],
+    &["rpc-password"],
+);
+
+pub const RPC_PASSWORD: OptionType = (
+    "[rpc-password] --rpc-password=[rpc-password] 'Specify a password for rpc authentication'",
+    &["no-jsonrpc"],
+    &[],
+    &["rpc-username"],
 );
