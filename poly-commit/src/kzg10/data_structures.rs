@@ -2,7 +2,12 @@ use crate::{delegate, *};
 use core::ops::{Add, AddAssign};
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
-use snarkos_utilities::{bytes::ToBytes, error, serialize::*, to_bytes};
+use snarkos_utilities::{
+    bytes::ToBytes,
+    error,
+    serialize::{CanonicalDeserialize, CanonicalSerialize},
+    to_bytes,
+};
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]

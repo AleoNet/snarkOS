@@ -5,8 +5,13 @@ use core::{
 };
 use rand_core::RngCore;
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::Field;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    error as error_fn,
+    serialize::*,
+};
 
 /// Labels a `LabeledPolynomial` or a `LabeledCommitment`.
 pub type PolynomialLabel = String;
@@ -42,7 +47,7 @@ pub trait PCVerifierKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of commitments for any polynomial
 /// commitment scheme.
-pub trait PCCommitment: Clone + ToBytes {
+pub trait PCCommitment: CanonicalDeserialize + CanonicalSerialize + Clone + ToBytes {
     /// Outputs a non-hiding commitment to the zero polynomial.
     fn empty() -> Self;
 
@@ -156,11 +161,23 @@ impl<'a, F: Field> LabeledPolynomial<'a, F> {
 }
 
 /// A commitment along with information about its degree bound (if any).
-#[derive(Clone)]
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct LabeledCommitment<C: PCCommitment> {
     label: PolynomialLabel,
     commitment: C,
     degree_bound: Option<usize>,
+}
+
+impl<C: PCCommitment> FromBytes for LabeledCommitment<C> {
+    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        CanonicalDeserialize::deserialize(&mut reader).map_err(|_| error_fn("could not deserialize struct"))
+    }
+}
+
+impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
+    fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        CanonicalSerialize::serialize(self, &mut writer).map_err(|_| error_fn("could not serialize struct"))
+    }
 }
 
 impl<C: PCCommitment> LabeledCommitment<C> {
@@ -186,13 +203,6 @@ impl<C: PCCommitment> LabeledCommitment<C> {
     /// Retrieve the degree bound in `self`.
     pub fn degree_bound(&self) -> Option<usize> {
         self.degree_bound
-    }
-}
-
-impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
-    #[inline]
-    fn write<W: snarkos_utilities::io::Write>(&self, writer: W) -> snarkos_utilities::io::Result<()> {
-        self.commitment.write(writer)
     }
 }
 

@@ -17,7 +17,13 @@ extern crate derivative;
 extern crate snarkos_profiler;
 
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::Field;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    error as error_fn,
+    serialize::*,
+};
 
 use core::iter::FromIterator;
 use rand_core::RngCore;
@@ -85,12 +91,24 @@ pub type QuerySet<'a, F> = BTreeSet<(String, F)>;
 pub type Evaluations<'a, F> = BTreeMap<(String, F), F>;
 
 /// A proof of satisfaction of linear combinations.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct BatchLCProof<F: Field, PC: PolynomialCommitment<F>> {
     /// Evaluation proof.
     pub proof: PC::BatchProof,
     /// Evaluations required to verify the proof.
     pub evals: Option<Vec<F>>,
+}
+
+impl<F: Field, PC: PolynomialCommitment<F>> FromBytes for BatchLCProof<F, PC> {
+    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        CanonicalDeserialize::deserialize(&mut reader).map_err(|_| error_fn("could not deserialize struct"))
+    }
+}
+
+impl<F: Field, PC: PolynomialCommitment<F>> ToBytes for BatchLCProof<F, PC> {
+    fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        CanonicalSerialize::serialize(self, &mut writer).map_err(|_| error_fn("could not serialize struct"))
+    }
 }
 
 /// Describes the interface for a polynomial commitment scheme that allows
@@ -113,7 +131,7 @@ pub trait PolynomialCommitment<F: Field>: Sized {
     /// The evaluation proof for a single point.
     type Proof: PCProof + Clone;
     /// The evaluation proof for a query set.
-    type BatchProof: Clone + From<Vec<Self::Proof>> + Into<Vec<Self::Proof>>;
+    type BatchProof: CanonicalSerialize + CanonicalDeserialize + Clone + From<Vec<Self::Proof>> + Into<Vec<Self::Proof>>;
     /// The error type for the scheme.
     type Error: snarkos_utilities::error::Error + From<Error>;
 
