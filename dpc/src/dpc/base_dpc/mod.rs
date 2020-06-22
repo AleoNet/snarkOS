@@ -280,7 +280,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let sn = Components::AccountSignature::randomize_public_key(
             &params.account_signature,
-            &account_private_key.pk_sig,
+            &account_private_key.pk_sig(&params.account_signature)?,
             &sig_and_pk_randomizer,
         )?;
         end_timer!(sn_time);
@@ -695,7 +695,7 @@ where
 
         // Generate Schnorr signature on transaction data
 
-        let signature_time = start_timer!(|| format!("Sign and randomize transaction contents {}", i));
+        let signature_time = start_timer!(|| "Sign and randomize transaction contents");
 
         let signature_message = to_bytes![
             network_id,

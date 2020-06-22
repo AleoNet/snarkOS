@@ -9,12 +9,9 @@ use snarkos_utilities::{
     rand::UniformRand,
 };
 
-use base58::ToBase58;
+use base58::{FromBase58, ToBase58};
 use rand::Rng;
-use std::{
-    fmt,
-    io::{Read, Result as IoResult, Write},
-};
+use std::{fmt, str::FromStr};
 
 #[derive(Derivative)]
 #[derivative(
@@ -24,7 +21,6 @@ use std::{
     Eq(bound = "C: DPCComponents")
 )]
 pub struct AccountPrivateKey<C: DPCComponents> {
-    pub pk_sig: <C::AccountSignature as SignatureScheme>::PublicKey,
     pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub metadata: [u8; 32],
@@ -40,7 +36,6 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
     ) -> Result<Self, AccountError> {
         // Sample SIG key pair.
         let sk_sig = C::AccountSignature::generate_private_key(parameters, rng)?;
-        let pk_sig = C::AccountSignature::generate_public_key(parameters, &sk_sig)?;
 
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
@@ -51,37 +46,42 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
 
         // Construct the account private key.
         Ok(Self {
-            pk_sig,
             sk_sig,
             sk_prf,
             metadata: *metadata,
             r_pk,
         })
     }
-}
 
-impl<C: DPCComponents> ToBytes for AccountPrivateKey<C> {
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.pk_sig.write(&mut writer)?;
-        self.sk_sig.write(&mut writer)?;
-        self.sk_prf.write(&mut writer)?;
-        self.metadata.write(&mut writer)?;
-        self.r_pk.write(&mut writer)
+    pub fn pk_sig(
+        &self,
+        parameters: &C::AccountSignature,
+    ) -> Result<<C::AccountSignature as SignatureScheme>::PublicKey, AccountError> {
+        Ok(C::AccountSignature::generate_public_key(parameters, &self.sk_sig)?)
     }
 }
 
-impl<C: DPCComponents> FromBytes for AccountPrivateKey<C> {
-    /// Reads in an account private key buffer.
-    #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let pk_sig: <C::AccountSignature as SignatureScheme>::PublicKey = FromBytes::read(&mut reader)?;
+impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
+    type Err = AccountError;
+
+    /// Reads in an account private key string.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.from_base58()?;
+        if data.len() != 132 {
+            return Err(AccountError::InvalidByteLength(data.len()));
+        }
+
+        if &data[0..4] != account_format::PRIVATE_KEY_PREFIX {
+            return Err(AccountError::InvalidPrefixBytes(data[0..4].to_vec()));
+        }
+
+        let mut reader = &data[4..];
         let sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
         let metadata: [u8; 32] = FromBytes::read(&mut reader)?;
         let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
 
         Ok(Self {
-            pk_sig,
             sk_sig,
             sk_prf,
             metadata,

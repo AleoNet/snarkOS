@@ -1,10 +1,9 @@
 use crate::algorithms::{CommitmentScheme, SignatureScheme};
 use snarkos_errors::objects::AccountError;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
 
-pub trait AccountScheme: FromBytes + ToBytes {
+pub trait AccountScheme: Sized {
     type AccountPublicKey: Default;
     type AccountPrivateKey: Default;
     type CommitmentScheme: CommitmentScheme;

@@ -17,6 +17,7 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
     max_block_size: 1_000_000usize,
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
+    network_id: 0,
     verifier: Posw::verify_only().unwrap(),
 });
 

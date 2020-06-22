@@ -16,10 +16,9 @@ use snarkos_network::{
 use snarkos_objects::AccountPublicKey;
 use snarkos_posw::Posw;
 use snarkos_rpc::start_rpc_server;
-use snarkos_utilities::bytes::FromBytes;
 
 use dirs::home_dir;
-use std::{fs, net::SocketAddr, sync::Arc};
+use std::{fs, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -39,10 +38,17 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
+    let network_id = match config.network.as_str() {
+        "mainnet" => 0,
+        "testnet" => 1,
+        _ => 0,
+    };
+
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
+        network_id,
         verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
@@ -107,13 +113,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    let miner_address: AccountPublicKey<Components> = FromBytes::read(&hex::decode(config.miner_address)?[..])?;
-
-    let network_id = match config.network.as_str() {
-        "mainnet" => 0,
-        "testnet" => 1,
-        _ => 0,
-    };
+    let miner_address = AccountPublicKey::<Components>::from_str(&config.miner_address)?;
 
     if config.is_miner {
         MinerInstance::new(
@@ -123,7 +123,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             storage.clone(),
             memory_pool_lock.clone(),
             server.context.clone(),
-            network_id,
         )
         .spawn();
     }

@@ -1,7 +1,16 @@
-use crate::{consensus::ConsensusError, network::ServerError, node::CliError, storage::StorageError};
+use crate::{
+    consensus::ConsensusError,
+    network::ServerError,
+    node::CliError,
+    objects::AccountError,
+    storage::StorageError,
+};
 
 #[derive(Debug, Error)]
 pub enum NodeError {
+    #[error("{}", _0)]
+    AccountError(AccountError),
+
     #[error("{}", _0)]
     CLIError(CliError),
 
@@ -19,6 +28,12 @@ pub enum NodeError {
 
     #[error("{}", _0)]
     StorageError(StorageError),
+}
+
+impl From<AccountError> for NodeError {
+    fn from(error: AccountError) -> Self {
+        NodeError::AccountError(error)
+    }
 }
 
 impl From<CliError> for NodeError {

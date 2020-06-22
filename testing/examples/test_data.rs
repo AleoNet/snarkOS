@@ -1,10 +1,7 @@
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::{
-    dpc::{DPCScheme, Record},
-    objects::Transaction,
-};
+use snarkos_models::dpc::{DPCScheme, Record};
 use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
 use snarkos_testing::consensus::*;
 use snarkos_utilities::bytes::ToBytes;
@@ -20,45 +17,28 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     let mut rng = FIXTURE.rng.clone();
     let consensus = TEST_CONSENSUS.clone();
 
-    let network_id = FIXTURE.genesis_block.transactions[0].network_id();
-
     // setup the miner
     let miner = Miner::new(miner_acc.public_key.clone(), consensus.clone());
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (block_1, coinbase_records) = mine_block(
-        &miner,
-        &ledger,
-        &parameters,
-        &consensus,
-        &mut memory_pool,
-        vec![],
-        network_id,
-    )?;
+    let (block_1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![])?;
 
     // make a tx which spends 10 to the BaseDPCComponents receiver
     let (_records_1, tx_1) = send(
         &ledger,
         &parameters,
+        &consensus,
         &miner_acc,
         coinbase_records.clone(),
         &acc_1.public_key,
         10,
-        network_id,
         &mut rng,
     )?;
 
     // mine the block
-    let (block_2, coinbase_records_2) = mine_block(
-        &miner,
-        &ledger,
-        &parameters,
-        &consensus,
-        &mut memory_pool,
-        vec![tx_1],
-        network_id,
-    )?;
+    let (block_2, coinbase_records_2) =
+        mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx_1])?;
 
     // Find alternative conflicting/late blocks
 
@@ -87,12 +67,11 @@ fn mine_block(
     consensus: &ConsensusParameters,
     memory_pool: &mut MemoryPool<Tx>,
     txs: Vec<Tx>,
-    network_id: u8,
 ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
     let transactions = DPCTransactions(txs);
 
     let (previous_block_header, transactions, coinbase_records) =
-        miner.establish_block(&parameters, ledger, &transactions, network_id)?;
+        miner.establish_block(&parameters, ledger, &transactions)?;
 
     let header = miner.find_block(&transactions, &previous_block_header)?;
 
@@ -120,11 +99,11 @@ fn mine_block(
 fn send<R: Rng>(
     ledger: &MerkleTreeLedger,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    consensus: &ConsensusParameters,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,
     receiver: &AccountPublicKey<Components>,
     amount: u64,
-    network_id: u8,
     rng: &mut R,
 ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
     let mut sum = 0;
@@ -143,7 +122,7 @@ fn send<R: Rng>(
     let dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
 
     let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
-    ConsensusParameters::create_transaction(
+    consensus.create_transaction(
         parameters,
         inputs,
         from,
@@ -154,7 +133,6 @@ fn send<R: Rng>(
         values,
         output,
         [0u8; 32],
-        network_id,
         &ledger,
         rng,
     )
