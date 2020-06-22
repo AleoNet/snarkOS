@@ -13,11 +13,10 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
-
 use base64;
+use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::thread_rng;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 type JsonrpcError = jsonrpc_core::Error;
 
@@ -136,8 +135,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         let mut old_account_private_keys = vec![];
         for private_key_string in transaction_input.old_account_private_keys {
-            let private_key_bytes = hex::decode(private_key_string)?;
-            old_account_private_keys.push(AccountPrivateKey::<Components>::read(&private_key_bytes[..])?);
+            old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
         // Fill any unused old_record indices with dummy records
@@ -151,6 +149,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             let private_key = old_account_private_keys[0].clone();
             let public_key = AccountPublicKey::<Components>::from(
                 &self.parameters.circuit_parameters.account_commitment,
+                &self.parameters.circuit_parameters.account_signature,
                 &private_key,
             )?;
 
@@ -178,8 +177,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let mut new_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            let public_key_bytes = hex::decode(recipient.address)?;
-            new_account_public_keys.push(AccountPublicKey::<Components>::read(&public_key_bytes[..])?);
+            new_account_public_keys.push(AccountPublicKey::<Components>::from_str(&recipient.address)?);
             new_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
