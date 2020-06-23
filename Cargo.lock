@@ -1279,6 +1279,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "marlin"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "poly-commit",
+ "rand_chacha",
+ "rand_core",
+ "rayon",
+ "snarkos-algorithms",
+ "snarkos-errors",
+ "snarkos-gadgets",
+ "snarkos-models",
+ "snarkos-profiler",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "matches"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1658,6 +1677,20 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "poly-commit"
+version = "0.1.0"
+dependencies = [
+ "derivative",
+ "digest 0.8.1",
+ "rand_core",
+ "snarkos-algorithms",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-profiler",
+ "snarkos-utilities",
 ]
 
 [[package]]
@@ -2367,6 +2400,7 @@ version = "0.8.0"
 dependencies = [
  "blake2",
  "criterion",
+ "marlin",
  "rand",
  "rand_xorshift",
  "snarkos-algorithms",

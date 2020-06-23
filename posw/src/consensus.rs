@@ -1,6 +1,7 @@
 //! Generic PoSW Miner and Verifier, compatible with any implementer of the SNARK trait.
 
 use crate::circuit::{POSWCircuit, POSWCircuitParameters};
+use marlin::snark::SRS;
 use snarkos_algorithms::crh::sha256d_to_u64;
 use snarkos_curves::{
     bls12_377::Fr,
@@ -10,7 +11,7 @@ use snarkos_errors::posw::PoswError;
 use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_models::{
     algorithms::{MerkleParameters, SNARK},
-    curves::{to_field_vec::ToConstraintField, PrimeField},
+    curves::{to_field_vec::ToConstraintField, PairingEngine, PrimeField},
     gadgets::algorithms::MaskedCRHGadget,
     parameters::Parameters,
 };
@@ -58,7 +59,7 @@ where
 
 impl<S, CP> Posw<S, F, M, HG, CP>
 where
-    S: SNARK<VerifierInput = Vec<F>, Circuit = POSWCircuit<F, M, HG, CP>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
+    S: SNARK,
     CP: POSWCircuitParameters,
 {
     /// Loads the PoSW runner from the locally stored parameters.
@@ -88,8 +89,44 @@ where
         })
     }
 
+    /// Creates a POSW circuit from the provided transaction ids and nonce.
+    fn circuit_from(nonce: u32, leaves: &[Vec<u8>]) -> POSWCircuit<F, M, HG, CP> {
+        let (root, leaves) = pedersen_merkle_root_hash_with_leaves(leaves);
+
+        // Generate the mask by committing to the nonce and the root
+        let mask = commit(nonce, &root.into());
+
+        // Convert the leaves to Options for the SNARK
+        let leaves = leaves.into_iter().map(|l| Some(l)).collect();
+
+        POSWCircuit {
+            leaves,
+            merkle_parameters: PARAMS.clone(),
+            mask: Some(mask),
+            root: Some(root),
+            field_type: PhantomData,
+            crh_gadget_type: PhantomData,
+            circuit_parameters_type: PhantomData,
+        }
+    }
+
+    /// Hashes the proof and checks it against the difficulty
+    fn check_difficulty(&self, proof: &ProofOfSuccinctWork, difficulty_target: u64) -> bool {
+        let hash_result = sha256d_to_u64(&proof.0[..]);
+        hash_result <= difficulty_target
+    }
+}
+
+impl<S, CP> Posw<S, F, M, HG, CP>
+where
+    S: SNARK<VerifierInput = Vec<F>, AssignedCircuit = POSWCircuit<F, M, HG, CP>>,
+    CP: POSWCircuitParameters,
+{
     /// Performs a trusted setup for the PoSW circuit and returns an instance of the runner
-    pub fn setup<R: Rng>(rng: &mut R) -> Result<Self, PoswError> {
+    pub fn trusted_setup<R: Rng>(rng: &mut R) -> Result<Self, PoswError>
+    where
+        S: SNARK<Circuit = POSWCircuit<F, M, HG, CP>>,
+    {
         let params = S::setup(
             POSWCircuit {
                 // the circuit will be padded internally
@@ -102,6 +139,38 @@ where
                 circuit_parameters_type: PhantomData,
             },
             rng,
+        )?;
+
+        Ok(Self {
+            pk: Some(params.0),
+            vk: params.1,
+            circuit: PhantomData,
+        })
+    }
+
+    /// Performs a deterministic setup for systems with universal setups
+    // Needs a different name due to https://github.com/rust-lang/rust/issues/20400
+    pub fn setup<E>(srs: SRS<E>) -> Result<Self, PoswError>
+    where
+        E: PairingEngine,
+        S: SNARK<Circuit = (POSWCircuit<F, M, HG, CP>, SRS<E>)>,
+    {
+        let params = S::setup(
+            (
+                POSWCircuit {
+                    // the circuit will be padded internally
+                    leaves: vec![None; 0],
+                    merkle_parameters: PARAMS.clone(),
+                    mask: None,
+                    root: None,
+                    field_type: PhantomData,
+                    crh_gadget_type: PhantomData,
+                    circuit_parameters_type: PhantomData,
+                },
+                srs,
+            ),
+            // NB: This does not get used internally.
+            &mut rand::rngs::OsRng,
         )?;
 
         Ok(Self {
@@ -183,33 +252,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Creates a POSW circuit from the provided transaction ids and nonce.
-    fn circuit_from(nonce: u32, leaves: &[Vec<u8>]) -> POSWCircuit<F, M, HG, CP> {
-        let (root, leaves) = pedersen_merkle_root_hash_with_leaves(leaves);
-
-        // Generate the mask by committing to the nonce and the root
-        let mask = commit(nonce, &root.into());
-
-        // Convert the leaves to Options for the SNARK
-        let leaves = leaves.into_iter().map(|l| Some(l)).collect();
-
-        POSWCircuit {
-            leaves,
-            merkle_parameters: PARAMS.clone(),
-            mask: Some(mask),
-            root: Some(root),
-            field_type: PhantomData,
-            crh_gadget_type: PhantomData,
-            circuit_parameters_type: PhantomData,
-        }
-    }
-
-    /// Hashes the proof and checks it against the difficulty
-    fn check_difficulty(&self, proof: &ProofOfSuccinctWork, difficulty_target: u64) -> bool {
-        let hash_result = sha256d_to_u64(&proof.0[..]);
-        hash_result <= difficulty_target
     }
 }
 
