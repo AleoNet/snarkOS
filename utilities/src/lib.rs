@@ -49,12 +49,12 @@ pub mod io;
 pub use std::io;
 
 #[cfg(not(feature = "std"))]
-fn error(_msg: &'static str) -> io::Error {
+pub fn error(_msg: &'static str) -> io::Error {
     io::Error
 }
 
 #[cfg(feature = "std")]
-fn error(msg: &'static str) -> io::Error {
+pub fn error(msg: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, msg)
 }
 
