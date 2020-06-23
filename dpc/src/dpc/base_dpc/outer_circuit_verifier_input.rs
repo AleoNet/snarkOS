@@ -4,6 +4,7 @@ use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
+    dpc::DPCComponents,
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -41,6 +42,10 @@ where
 
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+
+    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
+        ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::OuterField>, ConstraintFieldError> {
         let mut v = Vec::new();

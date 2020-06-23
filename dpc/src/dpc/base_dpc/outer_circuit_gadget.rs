@@ -4,6 +4,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
+    dpc::DPCComponents,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
         r1cs::ConstraintSystem,
@@ -66,7 +67,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 ) -> Result<(), SynthesisError>
 where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -90,6 +91,10 @@ where
 
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+
+    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
+        ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
     let (predicate_vk_commitment_parameters, predicate_vk_crh_parameters) = {
@@ -175,8 +180,9 @@ where
     let memo_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(memo).map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
-        .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let local_data_commitment_digest_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment_digest)
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let value_balance_as_u64 = value_balance.abs() as u64;
 
@@ -232,8 +238,8 @@ where
         field_element_to_bytes::<C, _>(cs, &predicate_commitment_fe, "predicate commitment")?;
     let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, &memo_fe, "memo")?;
     let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
-    let local_data_commitment_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_commitment_fe, "local data commitment")?;
+    let local_data_commitment_digest_fe_bytes =
+        field_element_to_bytes::<C, _>(cs, &local_data_commitment_digest_fe, "local data digest commitment")?;
     let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
     let is_negative_fe_bytes = field_element_to_bytes::<C, _>(cs, &is_negative_fe, "is_negative flag")?;
 
@@ -254,7 +260,7 @@ where
     inner_snark_input_bytes.extend(predicate_commitment_fe_bytes);
     inner_snark_input_bytes.extend(memo_fe_bytes);
     inner_snark_input_bytes.extend(network_id_fe_bytes);
-    inner_snark_input_bytes.extend(local_data_commitment_fe_bytes.clone());
+    inner_snark_input_bytes.extend(local_data_commitment_digest_fe_bytes.clone());
     inner_snark_input_bytes.extend(value_balance_fe_bytes);
     inner_snark_input_bytes.extend(is_negative_fe_bytes);
 
@@ -299,7 +305,7 @@ where
     let mut predicate_input_bytes = vec![];
 
     predicate_input_bytes.extend(local_data_commitment_parameters_fe_bytes);
-    predicate_input_bytes.extend(local_data_commitment_fe_bytes);
+    predicate_input_bytes.extend(local_data_commitment_digest_fe_bytes);
 
     let mut predicate_input_bits = vec![];
 

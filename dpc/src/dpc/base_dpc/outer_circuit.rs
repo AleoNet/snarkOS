@@ -12,6 +12,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
+    dpc::DPCComponents,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
@@ -38,7 +39,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
     predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
-    local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
+    local_data_commitment_digest: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
 }
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
@@ -71,7 +72,9 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let predicate_commitment = Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default());
         let predicate_randomness =
             Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
-        let local_data_comm = Some(<C::LocalDataCommitment as CommitmentScheme>::Output::default());
+
+        let local_data_commitment_digest =
+            Some(MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default());
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -92,7 +95,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
             predicate_commitment,
             predicate_randomness,
-            local_data_commitment: local_data_comm,
+            local_data_commitment_digest,
         }
     }
 
@@ -122,7 +125,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-        local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+        local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -149,7 +152,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
             predicate_commitment: Some(predicate_commitment.clone()),
             predicate_randomness: Some(predicate_randomness.clone()),
-            local_data_commitment: Some(local_data_commitment.clone()),
+            local_data_commitment_digest: Some(local_data_commitment_digest.clone()),
         }
     }
 }
@@ -177,6 +180,10 @@ where
 
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+
+    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
+        ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_outer_proof_gadget::<C, CS>(
@@ -195,7 +202,7 @@ where
             self.new_private_predicate_inputs.get()?.as_slice(),
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,
-            self.local_data_commitment.get()?,
+            self.local_data_commitment_digest.get()?,
         )?;
         Ok(())
     }
