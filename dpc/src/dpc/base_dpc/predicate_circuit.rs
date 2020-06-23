@@ -78,6 +78,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
     }
 }
 
+//TODO (raychu86) change this to predicate_check_gadget
 fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     circuit_parameters: &CircuitParameters<C>,
