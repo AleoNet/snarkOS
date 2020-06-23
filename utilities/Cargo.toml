@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 snarkos-derives = { path = "derives", optional = true }
-snarkos-errors = { path = "../errors", version = "0.8.0" }
+snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 
 bincode = { version = "1.2.1" }
 rand = { version = "0.7", default-features = false }
