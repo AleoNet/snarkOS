@@ -3,7 +3,7 @@ pub mod circuit;
 mod consensus;
 use consensus::{HG, M};
 
-use snarkos_algorithms::snark::GM17;
+use snarkos_algorithms::snark;
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_models::curves::PairingEngine;
 
@@ -16,13 +16,17 @@ use snarkos_objects::{
 };
 
 /// PoSW instantiated over BLS12-377 with GM17.
-pub type Posw = GenericPosw<Bls12_377>;
+pub type Posw = GenericPosw<GM17<Bls12_377>, Bls12_377>;
+pub type PoswMarlin = GenericPosw<Marlin<Bls12_377>, Bls12_377>;
 
 /// Generic GM17 PoSW over any pairing curve
-type GenericPosw<E> = consensus::Posw<Snark<E>, <E as PairingEngine>::Fr, M, HG, params::PoSWParams>;
+type GenericPosw<S, E> = consensus::Posw<S, <E as PairingEngine>::Fr, M, HG, params::PoSWParams>;
 
 /// GM17 type alias for the PoSW circuit
-pub type Snark<E> = GM17<E, Circuit<<E as PairingEngine>::Fr>, Vec<<E as PairingEngine>::Fr>>;
+pub type GM17<E> = snark::GM17<E, Circuit<<E as PairingEngine>::Fr>, Vec<<E as PairingEngine>::Fr>>;
+
+pub type Marlin<E> =
+    marlin::snark::MarlinSnark<'static, E, Circuit<<E as PairingEngine>::Fr>, Vec<<E as PairingEngine>::Fr>>;
 
 /// Instantiate the circuit with the CRH to Fq
 type Circuit<F> = circuit::POSWCircuit<F, M, HG, params::PoSWParams>;
@@ -59,8 +63,32 @@ mod tests {
     #[test]
     fn gm17_ok() {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
-        // run the setup
-        let posw = Posw::setup(rng).unwrap();
+
+        // run the trusted setup
+        let posw = Posw::trusted_setup(rng).unwrap();
+        // super low difficulty so we find a solution immediately
+        let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
+
+        let transaction_ids = vec![vec![1u8; 32]; 8];
+        let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
+
+        // generate the proof
+        let (nonce, proof) = posw
+            .mine(&subroots, difficulty_target, &mut rand::thread_rng(), std::u32::MAX)
+            .unwrap();
+
+        posw.verify(nonce, &proof, &pedersen_merkle_root).unwrap();
+    }
+
+    #[test]
+    fn marlin_ok() {
+        let rng = &mut XorShiftRng::seed_from_u64(1234567);
+
+        // run the trusted setup
+        let universal_srs = marlin::snark::Marlin::<Bls12_377>::universal_setup(10000, 10000, 100000, rng).unwrap();
+
+        // run the deterministic setup
+        let posw = PoswMarlin::setup(universal_srs).unwrap();
 
         // super low difficulty so we find a solution immediately
         let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
@@ -69,7 +97,9 @@ mod tests {
         let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
 
         // generate the proof
-        let (nonce, proof) = posw.mine(&subroots, difficulty_target, rng, std::u32::MAX).unwrap();
+        let (nonce, proof) = posw
+            .mine(&subroots, difficulty_target, &mut rand::thread_rng(), std::u32::MAX)
+            .unwrap();
 
         posw.verify(nonce, &proof, &pedersen_merkle_root).unwrap();
     }
