@@ -61,7 +61,7 @@ impl PedersenSize for PredVkHashWindow {
     const WINDOW_SIZE: usize = 300;
 }
 
-// TODO (raychu86) Update the window size
+// TODO (raychu86) Reduce the window size - local data commitments now have smaller inputs
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LocalDataWindow;
 
