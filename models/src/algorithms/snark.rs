@@ -7,14 +7,10 @@ use std::fmt::Debug;
 pub trait SNARK {
     type AssignedCircuit;
     type Circuit;
-    type Proof: Clone + Debug + Default + ToBytes + FromBytes;
-    type PreparedVerificationParameters: Clone
-        + Default
-        + From<Self::VerificationParameters>
-        + From<Self::ProvingParameters>;
+    type Proof: Clone + Debug + ToBytes + FromBytes;
+    type PreparedVerificationParameters: Clone + From<Self::VerificationParameters> + From<Self::ProvingParameters>;
     type ProvingParameters: Clone + ToBytes + FromBytes;
     type VerificationParameters: Clone
-        + Default
         + ToBytes
         + FromBytes
         + From<Self::PreparedVerificationParameters>
