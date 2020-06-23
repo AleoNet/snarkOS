@@ -1,5 +1,5 @@
 use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTree, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
@@ -146,12 +146,15 @@ where
     new_sn_nonce_randomness: Vec<[u8; 32]>,
     new_commitments: Vec<<Components::RecordCommitment as CommitmentScheme>::Output>,
 
-    // Predicate and local data commitment and randomness
+    // Predicate commitment and randomness
     predicate_commitment: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_commitment: <Components::LocalDataCommitment as CommitmentScheme>::Output,
-    local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
+    // Local data commitments, witnesses and digest
+    local_data_commitments: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
+    local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
+    local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
+    local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 
     // Value Balance
     value_balance: i64,
@@ -176,8 +179,10 @@ where
 
             new_records: self.new_records.to_vec(),
 
-            local_data_commitment: self.local_data_commitment.clone(),
+            local_data_commitments: self.local_data_commitments.clone(),
             local_data_randomness: self.local_data_randomness.clone(),
+            local_data_witnesses: self.local_data_witnesses.clone(),
+            local_data_commitment_digest: self.local_data_commitment_digest.clone(),
         }
     }
 }
@@ -193,9 +198,11 @@ pub struct LocalData<Components: BaseDPCComponents> {
     // New records
     pub new_records: Vec<DPCRecord<Components>>,
 
-    // Commitment to the above information.
-    pub local_data_commitment: <Components::LocalDataCommitment as CommitmentScheme>::Output,
-    pub local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
+    // Local data commitments, witnesses and digest
+    local_data_commitments: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
+    local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
+    local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
+    local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -448,8 +455,11 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             end_timer!(output_record_time);
         }
 
-        let local_data_comm_timer = start_timer!(|| "Compute predicate input commitment");
-        let mut predicate_input = Vec::new();
+        let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
+
+        let mut local_data_commitment_leaves = vec![];
+        let mut local_data_commitment_randomness = vec![];
+
         for i in 0..Components::NUM_INPUT_RECORDS {
             let record = &old_records[i];
             let bytes = to_bytes![
@@ -462,7 +472,16 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.death_predicate_repr(),
                 old_serial_numbers[i]
             ]?;
-            predicate_input.extend_from_slice(&bytes);
+
+            let input_record_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let input_record_commitment = <Components::LocalDataCommitment as CommitmentScheme>::commit(
+                &parameters.local_data_commitment,
+                &bytes,
+                &input_record_randomness,
+            )?;
+
+            local_data_commitment_randomness.push(input_record_randomness);
+            local_data_commitment_leaves.push(input_record_commitment);
         }
 
         for j in 0..Components::NUM_OUTPUT_RECORDS {
@@ -476,17 +495,49 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.birth_predicate_repr(),
                 record.death_predicate_repr()
             ]?;
-            predicate_input.extend_from_slice(&bytes);
-        }
-        predicate_input.extend_from_slice(memo);
-        predicate_input.push(network_id);
 
-        let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm = Components::LocalDataCommitment::commit(
+            let output_record_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let output_record_commitment = <Components::LocalDataCommitment as CommitmentScheme>::commit(
+                &parameters.local_data_commitment,
+                &bytes,
+                &output_record_randomness,
+            )?;
+
+            local_data_commitment_randomness.push(output_record_randomness);
+            local_data_commitment_leaves.push(output_record_commitment);
+        }
+
+        let memo_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let memo_commitment = <Components::LocalDataCommitment as CommitmentScheme>::commit(
             &parameters.local_data_commitment,
-            &predicate_input,
-            &local_data_rand,
+            memo,
+            &memo_randomness,
         )?;
+
+        local_data_commitment_randomness.push(memo_randomness);
+        local_data_commitment_leaves.push(memo_commitment);
+
+        let network_id_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+        let network_id_commitment = <Components::LocalDataCommitment as CommitmentScheme>::commit(
+            &parameters.local_data_commitment,
+            &[network_id],
+            &network_id_randomness,
+        )?;
+
+        local_data_commitment_randomness.push(network_id_randomness);
+        local_data_commitment_leaves.push(network_id_commitment);
+
+        let merkle_tree = MerkleTree::new(parameters.local_data_merkle_tree.clone(), &local_data_commitment_leaves)?;
+
+        // Compute the local_data_commitment witnesses
+        let mut local_data_witnesses = vec![];
+        for (i, leaf) in local_data_commitment_leaves.iter().enumerate() {
+            let witness = merkle_tree.generate_proof(i, leaf)?;
+            local_data_witnesses.push(witness);
+        }
+
+        let local_data_commitment_digest = merkle_tree.root();
+
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
@@ -528,8 +579,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             predicate_commitment: predicate_comm,
             predicate_randomness: predicate_rand,
-            local_data_commitment: local_data_comm,
-            local_data_randomness: local_data_rand,
+            local_data_commitments: local_data_commitment_leaves,
+            local_data_randomness: local_data_commitment_randomness,
+            local_data_witnesses,
+            local_data_commitment_digest,
 
             value_balance,
         };
@@ -688,8 +741,10 @@ where
             new_commitments,
             predicate_commitment,
             predicate_randomness,
-            local_data_commitment,
+            local_data_commitments,
             local_data_randomness,
+            local_data_witnesses,
+            local_data_commitment_digest,
             value_balance,
         } = context;
 
@@ -703,7 +758,7 @@ where
             old_serial_numbers,
             new_commitments,
             predicate_commitment,
-            local_data_commitment,
+            local_data_commitment_digest,
             value_balance,
             memorandum
         ]?;
@@ -789,7 +844,7 @@ where
             new_value_commit_randomness.push(value_commitment_randomness);
         }
 
-        let sighash = to_bytes![local_data_commitment]?;
+        let sighash = to_bytes![local_data_commitment_digest]?;
 
         let binding_signature =
             create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
@@ -817,8 +872,10 @@ where
                 &new_commitments,
                 &predicate_commitment,
                 &predicate_randomness,
-                &local_data_commitment,
+                &local_data_commitments,
                 &local_data_randomness,
+                &local_data_witnesses,
+                &local_data_commitment_digest,
                 memorandum,
                 &old_value_commits,
                 &old_value_commit_randomness,
@@ -857,7 +914,7 @@ where
                 new_birth_pred_attributes.as_slice(),
                 &predicate_commitment,
                 &predicate_randomness,
-                &local_data_commitment,
+                &local_data_commitment_digest,
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
@@ -875,7 +932,7 @@ where
             ledger_digest,
             transaction_proof,
             predicate_commitment,
-            local_data_commitment,
+            local_data_commitment_digest,
             value_balance,
             network_id,
             signatures,
@@ -964,7 +1021,7 @@ where
             new_commitments: transaction.new_commitments().to_vec(),
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.predicate_commitment().clone(),
-            local_data_commitment: transaction.local_data_commitment().clone(),
+            local_data_commitment_digest: transaction.local_data_commitment().clone(),
             value_balance: transaction.value_balance(),
             network_id: transaction.network_id(),
         };
