@@ -4,6 +4,7 @@ use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
+    dpc::DPCComponents,
 };
 
 #[derive(Derivative)]
@@ -22,9 +23,11 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
-    // Predicate input commitment and memo
+    // Predicate commitment
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
+
+    // Local data commitment digest
+    pub local_data_commitment_digest: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     pub memo: [u8; 32],
 
     pub value_balance: i64,
@@ -55,6 +58,10 @@ where
 
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
+
+    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
+        ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = Vec::new();
@@ -125,7 +132,7 @@ where
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
             &[self.network_id][..],
         )?);
-        v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
+        v.extend_from_slice(&self.local_data_commitment_digest.to_field_elements()?);
 
         let value_balance_as_u64 = self.value_balance.abs() as u64;
 

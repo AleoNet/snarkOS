@@ -12,6 +12,7 @@ use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme},
+    dpc::DPCComponents,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 use snarkos_objects::AccountPrivateKey;
@@ -36,12 +37,15 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     new_serial_number_nonce_randomness: Option<Vec<[u8; 32]>>,
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
 
-    // Commitment to Predicates and to local data.
+    // Predicate Commitment
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
     predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
 
-    local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
-    local_data_randomness: Option<<C::LocalDataCommitment as CommitmentScheme>::Randomness>,
+    // Local data commitments, witnesses, and digest
+    local_data_commitments: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Output>>,
+    local_data_randomness: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
+    local_data_witnesses: Option<Vec<MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>>>,
+    local_data_commitment_digest: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
 
     memo: Option<[u8; 32]>,
 
@@ -79,6 +83,15 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
         let local_data_randomness = <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
 
+        // Number of leaves are the number of input + output records + 2 (memo and network_id)
+        let num_leaves = num_input_records + num_output_records + 2;
+        let local_data_commitments = vec![<C::LocalDataCommitment as CommitmentScheme>::Output::default(); num_leaves];
+        let local_data_randomness =
+            vec![<C::LocalDataCommitment as CommitmentScheme>::Randomness::default(); num_leaves];
+        let local_data_witnesses = vec![MerklePath::default(); num_leaves];
+        let local_data_commitment_digest =
+            MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default();
+
         let input_value_commitments =
             vec![<C::ValueCommitment as CommitmentScheme>::Output::default(); num_input_records];
         let input_value_commitment_randomness =
@@ -111,11 +124,17 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness),
             new_commitments: Some(new_commitments),
 
-            // Other stuff
+            // Predicate commitment
             predicate_commitment: Some(predicate_commitment),
             predicate_randomness: Some(predicate_randomness),
-            local_data_commitment: Some(local_data_commitment),
+
+            // Local data commitments, witnesses, and digest
+            local_data_commitments: Some(local_data_commitments),
             local_data_randomness: Some(local_data_randomness),
+            local_data_witnesses: Some(local_data_witnesses),
+            local_data_commitment_digest: Some(local_data_commitment_digest),
+
+            // Other stuff
             memo: Some(memo),
 
             input_value_commitments: Some(input_value_commitments),
@@ -152,8 +171,11 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-        local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
-        local_data_randomness: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
+        // Local data commitments, witnesses, and digest
+        local_data_commitments: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
+        local_data_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
+        local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
+        local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
         memo: &[u8; 32],
 
@@ -182,6 +204,11 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_output_records, output_value_commitments.len());
         assert_eq!(num_output_records, output_value_commitment_randomness.len());
 
+        let num_leaves = num_input_records + num_output_records + 2;
+        assert_eq!(num_leaves, local_data_commitments.len());
+        assert_eq!(num_leaves, local_data_randomness.len());
+        assert_eq!(num_leaves, local_data_witnesses.len());
+
         Self {
             // Parameters
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -201,13 +228,17 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness.to_vec()),
             new_commitments: Some(new_commitments.to_vec()),
 
-            // Other stuff
+            // Predicate Commitment
             predicate_commitment: Some(predicate_commitment.clone()),
             predicate_randomness: Some(predicate_randomness.clone()),
 
-            local_data_commitment: Some(local_data_commitment.clone()),
-            local_data_randomness: Some(local_data_randomness.clone()),
+            // Local data commitments, witnesses, and digest
+            local_data_commitments: Some(local_data_commitments.to_vec()),
+            local_data_randomness: Some(local_data_randomness.to_vec()),
+            local_data_witnesses: Some(local_data_witnesses.to_vec()),
+            local_data_commitment_digest: Some(local_data_commitment_digest.clone()),
 
+            // Other stuff
             memo: Some(memo.clone()),
 
             input_value_commitments: Some(input_value_commitments.to_vec()),
@@ -240,11 +271,15 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_records.get()?,
             self.new_serial_number_nonce_randomness.get()?,
             self.new_commitments.get()?,
-            // Other stuff
+            // Predicate commitment
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,
-            self.local_data_commitment.get()?,
+            // Local data commitments, witnesses, and digest
+            self.local_data_commitments.get()?,
             self.local_data_randomness.get()?,
+            self.local_data_witnesses.get()?,
+            self.local_data_commitment_digest.get()?,
+            // Other stuff
             self.memo.get()?,
             self.input_value_commitments.get()?,
             self.input_value_commitment_randomness.get()?,

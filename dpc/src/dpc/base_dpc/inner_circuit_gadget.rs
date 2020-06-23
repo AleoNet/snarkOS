@@ -9,7 +9,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF},
-    dpc::Record,
+    dpc::{DPCComponents, Record},
     gadgets::{
         algorithms::{
             BindingSignatureGadget,
@@ -48,8 +48,12 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
-    local_data_randomness: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
+
+    local_data_commitments: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
+    local_data_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
+    local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
+    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
     input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
@@ -93,8 +97,10 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         //
         predicate_commitment,
         predicate_randomness,
-        local_data_commitment,
+        local_data_commitments,
         local_data_randomness,
+        local_data_witnesses,
+        local_data_commitment_digest,
         memo,
         input_value_commitments,
         input_value_commitment_randomness,
@@ -145,8 +151,12 @@ fn base_dpc_execute_gadget_helper<
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_comm: &LocalDataCommitment::Output,
-    local_data_rand: &LocalDataCommitment::Randomness,
+
+    local_data_commitments: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
+    local_data_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
+    local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
+    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
     input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
@@ -826,27 +836,28 @@ where
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
         local_data_bytes.extend_from_slice(&network_id);
 
-        let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
-            cs.ns(|| "Allocate local data commitment randomness"),
-            || Ok(local_data_rand),
-        )?;
-
-        let declared_local_data_commitment =
-            LocalDataCommitmentGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
-                Ok(local_data_comm)
-            })?;
-
-        let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
-            cs.ns(|| "Commit to local data"),
-            &local_data_commitment_parameters,
-            &local_data_bytes,
-            &local_data_commitment_randomness,
-        )?;
-
-        commitment.enforce_equal(
-            &mut cs.ns(|| "Check that local data commitment is valid"),
-            &declared_local_data_commitment,
-        )?;
+        // TODO (raychu86) Check the local data commitment and tree membership
+        //        let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
+        //            cs.ns(|| "Allocate local data commitment randomness"),
+        //            || Ok(local_data_rand),
+        //        )?;
+        //
+        //        let declared_local_data_commitment =
+        //            LocalDataCommitmentGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
+        //                Ok(local_data_comm)
+        //            })?;
+        //
+        //        let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
+        //            cs.ns(|| "Commit to local data"),
+        //            &local_data_commitment_parameters,
+        //            &local_data_bytes,
+        //            &local_data_commitment_randomness,
+        //        )?;
+        //
+        //        commitment.enforce_equal(
+        //            &mut cs.ns(|| "Check that local data commitment is valid"),
+        //            &declared_local_data_commitment,
+        //        )?;
     }
     // *******************************************************************
 
@@ -861,7 +872,7 @@ where
                 &circuit_parameters.value_commitment,
                 &input_value_commitments,
                 &output_value_commitments,
-                &to_bytes![local_data_comm]?,
+                &to_bytes![local_data_commitment_digest]?,
                 &binding_signature,
             )
             .unwrap();
