@@ -9,15 +9,6 @@ pub struct PrivatePredicateInput<C: BaseDPCComponents> {
     pub proof: <C::PredicateSNARK as SNARK>::Proof,
 }
 
-impl<C: BaseDPCComponents> Default for PrivatePredicateInput<C> {
-    fn default() -> Self {
-        Self {
-            verification_key: <C::PredicateSNARK as SNARK>::VerificationParameters::default(),
-            proof: <C::PredicateSNARK as SNARK>::Proof::default(),
-        }
-    }
-}
-
 impl<C: BaseDPCComponents> Clone for PrivatePredicateInput<C> {
     fn clone(&self) -> Self {
         Self {
