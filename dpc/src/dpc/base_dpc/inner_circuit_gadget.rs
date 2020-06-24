@@ -50,7 +50,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
-    local_data_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
+    local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
     local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
@@ -98,7 +98,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         predicate_commitment,
         predicate_randomness,
         local_data_commitment_leaves,
-        local_data_randomness,
+        local_data_commitment_leaves_randomness,
         local_data_witnesses,
         local_data_commitment_digest,
         memo,
@@ -153,7 +153,7 @@ fn base_dpc_execute_gadget_helper<
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
-    local_data_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
+    local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
     local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
@@ -819,14 +819,14 @@ where
             given_local_data_commitment_leaves.push(given_commitment);
         }
 
-        let mut local_data_commitment_commitment_randomness = vec![];
-        for (i, randomness) in local_data_randomness.iter().enumerate() {
+        let mut given_local_data_commitment_leaves_randomness = vec![];
+        for (i, randomness) in local_data_commitment_leaves_randomness.iter().enumerate() {
             let given_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
                 &mut cs.ns(|| format!("Local data commitment randomness: {:?}", i)),
                 || Ok(randomness),
             )?;
 
-            local_data_commitment_commitment_randomness.push(given_randomness);
+            given_local_data_commitment_leaves_randomness.push(given_randomness);
         }
 
         let mut index = 0;
@@ -852,7 +852,7 @@ where
                 cs.ns(|| format!("Commit input record {}", i)),
                 &local_data_commitment_parameters,
                 &input_record_bytes,
-                &local_data_commitment_commitment_randomness[index],
+                &given_local_data_commitment_leaves_randomness[index],
             )?;
 
             commitment.enforce_equal(
@@ -880,7 +880,7 @@ where
                 cs.ns(|| format!("Commit output record {}", j)),
                 &local_data_commitment_parameters,
                 &output_record_bytes,
-                &local_data_commitment_commitment_randomness[index],
+                &given_local_data_commitment_leaves_randomness[index],
             )?;
 
             commitment.enforce_equal(
@@ -897,7 +897,7 @@ where
             cs.ns(|| "Commit memo"),
             &local_data_commitment_parameters,
             &memo,
-            &local_data_commitment_commitment_randomness[index],
+            &given_local_data_commitment_leaves_randomness[index],
         )?;
 
         memo_commitment.enforce_equal(
@@ -913,7 +913,7 @@ where
             cs.ns(|| "Commit network id"),
             &local_data_commitment_parameters,
             &network_id,
-            &local_data_commitment_commitment_randomness[index],
+            &given_local_data_commitment_leaves_randomness[index],
         )?;
 
         network_id_commitment.enforce_equal(

@@ -152,7 +152,7 @@ where
 
     // Local data commitments, witnesses and digest
     local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
-    local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
+    local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
     local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
     local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 
@@ -180,7 +180,7 @@ where
             new_records: self.new_records.to_vec(),
 
             local_data_commitment_leaves: self.local_data_commitment_leaves.clone(),
-            local_data_randomness: self.local_data_randomness.clone(),
+            local_data_commitment_leaves_randomness: self.local_data_commitment_leaves_randomness.clone(),
             local_data_witnesses: self.local_data_witnesses.clone(),
             local_data_commitment_digest: self.local_data_commitment_digest.clone(),
         }
@@ -200,7 +200,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
 
     // Local data commitments, witnesses and digest
     pub local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
-    pub local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
+    pub local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
     pub local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
     pub local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 }
@@ -458,7 +458,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
 
         let mut local_data_commitment_leaves = vec![];
-        let mut local_data_commitment_randomness = vec![];
+        let mut local_data_commitment_leaves_randomness = vec![];
 
         for i in 0..Components::NUM_INPUT_RECORDS {
             let record = &old_records[i];
@@ -480,7 +480,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 &input_record_randomness,
             )?;
 
-            local_data_commitment_randomness.push(input_record_randomness);
+            local_data_commitment_leaves_randomness.push(input_record_randomness);
             local_data_commitment_leaves.push(input_record_commitment);
         }
 
@@ -503,7 +503,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 &output_record_randomness,
             )?;
 
-            local_data_commitment_randomness.push(output_record_randomness);
+            local_data_commitment_leaves_randomness.push(output_record_randomness);
             local_data_commitment_leaves.push(output_record_commitment);
         }
 
@@ -514,7 +514,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             &memo_randomness,
         )?;
 
-        local_data_commitment_randomness.push(memo_randomness);
+        local_data_commitment_leaves_randomness.push(memo_randomness);
         local_data_commitment_leaves.push(memo_commitment);
 
         let network_id_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -524,7 +524,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             &network_id_randomness,
         )?;
 
-        local_data_commitment_randomness.push(network_id_randomness);
+        local_data_commitment_leaves_randomness.push(network_id_randomness);
         local_data_commitment_leaves.push(network_id_commitment);
 
         let merkle_tree = MerkleTree::new(parameters.local_data_merkle_tree.clone(), &local_data_commitment_leaves)?;
@@ -580,7 +580,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             predicate_commitment: predicate_comm,
             predicate_randomness: predicate_rand,
             local_data_commitment_leaves,
-            local_data_randomness: local_data_commitment_randomness,
+            local_data_commitment_leaves_randomness,
             local_data_witnesses,
             local_data_commitment_digest,
 
@@ -742,7 +742,7 @@ where
             predicate_commitment,
             predicate_randomness,
             local_data_commitment_leaves,
-            local_data_randomness,
+            local_data_commitment_leaves_randomness,
             local_data_witnesses,
             local_data_commitment_digest,
             value_balance,
@@ -873,7 +873,7 @@ where
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment_leaves,
-                &local_data_randomness,
+                &local_data_commitment_leaves_randomness,
                 &local_data_witnesses,
                 &local_data_commitment_digest,
                 memorandum,
