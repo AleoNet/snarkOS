@@ -2,12 +2,14 @@ use crate::{
     base_dpc::{parameters::CircuitParameters, *},
     Assignment,
 };
+use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
     algorithms::CommitmentScheme,
     curves::to_field_vec::ToConstraintField,
+    dpc::DPCComponents,
     gadgets::{
-        algorithms::CommitmentGadget,
+        algorithms::{CRHGadget, CommitmentGadget},
         r1cs::{ConstraintSynthesizer, ConstraintSystem},
         utilities::{alloc::AllocGadget, uint::UInt8},
     },
@@ -15,7 +17,7 @@ use snarkos_models::{
 
 pub struct PredicateLocalData<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
-    pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     pub position: u8,
 }
 
@@ -23,7 +25,7 @@ pub struct PredicateLocalData<C: BaseDPCComponents> {
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for PredicateLocalData<C>
 where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = ToConstraintField::<C::InnerField>::to_field_elements(&[self.position][..])?;
@@ -39,13 +41,13 @@ pub struct PredicateCircuit<C: BaseDPCComponents> {
     pub circuit_parameters: Option<CircuitParameters<C>>,
 
     // Commitment to Predicate input.
-    pub local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
+    pub local_data_commitment: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
     pub position: u8,
 }
 
 impl<C: BaseDPCComponents> PredicateCircuit<C> {
     pub fn blank(circuit_parameters: &CircuitParameters<C>) -> Self {
-        let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
+        let local_data_commitment = MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default();
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -56,7 +58,7 @@ impl<C: BaseDPCComponents> PredicateCircuit<C> {
 
     pub fn new(
         circuit_parameters: &CircuitParameters<C>,
-        local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+        local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
         position: u8,
     ) -> Self {
         Self {
@@ -82,7 +84,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
 fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     circuit_parameters: &CircuitParameters<C>,
-    local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     position: u8,
 ) -> Result<(), SynthesisError> {
     let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[position])?;
@@ -93,10 +95,10 @@ fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::In
             || Ok(circuit_parameters.local_data_commitment.parameters().clone()),
         )?;
 
-    let _local_data_commitment_gadget =
-        <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc_input(
-            cs.ns(|| "Allocate local data commitment"),
-            || Ok(local_data_commitment),
+    let _local_data_digest_gadget =
+        <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+            &mut cs.ns(|| "Declare local data commitment digest"),
+            || Ok(local_data_commitment_digest),
         )?;
 
     Ok(())
