@@ -470,7 +470,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.payload(),
                 record.birth_predicate_repr(),
                 record.death_predicate_repr(),
-                old_serial_numbers[i]
+                old_serial_numbers[i],
+                &memo,
+                network_id
             ]?;
 
             let input_record_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -493,7 +495,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
                 record.value(),
                 record.payload(),
                 record.birth_predicate_repr(),
-                record.death_predicate_repr()
+                record.death_predicate_repr(),
+                &memo,
+                network_id
             ]?;
 
             let output_record_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -506,26 +510,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             local_data_commitment_leaves_randomness.push(output_record_randomness);
             local_data_commitment_leaves.push(output_record_commitment);
         }
-
-        let memo_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
-        let memo_commitment = <Components::LocalDataCommitment as CommitmentScheme>::commit(
-            &parameters.local_data_commitment,
-            memo,
-            &memo_randomness,
-        )?;
-
-        local_data_commitment_leaves_randomness.push(memo_randomness);
-        local_data_commitment_leaves.push(memo_commitment);
-
-        let network_id_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
-        let network_id_commitment = <Components::LocalDataCommitment as CommitmentScheme>::commit(
-            &parameters.local_data_commitment,
-            &[network_id],
-            &network_id_randomness,
-        )?;
-
-        local_data_commitment_leaves_randomness.push(network_id_randomness);
-        local_data_commitment_leaves.push(network_id_commitment);
 
         let merkle_tree = MerkleTree::new(parameters.local_data_merkle_tree.clone(), &local_data_commitment_leaves)?;
 

@@ -829,6 +829,9 @@ where
     {
         let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
+        let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
+        let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
+
         let mut local_data_commitment_input_bytes = vec![];
 
         for i in 0..C::NUM_INPUT_RECORDS {
@@ -847,6 +850,8 @@ where
             input_record_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
             input_record_bytes
                 .extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
+            input_record_bytes.extend_from_slice(&memo);
+            input_record_bytes.extend_from_slice(&network_id);
 
             local_data_commitment_input_bytes.push(input_record_bytes);
         }
@@ -863,15 +868,11 @@ where
             output_record_bytes.extend_from_slice(&new_payloads_gadgets[j]);
             output_record_bytes.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
             output_record_bytes.extend_from_slice(&new_death_predicate_hashes_gadgets[j]);
+            output_record_bytes.extend_from_slice(&memo);
+            output_record_bytes.extend_from_slice(&network_id);
 
             local_data_commitment_input_bytes.push(output_record_bytes);
         }
-
-        let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
-        let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
-
-        local_data_commitment_input_bytes.push(memo);
-        local_data_commitment_input_bytes.push(network_id);
 
         let local_data_commitment_gadget =
             <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(

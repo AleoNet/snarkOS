@@ -103,7 +103,7 @@ impl PedersenSize for ValueWindow {
 }
 
 define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
-define_merkle_tree_parameters!(LocalDataCommitmentMerkleParameters, LocalDataMerkleTreeCRH, 4);
+define_merkle_tree_parameters!(LocalDataCommitmentMerkleParameters, LocalDataMerkleTreeCRH, 3);
 
 pub struct Components;
 
