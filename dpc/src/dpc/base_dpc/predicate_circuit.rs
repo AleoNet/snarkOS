@@ -71,7 +71,7 @@ impl<C: BaseDPCComponents> PredicateCircuit<C> {
 
 impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        execute_payment_check_gadget(
+        execute_predicate_check_gadget(
             cs,
             self.circuit_parameters.get()?,
             self.local_data_commitment.get()?,
@@ -80,8 +80,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
     }
 }
 
-//TODO (raychu86) change this to predicate_check_gadget
-fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
+fn execute_predicate_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     circuit_parameters: &CircuitParameters<C>,
     local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
