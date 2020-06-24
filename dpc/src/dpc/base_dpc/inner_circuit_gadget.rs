@@ -809,27 +809,13 @@ where
     {
         let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
-        let mut given_local_data_commitment_leaves = vec![];
-        for (i, commtiment) in local_data_commitment_leaves.iter().enumerate() {
-            let given_commitment = LocalDataCommitmentGadget::OutputGadget::alloc(
-                &mut cs.ns(|| format!("Local data commitment leaf: {:?}", i)),
-                || Ok(commtiment),
+        let local_data_commitment_gadget =
+            <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+                &mut cs.ns(|| "Declare local data commitment gadget"),
+                || Ok(local_data_commitment),
             )?;
 
-            given_local_data_commitment_leaves.push(given_commitment);
-        }
-
-        let mut given_local_data_commitment_leaves_randomness = vec![];
-        for (i, randomness) in local_data_commitment_leaves_randomness.iter().enumerate() {
-            let given_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
-                &mut cs.ns(|| format!("Local data commitment randomness: {:?}", i)),
-                || Ok(randomness),
-            )?;
-
-            given_local_data_commitment_leaves_randomness.push(given_randomness);
-        }
-
-        let mut index = 0;
+        let mut local_data_commitment_input_bytes = vec![];
 
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data commitment with input record {}", i));
@@ -848,19 +834,7 @@ where
             input_record_bytes
                 .extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
 
-            let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
-                cs.ns(|| format!("Commit input record {}", i)),
-                &local_data_commitment_parameters,
-                &input_record_bytes,
-                &given_local_data_commitment_leaves_randomness[index],
-            )?;
-
-            commitment.enforce_equal(
-                &mut cs.ns(|| format!("Check that local data commitment is valid - leaf {}", index)),
-                &given_local_data_commitment_leaves[index],
-            )?;
-
-            index += 1;
+            local_data_commitment_input_bytes.push(input_record_bytes);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
@@ -876,70 +850,57 @@ where
             output_record_bytes.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
             output_record_bytes.extend_from_slice(&new_death_predicate_hashes_gadgets[j]);
 
-            let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
-                cs.ns(|| format!("Commit output record {}", j)),
-                &local_data_commitment_parameters,
-                &output_record_bytes,
-                &given_local_data_commitment_leaves_randomness[index],
-            )?;
-
-            commitment.enforce_equal(
-                &mut cs.ns(|| format!("Check that local data commitment is valid - leaf {}", index)),
-                &given_local_data_commitment_leaves[index],
-            )?;
-
-            index += 1;
+            local_data_commitment_input_bytes.push(output_record_bytes);
         }
 
         let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
-
-        let memo_commitment = LocalDataCommitmentGadget::check_commitment_gadget(
-            cs.ns(|| "Commit memo"),
-            &local_data_commitment_parameters,
-            &memo,
-            &given_local_data_commitment_leaves_randomness[index],
-        )?;
-
-        memo_commitment.enforce_equal(
-            &mut cs.ns(|| format!("Check that local data commitment is valid - leaf {}", index)),
-            &given_local_data_commitment_leaves[index],
-        )?;
-
-        index += 1;
-
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
 
-        let network_id_commitment = LocalDataCommitmentGadget::check_commitment_gadget(
-            cs.ns(|| "Commit network id"),
-            &local_data_commitment_parameters,
-            &network_id,
-            &given_local_data_commitment_leaves_randomness[index],
-        )?;
+        local_data_commitment_input_bytes.push(memo);
+        local_data_commitment_input_bytes.push(network_id);
 
-        network_id_commitment.enforce_equal(
-            &mut cs.ns(|| format!("Check that local data commitment is valid - leaf {}", index)),
-            &given_local_data_commitment_leaves[index],
-        )?;
-
-        let local_data_commitment_gadget =
-            <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
-                &mut cs.ns(|| "Declare local data commitment digest"),
-                || Ok(local_data_commitment),
+        for (i, (((input_bytes, commitment), randomness), local_data_leaf_witness)) in local_data_commitment_input_bytes
+            .iter()
+            .zip(local_data_commitment_leaves)
+            .zip(local_data_commitment_leaves_randomness)
+            .zip(local_data_witnesses)
+            .enumerate()
+        {
+            // Allocate commitment and randomness
+            let given_commitment = LocalDataCommitmentGadget::OutputGadget::alloc(
+                &mut cs.ns(|| format!("Local data commitment - leaf {}", i)),
+                || Ok(commitment),
             )?;
 
-        let witness_cs = &mut cs.ns(|| "Check local data merkle tree membership witness");
+            let given_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
+                &mut cs.ns(|| format!("Local data commitment randomness - leaf {}", i)),
+                || Ok(randomness),
+            )?;
 
-        for (i, witness) in local_data_witnesses.iter().enumerate() {
+            // Validate leaf commitment
+            let candidate_commitment = LocalDataCommitmentGadget::check_commitment_gadget(
+                cs.ns(|| format!("Candidate local data commitment leaf {}", i)),
+                &local_data_commitment_parameters,
+                &input_bytes,
+                &given_randomness,
+            )?;
+
+            candidate_commitment.enforce_equal(
+                &mut cs.ns(|| format!("Check that local data commitment leaf is valid - leaf {}", i)),
+                &given_commitment,
+            )?;
+
+            // Validate leaf merkle path
             let witness_gadget = MerklePathGadget::<_, <C as DPCComponents>::LocalDataMerkleHashGadget, _>::alloc(
-                &mut witness_cs.ns(|| format!("Declare local data membership witness {}", i)),
-                || Ok(witness),
+                &mut cs.ns(|| format!("Declare local data membership witness {}", i)),
+                || Ok(local_data_leaf_witness),
             )?;
 
             witness_gadget.check_membership(
-                &mut witness_cs.ns(|| format!("Perform ledger membership witness check: {}", i)),
+                &mut cs.ns(|| format!("Perform local data membership witness check: {}", i)),
                 &local_data_merkle_tree_parameters,
                 &local_data_commitment_gadget,
-                &given_local_data_commitment_leaves[i],
+                &given_commitment,
             )?;
         }
     }
