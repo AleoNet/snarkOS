@@ -4,11 +4,14 @@ use snarkos_algorithms::{
     define_merkle_tree_parameters,
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_models::objects::{LedgerScheme, Transaction};
+use snarkos_models::{
+    algorithms::{MerkleParameters, CRH},
+    objects::{LedgerScheme, Transaction},
+};
 use snarkos_objects::Block;
 use snarkos_storage::Ledger;
 
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

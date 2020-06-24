@@ -5,13 +5,17 @@ use crate::{
 use snarkos_algorithms::{
     crh::{PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
+    merkle_tree::MerkleTree,
 };
 use snarkos_curves::edwards_bls12::{EdwardsProjective as Edwards, Fq};
-use snarkos_models::gadgets::{
-    algorithms::CRHGadget,
-    curves::field::FieldGadget,
-    r1cs::{ConstraintSystem, TestConstraintSystem},
-    utilities::{alloc::AllocGadget, uint::UInt8},
+use snarkos_models::{
+    algorithms::{MerkleParameters, CRH},
+    gadgets::{
+        algorithms::CRHGadget,
+        curves::field::FieldGadget,
+        r1cs::{ConstraintSystem, TestConstraintSystem},
+        utilities::{alloc::AllocGadget, uint::UInt8},
+    },
 };
 use snarkos_utilities::bytes::ToBytes;
 

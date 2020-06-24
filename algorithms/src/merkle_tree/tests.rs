@@ -1,9 +1,13 @@
 use crate::{
     crh::{PedersenCRH, PedersenSize},
     define_merkle_tree_parameters,
+    merkle_tree::MerkleTree,
 };
 use snarkos_curves::edwards_bls12::EdwardsAffine as Edwards;
-use snarkos_models::curves::Zero;
+use snarkos_models::{
+    algorithms::{MerkleParameters, CRH},
+    curves::Zero,
+};
 use snarkos_utilities::bytes::ToBytes;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

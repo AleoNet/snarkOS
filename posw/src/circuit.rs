@@ -94,6 +94,7 @@ mod test {
     use snarkos_algorithms::{
         crh::{PedersenCompressedCRH, PedersenSize},
         define_merkle_tree_parameters,
+        merkle_tree::MerkleTree,
         snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof},
     };
     use snarkos_curves::{
@@ -101,7 +102,10 @@ mod test {
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
     use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
-    use snarkos_models::curves::to_field_vec::ToConstraintField;
+    use snarkos_models::{
+        algorithms::{MerkleParameters, CRH},
+        curves::to_field_vec::ToConstraintField,
+    };
     use snarkos_utilities::bytes::ToBytes;
 
     use blake2::{digest::Digest, Blake2s};

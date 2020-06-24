@@ -14,7 +14,6 @@ use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
-    define_merkle_tree_parameters_alternate,
     prf::Blake2s,
     signature::SchnorrSignature,
     snark::GM17,
@@ -36,7 +35,10 @@ use snarkos_gadgets::{
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
-use snarkos_models::dpc::DPCComponents;
+use snarkos_models::{
+    algorithms::{MerkleParameters, CRH},
+    dpc::DPCComponents,
+};
 
 use blake2::Blake2s as Blake2sHash;
 
@@ -101,7 +103,7 @@ impl PedersenSize for ValueWindow {
 }
 
 define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
-define_merkle_tree_parameters_alternate!(LocalDataCommitmentMerkleParameters, LocalDataMerkleTreeCRH, 4);
+define_merkle_tree_parameters!(LocalDataCommitmentMerkleParameters, LocalDataMerkleTreeCRH, 4);
 
 pub struct Components;
 
