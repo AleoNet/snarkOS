@@ -39,7 +39,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
     predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
-    local_data_commitment_digest: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
+    local_data_commitment: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
 }
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
@@ -73,7 +73,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let predicate_randomness =
             Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
 
-        let local_data_commitment_digest =
+        let local_data_commitment =
             Some(MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default());
 
         Self {
@@ -95,7 +95,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
             predicate_commitment,
             predicate_randomness,
-            local_data_commitment_digest,
+            local_data_commitment,
         }
     }
 
@@ -125,7 +125,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-        local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+        local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -152,7 +152,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
             predicate_commitment: Some(predicate_commitment.clone()),
             predicate_randomness: Some(predicate_randomness.clone()),
-            local_data_commitment_digest: Some(local_data_commitment_digest.clone()),
+            local_data_commitment: Some(local_data_commitment.clone()),
         }
     }
 }
@@ -202,7 +202,7 @@ where
             self.new_private_predicate_inputs.get()?.as_slice(),
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,
-            self.local_data_commitment_digest.get()?,
+            self.local_data_commitment.get()?,
         )?;
         Ok(())
     }

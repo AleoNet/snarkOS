@@ -83,7 +83,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
 fn execute_predicate_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     circuit_parameters: &CircuitParameters<C>,
-    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     position: u8,
 ) -> Result<(), SynthesisError> {
     let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[position])?;
@@ -94,10 +94,10 @@ fn execute_predicate_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
             || Ok(circuit_parameters.local_data_commitment.parameters().clone()),
         )?;
 
-    let _local_data_digest_gadget =
+    let _local_data_commitment_gadget =
         <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
             &mut cs.ns(|| "Declare local data commitment digest"),
-            || Ok(local_data_commitment_digest),
+            || Ok(local_data_commitment),
         )?;
 
     Ok(())

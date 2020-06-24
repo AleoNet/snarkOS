@@ -27,7 +27,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
 
     // Local data commitment digest
-    pub local_data_commitment_digest: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
     pub memo: [u8; 32],
 
     pub value_balance: i64,
@@ -139,7 +139,7 @@ where
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
             &[self.network_id][..],
         )?);
-        v.extend_from_slice(&self.local_data_commitment_digest.to_field_elements()?);
+        v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
 
         let value_balance_as_u64 = self.value_balance.abs() as u64;
 

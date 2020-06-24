@@ -154,7 +154,7 @@ where
     local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
     local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
-    local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 
     // Value Balance
     value_balance: i64,
@@ -182,7 +182,7 @@ where
             local_data_commitment_leaves: self.local_data_commitment_leaves.clone(),
             local_data_commitment_leaves_randomness: self.local_data_commitment_leaves_randomness.clone(),
             local_data_witnesses: self.local_data_witnesses.clone(),
-            local_data_commitment_digest: self.local_data_commitment_digest.clone(),
+            local_data_commitment: self.local_data_commitment.clone(),
         }
     }
 }
@@ -202,7 +202,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     pub local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
     pub local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
-    pub local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitment: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -536,7 +536,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             local_data_witnesses.push(witness);
         }
 
-        let local_data_commitment_digest = merkle_tree.root();
+        let local_data_commitment = merkle_tree.root();
 
         end_timer!(local_data_comm_timer);
 
@@ -582,7 +582,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             local_data_commitment_leaves,
             local_data_commitment_leaves_randomness,
             local_data_witnesses,
-            local_data_commitment_digest,
+            local_data_commitment,
 
             value_balance,
         };
@@ -744,7 +744,7 @@ where
             local_data_commitment_leaves,
             local_data_commitment_leaves_randomness,
             local_data_witnesses,
-            local_data_commitment_digest,
+            local_data_commitment,
             value_balance,
         } = context;
 
@@ -758,7 +758,7 @@ where
             old_serial_numbers,
             new_commitments,
             predicate_commitment,
-            local_data_commitment_digest,
+            local_data_commitment,
             value_balance,
             memorandum
         ]?;
@@ -844,7 +844,7 @@ where
             new_value_commit_randomness.push(value_commitment_randomness);
         }
 
-        let sighash = to_bytes![local_data_commitment_digest]?;
+        let sighash = to_bytes![local_data_commitment]?;
 
         let binding_signature =
             create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
@@ -875,7 +875,7 @@ where
                 &local_data_commitment_leaves,
                 &local_data_commitment_leaves_randomness,
                 &local_data_witnesses,
-                &local_data_commitment_digest,
+                &local_data_commitment,
                 memorandum,
                 &old_value_commits,
                 &old_value_commit_randomness,
@@ -914,7 +914,7 @@ where
                 new_birth_pred_attributes.as_slice(),
                 &predicate_commitment,
                 &predicate_randomness,
-                &local_data_commitment_digest,
+                &local_data_commitment,
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
@@ -932,7 +932,7 @@ where
             ledger_digest,
             transaction_proof,
             predicate_commitment,
-            local_data_commitment_digest,
+            local_data_commitment,
             value_balance,
             network_id,
             signatures,
@@ -1021,7 +1021,7 @@ where
             new_commitments: transaction.new_commitments().to_vec(),
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.predicate_commitment().clone(),
-            local_data_commitment_digest: transaction.local_data_commitment().clone(),
+            local_data_commitment: transaction.local_data_commitment().clone(),
             value_balance: transaction.value_balance(),
             network_id: transaction.network_id(),
         };

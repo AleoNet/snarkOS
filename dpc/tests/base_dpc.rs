@@ -118,7 +118,7 @@ fn base_dpc_integration_test() {
             // Instantiate death predicate circuit
             let death_predicate_circuit = PredicateCircuit::new(
                 &local_data.circuit_parameters,
-                &local_data.local_data_commitment_digest,
+                &local_data.local_data_commitment,
                 i as u8,
             );
 
@@ -137,7 +137,7 @@ fn base_dpc_integration_test() {
                         .local_data_commitment
                         .parameters()
                         .clone(),
-                    local_data_commitment: local_data.local_data_commitment_digest.clone(),
+                    local_data_commitment: local_data.local_data_commitment.clone(),
                     position: i as u8,
                 };
                 assert!(
@@ -160,7 +160,7 @@ fn base_dpc_integration_test() {
             // Instantiate birth predicate circuit
             let birth_predicate_circuit = PredicateCircuit::new(
                 &local_data.circuit_parameters,
-                &local_data.local_data_commitment_digest,
+                &local_data.local_data_commitment,
                 j as u8,
             );
 
@@ -179,7 +179,7 @@ fn base_dpc_integration_test() {
                         .local_data_commitment
                         .parameters()
                         .clone(),
-                    local_data_commitment: local_data.local_data_commitment_digest.clone(),
+                    local_data_commitment: local_data.local_data_commitment.clone(),
                     position: j as u8,
                 };
                 assert!(

@@ -52,7 +52,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
     local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
-    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -100,7 +100,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         local_data_commitment_leaves,
         local_data_commitment_leaves_randomness,
         local_data_witnesses,
-        local_data_commitment_digest,
+        local_data_commitment,
         memo,
         input_value_commitments,
         input_value_commitment_randomness,
@@ -155,7 +155,7 @@ fn base_dpc_execute_gadget_helper<
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
     local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
-    local_data_commitment_digest: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -921,10 +921,10 @@ where
             &given_local_data_commitment_leaves[index],
         )?;
 
-        let local_data_digest_gadget =
+        let local_data_commitment_gadget =
             <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
                 &mut cs.ns(|| "Declare local data commitment digest"),
-                || Ok(local_data_commitment_digest),
+                || Ok(local_data_commitment),
             )?;
 
         let witness_cs = &mut cs.ns(|| "Check local data merkle tree membership witness");
@@ -938,7 +938,7 @@ where
             witness_gadget.check_membership(
                 &mut witness_cs.ns(|| format!("Perform ledger membership witness check: {}", i)),
                 &local_data_merkle_tree_parameters,
-                &local_data_digest_gadget,
+                &local_data_commitment_gadget,
                 &given_local_data_commitment_leaves[i],
             )?;
         }
@@ -956,7 +956,7 @@ where
                 &circuit_parameters.value_commitment,
                 &input_value_commitments,
                 &output_value_commitments,
-                &to_bytes![local_data_commitment_digest]?,
+                &to_bytes![local_data_commitment]?,
                 &binding_signature,
             )
             .unwrap();
