@@ -809,12 +809,6 @@ where
     {
         let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
-        let local_data_commitment_gadget =
-            <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
-                &mut cs.ns(|| "Declare local data commitment gadget"),
-                || Ok(local_data_commitment),
-            )?;
-
         let mut local_data_commitment_input_bytes = vec![];
 
         for i in 0..C::NUM_INPUT_RECORDS {
@@ -858,6 +852,12 @@ where
 
         local_data_commitment_input_bytes.push(memo);
         local_data_commitment_input_bytes.push(network_id);
+
+        let local_data_commitment_gadget =
+            <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+                &mut cs.ns(|| "Declare local data commitment gadget"),
+                || Ok(local_data_commitment),
+            )?;
 
         for (i, (((input_bytes, commitment), randomness), local_data_leaf_witness)) in local_data_commitment_input_bytes
             .iter()
