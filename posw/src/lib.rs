@@ -65,7 +65,7 @@ mod tests {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
 
         // run the trusted setup
-        let posw = Posw::trusted_setup(rng).unwrap();
+        let posw = Posw::setup(rng).unwrap();
         // super low difficulty so we find a solution immediately
         let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
 
@@ -88,7 +88,7 @@ mod tests {
         let universal_srs = marlin::snark::Marlin::<Bls12_377>::universal_setup(10000, 10000, 100000, rng).unwrap();
 
         // run the deterministic setup
-        let posw = PoswMarlin::setup(universal_srs).unwrap();
+        let posw = PoswMarlin::index(universal_srs).unwrap();
 
         // super low difficulty so we find a solution immediately
         let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;

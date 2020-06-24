@@ -123,7 +123,8 @@ where
     CP: POSWCircuitParameters,
 {
     /// Performs a trusted setup for the PoSW circuit and returns an instance of the runner
-    pub fn trusted_setup<R: Rng>(rng: &mut R) -> Result<Self, PoswError>
+    #[cfg(test)]
+    pub fn setup<R: Rng>(rng: &mut R) -> Result<Self, PoswError>
     where
         S: SNARK<Circuit = POSWCircuit<F, M, HG, CP>>,
     {
@@ -149,8 +150,7 @@ where
     }
 
     /// Performs a deterministic setup for systems with universal setups
-    // Needs a different name due to https://github.com/rust-lang/rust/issues/20400
-    pub fn setup<E>(srs: SRS<E>) -> Result<Self, PoswError>
+    pub fn index<E>(srs: SRS<E>) -> Result<Self, PoswError>
     where
         E: PairingEngine,
         S: SNARK<Circuit = (POSWCircuit<F, M, HG, CP>, SRS<E>)>,
@@ -169,8 +169,7 @@ where
                 },
                 srs,
             ),
-            // NB: This does not get used internally.
-            &mut rand::rngs::OsRng,
+            &mut poly_commit::optional_rng::OptionalRng(None),
         )?;
 
         Ok(Self {

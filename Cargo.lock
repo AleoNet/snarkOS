@@ -2401,6 +2401,7 @@ dependencies = [
  "blake2",
  "criterion",
  "marlin",
+ "poly-commit",
  "rand",
  "rand_xorshift",
  "snarkos-algorithms",
