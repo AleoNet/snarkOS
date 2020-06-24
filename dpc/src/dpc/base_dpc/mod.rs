@@ -199,10 +199,10 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Local data commitments, witnesses and digest
-    local_data_commitments: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
-    local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
-    local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
-    local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitments: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
+    pub local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
+    pub local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
+    pub local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

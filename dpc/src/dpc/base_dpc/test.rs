@@ -151,8 +151,10 @@ fn test_execute_base_dpc_constraints() {
         new_commitments,
         predicate_commitment: predicate_comm,
         predicate_randomness: predicate_rand,
-        local_data_commitment: local_data_comm,
-        local_data_randomness: local_data_rand,
+        local_data_commitments,
+        local_data_randomness,
+        local_data_witnesses,
+        local_data_commitment_digest,
         value_balance,
     } = context;
 
@@ -162,7 +164,7 @@ fn test_execute_base_dpc_constraints() {
     for i in 0..NUM_INPUT_RECORDS {
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PredicateCircuit::new(&circuit_parameters, &local_data_comm, i as u8),
+            PredicateCircuit::new(&circuit_parameters, &local_data_commitment_digest, i as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -170,7 +172,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
-                local_data_commitment: local_data_comm.clone(),
+                local_data_commitment: local_data_commitment_digest.clone(),
                 position: i as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
@@ -186,7 +188,7 @@ fn test_execute_base_dpc_constraints() {
     for j in 0..NUM_OUTPUT_RECORDS {
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PredicateCircuit::new(&circuit_parameters, &local_data_comm, j as u8),
+            PredicateCircuit::new(&circuit_parameters, &local_data_commitment_digest, j as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -195,7 +197,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                 local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
-                local_data_commitment: local_data_comm.clone(),
+                local_data_commitment: local_data_commitment_digest.clone(),
                 position: j as u8,
             };
             assert!(PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify"));
@@ -262,7 +264,7 @@ fn test_execute_base_dpc_constraints() {
         new_value_commit_randomness.push(value_commitment_randomness);
     }
 
-    let sighash = to_bytes![local_data_comm].unwrap();
+    let sighash = to_bytes![local_data_commitment_digest].unwrap();
 
     let binding_signature = create_binding_signature::<
         <Components as BaseDPCComponents>::ValueCommitment,
@@ -298,8 +300,10 @@ fn test_execute_base_dpc_constraints() {
         &new_commitments,
         &predicate_comm,
         &predicate_rand,
-        &local_data_comm,
-        &local_data_rand,
+        &local_data_commitments,
+        &local_data_randomness,
+        &local_data_witnesses,
+        &local_data_commitment_digest,
         &memo,
         &old_value_commits,
         &old_value_commit_randomness,
@@ -350,8 +354,10 @@ fn test_execute_base_dpc_constraints() {
             &new_commitments,
             &predicate_comm,
             &predicate_rand,
-            &local_data_comm,
-            &local_data_rand,
+            &local_data_commitments,
+            &local_data_randomness,
+            &local_data_witnesses,
+            &local_data_commitment_digest,
             &memo,
             &old_value_commits,
             &old_value_commit_randomness,
@@ -387,7 +393,7 @@ fn test_execute_base_dpc_constraints() {
         &new_proof_and_vk,
         &predicate_comm,
         &predicate_rand,
-        &local_data_comm,
+        &local_data_commitment_digest,
     )
     .unwrap();
 

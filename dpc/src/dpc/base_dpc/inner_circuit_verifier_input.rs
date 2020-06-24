@@ -104,6 +104,13 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
+                .local_data_merkle_tree
+                .parameters()
+                .to_field_elements()?,
+        );
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
                 .serial_number_nonce
                 .parameters()
                 .to_field_elements()?,

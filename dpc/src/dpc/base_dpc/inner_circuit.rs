@@ -80,9 +80,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let predicate_commitment = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default();
         let predicate_randomness = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
 
-        let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
-        let local_data_randomness = <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
-
         // Number of leaves are the number of input + output records + 2 (memo and network_id)
         let num_leaves = num_input_records + num_output_records + 2;
         let local_data_commitments = vec![<C::LocalDataCommitment as CommitmentScheme>::Output::default(); num_leaves];
