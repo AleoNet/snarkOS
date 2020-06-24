@@ -19,7 +19,13 @@ use snarkos_models::{
             SignaturePublicKeyRandomizationGadget,
         },
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint::UInt8, ToBytesGadget},
+        utilities::{
+            alloc::AllocGadget,
+            boolean::Boolean,
+            eq::{ConditionalEqGadget, EqGadget},
+            uint::UInt8,
+            ToBytesGadget,
+        },
     },
 };
 use snarkos_objects::AccountPrivateKey;
@@ -219,7 +225,7 @@ where
     // 3. record_commitment_parameters
     // 4. predicate_vk_commitment_parameters
     // 5. local_data_commitment_parameters
-    // 6. local_data_commitment_parameters
+    // 6. local_data_merkle_tree_parameters
     // 7. serial_number_nonce_crh_parameters
     // 8. value_commitment_parameters
     // 9. ledger_parameters
@@ -304,6 +310,8 @@ where
             ledger_parameters,
         )
     };
+
+    let zero_value = UInt8::alloc_vec(&mut cs.ns(|| "Declare record zero value"), &to_bytes![0u64]?)?;
 
     let digest_gadget = <C::MerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
         &mut cs.ns(|| "Declare ledger digest"),
@@ -545,6 +553,12 @@ where
         {
             let commitment_cs = &mut cs.ns(|| "Check that record is well-formed");
 
+            given_value.conditional_enforce_equal(
+                &mut commitment_cs.ns(|| format!("Enforce that input record {} has a value of 0 if dummy", i)),
+                &zero_value,
+                &given_is_dummy,
+            )?;
+
             let account_public_key_bytes =
                 given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
@@ -725,6 +739,12 @@ where
         // *******************************************************************
         {
             let commitment_cs = &mut cs.ns(|| "Check that record is well-formed");
+
+            given_value.conditional_enforce_equal(
+                &mut commitment_cs.ns(|| format!("Enforce that the output record {} has a value of 0 if dummy", j)),
+                &zero_value,
+                &given_is_dummy,
+            )?;
 
             let account_public_key_bytes =
                 given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
