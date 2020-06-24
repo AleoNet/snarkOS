@@ -151,7 +151,7 @@ where
     predicate_randomness: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
     // Local data commitments, witnesses and digest
-    local_data_commitments: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
+    local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
     local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
     local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
@@ -179,7 +179,7 @@ where
 
             new_records: self.new_records.to_vec(),
 
-            local_data_commitments: self.local_data_commitments.clone(),
+            local_data_commitment_leaves: self.local_data_commitment_leaves.clone(),
             local_data_randomness: self.local_data_randomness.clone(),
             local_data_witnesses: self.local_data_witnesses.clone(),
             local_data_commitment_digest: self.local_data_commitment_digest.clone(),
@@ -199,7 +199,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Local data commitments, witnesses and digest
-    pub local_data_commitments: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
+    pub local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     pub local_data_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
     pub local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
     pub local_data_commitment_digest: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
@@ -579,7 +579,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             predicate_commitment: predicate_comm,
             predicate_randomness: predicate_rand,
-            local_data_commitments: local_data_commitment_leaves,
+            local_data_commitment_leaves,
             local_data_randomness: local_data_commitment_randomness,
             local_data_witnesses,
             local_data_commitment_digest,
@@ -741,7 +741,7 @@ where
             new_commitments,
             predicate_commitment,
             predicate_randomness,
-            local_data_commitments,
+            local_data_commitment_leaves,
             local_data_randomness,
             local_data_witnesses,
             local_data_commitment_digest,
@@ -872,7 +872,7 @@ where
                 &new_commitments,
                 &predicate_commitment,
                 &predicate_randomness,
-                &local_data_commitments,
+                &local_data_commitment_leaves,
                 &local_data_randomness,
                 &local_data_witnesses,
                 &local_data_commitment_digest,
