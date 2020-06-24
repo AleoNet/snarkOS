@@ -1,7 +1,7 @@
 use snarkos_consensus::ConsensusParameters;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::objects::Transaction;
-use snarkos_posw::Posw;
+use snarkos_posw::PoswMarlin;
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
@@ -18,7 +18,7 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
     max_nonce: u32::max_value(),
     target_block_time: 2i64, //unix seconds
     network_id: 0,
-    verifier: Posw::verify_only().unwrap(),
+    verifier: PoswMarlin::verify_only().unwrap(),
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]

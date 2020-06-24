@@ -27,9 +27,10 @@ use snarkos_objects::{
     MerkleRootHash,
     PedersenMerkleRootHash,
 };
-use snarkos_posw::{txids_to_roots, Posw, GM17};
+use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
+use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -52,7 +53,7 @@ pub struct ConsensusParameters {
     pub network_id: u8,
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
-    pub verifier: Posw,
+    pub verifier: PoswMarlin,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -147,7 +148,7 @@ impl ConsensusParameters {
         }
 
         // Verify the proof
-        let proof = <GM17<Bls12_377> as SNARK>::Proof::read(&header.proof.0[..])?;
+        let proof = <Marlin<Bls12_377> as SNARK>::Proof::read(&header.proof.0[..])?;
         let verification_timer = start_timer!(|| "POSW verify");
         self.verifier
             .verify(header.nonce, &proof, &header.pedersen_merkle_root_hash)?;
@@ -547,7 +548,7 @@ mod tests {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
 
         // mine a PoSW proof
-        let posw = Posw::load().unwrap();
+        let posw = PoswMarlin::load().unwrap();
         let difficulty_target = u64::MAX;
 
         let consensus: ConsensusParameters = ConsensusParameters {

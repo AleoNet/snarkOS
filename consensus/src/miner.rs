@@ -10,7 +10,7 @@ use snarkos_models::{
     objects::Transaction,
 };
 use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, Block, BlockHeader};
-use snarkos_posw::{txids_to_roots, Posw};
+use snarkos_posw::{txids_to_roots, PoswMarlin};
 use snarkos_storage::Ledger;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -30,7 +30,7 @@ pub struct Miner {
     pub consensus: ConsensusParameters,
 
     /// The miner instance (must be initialized with a Proving Key)
-    miner: Posw,
+    miner: PoswMarlin,
 }
 
 impl Miner {
@@ -40,7 +40,7 @@ impl Miner {
             address,
             consensus,
             // load the miner with the proving key, this should never fail
-            miner: Posw::load().expect("could not instantiate the miner"),
+            miner: PoswMarlin::load().expect("could not instantiate the miner"),
         }
     }
 
@@ -133,15 +133,12 @@ impl Miner {
         let difficulty_target = self.consensus.get_block_difficulty(parent_header, time);
 
         // TODO: Switch this to use a user-provided RNG
-        let (nonce, proof) = self
-            .miner
-            .mine(
-                &subroots,
-                difficulty_target,
-                &mut thread_rng(),
-                self.consensus.max_nonce,
-            )
-            .unwrap();
+        let (nonce, proof) = self.miner.mine(
+            &subroots,
+            difficulty_target,
+            &mut thread_rng(),
+            self.consensus.max_nonce,
+        )?;
 
         Ok(BlockHeader {
             previous_block_hash: parent_header.get_hash(),
