@@ -113,9 +113,8 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start miner thread
 
-    let miner_address = AccountPublicKey::<Components>::from_str(&config.miner_address)?;
-
     if config.is_miner {
+        let miner_address = AccountPublicKey::<Components>::from_str(&config.miner_address)?;
         MinerInstance::new(
             miner_address,
             consensus.clone(),
