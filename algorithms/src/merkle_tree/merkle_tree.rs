@@ -17,10 +17,6 @@ impl<P: MerkleParameters> MerkleTree<P> {
     pub fn new<L: ToBytes>(parameters: P, leaves: &[L]) -> Result<Self, MerkleError> {
         let new_time = start_timer!(|| "MerkleTree::new");
 
-        if leaves.is_empty() {
-            return Err(MerkleError::NoLeaves);
-        }
-
         let hash_input_size_in_bytes = (P::H::INPUT_SIZE_BITS / 8) * 2;
         let last_level_size = leaves.len().next_power_of_two();
         let tree_size = 2 * last_level_size - 1;

@@ -22,9 +22,6 @@ pub enum MerkleError {
 
     #[error("{}", _0)]
     Message(String),
-
-    #[error("No leaves given to Merkle tree")]
-    NoLeaves,
 }
 
 impl From<CRHError> for MerkleError {
