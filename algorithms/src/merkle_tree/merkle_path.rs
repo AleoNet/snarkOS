@@ -1,6 +1,6 @@
 use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{MerkleParameters, CRH};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::ToBytes;
 
 pub type MerkleTreeDigest<P> = <<P as MerkleParameters>::H as CRH>::Output;
 
@@ -19,9 +19,10 @@ impl<P: MerkleParameters> MerklePath<P> {
         }
 
         // Check that the given leaf matches the leaf in the membership proof.
-        let mut buffer = [0u8; 128];
-
         if !self.path.is_empty() {
+            let hash_input_size_in_bytes = (P::H::INPUT_SIZE_BITS / 8) * 2;
+            let mut buffer = vec![0u8; hash_input_size_in_bytes];
+
             let claimed_leaf_hash = self.parameters.hash_leaf::<L>(leaf, &mut buffer)?;
 
             // Check if leaf is one of the bottom-most siblings.
@@ -29,19 +30,21 @@ impl<P: MerkleParameters> MerklePath<P> {
                 return Ok(false);
             };
 
-            let mut prev = claimed_leaf_hash;
             // Check levels between leaf level and root.
+            let mut previous_hash = claimed_leaf_hash;
+            let mut buffer = vec![0u8; hash_input_size_in_bytes];
             for &(ref hash, ref sibling_hash) in &self.path {
                 // Check if the previous hash matches the correct current hash.
-                if &prev != hash && &prev != sibling_hash {
+                if &previous_hash != hash && &previous_hash != sibling_hash {
                     return Ok(false);
                 };
-                prev = self.parameters.hash_inner_node(hash, sibling_hash, &mut buffer)?;
+                previous_hash = self.parameters.hash_inner_node(hash, sibling_hash, &mut buffer)?;
             }
 
-            if root_hash != &prev {
+            if root_hash != &previous_hash {
                 return Ok(false);
             }
+
             Ok(true)
         } else {
             Ok(false)

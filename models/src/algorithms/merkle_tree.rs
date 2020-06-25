@@ -40,6 +40,7 @@ pub trait MerkleParameters: Clone + Default + From<<Self as MerkleParameters>::H
 
         // Construct left input.
         left.write(&mut writer)?;
+
         // Construct right input.
         right.write(&mut writer)?;
 
