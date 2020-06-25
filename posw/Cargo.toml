@@ -22,7 +22,7 @@ snarkos-parameters = { path = "../parameters", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
-blake2 = { version = "0.8.1" }
+blake2 = { version = "0.9.0" }
 rand = { version = "0.7" }
 thiserror = "1.0.20"
 
