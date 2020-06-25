@@ -44,7 +44,6 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     // Local data commitments, witnesses, and digest
     local_data_commitment_leaves: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Output>>,
     local_data_commitment_leaves_randomness: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
-    local_data_witnesses: Option<Vec<MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>>>,
     local_data_commitment: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
 
     memo: Option<[u8; 32]>,
@@ -86,7 +85,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             vec![<C::LocalDataCommitment as CommitmentScheme>::Output::default(); num_leaves];
         let local_data_commitment_leaves_randomness =
             vec![<C::LocalDataCommitment as CommitmentScheme>::Randomness::default(); num_leaves];
-        let local_data_witnesses = vec![MerklePath::default(); num_leaves];
         let local_data_commitment = MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default();
 
         let input_value_commitments =
@@ -128,7 +126,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             // Local data commitments, witnesses, and digest
             local_data_commitment_leaves: Some(local_data_commitment_leaves),
             local_data_commitment_leaves_randomness: Some(local_data_commitment_leaves_randomness),
-            local_data_witnesses: Some(local_data_witnesses),
             local_data_commitment: Some(local_data_commitment),
 
             // Other stuff
@@ -171,7 +168,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         // Local data commitments, witnesses, and digest
         local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
         local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
-        local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
         local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
         memo: &[u8; 32],
@@ -204,7 +200,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let num_leaves = num_input_records + num_output_records;
         assert_eq!(num_leaves, local_data_commitment_leaves.len());
         assert_eq!(num_leaves, local_data_commitment_leaves_randomness.len());
-        assert_eq!(num_leaves, local_data_witnesses.len());
 
         Self {
             // Parameters
@@ -232,7 +227,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             // Local data commitments, witnesses, and digest
             local_data_commitment_leaves: Some(local_data_commitment_leaves.to_vec()),
             local_data_commitment_leaves_randomness: Some(local_data_commitment_leaves_randomness.to_vec()),
-            local_data_witnesses: Some(local_data_witnesses.to_vec()),
             local_data_commitment: Some(local_data_commitment.clone()),
 
             // Other stuff
@@ -274,7 +268,6 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             // Local data commitments, witnesses, and digest
             self.local_data_commitment_leaves.get()?,
             self.local_data_commitment_leaves_randomness.get()?,
-            self.local_data_witnesses.get()?,
             self.local_data_commitment.get()?,
             // Other stuff
             self.memo.get()?,

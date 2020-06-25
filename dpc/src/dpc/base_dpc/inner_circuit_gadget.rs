@@ -57,7 +57,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
 
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
     local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
-    local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
     local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
     memo: &[u8; 32],
@@ -105,7 +104,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         predicate_randomness,
         local_data_commitment_leaves,
         local_data_commitment_leaves_randomness,
-        local_data_witnesses,
         local_data_commitment,
         memo,
         input_value_commitments,
@@ -160,7 +158,6 @@ fn base_dpc_execute_gadget_helper<
 
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
     local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
-    local_data_witnesses: &[MerklePath<<C as DPCComponents>::LocalDataMerkleParameters>],
     local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
 
     memo: &[u8; 32],
@@ -880,11 +877,10 @@ where
                 || Ok(local_data_commitment),
             )?;
 
-        for (i, (((input_bytes, commitment), randomness), local_data_leaf_witness)) in local_data_commitment_input_bytes
+        for (i, ((input_bytes, commitment), randomness)) in local_data_commitment_input_bytes
             .iter()
             .zip(local_data_commitment_leaves)
             .zip(local_data_commitment_leaves_randomness)
-            .zip(local_data_witnesses)
             .enumerate()
         {
             // Allocate commitment and randomness
@@ -910,20 +906,15 @@ where
                 &mut cs.ns(|| format!("Check that local data commitment leaf is valid - leaf {}", i)),
                 &given_commitment,
             )?;
-
-            // Validate leaf merkle path
-            let witness_gadget = MerklePathGadget::<_, <C as DPCComponents>::LocalDataMerkleHashGadget, _>::alloc(
-                &mut cs.ns(|| format!("Declare local data membership witness {}", i)),
-                || Ok(local_data_leaf_witness),
-            )?;
-
-            witness_gadget.check_membership(
-                &mut cs.ns(|| format!("Perform local data membership witness check: {}", i)),
-                &local_data_merkle_tree_parameters,
-                &local_data_commitment_gadget,
-                &given_commitment,
-            )?;
         }
+        //
+        //        let left_input =
+        //
+        //        let test = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+        //            &mut cs.ns(|| "Compute inner node"),
+        //            &local_data_merkle_tree_parameters,
+        //            &local_data_commitment_input_bytes[0],
+        //        )?;
     }
     // *******************************************************************
 

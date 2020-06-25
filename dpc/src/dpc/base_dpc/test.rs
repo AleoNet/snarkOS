@@ -153,7 +153,6 @@ fn test_execute_base_dpc_constraints() {
         predicate_randomness: predicate_rand,
         local_data_commitment_leaves,
         local_data_commitment_leaves_randomness,
-        local_data_witnesses,
         local_data_commitment,
         value_balance,
     } = context;
@@ -302,7 +301,6 @@ fn test_execute_base_dpc_constraints() {
         &predicate_rand,
         &local_data_commitment_leaves,
         &local_data_commitment_leaves_randomness,
-        &local_data_witnesses,
         &local_data_commitment,
         &memo,
         &old_value_commits,
@@ -356,7 +354,6 @@ fn test_execute_base_dpc_constraints() {
             &predicate_rand,
             &local_data_commitment_leaves,
             &local_data_commitment_leaves_randomness,
-            &local_data_witnesses,
             &local_data_commitment,
             &memo,
             &old_value_commits,

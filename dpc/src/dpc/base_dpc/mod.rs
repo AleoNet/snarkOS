@@ -153,7 +153,6 @@ where
     // Local data commitments, witnesses and digest
     local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
-    local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
     local_data_commitment: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 
     // Value Balance
@@ -181,7 +180,6 @@ where
 
             local_data_commitment_leaves: self.local_data_commitment_leaves.clone(),
             local_data_commitment_leaves_randomness: self.local_data_commitment_leaves_randomness.clone(),
-            local_data_witnesses: self.local_data_witnesses.clone(),
             local_data_commitment: self.local_data_commitment.clone(),
         }
     }
@@ -201,7 +199,6 @@ pub struct LocalData<Components: BaseDPCComponents> {
     // Local data commitments, witnesses and digest
     pub local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     pub local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
-    pub local_data_witnesses: Vec<MerklePath<<Components as DPCComponents>::LocalDataMerkleParameters>>,
     pub local_data_commitment: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
 }
 
@@ -513,13 +510,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let merkle_tree = MerkleTree::new(parameters.local_data_merkle_tree.clone(), &local_data_commitment_leaves)?;
 
-        // Compute the local_data_commitment witnesses
-        let mut local_data_witnesses = vec![];
-        for (i, leaf) in local_data_commitment_leaves.iter().enumerate() {
-            let witness = merkle_tree.generate_proof(i, leaf)?;
-            local_data_witnesses.push(witness);
-        }
-
         let local_data_commitment = merkle_tree.root();
 
         end_timer!(local_data_comm_timer);
@@ -565,7 +555,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             predicate_randomness: predicate_rand,
             local_data_commitment_leaves,
             local_data_commitment_leaves_randomness,
-            local_data_witnesses,
             local_data_commitment,
 
             value_balance,
@@ -727,7 +716,6 @@ where
             predicate_randomness,
             local_data_commitment_leaves,
             local_data_commitment_leaves_randomness,
-            local_data_witnesses,
             local_data_commitment,
             value_balance,
         } = context;
@@ -858,7 +846,6 @@ where
                 &predicate_randomness,
                 &local_data_commitment_leaves,
                 &local_data_commitment_leaves_randomness,
-                &local_data_witnesses,
                 &local_data_commitment,
                 memorandum,
                 &old_value_commits,
