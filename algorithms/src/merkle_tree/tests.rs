@@ -1,14 +1,9 @@
 use crate::{
-    crh::{PedersenCompressedCRH, PedersenCRH, PedersenSize},
-    merkle_tree::MerkleTree,
+    crh::{PedersenCRH, PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
+    merkle_tree::MerkleTree,
 };
-use snarkos_models::{
-    algorithms::{
-        crh::CRH,
-        merkle_tree::MerkleParameters
-    },
-};
+use snarkos_models::algorithms::{crh::CRH, merkle_tree::MerkleParameters};
 use snarkos_utilities::{to_bytes, ToBytes};
 
 fn generate_merkle_tree<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> MerkleTree<P> {
@@ -93,7 +88,11 @@ fn run_merkle_tree_matches_direct_hashing_test<P: MerkleParameters>() {
     // TODO (howardwu): Is the extra hash supposed to exist?
     let expected_root = pedersen.hash(&to_bytes![root].unwrap()).unwrap();
 
-    println!("merkle_root == expected_root\n\t{} == {}", merkle_tree.root(), expected_root);
+    println!(
+        "merkle_root == expected_root\n\t{} == {}",
+        merkle_tree.root(),
+        expected_root
+    );
     assert_eq!(merkle_tree_root, expected_root);
 }
 

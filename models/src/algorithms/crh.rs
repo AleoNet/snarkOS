@@ -2,7 +2,10 @@ use snarkos_errors::algorithms::CRHError;
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
-use std::{fmt::{Debug, Display}, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 pub trait CRH: Clone + From<<Self as CRH>::Parameters> {
     type Output: Clone + Debug + Display + ToBytes + FromBytes + Eq + Hash + Default;

@@ -23,10 +23,13 @@ pub fn prng() -> impl Rng {
 /// Defines a Merkle Tree using the provided hash and height.
 macro_rules! define_merkle_tree_parameters {
     ($struct_name:ident, $hash:ty, $height:expr) => {
-        #[allow(unused_imports)] use snarkos_models::algorithms::{MerkleParameters, CRH};
-        #[allow(unused_imports)] use $crate::merkle_tree::MerkleTree;
+        #[allow(unused_imports)]
+        use snarkos_models::algorithms::{MerkleParameters, CRH};
+        #[allow(unused_imports)]
+        use $crate::merkle_tree::MerkleTree;
 
-        #[allow(unused_imports)] use rand::Rng;
+        #[allow(unused_imports)]
+        use rand::Rng;
 
         #[derive(Clone, PartialEq, Eq, Debug)]
         pub struct $struct_name($hash);
