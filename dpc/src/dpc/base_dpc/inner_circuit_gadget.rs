@@ -877,6 +877,7 @@ where
                 || Ok(local_data_commitment),
             )?;
 
+        let mut commitment_leaves = vec![];
         for (i, ((input_bytes, commitment), randomness)) in local_data_commitment_input_bytes
             .iter()
             .zip(local_data_commitment_leaves)
@@ -906,15 +907,79 @@ where
                 &mut cs.ns(|| format!("Check that local data commitment leaf is valid - leaf {}", i)),
                 &given_commitment,
             )?;
+            commitment_leaves.push(candidate_commitment);
         }
-        //
-        //        let left_input =
-        //
-        //        let test = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
-        //            &mut cs.ns(|| "Compute inner node"),
-        //            &local_data_merkle_tree_parameters,
-        //            &local_data_commitment_input_bytes[0],
-        //        )?;
+
+        // TODO formalize into a merkle tree gadget
+
+        let leaf_1_input = commitment_leaves[0].to_bytes(&mut cs.ns(|| "leaf_1 commitment to bytes"))?;
+        let leaf_2_input = commitment_leaves[1].to_bytes(&mut cs.ns(|| "leaf_2 commitment to bytes"))?;
+        let leaf_3_input = commitment_leaves[2].to_bytes(&mut cs.ns(|| "leaf_3 commitment to bytes"))?;
+        let leaf_4_input = commitment_leaves[3].to_bytes(&mut cs.ns(|| "leaf_4 commitment to bytes"))?;
+
+        // Depth 2
+        let leaf_1 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute leaf 1"),
+            &local_data_merkle_tree_parameters,
+            &leaf_1_input,
+        )?;
+
+        let leaf_2 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute leaf 2"),
+            &local_data_merkle_tree_parameters,
+            &leaf_2_input,
+        )?;
+
+        let leaf_3 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute leaf 3"),
+            &local_data_merkle_tree_parameters,
+            &leaf_3_input,
+        )?;
+
+        let leaf_4 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute leaf 4"),
+            &local_data_merkle_tree_parameters,
+            &leaf_4_input,
+        )?;
+
+        // Depth 1
+
+        let mut inner_1_input = vec![];
+        inner_1_input.extend_from_slice(&leaf_1.to_bytes(&mut cs.ns(|| "leaf_1 to bytes"))?);
+        inner_1_input.extend_from_slice(&leaf_2.to_bytes(&mut cs.ns(|| "leaf_2 to bytes"))?);
+
+        let mut inner_2_input = vec![];
+        inner_2_input.extend_from_slice(&leaf_3.to_bytes(&mut cs.ns(|| "leaf_3 to bytes"))?);
+        inner_2_input.extend_from_slice(&leaf_4.to_bytes(&mut cs.ns(|| "leaf_4 to bytes"))?);
+
+        let left = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute inner left node"),
+            &local_data_merkle_tree_parameters,
+            &inner_1_input,
+        )?;
+
+        let right = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute inner right node"),
+            &local_data_merkle_tree_parameters,
+            &inner_2_input,
+        )?;
+
+        // Depth 0
+
+        let mut root_input = vec![];
+        root_input.extend_from_slice(&left.to_bytes(&mut cs.ns(|| "left to bytes"))?);
+        root_input.extend_from_slice(&right.to_bytes(&mut cs.ns(|| "right to bytes"))?);
+
+        let root = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute merkle tree root"),
+            &local_data_merkle_tree_parameters,
+            root_input.as_slice(),
+        )?;
+
+        local_data_commitment_gadget.enforce_equal(
+            &mut cs.ns(|| "Check that computed local data commitment is valid."),
+            &root,
+        )?;
     }
     // *******************************************************************
 

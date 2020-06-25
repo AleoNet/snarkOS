@@ -322,7 +322,8 @@ fn test_execute_base_dpc_constraints() {
 
     if core_cs.is_satisfied() {
         println!("\n\n\n\nAll Core check constraints:");
-        core_cs.print_named_objects();
+        //        core_cs.print_named_objects();
+        println!("num constraints: {:?}", core_cs.num_constraints());
     }
     println!("=========================================================");
     println!("=========================================================");
@@ -402,7 +403,8 @@ fn test_execute_base_dpc_constraints() {
     }
     if pf_check_cs.is_satisfied() {
         println!("\n\n\n\nAll Proof check constraints:");
-        pf_check_cs.print_named_objects();
+        //        pf_check_cs.print_named_objects();
+        println!("num constraints: {:?}", pf_check_cs.num_constraints());
     }
     println!("=========================================================");
     println!("=========================================================");
