@@ -9,10 +9,10 @@ use crate::{
     Vec,
 };
 use derivative::Derivative;
-use poly_commit::LabeledPolynomial;
 use snarkos_algorithms::fft::EvaluationDomain;
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
+use snarkos_polycommit::LabeledPolynomial;
 use snarkos_utilities::serialize::*;
 
 use core::marker::PhantomData;

@@ -1,12 +1,12 @@
 use crate::{String, ToString, Vec};
 use core::{borrow::Borrow, marker::PhantomData};
-use poly_commit::{LCTerm, LabeledPolynomial, LinearCombination};
 use snarkos_algorithms::{cfg_iter_mut, fft::EvaluationDomain};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::ConstraintSynthesizer,
 };
+use snarkos_polycommit::{LCTerm, LabeledPolynomial, LinearCombination};
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -246,7 +246,7 @@ pub trait EvaluationsProvider<F: Field> {
     fn get_lc_eval(&self, lc: &LinearCombination<F>, point: F) -> Result<F, Error>;
 }
 
-impl<'a, F: Field> EvaluationsProvider<F> for poly_commit::Evaluations<'a, F> {
+impl<'a, F: Field> EvaluationsProvider<F> for snarkos_polycommit::Evaluations<'a, F> {
     fn get_lc_eval(&self, lc: &LinearCombination<F>, point: F) -> Result<F, Error> {
         let key = (lc.label.clone(), point);
         self.get(&key).map(|v| *v).ok_or(Error::MissingEval(lc.label.clone()))

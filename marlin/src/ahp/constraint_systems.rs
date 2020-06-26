@@ -8,13 +8,13 @@ use crate::{
     ToString,
 };
 use derivative::Derivative;
-use poly_commit::LabeledPolynomial;
 use snarkos_algorithms::{cfg_iter_mut, fft::Evaluations as EvaluationsOnDomain};
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::{ConstraintSystem, Index as VarIndex, LinearCombination, Variable},
 };
+use snarkos_polycommit::LabeledPolynomial;
 
 use snarkos_utilities::serialize::*;
 

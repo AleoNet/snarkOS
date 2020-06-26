@@ -4,7 +4,6 @@ use crate::ahp::{constraint_systems::ProverConstraintSystem, indexer::*, verifie
 
 use crate::{ToString, Vec};
 use core::marker::PhantomData;
-use poly_commit::{LabeledPolynomial, Polynomial};
 use rand_core::RngCore;
 use snarkos_algorithms::{
     cfg_into_iter,
@@ -17,6 +16,7 @@ use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::ConstraintSynthesizer,
 };
+use snarkos_polycommit::{LabeledPolynomial, Polynomial};
 use snarkos_utilities::{bytes::ToBytes, error, serialize::*};
 use std::io::Write;
 

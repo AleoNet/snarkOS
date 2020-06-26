@@ -20,9 +20,9 @@ extern crate snarkos_profiler;
 
 use core::marker::PhantomData;
 use digest::Digest;
-use poly_commit::{Evaluations, LabeledCommitment, PCUniversalParams, PolynomialCommitment};
 use rand_core::RngCore;
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
+use snarkos_polycommit::{Evaluations, LabeledCommitment, PCUniversalParams, PolynomialCommitment};
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 #[cfg(not(feature = "std"))]

@@ -47,8 +47,8 @@ mod marlin {
 
     use blake2::Blake2s;
     use core::ops::MulAssign;
-    use poly_commit::marlin_pc::MarlinKZG10;
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
+    use snarkos_polycommit::marlin_pc::MarlinKZG10;
     use snarkos_utilities::rand::{test_rng, UniformRand};
 
     type MultiPC = MarlinKZG10<Bls12_377>;
