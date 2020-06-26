@@ -201,7 +201,7 @@ impl_params!(
     LocalDataCommitmentParameters,
     local_data_commitment_test,
     "local_data_commitment",
-    2317612
+    280780
 );
 impl_params!(
     RecordCommitmentParameters,
@@ -217,7 +217,7 @@ impl_params!(
 );
 
 // CRH
-impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 2188956);
+impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65572);
 impl_params!(
     PredicateVKCRHParameters,
     predicate_vk_crh_test,
