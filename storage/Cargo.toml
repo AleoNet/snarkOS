@@ -19,7 +19,7 @@ snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-parameters = { path = "../parameters", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
-bincode = { version = "1.2.0" }
+bincode = { version = "1.3.1" }
 hex = { version = "0.4.2" }
 parking_lot = { version = "0.11.0" }
 rand = { version = "0.7" }
