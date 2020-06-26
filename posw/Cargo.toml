@@ -21,8 +21,8 @@ snarkos-objects = { path = "../objects", version = "0.8.0" } # needed to instant
 snarkos-parameters = { path = "../parameters", version = "0.8.0" }
 snarkos-profiler = { path = "../profiler", version = "0.8.0" }
 snarkos-utilities = { path = "../utilities", version = "0.8.0" }
-poly-commit = { path = "../../poly-commit" }
-marlin = { path = "../../marlin" }
+snarkos-polycommit = { path = "../poly-commit", version = "0.1.0" }
+snarkos-marlin = { path = "../marlin", version = "0.1.0" }
 
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }

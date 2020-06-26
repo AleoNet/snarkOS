@@ -5,7 +5,6 @@ use crate::ahp::{constraint_systems::ProverConstraintSystem, indexer::*, verifie
 use crate::{ToString, Vec};
 use core::marker::PhantomData;
 use rand_core::RngCore;
-use snakros_polycommit::{LabeledPolynomial, Polynomial};
 use snarkos_algorithms::{
     cfg_into_iter,
     cfg_iter,
