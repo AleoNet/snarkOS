@@ -1,11 +1,16 @@
 use crate::algorithms::crh::pedersen::PedersenCRHParametersGadget;
-use snarkos_algorithms::crh::{BoweHopwoodPedersenCRH, PedersenSize, BOWE_HOPWOOD_CHUNK_SIZE};
+use snarkos_algorithms::crh::{
+    BoweHopwoodPedersenCRH,
+    BoweHopwoodPedersenCompressedCRH,
+    PedersenSize,
+    BOWE_HOPWOOD_CHUNK_SIZE,
+};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    curves::{Field, Group},
+    curves::{Field, Group, ProjectiveCurve},
     gadgets::{
         algorithms::CRHGadget,
-        curves::GroupGadget,
+        curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{
             boolean::Boolean,
@@ -57,5 +62,29 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<BoweH
             GG::precomputed_base_3_bit_signed_digit_scalar_mul(cs, &parameters.parameters.bases, &input_in_bits)?;
 
         Ok(result)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoweHopwoodPedersenCompressedCRHGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>>
+{
+    _group: PhantomData<*const G>,
+    _group_gadget: PhantomData<*const GG>,
+    _engine: PhantomData<F>,
+}
+
+impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: PedersenSize>
+    CRHGadget<BoweHopwoodPedersenCompressedCRH<G, S>, F> for BoweHopwoodPedersenCompressedCRHGadget<G, F, GG>
+{
+    type OutputGadget = GG::BaseFieldGadget;
+    type ParametersGadget = PedersenCRHParametersGadget<G, S, F, GG>;
+
+    fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        input: &[UInt8],
+    ) -> Result<Self::OutputGadget, SynthesisError> {
+        let output = BoweHopwoodPedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(cs, parameters, input)?;
+        Ok(output.to_x_coordinate())
     }
 }
