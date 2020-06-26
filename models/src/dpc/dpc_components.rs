@@ -19,8 +19,10 @@ pub trait DPCComponents: 'static + Sized {
     type AccountSignature: SignatureScheme;
     type AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Self::AccountSignature, Self::InnerField>;
 
-    /// Commitment scheme for committing to predicate input. Invoked inside
+    /// CRH and commitment scheme for committing to predicate input. Invoked inside
     /// `Self::MainN` and every predicate SNARK.
+    type LocalDataCRH: CRH;
+    type LocalDataCRHGadget: CRHGadget<Self::LocalDataCRH, Self::InnerField>;
     type LocalDataCommitment: CommitmentScheme;
     type LocalDataCommitmentGadget: CommitmentGadget<Self::LocalDataCommitment, Self::InnerField>;
 
