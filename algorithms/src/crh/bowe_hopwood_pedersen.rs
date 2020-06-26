@@ -180,32 +180,3 @@ impl<F: Field, G: Group + ToConstraintField<F>, S: PedersenSize> ToConstraintFie
         self.parameters.to_field_elements()
     }
 }
-
-//#[cfg(test)]
-//mod test {
-//    use crate::{
-//        crh::{bowe_hopwood::BoweHopwoodPedersenCRH, pedersen::PedersenWindow},
-//        FixedLengthCRH,
-//    };
-//    use algebra::{ed_on_bls12_381::EdwardsProjective, test_rng};
-//
-//    #[test]
-//    fn test_simple_bh() {
-//        #[derive(Clone)]
-//        struct TestWindow {}
-//        impl PedersenWindow for TestWindow {
-//            const WINDOW_SIZE: usize = 63;
-//            const NUM_WINDOWS: usize = 8;
-//        }
-//
-//        let rng = &mut test_rng();
-//        let params =
-//            <BoweHopwoodPedersenCRH<EdwardsProjective, TestWindow> as FixedLengthCRH>::setup(rng)
-//                .unwrap();
-//        <BoweHopwoodPedersenCRH<EdwardsProjective, TestWindow> as FixedLengthCRH>::evaluate(
-//            &params,
-//            &[1, 2, 3],
-//        )
-//            .unwrap();
-//    }
-//}
