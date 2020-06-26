@@ -2118,6 +2118,7 @@ dependencies = [
  "snarkos-errors",
  "snarkos-network",
  "snarkos-objects",
+ "snarkos-polycommit",
  "snarkos-posw",
  "snarkos-rpc",
  "snarkos-storage",
@@ -2358,6 +2359,25 @@ dependencies = [
  "snarkos-objects",
  "snarkos-posw",
  "snarkos-storage",
+ "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-polycommit"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "rand",
+ "rand_core",
+ "rayon",
+ "rusty-hook",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-profiler",
  "snarkos-utilities",
 ]
 
