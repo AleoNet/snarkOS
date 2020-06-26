@@ -1,3 +1,9 @@
+pub mod bowe_hopwood_pedersen;
+pub use self::bowe_hopwood_pedersen::*;
+
+pub mod bowe_hopwood_pedersen_compressed;
+pub use self::bowe_hopwood_pedersen_compressed::*;
+
 pub mod pedersen;
 pub use self::pedersen::*;
 
