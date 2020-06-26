@@ -124,7 +124,7 @@ where
     CP: POSWCircuitParameters,
 {
     /// Performs a trusted setup for the PoSW circuit and returns an instance of the runner
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-helpers"))]
     pub fn setup<R: Rng>(rng: &mut R) -> Result<Self, PoswError>
     where
         S: SNARK<Circuit = POSWCircuit<F, M, HG, CP>>,

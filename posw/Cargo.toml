@@ -36,6 +36,7 @@ rand_xorshift = { version = "0.2" }
 
 [features]
 print-trace = [ "snarkos-profiler/print-trace" ]
+test-helpers = []
 
 [[bench]]
 name = "posw"
