@@ -1,8 +1,5 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
-use snarkos_models::{
-    algorithms::{MerkleParameters, SNARK},
-    parameters::Parameters,
-};
+use snarkos_models::{algorithms::SNARK, parameters::Parameters};
 use snarkos_parameters::*;
 use snarkos_utilities::bytes::FromBytes;
 
@@ -17,7 +14,7 @@ pub struct CircuitParameters<C: BaseDPCComponents> {
     pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
     pub predicate_verification_key_hash: C::PredicateVerificationKeyHash,
     pub local_data_commitment: C::LocalDataCommitment,
-    pub local_data_merkle_tree: C::LocalDataMerkleParameters,
+    pub local_data_merkle_commitment: C::LocalDataMerkleCommitment,
     pub value_commitment: C::ValueCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
 }
@@ -38,11 +35,9 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
         let local_data_commitment: C::LocalDataCommitment = From::from(FromBytes::read(
             LocalDataCommitmentParameters::load_bytes()?.as_slice(),
         )?);
-
-        let local_data_merkle_tree_hash_parameters: <C::LocalDataMerkleParameters as MerkleParameters>::H =
-            From::from(FromBytes::read(&LocalDataMerkleTreeParameters::load_bytes()?[..])?);
-        let local_data_merkle_tree = From::from(local_data_merkle_tree_hash_parameters);
-
+        let local_data_merkle_commitment: C::LocalDataMerkleCommitment = From::from(FromBytes::read(
+            &LocalDataMerkleCommitmentParameters::load_bytes()?[..],
+        )?);
         let value_commitment: C::ValueCommitment =
             From::from(FromBytes::read(ValueCommitmentParameters::load_bytes()?.as_slice())?);
         let serial_number_nonce: C::SerialNumberNonceCRH = From::from(FromBytes::read(
@@ -56,7 +51,7 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
             predicate_verification_key_commitment,
             predicate_verification_key_hash,
             local_data_commitment,
-            local_data_merkle_tree,
+            local_data_merkle_commitment,
             value_commitment,
             serial_number_nonce,
         })

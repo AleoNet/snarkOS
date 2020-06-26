@@ -1,5 +1,5 @@
 use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTree, MerkleTreeDigest};
+use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
@@ -153,7 +153,7 @@ where
     // Local data commitments, witnesses and digest
     local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
-    local_data_commitment: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: <<Components as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 
     // Value Balance
     value_balance: i64,
@@ -199,7 +199,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
     // Local data commitments, witnesses and digest
     pub local_data_commitment_leaves: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Output>,
     pub local_data_commitment_leaves_randomness: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
-    pub local_data_commitment: MerkleTreeDigest<<Components as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitment: <<Components as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -222,8 +222,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Local Data Merkle Tree setup");
-        let local_data_merkle_tree_pp = Components::LocalDataMerkleParameters::setup(rng);
+        let time = start_timer!(|| "Local Data Merkle Commitment setup");
+        let local_data_merkle_commitment_pp = Components::LocalDataMerkleCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Value Commitment setup");
@@ -249,7 +249,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             predicate_verification_key_commitment: pred_vk_comm_pp,
             predicate_verification_key_hash: pred_vk_crh_pp,
             local_data_commitment: local_data_comm_pp,
-            local_data_merkle_tree: local_data_merkle_tree_pp,
+            local_data_merkle_commitment: local_data_merkle_commitment_pp,
             value_commitment: value_comm_pp,
             serial_number_nonce: sn_nonce_crh_pp,
         };
@@ -508,9 +508,27 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             local_data_commitment_leaves.push(output_record_commitment);
         }
 
-        let merkle_tree = MerkleTree::new(parameters.local_data_merkle_tree.clone(), &local_data_commitment_leaves)?;
+        assert_eq!(
+            local_data_commitment_leaves.len(),
+            Components::NUM_INPUT_RECORDS + Components::NUM_OUTPUT_RECORDS
+        );
 
-        let local_data_commitment = merkle_tree.root();
+        let left_inner_node =
+            Components::LocalDataMerkleCommitment::hash(&parameters.local_data_merkle_commitment, &to_bytes![
+                local_data_commitment_leaves[0],
+                local_data_commitment_leaves[1]
+            ]?)?;
+        let right_inner_node =
+            Components::LocalDataMerkleCommitment::hash(&parameters.local_data_merkle_commitment, &to_bytes![
+                local_data_commitment_leaves[2],
+                local_data_commitment_leaves[3]
+            ]?)?;
+
+        let local_data_commitment =
+            Components::LocalDataMerkleCommitment::hash(&parameters.local_data_merkle_commitment, &to_bytes![
+                left_inner_node,
+                right_inner_node
+            ]?)?;
 
         end_timer!(local_data_comm_timer);
 

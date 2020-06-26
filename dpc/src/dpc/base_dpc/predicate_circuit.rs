@@ -2,10 +2,9 @@ use crate::{
     base_dpc::{parameters::CircuitParameters, *},
     Assignment,
 };
-use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
-    algorithms::CommitmentScheme,
+    algorithms::{CommitmentScheme, CRH},
     curves::to_field_vec::ToConstraintField,
     dpc::DPCComponents,
     gadgets::{
@@ -17,7 +16,7 @@ use snarkos_models::{
 
 pub struct PredicateLocalData<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
-    pub local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitment: <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
     pub position: u8,
 }
 
@@ -25,7 +24,7 @@ pub struct PredicateLocalData<C: BaseDPCComponents> {
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for PredicateLocalData<C>
 where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = ToConstraintField::<C::InnerField>::to_field_elements(&[self.position][..])?;
@@ -41,13 +40,13 @@ pub struct PredicateCircuit<C: BaseDPCComponents> {
     pub circuit_parameters: Option<CircuitParameters<C>>,
 
     // Commitment to Predicate input.
-    pub local_data_commitment: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
+    pub local_data_commitment: Option<<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output>,
     pub position: u8,
 }
 
 impl<C: BaseDPCComponents> PredicateCircuit<C> {
     pub fn blank(circuit_parameters: &CircuitParameters<C>) -> Self {
-        let local_data_commitment = MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default();
+        let local_data_commitment = <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output::default();
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -58,7 +57,7 @@ impl<C: BaseDPCComponents> PredicateCircuit<C> {
 
     pub fn new(
         circuit_parameters: &CircuitParameters<C>,
-        local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+        local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
         position: u8,
     ) -> Self {
         Self {
@@ -83,7 +82,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
 fn execute_predicate_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     circuit_parameters: &CircuitParameters<C>,
-    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
     position: u8,
 ) -> Result<(), SynthesisError> {
     let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[position])?;
@@ -95,7 +94,7 @@ fn execute_predicate_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         )?;
 
     let _local_data_commitment_gadget =
-        <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+        <<C as DPCComponents>::LocalDataMerkleCommitmentGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
             &mut cs.ns(|| "Declare local data commitment digest"),
             || Ok(local_data_commitment),
         )?;

@@ -57,7 +57,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
 
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
     local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
-    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -158,7 +158,7 @@ fn base_dpc_execute_gadget_helper<
 
     local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
     local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
-    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -222,7 +222,7 @@ where
     // 3. record_commitment_parameters
     // 4. predicate_vk_commitment_parameters
     // 5. local_data_commitment_parameters
-    // 6. local_data_merkle_tree_parameters
+    // 6. local_data_merkle_commitment_parameters
     // 7. serial_number_nonce_crh_parameters
     // 8. value_commitment_parameters
     // 9. ledger_parameters
@@ -238,7 +238,7 @@ where
         record_commitment_parameters,
         predicate_vk_commitment_parameters,
         local_data_commitment_parameters,
-        local_data_merkle_tree_parameters,
+        local_data_merkle_commitment_parameters,
         serial_number_nonce_crh_parameters,
         value_commitment_parameters,
         ledger_parameters,
@@ -273,10 +273,10 @@ where
             || Ok(circuit_parameters.local_data_commitment.parameters()),
         )?;
 
-        let local_data_merkle_tree_parameters =
-            <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare local data merkle tree parameters"),
-                || Ok(circuit_parameters.local_data_merkle_tree.parameters()),
+        let local_data_merkle_commitment_parameters =
+            <<C as DPCComponents>::LocalDataMerkleCommitmentGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare local data merkle parameters"),
+                || Ok(circuit_parameters.local_data_merkle_commitment.parameters()),
             )?;
 
         let serial_number_nonce_crh_parameters = SerialNumberNonceCRHGadget::ParametersGadget::alloc_input(
@@ -301,7 +301,7 @@ where
             record_commitment_parameters,
             predicate_vk_commitment_parameters,
             local_data_commitment_parameters,
-            local_data_merkle_tree_parameters,
+            local_data_merkle_commitment_parameters,
             serial_number_nonce_crh_parameters,
             value_commitment_parameters,
             ledger_parameters,
@@ -872,7 +872,7 @@ where
         }
 
         let local_data_commitment_gadget =
-            <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+            <<C as DPCComponents>::LocalDataMerkleCommitmentGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
                 &mut cs.ns(|| "Declare local data commitment gadget"),
                 || Ok(local_data_commitment),
             )?;
@@ -912,67 +912,45 @@ where
 
         // TODO formalize into a merkle tree gadget
 
-        let leaf_1_input = commitment_leaves[0].to_bytes(&mut cs.ns(|| "leaf_1 commitment to bytes"))?;
-        let leaf_2_input = commitment_leaves[1].to_bytes(&mut cs.ns(|| "leaf_2 commitment to bytes"))?;
-        let leaf_3_input = commitment_leaves[2].to_bytes(&mut cs.ns(|| "leaf_3 commitment to bytes"))?;
-        let leaf_4_input = commitment_leaves[3].to_bytes(&mut cs.ns(|| "leaf_4 commitment to bytes"))?;
-
         // Depth 2
-        let leaf_1 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute leaf 1"),
-            &local_data_merkle_tree_parameters,
-            &leaf_1_input,
-        )?;
 
-        let leaf_2 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute leaf 2"),
-            &local_data_merkle_tree_parameters,
-            &leaf_2_input,
-        )?;
-
-        let leaf_3 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute leaf 3"),
-            &local_data_merkle_tree_parameters,
-            &leaf_3_input,
-        )?;
-
-        let leaf_4 = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute leaf 4"),
-            &local_data_merkle_tree_parameters,
-            &leaf_4_input,
-        )?;
+        let leaf_1 = commitment_leaves[0].to_bytes(&mut cs.ns(|| "leaf_1 commitment to bytes"))?;
+        let leaf_2 = commitment_leaves[1].to_bytes(&mut cs.ns(|| "leaf_2 commitment to bytes"))?;
+        let leaf_3 = commitment_leaves[2].to_bytes(&mut cs.ns(|| "leaf_3 commitment to bytes"))?;
+        let leaf_4 = commitment_leaves[3].to_bytes(&mut cs.ns(|| "leaf_4 commitment to bytes"))?;
 
         // Depth 1
 
-        let mut inner_1_input = vec![];
-        inner_1_input.extend_from_slice(&leaf_1.to_bytes(&mut cs.ns(|| "leaf_1 to bytes"))?);
-        inner_1_input.extend_from_slice(&leaf_2.to_bytes(&mut cs.ns(|| "leaf_2 to bytes"))?);
+        let mut left_input = vec![];
+        left_input.extend_from_slice(&leaf_1);
+        left_input.extend_from_slice(&leaf_2);
 
-        let mut inner_2_input = vec![];
-        inner_2_input.extend_from_slice(&leaf_3.to_bytes(&mut cs.ns(|| "leaf_3 to bytes"))?);
-        inner_2_input.extend_from_slice(&leaf_4.to_bytes(&mut cs.ns(|| "leaf_4 to bytes"))?);
+        let mut right_input = vec![];
+        right_input.extend_from_slice(&leaf_3);
+        right_input.extend_from_slice(&leaf_4);
 
-        let left = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+        let left = <<C as DPCComponents>::LocalDataMerkleCommitmentGadget as CRHGadget<_, _>>::check_evaluation_gadget(
             &mut cs.ns(|| "Compute inner left node"),
-            &local_data_merkle_tree_parameters,
-            &inner_1_input,
+            &local_data_merkle_commitment_parameters,
+            &left_input,
         )?;
 
-        let right = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute inner right node"),
-            &local_data_merkle_tree_parameters,
-            &inner_2_input,
-        )?;
+        let right =
+            <<C as DPCComponents>::LocalDataMerkleCommitmentGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+                &mut cs.ns(|| "Compute inner right node"),
+                &local_data_merkle_commitment_parameters,
+                &right_input,
+            )?;
 
         // Depth 0
 
         let mut root_input = vec![];
-        root_input.extend_from_slice(&left.to_bytes(&mut cs.ns(|| "left to bytes"))?);
-        root_input.extend_from_slice(&right.to_bytes(&mut cs.ns(|| "right to bytes"))?);
+        root_input.extend_from_slice(&left.to_bytes(&mut cs.ns(|| "inner left node to bytes"))?);
+        root_input.extend_from_slice(&right.to_bytes(&mut cs.ns(|| "inner right node to bytes"))?);
 
-        let root = <<C as DPCComponents>::LocalDataMerkleHashGadget as CRHGadget<_, _>>::check_evaluation_gadget(
+        let root = <<C as DPCComponents>::LocalDataMerkleCommitmentGadget as CRHGadget<_, _>>::check_evaluation_gadget(
             &mut cs.ns(|| "Compute merkle tree root"),
-            &local_data_merkle_tree_parameters,
+            &local_data_merkle_commitment_parameters,
             root_input.as_slice(),
         )?;
 

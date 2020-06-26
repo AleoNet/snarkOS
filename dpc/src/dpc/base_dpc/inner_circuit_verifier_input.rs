@@ -27,7 +27,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
 
     // Local data commitment digest
-    pub local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitment: <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
     pub memo: [u8; 32],
 
     pub value_balance: i64,
@@ -59,9 +59,8 @@ where
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
-    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
-        ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = Vec::new();
@@ -104,7 +103,7 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .local_data_merkle_tree
+                .local_data_merkle_commitment
                 .parameters()
                 .to_field_elements()?,
         );

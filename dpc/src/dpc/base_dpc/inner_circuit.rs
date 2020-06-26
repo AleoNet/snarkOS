@@ -11,7 +11,7 @@ use crate::{
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::DPCComponents,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
@@ -44,7 +44,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     // Local data commitments, witnesses, and digest
     local_data_commitment_leaves: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Output>>,
     local_data_commitment_leaves_randomness: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
-    local_data_commitment: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
+    local_data_commitment: Option<<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output>,
 
     memo: Option<[u8; 32]>,
 
@@ -85,7 +85,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             vec![<C::LocalDataCommitment as CommitmentScheme>::Output::default(); num_leaves];
         let local_data_commitment_leaves_randomness =
             vec![<C::LocalDataCommitment as CommitmentScheme>::Randomness::default(); num_leaves];
-        let local_data_commitment = MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default();
+        let local_data_commitment = <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output::default();
 
         let input_value_commitments =
             vec![<C::ValueCommitment as CommitmentScheme>::Output::default(); num_input_records];
@@ -168,7 +168,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         // Local data commitments, witnesses, and digest
         local_data_commitment_leaves: &[<C::LocalDataCommitment as CommitmentScheme>::Output],
         local_data_commitment_leaves_randomness: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
-        local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+        local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 
         memo: &[u8; 32],
 

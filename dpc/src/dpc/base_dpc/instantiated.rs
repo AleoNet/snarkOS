@@ -103,7 +103,6 @@ impl PedersenSize for ValueWindow {
 }
 
 define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
-define_merkle_tree_parameters!(LocalDataCommitmentMerkleParameters, LocalDataMerkleTreeCRH, 3);
 
 pub struct Components;
 
@@ -115,8 +114,8 @@ impl DPCComponents for Components {
     type InnerField = InnerField;
     type LocalDataCommitment = LocalDataCommitment;
     type LocalDataCommitmentGadget = LocalDataCommitmentGadget;
-    type LocalDataMerkleHashGadget = LocalDataMerkleTreeCRHGadget;
-    type LocalDataMerkleParameters = LocalDataCommitmentMerkleParameters;
+    type LocalDataMerkleCommitment = LocalDataMerkleCommitment;
+    type LocalDataMerkleCommitmentGadget = LocalDataMerkleTreeCRHGadget;
     type OuterField = OuterField;
     type PRF = PRF;
     type PRFGadget = PRFGadget;
@@ -163,7 +162,7 @@ pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
-pub type LocalDataMerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
+pub type LocalDataMerkleCommitment = PedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 
 pub type SerialNumberNonce = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredicateVerificationKeyHash = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;

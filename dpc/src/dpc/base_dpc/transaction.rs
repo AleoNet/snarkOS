@@ -2,7 +2,7 @@ use crate::dpc::base_dpc::BaseDPCComponents;
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, SNARK},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
     dpc::DPCComponents,
     objects::Transaction,
 };
@@ -40,7 +40,7 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
 
     #[derivative(PartialEq = "ignore")]
-    pub local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    pub local_data_commitment: <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 
     /// A transaction value balance is the difference between input and output record balances.
     /// This value effectively becomes the transaction fee for the miner. Only coinbase transactions
@@ -64,7 +64,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
         transaction_proof: <C::OuterSNARK as SNARK>::Proof,
         predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-        local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+        local_data_commitment: <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
         value_balance: i64,
         network_id: u8,
         signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
@@ -87,7 +87,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
 impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type Digest = MerkleTreeDigest<C::MerkleParameters>;
-    type LocalDataCommitment = MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>;
+    type LocalDataCommitment = <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output;
     type Memorandum = [u8; 32];
     type PredicateCommitment = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
@@ -208,7 +208,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let transaction_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
         let predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output =
             FromBytes::read(&mut reader)?;
-        let local_data_commitment: MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters> =
+        let local_data_commitment: <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output =
             FromBytes::read(&mut reader)?;
 
         let value_balance: i64 = FromBytes::read(&mut reader)?;

@@ -39,7 +39,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
     predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
-    local_data_commitment: Option<MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>>,
+    local_data_commitment: Option<<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output>,
 }
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
@@ -73,8 +73,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let predicate_randomness =
             Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
 
-        let local_data_commitment =
-            Some(MerkleTreeDigest::<<C as DPCComponents>::LocalDataMerkleParameters>::default());
+        let local_data_commitment = Some(<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output::default());
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -125,7 +124,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-        local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+        local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -181,9 +180,8 @@ where
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
-    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
-        ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output: ToConstraintField<C::InnerField>,
 {
     fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_outer_proof_gadget::<C, CS>(

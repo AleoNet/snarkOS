@@ -43,9 +43,8 @@ where
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
-    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
-        ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::OuterField>, ConstraintFieldError> {
         let mut v = Vec::new();

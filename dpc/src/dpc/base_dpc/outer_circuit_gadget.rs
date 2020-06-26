@@ -67,7 +67,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>,
+    local_data_commitment: &<<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output,
 ) -> Result<(), SynthesisError>
 where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -92,9 +92,8 @@ where
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 
-    <<<C as DPCComponents>::LocalDataMerkleParameters as MerkleParameters>::H as CRH>::Parameters:
-        ToConstraintField<C::InnerField>,
-    MerkleTreeDigest<<C as DPCComponents>::LocalDataMerkleParameters>: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <<C as DPCComponents>::LocalDataMerkleCommitment as CRH>::Output: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
     let (predicate_vk_commitment_parameters, predicate_vk_crh_parameters) = {
@@ -144,9 +143,10 @@ where
         ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let local_data_merkle_tree_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_merkle_tree.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let local_data_merkle_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+        circuit_parameters.local_data_merkle_commitment.parameters(),
+    )
+    .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let serial_number_nonce_crh_parameters_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.serial_number_nonce.parameters())
@@ -212,8 +212,11 @@ where
         field_element_to_bytes::<C, _>(cs, &predicate_vk_commitment_parameters_fe, "predicate vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &local_data_commitment_parameters_fe, "local data commitment pp")?;
-    let local_data_merkle_tree_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_merkle_tree_parameters_fe, "local data merkle tree pp")?;
+    let local_data_merkle_commitment_parameters_fe_bytes = field_element_to_bytes::<C, _>(
+        cs,
+        &local_data_merkle_commitment_parameters_fe,
+        "local data merkle commitment pp",
+    )?;
     let serial_number_nonce_crh_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
     let value_commitment_parameters_fe_bytes =
@@ -256,7 +259,7 @@ where
     inner_snark_input_bytes.extend(record_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(predicate_vk_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(local_data_commitment_parameters_fe_bytes.clone());
-    inner_snark_input_bytes.extend(local_data_merkle_tree_parameters_fe_bytes);
+    inner_snark_input_bytes.extend(local_data_merkle_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(serial_number_nonce_crh_parameters_fe_bytes);
     inner_snark_input_bytes.extend(value_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_parameters_fe_bytes);

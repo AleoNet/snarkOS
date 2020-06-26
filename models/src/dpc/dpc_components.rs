@@ -1,5 +1,5 @@
 use crate::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
     curves::PrimeField,
     gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
 };
@@ -24,12 +24,9 @@ pub trait DPCComponents: 'static + Sized {
     type LocalDataCommitment: CommitmentScheme;
     type LocalDataCommitmentGadget: CommitmentGadget<Self::LocalDataCommitment, Self::InnerField>;
 
-    /// MerkleParameters for constructing the local data commitment tree
-    type LocalDataMerkleParameters: MerkleParameters;
-    type LocalDataMerkleHashGadget: CRHGadget<
-        <Self::LocalDataMerkleParameters as MerkleParameters>::H,
-        Self::InnerField,
-    >;
+    /// CRH for constructing the local data commitment tree
+    type LocalDataMerkleCommitment: CRH;
+    type LocalDataMerkleCommitmentGadget: CRHGadget<Self::LocalDataMerkleCommitment, Self::InnerField>;
 
     /// CRH for hashes of birth and death verification keys.
     /// This is invoked only on the larger curve.
