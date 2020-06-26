@@ -1,7 +1,7 @@
 [package]
 name = "snarkos-posw"
 version = "0.8.0"
-authors = ["The Aleo Team <hello@aleo.org"]
+authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Proof of Succinct Work circuit implementation based on [KB20]"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
