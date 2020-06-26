@@ -66,7 +66,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+    local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
 ) -> Result<(), SynthesisError>
 where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -83,8 +83,8 @@ where
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -135,8 +135,8 @@ where
     )
     .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let local_data_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_commitment.parameters())
+    let local_data_crh_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let serial_number_nonce_crh_parameters_fe =
@@ -202,7 +202,7 @@ where
     let predicate_vk_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &predicate_vk_commitment_parameters_fe, "predicate vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_commitment_parameters_fe, "local data commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, &local_data_crh_parameters_fe, "local data commitment pp")?;
     let serial_number_nonce_crh_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
     let value_commitment_parameters_fe_bytes =

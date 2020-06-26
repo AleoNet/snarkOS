@@ -1,4 +1,4 @@
-use crate::crh::{PedersenCRH, PedersenCompressedCRH, PedersenSize};
+use crate::crh::{BoweHopwoodPedersenCRH, PedersenCRH, PedersenCompressedCRH, PedersenSize};
 use snarkos_curves::edwards_bls12::EdwardsProjective;
 use snarkos_models::algorithms::CRH;
 use snarkos_utilities::{
@@ -15,6 +15,14 @@ pub(super) struct Size;
 impl PedersenSize for Size {
     const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 128;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(super) struct BoweHopwoodSize;
+
+impl PedersenSize for BoweHopwoodSize {
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 63;
 }
 
 fn crh_parameters_serialization<C: CRH>() {
@@ -37,4 +45,20 @@ fn pedersen_crh_parameters_serialization() {
 #[test]
 fn pedersen_compressed_crh_parameters_serialization() {
     crh_parameters_serialization::<PedersenCompressedCRH<EdwardsProjective, Size>>();
+}
+
+#[test]
+fn bowe_hopwood_crh_parameters_serialization() {
+    crh_parameters_serialization::<BoweHopwoodPedersenCRH<EdwardsProjective, BoweHopwoodSize>>();
+}
+
+#[test]
+fn simple_bowe_hopwood_crh() {
+    type BoweHopwoodCRH = BoweHopwoodPedersenCRH<EdwardsProjective, BoweHopwoodSize>;
+
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
+
+    let parameters = BoweHopwoodCRH::setup(rng);
+
+    BoweHopwoodCRH::hash(&parameters, &[1, 2, 3]).unwrap();
 }

@@ -38,7 +38,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
     predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
-    local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
+    local_data_commitment: Option<<C::LocalDataCRH as CRH>::Output>,
 }
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
@@ -71,7 +71,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let predicate_commitment = Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default());
         let predicate_randomness =
             Some(<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
-        let local_data_comm = Some(<C::LocalDataCommitment as CommitmentScheme>::Output::default());
+        let local_data_comm = Some(<C::LocalDataCRH as CRH>::Output::default());
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
@@ -122,7 +122,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
         predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-        local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
+        local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -170,8 +170,8 @@ where
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 

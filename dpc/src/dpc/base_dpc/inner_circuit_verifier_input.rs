@@ -24,7 +24,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
 
     // Predicate input commitment and memo
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_commitment: <C::LocalDataCRH as CRH>::Output,
     pub memo: [u8; 32],
 
     pub value_balance: i64,
@@ -48,8 +48,8 @@ where
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -90,7 +90,7 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
-                .local_data_commitment
+                .local_data_crh
                 .parameters()
                 .to_field_elements()?,
         );

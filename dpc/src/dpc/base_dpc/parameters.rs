@@ -13,6 +13,7 @@ pub struct CircuitParameters<C: BaseDPCComponents> {
     pub record_commitment: C::RecordCommitment,
     pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
     pub predicate_verification_key_hash: C::PredicateVerificationKeyHash,
+    pub local_data_crh: C::LocalDataCRH,
     pub local_data_commitment: C::LocalDataCommitment,
     pub value_commitment: C::ValueCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
@@ -31,6 +32,8 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
             From::from(FromBytes::read(vec![].as_slice())?);
         let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
             From::from(FromBytes::read(PredicateVKCRHParameters::load_bytes()?.as_slice())?);
+        let local_data_crh: C::LocalDataCRH =
+            From::from(FromBytes::read(LocalDataCRHParameters::load_bytes()?.as_slice())?);
         let local_data_commitment: C::LocalDataCommitment = From::from(FromBytes::read(
             LocalDataCommitmentParameters::load_bytes()?.as_slice(),
         )?);
@@ -46,6 +49,7 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
             record_commitment,
             predicate_verification_key_commitment,
             predicate_verification_key_hash,
+            local_data_crh,
             local_data_commitment,
             value_commitment,
             serial_number_nonce,
@@ -107,6 +111,10 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
     ) {
         &self.inner_snark_parameters
+    }
+
+    pub fn local_data_crh_parameters(&self) -> &C::LocalDataCRH {
+        &self.circuit_parameters.local_data_crh
     }
 
     pub fn local_data_commitment_parameters(&self) -> &C::LocalDataCommitment {

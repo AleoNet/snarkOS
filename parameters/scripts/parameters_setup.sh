@@ -5,6 +5,7 @@
 cargo run --release --example account_commitment
 cargo run --release --example account_signature
 cargo run --release --example ledger_merkle_tree
+cargo run --release --example local_data_crh
 cargo run --release --example local_data_commitment
 cargo run --release --example predicate_vk_crh
 cargo run --release --example record_commitment
@@ -19,6 +20,9 @@ mv account_signature.checksum ../src/params
 
 mv ledger_merkle_tree.params ../src/params
 mv ledger_merkle_tree.checksum ../src/params
+
+mv local_data_crh.params ../src/params
+mv local_data_crh.checksum ../src/params
 
 mv local_data_commitment.params ../src/params
 mv local_data_commitment.checksum ../src/params

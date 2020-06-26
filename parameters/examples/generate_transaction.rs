@@ -32,6 +32,7 @@ use std::{
     io::{Result as IoResult, Write},
     marker::PhantomData,
     path::PathBuf,
+    str::FromStr,
     sync::Arc,
 };
 
@@ -69,7 +70,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
-    let recipient: AccountPublicKey<Components> = FromBytes::read(&hex::decode(recipient).unwrap()[..])?;
+    let recipient = AccountPublicKey::<Components>::from_str(&recipient)?;
 
     let crh_parameters =
         <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])

@@ -152,7 +152,7 @@ fn test_execute_base_dpc_constraints() {
         predicate_commitment: predicate_comm,
         predicate_randomness: predicate_rand,
         local_data_commitment: local_data_comm,
-        local_data_randomness: local_data_rand,
+        local_data_commitment_randomizers,
         value_balance,
     } = context;
 
@@ -299,7 +299,7 @@ fn test_execute_base_dpc_constraints() {
         &predicate_comm,
         &predicate_rand,
         &local_data_comm,
-        &local_data_rand,
+        &local_data_commitment_randomizers,
         &memo,
         &old_value_commits,
         &old_value_commit_randomness,
@@ -313,6 +313,7 @@ fn test_execute_base_dpc_constraints() {
 
     if !core_cs.is_satisfied() {
         println!("=========================================================");
+        println!("num constraints: {:?}", core_cs.num_constraints());
         println!("Unsatisfied constraints:");
         println!("{}", core_cs.which_is_unsatisfied().unwrap());
         println!("=========================================================");
@@ -320,7 +321,8 @@ fn test_execute_base_dpc_constraints() {
 
     if core_cs.is_satisfied() {
         println!("\n\n\n\nAll Core check constraints:");
-        core_cs.print_named_objects();
+        //        core_cs.print_named_objects();
+        println!("num constraints: {:?}", core_cs.num_constraints());
     }
     println!("=========================================================");
     println!("=========================================================");
@@ -351,7 +353,7 @@ fn test_execute_base_dpc_constraints() {
             &predicate_comm,
             &predicate_rand,
             &local_data_comm,
-            &local_data_rand,
+            &local_data_commitment_randomizers,
             &memo,
             &old_value_commits,
             &old_value_commit_randomness,
@@ -393,13 +395,15 @@ fn test_execute_base_dpc_constraints() {
 
     if !pf_check_cs.is_satisfied() {
         println!("=========================================================");
+        println!("num constraints: {:?}", pf_check_cs.num_constraints());
         println!("Unsatisfied constraints:");
         println!("{}", pf_check_cs.which_is_unsatisfied().unwrap());
         println!("=========================================================");
     }
     if pf_check_cs.is_satisfied() {
         println!("\n\n\n\nAll Proof check constraints:");
-        pf_check_cs.print_named_objects();
+        // pf_check_cs.print_named_objects();
+        println!("num constraints: {:?}", pf_check_cs.num_constraints());
     }
     println!("=========================================================");
     println!("=========================================================");

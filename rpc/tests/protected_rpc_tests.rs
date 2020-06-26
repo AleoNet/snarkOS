@@ -171,7 +171,7 @@ mod protected_rpc_tests {
         let old_account_private_keys = vec![sender.private_key.to_string()];
 
         let recipients = vec![TransactionRecipient {
-            address: hex::encode(to_bytes![receiver.public_key].unwrap()),
+            address: receiver.public_key.to_string(),
             amount: 100,
         }];
 
