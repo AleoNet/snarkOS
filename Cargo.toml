@@ -45,6 +45,7 @@ path = "snarkOS/main.rs"
 snarkos-consensus = { path = "./consensus", version = "0.8.0" }
 snarkos-dpc = { path = "./dpc", version = "0.8.0" }
 snarkos-errors = { path = "./errors", version = "0.8.0" }
+snarkos-marlin = { path = "./marlin", version = "0.1.0" }
 snarkos-network = { path = "network", version = "0.8.0" }
 snarkos-objects = { path = "objects", version = "0.8.0" }
 snarkos-posw = { path = "./posw", version = "0.8.0" }

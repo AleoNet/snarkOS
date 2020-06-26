@@ -2116,6 +2116,7 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-marlin",
  "snarkos-network",
  "snarkos-objects",
  "snarkos-polycommit",
@@ -2277,6 +2278,27 @@ dependencies = [
  "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
+ "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-marlin"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "rand_chacha",
+ "rand_core",
+ "rayon",
+ "rusty-hook",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-gadgets",
+ "snarkos-models",
+ "snarkos-polycommit",
+ "snarkos-profiler",
  "snarkos-utilities",
 ]
 
