@@ -21,6 +21,7 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
+use snarkos_polycommit::optional_rng::OptionalRng;
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -28,7 +29,7 @@ use snarkos_utilities::{
 };
 
 use blake2::{digest::Digest, Blake2s};
-use rand::Rng;
+use rand::{rngs::OsRng, Rng};
 use std::marker::PhantomData;
 
 // We need to instantiate the Merkle Tree and the Gadget, but these should not be
@@ -169,7 +170,8 @@ where
                 },
                 srs,
             ),
-            &mut snarkos_polycommit::optional_rng::OptionalRng(None),
+            // we need to specify the RNG type, but it is guaranteed to panic if used
+            &mut OptionalRng(None::<OsRng>),
         )?;
 
         Ok(Self {
