@@ -13,7 +13,6 @@ use rayon::prelude::*;
 
 /// Returns an iterator over `chunk_size` elements of the slice at a
 /// time.
-#[macro_export]
 macro_rules! cfg_chunks {
     ($e: expr, $size: expr) => {{
         #[cfg(feature = "pedersen-parallel")]
@@ -71,9 +70,13 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         }
 
         let maximum_num_chunks_in_segment = calculate_num_chunks_in_segment::<G::ScalarField>();
-        // "Bowe-Hopwood hash must have a window size resulting in scalars < (p-1)/2,
-        if S::WINDOW_SIZE > maximum_num_chunks_in_segment {}
-        assert!(S::WINDOW_SIZE > maximum_num_chunks_in_segment);
+        if S::WINDOW_SIZE > maximum_num_chunks_in_segment {
+            panic!(
+                "Bowe-Hopwood hash must have a window size resulting in scalars < (p-1)/2, \
+                 maximum segment size is {}",
+                maximum_num_chunks_in_segment
+            );
+        }
 
         let time = start_timer!(|| format!(
             "BoweHopwoodPedersenCRH::Setup: {} segments of {} 3-bit chunks; {{0,1}}^{{{}}} -> G",
