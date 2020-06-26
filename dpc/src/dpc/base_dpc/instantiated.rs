@@ -54,8 +54,8 @@ impl PedersenSize for SnNonceWindow {
 pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
-    const NUM_WINDOWS: usize = 38;
-    const WINDOW_SIZE: usize = 300;
+    const NUM_WINDOWS: usize = 46;
+    const WINDOW_SIZE: usize = 63;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -165,7 +165,7 @@ pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
-pub type PredicateVerificationKeyHash = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
+pub type PredicateVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
 pub type Predicate = DPCPredicate<Components>;
 pub type CoreCheckNIZK = GM17<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
@@ -192,7 +192,8 @@ pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAff
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
+pub type PredicateVerificationKeyHashGadget =
+    BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
