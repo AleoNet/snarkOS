@@ -25,7 +25,7 @@ macro_rules! cfg_chunks {
     }};
 }
 
-pub const CHUNK_SIZE: usize = 3;
+pub const BOWE_HOPWOOD_CHUNK_SIZE: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BoweHopwoodPedersenCRH<G: Group, S: PedersenSize> {
@@ -94,13 +94,13 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         let eval_time = start_timer!(|| "BoweHopwoodPedersenCRH::Eval");
 
-        if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS * CHUNK_SIZE {
+        if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE {
             panic!(
                 "incorrect input length {:?} for window params {:?}x{:?}x{}",
                 input.len(),
                 S::WINDOW_SIZE,
                 S::NUM_WINDOWS,
-                CHUNK_SIZE,
+                BOWE_HOPWOOD_CHUNK_SIZE,
             );
         }
 
@@ -108,14 +108,14 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         let input = bytes_to_bits(input);
         // Pad the input if it is not the current length.
         padded_input.extend_from_slice(&input);
-        if input.len() % CHUNK_SIZE != 0 {
+        if input.len() % BOWE_HOPWOOD_CHUNK_SIZE != 0 {
             let current_length = input.len();
-            for _ in 0..(CHUNK_SIZE - current_length % CHUNK_SIZE) {
+            for _ in 0..(BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE) {
                 padded_input.push(false);
             }
         }
 
-        assert_eq!(padded_input.len() % CHUNK_SIZE, 0);
+        assert_eq!(padded_input.len() % BOWE_HOPWOOD_CHUNK_SIZE, 0);
 
         assert_eq!(
             self.parameters.bases.len(),
@@ -124,12 +124,12 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
             self.parameters.bases.len(),
             S::WINDOW_SIZE,
             S::NUM_WINDOWS,
-            CHUNK_SIZE,
+            BOWE_HOPWOOD_CHUNK_SIZE,
         );
         for bases in self.parameters.bases.iter() {
             assert_eq!(bases.len(), S::WINDOW_SIZE);
         }
-        assert_eq!(CHUNK_SIZE, 3);
+        assert_eq!(BOWE_HOPWOOD_CHUNK_SIZE, 3);
 
         // Compute sum of h_i^{sum of
         // (1-2*c_{i,j,2})*(1+c_{i,j,0}+2*c_{i,j,1})*2^{4*(j-1)} for all j in segment}
