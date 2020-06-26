@@ -45,11 +45,9 @@ pub const NUM_OUTPUT_RECORDS: usize = 2;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SnNonceWindow;
 
-// `WINDOW_SIZE * NUM_WINDOWS` = NUM_INPUT_RECORDS * 64 + 1 + 32 = 225 bytes
-const SN_NONCE_SIZE_BITS: usize = NUM_INPUT_RECORDS * 2 * 512 + 8 + 256;
 impl PedersenSize for SnNonceWindow {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = SN_NONCE_SIZE_BITS / 8;
+    const WINDOW_SIZE: usize = 63;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -166,7 +164,7 @@ pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
-pub type SerialNumberNonce = PedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
+pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredicateVerificationKeyHash = PedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
 pub type Predicate = DPCPredicate<Components>;
@@ -193,7 +191,7 @@ pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls,
 pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type SerialNumberNonceGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyHashGadget = PedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
 
 pub type PRFGadget = Blake2sGadget;
