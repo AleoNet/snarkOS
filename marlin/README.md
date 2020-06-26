@@ -1,12 +1,4 @@
-<h1 align="center">Marlin</h1>
-
-<p align="center">
-    <a href="https://travis-ci.org/scipr-lab/marlin"><img src="https://travis-ci.org/scipr-lab/marlin.svg?branch=master"></a>
-    <a href="https://github.com/scipr-lab/marlin/blob/master/AUTHORS"><img src="https://img.shields.io/badge/authors-SCIPR%20Lab-orange.svg"></a>
-    <a href="https://github.com/scipr-lab/marlin/blob/master/LICENSE-APACHE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
-   <a href="https://github.com/scipr-lab/marlin/blob/master/LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-</p>
-
+# Marlin
 
 `marlin` is a Rust library that implements a
 <p align="center">
@@ -15,9 +7,7 @@ with<br>
 <b>universal and updatable SRS</b>
 </p>
 
-This library was initially developed as part of the [Marlin paper][marlin], and is released under the MIT License and the Apache v2 License (see [License](#license)).
-
-**WARNING:** This is an academic prototype, and in particular has not received careful code review. This implementation is NOT ready for production use.
+This library was initially developed as part of the [Marlin paper][marlin].
 
 ## Overview
 
@@ -32,26 +22,9 @@ The construction in this library follows the methodology introduced in the [Marl
 
 The first ingredient is provided as part of this library, and is an efficient algebraic holographic proof for R1CS (a generalization of arithmetic circuit satisfiability supported by many argument systems). The second ingredient is imported from [`poly-commit`](https://github.com/scipr-lab/poly-commit). See [the Marlin paper][marlin] for evaluation details.
 
-## Build guide
+## Profiling
 
-The library compiles on the `stable` toolchain of the Rust compiler. To install the latest version of Rust, first install `rustup` by following the instructions [here](https://rustup.rs/), or via your platform's package manager. Once `rustup` is installed, install the Rust toolchain by invoking:
-```bash
-rustup install stable
-```
-
-After that, use `cargo` (the standard Rust build tool) to build the library:
-```bash
-git clone https://github.com/scipr-lab/marlin.git
-cd marlin
-cargo build --release
-```
-
-This library comes with some unit and integration tests. Run these tests with:
-```bash
-cargo test
-```
-
-Lastly, this library is instrumented with profiling infrastructure that prints detailed traces of execution time. To enable this, compile with `cargo build --features print-trace`.
+This library is instrumented with profiling infrastructure that prints detailed traces of execution time. To enable this, compile with `cargo build --features print-trace`.
 
 
 ## Benchmarks
@@ -90,16 +63,6 @@ We compare the proof size of Marlin with that of [Groth16][groth16]. We instanti
 | Marlin AHP with PC of [[MBKM19]][sonic]    |         784         |
 |  [\[Groth16\]][groth16]                    |         192         |
 
-
-## License
-
-This library is licensed under either of the following licenses, at your discretion.
-
- * [Apache License Version 2.0](LICENSE-APACHE)
- * [MIT License](LICENSE-MIT)
-
-Unless you explicitly state otherwise, any contribution that you submit to this library shall be dual licensed as above (as defined in the Apache v2 License), without any additional terms or conditions.
-
 [marlin]: https://ia.cr/2019/1047
 [sonic]: https://ia.cr/2019/099
 [groth16]: https://ia.cr/2016/260
@@ -109,7 +72,3 @@ Unless you explicitly state otherwise, any contribution that you submit to this 
 [Marlin: Preprocessing zkSNARKs with Universal and Updatable SRS][marlin]     
 Alessandro Chiesa, Yuncong Hu, Mary Maller, [Pratyush Mishra](https://www.github.com/pratyush), Noah Vesely, [Nicholas Ward](https://www.github.com/npwardberkeley)     
 EUROCRYPT 2020
-
-## Acknowledgements
-
-This work was supported by: an Engineering and Physical Sciences Research Council grant; a Google Faculty Award; the RISELab at UC Berkeley; and donations from the Ethereum Foundation and the Interchain Foundation.

@@ -8,14 +8,14 @@ authors = [
   "Pratyush Mishra <pratyush@berkeley.edu>",
   "Noah Vesely <noah.vesely.18@ucl.ac.uk>",
   "Nicholas Ward <npward@berkeley.edu>",
+  "The Aleo Team <hello@aleo.org>",
 ]
 description = "A library for the Marlin preprocessing zkSNARK"
 repository = "https://github.com/scipr/marlin"
-documentation = "https://docs.rs/marlin/"
 keywords = ["cryptography", "polynomial commitments", "zkSNARK"]
 categories = ["cryptography"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
-license = "MIT/Apache-2.0"
+license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
@@ -23,22 +23,19 @@ snarkos-algorithms = { path = "../algorithms" }
 snarkos-errors = { path = "../errors" }
 snarkos-gadgets = { path = "../gadgets" }
 snarkos-models = { path = "../models" }
+snarkos-polycommit = { path = "../polycommit", default-features = false }
 snarkos-profiler = { path = "../profiler" }
 snarkos-utilities = { path = "../utilities" }
-
-snarkos-polycommit = { path = "../poly-commit", default-features = false }
 
 blake2 = { version = "0.8", default-features = false }
 derivative = { version = "2", features = ["use_core"] }
 digest = { version = "0.8" }
-rand_core = { version = "0.5" }
 rand_chacha = { version = "0.2.1", default-features = false }
+rand_core = { version = "0.5" }
 rayon = { version = "1", optional = true }
 
 [dev-dependencies]
 snarkos-curves = { path = "../curves" }
-
-rusty-hook = { version = "0.11.1" }
 
 [features]
 default = [ "std", "parallel" ]
