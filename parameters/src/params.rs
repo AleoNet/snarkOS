@@ -198,6 +198,12 @@ impl_params!(
     2317612
 );
 impl_params!(
+    LocalDataMerkleCommitmentParameters,
+    local_data_merkle_commitment_test,
+    "local_data_merkle_commitment",
+    65556
+);
+impl_params!(
     RecordCommitmentParameters,
     record_commitment_test,
     "record_commitment",
@@ -229,12 +235,6 @@ impl_params!(
     LedgerMerkleTreeParameters,
     ledger_merkle_tree_test,
     "ledger_merkle_tree",
-    65556
-);
-impl_params!(
-    LocalDataMerkleTreeParameters,
-    local_data_merkle_tree_test,
-    "local_data_merkle_tree",
     65556
 );
 

@@ -910,7 +910,7 @@ where
             commitment_leaves.push(candidate_commitment);
         }
 
-        // TODO formalize into a merkle tree gadget
+        // TODO (raychu86) formalize into a merkle tree gadget
 
         // Depth 2
 
