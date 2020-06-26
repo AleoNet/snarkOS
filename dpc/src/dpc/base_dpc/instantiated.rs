@@ -64,8 +64,8 @@ impl PedersenSize for PredVkHashWindow {
 pub struct LocalDataCRHWindow;
 
 impl PedersenSize for LocalDataCRHWindow {
-    const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 128;
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 64;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -73,7 +73,7 @@ pub struct LocalDataCommitmentWindow;
 
 impl PedersenSize for LocalDataCommitmentWindow {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 289;
+    const WINDOW_SIZE: usize = 129;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
