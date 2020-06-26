@@ -61,11 +61,19 @@ impl PedersenSize for PredVkHashWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct LocalDataWindow;
+pub struct LocalDataCRHWindow;
 
-impl PedersenSize for LocalDataWindow {
-    const NUM_WINDOWS: usize = 36;
-    const WINDOW_SIZE: usize = 248;
+impl PedersenSize for LocalDataCRHWindow {
+    const NUM_WINDOWS: usize = 4;
+    const WINDOW_SIZE: usize = 128;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LocalDataCommitmentWindow;
+
+impl PedersenSize for LocalDataCommitmentWindow {
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 289;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -108,6 +116,8 @@ impl DPCComponents for Components {
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;
+    type LocalDataCRH = LocalDataCRH;
+    type LocalDataCRHGadget = LocalDataCRHGadget;
     type LocalDataCommitment = LocalDataCommitment;
     type LocalDataCommitmentGadget = LocalDataCommitmentGadget;
     type OuterField = OuterField;
@@ -150,7 +160,8 @@ pub type OuterField = Bls12_377Fq;
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
-pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataWindow>;
+pub type LocalDataCRH = PedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
+pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataCommitmentWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
@@ -175,6 +186,7 @@ pub type LocalData = DPCLocalData<Components>;
 pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
+pub type LocalDataCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 

@@ -20,6 +20,9 @@ mv account_signature.checksum ../src/params
 mv ledger_merkle_tree.params ../src/params
 mv ledger_merkle_tree.checksum ../src/params
 
+mv local_data_crh.params ../src/params
+mv local_data_crh.checksum ../src/params
+
 mv local_data_commitment.params ../src/params
 mv local_data_commitment.checksum ../src/params
 

@@ -48,8 +48,8 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
-    local_data_randomness: &<C::LocalDataCommitment as CommitmentScheme>::Randomness,
+    local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+    local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
     input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
@@ -65,12 +65,14 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::AccountCommitment,
         C::AccountSignature,
         C::RecordCommitment,
+        C::LocalDataCRH,
         C::LocalDataCommitment,
         C::SerialNumberNonceCRH,
         C::PRF,
         C::AccountCommitmentGadget,
         C::AccountSignatureGadget,
         C::RecordCommitmentGadget,
+        C::LocalDataCRHGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceCRHGadget,
         C::PRFGadget,
@@ -94,7 +96,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         predicate_commitment,
         predicate_randomness,
         local_data_commitment,
-        local_data_randomness,
+        local_data_commitment_randomizers,
         memo,
         input_value_commitments,
         input_value_commitment_randomness,
@@ -112,12 +114,14 @@ fn base_dpc_execute_gadget_helper<
     AccountCommitment,
     AccountSignature,
     RecordCommitment,
+    LocalDataCRH,
     LocalDataCommitment,
     SerialNumberNonceCRH,
     P,
     AccountCommitmentGadget,
     AccountSignatureGadget,
     RecordCommitmentGadget,
+    LocalDataCRHGadget,
     LocalDataCommitmentGadget,
     SerialNumberNonceCRHGadget,
     PGadget,
@@ -145,8 +149,8 @@ fn base_dpc_execute_gadget_helper<
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_comm: &LocalDataCommitment::Output,
-    local_data_rand: &LocalDataCommitment::Randomness,
+    local_data_comm: &LocalDataCRH::Output,
+    local_data_commitment_randomizers: &[LocalDataCommitment::Randomness],
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
     input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
@@ -161,12 +165,14 @@ where
         AccountCommitment = AccountCommitment,
         AccountSignature = AccountSignature,
         RecordCommitment = RecordCommitment,
+        LocalDataCRH = LocalDataCRH,
         LocalDataCommitment = LocalDataCommitment,
         SerialNumberNonceCRH = SerialNumberNonceCRH,
         PRF = P,
         AccountCommitmentGadget = AccountCommitmentGadget,
         AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitmentGadget = RecordCommitmentGadget,
+        LocalDataCRHGadget = LocalDataCRHGadget,
         LocalDataCommitmentGadget = LocalDataCommitmentGadget,
         SerialNumberNonceCRHGadget = SerialNumberNonceCRHGadget,
         PRFGadget = PGadget,
@@ -174,6 +180,7 @@ where
     AccountCommitment: CommitmentScheme,
     AccountSignature: SignatureScheme,
     RecordCommitment: CommitmentScheme,
+    LocalDataCRH: CRH,
     LocalDataCommitment: CommitmentScheme,
     SerialNumberNonceCRH: CRH,
     P: PRF,
@@ -181,6 +188,7 @@ where
     AccountCommitmentGadget: CommitmentGadget<AccountCommitment, C::InnerField>,
     AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<AccountSignature, C::InnerField>,
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
+    LocalDataCRHGadget: CRHGadget<LocalDataCRH, C::InnerField>,
     LocalDataCommitmentGadget: CommitmentGadget<LocalDataCommitment, C::InnerField>,
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
     PGadget: PRFGadget<P, C::InnerField>,
@@ -208,21 +216,23 @@ where
     // 2. account_signature_parameters
     // 3. record_commitment_parameters
     // 4. predicate_vk_commitment_parameters
-    // 5. local_data_commitment_parameters
-    // 6. serial_number_nonce_crh_parameters
-    // 7. value_commitment_parameters
-    // 8. ledger_parameters
-    // 9. ledger_digest
-    // 10. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
-    // 11. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
-    // 12. predicate_commitment
-    // 13. local_data_commitment
-    // 14. binding_signature
+    // 5. local_data_crh_parameters
+    // 6. local_data_commitment_parameters
+    // 7. serial_number_nonce_crh_parameters
+    // 8. value_commitment_parameters
+    // 9. ledger_parameters
+    // 10. ledger_digest
+    // 11. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
+    // 12. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
+    // 13. predicate_commitment
+    // 14. local_data_commitment
+    // 15. binding_signature
     let (
         account_commitment_parameters,
         account_signature_parameters,
         record_commitment_parameters,
         predicate_vk_commitment_parameters,
+        local_data_crh_parameters,
         local_data_commitment_parameters,
         serial_number_nonce_crh_parameters,
         value_commitment_parameters,
@@ -253,6 +263,11 @@ where
             || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
         )?;
 
+        let local_data_crh_parameters = LocalDataCRHGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare local data CRH parameters"),
+            || Ok(circuit_parameters.local_data_crh.parameters()),
+        )?;
+
         let local_data_commitment_parameters = LocalDataCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare local data commitment parameters"),
             || Ok(circuit_parameters.local_data_commitment.parameters()),
@@ -279,6 +294,7 @@ where
             account_signature_parameters,
             record_commitment_parameters,
             predicate_vk_commitment_parameters,
+            local_data_crh_parameters,
             local_data_commitment_parameters,
             serial_number_nonce_crh_parameters,
             value_commitment_parameters,
@@ -790,60 +806,93 @@ where
     {
         let mut cs = cs.ns(|| "Check that local data commitment is valid.");
 
-        let mut local_data_bytes = Vec::new();
+        let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
+        let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
+
+        let mut old_record_commitment_bytes = vec![];
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
-            local_data_bytes.extend_from_slice(
+
+            let mut input_bytes = vec![];
+            input_bytes.extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
+            input_bytes.extend_from_slice(
                 &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
             );
-            local_data_bytes.extend_from_slice(
-                &old_account_public_keys_gadgets[i].to_bytes(&mut cs.ns(|| "old_account_public_key"))?,
-            );
-            local_data_bytes.extend_from_slice(&old_dummy_flags_gadgets[i].to_bytes(&mut cs.ns(|| "is_dummy"))?);
-            local_data_bytes.extend_from_slice(&old_value_gadgets[i]);
-            local_data_bytes.extend_from_slice(&old_payloads_gadgets[i]);
-            local_data_bytes.extend_from_slice(&old_birth_predicate_hashes_gadgets[i]);
-            local_data_bytes.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
-            local_data_bytes
-                .extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
+            input_bytes.extend_from_slice(&memo);
+            input_bytes.extend_from_slice(&network_id);
+
+            let commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
+                cs.ns(|| format!("Allocate old record local data commitment randomness {}", i)),
+                || Ok(&local_data_commitment_randomizers[i]),
+            )?;
+
+            let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
+                cs.ns(|| format!("Commit to old record local data {}", i)),
+                &local_data_commitment_parameters,
+                &input_bytes,
+                &commitment_randomness,
+            )?;
+
+            old_record_commitment_bytes
+                .extend_from_slice(&commitment.to_bytes(&mut cs.ns(|| "old_record_local_data"))?);
         }
 
+        let mut new_record_commitment_bytes = Vec::new();
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
-            local_data_bytes
+
+            let mut input_bytes = vec![];
+            input_bytes
                 .extend_from_slice(&new_record_commitments_gadgets[j].to_bytes(&mut cs.ns(|| "record_commitment"))?);
-            local_data_bytes
-                .extend_from_slice(&new_account_public_keys_gadgets[j].to_bytes(&mut cs.ns(|| "account_public_key"))?);
-            local_data_bytes.extend_from_slice(&new_dummy_flags_gadgets[j].to_bytes(&mut cs.ns(|| "is_dummy"))?);
-            local_data_bytes.extend_from_slice(&new_value_gadgets[j]);
-            local_data_bytes.extend_from_slice(&new_payloads_gadgets[j]);
-            local_data_bytes.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
-            local_data_bytes.extend_from_slice(&new_death_predicate_hashes_gadgets[j]);
+            input_bytes.extend_from_slice(&memo);
+            input_bytes.extend_from_slice(&network_id);
+
+            let commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
+                cs.ns(|| format!("Allocate new record local data commitment randomness {}", j)),
+                || Ok(&local_data_commitment_randomizers[C::NUM_INPUT_RECORDS + j]),
+            )?;
+
+            let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
+                cs.ns(|| format!("Commit to new record local data {}", j)),
+                &local_data_commitment_parameters,
+                &input_bytes,
+                &commitment_randomness,
+            )?;
+
+            new_record_commitment_bytes
+                .extend_from_slice(&commitment.to_bytes(&mut cs.ns(|| "new_record_local_data"))?);
         }
-        let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
-        local_data_bytes.extend_from_slice(&memo);
 
-        let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
-        local_data_bytes.extend_from_slice(&network_id);
+        let inner1_commitment_hash = LocalDataCRHGadget::check_evaluation_gadget(
+            cs.ns(|| "Compute to local data commitment inner1 hash"),
+            &local_data_crh_parameters,
+            &old_record_commitment_bytes,
+        )?;
 
-        let local_data_commitment_randomness = LocalDataCommitmentGadget::RandomnessGadget::alloc(
-            cs.ns(|| "Allocate local data commitment randomness"),
-            || Ok(local_data_rand),
+        let inner2_commitment_hash = LocalDataCRHGadget::check_evaluation_gadget(
+            cs.ns(|| "Compute to local data commitment inner2 hash"),
+            &local_data_crh_parameters,
+            &new_record_commitment_bytes,
+        )?;
+
+        let mut inner_commitment_hash_bytes = Vec::new();
+        inner_commitment_hash_bytes
+            .extend_from_slice(&inner1_commitment_hash.to_bytes(&mut cs.ns(|| "inner1_commitment_hash"))?);
+        inner_commitment_hash_bytes
+            .extend_from_slice(&inner2_commitment_hash.to_bytes(&mut cs.ns(|| "inner2_commitment_hash"))?);
+
+        let local_data_commitment = LocalDataCRHGadget::check_evaluation_gadget(
+            cs.ns(|| "Compute to local data commitment root"),
+            &local_data_crh_parameters,
+            &inner_commitment_hash_bytes,
         )?;
 
         let declared_local_data_commitment =
-            LocalDataCommitmentGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
+            LocalDataCRHGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
                 Ok(local_data_comm)
             })?;
 
-        let commitment = LocalDataCommitmentGadget::check_commitment_gadget(
-            cs.ns(|| "Commit to local data"),
-            &local_data_commitment_parameters,
-            &local_data_bytes,
-            &local_data_commitment_randomness,
-        )?;
-
-        commitment.enforce_equal(
+        local_data_commitment.enforce_equal(
             &mut cs.ns(|| "Check that local data commitment is valid"),
             &declared_local_data_commitment,
         )?;

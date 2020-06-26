@@ -150,8 +150,8 @@ where
     predicate_commitment: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     predicate_randomness: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_commitment: <Components::LocalDataCommitment as CommitmentScheme>::Output,
-    local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
+    local_data_commitment: <Components::LocalDataCRH as CRH>::Output,
+    local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
     // Value Balance
     value_balance: i64,
@@ -177,7 +177,7 @@ where
             new_records: self.new_records.to_vec(),
 
             local_data_commitment: self.local_data_commitment.clone(),
-            local_data_randomness: self.local_data_randomness.clone(),
+            local_data_commitment_randomizers: self.local_data_commitment_randomizers.clone(),
         }
     }
 }
@@ -194,8 +194,8 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_commitment: <Components::LocalDataCommitment as CommitmentScheme>::Output,
-    pub local_data_randomness: <Components::LocalDataCommitment as CommitmentScheme>::Randomness,
+    pub local_data_commitment: <Components::LocalDataCRH as CRH>::Output,
+    pub local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -210,23 +210,27 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Verification Key Commitment setup");
+        let time = start_timer!(|| "Verification key commitment setup");
         let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Local Data Commitment setup");
+        let time = start_timer!(|| "Local data CRH setup");
+        let local_data_crh_pp = Components::LocalDataCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Local data commitment setup");
         let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Value Commitment setup");
+        let time = start_timer!(|| "Value commitment setup");
         let value_comm_pp = Components::ValueCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Serial Nonce CRH setup");
+        let time = start_timer!(|| "Serial nonce CRH setup");
         let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Verification Key CRH setup");
+        let time = start_timer!(|| "Verification key CRH setup");
         let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
@@ -240,6 +244,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             record_commitment: rec_comm_pp,
             predicate_verification_key_commitment: pred_vk_comm_pp,
             predicate_verification_key_hash: pred_vk_crh_pp,
+            local_data_crh: local_data_crh_pp,
             local_data_commitment: local_data_comm_pp,
             value_commitment: value_comm_pp,
             serial_number_nonce: sn_nonce_crh_pp,
@@ -443,45 +448,49 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             end_timer!(output_record_time);
         }
 
-        let local_data_comm_timer = start_timer!(|| "Compute predicate input commitment");
-        let mut predicate_input = Vec::new();
+        let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
+
+        let mut local_data_commitment_randomizers = vec![];
+
+        let mut old_record_commitments = Vec::new();
         for i in 0..Components::NUM_INPUT_RECORDS {
             let record = &old_records[i];
-            let bytes = to_bytes![
-                record.commitment(),
-                record.account_public_key(),
-                record.is_dummy(),
-                record.value(),
-                record.payload(),
-                record.birth_predicate_repr(),
-                record.death_predicate_repr(),
-                old_serial_numbers[i]
-            ]?;
-            predicate_input.extend_from_slice(&bytes);
+            let input_bytes = to_bytes![old_serial_numbers[i], record.commitment(), memo, network_id]?;
+
+            let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let commitment = Components::LocalDataCommitment::commit(
+                &parameters.local_data_commitment,
+                &input_bytes,
+                &commitment_randomness,
+            )?;
+
+            old_record_commitments.extend_from_slice(&to_bytes![commitment]?);
+            local_data_commitment_randomizers.push(commitment_randomness);
         }
 
+        let mut new_record_commitments = Vec::new();
         for j in 0..Components::NUM_OUTPUT_RECORDS {
             let record = &new_records[j];
-            let bytes = to_bytes![
-                record.commitment(),
-                record.account_public_key(),
-                record.is_dummy(),
-                record.value(),
-                record.payload(),
-                record.birth_predicate_repr(),
-                record.death_predicate_repr()
-            ]?;
-            predicate_input.extend_from_slice(&bytes);
-        }
-        predicate_input.extend_from_slice(memo);
-        predicate_input.push(network_id);
+            let input_bytes = to_bytes![record.commitment(), memo, network_id]?;
 
-        let local_data_rand = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
-        let local_data_comm = Components::LocalDataCommitment::commit(
-            &parameters.local_data_commitment,
-            &predicate_input,
-            &local_data_rand,
-        )?;
+            let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let commitment = Components::LocalDataCommitment::commit(
+                &parameters.local_data_commitment,
+                &input_bytes,
+                &commitment_randomness,
+            )?;
+
+            new_record_commitments.extend_from_slice(&to_bytes![commitment]?);
+            local_data_commitment_randomizers.push(commitment_randomness);
+        }
+
+        let inner1_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &old_record_commitments)?;
+
+        let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
+
+        let local_data_comm =
+            Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
+
         end_timer!(local_data_comm_timer);
 
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
@@ -524,7 +533,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             predicate_commitment: predicate_comm,
             predicate_randomness: predicate_rand,
             local_data_commitment: local_data_comm,
-            local_data_randomness: local_data_rand,
+            local_data_commitment_randomizers,
 
             value_balance,
         };
@@ -684,7 +693,7 @@ where
             predicate_commitment,
             predicate_randomness,
             local_data_commitment,
-            local_data_randomness,
+            local_data_commitment_randomizers,
             value_balance,
         } = context;
 
@@ -813,7 +822,7 @@ where
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,
-                &local_data_randomness,
+                &local_data_commitment_randomizers,
                 memorandum,
                 &old_value_commits,
                 &old_value_commit_randomness,
