@@ -18,7 +18,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct PedersenCRHParametersGadget<G: Group, S: PedersenSize, F: Field, GG: GroupGadget<G, F>> {
-    parameters: PedersenCRHParameters<G, S>,
+    pub(crate) parameters: PedersenCRHParameters<G, S>,
     _group: PhantomData<GG>,
     _engine: PhantomData<F>,
 }
