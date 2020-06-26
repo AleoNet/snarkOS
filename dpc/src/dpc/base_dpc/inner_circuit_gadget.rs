@@ -19,7 +19,13 @@ use snarkos_models::{
             SignaturePublicKeyRandomizationGadget,
         },
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, eq::EqGadget, uint::UInt8, ToBytesGadget},
+        utilities::{
+            alloc::AllocGadget,
+            boolean::Boolean,
+            eq::{ConditionalEqGadget, EqGadget},
+            uint::UInt8,
+            ToBytesGadget,
+        },
     },
 };
 use snarkos_objects::AccountPrivateKey;
@@ -302,6 +308,8 @@ where
         )
     };
 
+    let zero_value = UInt8::alloc_vec(&mut cs.ns(|| "Declare record zero value"), &to_bytes![0u64]?)?;
+
     let digest_gadget = <C::MerkleHashGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
         &mut cs.ns(|| "Declare ledger digest"),
         || Ok(ledger_digest),
@@ -542,6 +550,13 @@ where
         {
             let commitment_cs = &mut cs.ns(|| "Check that record is well-formed");
 
+            given_value.conditional_enforce_equal(
+                &mut commitment_cs
+                    .ns(|| format!("Enforce that if old record {} is a dummy, that it has a value of 0", i)),
+                &zero_value,
+                &given_is_dummy,
+            )?;
+
             let account_public_key_bytes =
                 given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
@@ -723,6 +738,13 @@ where
         {
             let commitment_cs = &mut cs.ns(|| "Check that record is well-formed");
 
+            given_value.conditional_enforce_equal(
+                &mut commitment_cs
+                    .ns(|| format!("Enforce that if new record {} is a dummy, that it has a value of 0", j)),
+                &zero_value,
+                &given_is_dummy,
+            )?;
+
             let account_public_key_bytes =
                 given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
@@ -744,11 +766,11 @@ where
                 &given_commitment_randomness,
             )?;
             candidate_commitment.enforce_equal(
-                &mut commitment_cs.ns(|| "Check that computed commitment matches pub input"),
+                &mut commitment_cs.ns(|| "Check that computed commitment matches public input"),
                 &given_commitment,
             )?;
             candidate_commitment.enforce_equal(
-                &mut commitment_cs.ns(|| "Check that computed commitment matches declared comm"),
+                &mut commitment_cs.ns(|| "Check that computed commitment matches declared commitment"),
                 &given_record_commitment,
             )?;
         }
