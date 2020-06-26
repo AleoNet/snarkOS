@@ -82,7 +82,7 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
             "BoweHopwoodPedersenCRH::Setup: {} segments of {} 3-bit chunks; {{0,1}}^{{{}}} -> G",
             W::NUM_WINDOWS,
             W::WINDOW_SIZE,
-            W::WINDOW_SIZE * W::NUM_WINDOWS * CHUNK_SIZE
+            W::WINDOW_SIZE * W::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE
         ));
         let bases = Self::create_generators(rng);
         end_timer!(time);
@@ -136,10 +136,10 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         // for all i. Described in section 5.4.1.7 in the Zcash protocol
         // specification.
 
-        let result = cfg_chunks!(padded_input, S::WINDOW_SIZE * CHUNK_SIZE)
+        let result = cfg_chunks!(padded_input, S::WINDOW_SIZE * BOWE_HOPWOOD_CHUNK_SIZE)
             .zip(&self.parameters.bases)
             .map(|(segment_bits, segment_generators)| {
-                cfg_chunks!(segment_bits, CHUNK_SIZE)
+                cfg_chunks!(segment_bits, BOWE_HOPWOOD_CHUNK_SIZE)
                     .zip(segment_generators)
                     .map(|(chunk_bits, generator)| {
                         let mut encoded = generator.clone();
