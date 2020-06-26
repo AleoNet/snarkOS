@@ -59,6 +59,8 @@ mod tests {
     use super::*;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
+    use snarkos_models::algorithms::SNARK;
+    use snarkos_utilities::bytes::FromBytes;
 
     #[test]
     fn gm17_ok() {
@@ -76,7 +78,9 @@ mod tests {
         let (nonce, proof) = posw
             .mine(&subroots, difficulty_target, &mut rand::thread_rng(), std::u32::MAX)
             .unwrap();
+        assert_eq!(proof.len(), 387); // NOTE: GM17 uses uncompressed serialization
 
+        let proof = <GM17<Bls12_377> as SNARK>::Proof::read(&proof[..]).unwrap();
         posw.verify(nonce, &proof, &pedersen_merkle_root).unwrap();
     }
 
@@ -102,6 +106,9 @@ mod tests {
             .mine(&subroots, difficulty_target, &mut rand::thread_rng(), std::u32::MAX)
             .unwrap();
 
+        assert_eq!(proof.len(), 972); // NOTE: Marlin proofs use compressed serialization
+
+        let proof = <Marlin<Bls12_377> as SNARK>::Proof::read(&proof[..]).unwrap();
         posw.verify(nonce, &proof, &pedersen_merkle_root).unwrap();
     }
 }

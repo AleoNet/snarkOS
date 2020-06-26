@@ -1,5 +1,6 @@
 use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
@@ -26,7 +27,7 @@ use snarkos_objects::{
     MerkleRootHash,
     PedersenMerkleRootHash,
 };
-use snarkos_posw::{txids_to_roots, Posw};
+use snarkos_posw::{txids_to_roots, Posw, GM17};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
 
@@ -146,9 +147,10 @@ impl ConsensusParameters {
         }
 
         // Verify the proof
+        let proof = <GM17<Bls12_377> as SNARK>::Proof::read(&header.proof.0[..])?;
         let verification_timer = start_timer!(|| "POSW verify");
         self.verifier
-            .verify(header.nonce, &header.proof, &header.pedersen_merkle_root_hash)?;
+            .verify(header.nonce, &proof, &header.pedersen_merkle_root_hash)?;
         end_timer!(verification_timer);
 
         Ok(())
@@ -569,7 +571,7 @@ mod tests {
             merkle_root_hash: merkle_root_hash1,
             pedersen_merkle_root_hash: pedersen_merkle_root1,
             nonce: nonce1,
-            proof: proof1,
+            proof: proof1.into(),
             difficulty_target,
             time: 9999999,
         };
@@ -588,7 +590,7 @@ mod tests {
             merkle_root_hash: merkle_root_hash.clone(),
             pedersen_merkle_root_hash: pedersen_merkle_root.clone(),
             nonce: nonce2,
-            proof: proof2,
+            proof: proof2.into(),
             difficulty_target: new_difficulty_target,
             time: 9999999,
         };

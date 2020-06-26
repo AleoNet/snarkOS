@@ -2181,6 +2181,7 @@ dependencies = [
  "rand_xorshift",
  "serde",
  "snarkos-algorithms",
+ "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",

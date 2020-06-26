@@ -18,7 +18,6 @@ use snarkos_models::{
 use snarkos_objects::{
     pedersen_merkle_tree::{pedersen_merkle_root_hash_with_leaves, PedersenMerkleRootHash, PARAMS},
     MaskedMerkleTreeParameters,
-    ProofOfSuccinctWork,
 };
 use snarkos_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
 use snarkos_polycommit::optional_rng::OptionalRng;
@@ -112,8 +111,8 @@ where
     }
 
     /// Hashes the proof and checks it against the difficulty
-    fn check_difficulty(&self, proof: &ProofOfSuccinctWork, difficulty_target: u64) -> bool {
-        let hash_result = sha256d_to_u64(&proof.0[..]);
+    fn check_difficulty(&self, proof: &[u8], difficulty_target: u64) -> bool {
+        let hash_result = sha256d_to_u64(proof);
         hash_result <= difficulty_target
     }
 }
@@ -189,30 +188,33 @@ where
         difficulty_target: u64, // TODO: Change to Bignum?
         rng: &mut R,
         max_nonce: u32,
-    ) -> Result<(u32, ProofOfSuccinctWork), PoswError> {
+    ) -> Result<(u32, Vec<u8>), PoswError> {
         let pk = self.pk.as_ref().expect("tried to mine without a PK set up");
 
         let mut nonce;
         let mut proof;
+        let mut serialized_proof;
         loop {
             nonce = rng.gen_range(0, max_nonce);
             proof = Self::prove(&pk, nonce, subroots, rng)?;
 
-            if self.check_difficulty(&proof, difficulty_target) {
+            serialized_proof = to_bytes!(proof)?;
+            if self.check_difficulty(&serialized_proof, difficulty_target) {
                 break;
             }
         }
 
-        Ok((nonce, proof))
+        Ok((nonce, serialized_proof))
     }
 
-    /// Runs the internal SNARK `prove` function on the POSW circuit
+    /// Runs the internal SNARK `prove` function on the POSW circuit and returns
+    /// the proof serialized as bytes
     fn prove<R: Rng>(
         pk: &S::ProvingParameters,
         nonce: u32,
         subroots: &[Vec<u8>],
         rng: &mut R,
-    ) -> Result<ProofOfSuccinctWork, PoswError> {
+    ) -> Result<S::Proof, PoswError> {
         // instantiate the circuit with the nonce
         let circuit = Self::circuit_from(nonce, subroots);
 
@@ -221,11 +223,7 @@ where
         let proof = S::prove(pk, circuit, rng)?;
         end_timer!(proof_timer);
 
-        // serialize it
-        let proof_bytes = to_bytes![proof]?;
-        let mut p = [0; ProofOfSuccinctWork::size()];
-        p.copy_from_slice(&proof_bytes);
-        Ok(ProofOfSuccinctWork(p))
+        Ok(proof)
     }
 
     /// Verifies the Proof of Succinct Work against the nonce and pedersen merkle
@@ -234,12 +232,9 @@ where
     pub fn verify(
         &self,
         nonce: u32,
-        proof: &ProofOfSuccinctWork,
+        proof: &S::Proof,
         pedersen_merkle_root: &PedersenMerkleRootHash,
     ) -> Result<(), PoswError> {
-        // deserialize the snark proof ASAP
-        let proof = <S as SNARK>::Proof::read(&proof.0[..])?;
-
         // commit to it and the nonce
         let mask = commit(nonce, pedersen_merkle_root);
 
