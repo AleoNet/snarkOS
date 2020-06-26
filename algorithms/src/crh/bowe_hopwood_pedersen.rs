@@ -13,6 +13,7 @@ use rayon::prelude::*;
 
 /// Returns an iterator over `chunk_size` elements of the slice at a
 /// time.
+#[macro_export]
 macro_rules! cfg_chunks {
     ($e: expr, $size: expr) => {{
         #[cfg(feature = "pedersen-parallel")]
