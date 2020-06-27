@@ -24,7 +24,7 @@ impl PedersenSize for Size {
     const WINDOW_SIZE: usize = 4;
 }
 
-define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 3);
 
 type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
 type H = PedersenCompressedCRH<Edwards, Size>;
@@ -169,7 +169,7 @@ fn bad_root_test() {
 #[test]
 fn good_masked_root_test() {
     let mut leaves = Vec::new();
-    for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
+    for i in 0..1 << EdwardsMerkleParameters::DEPTH {
         let input = [i; 30];
         leaves.push(input);
     }
@@ -180,7 +180,7 @@ fn good_masked_root_test() {
 #[test]
 fn bad_masked_root_test() {
     let mut leaves = Vec::new();
-    for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
+    for i in 0..1 << EdwardsMerkleParameters::DEPTH {
         let input = [i; 30];
         leaves.push(input);
     }

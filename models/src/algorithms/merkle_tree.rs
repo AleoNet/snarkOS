@@ -9,7 +9,7 @@ use std::io::Cursor;
 pub trait MerkleParameters: Clone + Default + From<<Self as MerkleParameters>::H> {
     type H: CRH;
 
-    const HEIGHT: usize;
+    const DEPTH: usize;
 
     /// Setup the MerkleParameters
     fn setup<R: Rng>(rng: &mut R) -> Self;

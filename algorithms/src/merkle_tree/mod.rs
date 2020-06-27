@@ -20,9 +20,9 @@ pub fn prng() -> impl Rng {
 }
 
 #[macro_export]
-/// Defines a Merkle Tree using the provided hash and height.
+/// Defines a Merkle tree using the provided hash and depth.
 macro_rules! define_merkle_tree_parameters {
-    ($struct_name:ident, $hash:ty, $height:expr) => {
+    ($struct_name:ident, $hash:ty, $depth:expr) => {
         #[allow(unused_imports)]
         use snarkos_models::algorithms::{MerkleParameters, CRH};
         #[allow(unused_imports)]
@@ -37,7 +37,7 @@ macro_rules! define_merkle_tree_parameters {
         impl MerkleParameters for $struct_name {
             type H = $hash;
 
-            const HEIGHT: usize = $height;
+            const DEPTH: usize = $depth;
 
             fn setup<R: Rng>(rng: &mut R) -> Self {
                 Self(Self::H::setup(rng))

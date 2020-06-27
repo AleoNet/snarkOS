@@ -14,7 +14,7 @@ pub struct MerklePath<P: MerkleParameters> {
 
 impl<P: MerkleParameters> MerklePath<P> {
     pub fn verify<L: ToBytes>(&self, root_hash: &<P::H as CRH>::Output, leaf: &L) -> Result<bool, MerkleError> {
-        if self.path.len() != P::HEIGHT - 1 {
+        if self.path.len() != P::DEPTH {
             return Ok(false);
         }
 
@@ -54,8 +54,8 @@ impl<P: MerkleParameters> MerklePath<P> {
 
 impl<P: MerkleParameters> Default for MerklePath<P> {
     fn default() -> Self {
-        let mut path = Vec::with_capacity(P::HEIGHT);
-        for _i in 1..P::HEIGHT {
+        let mut path = Vec::with_capacity(P::DEPTH);
+        for _i in 0..P::DEPTH {
             path.push((<P::H as CRH>::Output::default(), <P::H as CRH>::Output::default()));
         }
         Self {

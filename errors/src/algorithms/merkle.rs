@@ -14,11 +14,11 @@ pub enum MerkleError {
     #[error("Incorrect path length: {}", _0)]
     IncorrectPathLength(usize),
 
-    #[error("Invalid path length: {}. Must be less than: {}", _0, _1)]
+    #[error("Invalid path length: {}. Must be less than or equal to: {}", _0, _1)]
     InvalidPathLength(usize, usize),
 
-    #[error("Invalid tree height: {}. Must be less than or equal to: {}", _0, _1)]
-    InvalidTreeHeight(usize, usize),
+    #[error("Invalid tree depth: {}. Must be less than or equal to: {}", _0, _1)]
+    InvalidTreeDepth(usize, usize),
 
     #[error("{}", _0)]
     Message(String),

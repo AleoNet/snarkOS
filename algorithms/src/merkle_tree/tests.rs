@@ -6,21 +6,29 @@ use crate::{
 use snarkos_models::algorithms::{crh::CRH, merkle_tree::MerkleParameters};
 use snarkos_utilities::{to_bytes, ToBytes};
 
+/// Generates a valid Merkle tree and verifies the Merkle path witness for each leaf.
 fn generate_merkle_tree<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> MerkleTree<P> {
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
+        assert_eq!(P::DEPTH, proof.path.len());
         assert!(proof.verify(&tree.root(), &leaf).unwrap());
     }
     tree
 }
 
+/// Generates a valid Merkle tree and verifies the Merkle path witness for each leaf does not verify to an invalid root hash.
 fn bad_merkle_tree_verify<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> () {
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
         assert!(proof.verify(&<P::H as CRH>::Output::default(), &leaf).unwrap());
     }
+}
+
+fn run_empty_merkle_tree_test<P: MerkleParameters>() {
+    let parameters = &P::default();
+    generate_merkle_tree::<P, Vec<u8>>(&vec![], parameters);
 }
 
 fn run_good_root_test<P: MerkleParameters>() {
@@ -149,6 +157,12 @@ mod pedersen_crh_on_affine {
     }
 
     #[test]
+    fn empty_merkle_tree_test() {
+        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 32);
+        run_empty_merkle_tree_test::<MTParameters>();
+    }
+
+    #[test]
     fn good_root_test() {
         define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 32);
         run_good_root_test::<MTParameters>();
@@ -163,13 +177,13 @@ mod pedersen_crh_on_affine {
 
     #[test]
     fn depth2_merkle_tree_matches_hashing_test() {
-        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 3);
+        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 2);
         run_merkle_tree_matches_hashing_test::<MTParameters>();
     }
 
     #[test]
     fn depth3_padded_merkle_tree_matches_hashing_test() {
-        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 4);
+        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 3);
         run_padded_merkle_tree_matches_hashing_test::<MTParameters>();
     }
 }
@@ -186,6 +200,12 @@ mod pedersen_crh_on_projective {
     }
 
     #[test]
+    fn empty_merkle_tree_test() {
+        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 32);
+        run_empty_merkle_tree_test::<MTParameters>();
+    }
+
+    #[test]
     fn good_root_test() {
         define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 32);
         run_good_root_test::<MTParameters>();
@@ -202,7 +222,7 @@ mod pedersen_crh_on_projective {
     #[ignore]
     #[test]
     fn depth2_merkle_tree_matches_hashing_test() {
-        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 3);
+        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 2);
         run_merkle_tree_matches_hashing_test::<MTParameters>();
     }
 
@@ -210,7 +230,7 @@ mod pedersen_crh_on_projective {
     #[ignore]
     #[test]
     fn depth3_padded_merkle_tree_matches_hashing_test() {
-        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 4);
+        define_merkle_tree_parameters!(MTParameters, PedersenCRH<Edwards, Size>, 3);
         run_padded_merkle_tree_matches_hashing_test::<MTParameters>();
     }
 }
@@ -227,6 +247,12 @@ mod pedersen_compressed_crh_on_projective {
     }
 
     #[test]
+    fn empty_merkle_tree_test() {
+        define_merkle_tree_parameters!(MTParameters, PedersenCompressedCRH<Edwards, Size>, 32);
+        run_empty_merkle_tree_test::<MTParameters>();
+    }
+
+    #[test]
     fn good_root_test() {
         define_merkle_tree_parameters!(MTParameters, PedersenCompressedCRH<Edwards, Size>, 32);
         run_good_root_test::<MTParameters>();
@@ -241,13 +267,13 @@ mod pedersen_compressed_crh_on_projective {
 
     #[test]
     fn depth2_merkle_tree_matches_hashing_test() {
-        define_merkle_tree_parameters!(MTParameters, PedersenCompressedCRH<Edwards, Size>, 3);
+        define_merkle_tree_parameters!(MTParameters, PedersenCompressedCRH<Edwards, Size>, 2);
         run_merkle_tree_matches_hashing_test::<MTParameters>();
     }
 
     #[test]
     fn depth3_padded_merkle_tree_matches_hashing_test() {
-        define_merkle_tree_parameters!(MTParameters, PedersenCompressedCRH<Edwards, Size>, 4);
+        define_merkle_tree_parameters!(MTParameters, PedersenCompressedCRH<Edwards, Size>, 3);
         run_padded_merkle_tree_matches_hashing_test::<MTParameters>();
     }
 }
