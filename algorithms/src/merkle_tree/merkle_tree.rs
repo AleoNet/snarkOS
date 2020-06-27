@@ -1,55 +1,66 @@
 use crate::merkle_tree::MerklePath;
 use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{MerkleParameters, CRH};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::ToBytes;
 
 pub struct MerkleTree<P: MerkleParameters> {
+    /// The computed root of the full Merkle tree.
     root: Option<<P::H as CRH>::Output>,
+
+    /// The internal hashes, from root to hashed leaves, of the full Merkle tree.
     tree: Vec<<P::H as CRH>::Output>,
-    leaves_hashed: Vec<<P::H as CRH>::Output>,
-    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>, // For each level after a full tree has been built from the leaves, keeps both the roots the siblings that are used to get to the desired height.
+
+    /// The hash of each non-empty leaf in the Merkle tree.
+    hashed_leaves: Vec<<P::H as CRH>::Output>,
+
+    /// For each level after a full tree has been built from the leaves,
+    /// keeps both the roots the siblings that are used to get to the desired depth.
+    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>,
+
+    /// The Merkle tree parameters (e.g. the hash function).
     parameters: P,
 }
 
 impl<P: MerkleParameters> MerkleTree<P> {
-    pub const HEIGHT: u8 = P::HEIGHT as u8;
+    pub const DEPTH: u8 = P::DEPTH as u8;
 
     pub fn new<L: ToBytes>(parameters: P, leaves: &[L]) -> Result<Self, MerkleError> {
-        let new_time = start_timer!(|| "MerkleTree::New");
+        let new_time = start_timer!(|| "MerkleTree::new");
 
         let last_level_size = leaves.len().next_power_of_two();
         let tree_size = 2 * last_level_size - 1;
-        let tree_height = tree_height(tree_size);
+        let tree_depth = tree_depth(tree_size);
 
-        if tree_height > Self::HEIGHT as usize {
-            return Err(MerkleError::InvalidTreeHeight(tree_height, Self::HEIGHT as usize));
+        if tree_depth > Self::DEPTH as usize {
+            return Err(MerkleError::InvalidTreeDepth(tree_depth, Self::DEPTH as usize));
         }
 
-        // Initialize the merkle tree.
+        // Initialize the Merkle tree.
         let mut tree = Vec::with_capacity(tree_size);
         let empty_hash = parameters.hash_empty()?;
         for _ in 0..tree_size {
             tree.push(empty_hash.clone());
         }
 
-        // Compute the starting indices for each level of the tree.
+        // Compute the starting index (on the left) for each level of the tree.
         let mut index = 0;
-        let mut level_indices = Vec::with_capacity(tree_height);
-        for _ in 0..tree_height {
+        let mut level_indices = Vec::with_capacity(tree_depth);
+        for _ in 0..=tree_depth {
             level_indices.push(index);
             index = left_child(index);
         }
 
         // Compute and store the hash values for each leaf.
-        let last_level_index = level_indices.pop().unwrap();
-        let mut buffer = [0u8; 128];
+        let hash_input_size_in_bytes = (P::H::INPUT_SIZE_BITS / 8) * 2;
+        let last_level_index = level_indices.pop().unwrap_or(0);
+        let mut buffer = vec![0u8; hash_input_size_in_bytes];
         for (i, leaf) in leaves.iter().enumerate() {
             tree[last_level_index + i] = parameters.hash_leaf(leaf, &mut buffer)?;
         }
 
         // Compute the hash values for every node in the tree.
         let mut upper_bound = last_level_index;
-        let mut buffer = [0u8; 128];
+        let mut buffer = vec![0u8; hash_input_size_in_bytes];
         level_indices.reverse();
         for &start_index in &level_indices {
             // Iterate over the current level.
@@ -62,29 +73,30 @@ impl<P: MerkleParameters> MerkleTree<P> {
             }
             upper_bound = start_index;
         }
+
         // Finished computing actual tree.
-        // Now, we compute the dummy nodes until we hit our HEIGHT goal.
-        let mut cur_height = tree_height;
+        // Now, we compute the dummy nodes until we hit our DEPTH goal.
+        let mut current_depth = tree_depth;
         let mut padding_tree = vec![];
-        let mut cur_hash = tree[0].clone();
-        while cur_height < Self::HEIGHT as usize {
-            cur_hash = parameters.hash_inner_node(&cur_hash, &empty_hash, &mut buffer)?;
+        let mut current_hash = tree[0].clone();
+        while current_depth < Self::DEPTH as usize {
+            current_hash = parameters.hash_inner_node(&current_hash, &empty_hash, &mut buffer)?;
 
             // do not pad at the top-level of the tree
-            if cur_height < Self::HEIGHT as usize - 1 {
-                padding_tree.push((cur_hash.clone(), empty_hash.clone()));
+            if current_depth < Self::DEPTH as usize - 1 {
+                padding_tree.push((current_hash.clone(), empty_hash.clone()));
             }
-            cur_height += 1;
+            current_depth += 1;
         }
-        let root_hash = cur_hash;
+        let root_hash = current_hash;
 
         end_timer!(new_time);
 
-        let leaves_hashed = tree[last_level_index..].to_vec();
+        let hashed_leaves = tree[last_level_index..].to_vec();
         Ok(MerkleTree {
             tree,
             padding_tree,
-            leaves_hashed,
+            hashed_leaves,
             parameters,
             root: Some(root_hash),
         })
@@ -96,19 +108,21 @@ impl<P: MerkleParameters> MerkleTree<P> {
     }
 
     #[inline]
-    pub fn leaves_hashed(&self) -> Vec<<P::H as CRH>::Output> {
-        self.leaves_hashed.clone()
+    pub fn hashed_leaves(&self) -> Vec<<P::H as CRH>::Output> {
+        self.hashed_leaves.clone()
     }
 
     pub fn generate_proof<L: ToBytes>(&self, index: usize, leaf: &L) -> Result<MerklePath<P>, MerkleError> {
-        let prove_time = start_timer!(|| "MerkleTree::GenProof");
+        let prove_time = start_timer!(|| "MerkleTree::generate_proof");
         let mut path = vec![];
 
-        let mut buffer = [0u8; 128];
+        let hash_input_size_in_bytes = (P::H::INPUT_SIZE_BITS / 8) * 2;
+        let mut buffer = vec![0u8; hash_input_size_in_bytes];
+
         let leaf_hash = self.parameters.hash_leaf(leaf, &mut buffer)?;
-        let tree_height = tree_height(self.tree.len());
-        let tree_index = convert_index_to_last_level(index, tree_height);
-        let empty_hash = self.parameters.hash_empty()?;
+
+        let tree_depth = tree_depth(self.tree.len());
+        let tree_index = convert_index_to_last_level(index, tree_depth);
 
         // Check that the given index corresponds to the correct leaf.
         if leaf_hash != self.tree[tree_index] {
@@ -129,19 +143,21 @@ impl<P: MerkleParameters> MerkleTree<P> {
         }
 
         // Store the root node. Set boolean as true for consistency with digest location.
-        if path.len() >= Self::HEIGHT as usize {
-            return Err(MerkleError::InvalidPathLength(path.len(), Self::HEIGHT as usize));
+        if path.len() > Self::DEPTH as usize {
+            return Err(MerkleError::InvalidPathLength(path.len(), Self::DEPTH as usize));
         }
 
-        if path.len() != (Self::HEIGHT - 1) as usize {
+        if path.len() != Self::DEPTH as usize {
+            let empty_hash = self.parameters.hash_empty()?;
             path.push((self.tree[0].clone(), empty_hash));
+
             for &(ref hash, ref sibling_hash) in &self.padding_tree {
                 path.push((hash.clone(), sibling_hash.clone()));
             }
         }
         end_timer!(prove_time);
 
-        if path.len() != (Self::HEIGHT - 1) as usize {
+        if path.len() != Self::DEPTH as usize {
             Err(MerkleError::IncorrectPathLength(path.len()))
         } else {
             Ok(MerklePath {
@@ -157,22 +173,22 @@ impl<P: MerkleParameters> Default for MerkleTree<P> {
         MerkleTree {
             tree: vec![],
             padding_tree: vec![],
-            leaves_hashed: vec![],
+            hashed_leaves: vec![],
             root: None,
             parameters: P::default(),
         }
     }
 }
 
-/// Returns the height of the tree, given the size of the tree.
+/// Returns the depth of the tree, given the size of the tree.
 #[inline]
-fn tree_height(tree_size: usize) -> usize {
+fn tree_depth(tree_size: usize) -> usize {
     // Returns the log2 value of the given number.
     fn log2(number: usize) -> usize {
         (number as f64).log2() as usize
     }
 
-    log2(tree_size + 1)
+    log2(tree_size)
 }
 
 /// Returns true iff the index represents the root.
@@ -218,6 +234,6 @@ fn parent(index: usize) -> Option<usize> {
 }
 
 #[inline]
-fn convert_index_to_last_level(index: usize, tree_height: usize) -> usize {
-    index + (1 << (tree_height - 1)) - 1
+fn convert_index_to_last_level(index: usize, tree_depth: usize) -> usize {
+    index + (1 << tree_depth) - 1
 }

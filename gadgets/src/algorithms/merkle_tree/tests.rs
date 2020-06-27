@@ -35,7 +35,7 @@ impl PedersenSize for Size {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BoweHopwoodSize;
 impl PedersenSize for BoweHopwoodSize {
-    const NUM_WINDOWS: usize = 4;
+    const NUM_WINDOWS: usize = 8;
     const WINDOW_SIZE: usize = 63;
 }
 
@@ -124,7 +124,7 @@ mod merkle_tree_compressed_pedersen_crh {
 
         let mut cs = TestConstraintSystem::<Fq>::new();
         let leaf_gadgets = tree
-            .leaves_hashed()
+            .hashed_leaves()
             .iter()
             .enumerate()
             .map(|(i, l)| <HG as CRHGadget<H, Fq>>::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || Ok(l)))
@@ -169,7 +169,7 @@ mod merkle_tree_compressed_pedersen_crh {
     #[test]
     fn good_root_test() {
         let mut leaves = Vec::new();
-        for i in 0..4u8 {
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
             let input = [i; 30];
             leaves.push(input);
         }
@@ -180,7 +180,7 @@ mod merkle_tree_compressed_pedersen_crh {
     #[test]
     fn bad_root_test() {
         let mut leaves = Vec::new();
-        for i in 0..4u8 {
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
             let input = [i; 30];
             leaves.push(input);
         }
@@ -190,7 +190,7 @@ mod merkle_tree_compressed_pedersen_crh {
     #[test]
     fn good_masked_root_test() {
         let mut leaves = Vec::new();
-        for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
             let input = [i; 30];
             leaves.push(input);
         }
@@ -201,7 +201,7 @@ mod merkle_tree_compressed_pedersen_crh {
     #[test]
     fn bad_masked_root_test() {
         let mut leaves = Vec::new();
-        for i in 0..1 << EdwardsMerkleParameters::HEIGHT - 1 {
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
             let input = [i; 30];
             leaves.push(input);
         }
@@ -217,11 +217,11 @@ mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
     type H = BoweHopwoodPedersenCompressedCRH<Edwards, BoweHopwoodSize>;
     type HG = BoweHopwoodPedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
-    // TODO (raychu86) Fix merkle proofs for BoweHopwoodCRH
+    // TODO (raychu86) Fix merkle proofs for Bowe-Hopwood CRH
     #[test]
     fn good_root_test() {
         let mut leaves = Vec::new();
-        for i in 0..4u8 {
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
             let input = [i; 30];
             leaves.push(input);
         }
@@ -232,7 +232,7 @@ mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
     #[test]
     fn bad_root_test() {
         let mut leaves = Vec::new();
-        for i in 0..4u8 {
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
             let input = [i; 30];
             leaves.push(input);
         }

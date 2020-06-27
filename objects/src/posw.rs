@@ -15,7 +15,7 @@ use std::{
 };
 
 // 2 * G1 + 1 * G2 assuming Bls12-377 and GM17.
-// Marlin requires 13 * G1 + 21 * Fq = 1296 btyes.
+// Marlin requires 13 * G1 + 21 * Fq = 1296 bytes.
 // Points are encoded with an extra byte for the infinity bit.
 const PROOF_SIZE: usize = 387;
 
