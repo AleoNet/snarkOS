@@ -26,6 +26,20 @@ macro_rules! cfg_chunks {
     }};
 }
 
+/// Applies the reduce operation over an iterator.
+#[macro_export]
+macro_rules! cfg_reduce {
+    ($e: expr, $default: expr, $op: expr) => {{
+        #[cfg(feature = "pedersen-parallel")]
+        let result = $e.reduce($default, $op);
+
+        #[cfg(not(feature = "pedersen-parallel"))]
+        let result = $e.fold($default, $op);
+
+        result
+    }};
+}
+
 pub const BOWE_HOPWOOD_CHUNK_SIZE: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -137,27 +151,35 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         // for all i. Described in section 5.4.1.7 in the Zcash protocol
         // specification.
 
-        let result = cfg_chunks!(padded_input, S::WINDOW_SIZE * BOWE_HOPWOOD_CHUNK_SIZE)
-            .zip(&self.parameters.bases)
-            .map(|(segment_bits, segment_generators)| {
-                cfg_chunks!(segment_bits, BOWE_HOPWOOD_CHUNK_SIZE)
-                    .zip(segment_generators)
-                    .map(|(chunk_bits, generator)| {
-                        let mut encoded = generator.clone();
-                        if chunk_bits[0] {
-                            encoded = encoded + generator;
-                        }
-                        if chunk_bits[1] {
-                            encoded += &generator.double();
-                        }
-                        if chunk_bits[2] {
-                            encoded = encoded.neg();
-                        }
-                        encoded
-                    })
-                    .reduce(G::zero, |a, b| a + &b)
-            })
-            .reduce(G::zero, |a, b| a + &b);
+        // TODO (howardwu): Are clever macros really better than repeating code for cfg?
+
+        let result = cfg_reduce!(
+            cfg_chunks!(padded_input, S::WINDOW_SIZE * BOWE_HOPWOOD_CHUNK_SIZE)
+                .zip(&self.parameters.bases)
+                .map(|(segment_bits, segment_generators)| {
+                    cfg_reduce!(
+                        cfg_chunks!(segment_bits, BOWE_HOPWOOD_CHUNK_SIZE)
+                            .zip(segment_generators)
+                            .map(|(chunk_bits, generator)| {
+                                let mut encoded = generator.clone();
+                                if chunk_bits[0] {
+                                    encoded = encoded + generator;
+                                }
+                                if chunk_bits[1] {
+                                    encoded += &generator.double();
+                                }
+                                if chunk_bits[2] {
+                                    encoded = encoded.neg();
+                                }
+                                encoded
+                            }),
+                        G::zero,
+                        |a, b| a + &b
+                    )
+                }),
+            G::zero,
+            |a, b| a + &b
+        );
 
         end_timer!(eval_time);
 
