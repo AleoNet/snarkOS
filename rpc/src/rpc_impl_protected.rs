@@ -107,7 +107,12 @@ impl RpcImpl {
             }
         };
 
-        Ok(serde_json::to_value(self.generate_account(metadata).unwrap()).unwrap())
+        let account_result = self.generate_account(metadata);
+
+        match account_result {
+            Ok(account) => Ok(serde_json::to_value(account).unwrap()),
+            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
+        }
     }
 
     /// Expose the protected functions as RPC enpoints
@@ -285,13 +290,13 @@ impl ProtectedRpcFunctions for RpcImpl {
         let rng = &mut thread_rng();
 
         let metadata: [u8; 32] = match metadata {
-            Some(metadata_string) => match hex::decode(metadata_string) {
+            Some(metadata_string) => match hex::decode(&metadata_string) {
                 Ok(bytes) => {
                     let mut metadata = [0u8; 32];
                     bytes.write(&mut metadata[..])?;
                     metadata
                 }
-                Err(_) => rng.gen(),
+                Err(_) => return Err(RpcError::InvalidMetadata(metadata_string)),
             },
             None => rng.gen(),
         };
