@@ -21,10 +21,10 @@ mod window {
 
 pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, window::TwoToOneWindow>;
 
-// We instantiate the tree here with height = 3. This may change in the future.
-pub const MASKED_TREE_HEIGHT: usize = 3;
+// We instantiate the tree here with depth = 2. This may change in the future.
+pub const MASKED_TREE_DEPTH: usize = 2;
 
-define_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, MASKED_TREE_HEIGHT);
+define_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, MASKED_TREE_DEPTH);
 
 /// A Merkle Tree instantiated with the Masked Pedersen hasher over BLS12-377
 pub type EdwardsMaskedMerkleTree = MerkleTree<MaskedMerkleTreeParameters>;
@@ -64,7 +64,7 @@ pub fn pedersen_merkle_root_hash(hashes: &[Vec<u8>]) -> Fr {
 /// base layer hashes leaved
 pub fn pedersen_merkle_root_hash_with_leaves(hashes: &[Vec<u8>]) -> (Fr, Vec<Fr>) {
     let tree = EdwardsMaskedMerkleTree::new(PARAMS.clone(), hashes).expect("could not create merkle tree");
-    (tree.root(), tree.leaves_hashed())
+    (tree.root(), tree.hashed_leaves())
 }
 
 impl From<Fr> for PedersenMerkleRootHash {

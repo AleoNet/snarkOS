@@ -3,7 +3,7 @@
 #![deny(non_shorthand_field_patterns, unused_attributes)]
 #![deny(renamed_and_removed_lints, unused_allocation, unused_comparisons)]
 #![deny(const_err, unused_must_use, unused_mut, private_in_public)]
-#![deny(unreachable_pub, unused_extern_crates, trivial_numeric_casts)]
+#![deny(unused_extern_crates, trivial_numeric_casts)]
 #![forbid(unsafe_code)]
 
 #[macro_use]

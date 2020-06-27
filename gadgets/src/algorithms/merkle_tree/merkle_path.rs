@@ -40,7 +40,7 @@ impl<P: MerkleParameters, HG: CRHGadget<P::H, F>, F: Field> MerklePathGadget<P, 
         leaf: impl ToBytesGadget<F>,
         should_enforce: &Boolean,
     ) -> Result<(), SynthesisError> {
-        assert_eq!(self.path.len(), P::HEIGHT - 1);
+        assert_eq!(self.path.len(), P::DEPTH);
         // Check that the hash of the given leaf matches the leaf hash in the membership
         // proof.
         let leaf_bits = leaf.to_bytes(&mut cs.ns(|| "leaf_to_bytes"))?;

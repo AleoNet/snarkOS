@@ -49,9 +49,7 @@ impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWC
                 Ok(crh_parameters)
             })?;
 
-        // According to the native tree in https://github.com/AleoHQ/snarkOS/blob/master/algorithms/src/merkle_tree/merkle_tree.rs,
-        // the tree height is calculated as ceil(log2(num_leaves)) + 1
-        let leaves_number = 2u32.pow(M::HEIGHT as u32 - 1) as usize;
+        let leaves_number = 2u32.pow(M::DEPTH as u32) as usize;
         assert!(self.leaves.len() <= leaves_number);
 
         // Initialize the leaves.
@@ -122,7 +120,7 @@ mod test {
     }
 
     // We use a small tree in this test
-    define_merkle_tree_parameters!(EdwardsMaskedMerkleParameters, PedersenCompressedCRH<Edwards, Size>, 5);
+    define_merkle_tree_parameters!(EdwardsMaskedMerkleParameters, PedersenCompressedCRH<Edwards, Size>, 4);
 
     type HashGadget = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
     type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
@@ -158,7 +156,7 @@ mod test {
         h.input(root_bytes.as_ref());
         let mask = h.result().to_vec();
 
-        let snark_leaves = tree.leaves_hashed().into_iter().map(Some).collect();
+        let snark_leaves = tree.hashed_leaves().into_iter().map(Some).collect();
         let proof = create_random_proof(
             POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
                 leaves: snark_leaves,

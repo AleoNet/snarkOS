@@ -45,138 +45,139 @@ macro_rules! impl_params {
 macro_rules! impl_params_remote {
     ($name: ident, $fname: tt, $size: tt) => {
 
-    pub struct $name;
+        pub struct $name;
 
-    impl Parameters for $name {
-        const CHECKSUM: &'static str = include_str!(concat!("params/", $fname, ".checksum"));
-        const SIZE: u64 = $size;
+        impl Parameters for $name {
+            const CHECKSUM: &'static str = include_str!(concat!("params/", $fname, ".checksum"));
+            const SIZE: u64 = $size;
 
-        fn load_bytes() -> Result<Vec<u8>, ParametersError> {
-            // Compose the correct file path for the parameter file.
-            let filename = Self::versioned_filename();
-            let mut file_path = PathBuf::from(file!());
-            file_path.pop();
-            file_path.push("params/");
-            file_path.push(&filename);
+            fn load_bytes() -> Result<Vec<u8>, ParametersError> {
+                // Compose the correct file path for the parameter file.
+                let filename = Self::versioned_filename();
+                let mut file_path = PathBuf::from(file!());
+                file_path.pop();
+                file_path.push("params/");
+                file_path.push(&filename);
 
-            // Compute the relative path.
-            let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
+                // Compute the relative path.
+                let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
 
-            // Compute the absolute path.
-            let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            absolute_path.push(&relative_path);
+                // Compute the absolute path.
+                let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                absolute_path.push(&relative_path);
 
-            let buffer = if relative_path.exists() {
-                // Attempts to load the parameter file locally with a relative path.
-                fs::read(relative_path)?.to_vec()
-            } else if absolute_path.exists() {
-                // Attempts to load the parameter file locally with an absolute path.
-                fs::read(absolute_path)?.to_vec()
-            } else {
-                // Downloads the missing parameters and stores it in the local directory for use.
-                eprintln!(
-                    "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
-                    filename, filename, file_path
-                );
-                let output = Self::load_remote()?;
-                match Self::store_bytes(&output, &relative_path, &absolute_path, &file_path) {
-                    Ok(()) => output,
-                    Err(_) => {
-                        eprintln!(
-                            "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\n",
-                            filename, file_path
-                        );
-                        output
+                let buffer = if relative_path.exists() {
+                    // Attempts to load the parameter file locally with a relative path.
+                    fs::read(relative_path)?.to_vec()
+                } else if absolute_path.exists() {
+                    // Attempts to load the parameter file locally with an absolute path.
+                    fs::read(absolute_path)?.to_vec()
+                } else {
+                    // Downloads the missing parameters and stores it in the local directory for use.
+                    eprintln!(
+                        "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
+                        filename, filename, file_path
+                    );
+                    let output = Self::load_remote()?;
+                    match Self::store_bytes(&output, &relative_path, &absolute_path, &file_path) {
+                        Ok(()) => output,
+                        Err(_) => {
+                            eprintln!(
+                                "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\n",
+                                filename, file_path
+                            );
+                            output
+                        }
                     }
+                };
+
+                let checksum = hex::encode(sha256(&buffer));
+                match Self::CHECKSUM == checksum {
+                    true => Ok(buffer),
+                    false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
                 }
-            };
+            }
+        }
 
-            let checksum = hex::encode(sha256(&buffer));
-            match Self::CHECKSUM == checksum {
-                true => Ok(buffer),
-                false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
+        impl $name {
+            #[cfg(any(test, feature = "remote"))]
+            pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
+                println!("{} - Downloading parameters...", module_path!());
+                let mut buffer = vec![];
+                let url = Self::remote_url();
+                Self::remote_fetch(&mut buffer, &url)?;
+                println!("\n{} - Download complete", module_path!());
+
+                // Verify the checksum of the remote data before returning
+                let checksum = hex::encode(sha256(&buffer));
+                match Self::CHECKSUM == checksum {
+                    true => Ok(buffer),
+                    false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
+                }
+            }
+
+            #[cfg(not(any(test, feature = "remote")))]
+            pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
+                Err(ParametersError::RemoteFetchDisabled)
+            }
+
+            fn versioned_filename() -> String {
+                match Self::CHECKSUM.get(0..7) {
+                    Some(sum) => format!("{}-{}.params", $fname, sum),
+                    _ => concat!($fname, ".params",).to_string()
+                }
+            }
+
+            #[cfg(any(test, feature = "remote"))]
+            fn remote_url() -> String {
+                format!("{}/{}", REMOTE_URL, Self::versioned_filename())
+            }
+
+            fn store_bytes(
+                buffer: &Vec<u8>,
+                relative_path: &PathBuf,
+                absolute_path: &PathBuf,
+                file_path: &PathBuf,
+            ) -> Result<(), ParametersError> {
+                println!("{} - Storing parameters ({:?})", module_path!(), file_path);
+                // Attempt to write the parameter buffer to a file.
+                if let Ok(mut file) = File::create(relative_path) {
+                    file.write_all(&buffer)?;
+                    drop(file);
+                } else if let Ok(mut file) = File::create(absolute_path) {
+                    file.write_all(&buffer)?;
+                    drop(file);
+                }
+                Ok(())
+            }
+
+            #[cfg(any(test, feature = "remote"))]
+            fn remote_fetch(buffer: &mut Vec<u8>, url: &str) -> Result<(), ParametersError> {
+                let mut easy = Easy::new();
+                easy.url(url)?;
+                easy.progress(true)?;
+                easy.progress_function(|total_download, current_download, _, _| {
+                    let percent = (current_download / total_download) * 100.0;
+                    let size_in_megabytes = total_download as u64 / 1_048_576;
+                    print!(
+                        "\r{} - {:.2}% complete ({:#} MB total)",
+                        module_path!(),
+                        percent,
+                        size_in_megabytes
+                    );
+                    true
+                })?;
+
+                let mut transfer = easy.transfer();
+                transfer.write_function(|data| {
+                    buffer.extend_from_slice(data);
+                    Ok(data.len())
+                })?;
+                Ok(transfer.perform()?)
             }
         }
     }
-
-    impl $name {
-        #[cfg(any(test, feature = "remote"))]
-        pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
-            println!("{} - Downloading parameters...", module_path!());
-            let mut buffer = vec![];
-            let url = Self::remote_url();
-            Self::remote_fetch(&mut buffer, &url)?;
-            println!("\n{} - Download complete", module_path!());
-
-            // Verify the checksum of the remote data before returning
-            let checksum = hex::encode(sha256(&buffer));
-            match Self::CHECKSUM == checksum {
-                true => Ok(buffer),
-                false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
-            }
-        }
-
-        #[cfg(not(any(test, feature = "remote")))]
-        pub fn load_remote() -> Result<Vec<u8>, ParametersError> {
-            Err(ParametersError::RemoteFetchDisabled)
-        }
-
-        fn versioned_filename() -> String {
-            match Self::CHECKSUM.get(0..7) {
-                Some(sum) => format!("{}-{}.params", $fname, sum),
-                _ => concat!($fname, ".params",).to_string()
-            }
-        }
-
-        #[cfg(any(test, feature = "remote"))]
-        fn remote_url() -> String {
-            format!("{}/{}", REMOTE_URL, Self::versioned_filename())
-        }
-
-        fn store_bytes(
-            buffer: &Vec<u8>,
-            relative_path: &PathBuf,
-            absolute_path: &PathBuf,
-            file_path: &PathBuf,
-        ) -> Result<(), ParametersError> {
-            println!("{} - Storing parameters ({:?})", module_path!(), file_path);
-            // Attempt to write the parameter buffer to a file.
-            if let Ok(mut file) = File::create(relative_path) {
-                file.write_all(&buffer)?;
-                drop(file);
-            } else if let Ok(mut file) = File::create(absolute_path) {
-                file.write_all(&buffer)?;
-                drop(file);
-            }
-            Ok(())
-        }
-
-        #[cfg(any(test, feature = "remote"))]
-        fn remote_fetch(buffer: &mut Vec<u8>, url: &str) -> Result<(), ParametersError> {
-            let mut easy = Easy::new();
-            easy.url(url)?;
-            easy.progress(true)?;
-            easy.progress_function(|total_download, current_download, _, _| {
-                let percent = (current_download / total_download) * 100.0;
-                let size_in_megabytes = total_download as u64 / 1_048_576;
-                print!(
-                    "\r{} - {:.2}% complete ({:#} MB total)",
-                    module_path!(),
-                    percent,
-                    size_in_megabytes
-                );
-                true
-            })?;
-
-            let mut transfer = easy.transfer();
-            transfer.write_function(|data| {
-                buffer.extend_from_slice(data);
-                Ok(data.len())
-            })?;
-            Ok(transfer.perform()?)
-        }
-    }
-}}
+}
 
 // Commitments
 impl_params!(
@@ -250,7 +251,7 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 545102262);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 539664038);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2523);
 
 // Outer SNARK

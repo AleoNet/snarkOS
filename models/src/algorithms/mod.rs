@@ -4,8 +4,8 @@ pub use self::commitment::*;
 pub mod crh;
 pub use self::crh::*;
 
-pub mod merkle_parameters;
-pub use self::merkle_parameters::*;
+pub mod merkle_tree;
+pub use self::merkle_tree::*;
 
 pub mod prf;
 pub use self::prf::*;

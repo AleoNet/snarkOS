@@ -12,7 +12,7 @@ use snarkos_objects::{
     pedersen_merkle_root,
     MerkleRootHash,
     PedersenMerkleRootHash,
-    MASKED_TREE_HEIGHT,
+    MASKED_TREE_DEPTH,
 };
 
 /// PoSW instantiated over BLS12-377 with GM17.
@@ -39,7 +39,7 @@ mod params {
 
 /// Subtree calculation
 pub fn txids_to_roots(transaction_ids: &[Vec<u8>]) -> (MerkleRootHash, PedersenMerkleRootHash, Vec<Vec<u8>>) {
-    let (root, subroots) = merkle_root_with_subroots(transaction_ids, MASKED_TREE_HEIGHT);
+    let (root, subroots) = merkle_root_with_subroots(transaction_ids, MASKED_TREE_DEPTH);
     let mut merkle_root_bytes = [0u8; 32];
     merkle_root_bytes[..].copy_from_slice(&root);
 
