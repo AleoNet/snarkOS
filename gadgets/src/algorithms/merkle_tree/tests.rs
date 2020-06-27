@@ -108,7 +108,7 @@ fn generate_merkle_tree<P: MerkleParameters, F: PrimeField, HG: CRHGadget<P::H, 
     assert!(satisfied);
 }
 
-mod compressed_pedersen {
+mod merkle_tree_compressed_pedersen_crh {
     use super::*;
 
     define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
@@ -209,7 +209,7 @@ mod compressed_pedersen {
     }
 }
 
-mod bowe_hopwood_pedersen {
+mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
     use super::*;
 
     define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
@@ -217,6 +217,7 @@ mod bowe_hopwood_pedersen {
     type H = BoweHopwoodPedersenCompressedCRH<Edwards, BoweHopwoodSize>;
     type HG = BoweHopwoodPedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
+    // TODO (raychu86) Fix merkle proofs for BoweHopwoodCRH
     #[test]
     fn good_root_test() {
         let mut leaves = Vec::new();
