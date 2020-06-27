@@ -201,3 +201,10 @@ pub struct CreateRawTransactionOuput {
     pub encoded_transaction: String,
     pub encoded_records: Vec<String>,
 }
+
+/// Output for the `generateaccount` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RpcAccount {
+    pub private_key: String,
+    pub public_key: String,
+}
