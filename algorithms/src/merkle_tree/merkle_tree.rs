@@ -108,7 +108,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
     }
 
     #[inline]
-    pub fn leaves_hashed(&self) -> Vec<<P::H as CRH>::Output> {
+    pub fn hashed_leaves(&self) -> Vec<<P::H as CRH>::Output> {
         self.hashed_leaves.clone()
     }
 

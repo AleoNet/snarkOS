@@ -103,7 +103,7 @@ fn generate_masked_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
 
     let mut cs = TestConstraintSystem::<Fq>::new();
     let leaf_gadgets = tree
-        .leaves_hashed()
+        .hashed_leaves()
         .iter()
         .enumerate()
         .map(|(i, l)| <HG as CRHGadget<H, Fq>>::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || Ok(l)))
