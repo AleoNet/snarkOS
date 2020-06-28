@@ -51,7 +51,11 @@ impl RpcImpl {
 
         let val: TransactionInputs = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonrpcError::invalid_params(format!("Invalid params: {}.", e)))?;
-        Ok(serde_json::to_value(self.create_raw_transaction(val).unwrap()).unwrap())
+
+        match self.create_raw_transaction(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
+            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
+        }
     }
 
     /// Wrap authentication around `fetch_record_commitments`
@@ -60,7 +64,10 @@ impl RpcImpl {
 
         params.expect_no_params()?;
 
-        Ok(Value::from(self.fetch_record_commitments().unwrap()))
+        match self.fetch_record_commitments() {
+            Ok(record_commitments) => Ok(Value::from(record_commitments)),
+            Err(_) => Err(JsonrpcError::invalid_request()),
+        }
     }
 
     /// Wrap authentication around `get_raw_record`
@@ -81,7 +88,11 @@ impl RpcImpl {
 
         let record_commitment: String = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonrpcError::invalid_params(format!("Invalid params: {}.", e)))?;
-        Ok(Value::from(self.get_raw_record(record_commitment).unwrap()))
+
+        match self.get_raw_record(record_commitment) {
+            Ok(record) => Ok(Value::from(record)),
+            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
+        }
     }
 
     /// Wrap authentication around `generate_account`
@@ -107,10 +118,8 @@ impl RpcImpl {
             }
         };
 
-        let account_result = self.generate_account(metadata);
-
-        match account_result {
-            Ok(account) => Ok(serde_json::to_value(account).unwrap()),
+        match self.generate_account(metadata) {
+            Ok(account) => Ok(serde_json::to_value(account).expect("account serialization failed")),
             Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
         }
     }
