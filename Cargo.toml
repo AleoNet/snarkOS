@@ -30,6 +30,7 @@ members = [
     "rpc",
     "storage",
     "testing",
+    "toolkit",
     "utilities"
 ]
 
