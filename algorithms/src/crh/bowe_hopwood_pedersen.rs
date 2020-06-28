@@ -34,7 +34,7 @@ macro_rules! cfg_reduce {
         let result = $e.reduce($default, $op);
 
         #[cfg(not(feature = "pedersen-parallel"))]
-        let result = $e.fold($default, $op);
+        let result = $e.fold($default(), $op);
 
         result
     }};
