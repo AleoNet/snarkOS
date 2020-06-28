@@ -1,8 +1,13 @@
 use crate::{
-    algorithms::crh::{BoweHopwoodPedersenCRHGadget, PedersenCRHGadget, PedersenCRHParametersGadget},
+    algorithms::crh::{
+        BoweHopwoodPedersenCRHGadget,
+        BoweHopwoodPedersenCompressedCRHGadget,
+        PedersenCRHGadget,
+        PedersenCRHParametersGadget,
+    },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_algorithms::crh::{BoweHopwoodPedersenCRH, PedersenCRH, PedersenSize};
+use snarkos_algorithms::crh::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenCompressedCRH, PedersenCRH, PedersenSize};
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective};
 use snarkos_models::{
     algorithms::CRH,
@@ -10,7 +15,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, uint::UInt8},
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
 };
 
@@ -21,6 +26,10 @@ type TestCRHGadget = PedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
 type TestBoweHopwoodCRH = BoweHopwoodPedersenCRH<EdwardsProjective, BoweHopwoodSize>;
 type TestBoweHopwoodCRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
+
+type TestBoweHopwoodCompressedCRH = BoweHopwoodPedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>;
+type TestBoweHopwoodCompressedCRHGadget =
+    BoweHopwoodPedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Size;
@@ -111,7 +120,7 @@ fn bowe_hopwood_crh_primitive_gadget_test() {
     println!("number of constraints for input: {}", cs.num_constraints());
 
     let crh = TestBoweHopwoodCRH::setup(rng);
-    let primitive_result = crh.hash(&input).unwrap();
+    let native_result = crh.hash(&input).unwrap();
 
     let gadget_parameters = <TestBoweHopwoodCRHGadget as CRHGadget<TestBoweHopwoodCRH, Fr>>::ParametersGadget::alloc(
         &mut cs.ns(|| "gadget_parameters"),
@@ -129,8 +138,55 @@ fn bowe_hopwood_crh_primitive_gadget_test() {
 
     println!("number of constraints total: {}", cs.num_constraints());
 
-    let primitive_result = primitive_result.into_affine();
-    assert_eq!(primitive_result.x, gadget_result.x.value.unwrap());
-    assert_eq!(primitive_result.y, gadget_result.y.value.unwrap());
+    let native_result = native_result.into_affine();
+    assert_eq!(native_result.x, gadget_result.x.value.unwrap());
+    assert_eq!(native_result.y, gadget_result.y.value.unwrap());
+    assert!(cs.is_satisfied());
+}
+
+#[test]
+fn bowe_hopwood_compressed_crh_primitive_gadget_test() {
+    let rng = &mut thread_rng();
+    let mut cs = TestConstraintSystem::<Fr>::new();
+
+    let (input, input_bytes, _) = generate_input(&mut cs, rng);
+    println!("number of constraints for input: {}", cs.num_constraints());
+
+    let crh = TestBoweHopwoodCompressedCRH::setup(rng);
+    let native_result = crh.hash(&input).unwrap();
+
+    let gadget_parameters =
+        <TestBoweHopwoodCompressedCRHGadget as CRHGadget<TestBoweHopwoodCompressedCRH, Fr>>::ParametersGadget::alloc(
+            &mut cs.ns(|| "gadget_parameters"),
+            || Ok(&crh.parameters),
+        )
+        .unwrap();
+    println!("number of constraints for input + params: {}", cs.num_constraints());
+
+    let gadget_result =
+        <TestBoweHopwoodCompressedCRHGadget as CRHGadget<TestBoweHopwoodCompressedCRH, Fr>>::check_evaluation_gadget(
+            &mut cs.ns(|| "gadget_evaluation"),
+            &gadget_parameters,
+            &input_bytes,
+        )
+        .unwrap();
+
+    println!("number of constraints total: {}", cs.num_constraints());
+
+    let native_result_gadget =
+        <TestBoweHopwoodCompressedCRHGadget as CRHGadget<TestBoweHopwoodCompressedCRH, Fr>>::OutputGadget::alloc(
+            &mut cs.ns(|| "native_result"),
+            || Ok(&native_result),
+        )
+        .unwrap();
+
+    native_result_gadget
+        .enforce_equal(
+            &mut cs.ns(|| "Check that computed crh matches provided output"),
+            &gadget_result,
+        )
+        .unwrap();
+
+    assert_eq!(native_result, gadget_result.value.unwrap());
     assert!(cs.is_satisfied());
 }
