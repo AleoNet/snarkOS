@@ -212,14 +212,14 @@ mod protected_rpc_tests {
     }
 
     #[test]
-    fn test_generate_account() {
+    fn test_create_new_account() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let parameters = load_verifying_parameters();
         let mut rng = FIXTURE_VK.rng.clone();
         let meta = authentication();
         let rpc = initialize_test_rpc(&storage, parameters);
 
-        let method = "generateaccount".to_string();
+        let method = "createnewaccount".to_string();
         let metadata: [u8; 32] = rng.gen();
         let params = hex::encode(metadata);
 
