@@ -1,10 +1,9 @@
 ---
 name: "\U0001F680 Feature request"
-about: Suggest a new feature in snarkOS
+about: Submit a new feature request 💡
 title: "[Feature Request]"
 labels: feature
 assignees: ''
-
 ---
 
 ## 🚀 Describe the Feature
@@ -13,25 +12,22 @@ assignees: ''
 
 ## Motivation
 
+**Is the feature request related to a problem? If so, please describe.**
 
-**What are you trying to do and how would you want to do it differently?**
+<!-- A clear and concise description of what the problem is.
+     Please link to any relevant issues or other PRs! -->
 
-**Is this something that currently cannot do?**
-
-**Is your feature request related to a problem? Please describe.**
-
-<!-- A clear and concise description of what the problem is. -->
-<!-- Please link to any relevant issues or other PRs! -->
+**Is this something that currently cannot be done?**
 
 ## Solution
 
-**Describe the solution you'd like**
 <!-- A clear and concise description of what you want to happen. -->
 
-**Describe alternatives you've considered**
-<!-- A clear and concise description of any alternative solutions or features you've considered. -->
-
 **Are you willing to open a pull request?** (See [CONTRIBUTING](../../CONTRIBUTING.md))
+
+## Alternative Solutions
+
+<!-- A clear and concise description of any alternative solutions or features you've considered. -->
 
 ## Relevant Context
 

@@ -1,6 +1,6 @@
 ---
 name: "\U0001F41B Bug report"
-about: Create a bug report for snarkOS
+about: Create a bug report if something isn't working 🔧
 title: "[Bug]"
 labels: bug
 assignees: ''
