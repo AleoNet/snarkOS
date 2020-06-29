@@ -96,7 +96,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `generate_account`
-    pub fn create_new_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
+    pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -118,7 +118,7 @@ impl RpcImpl {
             }
         };
 
-        match self.create_new_account(metadata) {
+        match self.create_account(metadata) {
             Ok(account) => Ok(serde_json::to_value(account).expect("account serialization failed")),
             Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
         }
@@ -131,7 +131,7 @@ impl RpcImpl {
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
         d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
         d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
-        d.add_method_with_meta("createnewaccount", Self::create_new_account_protected);
+        d.add_method_with_meta("createaccount", Self::create_account_protected);
 
         io.extend_with(d)
     }
@@ -295,7 +295,7 @@ impl ProtectedRpcFunctions for RpcImpl {
     }
 
     /// Generate a new account with optional metadata
-    fn create_new_account(&self, metadata: Option<String>) -> Result<RpcAccount, RpcError> {
+    fn create_account(&self, metadata: Option<String>) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
 
         let metadata: [u8; 32] = match metadata {
