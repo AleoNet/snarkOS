@@ -119,8 +119,19 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
             );
         }
 
-        let mut padded_input = Vec::with_capacity(input.len());
-        let input = bytes_to_bits(input);
+        // Pad the input if it is not the current length.
+        let mut input_bytes = input;
+        let mut padded_input_bytes = vec![];
+        if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
+            padded_input_bytes.extend_from_slice(input_bytes);
+            for _ in input.len()..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
+                padded_input_bytes.push(0u8);
+            }
+            input_bytes = padded_input_bytes.as_slice();
+        }
+
+        let mut padded_input = Vec::with_capacity(input_bytes.len());
+        let input = bytes_to_bits(input_bytes);
         // Pad the input if it is not the current length.
         padded_input.extend_from_slice(&input);
         if input.len() % BOWE_HOPWOOD_CHUNK_SIZE != 0 {

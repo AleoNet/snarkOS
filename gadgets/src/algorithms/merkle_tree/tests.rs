@@ -36,7 +36,7 @@ impl PedersenSize for Size {
 pub struct BoweHopwoodSize;
 impl PedersenSize for BoweHopwoodSize {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 63;
+    const WINDOW_SIZE: usize = 60;
 }
 
 fn generate_merkle_tree<P: MerkleParameters, F: PrimeField, HG: CRHGadget<P::H, F>>(
@@ -217,7 +217,6 @@ mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
     type H = BoweHopwoodPedersenCompressedCRH<Edwards, BoweHopwoodSize>;
     type HG = BoweHopwoodPedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
 
-    // TODO (raychu86) Fix merkle proofs for Bowe-Hopwood CRH
     #[test]
     fn good_root_test() {
         let mut leaves = Vec::new();
