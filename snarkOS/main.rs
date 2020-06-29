@@ -4,6 +4,7 @@ extern crate log;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
+    display::render_init,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
@@ -33,6 +34,8 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     if !config.quiet {
         std::env::set_var("RUST_LOG", "info");
         env_logger::init();
+
+        println!("{}", render_init(&config.miner_address));
     }
 
     let address = format! {"{}:{}", config.ip, config.port};
