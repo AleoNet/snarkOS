@@ -6,7 +6,7 @@ labels: bug
 assignees: ''
 ---
 
-## 🐛 Bug Summary
+## 🐛 Describe the Bug
 
 <!-- A clear and concise description of what the bug is.
 To report a security issue, please email security@aleo.org. -->
@@ -15,8 +15,7 @@ To report a security issue, please email security@aleo.org. -->
 
 **Code snippet to reproduce**
 ```rust
-# Your code goes here
-# Please make sure it does not require any external dependencies
+# Add code here
 ```
 
 **Stack trace & error message**
