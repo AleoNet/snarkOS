@@ -8,6 +8,7 @@ mod protected_rpc_tests {
     };
     use snarkos_models::dpc::Record;
     use snarkos_network::Context;
+    use snarkos_objects::{AccountPrivateKey, AccountPublicKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
@@ -16,8 +17,9 @@ mod protected_rpc_tests {
     };
 
     use jsonrpc_core::MetaIoHandler;
+    use rand::Rng;
     use serde_json::Value;
-    use std::sync::Arc;
+    use std::{str::FromStr, sync::Arc};
     use tokio::sync::Mutex;
 
     const TEST_USERNAME: &str = "TEST_USERNAME";
@@ -206,6 +208,49 @@ mod protected_rpc_tests {
         let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
 
         drop(io);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_create_account() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let parameters = load_verifying_parameters();
+        let mut rng = FIXTURE_VK.rng.clone();
+        let meta = authentication();
+        let rpc = initialize_test_rpc(&storage, parameters);
+
+        let method = "createaccount".to_string();
+        let metadata: [u8; 32] = rng.gen();
+        let params = hex::encode(metadata);
+
+        // Request without specified metadata
+        let request_without_metadata = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
+        let response = rpc
+            .handle_request_sync(&request_without_metadata, meta.clone())
+            .unwrap();
+
+        let extracted: Value = serde_json::from_str(&response).unwrap();
+
+        let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
+
+        let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
+        let _public_key = AccountPublicKey::<Components>::from_str(&account.public_key).unwrap();
+
+        // Request with specified metadata
+        let request_with_metadata = format!(
+            "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [\"{}\"] }}",
+            method, params
+        );
+        let response = rpc.handle_request_sync(&request_with_metadata, meta).unwrap();
+
+        let extracted: Value = serde_json::from_str(&response).unwrap();
+
+        let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
+
+        let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
+        let _public_key = AccountPublicKey::<Components>::from_str(&account.public_key).unwrap();
+
+        drop(rpc);
         kill_storage_sync(storage);
     }
 }

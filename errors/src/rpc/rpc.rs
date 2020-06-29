@@ -32,6 +32,9 @@ pub enum RpcError {
     #[error("invalid block hash: {}", _0)]
     InvalidBlockHash(String),
 
+    #[error("invalid metadata: {}", _0)]
+    InvalidMetadata(String),
+
     #[error("{}", _0)]
     Message(String),
 

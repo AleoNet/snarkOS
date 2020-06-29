@@ -54,4 +54,7 @@ pub trait ProtectedRpcFunctions {
 
     /// Returns hex encoded bytes of a record from its record commitment
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
+
+    /// Generate a new account with optional metadata
+    fn create_account(&self, metadata: Option<String>) -> Result<RpcAccount, RpcError>;
 }
