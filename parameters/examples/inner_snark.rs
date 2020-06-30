@@ -16,13 +16,11 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use hex;
 use rand::thread_rng;
-use std::{
-    fs::{self, File},
-    io::{Result as IoResult, Write},
-    path::PathBuf,
-};
+use std::path::PathBuf;
+
+mod utils;
+use utils::store;
 
 pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let rng = &mut thread_rng();
@@ -51,17 +49,6 @@ fn versioned_filename(checksum: &str) -> String {
         Some(sum) => format!("inner_snark_pk-{}.params", sum),
         _ => format!("inner_snark_pk.params"),
     }
-}
-
-fn store(file_path: &PathBuf, checksum_path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
-    // Save checksum to file
-    fs::write(checksum_path, hex::encode(sha256(bytes)))?;
-
-    // Save buffer to file
-    let mut file = File::create(file_path)?;
-    file.write_all(&bytes)?;
-    drop(file);
-    Ok(())
 }
 
 pub fn main() {
