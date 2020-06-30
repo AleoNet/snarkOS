@@ -1,27 +1,29 @@
 use crate::{
     algorithms::{
-        crh::{BoweHopwoodPedersenCompressedCRHGadget, PedersenCompressedCRHGadget},
+        crh::{BoweHopwoodPedersenCompressedCRHGadget, PedersenCRHGadget, PedersenCompressedCRHGadget},
         merkle_tree::*,
     },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
 use snarkos_algorithms::{
-    crh::{BoweHopwoodPedersenCompressedCRH, PedersenCompressedCRH, PedersenSize},
+    crh::{BoweHopwoodPedersenCompressedCRH, PedersenCRH, PedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
     merkle_tree::MerkleTree,
 };
-use snarkos_curves::edwards_bls12::{EdwardsProjective as Edwards, Fq};
+use snarkos_curves::{
+    bls12_377::Fr,
+    edwards_bls12::{EdwardsAffine, EdwardsProjective},
+};
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH},
     curves::PrimeField,
     gadgets::{
-        algorithms::CRHGadget,
-        curves::field::FieldGadget,
+        algorithms::{CRHGadget, MaskedCRHGadget},
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, uint::UInt8},
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
 };
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::ToBytes;
 
 use blake2::{digest::Digest, Blake2s};
 
@@ -35,7 +37,7 @@ impl PedersenSize for Size {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BoweHopwoodSize;
 impl PedersenSize for BoweHopwoodSize {
-    const NUM_WINDOWS: usize = 8;
+    const NUM_WINDOWS: usize = 32;
     const WINDOW_SIZE: usize = 60;
 }
 
@@ -108,63 +110,75 @@ fn generate_merkle_tree<P: MerkleParameters, F: PrimeField, HG: CRHGadget<P::H, 
     assert!(satisfied);
 }
 
-mod merkle_tree_compressed_pedersen_crh {
+fn generate_masked_merkle_tree<P: MerkleParameters, F: PrimeField, HG: MaskedCRHGadget<P::H, F>>(
+    leaves: &[[u8; 30]],
+    use_bad_root: bool,
+) -> () {
+    let parameters = P::default();
+    let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
+    let root = tree.root();
+
+    let mut cs = TestConstraintSystem::<F>::new();
+    let leaf_gadgets = tree
+        .hashed_leaves()
+        .iter()
+        .enumerate()
+        .map(|(i, l)| <HG as CRHGadget<_, _>>::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || Ok(l)))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    let nonce: [u8; 4] = rand::random();
+    let mut root_bytes = [0u8; 32];
+    root.write(&mut root_bytes[..]).unwrap();
+
+    let mut h = Blake2s::new();
+    h.input(nonce.as_ref());
+    h.input(&root_bytes);
+    let mask = h.result().to_vec();
+    let mask_bytes = UInt8::alloc_vec(cs.ns(|| "mask"), &mask).unwrap();
+
+    let crh_parameters = <HG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
+        Ok(parameters.parameters())
+    })
+    .unwrap();
+
+    let computed_root = compute_root::<_, HG, _, _, _>(
+        cs.ns(|| "compute masked root"),
+        &crh_parameters,
+        &mask_bytes,
+        &leaf_gadgets,
+    )
+    .unwrap();
+
+    let given_root = if use_bad_root {
+        <P::H as CRH>::Output::default()
+    } else {
+        root
+    };
+
+    let given_root_gadget =
+        <HG as CRHGadget<_, _>>::OutputGadget::alloc(&mut cs.ns(|| "given root"), || Ok(given_root)).unwrap();
+
+    computed_root
+        .enforce_equal(
+            &mut cs.ns(|| "Check that computed root matches provided root"),
+            &given_root_gadget,
+        )
+        .unwrap();
+
+    if !cs.is_satisfied() {
+        println!("Unsatisfied constraint: {}", cs.which_is_unsatisfied().unwrap());
+    }
+    assert!(cs.is_satisfied());
+}
+
+mod merkle_tree_pedersen_crh_on_affine {
     use super::*;
 
     define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
 
-    type EdwardsMerkleTree = MerkleTree<EdwardsMerkleParameters>;
-    type H = PedersenCompressedCRH<Edwards, Size>;
-    type HG = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
-
-    fn generate_masked_merkle_tree(leaves: &[[u8; 30]], use_bad_root: bool) -> () {
-        let parameters = EdwardsMerkleParameters::default();
-        let tree = EdwardsMerkleTree::new(parameters.clone(), leaves).unwrap();
-        let root = tree.root();
-
-        let mut cs = TestConstraintSystem::<Fq>::new();
-        let leaf_gadgets = tree
-            .hashed_leaves()
-            .iter()
-            .enumerate()
-            .map(|(i, l)| <HG as CRHGadget<H, Fq>>::OutputGadget::alloc(cs.ns(|| format!("leaf {}", i)), || Ok(l)))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-
-        let nonce: [u8; 4] = rand::random();
-        let mut root_bytes = [0u8; 32];
-        root.write(&mut root_bytes[..]).unwrap();
-
-        let mut h = Blake2s::new();
-        h.input(nonce.as_ref());
-        h.input(root_bytes.as_ref());
-        let mask = h.result().to_vec();
-        let mask_bytes = UInt8::alloc_vec(cs.ns(|| "mask"), &mask).unwrap();
-
-        let crh_parameters = <HG as CRHGadget<H, Fq>>::ParametersGadget::alloc(&mut cs.ns(|| "new_parameters"), || {
-            Ok(parameters.parameters())
-        })
-        .unwrap();
-
-        let computed_root = compute_root::<H, HG, _, _, _>(
-            cs.ns(|| "compute masked root"),
-            &crh_parameters,
-            &mask_bytes,
-            &leaf_gadgets,
-        )
-        .unwrap();
-
-        if !cs.is_satisfied() {
-            println!("Unsatisfied constraint: {}", cs.which_is_unsatisfied().unwrap());
-        }
-        assert!(cs.is_satisfied());
-        let given_root = if use_bad_root {
-            <H as CRH>::Output::default()
-        } else {
-            root
-        };
-        assert_eq!(given_root, computed_root.get_value().unwrap());
-    }
+    type H = PedersenCRH<EdwardsAffine, Size>;
+    type HG = PedersenCRHGadget<EdwardsAffine, Fr, EdwardsBlsGadget>;
 
     #[test]
     fn good_root_test() {
@@ -173,7 +187,7 @@ mod merkle_tree_compressed_pedersen_crh {
             let input = [i; 30];
             leaves.push(input);
         }
-        generate_merkle_tree::<EdwardsMerkleParameters, Fq, HG>(&leaves, false);
+        generate_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, false);
     }
 
     #[should_panic]
@@ -184,7 +198,37 @@ mod merkle_tree_compressed_pedersen_crh {
             let input = [i; 30];
             leaves.push(input);
         }
-        generate_merkle_tree::<EdwardsMerkleParameters, Fq, HG>(&leaves, true);
+        generate_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, true);
+    }
+}
+
+mod merkle_tree_compressed_pedersen_crh_on_projective {
+    use super::*;
+
+    define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+
+    type H = PedersenCompressedCRH<EdwardsProjective, Size>;
+    type HG = PedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
+
+    #[test]
+    fn good_root_test() {
+        let mut leaves = Vec::new();
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
+            let input = [i; 30];
+            leaves.push(input);
+        }
+        generate_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, false);
+    }
+
+    #[should_panic]
+    #[test]
+    fn bad_root_test() {
+        let mut leaves = Vec::new();
+        for i in 0..1 << EdwardsMerkleParameters::DEPTH {
+            let input = [i; 30];
+            leaves.push(input);
+        }
+        generate_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, true);
     }
 
     #[test]
@@ -194,7 +238,7 @@ mod merkle_tree_compressed_pedersen_crh {
             let input = [i; 30];
             leaves.push(input);
         }
-        generate_masked_merkle_tree(&leaves, false);
+        generate_masked_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, false);
     }
 
     #[should_panic]
@@ -205,17 +249,17 @@ mod merkle_tree_compressed_pedersen_crh {
             let input = [i; 30];
             leaves.push(input);
         }
-        generate_masked_merkle_tree(&leaves, true);
+        generate_masked_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, true);
     }
 }
 
-mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
+mod merkle_tree_bowe_hopwood_pedersen_compressed_crh_on_projective {
     use super::*;
 
     define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
 
-    type H = BoweHopwoodPedersenCompressedCRH<Edwards, BoweHopwoodSize>;
-    type HG = BoweHopwoodPedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
+    type H = BoweHopwoodPedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>;
+    type HG = BoweHopwoodPedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
     #[test]
     fn good_root_test() {
@@ -224,7 +268,7 @@ mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
             let input = [i; 30];
             leaves.push(input);
         }
-        generate_merkle_tree::<EdwardsMerkleParameters, Fq, HG>(&leaves, false);
+        generate_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, false);
     }
 
     #[should_panic]
@@ -235,6 +279,6 @@ mod merkle_tree_compressed_bowe_hopwood_pedersen_crh {
             let input = [i; 30];
             leaves.push(input);
         }
-        generate_merkle_tree::<EdwardsMerkleParameters, Fq, HG>(&leaves, true);
+        generate_merkle_tree::<EdwardsMerkleParameters, Fr, HG>(&leaves, true);
     }
 }
