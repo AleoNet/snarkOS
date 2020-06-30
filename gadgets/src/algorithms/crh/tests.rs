@@ -3,15 +3,24 @@ use crate::{
         BoweHopwoodPedersenCRHGadget,
         BoweHopwoodPedersenCompressedCRHGadget,
         PedersenCRHGadget,
-        PedersenCRHParametersGadget,
+        PedersenCompressedCRHGadget,
     },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_algorithms::crh::{BoweHopwoodPedersenCRH, BoweHopwoodPedersenCompressedCRH, PedersenCRH, PedersenSize};
-use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective};
+use snarkos_algorithms::crh::{
+    BoweHopwoodPedersenCRH,
+    BoweHopwoodPedersenCompressedCRH,
+    PedersenCRH,
+    PedersenCompressedCRH,
+    PedersenSize,
+};
+use snarkos_curves::{
+    bls12_377::Fr,
+    edwards_bls12::{EdwardsAffine, EdwardsProjective},
+};
 use snarkos_models::{
     algorithms::CRH,
-    curves::ProjectiveCurve,
+    curves::{Field, PrimeField},
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         r1cs::{ConstraintSystem, TestConstraintSystem},
@@ -20,16 +29,6 @@ use snarkos_models::{
 };
 
 use rand::{thread_rng, Rng};
-
-type TestCRH = PedersenCRH<EdwardsProjective, Size>;
-type TestCRHGadget = PedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
-
-type TestBoweHopwoodCRH = BoweHopwoodPedersenCRH<EdwardsProjective, BoweHopwoodSize>;
-type TestBoweHopwoodCRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
-
-type TestBoweHopwoodCompressedCRH = BoweHopwoodPedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>;
-type TestBoweHopwoodCompressedCRHGadget =
-    BoweHopwoodPedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Size;
@@ -44,10 +43,13 @@ pub(super) struct BoweHopwoodSize;
 
 impl PedersenSize for BoweHopwoodSize {
     const NUM_WINDOWS: usize = 32;
-    const WINDOW_SIZE: usize = 32;
+    const WINDOW_SIZE: usize = 48;
 }
 
-fn generate_input<CS: ConstraintSystem<Fr>, R: Rng>(mut cs: CS, rng: &mut R) -> ([u8; 128], Vec<UInt8>, Vec<UInt8>) {
+fn generate_input<F: Field, CS: ConstraintSystem<F>, R: Rng>(
+    mut cs: CS,
+    rng: &mut R,
+) -> ([u8; 128], Vec<UInt8>, Vec<UInt8>) {
     let mut input = [1u8; 128];
     rng.fill_bytes(&mut input);
     let mut mask = [1u8; 128];
@@ -68,32 +70,59 @@ fn generate_input<CS: ConstraintSystem<Fr>, R: Rng>(mut cs: CS, rng: &mut R) -> 
     (input, input_bytes, mask_bytes)
 }
 
-#[test]
-fn pedersen_crh_primitive_gadget_test() {
+fn primitive_crh_gadget_test<F: Field, H: CRH, CG: CRHGadget<H, F>>() {
     let rng = &mut thread_rng();
-    let mut cs = TestConstraintSystem::<Fr>::new();
+    let mut cs = TestConstraintSystem::<F>::new();
 
-    let (input, input_bytes, mask_bytes) = generate_input(&mut cs, rng);
+    let (input, input_bytes, _mask_bytes) = generate_input(&mut cs, rng);
     println!("number of constraints for input: {}", cs.num_constraints());
 
-    let crh = TestCRH::setup(rng);
+    let crh = H::setup(rng);
     let native_result = crh.hash(&input).unwrap();
 
-    let parameters_gadget: PedersenCRHParametersGadget<EdwardsProjective, Size, Fr, EdwardsBlsGadget> =
-        <TestCRHGadget as CRHGadget<TestCRH, Fr>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || {
-            Ok(&crh.parameters)
-        })
-        .unwrap();
+    let parameters_gadget =
+        <CG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || Ok(crh.parameters()))
+            .unwrap();
     println!("number of constraints for input + params: {}", cs.num_constraints());
 
-    let output_gadget = <TestCRHGadget as CRHGadget<TestCRH, Fr>>::check_evaluation_gadget(
+    let output_gadget = <CG as CRHGadget<_, _>>::check_evaluation_gadget(
         &mut cs.ns(|| "gadget_evaluation"),
         &parameters_gadget,
         &input_bytes,
     )
     .unwrap();
 
-    let masked_output_gadget = <TestCRHGadget as MaskedCRHGadget<TestCRH, Fr>>::check_evaluation_gadget_masked(
+    println!("number of constraints total: {}", cs.num_constraints());
+
+    let native_result_gadget =
+        <CG as CRHGadget<_, _>>::OutputGadget::alloc(&mut cs.ns(|| "native_result"), || Ok(&native_result)).unwrap();
+
+    output_gadget
+        .enforce_equal(
+            &mut cs.ns(|| "Check that computed crh matches provided output"),
+            &native_result_gadget,
+        )
+        .unwrap();
+
+    assert!(cs.is_satisfied());
+}
+
+fn masked_crh_gadget_test<F: PrimeField, H: CRH, CG: MaskedCRHGadget<H, F>>() {
+    let rng = &mut thread_rng();
+    let mut cs = TestConstraintSystem::<F>::new();
+
+    let (input, input_bytes, mask_bytes) = generate_input(&mut cs, rng);
+    println!("number of constraints for input: {}", cs.num_constraints());
+
+    let crh = H::setup(rng);
+    let native_result = crh.hash(&input).unwrap();
+
+    let parameters_gadget =
+        <CG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || Ok(crh.parameters()))
+            .unwrap();
+    println!("number of constraints for input + params: {}", cs.num_constraints());
+
+    let masked_output_gadget = <CG as MaskedCRHGadget<_, _>>::check_evaluation_gadget_masked(
         &mut cs.ns(|| "masked_gadget_evaluation"),
         &parameters_gadget,
         &input_bytes,
@@ -103,90 +132,87 @@ fn pedersen_crh_primitive_gadget_test() {
 
     println!("number of constraints total: {}", cs.num_constraints());
 
-    let native_result = native_result.into_affine();
-    assert_eq!(native_result.x, output_gadget.x.value.unwrap());
-    assert_eq!(native_result.y, output_gadget.y.value.unwrap());
-    assert_eq!(native_result.x, masked_output_gadget.x.value.unwrap());
-    assert_eq!(native_result.y, masked_output_gadget.y.value.unwrap());
-    assert!(cs.is_satisfied());
-}
-
-#[test]
-fn bowe_hopwood_crh_primitive_gadget_test() {
-    let rng = &mut thread_rng();
-    let mut cs = TestConstraintSystem::<Fr>::new();
-
-    let (input, input_bytes, _) = generate_input(&mut cs, rng);
-    println!("number of constraints for input: {}", cs.num_constraints());
-
-    let crh = TestBoweHopwoodCRH::setup(rng);
-    let native_result = crh.hash(&input).unwrap();
-
-    let gadget_parameters = <TestBoweHopwoodCRHGadget as CRHGadget<TestBoweHopwoodCRH, Fr>>::ParametersGadget::alloc(
-        &mut cs.ns(|| "gadget_parameters"),
-        || Ok(&crh.parameters),
-    )
-    .unwrap();
-    println!("number of constraints for input + params: {}", cs.num_constraints());
-
-    let gadget_result = <TestBoweHopwoodCRHGadget as CRHGadget<TestBoweHopwoodCRH, Fr>>::check_evaluation_gadget(
-        &mut cs.ns(|| "gadget_evaluation"),
-        &gadget_parameters,
-        &input_bytes,
-    )
-    .unwrap();
-
-    println!("number of constraints total: {}", cs.num_constraints());
-
-    let native_result = native_result.into_affine();
-    assert_eq!(native_result.x, gadget_result.x.value.unwrap());
-    assert_eq!(native_result.y, gadget_result.y.value.unwrap());
-    assert!(cs.is_satisfied());
-}
-
-#[test]
-fn bowe_hopwood_compressed_crh_primitive_gadget_test() {
-    let rng = &mut thread_rng();
-    let mut cs = TestConstraintSystem::<Fr>::new();
-
-    let (input, input_bytes, _) = generate_input(&mut cs, rng);
-    println!("number of constraints for input: {}", cs.num_constraints());
-
-    let crh = TestBoweHopwoodCompressedCRH::setup(rng);
-    let native_result = crh.hash(&input).unwrap();
-
-    let gadget_parameters =
-        <TestBoweHopwoodCompressedCRHGadget as CRHGadget<TestBoweHopwoodCompressedCRH, Fr>>::ParametersGadget::alloc(
-            &mut cs.ns(|| "gadget_parameters"),
-            || Ok(&crh.parameters),
-        )
-        .unwrap();
-    println!("number of constraints for input + params: {}", cs.num_constraints());
-
-    let gadget_result =
-        <TestBoweHopwoodCompressedCRHGadget as CRHGadget<TestBoweHopwoodCompressedCRH, Fr>>::check_evaluation_gadget(
-            &mut cs.ns(|| "gadget_evaluation"),
-            &gadget_parameters,
-            &input_bytes,
-        )
-        .unwrap();
-
-    println!("number of constraints total: {}", cs.num_constraints());
-
     let native_result_gadget =
-        <TestBoweHopwoodCompressedCRHGadget as CRHGadget<TestBoweHopwoodCompressedCRH, Fr>>::OutputGadget::alloc(
-            &mut cs.ns(|| "native_result"),
-            || Ok(&native_result),
-        )
-        .unwrap();
+        <CG as CRHGadget<_, _>>::OutputGadget::alloc(&mut cs.ns(|| "native_result"), || Ok(&native_result)).unwrap();
 
-    native_result_gadget
+    masked_output_gadget
         .enforce_equal(
             &mut cs.ns(|| "Check that computed crh matches provided output"),
-            &gadget_result,
+            &native_result_gadget,
         )
         .unwrap();
 
-    assert_eq!(native_result, gadget_result.value.unwrap());
     assert!(cs.is_satisfied());
+}
+
+mod pedersen_crh_gadget_on_projective {
+    use super::*;
+
+    type TestCRH = PedersenCRH<EdwardsProjective, Size>;
+    type TestCRHGadget = PedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
+
+    #[test]
+    fn primitive_gadget_test() {
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
+
+    #[test]
+    fn masked_gadget_test() {
+        masked_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
+}
+
+mod pedersen_crh_gadget_on_affine {
+    use super::*;
+
+    type TestCRH = PedersenCRH<EdwardsAffine, Size>;
+    type TestCRHGadget = PedersenCRHGadget<EdwardsAffine, Fr, EdwardsBlsGadget>;
+
+    #[test]
+    fn primitive_gadget_test() {
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
+}
+
+mod pedersen_compressed_crh_gadget_on_projective {
+    use super::*;
+
+    type TestCRH = PedersenCompressedCRH<EdwardsProjective, Size>;
+    type TestCRHGadget = PedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
+
+    #[test]
+    fn primitive_gadget_test() {
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
+
+    #[test]
+    fn masked_gadget_test() {
+        masked_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
+}
+
+// Note: Bowe-Hopwood CRH Gadget currently does not support affine curves or masked crh
+
+mod bowe_hopwood_pedersen_crh_gadget_on_projective {
+    use super::*;
+
+    type TestCRH = BoweHopwoodPedersenCRH<EdwardsProjective, BoweHopwoodSize>;
+    type TestCRHGadget = BoweHopwoodPedersenCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
+
+    #[test]
+    fn primitive_gadget_test() {
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
+}
+
+mod bowe_hopwood_pedersen_compressed_crh_gadget_on_projective {
+    use super::*;
+
+    type TestCRH = BoweHopwoodPedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>;
+    type TestCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
+
+    #[test]
+    fn primitive_gadget_test() {
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+    }
 }
