@@ -241,7 +241,7 @@ pub fn from_str_test<F: PrimeField>() {
             let n: u64 = rng.gen();
 
             let a = F::from_str(&format!("{}", n)).map_err(|_| ()).unwrap();
-            let b = F::from_repr(n.into());
+            let b = F::from_repr(n.into()).unwrap();
 
             assert_eq!(a, b);
         }
@@ -319,7 +319,7 @@ pub fn field_test<F: Field>(a: F, b: F) {
 
 pub fn primefield_test<F: PrimeField>() {
     let one = F::one();
-    assert_eq!(F::from_repr(one.into_repr()), one);
+    assert_eq!(F::from_repr(one.into_repr()).unwrap(), one);
     assert_eq!(F::from_str("1").ok().unwrap(), one);
 }
 

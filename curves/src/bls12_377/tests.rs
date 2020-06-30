@@ -388,7 +388,7 @@ fn test_fq_ordering() {
     // BigInteger384's ordering is well-tested, but we still need to make sure the
     // Fq elements aren't being compared in Montgomery form.
     for i in 0..100 {
-        assert!(Fq::from_repr(BigInteger384::from(i + 1)) > Fq::from_repr(BigInteger384::from(i)));
+        assert!(Fq::from_repr(BigInteger384::from(i + 1)).unwrap() > Fq::from_repr(BigInteger384::from(i)).unwrap());
     }
 }
 
@@ -396,8 +396,14 @@ fn test_fq_ordering() {
 fn test_fq_legendre() {
     assert_eq!(QuadraticResidue, Fq::one().legendre());
     assert_eq!(Zero, Fq::zero().legendre());
-    assert_eq!(QuadraticResidue, Fq::from_repr(BigInteger384::from(4)).legendre());
-    assert_eq!(QuadraticNonResidue, Fq::from_repr(BigInteger384::from(5)).legendre());
+    assert_eq!(
+        QuadraticResidue,
+        Fq::from_repr(BigInteger384::from(4)).unwrap().legendre()
+    );
+    assert_eq!(
+        QuadraticNonResidue,
+        Fq::from_repr(BigInteger384::from(5)).unwrap().legendre()
+    );
 }
 
 #[test]

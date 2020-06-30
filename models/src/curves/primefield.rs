@@ -9,7 +9,7 @@ pub trait PrimeField: Field + FromStr {
     type BigInt: BigInteger;
 
     /// Returns a prime field element from its underlying representation.
-    fn from_repr(repr: <Self::Params as FpParameters>::BigInt) -> Self;
+    fn from_repr(repr: <Self::Params as FpParameters>::BigInt) -> Option<Self>;
 
     /// Returns the underlying representation of the prime field element.
     fn into_repr(&self) -> Self::BigInt;

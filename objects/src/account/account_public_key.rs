@@ -1,10 +1,7 @@
-use crate::{account_format, AccountPrivateKey};
+use crate::account_format;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{algorithms::CommitmentScheme, dpc::DPCComponents};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use bech32::{Bech32, FromBase32, ToBase32};
 use std::{
@@ -26,21 +23,8 @@ pub struct AccountPublicKey<C: DPCComponents> {
 
 impl<C: DPCComponents> AccountPublicKey<C> {
     /// Creates a new account public key from an account private key.
-    pub fn from(
-        commitment_parameters: &C::AccountCommitment,
-        signature_parameters: &C::AccountSignature,
-        private_key: &AccountPrivateKey<C>,
-    ) -> Result<Self, AccountError> {
-        // Construct the commitment input for the account public key.
-        let commit_input = to_bytes![
-            private_key.pk_sig(signature_parameters)?,
-            private_key.sk_prf,
-            private_key.metadata
-        ]?;
-
-        Ok(Self {
-            commitment: C::AccountCommitment::commit(commitment_parameters, &commit_input, &private_key.r_pk)?,
-        })
+    pub fn from(commitment: <C::AccountCommitment as CommitmentScheme>::Output) -> Result<Self, AccountError> {
+        Ok(Self { commitment })
     }
 }
 

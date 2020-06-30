@@ -20,7 +20,12 @@ impl PrivateKey {
         };
 
         let parameters = CircuitParameters::<Components>::load()?;
-        let private_key = AccountPrivateKey::<Components>::new(&parameters.account_signature, &metadata, rng)?;
+        let private_key = AccountPrivateKey::<Components>::new(
+            &parameters.account_signature,
+            &parameters.account_commitment,
+            &metadata,
+            rng,
+        )?;
         Ok(Self { private_key })
     }
 }

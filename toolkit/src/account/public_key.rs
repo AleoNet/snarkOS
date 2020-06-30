@@ -15,9 +15,9 @@ impl PublicKey {
     pub fn from(private_key: &PrivateKey) -> Result<Self, PublicKeyError> {
         let parameters = CircuitParameters::<Components>::load()?;
         let public_key = AccountPublicKey::<Components>::from(
-            &parameters.account_commitment,
-            &parameters.account_signature,
-            &private_key.private_key,
+            private_key
+                .private_key
+                .commitment(&parameters.account_signature, &parameters.account_commitment)?,
         )?;
         Ok(Self { public_key })
     }

@@ -15,8 +15,8 @@ mod miner {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
 
-        let key = AccountPrivateKey::<C>::new(&sig_params, &[0; 32], rng).unwrap();
-        let pubkey = AccountPublicKey::from(&comm_params, &sig_params, &key).unwrap();
+        let key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, &[0; 32], rng).unwrap();
+        let pubkey = AccountPublicKey::from(key.commitment(&sig_params, &comm_params).unwrap()).unwrap();
 
         (key, pubkey)
     }

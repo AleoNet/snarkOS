@@ -21,7 +21,7 @@ use snarkos_algorithms::{
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
     bw6_761::BW6_761,
-    edwards_bls12::{EdwardsAffine, EdwardsProjective as EdwardsBls},
+    edwards_bls12::{fr::Fr as EdwardsFr, EdwardsAffine, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
 };
 use snarkos_gadgets::{
@@ -113,6 +113,7 @@ pub struct Components;
 impl DPCComponents for Components {
     type AccountCommitment = AccountCommitment;
     type AccountCommitmentGadget = AccountCommitmentGadget;
+    type AccountScalarField = EdwardsFr;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;

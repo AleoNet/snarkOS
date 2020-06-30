@@ -1,11 +1,11 @@
-use crate::curves::{Field, FpParameters, LegendreSymbol, PrimeField, SquareRootField};
+use crate::curves::{Field, FpParameters, LegendreSymbol, One, PrimeField, SquareRootField, Zero};
+use snarkos_errors::curves::FieldError;
 use snarkos_utilities::{
     biginteger::{arithmetic as fa, BigInteger as _BigInteger, BigInteger384 as BigInteger},
     bytes::{FromBytes, ToBytes},
     serialize::CanonicalDeserialize,
 };
 
-use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -327,13 +327,15 @@ impl<P: Fp384Parameters> PrimeField for Fp384<P> {
     type Params = P;
 
     #[inline]
-    fn from_repr(r: BigInteger) -> Self {
+    fn from_repr(r: BigInteger) -> Option<Self> {
         let mut r = Fp384(r, PhantomData);
-        if r.is_valid() {
-            r.mul_assign(&Fp384(P::R2, PhantomData));
-            r
+        if r.is_zero() {
+            Some(r)
+        } else if r.is_valid() {
+            r *= &Fp384(P::R2, PhantomData);
+            Some(r)
         } else {
-            Self::zero()
+            None
         }
     }
 
@@ -440,19 +442,21 @@ impl<P: Fp384Parameters> ToBytes for Fp384<P> {
 impl<P: Fp384Parameters> FromBytes for Fp384<P> {
     #[inline]
     fn read<R: Read>(reader: R) -> IoResult<Self> {
-        BigInteger::read(reader).map(Fp384::from_repr)
+        BigInteger::read(reader).and_then(|b| match Self::from_repr(b) {
+            Some(f) => Ok(f),
+            None => Err(FieldError::InvalidFieldElement.into()),
+        })
     }
 }
 
 impl<P: Fp384Parameters> FromStr for Fp384<P> {
-    type Err = ();
+    type Err = FieldError;
 
     /// Interpret a string of numbers as a (congruent) prime field element.
     /// Does not accept unnecessary leading zeroes or a blank string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            println!("Is empty!");
-            return Err(());
+            return Err(FieldError::ParsingEmptyString);
         }
 
         if s == "0" {
@@ -461,7 +465,7 @@ impl<P: Fp384Parameters> FromStr for Fp384<P> {
 
         let mut res = Self::zero();
 
-        let ten = Self::from_repr(<Self as PrimeField>::BigInt::from(10));
+        let ten = Self::from_repr(<Self as PrimeField>::BigInt::from(10)).ok_or(FieldError::InvalidFieldElement)?;
 
         let mut first_digit = true;
 
@@ -470,22 +474,29 @@ impl<P: Fp384Parameters> FromStr for Fp384<P> {
                 Some(c) => {
                     if first_digit {
                         if c == 0 {
-                            return Err(());
+                            return Err(FieldError::InvalidString);
                         }
 
                         first_digit = false;
                     }
 
                     res.mul_assign(&ten);
-                    res.add_assign(&Self::from_repr(<Self as PrimeField>::BigInt::from(u64::from(c))));
+                    res.add_assign(
+                        &Self::from_repr(<Self as PrimeField>::BigInt::from(u64::from(c)))
+                            .ok_or(FieldError::InvalidFieldElement)?,
+                    );
                 }
                 None => {
-                    println!("Not valid digit!");
-                    return Err(());
+                    return Err(FieldError::ParsingNonDigitCharacter);
                 }
             }
         }
-        if !res.is_valid() { Err(()) } else { Ok(res) }
+
+        if !res.is_valid() {
+            Err(FieldError::InvalidFieldElement)
+        } else {
+            Ok(res)
+        }
     }
 }
 

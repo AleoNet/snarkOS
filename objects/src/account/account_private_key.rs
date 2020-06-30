@@ -4,10 +4,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, PRF},
     dpc::DPCComponents,
 };
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    rand::UniformRand,
-};
+use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;
@@ -30,34 +27,71 @@ pub struct AccountPrivateKey<C: DPCComponents> {
 impl<C: DPCComponents> AccountPrivateKey<C> {
     /// Creates a new account private key.
     pub fn new<R: Rng>(
-        parameters: &C::AccountSignature,
+        signature_parameters: &C::AccountSignature,
+        commitment_parameters: &C::AccountCommitment,
         metadata: &[u8; 32],
         rng: &mut R,
     ) -> Result<Self, AccountError> {
         // Sample SIG key pair.
-        let sk_sig = C::AccountSignature::generate_private_key(parameters, rng)?;
+        let sk_sig = C::AccountSignature::generate_private_key(signature_parameters, rng)?;
 
         // Sample PRF secret key.
         let sk_bytes: [u8; 32] = rng.gen();
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
 
-        // Sample randomness rpk for the commitment scheme.
-        let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
+        // Sample randomly until a valid private key is found.
+        loop {
+            // Sample randomness rpk for the commitment scheme.
+            let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
 
-        // Construct the account private key.
-        Ok(Self {
-            sk_sig,
-            sk_prf,
-            metadata: *metadata,
-            r_pk,
-        })
+            // Construct the account private key.
+            let private_key = Self {
+                sk_sig: sk_sig.clone(),
+                sk_prf: sk_prf.clone(),
+                metadata: metadata.clone(),
+                r_pk,
+            };
+
+            // Returns the private key if it is valid.
+            if private_key.is_valid(signature_parameters, commitment_parameters)? {
+                return Ok(private_key);
+            }
+        }
     }
 
+    /// Returns `Ok(true)` if the private key is well-formed.
+    pub fn is_valid(
+        &self,
+        signature_parameters: &C::AccountSignature,
+        commitment_parameters: &C::AccountCommitment,
+    ) -> Result<bool, AccountError> {
+        let commitment_bytes = to_bytes![self.commitment(signature_parameters, commitment_parameters)?]?;
+        Ok(C::AccountScalarField::read(&commitment_bytes[..]).is_ok())
+    }
+
+    /// Returns the commitment output to produce an account public key.
+    pub fn commitment(
+        &self,
+        signature_parameters: &C::AccountSignature,
+        commitment_parameters: &C::AccountCommitment,
+    ) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
+        // Construct the commitment input for the account public key.
+        let pk_sig = self.pk_sig(signature_parameters)?;
+        let commit_input = to_bytes![pk_sig, self.sk_prf, self.metadata]?;
+
+        let commitment = C::AccountCommitment::commit(commitment_parameters, &commit_input, &self.r_pk)?;
+        Ok(commitment)
+    }
+
+    /// Returns the account signature public key.
     pub fn pk_sig(
         &self,
-        parameters: &C::AccountSignature,
+        signature_parameters: &C::AccountSignature,
     ) -> Result<<C::AccountSignature as SignatureScheme>::PublicKey, AccountError> {
-        Ok(C::AccountSignature::generate_public_key(parameters, &self.sk_sig)?)
+        Ok(C::AccountSignature::generate_public_key(
+            signature_parameters,
+            &self.sk_sig,
+        )?)
     }
 }
 

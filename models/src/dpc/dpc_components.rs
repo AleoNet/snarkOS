@@ -11,7 +11,10 @@ pub trait DPCComponents: 'static + Sized {
     type InnerField: PrimeField;
     type OuterField: PrimeField;
 
-    /// Commitment scheme for address contents. Invoked only over `Self::InnerField`.
+    /// Encryption scheme for account records.
+    type AccountScalarField: PrimeField;
+
+    /// Commitment scheme for account contents. Invoked only over `Self::InnerField`.
     type AccountCommitment: CommitmentScheme;
     type AccountCommitmentGadget: CommitmentGadget<Self::AccountCommitment, Self::InnerField>;
 
