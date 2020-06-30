@@ -26,4 +26,4 @@ wasm-bindgen = { version = "0.2.59" }
 
 [dev-dependencies]
 rand_chacha = { version = "0.2", default-features = false }
-wasm-bindgen-test = { version = "0.3.13" }
+wasm-bindgen-test = { version = "0.3.14" }
