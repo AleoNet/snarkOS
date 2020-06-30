@@ -1,27 +1,16 @@
 use crate::consensus::TestTx;
-use snarkos_algorithms::{
-    crh::{PedersenCompressedCRH, PedersenSize},
-    define_merkle_tree_parameters,
+use snarkos_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
+use snarkos_models::{
+    algorithms::merkle_tree::MerkleParameters,
+    objects::{LedgerScheme, Transaction},
 };
-use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
-use snarkos_models::objects::{LedgerScheme, Transaction};
 use snarkos_objects::Block;
 use snarkos_storage::Ledger;
 
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 use std::{path::PathBuf, sync::Arc};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Size;
-
-impl PedersenSize for Size {
-    const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 128;
-}
-
-define_merkle_tree_parameters!(TestMerkleParams, PedersenCompressedCRH<EdwardsBls, Size>, 32);
-
-pub type Store = Ledger<TestTx, TestMerkleParams>;
+pub type Store = Ledger<TestTx, CommitmentMerkleParameters>;
 
 pub fn random_storage_path() -> String {
     let random_path: usize = thread_rng().gen();
