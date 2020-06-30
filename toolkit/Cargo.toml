@@ -11,8 +11,12 @@ include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
 
-[lib]
-crate-type = ["cdylib"]
+#[lib]
+#crate-type = ["cdylib"]
+
+[[bench]]
+name = "account"
+harness = false
 
 [dependencies]
 snarkos-dpc = { path = "../dpc", version = "0.8.0", default-features = false }
@@ -25,5 +29,6 @@ thiserror = { version = "1.0" }
 wasm-bindgen = { version = "0.2.59" }
 
 [dev-dependencies]
+criterion = { version = "0.3.1" }
 rand_chacha = { version = "0.2", default-features = false }
 wasm-bindgen-test = { version = "0.3.13" }

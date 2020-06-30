@@ -32,4 +32,12 @@ impl Account {
             public_key,
         }
     }
+
+    #[wasm_bindgen]
+    pub fn to_string(&self) -> String {
+        format!(
+            "Account {{ private_key: {}, public_key: {} }}",
+            self.private_key, self.public_key
+        )
+    }
 }

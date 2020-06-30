@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate thiserror;
+
+#[cfg(target_arch = "wasm32")]
 #[macro_use]
 extern crate wasm_bindgen_test;
 
