@@ -12,7 +12,7 @@ use crate::dpc::base_dpc::{
 };
 use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
-    crh::{BoweHopwoodPedersenCompressedCRH, PedersenCompressedCRH, PedersenSize},
+    crh::{BoweHopwoodPedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
     prf::Blake2s,
     signature::SchnorrSignature,
@@ -28,7 +28,7 @@ use snarkos_gadgets::{
     algorithms::{
         binding_signature::BindingSignatureVerificationGadget,
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
-        crh::{BoweHopwoodPedersenCompressedCRHGadget, PedersenCompressedCRHGadget},
+        crh::BoweHopwoodPedersenCompressedCRHGadget,
         prf::Blake2sGadget,
         signature::SchnorrPublicKeyRandomizationGadget,
         snark::GM17VerifierGadget,
@@ -46,7 +46,7 @@ pub const NUM_OUTPUT_RECORDS: usize = 2;
 pub struct SnNonceWindow;
 
 impl PedersenSize for SnNonceWindow {
-    const NUM_WINDOWS: usize = 8;
+    const NUM_WINDOWS: usize = 32;
     const WINDOW_SIZE: usize = 63;
 }
 
@@ -54,7 +54,7 @@ impl PedersenSize for SnNonceWindow {
 pub struct PredVkHashWindow;
 
 impl PedersenSize for PredVkHashWindow {
-    const NUM_WINDOWS: usize = 46;
+    const NUM_WINDOWS: usize = 144;
     const WINDOW_SIZE: usize = 63;
 }
 
@@ -62,8 +62,8 @@ impl PedersenSize for PredVkHashWindow {
 pub struct LocalDataCRHWindow;
 
 impl PedersenSize for LocalDataCRHWindow {
-    const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 64;
+    const NUM_WINDOWS: usize = 16;
+    const WINDOW_SIZE: usize = 32;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -77,8 +77,8 @@ impl PedersenSize for LocalDataCommitmentWindow {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TwoToOneWindow;
 impl PedersenSize for TwoToOneWindow {
-    const NUM_WINDOWS: usize = 2;
-    const WINDOW_SIZE: usize = 63;
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 32;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -157,7 +157,7 @@ pub type OuterField = Bls12_377Fq;
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
-pub type LocalDataCRH = PedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
+pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataCommitmentWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
@@ -183,7 +183,7 @@ pub type LocalData = DPCLocalData<Components>;
 pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
-pub type LocalDataCRHGadget = PedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type LocalDataCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
