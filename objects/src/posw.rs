@@ -118,3 +118,17 @@ impl FromBytes for ProofOfSuccinctWork {
         Ok(ProofOfSuccinctWork(proof))
     }
 }
+
+impl From<&[u8]> for ProofOfSuccinctWork {
+    fn from(proof: &[u8]) -> Self {
+        let mut bytes = [0; ProofOfSuccinctWork::size()];
+        bytes.copy_from_slice(&proof);
+        Self(bytes)
+    }
+}
+
+impl From<Vec<u8>> for ProofOfSuccinctWork {
+    fn from(proof: Vec<u8>) -> Self {
+        Self::from(proof.as_ref())
+    }
+}

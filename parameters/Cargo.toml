@@ -26,7 +26,7 @@ snarkos-consensus = { path = "../consensus", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0" }
 snarkos-dpc = { path = "../dpc", version = "0.8.0" }
 snarkos-objects = { path = "../objects", version = "0.8.0" }
-snarkos-posw = { path = "../posw", version = "0.8.0" }
+snarkos-posw = { path = "../posw", version = "0.8.0", features = ["test-helpers"] }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
 
 chrono = { version = "0.4", features = ["serde"] }
