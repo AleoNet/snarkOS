@@ -1,4 +1,10 @@
-use crate::crh::{BoweHopwoodPedersenCRH, PedersenCRH, PedersenCompressedCRH, PedersenSize};
+use crate::crh::{
+    BoweHopwoodPedersenCRH,
+    BoweHopwoodPedersenCompressedCRH,
+    PedersenCRH,
+    PedersenCompressedCRH,
+    PedersenSize,
+};
 use snarkos_curves::edwards_bls12::EdwardsProjective;
 use snarkos_models::algorithms::CRH;
 use snarkos_utilities::{
@@ -54,7 +60,7 @@ fn bowe_hopwood_crh_parameters_serialization() {
 
 #[test]
 fn bowe_hopwood_compressed_crh_parameters_serialization() {
-    crh_parameters_serialization::<PedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>>();
+    crh_parameters_serialization::<BoweHopwoodPedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>>();
 }
 
 #[test]
