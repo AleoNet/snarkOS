@@ -2088,9 +2088,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.55"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec2c5d7e739bc07a3e73381a39d61fdb5f671c60c1df26a130690665803d8226"
+checksum = "3433e879a558dde8b5e8feb2a04899cf34fdde1fafb894687e52105fc1162ac3"
 dependencies = [
  "itoa",
  "ryu",
@@ -2362,6 +2362,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-marlin"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "rand_chacha",
+ "rand_core",
+ "rayon",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-gadgets",
+ "snarkos-models",
+ "snarkos-polycommit",
+ "snarkos-profiler",
+ "snarkos-utilities",
+]
+
+[[package]]
 name = "snarkos-models"
 version = "0.8.0"
 dependencies = [
@@ -2440,6 +2460,24 @@ dependencies = [
  "snarkos-objects",
  "snarkos-posw",
  "snarkos-storage",
+ "snarkos-utilities",
+]
+
+[[package]]
+name = "snarkos-polycommit"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "rand",
+ "rand_core",
+ "rayon",
+ "snarkos-algorithms",
+ "snarkos-curves",
+ "snarkos-errors",
+ "snarkos-models",
+ "snarkos-profiler",
  "snarkos-utilities",
 ]
 
