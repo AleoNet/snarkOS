@@ -53,6 +53,11 @@ fn bowe_hopwood_crh_parameters_serialization() {
 }
 
 #[test]
+fn bowe_hopwood_compressed_crh_parameters_serialization() {
+    crh_parameters_serialization::<PedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>>();
+}
+
+#[test]
 fn simple_bowe_hopwood_crh() {
     type BoweHopwoodCRH = BoweHopwoodPedersenCRH<EdwardsProjective, BoweHopwoodSize>;
 
