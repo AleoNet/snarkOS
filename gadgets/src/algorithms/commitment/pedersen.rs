@@ -116,7 +116,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
         assert!((input.len() * 8) <= (S::WINDOW_SIZE * S::NUM_WINDOWS));
 
         let mut padded_input = input.to_vec();
-        // Pad if input length is less than `W::WINDOW_SIZE * W::NUM_WINDOWS`.
+        // Pad if input length is less than `S::WINDOW_SIZE * S::NUM_WINDOWS`.
         if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
             let current_length = input.len();
             for _ in current_length..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {

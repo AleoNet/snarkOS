@@ -95,9 +95,9 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
 
         let time = start_timer!(|| format!(
             "BoweHopwoodPedersenCRH::Setup: {} segments of {} 3-bit chunks; {{0,1}}^{{{}}} -> G",
-            W::NUM_WINDOWS,
-            W::WINDOW_SIZE,
-            W::WINDOW_SIZE * W::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE
+            S::NUM_WINDOWS,
+            S::WINDOW_SIZE,
+            S::WINDOW_SIZE * S::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE
         ));
         let bases = Self::create_generators(rng);
         end_timer!(time);
@@ -109,14 +109,12 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         let eval_time = start_timer!(|| "BoweHopwoodPedersenCRH::Eval");
 
-        if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE {
-            panic!(
-                "incorrect input length {:?} for window params {:?}x{:?}x{}",
+        if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS {
+            return Err(CRHError::IncorrectInputLength(
                 input.len(),
                 S::WINDOW_SIZE,
                 S::NUM_WINDOWS,
-                BOWE_HOPWOOD_CHUNK_SIZE,
-            );
+            ));
         }
 
         // Pad the input if it is not the current length.

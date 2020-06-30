@@ -43,8 +43,8 @@ impl PedersenSize for Size {
 pub(super) struct BoweHopwoodSize;
 
 impl PedersenSize for BoweHopwoodSize {
-    const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 63;
+    const NUM_WINDOWS: usize = 32;
+    const WINDOW_SIZE: usize = 32;
 }
 
 fn generate_input<CS: ConstraintSystem<Fr>, R: Rng>(mut cs: CS, rng: &mut R) -> ([u8; 128], Vec<UInt8>, Vec<UInt8>) {
