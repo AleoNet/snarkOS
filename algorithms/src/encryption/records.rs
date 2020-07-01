@@ -13,8 +13,8 @@ pub struct RecordEncryption<G: Group + ProjectiveCurve> {
 }
 
 impl<G: Group + ProjectiveCurve> EncryptionScheme for RecordEncryption<G> {
-    type Message = Vec<G>;
-    type Output = Vec<G>;
+    type Ciphertext = Vec<G>;
+    type Plaintext = Vec<G>;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = G;
 
@@ -35,9 +35,9 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for RecordEncryption<G> {
     fn encrypt<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
-        message: &Self::Message,
+        message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<Self::Output, EncryptionError> {
+    ) -> Result<Self::Ciphertext, EncryptionError> {
         let mut record_view_key = G::zero();
         let mut y = <G as Group>::ScalarField::zero();
         let mut z_bytes = vec![];
@@ -63,7 +63,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for RecordEncryption<G> {
             // h_i <- 1 [/] (z [+] i) * record_view_key
             let h_i = match &(z + &i).inverse() {
                 Some(val) => record_view_key.mul(val),
-                None => return Err(EncryptionError::Message("no inverse".into())),
+                None => return Err(EncryptionError::MissingInverse),
             };
 
             // c_i <- h_i + m_i
@@ -76,7 +76,40 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for RecordEncryption<G> {
         Ok(ciphertext)
     }
 
-    fn decrypt(&self, private_key: Self::PrivateKey, ciphertext: &Self::Output) -> Result<Vec<u8>, EncryptionError> {
-        Ok(vec![])
+    fn decrypt(
+        &self,
+        private_key: Self::PrivateKey,
+        ciphertext: &Self::Ciphertext,
+    ) -> Result<Self::Plaintext, EncryptionError> {
+        assert!(ciphertext.len() > 0);
+        let c_0 = &ciphertext[0];
+
+        let record_view_key = c_0.mul(&private_key);
+
+        let affine = record_view_key.into_affine();
+        debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
+        let z_bytes = to_bytes![affine.to_x_coordinate()]?;
+
+        let z = <G as Group>::ScalarField::read(&z_bytes[..])?;
+
+        let one = <G as Group>::ScalarField::one();
+        let mut plaintext = vec![];
+        let mut i = <G as Group>::ScalarField::one();
+
+        for c_i in ciphertext.iter().skip(1) {
+            // h_i <- 1 [/] (z [+] i) * record_view_key
+            let h_i = match &(z + &i).inverse() {
+                Some(val) => record_view_key.mul(val),
+                None => return Err(EncryptionError::MissingInverse),
+            };
+
+            // m_i <- c_i - h_i
+            let m_i = *c_i - &h_i;
+
+            plaintext.push(m_i);
+            i += &one;
+        }
+
+        Ok(plaintext)
     }
 }

@@ -10,8 +10,8 @@ use std::{fmt::Debug, hash::Hash};
 pub trait EncryptionScheme: Sized + Clone {
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type PublicKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
-    type Message: Clone + Debug + Default + Eq + Hash;
-    type Output: Clone + Debug + Default + Eq + Hash;
+    type Plaintext: Clone + Debug + Default + Eq + Hash;
+    type Ciphertext: Clone + Debug + Default + Eq + Hash;
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
@@ -20,9 +20,13 @@ pub trait EncryptionScheme: Sized + Clone {
     fn encrypt<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
-        message: &Self::Message,
+        message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<Self::Output, EncryptionError>;
+    ) -> Result<Self::Ciphertext, EncryptionError>;
 
-    fn decrypt(&self, private_key: Self::PrivateKey, ciphertext: &Self::Output) -> Result<Vec<u8>, EncryptionError>;
+    fn decrypt(
+        &self,
+        private_key: Self::PrivateKey,
+        ciphertext: &Self::Ciphertext,
+    ) -> Result<Self::Plaintext, EncryptionError>;
 }

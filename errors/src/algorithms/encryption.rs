@@ -3,6 +3,9 @@ pub enum EncryptionError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[error("Missing inverse for group element")]
+    MissingInverse,
+
     #[error("{}", _0)]
     Message(String),
 }
