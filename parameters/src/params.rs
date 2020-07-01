@@ -3,8 +3,8 @@ use snarkos_errors::parameters::ParametersError;
 use snarkos_models::parameters::Parameters;
 
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter, Read, Write},
+    fs::{self, File},
+    io::Write,
     path::PathBuf,
 };
 
@@ -66,29 +66,28 @@ macro_rules! impl_params_remote {
                 let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
                 absolute_path.push(&relative_path);
 
-                let mut buffer = Vec::with_capacity(Self::SIZE as usize);
-                if relative_path.exists() {
+                let buffer = if relative_path.exists() {
                     // Attempts to load the parameter file locally with a relative path.
-                    let file = File::open(relative_path)?;
-                    let mut reader = BufReader::new(file);
-                    reader.read_to_end(&mut buffer)?;
+                    fs::read(relative_path)?.to_vec()
                 } else if absolute_path.exists() {
-                    let file = File::open(absolute_path)?;
-                    let mut reader = BufReader::new(file);
                     // Attempts to load the parameter file locally with an absolute path.
-                    reader.read_to_end(&mut buffer)?;
+                    fs::read(absolute_path)?.to_vec()
                 } else {
                     // Downloads the missing parameters and stores it in the local directory for use.
                     eprintln!(
                         "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
                         filename, filename, file_path
                     );
-                    buffer = Self::load_remote()?;
-                    if let Err(err) = Self::store_bytes(&buffer, &relative_path, &absolute_path, &file_path) {
-                        eprintln!(
-                            "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\nError: {:?}",
-                            filename, file_path, err
-                        );
+                    let output = Self::load_remote()?;
+                    match Self::store_bytes(&output, &relative_path, &absolute_path, &file_path) {
+                        Ok(()) => output,
+                        Err(_) => {
+                            eprintln!(
+                                "\nWARNING - Failed to store \"{}\" locally. Please download this file manually and ensure it is stored in {:?}.\n",
+                                filename, file_path
+                            );
+                            output
+                        }
                     }
                 };
 
@@ -142,12 +141,10 @@ macro_rules! impl_params_remote {
             ) -> Result<(), ParametersError> {
                 println!("{} - Storing parameters ({:?})", module_path!(), file_path);
                 // Attempt to write the parameter buffer to a file.
-                if let Ok(file) = File::create(relative_path) {
-                    let mut file = BufWriter::new(file);
+                if let Ok(mut file) = File::create(relative_path) {
                     file.write_all(&buffer)?;
                     drop(file);
-                } else if let Ok(file) = File::create(absolute_path) {
-                    let mut file = BufWriter::new(file);
+                } else if let Ok(mut file) = File::create(absolute_path) {
                     file.write_all(&buffer)?;
                     drop(file);
                 }
