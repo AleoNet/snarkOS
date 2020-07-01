@@ -224,6 +224,16 @@ impl RpcFunctions for RpcImpl {
         }
     }
 
+    /// Validate and return if the transaction is valid.
+    fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
+        let transaction_bytes = hex::decode(transaction_bytes)?;
+        let transaction = Tx::read(&transaction_bytes[..])?;
+
+        Ok(self
+            .consensus
+            .verify_transaction(&self.parameters, &transaction, &self.storage)?)
+    }
+
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
