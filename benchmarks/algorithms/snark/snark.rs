@@ -4,10 +4,11 @@ use rand;
 extern crate criterion;
 use snarkos_algorithms::snark::GM17;
 use snarkos_curves::bls12_377::{Bls12_377, Fr};
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::SNARK,
     curves::Field,
-    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, SynthesisError},
+    gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 
 use criterion::Criterion;
