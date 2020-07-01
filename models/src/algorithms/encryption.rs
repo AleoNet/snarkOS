@@ -8,12 +8,21 @@ use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
 pub trait EncryptionScheme: Sized + Clone {
-    type Output: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
-    type Randomness: Clone + Debug + Default + Eq + UniformRand + ToBytes + FromBytes;
+    type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
+    type PublicKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
+    type Message: Clone + Debug + Default + Eq + Hash;
+    type Output: Clone + Debug + Default + Eq + Hash;
 
-    fn setup<R: Rng>(r: &mut R) -> Self;
+    fn setup<R: Rng>(rng: &mut R) -> Self;
 
-    fn encrypt(&self, message: &[u8], randomness: &Self::Randomness) -> Result<Self::Output, EncryptionError>;
+    fn keygen<R: Rng>(&self, rng: &mut R) -> (Self::PrivateKey, Self::PublicKey);
 
-    fn decrypt(&self, ciphertext: &Self::Output) -> Result<Vec<u8>, EncryptionError>;
+    fn encrypt<R: Rng>(
+        &self,
+        public_key: &Self::PublicKey,
+        message: &Self::Message,
+        rng: &mut R,
+    ) -> Result<Self::Output, EncryptionError>;
+
+    fn decrypt(&self, private_key: Self::PrivateKey, ciphertext: &Self::Output) -> Result<Vec<u8>, EncryptionError>;
 }
