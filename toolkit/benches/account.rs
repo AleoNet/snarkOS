@@ -5,8 +5,8 @@ use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 
 fn account_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Account");
-    group.sample_size(10);
+    let mut group = c.benchmark_group("account");
+    group.sample_size(20);
 
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
 

@@ -2,9 +2,10 @@ use crate::account_format;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, PRF},
+    curves::PrimeField,
     dpc::DPCComponents,
 };
-use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
+use snarkos_utilities::{rand::UniformRand, to_bytes, BigInteger, FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;
@@ -78,8 +79,20 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
     ) -> Result<C::AccountDecryptionKey, AccountError> {
-        let commitment_bytes = to_bytes![self.commitment(signature_parameters, commitment_parameters)?]?;
-        Ok(C::AccountDecryptionKey::read(&commitment_bytes[..])?)
+        let commitment_bytes = to_bytes![self.commit(signature_parameters, commitment_parameters)?]?;
+
+        // This operation implicitly enforces that the unused MSB bits
+        // for the scalar field representation are correctly set to 0.
+        let decryption_key = C::AccountDecryptionKey::read(&commitment_bytes[..])?;
+
+        // To simplify verification of this isomorphism from the base field
+        // to the scalar field in the `inner_snark`, we additionally enforce
+        // that the MSB bit of the scalar field is also set to 0.
+        if decryption_key.into_repr().get_bit(250) {
+            return Err(AccountError::InvalidAccountCommitment);
+        }
+
+        Ok(decryption_key)
     }
 
     /// Returns the signature public key for deriving the account view key.
@@ -94,7 +107,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
     }
 
     /// Returns the commitment output of the private key.
-    fn commitment(
+    fn commit(
         &self,
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,

@@ -11,6 +11,9 @@ pub enum AccountError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[error("invalid account commitment")]
+    InvalidAccountCommitment,
+
     #[error("invalid byte length: {}", _0)]
     InvalidByteLength(usize),
 
