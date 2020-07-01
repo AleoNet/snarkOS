@@ -78,7 +78,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for RecordEncryption<G> {
 
     fn decrypt(
         &self,
-        private_key: Self::PrivateKey,
+        private_key: &Self::PrivateKey,
         ciphertext: &Self::Ciphertext,
     ) -> Result<Self::Plaintext, EncryptionError> {
         assert!(ciphertext.len() > 0);

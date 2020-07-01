@@ -26,7 +26,7 @@ pub trait EncryptionScheme: Sized + Clone {
 
     fn decrypt(
         &self,
-        private_key: Self::PrivateKey,
+        private_key: &Self::PrivateKey,
         ciphertext: &Self::Ciphertext,
     ) -> Result<Self::Plaintext, EncryptionError>;
 }
