@@ -621,16 +621,12 @@ where
         })
     }
 
-    fn create_account<R: Rng>(
-        parameters: &Self::Parameters,
-        metadata: &Self::Metadata,
-        rng: &mut R,
-    ) -> Result<Self::Account, DPCError> {
+    fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError> {
         let time = start_timer!(|| "BaseDPC::create_account");
 
         let account_signature_parameters = &parameters.circuit_parameters.account_signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(account_signature_parameters, commitment_parameters, metadata, rng)?;
+        let account = Account::new(account_signature_parameters, commitment_parameters, rng)?;
 
         end_timer!(time);
 

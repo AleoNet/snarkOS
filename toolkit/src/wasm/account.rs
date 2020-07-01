@@ -15,7 +15,7 @@ impl Account {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         let rng = &mut StdRng::from_entropy();
-        let private_key = PrivateKey::new(None, rng).unwrap();
+        let private_key = PrivateKey::new(rng).unwrap();
         let public_key = PublicKey::from(&private_key).unwrap();
         Self {
             private_key,

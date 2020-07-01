@@ -64,8 +64,7 @@ fn test_execute_base_dpc_constraints() {
     let commitment_parameters = &circuit_parameters.account_commitment;
 
     // Generate metadata and an account for a dummy initial record.
-    let meta_data = [1u8; 32];
-    let dummy_account = Account::new(signature_parameters, commitment_parameters, &meta_data, &mut rng).unwrap();
+    let dummy_account = Account::new(signature_parameters, commitment_parameters, &mut rng).unwrap();
 
     let genesis_block = Block {
         header: BlockHeader {
@@ -105,8 +104,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Create an account for an actual new record.
 
-    let new_metadata = [1u8; 32];
-    let new_account = Account::new(signature_parameters, commitment_parameters, &new_metadata, &mut rng).unwrap();
+    let new_account = Account::new(signature_parameters, commitment_parameters, &mut rng).unwrap();
 
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());

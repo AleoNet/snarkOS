@@ -24,11 +24,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn setup<R: Rng>(ledger_parameters: &L::MerkleParameters, rng: &mut R) -> Result<Self::Parameters, DPCError>;
 
     /// Returns an account, given the public parameters, metadata, and an rng.
-    fn create_account<R: Rng>(
-        parameters: &Self::Parameters,
-        metadata: &Self::Metadata,
-        rng: &mut R,
-    ) -> Result<Self::Account, DPCError>;
+    fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
     /// Returns new records and a transaction based on the authorized
     /// consumption of old records.

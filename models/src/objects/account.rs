@@ -12,7 +12,6 @@ pub trait AccountScheme: Sized {
     fn new<R: Rng>(
         signature_parameters: &Self::SignatureScheme,
         commitment_parameters: &Self::CommitmentScheme,
-        metadata: &[u8; 32],
         rng: &mut R,
     ) -> Result<Self, AccountError>;
 }

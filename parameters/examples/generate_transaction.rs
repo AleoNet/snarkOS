@@ -88,11 +88,9 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let predicate = DPCPredicate::<Components>::new(predicate_vk_hash_bytes.clone());
 
     // Generate a new account that owns the dummy input records
-    let account_metadata: [u8; 32] = rng.gen();
     let dummy_account = Account::new(
         &parameters.circuit_parameters.account_signature,
         &parameters.circuit_parameters.account_commitment,
-        &account_metadata,
         rng,
     )
     .unwrap();

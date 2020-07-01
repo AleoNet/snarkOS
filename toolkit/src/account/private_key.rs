@@ -12,20 +12,10 @@ pub struct PrivateKey {
 }
 
 impl PrivateKey {
-    pub fn new<R: Rng + CryptoRng>(metadata: Option<[u8; 32]>, rng: &mut R) -> Result<Self, PrivateKeyError> {
-        // Resolve the metadata value
-        let metadata = match metadata {
-            Some(metadata) => metadata,
-            None => [0u8; 32],
-        };
-
+    pub fn new<R: Rng + CryptoRng>(rng: &mut R) -> Result<Self, PrivateKeyError> {
         let parameters = CircuitParameters::<Components>::load()?;
-        let private_key = AccountPrivateKey::<Components>::new(
-            &parameters.account_signature,
-            &parameters.account_commitment,
-            &metadata,
-            rng,
-        )?;
+        let private_key =
+            AccountPrivateKey::<Components>::new(&parameters.account_signature, &parameters.account_commitment, rng)?;
         Ok(Self { private_key })
     }
 }

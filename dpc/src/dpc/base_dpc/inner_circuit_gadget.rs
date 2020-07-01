@@ -446,14 +446,12 @@ where
             let pk_sig_bytes = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
 
             let sk_prf = PGadget::new_seed(&mut account_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
-            let metadata = UInt8::alloc_vec(&mut account_cs.ns(|| "Declare metadata"), &account_private_key.metadata)?;
             let r_pk = AccountCommitmentGadget::RandomnessGadget::alloc(&mut account_cs.ns(|| "Declare r_pk"), || {
                 Ok(&account_private_key.r_pk)
             })?;
 
             let mut account_public_key_input = pk_sig_bytes.clone();
             account_public_key_input.extend_from_slice(&sk_prf);
-            account_public_key_input.extend_from_slice(&metadata);
 
             let candidate_account_public_key = AccountCommitmentGadget::check_commitment_gadget(
                 &mut account_cs.ns(|| "Compute account public key"),

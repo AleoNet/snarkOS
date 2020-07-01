@@ -22,7 +22,6 @@ pub struct AccountPrivateKey<C: DPCComponents> {
     pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
-    pub metadata: [u8; 32],
 }
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
@@ -30,7 +29,6 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
     pub fn new<R: Rng>(
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
-        metadata: &[u8; 32],
         rng: &mut R,
     ) -> Result<Self, AccountError> {
         // Sample SIG key pair.
@@ -44,12 +42,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct the account private key.
-        let mut private_key = Self {
-            sk_sig,
-            sk_prf,
-            r_pk,
-            metadata: *metadata,
-        };
+        let mut private_key = Self { sk_sig, sk_prf, r_pk };
 
         // Sample randomly until a valid private key is found.
         loop {
@@ -88,7 +81,10 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         // To simplify verification of this isomorphism from the base field
         // to the scalar field in the `inner_snark`, we additionally enforce
         // that the MSB bit of the scalar field is also set to 0.
-        if decryption_key.into_repr().get_bit(250) {
+        if decryption_key
+            .into_repr()
+            .get_bit(C::AccountDecryptionKey::size_in_bits() - 1)
+        {
             return Err(AccountError::InvalidAccountCommitment);
         }
 
@@ -113,7 +109,8 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         commitment_parameters: &C::AccountCommitment,
     ) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
         // Construct the commitment input for the account public key.
-        let commit_input = to_bytes![self.pk_sig(signature_parameters)?, self.sk_prf, self.metadata]?;
+        let pk_sig = self.pk_sig(signature_parameters)?;
+        let commit_input = to_bytes![pk_sig, self.sk_prf]?;
 
         Ok(C::AccountCommitment::commit(
             commitment_parameters,
@@ -140,37 +137,28 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
         let mut reader = &data[4..];
         let sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
-        let metadata: [u8; 32] = FromBytes::read(&mut reader)?;
         let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
 
-        Ok(Self {
-            sk_sig,
-            sk_prf,
-            r_pk,
-            metadata,
-        })
+        Ok(Self { sk_sig, sk_prf, r_pk })
     }
 }
 
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut private_key = [0u8; 132];
+        let mut private_key = [0u8; 101];
         let prefix = account_format::PRIVATE_KEY_PREFIX;
 
-        private_key[0..4].copy_from_slice(&prefix);
+        private_key[0..5].copy_from_slice(&prefix);
 
         self.sk_sig
-            .write(&mut private_key[4..36])
+            .write(&mut private_key[5..37])
             .expect("sk_sig formatting failed");
         self.sk_prf
-            .write(&mut private_key[36..68])
+            .write(&mut private_key[37..69])
             .expect("sk_prf formatting failed");
         self.r_pk
-            .write(&mut private_key[68..100])
+            .write(&mut private_key[69..101])
             .expect("r_pk formatting failed");
-        self.metadata
-            .write(&mut private_key[100..132])
-            .expect("metadata formatting failed");
 
         write!(f, "{}", private_key.to_base58())
     }
@@ -180,8 +168,8 @@ impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, r_pk: {:?}, metadata: {:?} }}",
-            self.sk_sig, self.sk_prf, self.r_pk, self.metadata,
+            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, r_pk: {:?} }}",
+            self.sk_sig, self.sk_prf, self.r_pk,
         )
     }
 }
