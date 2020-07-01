@@ -63,6 +63,16 @@ mod tests {
     use snarkos_utilities::bytes::FromBytes;
 
     #[test]
+    fn load_params_verify() {
+        let _params = Posw::verify_only().unwrap();
+    }
+
+    #[test]
+    fn load_params() {
+        let _params = Posw::load().unwrap();
+    }
+
+    #[test]
     fn gm17_ok() {
         let rng = &mut XorShiftRng::seed_from_u64(1234567);
 
