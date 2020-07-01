@@ -2458,6 +2458,7 @@ dependencies = [
  "snarkos-curves",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-marlin",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-posw",

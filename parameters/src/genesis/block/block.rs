@@ -6,7 +6,7 @@ pub struct GenesisBlock;
 
 impl Genesis for GenesisBlock {
     const CHECKSUM: &'static str = "";
-    const SIZE: u64 = 1479;
+    const SIZE: u64 = 2064;
 
     fn load_bytes() -> Vec<u8> {
         let mut buffer = vec![];
