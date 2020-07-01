@@ -6,3 +6,9 @@ pub enum EncryptionError {
     #[error("{}", _0)]
     Message(String),
 }
+
+impl From<std::io::Error> for EncryptionError {
+    fn from(error: std::io::Error) -> Self {
+        EncryptionError::Crate("std::io", format!("{:?}", error))
+    }
+}
