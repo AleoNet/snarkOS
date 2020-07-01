@@ -3,6 +3,8 @@ use crate::account::{PrivateKey, PublicKey};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 
+// TODO (howardwu): Reenable this test once accounts are stable following #221.
+#[ignore]
 #[test]
 pub fn private_key_test() {
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
@@ -16,6 +18,8 @@ pub fn private_key_test() {
     assert_eq!(expected_private_key, candidate_private_key);
 }
 
+// TODO (howardwu): Reenable this test once accounts are stable following #221.
+#[ignore]
 #[test]
 pub fn public_key_test() {
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
