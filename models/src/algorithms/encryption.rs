@@ -7,7 +7,8 @@ use snarkos_utilities::{
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait EncryptionScheme: Sized + Clone {
+pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Parameters> {
+    type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type PublicKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
     type Plaintext: Clone + Debug + Default + Eq + Hash;

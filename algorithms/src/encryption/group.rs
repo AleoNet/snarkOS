@@ -14,6 +14,7 @@ pub struct GroupEncryption<G: Group + ProjectiveCurve> {
 
 impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     type Ciphertext = Vec<G>;
+    type Parameters = G;
     type Plaintext = Vec<G>;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = G;
@@ -111,5 +112,11 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         }
 
         Ok(plaintext)
+    }
+}
+
+impl<G: Group + ProjectiveCurve> From<G> for GroupEncryption<G> {
+    fn from(parameters: G) -> Self {
+        Self { parameters }
     }
 }
