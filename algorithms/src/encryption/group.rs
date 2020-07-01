@@ -8,11 +8,11 @@ use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
 use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RecordEncryption<G: Group + ProjectiveCurve> {
+pub struct GroupEncryption<G: Group + ProjectiveCurve> {
     pub parameters: G,
 }
 
-impl<G: Group + ProjectiveCurve> EncryptionScheme for RecordEncryption<G> {
+impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     type Ciphertext = Vec<G>;
     type Plaintext = Vec<G>;
     type PrivateKey = <G as Group>::ScalarField;

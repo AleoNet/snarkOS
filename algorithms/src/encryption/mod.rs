@@ -1,5 +1,5 @@
-pub mod records;
-pub use self::records::*;
+pub mod group;
+pub use self::group::*;
 
 #[cfg(test)]
 pub mod tests;
