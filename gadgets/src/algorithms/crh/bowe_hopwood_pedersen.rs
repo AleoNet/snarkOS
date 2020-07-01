@@ -39,8 +39,17 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<BoweH
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        // Pad the input if it is not the current length.
-        let mut input_in_bits: Vec<_> = input.to_vec().into_iter().flat_map(|byte| byte.to_bits_le()).collect();
+        // Pad the input bytes
+        let mut padded_input_bytes = input.to_vec();
+        padded_input_bytes.resize(S::WINDOW_SIZE * S::NUM_WINDOWS / 8, UInt8::constant(0u8));
+        assert_eq!(padded_input_bytes.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
+
+        // Pad the input bits if it is not the current length.
+        let mut input_in_bits: Vec<_> = padded_input_bytes
+            .to_vec()
+            .into_iter()
+            .flat_map(|byte| byte.to_bits_le())
+            .collect();
         if (input_in_bits.len()) % BOWE_HOPWOOD_CHUNK_SIZE != 0 {
             let current_length = input_in_bits.len();
             for _ in 0..(BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE) {
