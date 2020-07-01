@@ -95,9 +95,9 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
 
         let time = start_timer!(|| format!(
             "BoweHopwoodPedersenCRH::Setup: {} segments of {} 3-bit chunks; {{0,1}}^{{{}}} -> G",
-            W::NUM_WINDOWS,
-            W::WINDOW_SIZE,
-            W::WINDOW_SIZE * W::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE
+            S::NUM_WINDOWS,
+            S::WINDOW_SIZE,
+            S::WINDOW_SIZE * S::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE
         ));
         let bases = Self::create_generators(rng);
         end_timer!(time);
@@ -109,18 +109,27 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
     fn hash(&self, input: &[u8]) -> Result<Self::Output, CRHError> {
         let eval_time = start_timer!(|| "BoweHopwoodPedersenCRH::Eval");
 
-        if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS * BOWE_HOPWOOD_CHUNK_SIZE {
-            panic!(
-                "incorrect input length {:?} for window params {:?}x{:?}x{}",
+        if (input.len() * 8) > S::WINDOW_SIZE * S::NUM_WINDOWS {
+            return Err(CRHError::IncorrectInputLength(
                 input.len(),
                 S::WINDOW_SIZE,
                 S::NUM_WINDOWS,
-                BOWE_HOPWOOD_CHUNK_SIZE,
-            );
+            ));
         }
 
-        let mut padded_input = Vec::with_capacity(input.len());
-        let input = bytes_to_bits(input);
+        // Pad the input if it is not the current length.
+        let mut input_bytes = input;
+        let mut padded_input_bytes = vec![];
+        if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
+            padded_input_bytes.extend_from_slice(input_bytes);
+            for _ in input.len()..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
+                padded_input_bytes.push(0u8);
+            }
+            input_bytes = padded_input_bytes.as_slice();
+        }
+
+        let mut padded_input = Vec::with_capacity(input_bytes.len());
+        let input = bytes_to_bits(input_bytes);
         // Pad the input if it is not the current length.
         padded_input.extend_from_slice(&input);
         if input.len() % BOWE_HOPWOOD_CHUNK_SIZE != 0 {

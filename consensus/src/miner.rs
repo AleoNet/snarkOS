@@ -150,7 +150,7 @@ impl Miner {
             time,
             difficulty_target,
             nonce,
-            proof,
+            proof: proof.into(),
         })
     }
 

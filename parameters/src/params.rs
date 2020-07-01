@@ -196,7 +196,7 @@ impl_params!(
     LedgerMerkleTreeParameters,
     ledger_merkle_tree_test,
     "ledger_merkle_tree",
-    65556
+    32804
 );
 impl_params!(
     LocalDataCommitmentParameters,
@@ -218,18 +218,18 @@ impl_params!(
 );
 
 // CRH
-impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65572);
+impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
 impl_params!(
     PredicateVKCRHParameters,
     predicate_vk_crh_test,
     "predicate_vk_crh",
-    2188956
+    1742404
 );
 impl_params!(
     SerialNumberNonceCRHParameters,
     serial_number_nonce_crh_test,
     "serial_number_nonce_crh",
-    295972
+    258180
 );
 
 // POSW SNARK
@@ -251,9 +251,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 539664038);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 421629022);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2523);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 1334516666);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 944119354);
 impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4636);
