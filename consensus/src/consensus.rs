@@ -546,11 +546,8 @@ mod tests {
 
     #[test]
     fn verify_header() {
-        let rng = &mut XorShiftRng::seed_from_u64(1234567);
-
         // mine a PoSW proof
         let posw = PoswMarlin::load().unwrap();
-        let difficulty_target = std::u64::MAX;
 
         let consensus: ConsensusParameters = ConsensusParameters {
             max_block_size: 1_000_000usize,
