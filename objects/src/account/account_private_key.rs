@@ -12,16 +12,16 @@ use std::{fmt, str::FromStr};
 
 #[derive(Derivative)]
 #[derivative(
-    Default(bound = "C: DPCComponents"),
     Clone(bound = "C: DPCComponents"),
+    Default(bound = "C: DPCComponents"),
     PartialEq(bound = "C: DPCComponents"),
     Eq(bound = "C: DPCComponents")
 )]
 pub struct AccountPrivateKey<C: DPCComponents> {
     pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
-    pub metadata: [u8; 32],
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
+    pub metadata: [u8; 32],
 }
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
@@ -39,51 +39,50 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         let sk_bytes: [u8; 32] = rng.gen();
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
 
+        // Sample randomness rpk for the commitment scheme.
+        let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+        // Construct the account private key.
+        let mut private_key = Self {
+            sk_sig,
+            sk_prf,
+            r_pk,
+            metadata: *metadata,
+        };
+
         // Sample randomly until a valid private key is found.
         loop {
             // Sample randomness rpk for the commitment scheme.
-            let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-            // Construct the account private key.
-            let private_key = Self {
-                sk_sig: sk_sig.clone(),
-                sk_prf: sk_prf.clone(),
-                metadata: metadata.clone(),
-                r_pk,
-            };
+            private_key.r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
 
             // Returns the private key if it is valid.
-            if private_key.is_valid(signature_parameters, commitment_parameters)? {
+            if private_key.is_valid(signature_parameters, commitment_parameters) {
                 return Ok(private_key);
             }
         }
     }
 
-    /// Returns `Ok(true)` if the private key is well-formed.
+    /// Returns `true` if the private key is well-formed. Otherwise, returns `false`.
     pub fn is_valid(
         &self,
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
-    ) -> Result<bool, AccountError> {
-        let commitment_bytes = to_bytes![self.commitment(signature_parameters, commitment_parameters)?]?;
-        Ok(C::AccountScalarField::read(&commitment_bytes[..]).is_ok())
+    ) -> bool {
+        self.to_decryption_key(signature_parameters, commitment_parameters)
+            .is_ok()
     }
 
-    /// Returns the commitment output to produce an account public key.
-    pub fn commitment(
+    /// Returns the decryption key for the account view key.
+    pub fn to_decryption_key(
         &self,
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
-    ) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
-        // Construct the commitment input for the account public key.
-        let pk_sig = self.pk_sig(signature_parameters)?;
-        let commit_input = to_bytes![pk_sig, self.sk_prf, self.metadata]?;
-
-        let commitment = C::AccountCommitment::commit(commitment_parameters, &commit_input, &self.r_pk)?;
-        Ok(commitment)
+    ) -> Result<C::AccountDecryptionKey, AccountError> {
+        let commitment_bytes = to_bytes![self.commitment(signature_parameters, commitment_parameters)?]?;
+        Ok(C::AccountDecryptionKey::read(&commitment_bytes[..])?)
     }
 
-    /// Returns the account signature public key.
+    /// Returns the signature public key for deriving the account view key.
     pub fn pk_sig(
         &self,
         signature_parameters: &C::AccountSignature,
@@ -91,6 +90,22 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         Ok(C::AccountSignature::generate_public_key(
             signature_parameters,
             &self.sk_sig,
+        )?)
+    }
+
+    /// Returns the commitment output of the private key.
+    fn commitment(
+        &self,
+        signature_parameters: &C::AccountSignature,
+        commitment_parameters: &C::AccountCommitment,
+    ) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
+        // Construct the commitment input for the account public key.
+        let commit_input = to_bytes![self.pk_sig(signature_parameters)?, self.sk_prf, self.metadata]?;
+
+        Ok(C::AccountCommitment::commit(
+            commitment_parameters,
+            &commit_input,
+            &self.r_pk,
         )?)
     }
 }
@@ -118,8 +133,8 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
         Ok(Self {
             sk_sig,
             sk_prf,
-            metadata,
             r_pk,
+            metadata,
         })
     }
 }
@@ -137,12 +152,12 @@ impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
         self.sk_prf
             .write(&mut private_key[36..68])
             .expect("sk_prf formatting failed");
-        self.metadata
-            .write(&mut private_key[68..100])
-            .expect("metadata formatting failed");
         self.r_pk
-            .write(&mut private_key[100..132])
+            .write(&mut private_key[68..100])
             .expect("r_pk formatting failed");
+        self.metadata
+            .write(&mut private_key[100..132])
+            .expect("metadata formatting failed");
 
         write!(f, "{}", private_key.to_base58())
     }
@@ -152,8 +167,8 @@ impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, metadata: {:?}, r_pk: {:?} }}",
-            self.sk_sig, self.sk_prf, self.metadata, self.r_pk,
+            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, r_pk: {:?}, metadata: {:?} }}",
+            self.sk_sig, self.sk_prf, self.r_pk, self.metadata,
         )
     }
 }

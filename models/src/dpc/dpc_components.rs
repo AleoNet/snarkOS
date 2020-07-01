@@ -12,7 +12,9 @@ pub trait DPCComponents: 'static + Sized {
     type OuterField: PrimeField;
 
     /// Encryption scheme for account records.
-    type AccountScalarField: PrimeField;
+    // TODO (howardwu): Formalize this into an EncryptionScheme (EncryptionKey, DecryptionKey).
+    // type AccountEncryptionKey: ;
+    type AccountDecryptionKey: PrimeField;
 
     /// Commitment scheme for account contents. Invoked only over `Self::InnerField`.
     type AccountCommitment: CommitmentScheme;

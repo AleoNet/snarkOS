@@ -113,7 +113,7 @@ pub struct Components;
 impl DPCComponents for Components {
     type AccountCommitment = AccountCommitment;
     type AccountCommitmentGadget = AccountCommitmentGadget;
-    type AccountScalarField = EdwardsFr;
+    type AccountDecryptionKey = EdwardsFr;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;

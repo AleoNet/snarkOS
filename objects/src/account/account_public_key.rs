@@ -1,7 +1,7 @@
-use crate::account_format;
+use crate::{account_format, AccountPrivateKey};
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{algorithms::CommitmentScheme, dpc::DPCComponents};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
 use bech32::{Bech32, FromBase32, ToBase32};
 use std::{
@@ -18,19 +18,31 @@ use std::{
     Eq(bound = "C: DPCComponents")
 )]
 pub struct AccountPublicKey<C: DPCComponents> {
-    pub commitment: <C::AccountCommitment as CommitmentScheme>::Output,
+    pub decryption_key: C::AccountDecryptionKey,
 }
 
 impl<C: DPCComponents> AccountPublicKey<C> {
     /// Creates a new account public key from an account private key.
-    pub fn from(commitment: <C::AccountCommitment as CommitmentScheme>::Output) -> Result<Self, AccountError> {
-        Ok(Self { commitment })
+    pub fn from(
+        signature_parameters: &C::AccountSignature,
+        commitment_parameters: &C::AccountCommitment,
+        private_key: &AccountPrivateKey<C>,
+    ) -> Result<Self, AccountError> {
+        let decryption_key = private_key.to_decryption_key(signature_parameters, commitment_parameters)?;
+        Ok(Self { decryption_key })
+    }
+
+    pub fn as_commitment(&self) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
+        let commitment_bytes = to_bytes![self.decryption_key]?;
+        Ok(<C::AccountCommitment as CommitmentScheme>::Output::read(
+            &commitment_bytes[..],
+        )?)
     }
 }
 
 impl<C: DPCComponents> ToBytes for AccountPublicKey<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.commitment.write(&mut writer)
+        self.decryption_key.write(&mut writer)
     }
 }
 
@@ -38,9 +50,9 @@ impl<C: DPCComponents> FromBytes for AccountPublicKey<C> {
     /// Reads in an account public key buffer.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let commitment: <C::AccountCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
+        let decryption_key: C::AccountDecryptionKey = FromBytes::read(&mut reader)?;
 
-        Ok(Self { commitment })
+        Ok(Self { decryption_key })
     }
 }
 
@@ -71,7 +83,7 @@ impl<C: DPCComponents> FromStr for AccountPublicKey<C> {
 impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut public_key = [0u8; 32];
-        self.commitment
+        self.decryption_key
             .write(&mut public_key[0..32])
             .expect("public key formatting failed");
 
@@ -84,6 +96,6 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
 
 impl<C: DPCComponents> fmt::Debug for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "AccountPublicKey {{ commitment: {:?} }}", self.commitment)
+        write!(f, "AccountPublicKey {{ decryption_key: {:?} }}", self.decryption_key)
     }
 }

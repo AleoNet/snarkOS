@@ -4,8 +4,8 @@ use snarkos_errors::objects::AccountError;
 use rand::Rng;
 
 pub trait AccountScheme: Sized {
-    type AccountPublicKey: Default;
-    type AccountPrivateKey: Default;
+    type AccountPublicKey;
+    type AccountPrivateKey;
     type CommitmentScheme: CommitmentScheme;
     type SignatureScheme: SignatureScheme;
 

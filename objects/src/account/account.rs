@@ -26,7 +26,7 @@ impl<C: DPCComponents> AccountScheme for Account<C> {
         rng: &mut R,
     ) -> Result<Self, AccountError> {
         let private_key = AccountPrivateKey::new(signature_parameters, commitment_parameters, metadata, rng)?;
-        let public_key = AccountPublicKey::from(private_key.commitment(signature_parameters, commitment_parameters)?)?;
+        let public_key = AccountPublicKey::from(signature_parameters, commitment_parameters, &private_key)?;
 
         Ok(Self {
             private_key,

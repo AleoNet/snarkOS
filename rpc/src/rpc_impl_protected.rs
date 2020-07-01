@@ -187,10 +187,11 @@ impl ProtectedRpcFunctions for RpcImpl {
                 .hash(&[64u8; 1])?;
 
             let private_key = old_account_private_keys[0].clone();
-            let public_key = AccountPublicKey::<Components>::from(private_key.commitment(
+            let public_key = AccountPublicKey::<Components>::from(
                 &self.parameters.circuit_parameters.account_signature,
                 &self.parameters.circuit_parameters.account_commitment,
-            )?)?;
+                &private_key,
+            )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
                 &self.parameters.circuit_parameters,
