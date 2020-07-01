@@ -175,6 +175,8 @@ impl RpcFunctions for RpcImpl {
             None => None,
         };
 
+        let transaction_metadata = TransactionMetadata { block_number };
+
         Ok(TransactionInfo {
             txid: hex::encode(&transaction_id),
             size: transaction_bytes.len(),
@@ -187,7 +189,7 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
-            block_number,
+            transaction_metadata,
         })
     }
 
