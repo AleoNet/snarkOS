@@ -1,12 +1,23 @@
 use crate::encryption::GroupEncryption;
 use snarkos_curves::edwards_bls12::EdwardsProjective;
-use snarkos_models::algorithms::EncryptionScheme;
-use snarkos_utilities::rand::UniformRand;
+use snarkos_models::{
+    algorithms::EncryptionScheme,
+    curves::{Group, ProjectiveCurve},
+};
 
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 type TestEncryptionScheme = GroupEncryption<EdwardsProjective>;
+
+fn generate_input<G: Group + ProjectiveCurve, R: Rng>(input_size: usize, rng: &mut R) -> Vec<G> {
+    let mut input = vec![];
+    for _ in 0..input_size {
+        input.push(G::rand(rng))
+    }
+
+    input
+}
 
 #[test]
 fn simple_encryption() {
@@ -16,7 +27,7 @@ fn simple_encryption() {
 
     let (private_key, public_key) = encryption_scheme.keygen(rng);
 
-    let message = vec![EdwardsProjective::rand(rng); 32];
+    let message = generate_input(32, rng);
 
     let ciphertext = encryption_scheme.encrypt(&public_key, &message, rng).unwrap();
 
