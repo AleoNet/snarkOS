@@ -446,16 +446,16 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
             let h_j = record_view_key_gadget.mul_bits(cs.ns(|| "h_j"), &zero, blinding_exponent_bits.iter())?;
 
             // z * h_j
-            let a = h_j.mul_bits(cs.ns(|| "z * h_j"), &zero, z_bits.iter())?;
+            let zh_j = h_j.mul_bits(cs.ns(|| "z * h_j"), &zero, z_bits.iter())?;
 
             // j * h_j
-            let mut incremental_h_j = GG::zero(&mut cs.ns(|| "j * h_j"))?;
+            let mut jh_j = GG::zero(&mut cs.ns(|| "j * h_j"))?;
             for i in 0..index + 1 {
-                incremental_h_j = incremental_h_j.add(cs.ns(|| format!("add: {}", i)), &h_j)?;
+                jh_j = jh_j.add(cs.ns(|| format!("add: {}", i)), &h_j)?;
             }
 
             // (z_i [+] j) * h_i,j
-            let expected_record_view_key = a.add(cs.ns(|| "expected record view key"), &incremental_h_j)?;
+            let expected_record_view_key = zh_j.add(cs.ns(|| "expected record view key"), &jh_j)?;
 
             expected_record_view_key.enforce_equal(
                 &mut cs.ns(|| "Check that declared and computed record view keys are equal"),
