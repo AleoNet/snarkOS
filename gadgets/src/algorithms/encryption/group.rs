@@ -402,7 +402,6 @@ impl<
     type ParametersGadget = GroupEncryptionParametersGadget<G, F, GG>;
     type PlaintextGadget = GroupEncryptionPlaintextGadget<G, F, GG>;
     type PrivateKeyGadget = GroupEncryptionPrivateKeyGadget<G>;
-    // TODO Remove this
     type PublicKeyGadget = GroupEncryptionPublicKeyGadget<G, F, GG>;
     type RandomnessGadget = GroupEncryptionRandomnessGadget<G>;
 
