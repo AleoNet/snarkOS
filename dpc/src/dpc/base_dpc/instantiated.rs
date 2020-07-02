@@ -14,6 +14,7 @@ use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{BoweHopwoodPedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
+    encryption::GroupEncryption,
     prf::Blake2s,
     signature::SchnorrSignature,
     snark::GM17,
@@ -110,7 +111,8 @@ pub struct Components;
 impl DPCComponents for Components {
     type AccountCommitment = AccountCommitment;
     type AccountCommitmentGadget = AccountCommitmentGadget;
-    type AccountDecryptionKey = EdwardsFr;
+    type AccountDecryptionKey = AccountDecryptionKey;
+    type AccountEncryption = AccountEncryption;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;
@@ -156,6 +158,8 @@ pub type InnerField = Bls12_377Fr;
 pub type OuterField = Bls12_377Fq;
 
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
+pub type AccountEncryption = GroupEncryption<EdwardsBls>;
+pub type AccountDecryptionKey = EdwardsFr;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;

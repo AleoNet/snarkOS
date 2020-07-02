@@ -2,7 +2,7 @@ use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
@@ -206,6 +206,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
+        let time = start_timer!(|| "Account encryption scheme setup");
+        let account_encryption = Components::AccountEncryption::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Account signature setup");
+        let account_signature = Components::AccountSignature::setup(rng)?;
+        end_timer!(time);
+
         let time = start_timer!(|| "Record commitment scheme setup");
         let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
@@ -234,12 +242,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Account signature setup");
-        let account_signature = Components::AccountSignature::setup(rng)?;
-        end_timer!(time);
-
         let comm_crh_sig_pp = CircuitParameters {
             account_commitment,
+            account_encryption,
             account_signature,
             record_commitment: rec_comm_pp,
             predicate_verification_key_commitment: pred_vk_comm_pp,

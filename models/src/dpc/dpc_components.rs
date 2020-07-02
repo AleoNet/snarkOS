@@ -1,5 +1,5 @@
 use crate::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH, PRF},
     curves::PrimeField,
     gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
 };
@@ -13,7 +13,7 @@ pub trait DPCComponents: 'static + Sized {
 
     /// Encryption scheme for account records.
     // TODO (howardwu): Formalize this into an EncryptionScheme (EncryptionKey, DecryptionKey).
-    // type AccountEncryptionKey: ;
+    type AccountEncryption: EncryptionScheme;
     type AccountDecryptionKey: PrimeField;
 
     /// Commitment scheme for account contents. Invoked only over `Self::InnerField`.

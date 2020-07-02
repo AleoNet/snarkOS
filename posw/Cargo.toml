@@ -11,10 +11,6 @@ include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
 
-[[bench]]
-name = "posw"
-harness = false
-
 [dependencies]
 snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
 snarkos-curves = { path = "../curves", version = "0.8.0" } # needed to instantiate with BLS12-377
