@@ -17,17 +17,16 @@ pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type CiphertextGadget: EqGadget<F> + AllocGadget<E::Ciphertext, F> + Clone + Sized + Debug;
     type PlaintextGadget: EqGadget<F> + AllocGadget<E::Plaintext, F> + Clone + Sized + Debug;
 
-    //    fn check_encryption_gadget<CS: ConstraintSystem<F>>(
-    //        cs: CS,
-    //        parameters: &Self::ParametersGadget,
-    //        public_key: &Self::PublicKeyGadget,
-    //        input: &Self::PlaintextGadget,
-    //    ) -> Result<Self::CiphertextGadget, SynthesisError>;
+    //TODO Add handle E::PrivateKey with more formal G::ScalarField
+    type RandomnessGadget: AllocGadget<E::PrivateKey, F> + Clone + Sized + Debug;
+    type BlindingExponentGadget: AllocGadget<Vec<E::PrivateKey>, F> + Clone + Sized + Debug;
 
-    //    fn check_decryption_gadget<CS: ConstraintSystem<F>>(
-    //        cs: CS,
-    //        parameters: &Self::ParametersGadget,
-    //        private_key: &Self::PrivateKeyGadget,
-    //        input: &Self::CiphertextGadget,
-    //    ) -> Result<Self::PlaintextGadget, SynthesisError>;
+    fn check_encryption_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        randomness: &Self::RandomnessGadget,
+        public_key: &Self::PublicKeyGadget,
+        input: &Self::PlaintextGadget,
+        blinding_exponents: &Self::BlindingExponentGadget,
+    ) -> Result<(), SynthesisError>;
 }
