@@ -4,7 +4,7 @@ use snarkos_models::{
     curves::{Field, Group, PrimeField, ProjectiveCurve},
     gadgets::{
         algorithms::EncryptionGadget,
-        curves::{CompressedGroupGadget, FieldGadget, GroupGadget},
+        curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
@@ -378,24 +378,14 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionC
 // Group Encryption Gadget
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GroupEncryptionGadget<
-    G: Group + ProjectiveCurve,
-    F: PrimeField,
-    FG: FieldGadget<<G as Group>::ScalarField, F>,
-    GG: CompressedGroupGadget<G, F>,
-> {
-    _field_gadget: PhantomData<fn() -> FG>,
+pub struct GroupEncryptionGadget<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>> {
     _group: PhantomData<fn() -> G>,
     _group_gadget: PhantomData<fn() -> GG>,
     _engine: PhantomData<F>,
 }
 
-impl<
-    G: Group + ProjectiveCurve,
-    F: PrimeField,
-    FG: FieldGadget<<G as Group>::ScalarField, F>,
-    GG: CompressedGroupGadget<G, F>,
-> EncryptionGadget<GroupEncryption<G>, F> for GroupEncryptionGadget<G, F, FG, GG>
+impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>> EncryptionGadget<GroupEncryption<G>, F>
+    for GroupEncryptionGadget<G, F, GG>
 {
     type BlindingExponentGadget = GroupEncryptionBlindingExponentsGadget<G>;
     type CiphertextGadget = GroupEncryptionCiphertextGadget<G, F, GG>;
@@ -444,9 +434,6 @@ impl<
         let z_bytes = z.to_bytes(&mut cs.ns(|| "z_to_bytes"))?;
         let z_bits: Vec<_> = z_bytes.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
 
-        let one = FG::one(cs.ns(|| "one"))?;
-        let mut j = FG::one(cs.ns(|| "j"))?;
-
         let mut ciphertext = vec![c_0];
         for (index, (blinding_exponent, m_j)) in blinding_exponents.0.iter().zip(&input.plaintext).enumerate() {
             let cs = &mut cs.ns(|| format!("c_{}", index + 1));
@@ -462,11 +449,13 @@ impl<
             let a = h_j.mul_bits(cs.ns(|| "z * h_j"), &zero, z_bits.iter())?;
 
             // j * h_j
-            let j_bits = j.to_bits(cs.ns(|| "j_bits"))?;
-            let b = h_j.mul_bits(cs.ns(|| "j * h_j"), &zero, j_bits.iter())?;
+            let mut incremental_h_j = GG::zero(&mut cs.ns(|| "j * h_j"))?;
+            for i in 0..index + 1 {
+                incremental_h_j = incremental_h_j.add(cs.ns(|| format!("add: {}", i)), &h_j)?;
+            }
 
             // (z_i [+] j) * h_i,j
-            let expected_record_view_key = a.add(cs.ns(|| "expected record view key"), &b)?;
+            let expected_record_view_key = a.add(cs.ns(|| "expected record view key"), &incremental_h_j)?;
 
             expected_record_view_key.enforce_equal(
                 &mut cs.ns(|| "Check that declared and computed record view keys are equal"),
@@ -477,7 +466,6 @@ impl<
             let c_j = h_j.add(cs.ns(|| "construct c_j"), &m_j)?;
 
             ciphertext.push(c_j);
-            j = j.add(cs.ns(|| format!("index {}", index + 1)), &one)?;
         }
 
         Ok(GroupEncryptionCiphertextGadget {
