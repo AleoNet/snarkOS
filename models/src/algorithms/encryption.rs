@@ -22,13 +22,25 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
 
     fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
 
-    // TODO (raychu86) clean up model for getting randomness and blinding exponents
-    fn encrypt<R: Rng>(
+    fn generate_randomness<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
-        message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<(Self::Ciphertext, Self::Randomness, Self::BlindingExponents), EncryptionError>;
+    ) -> Result<Self::Randomness, EncryptionError>;
+
+    fn generate_blinding_exponents(
+        &self,
+        public_key: &Self::PublicKey,
+        randomness: &Self::Randomness,
+        message_length: usize,
+    ) -> Result<Self::BlindingExponents, EncryptionError>;
+
+    fn encrypt(
+        &self,
+        public_key: &Self::PublicKey,
+        randomness: &Self::Randomness,
+        message: &Self::Plaintext,
+    ) -> Result<Self::Ciphertext, EncryptionError>;
 
     fn decrypt(
         &self,

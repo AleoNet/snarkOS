@@ -43,43 +43,75 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         public_key
     }
 
-    fn encrypt<R: Rng>(
+    fn generate_randomness<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
-        message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<(Self::Ciphertext, Self::Randomness, Self::BlindingExponents), EncryptionError> {
-        let mut record_view_key = G::zero();
+    ) -> Result<Self::Randomness, EncryptionError> {
         let mut y = Self::Randomness::zero();
         let mut z_bytes = vec![];
 
         while Self::Randomness::read(&z_bytes[..]).is_err() {
             y = Self::Randomness::rand(rng);
-            record_view_key = public_key.mul(&y);
 
-            let affine = record_view_key.into_affine();
+            let affine = public_key.mul(&y).into_affine();
             debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
             z_bytes = to_bytes![affine.to_x_coordinate()]?;
         }
 
+        Ok(y)
+    }
+
+    fn generate_blinding_exponents(
+        &self,
+        public_key: &Self::PublicKey,
+        randomness: &Self::Randomness,
+        message_length: usize,
+    ) -> Result<Self::BlindingExponents, EncryptionError> {
+        let record_view_key = public_key.mul(&randomness);
+
+        let affine = record_view_key.into_affine();
+        debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
+        let z_bytes = to_bytes![affine.to_x_coordinate()]?;
+
         let z = Self::Randomness::read(&z_bytes[..])?;
 
-        let c_0 = self.parameters.mul(&y);
-
         let one = Self::Randomness::one();
-        let mut ciphertext = vec![c_0];
         let mut i = Self::Randomness::one();
 
         let mut blinding_exponents = vec![];
-        for m_i in message {
-            // h_i <- 1 [/] (z [+] i) * record_view_key
-            let h_i = match &(z + &i).inverse() {
-                Some(val) => {
-                    blinding_exponents.push(val.clone());
-                    record_view_key.mul(val)
-                }
+        for _ in 0..message_length {
+            // 1 [/] (z [+] i)
+            match (z + &i).inverse() {
+                Some(val) => blinding_exponents.push(val),
                 None => return Err(EncryptionError::MissingInverse),
             };
+
+            i += &one;
+        }
+
+        Ok(blinding_exponents)
+    }
+
+    fn encrypt(
+        &self,
+        public_key: &Self::PublicKey,
+        randomness: &Self::Randomness,
+        message: &Self::Plaintext,
+    ) -> Result<Self::Ciphertext, EncryptionError> {
+        let record_view_key = public_key.mul(&randomness);
+
+        let c_0 = self.parameters.mul(&randomness);
+        let mut ciphertext = vec![c_0];
+
+        let one = Self::Randomness::one();
+        let mut i = Self::Randomness::one();
+
+        let blinding_exponents = self.generate_blinding_exponents(public_key, randomness, message.len())?;
+
+        for (m_i, blinding_exp) in message.iter().zip(blinding_exponents) {
+            // h_i <- 1 [/] (z [+] i) * record_view_key
+            let h_i = record_view_key.mul(&blinding_exp);
 
             // c_i <- h_i + m_i
             let c_i = h_i + m_i;
@@ -88,7 +120,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
             i += &one;
         }
 
-        Ok((ciphertext, y, blinding_exponents))
+        Ok(ciphertext)
     }
 
     fn decrypt(
