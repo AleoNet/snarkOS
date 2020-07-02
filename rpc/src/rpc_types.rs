@@ -62,6 +62,12 @@ pub struct PeerInfo {
     pub peers: Vec<SocketAddr>,
 }
 
+/// Transaction Metadata
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionMetadata {
+    pub block_number: Option<u32>,
+}
+
 /// Returned value for the `gettransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionInfo {
@@ -99,7 +105,7 @@ pub struct TransactionInfo {
     pub signatures: Vec<String>,
 
     /// Block the transaction lives in
-    pub block_number: Option<u32>,
+    pub transaction_metadata: TransactionMetadata,
 }
 
 /// Record payload
