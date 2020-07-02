@@ -345,12 +345,7 @@ where
             // or hash is incorrect, then it will not match the computed equivalent.
             let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
                 &mut declare_cs.ns(|| "given_account_public_key"),
-                || {
-                    Ok(record
-                        .account_public_key()
-                        .as_commitment()
-                        .map_err(|_| SynthesisError::AssignmentMissing)?)
-                },
+                || Ok(record.account_public_key().into_repr()),
             )?;
             old_account_public_keys_gadgets.push(given_account_public_key.clone());
 
@@ -611,12 +606,7 @@ where
 
             let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
                 &mut declare_cs.ns(|| "given_account_public_key"),
-                || {
-                    Ok(record
-                        .account_public_key()
-                        .as_commitment()
-                        .map_err(|_| SynthesisError::AssignmentMissing)?)
-                },
+                || Ok(record.account_public_key().into_repr()),
             )?;
             new_account_public_keys_gadgets.push(given_account_public_key.clone());
 

@@ -16,7 +16,9 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
-    fn keygen<R: Rng>(&self, rng: &mut R) -> (Self::PrivateKey, Self::PublicKey);
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Self::PrivateKey;
+
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
 
     fn encrypt<R: Rng>(
         &self,

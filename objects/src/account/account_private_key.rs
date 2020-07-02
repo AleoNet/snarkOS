@@ -1,7 +1,7 @@
 use crate::account_format;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SignatureScheme, PRF},
+    algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, PRF},
     curves::PrimeField,
     dpc::DPCComponents,
 };
@@ -71,12 +71,13 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         &self,
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
-    ) -> Result<C::AccountDecryptionKey, AccountError> {
-        let commitment_bytes = to_bytes![self.commit(signature_parameters, commitment_parameters)?]?;
+    ) -> Result<<C::AccountEncryption as EncryptionScheme>::PrivateKey, AccountError> {
+        let commitment = self.commit(signature_parameters, commitment_parameters)?;
+        let decryption_key_bytes = to_bytes![commitment]?;
 
         // This operation implicitly enforces that the unused MSB bits
         // for the scalar field representation are correctly set to 0.
-        let decryption_key = C::AccountDecryptionKey::read(&commitment_bytes[..])?;
+        let decryption_key = C::AccountDecryptionKey::read(&decryption_key_bytes[..])?;
 
         // To simplify verification of this isomorphism from the base field
         // to the scalar field in the `inner_snark`, we additionally enforce
@@ -88,7 +89,9 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
             return Err(AccountError::InvalidAccountCommitment);
         }
 
-        Ok(decryption_key)
+        Ok(<C::AccountEncryption as EncryptionScheme>::PrivateKey::read(
+            &decryption_key_bytes[..],
+        )?)
     }
 
     /// Returns the signature public key for deriving the account view key.

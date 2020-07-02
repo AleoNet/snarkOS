@@ -312,7 +312,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let death_predicate_repr = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_public_key.decryption_key, // 256 bits = 32 bytes
+            account_public_key.encryption_key, // 256 bits = 32 bytes
             is_dummy,                          // 1 bit = 1 byte
             value,                             // 64 bits = 8 bytes
             payload,                           // 256 bits = 32 bytes
@@ -631,7 +631,13 @@ where
 
         let account_signature_parameters = &parameters.circuit_parameters.account_signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(account_signature_parameters, commitment_parameters, rng)?;
+        let encryption_parameters = &parameters.circuit_parameters.account_encryption;
+        let account = Account::new(
+            account_signature_parameters,
+            commitment_parameters,
+            encryption_parameters,
+            rng,
+        )?;
 
         end_timer!(time);
 

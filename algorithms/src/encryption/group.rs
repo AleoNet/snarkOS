@@ -25,12 +25,20 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         }
     }
 
-    fn keygen<R: Rng>(&self, rng: &mut R) -> (Self::PrivateKey, Self::PublicKey) {
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Self::PrivateKey {
+        let keygen_time = start_timer!(|| "GroupEncryption::generate_private_key");
         let private_key = <G as Group>::ScalarField::rand(rng);
+        end_timer!(keygen_time);
 
+        private_key
+    }
+
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey {
+        let keygen_time = start_timer!(|| "GroupEncryption::generate_public_key");
         let public_key = self.parameters.mul(&private_key);
+        end_timer!(keygen_time);
 
-        (private_key, public_key)
+        public_key
     }
 
     fn encrypt<R: Rng>(

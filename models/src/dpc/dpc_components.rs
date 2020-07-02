@@ -12,7 +12,6 @@ pub trait DPCComponents: 'static + Sized {
     type OuterField: PrimeField;
 
     /// Encryption scheme for account records.
-    // TODO (howardwu): Formalize this into an EncryptionScheme (EncryptionKey, DecryptionKey).
     type AccountEncryption: EncryptionScheme;
     type AccountDecryptionKey: PrimeField;
 
