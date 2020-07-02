@@ -426,13 +426,12 @@ impl<
         randomness: &Self::RandomnessGadget,               // y
         public_key: &Self::PublicKeyGadget,                // account_address
         input: &Self::PlaintextGadget,                     // m
-        blinding_exponents: &Self::BlindingExponentGadget, // 1 [/] (z_i [+] j)
-    ) -> Result<(), SynthesisError> {
-        assert!(input.plaintext.len() > 0);
+        blinding_exponents: &Self::BlindingExponentGadget, // 1 [/] (z [+] j)
+    ) -> Result<Self::CiphertextGadget, SynthesisError> {
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
 
         let randomness_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
-        let c0 = parameters
+        let c_0 = parameters
             .parameters
             .mul_bits(cs.ns(|| "c_0"), &zero, randomness_bits.iter())?;
 
@@ -446,39 +445,45 @@ impl<
         let z_bits: Vec<_> = z_bytes.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
 
         let one = FG::one(cs.ns(|| "one"))?;
-        let mut j = FG::zero(cs.ns(|| "i"))?;
+        let mut j = FG::one(cs.ns(|| "j"))?;
 
-        for (index, blinding_exponent) in blinding_exponents.0.iter().enumerate() {
-            let cs = &mut cs.ns(|| format!("iteration: {}", index));
+        let mut ciphertext = vec![c_0];
+        for (index, (blinding_exponent, m_j)) in blinding_exponents.0.iter().zip(&input.plaintext).enumerate() {
+            let cs = &mut cs.ns(|| format!("c_{}", index + 1));
 
             let blinding_exponent_bits: Vec<_> = blinding_exponent
                 .iter()
                 .flat_map(|byte| byte.clone().to_bits_le())
                 .collect();
-            let h_j = record_view_key_gadget.mul_bits(
-                cs.ns(|| format!("h_{}", index)),
-                &zero,
-                blinding_exponent_bits.iter(),
-            )?;
+
+            let h_j = record_view_key_gadget.mul_bits(cs.ns(|| "h_j"), &zero, blinding_exponent_bits.iter())?;
 
             // z * h_j
-            let a = h_j.mul_bits(cs.ns(|| format!("z * h_{}", index)), &zero, z_bits.iter())?;
+            let a = h_j.mul_bits(cs.ns(|| "z * h_j"), &zero, z_bits.iter())?;
 
             // j * h_j
-            let j_bits = j.to_bits(cs.ns(|| format!("{}_bits", index)))?;
-            let b = h_j.mul_bits(cs.ns(|| format!("j * h_{}", index)), &zero, j_bits.iter())?;
+            let j_bits = j.to_bits(cs.ns(|| "j_bits"))?;
+            let b = h_j.mul_bits(cs.ns(|| "j * h_j"), &zero, j_bits.iter())?;
 
             // (z_i [+] j) * h_i,j
-            let expected_record_view_key = a.add(cs.ns(|| format!("expected record view key {}", index)), &b)?;
+            let expected_record_view_key = a.add(cs.ns(|| "expected record view key"), &b)?;
 
             expected_record_view_key.enforce_equal(
                 &mut cs.ns(|| "Check that declared and computed record view keys are equal"),
                 &record_view_key_gadget,
             )?;
 
-            j = j.add(cs.ns(|| format!("index {}", index)), &one)?;
+            // Construct c_j
+            let c_j = h_j.add(cs.ns(|| "construct c_j"), &m_j)?;
+
+            ciphertext.push(c_j);
+            j = j.add(cs.ns(|| format!("index {}", index + 1)), &one)?;
         }
 
-        Ok(())
+        Ok(GroupEncryptionCiphertextGadget {
+            ciphertext,
+            _engine: PhantomData,
+            _group: PhantomData,
+        })
     }
 }
