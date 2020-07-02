@@ -203,6 +203,30 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> Clone for Grou
     }
 }
 
+impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for GroupEncryptionPublicKeyGadget<G, F, GG> {
+    #[inline]
+    fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        other: &Self,
+        condition: &Boolean,
+    ) -> Result<(), SynthesisError> {
+        self.public_key.conditional_enforce_equal(
+            &mut cs.ns(|| format!("conditional_enforce_equal")),
+            &other.public_key,
+            condition,
+        )?;
+
+        Ok(())
+    }
+
+    fn cost() -> usize {
+        <GG as ConditionalEqGadget<F>>::cost()
+    }
+}
+
+impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionPublicKeyGadget<G, F, GG> {}
+
 // GroupEncryption Plaintext Gadget
 #[derive(Debug, PartialEq, Eq)]
 pub struct GroupEncryptionPlaintextGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
@@ -401,8 +425,10 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
         private_key: &Self::PrivateKeyGadget,
     ) -> Result<Self::PublicKeyGadget, SynthesisError> {
         let base = parameters.parameters.clone();
+        let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
+
         let private_key_bits = private_key.0.iter().flat_map(|b| b.to_bits_le()).collect::<Vec<_>>();
-        let public_key = base.mul_bits(&mut cs.ns(|| "check_public_key_gadget"), &base, private_key_bits.iter())?;
+        let public_key = base.mul_bits(&mut cs.ns(|| "check_public_key_gadget"), &zero, private_key_bits.iter())?;
         Ok(GroupEncryptionPublicKeyGadget {
             public_key,
             _group: PhantomData,

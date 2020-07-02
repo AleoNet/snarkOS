@@ -13,7 +13,7 @@ use std::fmt::Debug;
 pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type ParametersGadget: AllocGadget<E::Parameters, F> + Clone;
     type PrivateKeyGadget: AllocGadget<E::PrivateKey, F> + Clone + Sized + Debug;
-    type PublicKeyGadget: AllocGadget<E::PublicKey, F> + Clone + Sized + Debug;
+    type PublicKeyGadget: EqGadget<F> + AllocGadget<E::PublicKey, F> + Clone + Sized + Debug;
     type CiphertextGadget: EqGadget<F> + AllocGadget<E::Ciphertext, F> + Clone + Sized + Debug;
     type PlaintextGadget: EqGadget<F> + AllocGadget<E::Plaintext, F> + Clone + Sized + Debug;
     type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
