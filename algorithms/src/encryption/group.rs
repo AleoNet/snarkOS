@@ -47,7 +47,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         public_key: &Self::PublicKey,
         message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<Self::Ciphertext, EncryptionError> {
+    ) -> Result<(Self::Ciphertext, Self::Randomness, Vec<Self::Randomness>), EncryptionError> {
         let mut record_view_key = G::zero();
         let mut y = Self::Randomness::zero();
         let mut z_bytes = vec![];
@@ -69,10 +69,14 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         let mut ciphertext = vec![c_0];
         let mut i = Self::Randomness::one();
 
+        let mut blinding_exponents = vec![];
         for m_i in message {
             // h_i <- 1 [/] (z [+] i) * record_view_key
             let h_i = match &(z + &i).inverse() {
-                Some(val) => record_view_key.mul(val),
+                Some(val) => {
+                    blinding_exponents.push(val.clone());
+                    record_view_key.mul(val)
+                }
                 None => return Err(EncryptionError::MissingInverse),
             };
 
@@ -83,7 +87,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
             i += &one;
         }
 
-        Ok(ciphertext)
+        Ok((ciphertext, y, blinding_exponents))
     }
 
     fn decrypt(

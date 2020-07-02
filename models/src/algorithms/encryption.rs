@@ -26,7 +26,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
         public_key: &Self::PublicKey,
         message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<Self::Ciphertext, EncryptionError>;
+    ) -> Result<(Self::Ciphertext, Self::Randomness, Vec<Self::Randomness>), EncryptionError>;
 
     fn decrypt(
         &self,

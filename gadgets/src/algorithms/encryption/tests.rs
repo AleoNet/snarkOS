@@ -18,7 +18,7 @@ use rand_xorshift::XorShiftRng;
 type TestEncryptionScheme = GroupEncryption<EdwardsProjective>;
 type TestEncryptionSchemeGadget = GroupEncryptionGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
 
-pub fn generate_input<G: Group + ProjectiveCurve, R: Rng>(input_size: usize, rng: &mut R) -> Vec<G> {
+fn generate_input<G: Group + ProjectiveCurve, R: Rng>(input_size: usize, rng: &mut R) -> Vec<G> {
     let mut input = vec![];
     for _ in 0..input_size {
         input.push(G::rand(rng))
@@ -64,6 +64,78 @@ fn test_group_encryption_public_key_gadget() {
         .enforce_equal(
             cs.ns(|| "Check that declared and computed public keys are equal"),
             &public_key_gadget,
+        )
+        .unwrap();
+
+    if !cs.is_satisfied() {
+        println!("which is unsatisfied: {:?}", cs.which_is_unsatisfied().unwrap());
+    }
+    assert!(cs.is_satisfied());
+}
+
+#[test]
+fn test_group_encryption_gadget() {
+    let mut cs = TestConstraintSystem::<Fr>::new();
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
+
+    let encryption_scheme = TestEncryptionScheme::setup(rng);
+
+    let private_key = encryption_scheme.generate_private_key(rng);
+    let public_key = encryption_scheme.generate_public_key(&private_key);
+
+    let message = generate_input(32, rng);
+
+    let (ciphertext, randomness, blinding_exponents) = encryption_scheme.encrypt(&public_key, &message, rng).unwrap();
+
+    // Alloc parameters, public key, plaintext, randomness, and blinding exponents
+    let parameters_gadget = <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::ParametersGadget::alloc(
+        &mut cs.ns(|| "parameters_gadget"),
+        || Ok(&encryption_scheme.parameters),
+    )
+    .unwrap();
+    let public_key_gadget = <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::PublicKeyGadget::alloc(
+        &mut cs.ns(|| "public_key_gadget"),
+        || Ok(&public_key),
+    )
+    .unwrap();
+    let plaintext_gadget = <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::PlaintextGadget::alloc(
+        &mut cs.ns(|| "plaintext_gadget"),
+        || Ok(&message),
+    )
+    .unwrap();
+    let randomness_gadget = <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::RandomnessGadget::alloc(
+        &mut cs.ns(|| "randomness_gadget"),
+        || Ok(&randomness),
+    )
+    .unwrap();
+    let blinding_exponents_gadget =
+        <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::BlindingExponentGadget::alloc(
+            &mut cs.ns(|| "blinding_exponents_gadget"),
+            || Ok(&blinding_exponents),
+        )
+        .unwrap();
+
+    // Expected ciphertext gadget
+    let expected_ciphertext_gadget = <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::CiphertextGadget::alloc(
+        &mut cs.ns(|| "ciphertext_gadget"),
+        || Ok(&ciphertext),
+    )
+    .unwrap();
+
+    let ciphertext_gadget = TestEncryptionSchemeGadget::check_encryption_gadget(
+        &mut cs.ns(|| "ciphertext_gadget_evaluation"),
+        &parameters_gadget,
+        &randomness_gadget,
+        &public_key_gadget,
+        &plaintext_gadget,
+        &blinding_exponents_gadget,
+    )
+    .unwrap();
+
+    expected_ciphertext_gadget
+        .enforce_equal(
+            cs.ns(|| "Check that declared and computed ciphertexts are equal"),
+            &ciphertext_gadget,
         )
         .unwrap();
 
