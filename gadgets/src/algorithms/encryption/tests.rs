@@ -60,12 +60,16 @@ fn test_group_encryption_public_key_gadget() {
     )
     .unwrap();
 
+    println!("number of constraints for inputs: {}", cs.num_constraints());
+
     expected_public_key_gadget
         .enforce_equal(
             cs.ns(|| "Check that declared and computed public keys are equal"),
             &public_key_gadget,
         )
         .unwrap();
+
+    println!("number of constraints total: {}", cs.num_constraints());
 
     if !cs.is_satisfied() {
         println!("which is unsatisfied: {:?}", cs.which_is_unsatisfied().unwrap());
@@ -83,9 +87,12 @@ fn test_group_encryption_gadget() {
     let private_key = encryption_scheme.generate_private_key(rng);
     let public_key = encryption_scheme.generate_public_key(&private_key);
 
+    let randomness = encryption_scheme.generate_randomness(&public_key, rng).unwrap();
     let message = generate_input(32, rng);
-
-    let (ciphertext, randomness, blinding_exponents) = encryption_scheme.encrypt(&public_key, &message, rng).unwrap();
+    let blinding_exponents = encryption_scheme
+        .generate_blinding_exponents(&public_key, &randomness, message.len())
+        .unwrap();
+    let ciphertext = encryption_scheme.encrypt(&public_key, &randomness, &message).unwrap();
 
     // Alloc parameters, public key, plaintext, randomness, and blinding exponents
     let parameters_gadget = <TestEncryptionSchemeGadget as EncryptionGadget<_, _>>::ParametersGadget::alloc(
@@ -122,6 +129,8 @@ fn test_group_encryption_gadget() {
     )
     .unwrap();
 
+    println!("number of constraints for inputs: {}", cs.num_constraints());
+
     let ciphertext_gadget = TestEncryptionSchemeGadget::check_encryption_gadget(
         &mut cs.ns(|| "ciphertext_gadget_evaluation"),
         &parameters_gadget,
@@ -138,6 +147,8 @@ fn test_group_encryption_gadget() {
             &ciphertext_gadget,
         )
         .unwrap();
+
+    println!("number of constraints total: {}", cs.num_constraints());
 
     if !cs.is_satisfied() {
         println!("which is unsatisfied: {:?}", cs.which_is_unsatisfied().unwrap());
