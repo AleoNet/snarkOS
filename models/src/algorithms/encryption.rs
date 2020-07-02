@@ -21,6 +21,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
 
     fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
 
+    // TODO (raychu86) clean up model for returning randomness and blinding exponents
     fn encrypt<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
