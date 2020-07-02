@@ -4,6 +4,9 @@ pub use self::commitment::*;
 pub mod crh;
 pub use self::crh::*;
 
+pub mod encryption;
+pub use self::encryption::*;
+
 pub mod merkle_tree;
 pub use self::merkle_tree::*;
 

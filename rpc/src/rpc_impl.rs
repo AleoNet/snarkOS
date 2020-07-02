@@ -175,6 +175,8 @@ impl RpcFunctions for RpcImpl {
             None => None,
         };
 
+        let transaction_metadata = TransactionMetadata { block_number };
+
         Ok(TransactionInfo {
             txid: hex::encode(&transaction_id),
             size: transaction_bytes.len(),
@@ -187,7 +189,7 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
-            block_number,
+            transaction_metadata,
         })
     }
 
@@ -222,6 +224,16 @@ impl RpcFunctions for RpcImpl {
             }
             false => Ok("Transaction contains spent records".into()),
         }
+    }
+
+    /// Validate and return if the transaction is valid.
+    fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
+        let transaction_bytes = hex::decode(transaction_bytes)?;
+        let transaction = Tx::read(&transaction_bytes[..])?;
+
+        Ok(self
+            .consensus
+            .verify_transaction(&self.parameters, &transaction, &self.storage)?)
     }
 
     /// Fetch the number of connected peers this node has.
