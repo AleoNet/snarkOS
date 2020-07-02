@@ -26,5 +26,5 @@ pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
         public_key: &Self::PublicKeyGadget,
         input: &Self::PlaintextGadget,
         blinding_exponents: &Self::BlindingExponentGadget,
-    ) -> Result<(), SynthesisError>;
+    ) -> Result<Self::CiphertextGadget, SynthesisError>;
 }
