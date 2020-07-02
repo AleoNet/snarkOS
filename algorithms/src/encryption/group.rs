@@ -13,6 +13,7 @@ pub struct GroupEncryption<G: Group + ProjectiveCurve> {
 }
 
 impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
+    type BlindingExponents = Vec<<G as Group>::ScalarField>;
     type Ciphertext = Vec<G>;
     type Parameters = G;
     type Plaintext = Vec<G>;
@@ -47,7 +48,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         public_key: &Self::PublicKey,
         message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<(Self::Ciphertext, Self::Randomness, Vec<Self::Randomness>), EncryptionError> {
+    ) -> Result<(Self::Ciphertext, Self::Randomness, Self::BlindingExponents), EncryptionError> {
         let mut record_view_key = G::zero();
         let mut y = Self::Randomness::zero();
         let mut z_bytes = vec![];

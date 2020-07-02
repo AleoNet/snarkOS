@@ -14,6 +14,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     type Plaintext: Clone + Debug + Default + Eq + Hash;
     type Ciphertext: Clone + Debug + Default + Eq + Hash;
     type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
+    type BlindingExponents: Clone + Debug + Default + Eq + Hash + ToBytes;
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
@@ -21,13 +22,13 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
 
     fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
 
-    // TODO (raychu86) clean up model for returning randomness and blinding exponents
+    // TODO (raychu86) clean up model for getting randomness and blinding exponents
     fn encrypt<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
         message: &Self::Plaintext,
         rng: &mut R,
-    ) -> Result<(Self::Ciphertext, Self::Randomness, Vec<Self::Randomness>), EncryptionError>;
+    ) -> Result<(Self::Ciphertext, Self::Randomness, Self::BlindingExponents), EncryptionError>;
 
     fn decrypt(
         &self,
