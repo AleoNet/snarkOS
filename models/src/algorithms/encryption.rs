@@ -13,6 +13,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     type PublicKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
     type Plaintext: Clone + Debug + Default + Eq + Hash;
     type Ciphertext: Clone + Debug + Default + Eq + Hash;
+    type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 

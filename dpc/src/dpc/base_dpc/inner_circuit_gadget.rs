@@ -1,5 +1,6 @@
 use crate::dpc::base_dpc::{
     binding_signature::{gadget_verification_setup, BindingSignature},
+    instantiated::AccountEncryptionGadget,
     parameters::CircuitParameters,
     record::DPCRecord,
     BaseDPCComponents,
@@ -343,7 +344,7 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
+            let given_account_public_key = AccountEncryptionGadget::PublicKeyGadget::alloc(
                 &mut declare_cs.ns(|| "given_account_public_key"),
                 || Ok(record.account_public_key().into_repr()),
             )?;
@@ -604,7 +605,7 @@ where
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
-            let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
+            let given_account_public_key = AccountEncryptionGadget::PublicKeyGadget::alloc(
                 &mut declare_cs.ns(|| "given_account_public_key"),
                 || Ok(record.account_public_key().into_repr()),
             )?;

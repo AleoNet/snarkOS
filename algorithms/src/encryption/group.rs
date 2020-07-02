@@ -18,6 +18,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     type Plaintext = Vec<G>;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = G;
+    type Randomness = <G as Group>::ScalarField;
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
@@ -48,11 +49,11 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         rng: &mut R,
     ) -> Result<Self::Ciphertext, EncryptionError> {
         let mut record_view_key = G::zero();
-        let mut y = <G as Group>::ScalarField::zero();
+        let mut y = Self::Randomness::zero();
         let mut z_bytes = vec![];
 
-        while <G as Group>::ScalarField::read(&z_bytes[..]).is_err() {
-            y = <G as Group>::ScalarField::rand(rng);
+        while Self::Randomness::read(&z_bytes[..]).is_err() {
+            y = Self::Randomness::rand(rng);
             record_view_key = public_key.mul(&y);
 
             let affine = record_view_key.into_affine();
@@ -60,13 +61,13 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
             z_bytes = to_bytes![affine.to_x_coordinate()]?;
         }
 
-        let z = <G as Group>::ScalarField::read(&z_bytes[..])?;
+        let z = Self::Randomness::read(&z_bytes[..])?;
 
         let c_0 = self.parameters.mul(&y);
 
-        let one = <G as Group>::ScalarField::one();
+        let one = Self::Randomness::one();
         let mut ciphertext = vec![c_0];
-        let mut i = <G as Group>::ScalarField::one();
+        let mut i = Self::Randomness::one();
 
         for m_i in message {
             // h_i <- 1 [/] (z [+] i) * record_view_key
@@ -99,11 +100,11 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
         let z_bytes = to_bytes![affine.to_x_coordinate()]?;
 
-        let z = <G as Group>::ScalarField::read(&z_bytes[..])?;
+        let z = Self::Randomness::read(&z_bytes[..])?;
 
-        let one = <G as Group>::ScalarField::one();
+        let one = Self::Randomness::one();
         let mut plaintext = vec![];
-        let mut i = <G as Group>::ScalarField::one();
+        let mut i = Self::Randomness::one();
 
         for c_i in ciphertext.iter().skip(1) {
             // h_i <- 1 [/] (z [+] i) * record_view_key
@@ -124,12 +125,6 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
-    }
-}
-
-impl<G: Group + ProjectiveCurve> From<G> for GroupEncryption<G> {
-    fn from(parameters: G) -> Self {
-        Self { parameters }
     }
 }
 

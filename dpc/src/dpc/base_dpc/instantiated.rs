@@ -30,6 +30,7 @@ use snarkos_gadgets::{
         binding_signature::BindingSignatureVerificationGadget,
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::BoweHopwoodPedersenCompressedCRHGadget,
+        encryption::GroupEncryptionGadget,
         prf::Blake2sGadget,
         signature::SchnorrPublicKeyRandomizationGadget,
         snark::GM17VerifierGadget,
@@ -113,6 +114,7 @@ impl DPCComponents for Components {
     type AccountCommitmentGadget = AccountCommitmentGadget;
     type AccountDecryptionKey = AccountDecryptionKey;
     type AccountEncryption = AccountEncryption;
+    type AccountEncryptionGadget = AccountEncryptionGadget;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;
@@ -186,6 +188,7 @@ pub type LocalData = DPCLocalData<Components>;
 // Gadgets
 
 pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type AccountEncryptionGadget = GroupEncryptionGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;

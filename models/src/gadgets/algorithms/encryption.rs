@@ -16,10 +16,8 @@ pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type PublicKeyGadget: AllocGadget<E::PublicKey, F> + Clone + Sized + Debug;
     type CiphertextGadget: EqGadget<F> + AllocGadget<E::Ciphertext, F> + Clone + Sized + Debug;
     type PlaintextGadget: EqGadget<F> + AllocGadget<E::Plaintext, F> + Clone + Sized + Debug;
-
-    //TODO Add handle E::PrivateKey with more formal G::ScalarField
-    type RandomnessGadget: AllocGadget<E::PrivateKey, F> + Clone + Sized + Debug;
-    type BlindingExponentGadget: AllocGadget<Vec<E::PrivateKey>, F> + Clone + Sized + Debug;
+    type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
+    type BlindingExponentGadget: AllocGadget<Vec<E::Randomness>, F> + Clone + Sized + Debug;
 
     fn check_encryption_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
