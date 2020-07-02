@@ -19,6 +19,12 @@ pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
     type BlindingExponentGadget: AllocGadget<Vec<E::Randomness>, F> + Clone + Sized + Debug;
 
+    fn check_public_key_gadget<CS: ConstraintSystem<F>>(
+        cs: CS,
+        parameters: &Self::ParametersGadget,
+        private_key: &Self::PrivateKeyGadget,
+    ) -> Result<Self::PublicKeyGadget, SynthesisError>;
+
     fn check_encryption_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,

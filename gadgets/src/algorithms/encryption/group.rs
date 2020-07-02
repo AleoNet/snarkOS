@@ -391,8 +391,8 @@ pub struct GroupEncryptionGadget<
 }
 
 impl<
-    F: PrimeField,
     G: Group + ProjectiveCurve,
+    F: PrimeField,
     FG: FieldGadget<<G as Group>::ScalarField, F>,
     GG: CompressedGroupGadget<G, F>,
 > EncryptionGadget<GroupEncryption<G>, F> for GroupEncryptionGadget<G, F, FG, GG>
@@ -404,6 +404,21 @@ impl<
     type PrivateKeyGadget = GroupEncryptionPrivateKeyGadget<G>;
     type PublicKeyGadget = GroupEncryptionPublicKeyGadget<G, F, GG>;
     type RandomnessGadget = GroupEncryptionRandomnessGadget<G>;
+
+    fn check_public_key_gadget<CS: ConstraintSystem<F>>(
+        mut cs: CS,
+        parameters: &Self::ParametersGadget,
+        private_key: &Self::PrivateKeyGadget,
+    ) -> Result<Self::PublicKeyGadget, SynthesisError> {
+        let base = parameters.parameters.clone();
+        let private_key_bits = private_key.0.iter().flat_map(|b| b.to_bits_le()).collect::<Vec<_>>();
+        let public_key = base.mul_bits(&mut cs.ns(|| "check_public_key_gadget"), &base, private_key_bits.iter())?;
+        Ok(GroupEncryptionPublicKeyGadget {
+            public_key,
+            _group: PhantomData,
+            _engine: PhantomData,
+        })
+    }
 
     fn check_encryption_gadget<CS: ConstraintSystem<F>>(
         mut cs: CS,

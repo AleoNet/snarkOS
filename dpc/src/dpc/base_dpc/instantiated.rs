@@ -188,7 +188,7 @@ pub type LocalData = DPCLocalData<Components>;
 // Gadgets
 
 pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type AccountEncryptionGadget = GroupEncryptionGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type AccountEncryptionGadget = GroupEncryptionGadget<EdwardsBls, InnerField, FpGadget<EdwardsFr>, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
