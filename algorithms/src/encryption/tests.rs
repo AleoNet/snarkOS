@@ -29,7 +29,10 @@ fn simple_encryption() {
     let public_key = encryption_scheme.generate_public_key(&private_key);
 
     let message = generate_input(32, rng);
-    let (ciphertext, _randomness, _blinding_exponents) = encryption_scheme.encrypt(&public_key, &message, rng).unwrap();
+
+    let randomness = encryption_scheme.generate_randomness(&public_key, rng).unwrap();
+
+    let ciphertext = encryption_scheme.encrypt(&public_key, &randomness, &message).unwrap();
     let decrypted_message = encryption_scheme.decrypt(&private_key, &ciphertext).unwrap();
 
     assert_eq!(message, decrypted_message);
