@@ -132,3 +132,9 @@ impl<G: Group + ProjectiveCurve> From<G> for GroupEncryption<G> {
         Self { parameters }
     }
 }
+
+impl<G: Group + ProjectiveCurve> From<G> for GroupEncryption<G> {
+    fn from(parameters: G) -> Self {
+        Self { parameters }
+    }
+}
