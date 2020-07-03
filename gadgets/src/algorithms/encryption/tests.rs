@@ -10,7 +10,6 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget},
     },
 };
-//use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -88,7 +87,7 @@ fn test_group_encryption_gadget() {
     let public_key = encryption_scheme.generate_public_key(&private_key);
 
     let randomness = encryption_scheme.generate_randomness(&public_key, rng).unwrap();
-    let message = generate_input(32, rng);
+    let message = generate_input(10, rng);
     let blinding_exponents = encryption_scheme
         .generate_blinding_exponents(&public_key, &randomness, message.len())
         .unwrap();

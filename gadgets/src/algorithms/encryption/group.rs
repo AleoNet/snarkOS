@@ -15,7 +15,7 @@ use snarkos_models::{
         },
     },
 };
-use snarkos_utilities::{to_bytes, ToBytes};
+use snarkos_utilities::{math::log2, to_bytes, ToBytes};
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -462,7 +462,9 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
 
         let mut ciphertext = vec![c_0];
         for (index, (blinding_exponent, m_j)) in blinding_exponents.0.iter().zip(&input.plaintext).enumerate() {
-            let cs = &mut cs.ns(|| format!("c_{}", index + 1));
+            let j = index + 1;
+
+            let cs = &mut cs.ns(|| format!("c_{}", j));
 
             let blinding_exponent_bits: Vec<_> = blinding_exponent
                 .iter()
@@ -475,10 +477,26 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
             let zh_j = h_j.mul_bits(cs.ns(|| "z * h_j"), &zero, z_bits.iter())?;
 
             // j * h_j
-            let mut jh_j = GG::zero(&mut cs.ns(|| "j * h_j"))?;
-            for i in 0..index + 1 {
-                jh_j = jh_j.add(cs.ns(|| format!("add: {}", i)), &h_j)?;
-            }
+            let jh_j = {
+                let mut jh_j_cs = cs.ns(|| format!("Construct {} * h_{}", j, j));
+
+                let mut jh_j = h_j.clone();
+
+                let num_doubling = log2(j);
+
+                for i in 0..num_doubling {
+                    jh_j.double_in_place(jh_j_cs.ns(|| format!("Double {}", i)))?;
+                }
+
+                let num_exponentiations = 2usize.pow(num_doubling);
+
+                if j > num_exponentiations {
+                    for i in 0..(j - num_exponentiations) {
+                        jh_j = jh_j.add(jh_j_cs.ns(|| format!("Add: {}", i)), &h_j)?;
+                    }
+                }
+                jh_j
+            };
 
             // (z_i [+] j) * h_i,j
             let expected_record_view_key = zh_j.add(cs.ns(|| "expected record view key"), &jh_j)?;
