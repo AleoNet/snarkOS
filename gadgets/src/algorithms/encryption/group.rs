@@ -193,6 +193,16 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<G,
     }
 }
 
+impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryptionPublicKeyGadget<G, F, GG> {
+    fn to_bytes<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.public_key.to_bytes(&mut cs.ns(|| "to_bytes"))
+    }
+
+    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.public_key.to_bytes_strict(&mut cs.ns(|| "to_bytes_strict"))
+    }
+}
+
 impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> Clone for GroupEncryptionPublicKeyGadget<G, F, GG> {
     fn clone(&self) -> Self {
         Self {

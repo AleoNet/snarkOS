@@ -3,7 +3,7 @@ use crate::{
     curves::Field,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, eq::EqGadget},
+        utilities::{alloc::AllocGadget, eq::EqGadget, ToBytesGadget},
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
@@ -13,9 +13,9 @@ use std::fmt::Debug;
 pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type ParametersGadget: AllocGadget<E::Parameters, F> + Clone;
     type PrivateKeyGadget: AllocGadget<E::PrivateKey, F> + Clone + Sized + Debug;
-    type PublicKeyGadget: EqGadget<F> + AllocGadget<E::PublicKey, F> + Clone + Sized + Debug;
-    type CiphertextGadget: EqGadget<F> + AllocGadget<E::Ciphertext, F> + Clone + Sized + Debug;
-    type PlaintextGadget: EqGadget<F> + AllocGadget<E::Plaintext, F> + Clone + Sized + Debug;
+    type PublicKeyGadget: AllocGadget<E::PublicKey, F> + EqGadget<F> + ToBytesGadget<F> + Clone + Sized + Debug;
+    type CiphertextGadget: AllocGadget<E::Ciphertext, F> + EqGadget<F> + Clone + Sized + Debug;
+    type PlaintextGadget: AllocGadget<E::Plaintext, F> + EqGadget<F> + Clone + Sized + Debug;
     type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
     type BlindingExponentGadget: AllocGadget<Vec<E::Randomness>, F> + Clone + Sized + Debug;
 
