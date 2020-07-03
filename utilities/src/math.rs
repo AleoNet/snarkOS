@@ -5,7 +5,7 @@ pub fn log2(x: usize) -> u32 {
     }
 
     let n = x.leading_zeros();
-    core::mem::size_of::<usize>() as u32 * 8 - n
+    core::mem::size_of::<usize>() as u32 * 8 - n - 1
 }
 
 /// Return ceil(x/y)
