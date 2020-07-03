@@ -52,14 +52,14 @@ fn test_group_encryption_public_key_gadget() {
     )
     .unwrap();
 
+    println!("number of constraints for inputs: {}", cs.num_constraints());
+
     let public_key_gadget = TestEncryptionSchemeGadget::check_public_key_gadget(
         &mut cs.ns(|| "public_key_gadget_evaluation"),
         &parameters_gadget,
         &private_key_gadget,
     )
     .unwrap();
-
-    println!("number of constraints for inputs: {}", cs.num_constraints());
 
     expected_public_key_gadget
         .enforce_equal(

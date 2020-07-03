@@ -15,7 +15,7 @@ use snarkos_models::{
         },
     },
 };
-use snarkos_utilities::{math::log2, to_bytes, ToBytes};
+use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -482,7 +482,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
 
                 let mut jh_j = h_j.clone();
 
-                let num_doubling = log2(j);
+                let num_doubling = (j as f64).log2() as u32;
 
                 for i in 0..num_doubling {
                     jh_j.double_in_place(jh_j_cs.ns(|| format!("Double {}", i)))?;
