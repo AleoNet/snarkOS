@@ -87,7 +87,7 @@ impl PedersenSize for TwoToOneWindow {
 pub struct RecordWindow;
 impl PedersenSize for RecordWindow {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 297;
+    const WINDOW_SIZE: usize = 233;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

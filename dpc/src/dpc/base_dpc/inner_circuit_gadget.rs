@@ -473,28 +473,29 @@ where
                 &r_pk,
             )?;
 
-            let decryption_key = account_private_key
+            let given_account_view_key = account_private_key
                 .to_decryption_key(
                     &circuit_parameters.account_signature,
                     &circuit_parameters.account_commitment,
                 )
                 .unwrap();
 
-            let private_key_gadget = AccountEncryptionGadget::PrivateKeyGadget::alloc(
-                &mut account_cs.ns(|| "Allocate private key"),
-                || Ok(decryption_key),
+            let given_account_view_key_gadget = AccountEncryptionGadget::PrivateKeyGadget::alloc(
+                &mut account_cs.ns(|| "Allocate account view key"),
+                || Ok(given_account_view_key),
             )?;
 
             let account_view_key_bytes =
                 account_view_key.to_bytes(&mut account_cs.ns(|| "account_view_key to_bytes"))?;
-            let private_key_bytes =
-                private_key_gadget.to_bytes(&mut account_cs.ns(|| "private_key_gadget to_bytes"))?;
+            let given_account_view_key_bytes =
+                given_account_view_key_gadget.to_bytes(&mut account_cs.ns(|| "private_key_gadget to_bytes"))?;
 
             // Enforce that derived key are equivalent
-            // Temporary solution: Need to figure out how to cast `account_view_key` into a type `check_public_key_gadget` can use
-            account_view_key_bytes.enforce_equal(
+            // Temporary solution: compare the byte converions
+            // TODO (raychu86) Need to figure out how to cast `account_view_key` into a type `check_public_key_gadget` can use
+            given_account_view_key_bytes.enforce_equal(
                 &mut account_cs.ns(|| "Check that declared and computed encryption private keys are equal"),
-                &private_key_bytes,
+                &account_view_key_bytes,
             )?;
 
             // TODO (howardwu): Enforce 6 MSB bits are 0.
@@ -502,7 +503,7 @@ where
             let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
                 &mut account_cs.ns(|| "Compute account address"),
                 &account_encryption_parameters,
-                &private_key_gadget,
+                &given_account_view_key_gadget,
             )?;
 
             candidate_account_address.enforce_equal(
