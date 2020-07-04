@@ -1,6 +1,5 @@
 use crate::dpc::base_dpc::{
     binding_signature::{gadget_verification_setup, BindingSignature},
-    instantiated::AccountEncryptionGadget,
     parameters::CircuitParameters,
     record::DPCRecord,
     BaseDPCComponents,
@@ -466,6 +465,7 @@ where
             let mut account_view_key_input = pk_sig_bytes.clone();
             account_view_key_input.extend_from_slice(&sk_prf);
 
+            // Decryption key
             let account_view_key = AccountCommitmentGadget::check_commitment_gadget(
                 &mut account_cs.ns(|| "Compute account view key"),
                 &account_commitment_parameters,
@@ -473,12 +473,36 @@ where
                 &r_pk,
             )?;
 
+            let decryption_key = account_private_key
+                .to_decryption_key(
+                    &circuit_parameters.account_signature,
+                    &circuit_parameters.account_commitment,
+                )
+                .unwrap();
+
+            let private_key_gadget = AccountEncryptionGadget::PrivateKeyGadget::alloc(
+                &mut account_cs.ns(|| "Allocate private key"),
+                || Ok(decryption_key),
+            )?;
+
+            let account_view_key_bytes =
+                account_view_key.to_bytes(&mut account_cs.ns(|| "account_view_key to_bytes"))?;
+            let private_key_bytes =
+                private_key_gadget.to_bytes(&mut account_cs.ns(|| "private_key_gadget to_bytes"))?;
+
+            // Enforce that derived key are equivalent
+            // Temporary solution: Need to figure out how to cast `account_view_key` into a type `check_public_key_gadget` can use
+            account_view_key_bytes.enforce_equal(
+                &mut account_cs.ns(|| "Check that declared and computed encryption private keys are equal"),
+                &private_key_bytes,
+            )?;
+
             // TODO (howardwu): Enforce 6 MSB bits are 0.
 
             let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
                 &mut account_cs.ns(|| "Compute account address"),
                 &account_encryption_parameters,
-                &account_view_key_input,
+                &private_key_gadget,
             )?;
 
             candidate_account_address.enforce_equal(
