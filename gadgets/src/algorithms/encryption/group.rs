@@ -1,4 +1,4 @@
-use snarkos_algorithms::encryption::GroupEncryption;
+use snarkos_algorithms::encryption::{GroupEncryption, GroupEncryptionPublicKey};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, PrimeField, ProjectiveCurve},
@@ -177,26 +177,34 @@ pub struct GroupEncryptionPublicKeyGadget<G: Group, F: Field, GG: GroupGadget<G,
     _engine: PhantomData<*const F>,
 }
 
-impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<G, F>
+impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<GroupEncryptionPublicKey<G>, F>
     for GroupEncryptionPublicKeyGadget<G, F, GG>
 {
-    fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G>, CS: ConstraintSystem<F>>(
+    fn alloc<
+        Fn: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<GroupEncryptionPublicKey<G>>,
+        CS: ConstraintSystem<F>,
+    >(
         cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_checked(cs, || f().map(|pp| pp))?,
+            public_key: GG::alloc_checked(cs, || f().map(|pp| pp.borrow().0))?,
             _engine: PhantomData,
             _group: PhantomData,
         })
     }
 
-    fn alloc_input<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<G>, CS: ConstraintSystem<F>>(
+    fn alloc_input<
+        Fn: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<GroupEncryptionPublicKey<G>>,
+        CS: ConstraintSystem<F>,
+    >(
         cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
         Ok(Self {
-            public_key: GG::alloc_input(cs, || f().map(|pp| pp))?,
+            public_key: GG::alloc_input(cs, || f().map(|pp| pp.borrow().0))?,
             _engine: PhantomData,
             _group: PhantomData,
         })

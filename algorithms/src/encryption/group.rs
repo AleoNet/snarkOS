@@ -6,10 +6,37 @@ use snarkos_models::{
 use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
 use rand::Rng;
+use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GroupEncryption<G: Group + ProjectiveCurve> {
     pub parameters: G,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GroupEncryptionPublicKey<G: Group + ProjectiveCurve>(pub G);
+
+impl<G: Group + ProjectiveCurve> ToBytes for GroupEncryptionPublicKey<G> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        let affine = self.0.into_affine();
+        affine.write(&mut writer)
+    }
+}
+
+impl<G: Group + ProjectiveCurve> FromBytes for GroupEncryptionPublicKey<G> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let affine = <G as ProjectiveCurve>::Affine::read(&mut reader)?;
+
+        Ok(Self(affine.into_projective()))
+    }
+}
+
+impl<G: Group + ProjectiveCurve> Default for GroupEncryptionPublicKey<G> {
+    fn default() -> Self {
+        Self(G::default())
+    }
 }
 
 impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
@@ -18,7 +45,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     type Parameters = G;
     type Plaintext = Vec<G>;
     type PrivateKey = <G as Group>::ScalarField;
-    type PublicKey = G;
+    type PublicKey = GroupEncryptionPublicKey<G>;
     type Randomness = <G as Group>::ScalarField;
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
@@ -40,7 +67,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         let public_key = self.parameters.mul(&private_key);
         end_timer!(keygen_time);
 
-        public_key
+        GroupEncryptionPublicKey(public_key)
     }
 
     fn generate_randomness<R: Rng>(
@@ -54,7 +81,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         while Self::Randomness::read(&z_bytes[..]).is_err() {
             y = Self::Randomness::rand(rng);
 
-            let affine = public_key.mul(&y).into_affine();
+            let affine = public_key.0.mul(&y).into_affine();
             debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
             z_bytes = to_bytes![affine.to_x_coordinate()]?;
         }
@@ -68,7 +95,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         randomness: &Self::Randomness,
         message_length: usize,
     ) -> Result<Self::BlindingExponents, EncryptionError> {
-        let record_view_key = public_key.mul(&randomness);
+        let record_view_key = public_key.0.mul(&randomness);
 
         let affine = record_view_key.into_affine();
         debug_assert!(affine.is_in_correct_subgroup_assuming_on_curve());
@@ -99,7 +126,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         randomness: &Self::Randomness,
         message: &Self::Plaintext,
     ) -> Result<Self::Ciphertext, EncryptionError> {
-        let record_view_key = public_key.mul(&randomness);
+        let record_view_key = public_key.0.mul(&randomness);
 
         let c_0 = self.parameters.mul(&randomness);
         let mut ciphertext = vec![c_0];

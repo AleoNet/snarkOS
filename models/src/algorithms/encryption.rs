@@ -10,7 +10,7 @@ use std::{fmt::Debug, hash::Hash};
 pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Parameters> {
     type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
-    type PublicKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
+    type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
     type Plaintext: Clone + Debug + Default + Eq + Hash;
     type Ciphertext: Clone + Debug + Default + Eq + Hash;
     type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
