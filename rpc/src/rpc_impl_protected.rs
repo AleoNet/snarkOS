@@ -171,8 +171,9 @@ impl ProtectedRpcFunctions for RpcImpl {
 
             let private_key = old_account_private_keys[0].clone();
             let public_key = AccountPublicKey::<Components>::from(
-                &self.parameters.circuit_parameters.account_signature,
-                &self.parameters.circuit_parameters.account_commitment,
+                self.parameters.account_signature_parameters(),
+                self.parameters.account_commitment_parameters(),
+                self.parameters.account_encryption_parameters(),
                 &private_key,
             )?;
 
@@ -284,6 +285,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let account = Account::<Components>::new(
             self.parameters.account_signature_parameters(),
             self.parameters.account_commitment_parameters(),
+            self.parameters.account_encryption_parameters(),
             rng,
         )?;
 

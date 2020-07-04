@@ -104,6 +104,10 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.circuit_parameters.account_commitment
     }
 
+    pub fn account_encryption_parameters(&self) -> &C::AccountEncryption {
+        &self.circuit_parameters.account_encryption
+    }
+
     pub fn account_signature_parameters(&self) -> &C::AccountSignature {
         &self.circuit_parameters.account_signature
     }

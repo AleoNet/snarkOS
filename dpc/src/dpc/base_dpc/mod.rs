@@ -312,13 +312,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let death_predicate_repr = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_public_key.encryption_key, // 256 bits = 32 bytes
-            is_dummy,                          // 1 bit = 1 byte
-            value,                             // 64 bits = 8 bytes
-            payload,                           // 256 bits = 32 bytes
-            birth_predicate_repr,              // 256 bits = 32 bytes
-            death_predicate_repr,              // 256 bits = 32 bytes
-            sn_nonce                           // 256 bits = 32 bytes
+            account_public_key,   // 256 bits = 32 bytes
+            is_dummy,             // 1 bit = 1 byte
+            value,                // 64 bits = 8 bytes
+            payload,              // 256 bits = 32 bytes
+            birth_predicate_repr, // 256 bits = 32 bytes
+            death_predicate_repr, // 256 bits = 32 bytes
+            sn_nonce              // 256 bits = 32 bytes
         ]?;
 
         let commitment = Components::RecordCommitment::commit(

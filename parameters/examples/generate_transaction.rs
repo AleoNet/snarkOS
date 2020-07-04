@@ -91,6 +91,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let dummy_account = Account::new(
         &parameters.circuit_parameters.account_signature,
         &parameters.circuit_parameters.account_commitment,
+        &parameters.circuit_parameters.account_encryption,
         rng,
     )
     .unwrap();

@@ -91,6 +91,16 @@ impl<G: Group, F: PrimeField> AllocGadget<G::ScalarField, F> for GroupEncryption
     }
 }
 
+impl<G: Group, F: PrimeField> ToBytesGadget<F> for GroupEncryptionPrivateKeyGadget<G> {
+    fn to_bytes<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.0.to_bytes(&mut cs.ns(|| "to_bytes"))
+    }
+
+    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        self.0.to_bytes_strict(&mut cs.ns(|| "to_bytes_strict"))
+    }
+}
+
 // GroupEncryption Randomness Gadget
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupEncryptionRandomnessGadget<G: Group>(pub Vec<UInt8>, PhantomData<G>);

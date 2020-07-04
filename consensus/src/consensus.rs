@@ -354,6 +354,7 @@ impl ConsensusParameters {
         let new_account = Account::new(
             &parameters.circuit_parameters.account_signature,
             &parameters.circuit_parameters.account_commitment,
+            &parameters.circuit_parameters.account_encryption,
             rng,
         )
         .unwrap();
