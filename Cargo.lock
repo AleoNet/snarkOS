@@ -1641,7 +1641,7 @@ dependencies = [
  "cloudabi 0.0.3",
  "libc",
  "redox_syscall",
- "smallvec 1.4.0",
+ "smallvec 1.4.1",
  "winapi 0.3.9",
 ]
 
@@ -1656,7 +1656,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall",
- "smallvec 1.4.0",
+ "smallvec 1.4.1",
  "winapi 0.3.9",
 ]
 
@@ -2177,9 +2177,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7cb5678e1615754284ec264d9bb5b4c27d2018577fd90ac0ceb578591ed5ee4"
+checksum = "3757cb9d89161a2f24e1cf78efa0c1fcff485d18e3f55e0aa3480824ddaa0f3f"
 
 [[package]]
 name = "snarkos"
@@ -2220,7 +2220,7 @@ dependencies = [
  "rand_xorshift",
  "rayon",
  "sha2",
- "smallvec 1.4.0",
+ "smallvec 1.4.1",
  "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
@@ -2240,7 +2240,7 @@ dependencies = [
  "rand_xorshift",
  "rayon",
  "sha2",
- "smallvec 1.4.0",
+ "smallvec 1.4.1",
  "snarkos-algorithms",
  "snarkos-curves",
  "snarkos-errors",
@@ -2392,7 +2392,7 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "serde",
- "smallvec 1.4.0",
+ "smallvec 1.4.1",
  "snarkos-errors",
  "snarkos-utilities",
 ]
