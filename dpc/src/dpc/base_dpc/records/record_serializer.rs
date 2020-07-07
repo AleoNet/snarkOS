@@ -10,7 +10,6 @@ use snarkos_utilities::{to_bytes, BigInteger, FromBytes, ToBytes};
 
 use std::marker::PhantomData;
 
-// TODO (raychu86) resolve duplicate impls
 pub fn recover_from_x_coordinate<G: Group + ProjectiveCurve>(
     x_bytes: &[u8],
 ) -> Result<(<G as ProjectiveCurve>::Affine, u32), DPCError> {
@@ -67,6 +66,8 @@ pub trait SerializeRecord {
     type Record: Record;
 
     fn serialize(record: Self::Record) -> Result<Vec<Self::Group>, DPCError>;
+
+    fn deserialize(serialized_record: Vec<Self::Group>) -> Result<Self::Record, DPCError>;
 }
 
 pub struct RecordSerializer<C: BaseDPCComponents, G: Group + ProjectiveCurve>(PhantomData<C>, PhantomData<G>);
@@ -224,25 +225,17 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
         Ok(output)
     }
 
-    //    pub fn deserialize<G: Group + ProjectiveCurve>(serialized_record: Vec<G>) -> Result<Vec<u8>, DPCError> {
-    //        let mut bytes = vec![];
-    //
-    //        for element in serialized_record {
-    //            let affine = element.into_affine();
-    //            let x = affine.to_x_coordinate();
-    //            let x_bytes = to_bytes![x]?;
-    //
-    //            bytes.extend(x_bytes);
-    //        }
-    //
-    //        let serialized = Self::read(&bytes[..])?;
-    //
-    //        println!("bytes len: {:?}", bytes.len());
-    //
-    //        println!("account_public_key: {:?}", to_bytes![serialized.account_public_key]?);
-    //        println!("serial_number_nonce: {:?}", to_bytes![serialized.serial_number_nonce]?);
-    //        println!("commitment: {:?}", to_bytes![serialized.commitment]?);
-    //
-    //        Ok(bytes)
-    //    }
+    fn deserialize(_serialized_record: Vec<Self::Group>) -> Result<Self::Record, DPCError> {
+        //        let mut bytes = vec![];
+        //
+        //        for element in serialized_record {
+        //            let affine = element.into_affine();
+        //            let x = affine.to_x_coordinate();
+        //            let x_bytes = to_bytes![x]?;
+        //
+        //            bytes.extend(x_bytes);
+        //        }
+
+        unimplemented!()
+    }
 }
