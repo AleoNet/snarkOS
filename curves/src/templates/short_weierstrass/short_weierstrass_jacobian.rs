@@ -80,24 +80,6 @@ impl<P: Parameters> GroupAffine<P> {
         res
     }
 
-    /// Attempts to construct an affine point given an x-coordinate. The
-    /// point is not guaranteed to be in the prime order subgroup.
-    ///
-    /// If and only if `greatest` is set will the lexicographically
-    /// largest y-coordinate be selected.
-    #[allow(dead_code)]
-    pub(crate) fn get_point_from_x(x: P::BaseField, greatest: bool) -> Option<Self> {
-        // Compute x^3 + ax + b
-        let x3b = P::add_b(&((x.square() * &x) + &P::mul_by_a(&x)));
-
-        x3b.sqrt().map(|y| {
-            let negy = -y;
-
-            let y = if (y < negy) ^ greatest { y } else { negy };
-            Self::new(x, y, false)
-        })
-    }
-
     pub fn is_on_curve(&self) -> bool {
         if self.is_zero() {
             true
@@ -132,6 +114,23 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     #[inline]
     fn prime_subgroup_generator() -> Self {
         Self::new(P::AFFINE_GENERATOR_COEFFS.0, P::AFFINE_GENERATOR_COEFFS.1, false)
+    }
+
+    /// Attempts to construct an affine point given an x-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_x_coordinate(x: Self::BaseField, greatest: bool) -> Option<Self> {
+        // Compute x^3 + ax + b
+        let x3b = P::add_b(&((x.square() * &x) + &P::mul_by_a(&x)));
+
+        x3b.sqrt().map(|y| {
+            let negy = -y;
+
+            let y = if (y < negy) ^ greatest { y } else { negy };
+            Self::new(x, y, false)
+        })
     }
 
     fn add(self, _other: &Self) -> Self {

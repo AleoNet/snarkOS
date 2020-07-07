@@ -204,6 +204,13 @@ pub trait AffineCurve:
     #[must_use]
     fn prime_subgroup_generator() -> Self;
 
+    /// Attempts to construct an affine point given an x-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_x_coordinate(x: Self::BaseField, greatest: bool) -> Option<Self>;
+
     fn add(self, other: &Self) -> Self;
 
     /// Performs scalar multiplication of this element with mixed addition.

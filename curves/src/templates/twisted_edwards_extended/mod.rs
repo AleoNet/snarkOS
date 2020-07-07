@@ -79,25 +79,6 @@ impl<P: Parameters> GroupAffine<P> {
         res
     }
 
-    /// Attempts to construct an affine point given an x-coordinate. The
-    /// point is not guaranteed to be in the prime order subgroup.
-    ///
-    /// If and only if `greatest` is set will the lexicographically
-    /// largest y-coordinate be selected.
-    #[allow(dead_code)]
-    pub fn get_point_from_x(x: P::BaseField, greatest: bool) -> Option<Self> {
-        let x2 = x.square();
-        let one = P::BaseField::one();
-        let numerator = P::mul_by_a(&x2) - &one;
-        let denominator = P::COEFF_D * &x2 - &one;
-        let y2 = denominator.inverse().map(|denom| denom * &numerator);
-        y2.and_then(|y2| y2.sqrt()).map(|y| {
-            let negy = -y;
-            let y = if (y < negy) ^ greatest { y } else { negy };
-            Self::new(x, y)
-        })
-    }
-
     /// Checks that the current point is on the elliptic curve.
     pub fn is_on_curve(&self) -> bool {
         let x2 = self.x.square();
@@ -129,6 +110,24 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         Self::new(P::AFFINE_GENERATOR_COEFFS.0, P::AFFINE_GENERATOR_COEFFS.1)
     }
 
+    /// Attempts to construct an affine point given an x-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_x_coordinate(x: Self::BaseField, greatest: bool) -> Option<Self> {
+        let x2 = x.square();
+        let one = Self::BaseField::one();
+        let numerator = P::mul_by_a(&x2) - &one;
+        let denominator = P::COEFF_D * &x2 - &one;
+        let y2 = denominator.inverse().map(|denom| denom * &numerator);
+        y2.and_then(|y2| y2.sqrt()).map(|y| {
+            let negy = -y;
+            let y = if (y < negy) ^ greatest { y } else { negy };
+            Self::new(x, y)
+        })
+    }
+
     // Copied from https://github.com/scipr-lab/zexe/blob/4b3f08c6c0a08c5392ed8aa3fd3c32f28da402c4/algebra-core/src/curves/models/twisted_edwards_extended.rs#L144-L156.
     fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
         let x = P::BaseField::from_random_bytes_with_flags(bytes);
@@ -137,7 +136,7 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
             if x.is_zero() {
                 Some(Self::zero())
             } else {
-                Self::get_point_from_x(x, parsed_flags.is_positive())
+                Self::from_x_coordinate(x, parsed_flags.is_positive())
             }
         } else {
             None
@@ -278,7 +277,7 @@ impl<P: Parameters> Distribution<GroupAffine<P>> for Standard {
             let x = P::BaseField::rand(rng);
             let greatest = rng.gen();
 
-            if let Some(p) = GroupAffine::get_point_from_x(x, greatest) {
+            if let Some(p) = GroupAffine::from_x_coordinate(x, greatest) {
                 return p.scale_by_cofactor().into();
             }
         }
@@ -357,7 +356,7 @@ impl<P: Parameters> Distribution<GroupProjective<P>> for Standard {
             let x = P::BaseField::rand(rng);
             let greatest = rng.gen();
 
-            if let Some(p) = GroupAffine::get_point_from_x(x, greatest) {
+            if let Some(p) = GroupAffine::from_x_coordinate(x, greatest) {
                 return p.scale_by_cofactor();
             }
         }
