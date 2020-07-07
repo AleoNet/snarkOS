@@ -54,6 +54,8 @@ use self::outer_circuit_verifier_input::*;
 pub mod parameters;
 use self::parameters::*;
 
+pub mod records;
+
 pub mod record_payload;
 
 pub mod instantiated;
