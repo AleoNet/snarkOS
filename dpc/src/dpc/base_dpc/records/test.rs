@@ -66,11 +66,9 @@ fn test_record_serialization() {
     )
     .unwrap();
 
-    println!("birth pred repr: {:?}", record.birth_predicate_repr);
-
     let serialized_record = RecordSerializer::<_, EdwardsBls>::serialize(&record).unwrap();
 
-    println!("\nserialized record:\n {:?}\n", serialized_record.len());
+    println!("\nserialized record length: {:?}\n", serialized_record.len());
 
     let record_components = RecordSerializer::<Components, EdwardsBls>::deserialize(serialized_record).unwrap();
 
@@ -78,6 +76,8 @@ fn test_record_serialization() {
     assert_eq!(record.commitment_randomness, record_components.commitment_randomness);
     assert_eq!(record.birth_predicate_repr, record_components.birth_predicate_repr);
     assert_eq!(record.death_predicate_repr, record_components.death_predicate_repr);
+    assert_eq!(record.payload, record_components.payload);
+    assert_eq!(record.value, record_components.value);
 }
 
 #[test]

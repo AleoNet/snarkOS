@@ -72,30 +72,6 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
-//pub fn native_recover_affine_from_x_coord<G: Group + ProjectiveCurve>(
-//    x_bytes: &[u8],
-//) -> Result<<G as ProjectiveCurve>::Affine, DPCError> {
-//    let x: <<G as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(x_bytes)?;
-//
-//    if let Some(affine) = <G as ProjectiveCurve>::Affine::from_x_coordinate(x, false) {
-//        if affine.is_in_correct_subgroup_assuming_on_curve() {
-//            let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
-//
-//            return Ok(affine);
-//        }
-//    }
-//
-//    if let Some(affine) = <G as ProjectiveCurve>::Affine::from_x_coordinate(x, true) {
-//        if affine.is_in_correct_subgroup_assuming_on_curve() {
-//            let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
-//
-//            return Ok(affine);
-//        }
-//    }
-//
-//    Err(BindingSignatureError::NotInCorrectSubgroupOnCurve(to_bytes![x]?))
-//}
-
 pub trait SerializeRecord {
     type Group: Group + ProjectiveCurve;
     type InnerField: PrimeField;
@@ -272,7 +248,6 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
 
         for (i, element) in data_elements.iter().enumerate() {
             output.push((element.0.into_projective(), element.1));
-            println!("ELEMENT {}", i);
         }
 
         Ok(output)
@@ -335,11 +310,22 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
         let birth_predicate_repr = bits_to_bytes(&birth_predicate_repr_bits);
         let death_predicate_repr = bits_to_bytes(&death_predicate_repr_bits);
 
-        // TODO (raychu86) Add payload and value deserialization
+        // Deserialize payload
+
+        let mut payload_and_value_bits = vec![];
+        for (element, iterations) in serialized_record[5..].iter() {
+            let element_bytes = recover_x_coordinate::<Self::Group>(element.into_affine(), *iterations)?;
+            payload_and_value_bits.extend(&bytes_to_bits(&element_bytes)[0..data_field_bitsize]);
+        }
+
+        let payload_and_value_bytes = bits_to_bytes(&payload_and_value_bits);
+
+        let payload = RecordPayload::read(&payload_and_value_bytes[..])?;
+        let value: u64 = FromBytes::read(&payload_and_value_bytes[payload.size()..])?;
 
         Ok(RecordComponents {
-            value: 0,
-            payload: RecordPayload::default(),
+            value,
+            payload,
             birth_predicate_repr,
             death_predicate_repr,
             serial_number_nonce,
