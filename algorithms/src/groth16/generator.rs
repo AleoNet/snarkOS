@@ -1,10 +1,10 @@
 use crate::{cfg_into_iter, cfg_iter, fft::EvaluationDomain, msm::FixedBaseMSM};
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{
     curves::{Field, Group, One, PairingEngine, PrimeField, ProjectiveCurve, Zero},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, Variable},
 };
-use snarkos_utilities::rand::UniformRand;
+use snarkos_utilities::{rand::UniformRand, serialize::*};
 
 use rand::Rng;
 
@@ -33,6 +33,7 @@ where
 
 /// This is our assembly structure that we'll use to synthesize the
 /// circuit into a QAP.
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct KeypairAssembly<E: PairingEngine> {
     pub num_inputs: usize,
     pub num_aux: usize,

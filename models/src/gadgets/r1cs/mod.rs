@@ -14,6 +14,8 @@ pub use test_fr::*;
 use crate::curves::Field;
 
 use smallvec::SmallVec as StackVec;
+use snarkos_errors::serialization::SerializationError;
+use snarkos_utilities::serialize::*;
 use std::cmp::Ordering;
 
 type SmallVec<F> = StackVec<[(Variable, F); 16]>;
@@ -63,6 +65,47 @@ impl Ord for Index {
     }
 }
 
+impl CanonicalSerialize for Index {
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
+        let inner = match *self {
+            Index::Input(inner) => {
+                true.serialize(writer)?;
+                inner
+            }
+            Index::Aux(inner) => {
+                false.serialize(writer)?;
+                inner
+            }
+        };
+        inner.serialize(writer)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn serialized_size(&self) -> usize {
+        Self::SERIALIZED_SIZE
+    }
+}
+
+impl ConstantSerializedSize for Index {
+    const SERIALIZED_SIZE: usize = usize::SERIALIZED_SIZE + 1;
+    const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
+}
+
+impl CanonicalDeserialize for Index {
+    #[inline]
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
+        let is_input = bool::deserialize(reader)?;
+        let inner = usize::deserialize(reader)?;
+        Ok(if is_input {
+            Index::Input(inner)
+        } else {
+            Index::Aux(inner)
+        })
+    }
+}
+
 /// This represents a linear combination of some variables, with coefficients
 /// in the field `F`.
 /// The `(coeff, var)` pairs in a `LinearCombination` are kept sorted according
@@ -77,4 +120,24 @@ pub enum ConstraintVar<F: Field> {
     LC(LinearCombination<F>),
     /// A wrapper around a `Variable`.
     Var(Variable),
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn serialize_index() {
+        serialize_index_test(true);
+        serialize_index_test(false);
+    }
+
+    fn serialize_index_test(input: bool) {
+        let idx = if input { Index::Input(32) } else { Index::Aux(32) };
+
+        let mut v = vec![];
+        idx.serialize(&mut v).unwrap();
+        let idx2 = Index::deserialize(&mut &v[..]).unwrap();
+        assert_eq!(idx, idx2);
+    }
 }
