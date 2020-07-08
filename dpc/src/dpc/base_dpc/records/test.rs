@@ -13,9 +13,20 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use rand::{thread_rng, Rng};
 
 #[test]
+fn test_bits_to_bytes() {
+    let mut rng = thread_rng();
+
+    let bytes: [u8; 32] = rng.gen();
+
+    let bits = bytes_to_bits(&bytes);
+
+    let recovered_bytes = bits_to_bytes(&bits);
+    assert_eq!(bytes.to_vec(), recovered_bytes);
+}
+
+#[test]
 fn test_record_serialization() {
     //    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-
     let mut rng = thread_rng();
 
     // Generate parameters for the ledger, commitment schemes, CRH, and the
@@ -57,19 +68,21 @@ fn test_record_serialization() {
 
     println!("birth pred repr: {:?}", record.birth_predicate_repr);
 
-    let serialized_record = RecordSerializer::<_, EdwardsBls>::serialize(record).unwrap();
+    let serialized_record = RecordSerializer::<_, EdwardsBls>::serialize(&record).unwrap();
 
     println!("\nserialized record:\n {:?}\n", serialized_record.len());
 
-    let deserialized_record = RecordSerializer::<Components, EdwardsBls>::deserialize(serialized_record).unwrap();
+    let record_components = RecordSerializer::<Components, EdwardsBls>::deserialize(serialized_record).unwrap();
 
-    //    println!("\ndeserialized record:\n {:?}\n", deserialized_record.len());
+    assert_eq!(record.serial_number_nonce, record_components.serial_number_nonce);
+    assert_eq!(record.commitment_randomness, record_components.commitment_randomness);
+    assert_eq!(record.birth_predicate_repr, record_components.birth_predicate_repr);
+    assert_eq!(record.death_predicate_repr, record_components.death_predicate_repr);
 }
 
 #[test]
 fn test_serialization_recovery() {
     //    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-
     let mut rng = thread_rng();
 
     // Generate parameters for the ledger, commitment schemes, CRH, and the
@@ -110,10 +123,6 @@ fn test_serialization_recovery() {
     .unwrap();
 
     let commitment_randomness = record.commitment_randomness;
-    //    let birth_predicate_repr = record.birth_predicate_repr();
-    //    let death_predicate_repr = record.death_predicate_repr();
-    //    let payload = record.payload();
-    //    let value = record.value();
 
     // TODO (raychu86) This test fails ~ 1/4 of the time when recover_x_coordinate returns a 0 value affine incorrectly
 
@@ -130,16 +139,4 @@ fn test_serialization_recovery() {
     println!("recovered x_coord_bytes: {:?}", recovered_bytes);
 
     assert_eq!(commitment_randomness_bytes, recovered_bytes);
-}
-
-#[test]
-fn test_bits_to_bytes() {
-    let mut rng = thread_rng();
-
-    let bytes: [u8; 32] = rng.gen();
-
-    let bits = bytes_to_bits(&bytes);
-
-    let recovered_bytes = bits_to_bytes(&bits);
-    assert_eq!(bytes.to_vec(), recovered_bytes);
 }

@@ -2,6 +2,7 @@ use crate::base_dpc::{record::DPCRecord, record_payload::RecordPayload, BaseDPCC
 use snarkos_algorithms::crh::bytes_to_bits;
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
+    algorithms::{CommitmentScheme, CRH},
     curves::{AffineCurve, Group, PrimeField, ProjectiveCurve},
     dpc::{DPCComponents, Record},
 };
@@ -102,22 +103,22 @@ pub trait SerializeRecord {
     type Record: Record;
     type RecordComponents;
 
-    fn serialize(record: Self::Record) -> Result<Vec<(Self::Group, u32)>, DPCError>;
+    fn serialize(record: &Self::Record) -> Result<Vec<(Self::Group, u32)>, DPCError>;
 
     fn deserialize(serialized_record: Vec<(Self::Group, u32)>) -> Result<Self::RecordComponents, DPCError>;
 }
 
 pub struct RecordComponents<C: BaseDPCComponents> {
-    //    pub(super) value: u64,
-    pub(super) payload: RecordPayload,
+    pub value: u64,
+    pub payload: RecordPayload,
 
-    pub(super) birth_predicate_repr: Vec<u8>,
-    pub(super) death_predicate_repr: Vec<u8>,
+    pub birth_predicate_repr: Vec<u8>,
+    pub death_predicate_repr: Vec<u8>,
 
-    //    pub(super) serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
+    pub serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
 
-    //    pub(super) commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness,
-    pub(super) _components: PhantomData<C>,
+    pub commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness,
+    pub _components: PhantomData<C>,
 }
 
 pub struct RecordSerializer<C: BaseDPCComponents, G: Group + ProjectiveCurve>(PhantomData<C>, PhantomData<G>);
@@ -129,7 +130,7 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
     type Record = DPCRecord<C>;
     type RecordComponents = RecordComponents<C>;
 
-    fn serialize(record: Self::Record) -> Result<Vec<(Self::Group, u32)>, DPCError> {
+    fn serialize(record: &Self::Record) -> Result<Vec<(Self::Group, u32)>, DPCError> {
         let scalar_field_bitsize = <Self::Group as Group>::ScalarField::size_in_bits();
         let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
         let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
@@ -182,15 +183,6 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
 
         let birth_predicate_repr_biginteger = Self::OuterField::read(&birth_predicate_repr[..])?.into_repr();
         let death_predicate_repr_biginteger = Self::OuterField::read(&death_predicate_repr[..])?.into_repr();
-
-        println!(
-            "\nbirth_predicate_repr_biginteger: {:?}",
-            birth_predicate_repr_biginteger
-        );
-        println!("birth_predicate_repr: {:?}", birth_predicate_repr);
-        println!("birth_predicate_repr_biginteger to bytes: {:?}\n", to_bytes![
-            birth_predicate_repr_biginteger
-        ]?);
 
         let mut birth_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
         let mut death_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
@@ -283,110 +275,75 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
             println!("ELEMENT {}", i);
         }
 
-        {
-            println!("----CHECK BASIC RECOVERY----\n");
-            // (Temporary) check that the birth and death predicate repr bytes can be recovered correctly
-
-            let birth_predicate_repr_bytes = bits_to_bytes(&birth_predicate_repr_bits);
-
-            let (affine, iterations) =
-                recover_from_x_coordinate::<Self::Group>(&birth_predicate_repr_bytes[..]).unwrap();
-
-            let recovered_birth_predicate_repr = recover_x_coordinate::<Self::Group>(affine, iterations).unwrap();
-
-            println!("birth_predicate_repr_bits: {:?}", birth_predicate_repr_bits);
-            println!(
-                "recovered_birth_predicate_repr_bits: {:?}",
-                bytes_to_bits(&recovered_birth_predicate_repr)
-            );
-
-            assert_eq!(birth_predicate_repr_bytes, recovered_birth_predicate_repr);
-
-            let death_predicate_repr_bytes = bits_to_bytes(&death_predicate_repr_bits);
-
-            let (affine, iterations) =
-                recover_from_x_coordinate::<Self::Group>(&death_predicate_repr_bytes[..]).unwrap();
-
-            let recovered_death_predicate_repr = recover_x_coordinate::<Self::Group>(affine, iterations).unwrap();
-
-            assert_eq!(death_predicate_repr_bytes, recovered_death_predicate_repr);
-
-            let birth_predicate_repr_remainder_bytes = bits_to_bytes(&birth_predicate_repr_remainder_bits);
-
-            let (affine, iterations) =
-                recover_from_x_coordinate::<Self::Group>(&birth_predicate_repr_remainder_bytes[..]).unwrap();
-
-            let recovered_remainder = recover_x_coordinate::<Self::Group>(affine, iterations).unwrap();
-
-            assert_eq!(birth_predicate_repr_remainder_bytes, recovered_remainder);
-        }
-
         Ok(output)
     }
 
     fn deserialize(serialized_record: Vec<(Self::Group, u32)>) -> Result<Self::RecordComponents, DPCError> {
-        let scalar_field_bitsize = <Self::Group as Group>::ScalarField::size_in_bits();
         let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
         let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
 
         let data_field_bitsize = base_field_bitsize - 1;
         let remainder_size = outer_field_bitsize - data_field_bitsize;
 
-        //        let mut bytes = vec![];
-        //        for element in serialized_record {
-        //            let affine = element.into_affine();
-        //            let x = affine.to_x_coordinate();
-        //            let x_bytes = to_bytes![x]?;
-        //
-        //            bytes.extend(x_bytes);
-        //        }
+        // Deserialize serial number nonce
 
-        let birth_pred_repr_affine = serialized_record[2].0.into_affine();
-        let birth_pred_repr_iterations = serialized_record[2].1;
+        let (serial_number_nonce, serial_number_nonce_iterations) = &serialized_record[0];
+        let serial_number_nonce_bytes =
+            recover_x_coordinate::<Self::Group>(serial_number_nonce.into_affine(), *serial_number_nonce_iterations)?;
+        let serial_number_nonce_bits = &bytes_to_bits(&serial_number_nonce_bytes)[0..data_field_bitsize];
 
-        let death_pred_repr_affine = serialized_record[3].0.into_affine();
-        let death_pred_repr_iterations = serialized_record[3].1;
+        let serial_number_nonce =
+            <C::SerialNumberNonceCRH as CRH>::Output::read(&bits_to_bytes(serial_number_nonce_bits)[..])?;
 
-        let pred_repr_remainder_affine = serialized_record[4].0.into_affine();
-        let pred_repr_remainder_iterations = serialized_record[4].1;
+        // Deserialize commitment randomness
 
-        let recovered_birth_pred_repr =
-            recover_x_coordinate::<Self::Group>(birth_pred_repr_affine, birth_pred_repr_iterations)?;
-        let recovered_death_pred_repr =
-            recover_x_coordinate::<Self::Group>(death_pred_repr_affine, death_pred_repr_iterations)?;
-        let recovered_pred_repr_remainder =
-            recover_x_coordinate::<Self::Group>(pred_repr_remainder_affine, pred_repr_remainder_iterations)?;
+        let (commitment_randomness, commitment_randomness_iterations) = &serialized_record[1];
+        let commitment_randomness_bytes = recover_x_coordinate::<Self::Group>(
+            commitment_randomness.into_affine(),
+            *commitment_randomness_iterations,
+        )?;
+        let commitment_randomness_bits = &bytes_to_bits(&commitment_randomness_bytes)[0..data_field_bitsize];
 
-        let mut recovered_birth_pred_repr_bits =
-            bytes_to_bits(&recovered_birth_pred_repr)[0..base_field_bitsize].to_vec();
-        let mut recovered_death_pred_repr_bits =
-            bytes_to_bits(&recovered_death_pred_repr)[0..base_field_bitsize].to_vec();
+        let commitment_randomness = <C::RecordCommitment as CommitmentScheme>::Randomness::read(
+            &bits_to_bytes(commitment_randomness_bits)[..],
+        )?;
 
-        let recovered_pred_repr_remainder_bits = bytes_to_bits(&recovered_pred_repr_remainder);
+        // Deserialize birth and death predicates
 
-        let no_remainder_birth_predicate_repr = bits_to_bytes(&recovered_birth_pred_repr_bits);
+        let (birth_predicate_repr, birth_pred_repr_iterations) = &serialized_record[2];
 
-        println!(
-            "pre remainder recovered birth_predicate_repr: {:?}",
-            no_remainder_birth_predicate_repr
-        );
+        let (death_predicate_repr, death_pred_repr_iterations) = &serialized_record[3];
 
-        recovered_birth_pred_repr_bits.extend(&recovered_pred_repr_remainder_bits[0..remainder_size]);
-        recovered_death_pred_repr_bits.extend(&recovered_pred_repr_remainder_bits[remainder_size..remainder_size * 2]);
+        let (predicate_repr_remainder, pred_repr_remainder_iterations) = &serialized_record[4];
 
-        let birth_predicate_repr = bits_to_bytes(&recovered_birth_pred_repr_bits);
-        let death_predicate_repr = bits_to_bytes(&recovered_death_pred_repr_bits);
+        let birth_predicate_repr_bytes =
+            recover_x_coordinate::<Self::Group>(birth_predicate_repr.into_affine(), *birth_pred_repr_iterations)?;
+        let death_predicate_repr_bytes =
+            recover_x_coordinate::<Self::Group>(death_predicate_repr.into_affine(), *death_pred_repr_iterations)?;
+        let predicate_repr_remainder_bytes = recover_x_coordinate::<Self::Group>(
+            predicate_repr_remainder.into_affine(),
+            *pred_repr_remainder_iterations,
+        )?;
 
-        println!("recovered birth_predicate_repr: {:?}", birth_predicate_repr);
-        println!("recovered death_predicate_repr: {:?}", death_predicate_repr);
+        let mut birth_predicate_repr_bits = bytes_to_bits(&birth_predicate_repr_bytes)[0..data_field_bitsize].to_vec();
+        let mut death_predicate_repr_bits = bytes_to_bits(&death_predicate_repr_bytes)[0..data_field_bitsize].to_vec();
 
-        //        println!("recovered_birth_pred_repr_1_bits: {:?}", recovered_birth_pred_repr_1_bits);
-        //        println!("recovered_death_pred_repr_1_bits: {:?}", recovered_death_pred_repr_1_bits);
+        let predicate_repr_remainder_bits = bytes_to_bits(&predicate_repr_remainder_bytes);
+        birth_predicate_repr_bits.extend(&predicate_repr_remainder_bits[0..remainder_size]);
+        death_predicate_repr_bits.extend(&predicate_repr_remainder_bits[remainder_size..remainder_size * 2]);
+
+        let birth_predicate_repr = bits_to_bytes(&birth_predicate_repr_bits);
+        let death_predicate_repr = bits_to_bytes(&death_predicate_repr_bits);
+
+        // TODO (raychu86) Add payload and value deserialization
 
         Ok(RecordComponents {
+            value: 0,
             payload: RecordPayload::default(),
-            birth_predicate_repr: vec![],
-            death_predicate_repr: vec![],
+            birth_predicate_repr,
+            death_predicate_repr,
+            serial_number_nonce,
+            commitment_randomness,
             _components: PhantomData,
         })
     }
