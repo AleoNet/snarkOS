@@ -133,7 +133,45 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         let x = P::BaseField::from_random_bytes_with_flags(bytes);
         if let Some((x, flags)) = x {
             let parsed_flags = EdwardsFlags::from_u8(flags);
+
+            //            use snarkos_utilities::biginteger::BigInteger256;
+
+            //            fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
+            //                let mut bits = Vec::with_capacity(bytes.len() * 8);
+            //                for byte in bytes {
+            //                    for i in 0..8 {
+            //                        let bit = (*byte >> (7-i)) & 1;
+            //                        bits.push(bit == 1)
+            //                    }
+            //                }
+            //                bits
+            //            }
+            //            use snarkos_utilities::biginteger::biginteger::BigInteger;
+            //
+            //
+            //            let mut modulus_bytes = [0u64; 4];
+            //            modulus_bytes.clone_from_slice(P::BaseField::characteristic());
+            //            let modulus = BigInteger256::new(modulus_bytes);
+            //            println!("MODULUS: {:?}\n", modulus);
+            //
+            //
+            //            let mut value = BigInteger256::from_bits(&bytes_to_bits(bytes));
+            //
+            //            println!("MSB: {} {} {} {} ... {} {} {} {}", value.get_bit(255), value.get_bit(254), value.get_bit(253), value.get_bit(252),
+            //                     value.get_bit(3), value.get_bit(2), value.get_bit(1), value.get_bit(0));
+
             if x.is_zero() {
+                //
+                println!("\nWHY IS IT ZERO?: {:?}", flags);
+                //                println!("WHY IS IT ZERO? bytes:: {:?}\n", bytes);
+                //
+                //                println!("");
+                //                println!("VALUE < MODULUS - {}", value < modulus);
+                //                println!("VALUE   {}", value);
+                //                println!("MODULUS {}", modulus);
+                //                value.sub_noborrow(&modulus);
+                //                println!("DIFF    {}", value);
+
                 Some(Self::zero())
             } else {
                 Self::from_x_coordinate(x, parsed_flags.is_positive())

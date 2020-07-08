@@ -8,6 +8,8 @@ use snarkos_objects::Account;
 
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
+//use std::io::Cursor;
+
 //use rand::SeedableRng;
 //use rand_xorshift::XorShiftRng;
 use rand::{thread_rng, Rng};
@@ -131,10 +133,10 @@ fn test_serialization_recovery() {
 
     let (affine, iterations) = recover_from_x_coordinate::<EdwardsBls>(&commitment_randomness_bytes).unwrap();
 
-    let recovered_bytes = recover_x_coordinate::<EdwardsBls>(affine, iterations).unwrap();
-
     println!("affine: {:?}", affine);
     println!("affine bytes: {:?}", to_bytes![affine].unwrap());
+
+    let recovered_bytes = recover_x_coordinate::<EdwardsBls>(affine, iterations).unwrap();
 
     println!("recovered x_coord_bytes: {:?}", recovered_bytes);
 
@@ -172,17 +174,92 @@ fn test_recovery_working_with_iteration() {
     let commitment_randomness =
         <<Components as DPCComponents>::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
-    let mut bytes = to_bytes![commitment_randomness].unwrap();
-
-    let mut g = <EdwardsBls as ProjectiveCurve>::Affine::from_random_bytes(&bytes);
-
-    let mut iterations = 0;
-    while g.is_none() {
-        bytes.iter_mut().for_each(|i| *i = i.wrapping_sub(1));
-        g = <EdwardsBls as ProjectiveCurve>::Affine::from_random_bytes(&bytes);
-        iterations += 1;
+    fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
+        let mut bits = Vec::with_capacity(bytes.len() * 8);
+        for byte in bytes {
+            for i in 0..8 {
+                let bit = (*byte >> i) & 1;
+                bits.push(bit == 1)
+            }
+        }
+        bits
     }
 
-    println!("g: {:?}", g.unwrap());
-    println!("Iterations: {}", iterations);
+    use snarkos_utilities::biginteger::biginteger::BigInteger;
+    //
+    //
+    //
+    let bytes = to_bytes![commitment_randomness].unwrap();
+
+    println!("{:?}", bytes_to_bits(&bytes));
+
+    println!(
+        "{} {} {} {}",
+        commitment_randomness.0.get_bit(255),
+        commitment_randomness.0.get_bit(254),
+        commitment_randomness.0.get_bit(253),
+        commitment_randomness.0.get_bit(252)
+    );
+    //
+    //
+    //    let commitment_bits = bytes_to_bits(&bytes);
+    //    println!("{:?}", commitment_bits);
+
+    //    {
+    //        let mut serialized = vec![0u8; 32];
+    //        let mut cursor = Cursor::new(&mut serialized[..]);
+    //        a.serialize_with_flags(&mut cursor, SWFlags::from_y_sign(true)).unwrap();
+    //        let mut cursor = Cursor::new(&serialized[..]);
+    //        let (b, flags) = F::deserialize_with_flags::<_, SWFlags>(&mut cursor).unwrap();
+    //        assert_eq!(flags.is_positive(), Some(true));
+    //        assert!(!flags.is_infinity());
+    //        assert_eq!(a, b);
+    //    }
+
+    //    let mut serialized = vec![0u8; 32];
+    //    let mut cursor = Cursor::new(&mut serialized[..]);
+    //    commitment_randomness.serialize(&mut cursor).unwrap();
+    use snarkos_errors::dpc::DPCError;
+    use snarkos_models::curves::Group;
+    use snarkos_utilities::FromBytes;
+
+    fn recover_affine_from_x_coord<G: Group + ProjectiveCurve>(
+        x_bytes: &[u8],
+    ) -> Result<<G as ProjectiveCurve>::Affine, DPCError> {
+        let x: <<EdwardsBls as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(x_bytes)?;
+
+        if let Some(affine) = <EdwardsBls as ProjectiveCurve>::Affine::from_x_coordinate(x, false) {
+            //            if affine.is_in_correct_subgroup_assuming_on_curve() {
+            //                let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
+            //
+            //                return Ok(affine);
+            //            }
+            let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
+            return Ok(affine);
+        }
+
+        if let Some(affine) = <EdwardsBls as ProjectiveCurve>::Affine::from_x_coordinate(x, true) {
+            //            if affine.is_in_correct_subgroup_assuming_on_curve() {
+            //                let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
+            //
+            //                return Ok(affine);
+            //            }
+            let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
+            return Ok(affine);
+        }
+
+        Err(DPCError::Message("NotInCorrectSubgroupOnCurve".into()))
+    }
+
+    let g = recover_affine_from_x_coord::<EdwardsBls>(&to_bytes![commitment_randomness].unwrap()).unwrap();
+
+    //    let mut iterations = 0;
+    //    while g.is_none() {
+    //        serialized.iter_mut().for_each(|i| *i = i.wrapping_sub(1));
+    //        g = <EdwardsBls as ProjectiveCurve>::Affine::from_random_bytes(&serialized);
+    //        iterations += 1;
+    //    }
+
+    println!("g: {:?}", g);
+    //    println!("Iterations: {}", iterations);
 }

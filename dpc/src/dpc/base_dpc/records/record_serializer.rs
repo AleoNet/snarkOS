@@ -24,6 +24,9 @@ pub fn recover_from_x_coordinate<G: Group + ProjectiveCurve>(
         iterations += 1;
     }
 
+    //    println!("g: {:?}", g.unwrap());
+    //    println!("g bytes: {:?}", to_bytes![g.unwrap()]?);
+
     println!("\tITERATIONS - {}", iterations);
     let affine = g.unwrap();
     Ok((affine, iterations))
@@ -246,7 +249,7 @@ impl<C: BaseDPCComponents, G: Group + ProjectiveCurve> SerializeRecord for Recor
 
         let mut output = Vec::with_capacity(data_elements.len());
 
-        for (i, element) in data_elements.iter().enumerate() {
+        for element in data_elements.iter() {
             output.push((element.0.into_projective(), element.1));
         }
 

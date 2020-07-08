@@ -146,6 +146,8 @@ macro_rules! bigint_impl {
                 }
             }
 
+            /// Constructs a `BigInteger` by parsing a vector of bits in big endian format
+            /// and transforms it into a vector of little endian u64 elements.
             #[inline]
             fn from_bits(bits: &[bool]) -> Self {
                 let mut res = Self::default();
