@@ -124,7 +124,7 @@ fn test_serialization_recovery() {
 
     let commitment_randomness = record.commitment_randomness;
 
-    // TODO (raychu86) This test fails ~ 1/4 of the time when recover_x_coordinate returns a 0 value affine incorrectly
+    // TODO This test fails ~ 1/4 of the time when `recover_from_x_coordinate` returns a 0 value affine incorrectly
 
     let commitment_randomness_bytes = to_bytes![commitment_randomness].unwrap();
     println!("commitment_randomness_bytes: {:?}", commitment_randomness_bytes);
@@ -139,4 +139,50 @@ fn test_serialization_recovery() {
     println!("recovered x_coord_bytes: {:?}", recovered_bytes);
 
     assert_eq!(commitment_randomness_bytes, recovered_bytes);
+}
+
+use snarkos_models::{
+    algorithms::CommitmentScheme,
+    curves::{AffineCurve, ProjectiveCurve},
+    dpc::DPCComponents,
+};
+use snarkos_utilities::rand::UniformRand;
+
+// TODO debug iterations
+
+#[test]
+fn test_recovery_not_working_without_iteration() {
+    let rng = &mut thread_rng();
+    let commitment_randomness =
+        <<Components as DPCComponents>::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+    let bytes = to_bytes![commitment_randomness].unwrap();
+
+    // This should always work, but fails a good % of the time
+    let g = <EdwardsBls as ProjectiveCurve>::Affine::from_random_bytes(&bytes);
+
+    assert!(g.is_some());
+
+    println!("g: {:?}", g.unwrap());
+}
+
+#[test]
+fn test_recovery_working_with_iteration() {
+    let rng = &mut thread_rng();
+    let commitment_randomness =
+        <<Components as DPCComponents>::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
+
+    let mut bytes = to_bytes![commitment_randomness].unwrap();
+
+    let mut g = <EdwardsBls as ProjectiveCurve>::Affine::from_random_bytes(&bytes);
+
+    let mut iterations = 0;
+    while g.is_none() {
+        bytes.iter_mut().for_each(|i| *i = i.wrapping_sub(1));
+        g = <EdwardsBls as ProjectiveCurve>::Affine::from_random_bytes(&bytes);
+        iterations += 1;
+    }
+
+    println!("g: {:?}", g.unwrap());
+    println!("Iterations: {}", iterations);
 }
