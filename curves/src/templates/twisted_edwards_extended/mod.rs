@@ -121,7 +121,9 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         let numerator = P::mul_by_a(&x2) - &one;
         let denominator = P::COEFF_D * &x2 - &one;
         let y2 = denominator.inverse().map(|denom| denom * &numerator);
+        println!("@@@ IM AT Y2");
         y2.and_then(|y2| y2.sqrt()).map(|y| {
+            println!("@@@ IM AT -Y");
             let negy = -y;
             let y = if (y < negy) ^ greatest { y } else { negy };
             Self::new(x, y)

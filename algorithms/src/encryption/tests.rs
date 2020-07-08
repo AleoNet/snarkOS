@@ -25,12 +25,13 @@ fn simple_encryption() {
 
     let encryption_scheme = TestEncryptionScheme::setup(rng);
 
-    let (private_key, public_key) = encryption_scheme.keygen(rng);
+    let private_key = encryption_scheme.generate_private_key(rng);
+    let public_key = encryption_scheme.generate_public_key(&private_key);
 
+    let randomness = encryption_scheme.generate_randomness(&public_key, rng).unwrap();
     let message = generate_input(32, rng);
 
-    let ciphertext = encryption_scheme.encrypt(&public_key, &message, rng).unwrap();
-
+    let ciphertext = encryption_scheme.encrypt(&public_key, &randomness, &message).unwrap();
     let decrypted_message = encryption_scheme.decrypt(&private_key, &ciphertext).unwrap();
 
     assert_eq!(message, decrypted_message);

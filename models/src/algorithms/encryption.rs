@@ -7,21 +7,39 @@ use snarkos_utilities::{
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait EncryptionScheme: Sized + Clone {
+pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Parameters> {
+    type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
-    type PublicKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes;
+    type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
     type Plaintext: Clone + Debug + Default + Eq + Hash;
     type Ciphertext: Clone + Debug + Default + Eq + Hash;
+    type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
+    type BlindingExponents: Clone + Debug + Default + Eq + Hash + ToBytes;
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
-    fn keygen<R: Rng>(&self, rng: &mut R) -> (Self::PrivateKey, Self::PublicKey);
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Self::PrivateKey;
 
-    fn encrypt<R: Rng>(
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
+
+    fn generate_randomness<R: Rng>(
         &self,
         public_key: &Self::PublicKey,
-        message: &Self::Plaintext,
         rng: &mut R,
+    ) -> Result<Self::Randomness, EncryptionError>;
+
+    fn generate_blinding_exponents(
+        &self,
+        public_key: &Self::PublicKey,
+        randomness: &Self::Randomness,
+        message_length: usize,
+    ) -> Result<Self::BlindingExponents, EncryptionError>;
+
+    fn encrypt(
+        &self,
+        public_key: &Self::PublicKey,
+        randomness: &Self::Randomness,
+        message: &Self::Plaintext,
     ) -> Result<Self::Ciphertext, EncryptionError>;
 
     fn decrypt(
@@ -29,4 +47,6 @@ pub trait EncryptionScheme: Sized + Clone {
         private_key: &Self::PrivateKey,
         ciphertext: &Self::Ciphertext,
     ) -> Result<Self::Plaintext, EncryptionError>;
+
+    fn parameters(&self) -> &Self::Parameters;
 }

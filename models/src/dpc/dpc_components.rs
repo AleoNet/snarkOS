@@ -1,7 +1,13 @@
 use crate::{
-    algorithms::{CommitmentScheme, SignatureScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH, PRF},
     curves::PrimeField,
-    gadgets::algorithms::{CRHGadget, CommitmentGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
+    gadgets::algorithms::{
+        CRHGadget,
+        CommitmentGadget,
+        EncryptionGadget,
+        PRFGadget,
+        SignaturePublicKeyRandomizationGadget,
+    },
 };
 
 pub trait DPCComponents: 'static + Sized {
@@ -11,7 +17,12 @@ pub trait DPCComponents: 'static + Sized {
     type InnerField: PrimeField;
     type OuterField: PrimeField;
 
-    /// Commitment scheme for address contents. Invoked only over `Self::InnerField`.
+    /// Encryption scheme for account records.
+    type AccountEncryption: EncryptionScheme;
+    type AccountEncryptionGadget: EncryptionGadget<Self::AccountEncryption, Self::InnerField>;
+    type AccountDecryptionKey: PrimeField;
+
+    /// Commitment scheme for account contents. Invoked only over `Self::InnerField`.
     type AccountCommitment: CommitmentScheme;
     type AccountCommitmentGadget: CommitmentGadget<Self::AccountCommitment, Self::InnerField>;
 

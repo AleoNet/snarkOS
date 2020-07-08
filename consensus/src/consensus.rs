@@ -351,11 +351,10 @@ impl ConsensusParameters {
         }
 
         // Generate a new account that owns the dummy input records
-        let account_metadata: [u8; 32] = rng.gen();
         let new_account = Account::new(
             &parameters.circuit_parameters.account_signature,
             &parameters.circuit_parameters.account_commitment,
-            &account_metadata,
+            &parameters.circuit_parameters.account_encryption,
             rng,
         )
         .unwrap();

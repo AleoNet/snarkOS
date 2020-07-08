@@ -8,7 +8,7 @@ use rand_chacha::ChaChaRng;
 #[test]
 pub fn private_key_test() {
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
-    let private_key = PrivateKey::new(None, rng);
+    let private_key = PrivateKey::new(rng);
     assert!(private_key.is_ok());
 
     let expected_private_key = "AKey1KqF7t1fXt4ie38R3nyqbWokKru23zkLBTiSBjyfK96matiT3FEcLjmBabc3goXPXbZKcU1XLFHBuQ75mCsjCeLo8AbWQ7DMCmCyGRJGf8RKBvXQjnL51sZgqesMMaoxujzBm6gBfx2fmAW4QbQFQqxJSojna2rd6fJYS8v5D8zmy6R1";
@@ -23,7 +23,7 @@ pub fn private_key_test() {
 #[test]
 pub fn public_key_test() {
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
-    let private_key = PrivateKey::new(None, rng).unwrap();
+    let private_key = PrivateKey::new(rng).unwrap();
     let public_key = PublicKey::from(&private_key);
     assert!(public_key.is_ok());
 

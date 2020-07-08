@@ -1,4 +1,4 @@
-use crate::algorithms::{CommitmentScheme, SignatureScheme};
+use crate::algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme};
 use snarkos_errors::objects::AccountError;
 
 use rand::Rng;
@@ -7,12 +7,13 @@ pub trait AccountScheme: Sized {
     type AccountPublicKey: Default;
     type AccountPrivateKey: Default;
     type CommitmentScheme: CommitmentScheme;
+    type EncryptionScheme: EncryptionScheme;
     type SignatureScheme: SignatureScheme;
 
     fn new<R: Rng>(
         signature_parameters: &Self::SignatureScheme,
         commitment_parameters: &Self::CommitmentScheme,
-        metadata: &[u8; 32],
+        encryption_parameters: &Self::EncryptionScheme,
         rng: &mut R,
     ) -> Result<Self, AccountError>;
 }

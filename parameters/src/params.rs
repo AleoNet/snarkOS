@@ -235,6 +235,14 @@ impl_params!(
     258180
 );
 
+// Encryption
+impl_params!(
+    AccountEncryptionParameters,
+    account_encryption_test,
+    "account_encryption",
+    417868
+);
+
 // POSW SNARK
 impl_params!(PoswSNARKPKParameters, posw_snark_pk_test, "posw_snark_pk", 26204306);
 impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 1165);

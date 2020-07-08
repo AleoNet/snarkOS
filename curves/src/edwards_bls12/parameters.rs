@@ -2,6 +2,7 @@ use crate::{
     edwards_bls12::{Fq, Fr},
     templates::twisted_edwards_extended::{GroupAffine, GroupProjective},
 };
+use snarkos_errors::curves::GroupError;
 use snarkos_models::{
     curves::{ModelParameters, MontgomeryModelParameters, TEModelParameters},
     field,
@@ -94,18 +95,18 @@ impl MontgomeryModelParameters for EdwardsParameters {
 }
 
 impl FromStr for EdwardsAffine {
-    type Err = ();
+    type Err = GroupError;
 
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
         s = s.trim();
         if s.is_empty() {
-            return Err(());
+            return Err(GroupError::ParsingEmptyString);
         }
         if s.len() < 3 {
-            return Err(());
+            return Err(GroupError::InvalidString);
         }
         if !(s.starts_with('(') && s.ends_with(')')) {
-            return Err(());
+            return Err(GroupError::InvalidString);
         }
         let mut point = Vec::new();
         for substr in s.split(|c| c == '(' || c == ')' || c == ',' || c == ' ') {
@@ -114,11 +115,15 @@ impl FromStr for EdwardsAffine {
             }
         }
         if point.len() != 2 {
-            return Err(());
+            return Err(GroupError::InvalidGroupElement);
         }
         let point = EdwardsAffine::new(point[0], point[1]);
 
-        if !point.is_on_curve() { Err(()) } else { Ok(point) }
+        if !point.is_on_curve() {
+            Err(GroupError::InvalidGroupElement)
+        } else {
+            Ok(point)
+        }
     }
 }
 
