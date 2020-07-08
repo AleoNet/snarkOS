@@ -16,6 +16,7 @@ pub mod commitment;
 pub mod crh;
 pub mod encryption;
 pub mod fft;
+pub mod groth16;
 pub mod merkle_tree;
 pub mod msm;
 pub mod prf;
