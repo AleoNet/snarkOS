@@ -161,12 +161,7 @@ fn print_montgomery_to_weierstrass_parameters() {
 fn test_isomorphism() {
     use rand::thread_rng;
     use snarkos_models::curves::{field::Field, LegendreSymbol, One, Zero};
-    use snarkos_utilities::{
-        rand::UniformRand,
-        serialize::{EdwardsFlags, Flags},
-        to_bytes,
-        ToBytes,
-    };
+    use snarkos_utilities::{rand::UniformRand, to_bytes, ToBytes};
 
     let rng = &mut thread_rng();
 
@@ -292,23 +287,8 @@ fn test_isomorphism() {
         (x, y)
     };
 
-    let group_recovered = {
-        // Map it to its corresponding Fq element.
-        let greatest = {
-            let output = Fq::from_random_bytes_with_flags(&to_bytes![x].unwrap());
-            assert!(output.is_some());
-
-            let (_, flags) = output.unwrap();
-            let greatest = EdwardsFlags::from_u8(flags).is_positive();
-            greatest
-        };
-
-        EdwardsAffine::get_point_from_x(x.clone(), greatest).unwrap()
-    };
-
     let group = EdwardsAffine::new(x, y);
 
-    println!("\n{:?}", group_recovered);
     println!("{:?}", group);
 
     // Convert the twisted Edwards element (x, y) to the alternate Montgomery element (u, v)
@@ -381,32 +361,34 @@ fn test_isomorphism() {
         let denominator = x * &u;
         let value2 = (numerator * &denominator.inverse().unwrap()).sqrt();
 
+        let mut recovered_value = None;
+
         if let Some(value) = value1 {
             if fq_element == value {
                 println!("SUCCESS 1");
-                value
+                recovered_value = Some(value);
             } else if fq_element == -value {
                 println!("SUCCESS 2");
-                -value
-            } else {
-                println!("FAILED");
-                panic!()
+                recovered_value = Some(-value);
             }
-        } else if let Some(value) = value2 {
+        }
+
+        if let Some(value) = value2 {
             if fq_element == value {
                 println!("SUCCESS 3");
-                value
+                recovered_value = Some(value)
             } else if fq_element == -value {
                 println!("SUCCESS 4");
-                -value
-            } else {
-                println!("FAILED");
-                panic!()
+                recovered_value = Some(-value);
             }
-        } else {
+        }
+
+        if recovered_value.is_none() {
             println!("FAILED");
             panic!()
         }
+
+        recovered_value.unwrap()
     };
 
     let fr_element_reconstructed = {
