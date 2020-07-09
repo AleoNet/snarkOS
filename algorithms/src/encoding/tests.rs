@@ -1,10 +1,7 @@
 use crate::encoding::Elligator2;
-use snarkos_curves::{
-    edwards_bls12::*,
-    templates::twisted_edwards_extended::tests::{edwards_test, montgomery_conversion_test},
-};
+use snarkos_curves::edwards_bls12::*;
 
-use snarkos_utilities::{rand::UniformRand, to_bytes, ToBytes};
+use snarkos_utilities::rand::UniformRand;
 
 use rand::thread_rng;
 
@@ -13,5 +10,9 @@ fn test_encoding() {
     let rng = &mut thread_rng();
     let fr_element: Fr = Fr::rand(rng);
 
-    let y = Elligator2::encode::<EdwardsParameters, EdwardsProjective>(fr_element).unwrap();
+    let encoded_element = Elligator2::<EdwardsParameters, EdwardsProjective>::encode(&fr_element).unwrap();
+
+    let recovered_fr_element = Elligator2::<EdwardsParameters, EdwardsProjective>::decode(&encoded_element).unwrap();
+
+    assert_eq!(fr_element, recovered_fr_element);
 }

@@ -12,14 +12,19 @@ use snarkos_models::curves::{
 };
 use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
-pub struct Elligator2 {}
+use std::marker::PhantomData;
 
-impl Elligator2 {
-    pub fn encode<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve>(
-        fr_element: <G as Group>::ScalarField,
-    ) -> Result<<G as ProjectiveCurve>::Affine, EncodingError> {
-        println!("Starting Fr element is - {:?}", fr_element);
+pub struct Elligator2<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve> {
+    _parameters: PhantomData<P>,
+    _group: PhantomData<G>,
+}
 
+impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve> Elligator2<P, G> {
+    const A: P::BaseField = <P as MontgomeryModelParameters>::COEFF_A;
+    const B: P::BaseField = <P as MontgomeryModelParameters>::COEFF_B;
+    const D: P::BaseField = <P as TEModelParameters>::COEFF_D;
+
+    pub fn encode(fr_element: &<G as Group>::ScalarField) -> Result<<G as ProjectiveCurve>::Affine, EncodingError> {
         // Map it to its corresponding Fq element.
         let fq_element = {
             let output = P::BaseField::from_random_bytes(&to_bytes![fr_element]?);
@@ -27,17 +32,12 @@ impl Elligator2 {
             output.unwrap()
         };
 
-        let A = <P as MontgomeryModelParameters>::COEFF_A;
-        let B = <P as MontgomeryModelParameters>::COEFF_B;
-
         // Compute the parameters for the alternate Montgomery form: v^2 == u^3 + A * u^2 + B * u.
         let (a, b) = {
-            let a = A * &B.inverse().unwrap();
-            let b = P::BaseField::one() * &B.square().inverse().unwrap();
+            let a = Self::A * &Self::B.inverse().unwrap();
+            let b = P::BaseField::one() * &Self::B.square().inverse().unwrap();
             (a, b)
         };
-
-        println!("Starting Fq element is {:?}", fq_element);
 
         // Compute the mapping from Fq to E(Fq) as an alternate Montgomery element (u, v).
         let (u, v) = {
@@ -46,7 +46,7 @@ impl Elligator2 {
 
             // Let u = D.
             // TODO (howardwu): change to 5.
-            let u = <P as TEModelParameters>::COEFF_D;
+            let u = Self::D;
 
             // Let ur2 = u * r^2;
             let ur2 = r.square() * &u;
@@ -110,8 +110,8 @@ impl Elligator2 {
 
         // Convert the alternate Montgomery element (u, v) to Montgomery element (s, t).
         let (s, t) = {
-            let s = u * &B;
-            let t = v * &B;
+            let s = u * &Self::B;
+            let t = v * &Self::B;
 
             // Ensure (s, t) is a valid Montgomery element
             {
@@ -119,7 +119,7 @@ impl Elligator2 {
                 let t2 = t.square();
                 let s2 = s.square();
                 let s3 = s2 * &s;
-                assert_eq!(B * &t2, s3 + &(A * &s2) + &s);
+                assert_eq!(Self::B * &t2, s3 + &(Self::A * &s2) + &s);
             }
 
             (s, t)
@@ -136,17 +136,116 @@ impl Elligator2 {
             (x, y)
         };
 
-        let group_recovered = <G as ProjectiveCurve>::Affine::from_random_bytes(&to_bytes![x].unwrap()).unwrap();
+        let group = <G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?;
 
-        assert_eq!(to_bytes![x]?, to_bytes![group_recovered.to_x_coordinate()]?);
-        assert_eq!(to_bytes![y]?, to_bytes![group_recovered.to_y_coordinate()]?);
-
-        Ok(group_recovered)
+        Ok(group)
     }
 
-    pub fn decode<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve>(
-        group_element: <G as ProjectiveCurve>::Affine,
-    ) -> Result<(), EncodingError> {
-        unimplemented!()
+    pub fn decode(group_element: &<G as ProjectiveCurve>::Affine) -> Result<<G as Group>::ScalarField, EncodingError> {
+        let x = P::BaseField::read(&to_bytes![group_element.to_x_coordinate()]?[..])?;
+        let y = P::BaseField::read(&to_bytes![group_element.to_y_coordinate()]?[..])?;
+
+        // Compute the parameters for the alternate Montgomery form: v^2 == u^3 + A * u^2 + B * u.
+        let (a, b) = {
+            let a = Self::A * &Self::B.inverse().unwrap();
+            let b = P::BaseField::one() * &Self::B.square().inverse().unwrap();
+            (a, b)
+        };
+
+        // Convert the twisted Edwards element (x, y) to the alternate Montgomery element (u, v)
+        let (u_reconstructed, _v_reconstructed) = {
+            let numerator = P::BaseField::one() + &y;
+            let denominator = P::BaseField::one() - &y;
+
+            let u = numerator.clone() * &(denominator.inverse().unwrap());
+            let v = numerator * &((denominator * &x).inverse().unwrap());
+
+            // Ensure (u, v) is a valid Montgomery element
+            {
+                // Enforce B * v^2 == u^3 + A * u^2 + u
+                let v2 = v.square();
+                let u2 = u.square();
+                let u3 = u2 * &u;
+                assert_eq!(Self::B * &v2, u3 + &(Self::A * &u2) + &u);
+            }
+
+            let u = u * &Self::B.inverse().unwrap();
+            let v = v * &Self::B.inverse().unwrap();
+
+            // Ensure (u, v) is a valid alternate Montgomery element.
+            {
+                // Enforce v^2 == u^3 + A * u^2 + B * u
+                let v2 = v.square();
+                let u2 = u.square();
+                let u3 = u2 * &u;
+                assert_eq!(v2, u3 + &(a * &u2) + &(b * &u));
+            }
+
+            (u, v)
+        };
+
+        let x = u_reconstructed;
+
+        // TODO (howardwu): change to 5.
+        // Let u = D.
+        let u = Self::D;
+
+        {
+            // Verify u is a quadratic nonresidue.
+            assert!(u.legendre().is_qnr());
+
+            // Verify that x != -A.
+            assert_ne!(x, -a);
+
+            // Verify that if y is 0, then x is 0.
+            if y.is_zero() {
+                assert!(x.is_zero());
+            }
+
+            // Verify -ux(x + A) is a residue.
+            assert_eq!((-(u * &x) * &(x + &a)).legendre(), LegendreSymbol::QuadraticResidue);
+        }
+
+        // TODO Find more efficient way than brute force checking the valid recovery
+
+        // Let value1 = sqrt(-x / ((x + A) * u)).
+        let numerator = -x;
+        let denominator = (x + &a) * &u;
+        let value1 = (numerator * &denominator.inverse().unwrap()).sqrt();
+
+        // Let value2 = sqrt(-(x + A) / ux)).
+        let numerator = -x - &a;
+        let denominator = x * &u;
+        let value2 = (numerator * &denominator.inverse().unwrap()).sqrt();
+
+        if let Some(value) = value1 {
+            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![value]?) {
+                if &Self::encode(&fr_element_reconstructed)? == group_element {
+                    return Ok(fr_element_reconstructed);
+                }
+            }
+
+            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![-value]?) {
+                if &Self::encode(&fr_element_reconstructed)? == group_element {
+                    return Ok(fr_element_reconstructed);
+                }
+            }
+        }
+
+        if let Some(value) = value2 {
+            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![value]?) {
+                if &Self::encode(&fr_element_reconstructed)? == group_element {
+                    return Ok(fr_element_reconstructed);
+                }
+            }
+
+            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![-value]?) {
+                if &Self::encode(&fr_element_reconstructed)? == group_element {
+                    return Ok(fr_element_reconstructed);
+                }
+            }
+        }
+
+        Err(EncodingError::InvalidGroupElement)
     }
 }
