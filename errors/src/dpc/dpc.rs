@@ -1,5 +1,5 @@
 use crate::{
-    algorithms::{CRHError, CommitmentError, PRFError, SNARKError, SignatureError},
+    algorithms::{CRHError, CommitmentError, EncodingError, PRFError, SNARKError, SignatureError},
     dpc::{BindingSignatureError, LedgerError},
     objects::AccountError,
     parameters::ParametersError,
@@ -21,6 +21,9 @@ pub enum DPCError {
 
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[error("{}", _0)]
+    EncodingError(EncodingError),
 
     #[error("{}", _0)]
     LedgerError(LedgerError),
@@ -68,6 +71,12 @@ impl From<CommitmentError> for DPCError {
 impl From<CRHError> for DPCError {
     fn from(error: CRHError) -> Self {
         DPCError::CRHError(error)
+    }
+}
+
+impl From<EncodingError> for DPCError {
+    fn from(error: EncodingError) -> Self {
+        DPCError::EncodingError(error)
     }
 }
 
