@@ -1,18 +1,14 @@
-use rand::Rng;
-
+use super::{push_constraints, r1cs_to_qap::R1CStoQAP, Parameters, Proof};
 use crate::{cfg_into_iter, msm::VariableBaseMSM};
-
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, Group, One, PairingEngine, PrimeField, ProjectiveCurve, Zero},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, Variable},
 };
-
-use snarkos_errors::gadgets::SynthesisError;
-
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_utilities::rand::UniformRand;
 
-use super::{push_constraints, r1cs_to_qap::R1CStoQAP, Parameters, Proof};
+use rand::Rng;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;

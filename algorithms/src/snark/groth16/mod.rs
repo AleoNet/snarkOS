@@ -9,14 +9,12 @@
 #![deny(unused_comparisons, bare_trait_objects, unused_must_use, const_err)]
 #![forbid(unsafe_code)]
 
-use snarkos_utilities::serialize::*;
-
 use snarkos_errors::serialization::SerializationError;
-
 use snarkos_models::{
     curves::{Field, PairingCurve, PairingEngine},
     gadgets::r1cs::{Index, LinearCombination},
 };
+use snarkos_utilities::serialize::*;
 
 /// Reduce an R1CS instance to a *Quadratic Arithmetic Program* instance.
 pub mod r1cs_to_qap;

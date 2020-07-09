@@ -37,7 +37,7 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for MySillyCircuit<C
 
 mod bls12_377 {
     use super::*;
-    use crate::groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
+    use crate::snark::groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
     use core::ops::MulAssign;
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
     use snarkos_utilities::rand::{test_rng, UniformRand};
@@ -66,7 +66,7 @@ mod bls12_377 {
 
 mod bw6_761 {
     use super::*;
-    use crate::groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
+    use crate::snark::groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
 
     use snarkos_curves::bw6_761::{Fr, BW6_761};
     use snarkos_utilities::rand::{test_rng, UniformRand};

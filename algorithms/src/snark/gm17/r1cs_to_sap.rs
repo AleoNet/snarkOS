@@ -1,7 +1,5 @@
-use crate::{
-    fft::EvaluationDomain,
-    snark::{generator::KeypairAssembly, prover::ProvingAssignment},
-};
+use super::{generator::KeypairAssembly, prover::ProvingAssignment};
+use crate::fft::EvaluationDomain;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, One, PairingEngine, Zero},

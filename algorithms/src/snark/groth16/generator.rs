@@ -1,3 +1,4 @@
+use super::{push_constraints, r1cs_to_qap::R1CStoQAP, Parameters, VerifyingKey};
 use crate::{cfg_into_iter, cfg_iter, fft::EvaluationDomain, msm::FixedBaseMSM};
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{
@@ -12,8 +13,6 @@ use rand::Rng;
 use rayon::prelude::*;
 
 use snarkos_profiler::{end_timer, start_timer};
-
-use super::{push_constraints, r1cs_to_qap::R1CStoQAP, Parameters, VerifyingKey};
 
 /// Generates a random common reference string for
 /// a circuit.
