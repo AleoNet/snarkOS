@@ -1,5 +1,5 @@
-pub mod ellegator2;
-pub use self::ellegator2::*;
+pub mod elligator2;
+pub use self::elligator2::*;
 
 #[cfg(test)]
 pub mod tests;
