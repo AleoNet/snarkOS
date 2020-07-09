@@ -1,6 +1,5 @@
-use crate::{cfg_iter, cfg_iter_mut, fft::EvaluationDomain};
-
 use super::{generator::KeypairAssembly, prover::ProvingAssignment, Vec};
+use crate::{cfg_iter, cfg_iter_mut, fft::EvaluationDomain};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{PairingEngine, Zero},

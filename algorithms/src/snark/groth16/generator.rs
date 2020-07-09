@@ -5,14 +5,13 @@ use snarkos_models::{
     curves::{Field, Group, One, PairingEngine, PrimeField, ProjectiveCurve, Zero},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem, Index, LinearCombination, Variable},
 };
+use snarkos_profiler::{end_timer, start_timer};
 use snarkos_utilities::{rand::UniformRand, serialize::*};
 
 use rand::Rng;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
-
-use snarkos_profiler::{end_timer, start_timer};
 
 /// Generates a random common reference string for
 /// a circuit.

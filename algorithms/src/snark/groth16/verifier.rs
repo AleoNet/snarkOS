@@ -1,8 +1,6 @@
-use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve};
-
 use super::{PreparedVerifyingKey, Proof, VerifyingKey};
-
 use snarkos_errors::gadgets::SynthesisError;
+use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve};
 
 use core::ops::{AddAssign, Neg};
 
