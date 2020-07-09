@@ -7,13 +7,18 @@ use snarkos_models::curves::{
     tests_field::{field_serialization_test, field_test, primefield_test},
     tests_group::group_test,
     AffineCurve,
+    Field,
+    LegendreSymbol,
     MontgomeryModelParameters,
+    One,
     ProjectiveCurve,
     SquareRootField,
     TEModelParameters,
+    Zero,
 };
+use snarkos_utilities::{rand::UniformRand, to_bytes, ToBytes};
 
-use rand;
+use rand::thread_rng;
 
 #[test]
 fn test_edwards_bls12_fr() {
@@ -84,8 +89,6 @@ fn test_montgomery_conversion() {
 
 #[test]
 fn test_edwards_to_montgomery_point() {
-    use snarkos_models::curves::{field::Field, One};
-
     let a: EdwardsAffine = rand::random();
     let (x, y) = (a.x, a.y);
 
@@ -129,8 +132,6 @@ fn test_edwards_to_montgomery_point() {
 #[ignore]
 #[test]
 fn print_montgomery_to_weierstrass_parameters() {
-    use snarkos_models::curves::{field::Field, One};
-
     const A: Fq = <EdwardsParameters as MontgomeryModelParameters>::COEFF_A;
     const B: Fq = <EdwardsParameters as MontgomeryModelParameters>::COEFF_B;
 
@@ -159,10 +160,6 @@ fn print_montgomery_to_weierstrass_parameters() {
 
 #[test]
 fn test_isomorphism() {
-    use rand::thread_rng;
-    use snarkos_models::curves::{field::Field, LegendreSymbol, One, Zero};
-    use snarkos_utilities::{rand::UniformRand, to_bytes, ToBytes};
-
     let rng = &mut thread_rng();
 
     // Sample a random Fr element.
@@ -398,39 +395,4 @@ fn test_isomorphism() {
     };
 
     assert_eq!(fr_element, fr_element_reconstructed);
-
-    // // Let r = element in its alternate Montgomery form.
-    // let r = {
-    //
-    //     // Recover element as a Montgomery element (u, v).
-    //     let (u, v) = {
-    //         let u = element;
-    //         let u2 = u.square();
-    //         let u3 = u2.clone() * &u;
-    //         let au2 = u2 * &a;
-    //         let numerator = u3 + &au2 + &u;
-    //         let denominator = B;
-    //         let v = (numerator * &denominator.inverse().unwrap()).sqrt().unwrap();
-    //         (u, v)
-    //     };
-    //
-    //     // Convert Montgomery element (u, v) into its alternate Montgomery form.
-    //     let (u, v) = {
-    //         let u = u * &B.inverse().unwrap();
-    //         let v = v * &B.inverse().unwrap();
-    //
-    //         // Ensure (u, v) is a valid alternate Montgomery element.
-    //         {
-    //             // Enforce v^2 == u^3 + A * u^2 + B * u
-    //             let v2 = v.square();
-    //             let u2 = u.square();
-    //             let u3 = u2 * &u;
-    //             assert_eq!(v2, u3 + &(a * &u2) + &(b * &u));
-    //         }
-    //
-    //         (u, v)
-    //     };
-    //
-    //     u
-    // };
 }
