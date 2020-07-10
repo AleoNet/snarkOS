@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 snarkos-dpc = { path = "../dpc", version = "0.8.0", default-features = false }
