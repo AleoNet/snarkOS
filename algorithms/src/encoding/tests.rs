@@ -18,6 +18,8 @@ fn test_elligator2_encode_decode() {
         let (encoded, fq_high) = Elligator2::<EdwardsParameters, EdwardsProjective>::encode(&original).unwrap();
         let decoded = Elligator2::<EdwardsParameters, EdwardsProjective>::decode(&encoded, fq_high).unwrap();
 
+        println!("\n{} == {}", original, decoded);
+
         assert_eq!(original, decoded)
     }
 }
