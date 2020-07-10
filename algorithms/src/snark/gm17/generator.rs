@@ -1,8 +1,5 @@
-use crate::{
-    fft::EvaluationDomain,
-    msm::FixedBaseMSM,
-    snark::{r1cs_to_sap::R1CStoSAP, Parameters, VerifyingKey},
-};
+use super::{r1cs_to_sap::R1CStoSAP, Parameters, VerifyingKey};
+use crate::{fft::EvaluationDomain, msm::FixedBaseMSM};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, Field, One, PairingEngine, PrimeField, ProjectiveCurve, Zero},

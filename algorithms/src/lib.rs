@@ -14,6 +14,7 @@ extern crate snarkos_profiler;
 
 pub mod commitment;
 pub mod crh;
+pub mod encryption;
 pub mod fft;
 pub mod merkle_tree;
 pub mod msm;

@@ -32,7 +32,7 @@ impl<F: Field> ConstraintSynthesizer<F> for MySillyCircuit<F> {
 
 mod bls12_377 {
     use super::*;
-    use crate::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
+    use crate::snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
     use snarkos_utilities::rand::{test_rng, UniformRand};
 
@@ -62,7 +62,7 @@ mod bls12_377 {
 
 mod sw6 {
     use super::*;
-    use crate::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
+    use crate::snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
     use snarkos_curves::sw6::{Fr as SW6Fr, SW6};
     use snarkos_utilities::rand::{test_rng, UniformRand};
 
@@ -148,7 +148,7 @@ mod gm17 {
 
 mod serialization {
     use super::*;
-    use crate::snark::{create_random_proof, generate_random_parameters, Parameters, Proof, VerifyingKey};
+    use crate::snark::gm17::{create_random_proof, generate_random_parameters, Parameters, Proof, VerifyingKey};
 
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
     use snarkos_utilities::{

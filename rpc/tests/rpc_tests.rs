@@ -254,6 +254,20 @@ mod rpc_tests {
     }
 
     #[test]
+    fn test_rpc_validate_transaction() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        assert_eq!(
+            rpc.request("validaterawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),
+            "true"
+        );
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
     fn test_rpc_decode_record() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);

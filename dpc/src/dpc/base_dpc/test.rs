@@ -36,7 +36,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 #[cfg(debug_assertions)]
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 
 #[cfg(debug_assertions)]
 use crate::dpc::base_dpc::predicate_circuit::PredicateLocalData;
