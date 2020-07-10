@@ -15,24 +15,9 @@ fn test_elligator2_encode_decode() {
     for _ in 0..ITERATIONS {
         let original: Fq = Fq::rand(rng);
 
-        //        let encoded = Elligator2::<EdwardsParameters, EdwardsProjective>::encode(&original).unwrap();
-        //        let decoded = Elligator2::<EdwardsParameters, EdwardsProjective>::decode(&encoded).unwrap();
-        //
-        //        match original == decoded {
-        //            true => {
-        //                println!("{} == {}", original, decoded);
-        //                assert_eq!(original, decoded)
-        //            },
-        //            false => {
-        //                println!("{} == {}", original, -decoded);
-        //                assert_eq!(original, -decoded)
-        //            },
-        //        }
-
         let (encoded, fq_high) = Elligator2::<EdwardsParameters, EdwardsProjective>::encode(&original).unwrap();
         let decoded = Elligator2::<EdwardsParameters, EdwardsProjective>::decode(&encoded, fq_high).unwrap();
 
-        println!("{} == {}", original, decoded);
         assert_eq!(original, decoded)
     }
 }

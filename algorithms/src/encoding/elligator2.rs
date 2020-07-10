@@ -12,7 +12,7 @@ use snarkos_models::curves::{
 };
 use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
-use std::{marker::PhantomData, ops::Neg};
+use std::{cmp, marker::PhantomData, ops::Neg};
 
 pub struct Elligator2<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve> {
     _parameters: PhantomData<P>,
@@ -26,6 +26,10 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
 
     /// Returns the encoded group element for a given base field element.
     pub fn encode(fq_element: &P::BaseField) -> Result<(<G as ProjectiveCurve>::Affine, bool), EncodingError> {
+        let fq_high = fq_element > &fq_element.neg();
+
+        let fq_element = if fq_high { *fq_element } else { fq_element.neg() };
+
         // Compute the parameters for the alternate Montgomery form: v^2 == u^3 + A * u^2 + B * u.
         let (a, b) = {
             let a = Self::A * &Self::B.inverse().unwrap();
@@ -132,8 +136,6 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             (x, y)
         };
 
-        let fq_high = fq_element > &fq_element.neg();
-
         Ok((<G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?, fq_high))
     }
 
@@ -221,10 +223,10 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             (numerator * &denominator.inverse().unwrap()).sqrt().unwrap()
         };
 
-        let element = if fq_high && (element > -element) {
-            element
+        let element = if fq_high {
+            cmp::max(element, -element)
         } else {
-            -element
+            cmp::min(element, -element)
         };
 
         #[cfg(debug_assertions)]
