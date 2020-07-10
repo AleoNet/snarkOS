@@ -65,10 +65,7 @@ macro_rules! sqrt_impl {
         // is also a quadratic non-residue (since `t` is odd).
         match $self.legendre() {
             Zero => Some(*$self),
-            QuadraticNonResidue => {
-                println!("QUADRATIC NONRESIDUE");
-                None
-            }
+            QuadraticNonResidue => None,
             QuadraticResidue => {
                 let mut z = $Self::qnr_to_t();
                 let mut w = $self.pow($P::T_MINUS_ONE_DIV_TWO);

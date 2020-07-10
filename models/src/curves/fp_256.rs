@@ -322,10 +322,7 @@ impl<P: Fp256Parameters> SquareRootField for Fp256<P> {
 
         // s = self^((MODULUS - 1) // 2)
         let mut s = self.pow(P::MODULUS_MINUS_ONE_DIV_TWO);
-
-        println!("@@@ {} {} {}", self, s, s.is_one());
         s.reduce();
-        println!("@@@ {} {} {}", self, s, s.is_one());
 
         if s.is_zero() {
             Zero

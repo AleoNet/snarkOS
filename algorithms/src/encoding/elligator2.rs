@@ -12,7 +12,7 @@ use snarkos_models::curves::{
 };
 use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Neg};
 
 pub struct Elligator2<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve> {
     _parameters: PhantomData<P>,
@@ -24,14 +24,8 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
     const B: P::BaseField = <P as MontgomeryModelParameters>::COEFF_B;
     const D: P::BaseField = <P as TEModelParameters>::COEFF_D;
 
-    pub fn encode(fr_element: &<G as Group>::ScalarField) -> Result<<G as ProjectiveCurve>::Affine, EncodingError> {
-        // Map it to its corresponding Fq element.
-        let fq_element = {
-            let output = P::BaseField::from_random_bytes(&to_bytes![fr_element]?);
-            assert!(output.is_some());
-            output.unwrap()
-        };
-
+    /// Returns the encoded group element for a given base field element.
+    pub fn encode(fq_element: &P::BaseField) -> Result<(<G as ProjectiveCurve>::Affine, bool), EncodingError> {
         // Compute the parameters for the alternate Montgomery form: v^2 == u^3 + A * u^2 + B * u.
         let (a, b) = {
             let a = Self::A * &Self::B.inverse().unwrap();
@@ -56,6 +50,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
                 assert!(!r.is_zero());
 
                 // Verify u is a quadratic nonresidue.
+                #[cfg(debug_assertions)]
                 assert!(u.legendre().is_qnr());
 
                 // Verify 1 + ur^2 != 0.
@@ -114,6 +109,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             let t = v * &Self::B;
 
             // Ensure (s, t) is a valid Montgomery element
+            #[cfg(debug_assertions)]
             {
                 // Enforce B * t^2 == s^3 + A * s^2 + s
                 let t2 = t.square();
@@ -136,12 +132,15 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             (x, y)
         };
 
-        let group = <G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?;
+        let fq_high = fq_element > &fq_element.neg();
 
-        Ok(group)
+        Ok((<G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?, fq_high))
     }
 
-    pub fn decode(group_element: &<G as ProjectiveCurve>::Affine) -> Result<<G as Group>::ScalarField, EncodingError> {
+    pub fn decode(
+        group_element: &<G as ProjectiveCurve>::Affine,
+        fq_high: bool,
+    ) -> Result<P::BaseField, EncodingError> {
         let x = P::BaseField::read(&to_bytes![group_element.to_x_coordinate()]?[..])?;
         let y = P::BaseField::read(&to_bytes![group_element.to_y_coordinate()]?[..])?;
 
@@ -153,7 +152,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
         };
 
         // Convert the twisted Edwards element (x, y) to the alternate Montgomery element (u, v)
-        let (u_reconstructed, _v_reconstructed) = {
+        let (u_reconstructed, v_reconstructed) = {
             let numerator = P::BaseField::one() + &y;
             let denominator = P::BaseField::one() - &y;
 
@@ -161,6 +160,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             let v = numerator * &((denominator * &x).inverse().unwrap());
 
             // Ensure (u, v) is a valid Montgomery element
+            #[cfg(debug_assertions)]
             {
                 // Enforce B * v^2 == u^3 + A * u^2 + u
                 let v2 = v.square();
@@ -192,6 +192,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
 
         {
             // Verify u is a quadratic nonresidue.
+            #[cfg(debug_assertions)]
             assert!(u.legendre().is_qnr());
 
             // Verify that x != -A.
@@ -206,46 +207,29 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             assert_eq!((-(u * &x) * &(x + &a)).legendre(), LegendreSymbol::QuadraticResidue);
         }
 
-        // TODO Find more efficient way than brute force checking the valid recovery
+        let exists_in_sqrt_fq2 = v_reconstructed.square().sqrt().unwrap() == v_reconstructed;
 
-        // Let value1 = sqrt(-x / ((x + A) * u)).
-        let numerator = -x;
-        let denominator = (x + &a) * &u;
-        let value1 = (numerator * &denominator.inverse().unwrap()).sqrt();
+        let element = if exists_in_sqrt_fq2 {
+            // Let value = sqrt(-x / ((x + A) * u)).
+            let numerator = -x;
+            let denominator = (x + &a) * &u;
+            (numerator * &denominator.inverse().unwrap()).sqrt().unwrap()
+        } else {
+            // Let value2 = sqrt(-(x + A) / ux)).
+            let numerator = -x - &a;
+            let denominator = x * &u;
+            (numerator * &denominator.inverse().unwrap()).sqrt().unwrap()
+        };
 
-        // Let value2 = sqrt(-(x + A) / ux)).
-        let numerator = -x - &a;
-        let denominator = x * &u;
-        let value2 = (numerator * &denominator.inverse().unwrap()).sqrt();
+        let element = if fq_high && (element > -element) {
+            element
+        } else {
+            -element
+        };
 
-        if let Some(value) = value1 {
-            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![value]?) {
-                if &Self::encode(&fr_element_reconstructed)? == group_element {
-                    return Ok(fr_element_reconstructed);
-                }
-            }
+        #[cfg(debug_assertions)]
+        assert!(&Self::encode(&element)?.0 == group_element);
 
-            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![-value]?) {
-                if &Self::encode(&fr_element_reconstructed)? == group_element {
-                    return Ok(fr_element_reconstructed);
-                }
-            }
-        }
-
-        if let Some(value) = value2 {
-            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![value]?) {
-                if &Self::encode(&fr_element_reconstructed)? == group_element {
-                    return Ok(fr_element_reconstructed);
-                }
-            }
-
-            if let Some(fr_element_reconstructed) = <G as Group>::ScalarField::from_random_bytes(&to_bytes![-value]?) {
-                if &Self::encode(&fr_element_reconstructed)? == group_element {
-                    return Ok(fr_element_reconstructed);
-                }
-            }
-        }
-
-        Err(EncodingError::InvalidGroupElement)
+        Ok(element)
     }
 }
