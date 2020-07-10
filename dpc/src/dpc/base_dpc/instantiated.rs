@@ -22,7 +22,7 @@ use snarkos_algorithms::{
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
     bw6_761::BW6_761,
-    edwards_bls12::{fr::Fr as EdwardsFr, EdwardsAffine, EdwardsProjective as EdwardsBls},
+    edwards_bls12::{fr::Fr as EdwardsFr, EdwardsAffine, EdwardsParameters, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
 };
 use snarkos_gadgets::{
@@ -141,6 +141,8 @@ impl DPCComponents for Components {
 impl BaseDPCComponents for Components {
     type BindingSignatureGadget = BindingSignatureGadget;
     type BindingSignatureGroup = EdwardsBls;
+    type EncryptionGroup = EdwardsBls;
+    type EncryptionModelParameters = EdwardsParameters;
     type InnerSNARK = CoreCheckNIZK;
     type InnerSNARKGadget = InnerSNARKGadget;
     type MerkleHashGadget = MerkleTreeCRHGadget;

@@ -1,9 +1,16 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use crate::dpc::base_dpc::{
+    binding_signature::*,
+    record_payload::RecordPayload,
+    records::record_serializer::{RecordSerializer, SerializeRecord},
+};
+use snarkos_algorithms::{
+    encoding::Elligator2,
+    merkle_tree::{MerklePath, MerkleTreeDigest},
+};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
-    curves::{Group, ProjectiveCurve},
+    curves::{Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
@@ -84,6 +91,10 @@ pub trait BaseDPCComponents: DPCComponents {
         Self::InnerField,
         Self::BindingSignatureGroup,
     >;
+
+    /// Group and Model Parameters for record encryption
+    type EncryptionGroup: Group + ProjectiveCurve;
+    type EncryptionModelParameters: MontgomeryModelParameters + TEModelParameters;
 
     /// SNARK for non-proof-verification checks
     type InnerSNARK: SNARK<
@@ -816,6 +827,36 @@ where
                 rng,
             )?;
 
+        // Record encoding
+
+        let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for record in &new_records {
+            let serialized_record = RecordSerializer::<
+                Components,
+                Components::EncryptionModelParameters,
+                Components::EncryptionGroup,
+            >::serialize(&record)?;
+
+            let mut record_field_elements = vec![];
+            for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
+                if i == 0 {
+                    // Serial number nonce
+                    let record_field_element = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
+                    record_field_elements.push(record_field_element);
+                } else {
+                    let record_field_element = Elligator2::<
+                        <Components as BaseDPCComponents>::EncryptionModelParameters,
+                        <Components as BaseDPCComponents>::EncryptionGroup,
+                    >::decode(&element.into_affine(), *fq_high)
+                    .unwrap();
+
+                    record_field_elements.push(record_field_element);
+                }
+            }
+
+            new_records_field_elements.push(record_field_elements);
+        }
+
         let inner_proof = {
             let circuit = InnerCircuit::new(
                 &parameters.circuit_parameters,
@@ -828,6 +869,7 @@ where
                 &new_records,
                 &new_sn_nonce_randomness,
                 &new_commitments,
+                &new_records_field_elements,
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,

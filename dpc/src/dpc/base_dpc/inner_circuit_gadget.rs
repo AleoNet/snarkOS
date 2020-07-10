@@ -9,6 +9,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF},
+    curves::{Group, ModelParameters, PrimeField},
     dpc::Record,
     gadgets::{
         algorithms::{
@@ -25,6 +26,7 @@ use snarkos_models::{
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
             uint::UInt8,
+            ToBitsGadget,
             ToBytesGadget,
         },
     },
@@ -51,6 +53,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
+    new_record_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
 
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -101,6 +104,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records,
         new_sn_nonce_randomness,
         new_commitments,
+        new_record_field_elements,
         //
         predicate_commitment,
         predicate_randomness,
@@ -156,6 +160,7 @@ fn base_dpc_execute_gadget_helper<
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[RecordCommitment::Output],
+    new_record_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
 
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -492,7 +497,7 @@ where
 
             // Enforce that derived key are equivalent
             // Temporary solution: compare the byte converions
-            // TODO (raychu86) Need to figure out how to cast `account_view_key` into a type `check_public_key_gadget` can use
+            // TODO (raychu86) Cast `account_view_key` into a type `check_public_key_gadget` can use
             given_account_view_key_bytes.enforce_equal(
                 &mut account_cs.ns(|| "Check that declared and computed encryption private keys are equal"),
                 &account_view_key_bytes,
@@ -634,10 +639,11 @@ where
         }
     }
 
-    for (j, ((record, sn_nonce_randomness), commitment)) in new_records
+    for (j, (((record, sn_nonce_randomness), commitment), record_field_elements)) in new_records
         .iter()
         .zip(new_sn_nonce_randomness)
         .zip(new_commitments)
+        .zip(new_record_field_elements)
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
@@ -653,6 +659,7 @@ where
             given_death_predicate_hash,
             given_commitment_randomness,
             serial_number_nonce,
+            serial_number_nonce_bytes,
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
@@ -704,6 +711,9 @@ where
                     Ok(record.serial_number_nonce())
                 })?;
 
+            let serial_number_nonce_bytes =
+                serial_number_nonce.to_bytes(&mut declare_cs.ns(|| "Convert sn nonce to bytes"))?;
+
             (
                 given_account_public_key,
                 given_record_commitment,
@@ -715,6 +725,7 @@ where
                 given_death_predicate_hash,
                 given_commitment_randomness,
                 serial_number_nonce,
+                serial_number_nonce_bytes,
             )
         };
         // ********************************************************************
@@ -798,7 +809,6 @@ where
             let account_public_key_bytes =
                 given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
-            let sn_nonce_bytes = serial_number_nonce.to_bytes(&mut commitment_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             let mut commitment_input = Vec::new();
             commitment_input.extend_from_slice(&account_public_key_bytes);
@@ -807,7 +817,7 @@ where
             commitment_input.extend_from_slice(&given_payload);
             commitment_input.extend_from_slice(&given_birth_predicate_hash);
             commitment_input.extend_from_slice(&given_death_predicate_hash);
-            commitment_input.extend_from_slice(&sn_nonce_bytes);
+            commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
                 &mut commitment_cs.ns(|| "Compute record commitment"),
@@ -823,6 +833,231 @@ where
                 &mut commitment_cs.ns(|| "Check that computed commitment matches declared commitment"),
                 &given_record_commitment,
             )?;
+        }
+
+        // *******************************************************************
+
+        // *******************************************************************
+        // Check that the record encryption well-formed.
+        // *******************************************************************
+        {
+            let encryption_cs = &mut cs.ns(|| "Check that record encryption is well-formed");
+
+            // Check serialization
+
+            // *******************************************************************
+            // Convert serial number nonce, commitment_randomness, birth predicate repr, death predicate repr, payload, and value into bits
+
+            //            let serial_number_nonce_bits = serial_number_nonce_bytes
+            //                .iter()
+            //                .flat_map(|byte| byte.to_bits_le())
+            //                .collect::<Vec<_>>();
+
+            let serial_number_nonce_bits = serial_number_nonce_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert serial_number_nonce_bytes to bits"))?;
+
+            let commitment_randomness_bytes =
+                UInt8::alloc_vec(encryption_cs.ns(|| "Allocate commitment randomness bytes"), &to_bytes![
+                    record.commitment_randomness()
+                ]?)?;
+
+            let commitment_randomness_bits = commitment_randomness_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert commitment_randomness_bytes to bits"))?;
+            let full_birth_predicate_repr_bits = given_birth_predicate_hash
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash to bits"))?;
+            let full_death_predicate_repr_bits = given_death_predicate_hash
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash to bits"))?;
+            let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
+            let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
+
+            // *******************************************************************
+            // Pack the bits into serialization format
+
+            let scalar_field_bitsize = <C::BindingSignatureGroup as Group>::ScalarField::size_in_bits();
+            let base_field_bitsize = <C::InnerField as PrimeField>::size_in_bits();
+            let outer_field_bitsize = <C::OuterField as PrimeField>::size_in_bits();
+
+            // A standard unit for packing bits into data storage
+            let data_field_bitsize = base_field_bitsize - 1;
+
+            // Assumption 1 - The scalar field bit size must be strictly less than the base field bit size
+            // for the logic below to work correctly.
+            assert!(scalar_field_bitsize < base_field_bitsize);
+
+            // Assumption 2 - this implementation assumes the outer field bit size is larger than
+            // the data field bit size by at most one additional scalar field bit size.
+            assert!((outer_field_bitsize - data_field_bitsize) <= data_field_bitsize);
+
+            // Assumption 3 - this implementation assumes the remainder of two outer field bit sizes
+            // can fit within one data field element's bit size.
+            assert!((2 * (outer_field_bitsize - data_field_bitsize)) <= data_field_bitsize);
+
+            // Assumption 4 - this implementation assumes the payload and value may be zero values.
+            // As such, to ensure the values are non-zero for encoding and decoding, we explicitly
+            // reserve the MSB of the data field element's valid bitsize and set the bit to 1.
+            let payload_field_bitsize = data_field_bitsize - 1;
+
+            // Birth and death predicates
+
+            let mut birth_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
+            let mut death_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
+            let mut birth_predicate_repr_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut death_predicate_repr_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+
+            for i in 0..data_field_bitsize {
+                birth_predicate_repr_bits.push(full_birth_predicate_repr_bits[i]);
+                death_predicate_repr_bits.push(full_death_predicate_repr_bits[i]);
+            }
+
+            // (Assumption 2 applies)
+            for i in data_field_bitsize..outer_field_bitsize {
+                birth_predicate_repr_remainder_bits.push(full_birth_predicate_repr_bits[i]);
+                death_predicate_repr_remainder_bits.push(full_death_predicate_repr_bits[i]);
+            }
+            birth_predicate_repr_remainder_bits.extend_from_slice(&death_predicate_repr_remainder_bits);
+
+            // Payload
+
+            let mut payload_elements = vec![];
+
+            let mut payload_field_bits = Vec::with_capacity(payload_field_bitsize + 1);
+
+            for (i, bit) in payload_bits.iter().enumerate() {
+                payload_field_bits.push(*bit);
+
+                if i > 0 && i % payload_field_bitsize == 0 {
+                    // (Assumption 4)
+                    payload_field_bits.push(Boolean::Constant(true));
+
+                    payload_elements.push(payload_field_bits.clone());
+
+                    payload_field_bits.clear();
+                }
+            }
+
+            let num_payload_elements = payload_bits.len() / payload_field_bitsize;
+            assert_eq!(payload_elements.len(), num_payload_elements);
+
+            // Determine if value can fit in current payload_field_bits.
+            let value_does_not_fit = (payload_field_bits.len() + value_bits.len()) > payload_field_bitsize;
+
+            if value_does_not_fit {
+                // (Assumption 4)
+                payload_field_bits.push(Boolean::Constant(true));
+
+                payload_elements.push(payload_field_bits.clone());
+
+                payload_field_bits.clear();
+            }
+
+            assert_eq!(
+                payload_elements.len(),
+                num_payload_elements + (value_does_not_fit as usize)
+            );
+
+            payload_field_bits.extend_from_slice(&value_bits);
+            payload_field_bits.push(Boolean::Constant(true));
+            payload_elements.push(payload_field_bits.clone());
+
+            let num_payload_elements = payload_bits.len() / payload_field_bitsize;
+
+            assert_eq!(
+                payload_elements.len(),
+                num_payload_elements + (value_does_not_fit as usize) + 1
+            );
+
+            // *******************************************************************
+            // Feed in Field elements of the serialization and convert them to bits
+
+            // TODO figure out how to alloc the fp gadgets
+            //            let serial_number_nonce_fp = FpGadget::<
+            //                <C::EncryptionModelParameters as ModelParameters>::BaseField,
+            //            >::alloc(
+            //                &mut encryption_cs.ns(|| "serial_number_nonce_fp"),
+            //                || Ok(record_field_elements[0]),
+            //            )?;
+
+            let given_serial_number_nonce_bytes =
+                UInt8::alloc_vec(&mut encryption_cs.ns(|| "given_serial_number_nonce_bytes"), &to_bytes![
+                    record_field_elements[0]
+                ]?)?;
+            let given_serial_number_nonce_bits = given_serial_number_nonce_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_serial_number_nonce_bytes to bits"))?;
+
+            let given_commitment_randomness_bytes = UInt8::alloc_vec(
+                &mut encryption_cs.ns(|| "given_commitment_randomness_bytes"),
+                &to_bytes![record_field_elements[1]]?,
+            )?;
+            let given_commitment_randomness_bits = given_commitment_randomness_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_commitment_randomness_bytes to bits"))?;
+
+            let given_birth_predicate_repr_bytes = UInt8::alloc_vec(
+                &mut encryption_cs.ns(|| "given_birth_predicate_repr_bytes"),
+                &to_bytes![record_field_elements[2]]?,
+            )?;
+            let given_birth_predicate_repr_bits = given_birth_predicate_repr_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_repr_bytes to bits"))?;
+
+            let given_death_predicate_repr_bytes = UInt8::alloc_vec(
+                &mut encryption_cs.ns(|| "given_death_predicate_repr_bytes"),
+                &to_bytes![record_field_elements[3]]?,
+            )?;
+            let given_death_predicate_repr_bits = given_death_predicate_repr_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_repr_bytes to bits"))?;
+
+            let given_predicate_repr_remainder_bytes = UInt8::alloc_vec(
+                &mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"),
+                &to_bytes![record_field_elements[4]]?,
+            )?;
+            let given_predicate_repr_remainder_bits = given_predicate_repr_remainder_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_predicate_repr_remainder_bytes to bits"))?;
+
+            // *******************************************************************
+            // Equate the gadget packed and provided bits
+
+            serial_number_nonce_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared serial_number_nonce_bits match"),
+                &given_serial_number_nonce_bits,
+            )?;
+
+            commitment_randomness_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared commitment_randomness_bits match"),
+                &given_commitment_randomness_bits,
+            )?;
+
+            birth_predicate_repr_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_repr_bits match"),
+                &given_birth_predicate_repr_bits,
+            )?;
+
+            death_predicate_repr_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_repr_bits match"),
+                &given_death_predicate_repr_bits,
+            )?;
+
+            birth_predicate_repr_remainder_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared predicate_repr_remainder_bits match"),
+                &given_predicate_repr_remainder_bits,
+            )?;
+
+            for (i, (payload_element, field_element)) in
+                payload_elements.iter().zip(&record_field_elements[5..]).enumerate()
+            {
+                let given_element_bytes = UInt8::alloc_vec(
+                    &mut encryption_cs.ns(|| format!("given_payload_bytes - {}", i)),
+                    &to_bytes![field_element]?,
+                )?;
+                let given_element_bits = given_element_bytes
+                    .to_bits(&mut encryption_cs.ns(|| format!("Convert given_payload_bytes - {} to bits", i)))?;
+
+                payload_element.enforce_equal(
+                    &mut encryption_cs.ns(|| format!("Check that computed and declared payload_bits match {}", i)),
+                    &given_element_bits,
+                )?;
+            }
+
+            // TODO Check the actual encoding correctness
+            // Check encoding
         }
     }
     // *******************************************************************

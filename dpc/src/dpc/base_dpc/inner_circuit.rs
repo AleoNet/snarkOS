@@ -12,6 +12,7 @@ use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
+    curves::ModelParameters,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 use snarkos_objects::AccountPrivateKey;
@@ -35,6 +36,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     new_records: Option<Vec<DPCRecord<C>>>,
     new_serial_number_nonce_randomness: Option<Vec<[u8; 32]>>,
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
+    new_record_field_elements: Option<Vec<Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>>>,
 
     // Commitment to Predicates and to local data.
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
@@ -71,6 +73,9 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let new_commitments = vec![<C::RecordCommitment as CommitmentScheme>::Output::default(); num_output_records];
         let new_serial_number_nonce_randomness = vec![[0u8; 32]; num_output_records];
         let new_records = vec![DPCRecord::default(); num_output_records];
+        // TODO (raychu86) Fix the length of this to be generic
+        let new_record_field_elements =
+            vec![vec![<C::EncryptionModelParameters as ModelParameters>::BaseField::default(); 7]; num_output_records];
 
         let memo = [0u8; 32];
 
@@ -114,6 +119,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_records: Some(new_records),
             new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness),
             new_commitments: Some(new_commitments),
+            new_record_field_elements: Some(new_record_field_elements),
 
             // Other stuff
             predicate_commitment: Some(predicate_commitment),
@@ -151,6 +157,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         new_records: &[DPCRecord<C>],
         new_serial_number_nonce_randomness: &[[u8; 32]],
         new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
+        new_record_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
 
         // Other stuff
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -185,6 +192,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_output_records, new_commitments.len());
         assert_eq!(num_output_records, output_value_commitments.len());
         assert_eq!(num_output_records, output_value_commitment_randomness.len());
+        assert_eq!(num_output_records, new_record_field_elements.len());
 
         Self {
             // Parameters
@@ -204,6 +212,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_records: Some(new_records.to_vec()),
             new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness.to_vec()),
             new_commitments: Some(new_commitments.to_vec()),
+            new_record_field_elements: Some(new_record_field_elements.to_vec()),
 
             // Other stuff
             predicate_commitment: Some(predicate_commitment.clone()),
@@ -244,6 +253,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_records.get()?,
             self.new_serial_number_nonce_randomness.get()?,
             self.new_commitments.get()?,
+            self.new_record_field_elements.get()?,
             // Other stuff
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,

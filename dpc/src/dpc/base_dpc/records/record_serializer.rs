@@ -181,6 +181,14 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             death_predicate_repr_bits.push(death_predicate_repr_biginteger.get_bit(i));
         }
 
+        let mut birth_predicate_repr_bits2 = Vec::with_capacity(base_field_bitsize);
+        let birth_bits = bytes_to_bits(birth_predicate_repr);
+        for i in 0..data_field_bitsize {
+            birth_predicate_repr_bits2.push(birth_bits[i]);
+        }
+
+        assert_eq!(birth_predicate_repr_bits, birth_predicate_repr_bits2);
+
         // (Assumption 2 applies)
         for i in data_field_bitsize..outer_field_bitsize {
             birth_predicate_repr_remainder_bits.push(birth_predicate_repr_biginteger.get_bit(i));
