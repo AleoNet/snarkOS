@@ -284,10 +284,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         let (serial_number_nonce, serial_number_nonce_fq_high) = &serialized_record[0];
         let serial_number_nonce_bytes =
             recover_x_coordinate::<Self::Group>(serial_number_nonce.into_affine(), *serial_number_nonce_fq_high)?;
-        let serial_number_nonce_bits = &bytes_to_bits(&serial_number_nonce_bytes)[0..data_field_bitsize];
-
-        let serial_number_nonce =
-            <C::SerialNumberNonceCRH as CRH>::Output::read(&bits_to_bytes(serial_number_nonce_bits)[..])?;
+        let serial_number_nonce = <C::SerialNumberNonceCRH as CRH>::Output::read(&serial_number_nonce_bytes[..])?;
 
         // Deserialize commitment randomness
 

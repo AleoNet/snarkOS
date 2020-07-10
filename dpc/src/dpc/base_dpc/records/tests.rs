@@ -81,6 +81,12 @@ fn test_record_serialization() {
     let record_components =
         RecordSerializer::<Components, EdwardsParameters, EdwardsBls>::deserialize(serialized_record).unwrap();
 
+    println!("record.serial_number_nonce: {}", record.serial_number_nonce);
+    println!(
+        "record_components.serial_number_nonce: {}",
+        record_components.serial_number_nonce
+    );
+
     assert_eq!(record.serial_number_nonce, record_components.serial_number_nonce);
 
     println!("record.commitment_randomness: {}", record.commitment_randomness);
