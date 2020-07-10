@@ -1,6 +1,6 @@
 mod pairing {
     use snarkos_curves::{
-        bw6_761::{BW6_761, BW6_761Parameters, Fq6, G1Affine, G1Projective as G1, G2Affine, G2Projective as G2},
+        bw6_761::{BW6_761Parameters, Fq6, G1Affine, G1Projective as G1, G2Affine, G2Projective as G2, BW6_761},
         templates::bw6::{G1Prepared, G2Prepared},
     };
     use snarkos_models::curves::{PairingCurve, PairingEngine};
