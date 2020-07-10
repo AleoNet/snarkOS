@@ -3,7 +3,6 @@ use snarkos_errors::algorithms::SignatureError;
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-use hex;
 use rand::thread_rng;
 use std::path::PathBuf;
 

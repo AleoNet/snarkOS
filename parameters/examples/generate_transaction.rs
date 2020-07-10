@@ -9,7 +9,7 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::dpc::{DPCError, LedgerError};
 use snarkos_models::{
-    algorithms::{MerkleParameters, CRH},
+    algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
     dpc::{DPCComponents, DPCScheme},
     objects::{account::AccountScheme, Transaction},
     parameters::Parameters,
@@ -37,7 +37,7 @@ use std::{
 };
 
 /// Generate a blank ledger to facilitate generation of the genesis block
-fn empty_ledger<T: Transaction, P: MerkleParameters>(
+fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     parameters: P,
     path: &PathBuf,
 ) -> Result<Ledger<T, P>, LedgerError> {

@@ -1,6 +1,6 @@
 use crate::*;
 use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::MerkleParameters, dpc::Record, objects::Transaction};
+use snarkos_models::{algorithms::LoadableMerkleParameters, dpc::Record, objects::Transaction};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -8,7 +8,7 @@ use snarkos_utilities::{
 
 // TODO (howardwu): Remove this from `Ledger` as it is not used for ledger state.
 //  This is merely for local node / miner functionality.
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get all stored record commitments of the node
     pub fn get_record_commitments(&self, limit: usize) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];

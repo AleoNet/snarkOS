@@ -7,7 +7,7 @@ use crate::{
 };
 use snarkos_algorithms::{
     crh::{BoweHopwoodPedersenCompressedCRH, PedersenCRH, PedersenCompressedCRH, PedersenSize},
-    define_merkle_tree_parameters,
+    define_masked_merkle_tree_parameters,
     merkle_tree::MerkleTree,
 };
 use snarkos_curves::{
@@ -15,7 +15,7 @@ use snarkos_curves::{
     edwards_bls12::{EdwardsAffine, EdwardsProjective},
 };
 use snarkos_models::{
-    algorithms::{MerkleParameters, CRH},
+    algorithms::{MaskedMerkleParameters, MerkleParameters, CRH},
     curves::PrimeField,
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
@@ -110,7 +110,7 @@ fn generate_merkle_tree<P: MerkleParameters, F: PrimeField, HG: CRHGadget<P::H, 
     assert!(satisfied);
 }
 
-fn generate_masked_merkle_tree<P: MerkleParameters, F: PrimeField, HG: MaskedCRHGadget<P::H, F>>(
+fn generate_masked_merkle_tree<P: MaskedMerkleParameters, F: PrimeField, HG: MaskedCRHGadget<P::H, F>>(
     leaves: &[[u8; 30]],
     use_bad_root: bool,
 ) -> () {
@@ -142,9 +142,16 @@ fn generate_masked_merkle_tree<P: MerkleParameters, F: PrimeField, HG: MaskedCRH
     })
     .unwrap();
 
+    let mask_crh_parameters =
+        <HG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "new_mask_parameters"), || {
+            Ok(parameters.mask_parameters())
+        })
+        .unwrap();
+
     let computed_root = compute_root::<_, HG, _, _, _>(
         cs.ns(|| "compute masked root"),
         &crh_parameters,
+        &mask_crh_parameters,
         &mask_bytes,
         &leaf_gadgets,
     )
@@ -175,7 +182,7 @@ fn generate_masked_merkle_tree<P: MerkleParameters, F: PrimeField, HG: MaskedCRH
 mod merkle_tree_pedersen_crh_on_affine {
     use super::*;
 
-    define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+    define_masked_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
 
     type H = PedersenCRH<EdwardsAffine, Size>;
     type HG = PedersenCRHGadget<EdwardsAffine, Fr, EdwardsBlsGadget>;
@@ -205,7 +212,7 @@ mod merkle_tree_pedersen_crh_on_affine {
 mod merkle_tree_compressed_pedersen_crh_on_projective {
     use super::*;
 
-    define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+    define_masked_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
 
     type H = PedersenCompressedCRH<EdwardsProjective, Size>;
     type HG = PedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
@@ -256,7 +263,7 @@ mod merkle_tree_compressed_pedersen_crh_on_projective {
 mod merkle_tree_bowe_hopwood_pedersen_compressed_crh_on_projective {
     use super::*;
 
-    define_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
+    define_masked_merkle_tree_parameters!(EdwardsMerkleParameters, H, 4);
 
     type H = BoweHopwoodPedersenCompressedCRH<EdwardsProjective, BoweHopwoodSize>;
     type HG = BoweHopwoodPedersenCompressedCRHGadget<EdwardsProjective, Fr, EdwardsBlsGadget>;
