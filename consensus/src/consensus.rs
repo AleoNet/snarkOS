@@ -1,5 +1,5 @@
 use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,

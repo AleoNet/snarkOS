@@ -11,7 +11,7 @@ use crate::dpc::base_dpc::{
     ExecuteContext,
     DPC,
 };
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},

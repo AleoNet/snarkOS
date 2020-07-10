@@ -1,9 +1,4 @@
-#![deny(
-    unused_import_braces,
-    unused_qualifications,
-    trivial_casts,
-    trivial_numeric_casts
-)]
+#![deny(unused_import_braces, unused_qualifications, trivial_casts, trivial_numeric_casts)]
 #![deny(unused_qualifications, variant_size_differences, stable_features)]
 #![deny(
     non_shorthand_field_patterns,
@@ -11,36 +6,23 @@
     unused_imports,
     unused_extern_crates
 )]
-#![deny(
-    renamed_and_removed_lints,
-    stable_features,
-    unused_allocation,
-    unused_comparisons
-)]
-#![deny(
-    unused_must_use,
-    unused_mut,
-    unused_unsafe,
-    private_in_public,
-    unsafe_code
-)]
+#![deny(renamed_and_removed_lints, stable_features, unused_allocation, unused_comparisons)]
+#![deny(unused_must_use, unused_mut, unused_unsafe, private_in_public, unsafe_code)]
 
 // For randomness (during paramgen and proof generation)
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 // For benchmarking
 use std::time::{Duration, Instant};
 
+// Bring in some tools for using pairing-friendly curves
+use algebra::bls12_381::{Bls12_381, Fr};
+use algebra_core::{test_rng, Field};
+
 // We're going to use the BLS12-381 pairing-friendly elliptic curve.
-use snarkos_curves::{bls12_381::{Bls12_381, Fr}, models::fields::Field};
 
 // We'll use these interfaces to construct our circuit.
-use snarkos_r1cs::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
-
-// We're going to use the GM17 proving system.
-use snarkos_algorithms::snark::gm17::{
-    create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
-};
+use r1cs_core::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
 const MIMC_ROUNDS: usize = 322;
 
@@ -86,25 +68,16 @@ struct MiMCDemo<'a, F: Field> {
 /// is used during paramgen and proving in order to
 /// synthesize the constraint system.
 impl<'a, F: Field> ConstraintSynthesizer<F> for MiMCDemo<'a, F> {
-    fn generate_constraints<CS: ConstraintSystem<F>>(
-        self,
-        cs: &mut CS,
-    ) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         assert_eq!(self.constants.len(), MIMC_ROUNDS);
 
         // Allocate the first component of the preimage.
         let mut xl_value = self.xl;
-        let mut xl = cs.alloc(
-            || "preimage xl",
-            || xl_value.ok_or(SynthesisError::AssignmentMissing),
-        )?;
+        let mut xl = cs.alloc(|| "preimage xl", || xl_value.ok_or(SynthesisError::AssignmentMissing))?;
 
         // Allocate the second component of the preimage.
         let mut xr_value = self.xr;
-        let mut xr = cs.alloc(
-            || "preimage xr",
-            || xr_value.ok_or(SynthesisError::AssignmentMissing),
-        )?;
+        let mut xr = cs.alloc(|| "preimage xr", || xr_value.ok_or(SynthesisError::AssignmentMissing))?;
 
         for i in 0..MIMC_ROUNDS {
             // xL, xR := xR + (xL + Ci)^3, xL
@@ -116,10 +89,7 @@ impl<'a, F: Field> ConstraintSynthesizer<F> for MiMCDemo<'a, F> {
                 e.square_in_place();
                 e
             });
-            let tmp = cs.alloc(
-                || "tmp",
-                || tmp_value.ok_or(SynthesisError::AssignmentMissing),
-            )?;
+            let tmp = cs.alloc(|| "tmp", || tmp_value.ok_or(SynthesisError::AssignmentMissing))?;
 
             cs.enforce(
                 || "tmp = (xL + Ci)^2",
@@ -141,15 +111,9 @@ impl<'a, F: Field> ConstraintSynthesizer<F> for MiMCDemo<'a, F> {
             let new_xl = if i == (MIMC_ROUNDS - 1) {
                 // This is the last round, xL is our image and so
                 // we allocate a public input.
-                cs.alloc_input(
-                    || "image",
-                    || new_xl_value.ok_or(SynthesisError::AssignmentMissing),
-                )?
+                cs.alloc_input(|| "image", || new_xl_value.ok_or(SynthesisError::AssignmentMissing))?
             } else {
-                cs.alloc(
-                    || "new_xl",
-                    || new_xl_value.ok_or(SynthesisError::AssignmentMissing),
-                )?
+                cs.alloc(|| "new_xl", || new_xl_value.ok_or(SynthesisError::AssignmentMissing))?
             };
 
             cs.enforce(
@@ -173,10 +137,13 @@ impl<'a, F: Field> ConstraintSynthesizer<F> for MiMCDemo<'a, F> {
 }
 
 #[test]
-fn test_mimc_groth_maller_17() {
+fn test_mimc_groth_16() {
+    // We're going to use the Groth16 proving system.
+    use groth16::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
+
     // This may not be cryptographically safe, use
     // `OsRng` (for example) in production software.
-    let rng = &mut thread_rng();
+    let rng = &mut test_rng();
 
     // Generate the MiMC round constants
     let constants = (0..MIMC_ROUNDS).map(|_| rng.gen()).collect::<Vec<_>>();
@@ -242,12 +209,10 @@ fn test_mimc_groth_maller_17() {
         total_verifying += start.elapsed();
     }
     let proving_avg = total_proving / SAMPLES;
-    let proving_avg =
-        proving_avg.subsec_nanos() as f64 / 1_000_000_000f64 + (proving_avg.as_secs() as f64);
+    let proving_avg = proving_avg.subsec_nanos() as f64 / 1_000_000_000f64 + (proving_avg.as_secs() as f64);
 
     let verifying_avg = total_verifying / SAMPLES;
-    let verifying_avg =
-        verifying_avg.subsec_nanos() as f64 / 1_000_000_000f64 + (verifying_avg.as_secs() as f64);
+    let verifying_avg = verifying_avg.subsec_nanos() as f64 / 1_000_000_000f64 + (verifying_avg.as_secs() as f64);
 
     println!("Average proving time: {:?} seconds", proving_avg);
     println!("Average verifying time: {:?} seconds", verifying_avg);
