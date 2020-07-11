@@ -1,4 +1,4 @@
-name: CI - Branch
+name: CI - Branches
 on:
   pull_request:
   push:
@@ -25,8 +25,6 @@ jobs:
 
       - name: cargo fmt --check
         uses: actions-rs/cargo@v1
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
         with:
           command: fmt
           args: --all -- --check
@@ -52,30 +50,8 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
 
-      - name: Check examples
-        uses: actions-rs/cargo@v1
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-        with:
-          command: check
-          args: --examples --all
-
-      - name: Check examples with all features on stable
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --examples --all-features --all
-        if: matrix.rust == 'stable'
-
-      - name: Check benchmarks on nightly
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features --examples --all --benches
-        if: matrix.rust == 'nightly'
-
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release --all --no-fail-fast
+          args: --release --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
