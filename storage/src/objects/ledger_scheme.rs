@@ -2,7 +2,7 @@ use crate::*;
 use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
 use snarkos_models::{
-    algorithms::MerkleParameters,
+    algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::Block;
@@ -14,7 +14,7 @@ use snarkos_utilities::{
 use parking_lot::RwLock;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
-impl<T: Transaction, P: MerkleParameters> LedgerScheme for Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type MerkleParameters = P;

@@ -15,6 +15,7 @@ use snarkos_models::{
 pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToBytesGadget<F>, CS: ConstraintSystem<F>>(
     mut cs: CS,
     parameters: &HG::ParametersGadget,
+    mask_parameters: &HG::ParametersGadget,
     mask: &TB,
     leaves: &[HG::OutputGadget],
 ) -> Result<HG::OutputGadget, SynthesisError> {
@@ -36,6 +37,7 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
                     parameters,
                     &left_right[0],
                     &left_right[1],
+                    mask_parameters,
                     &mask_bytes,
                 );
                 inner_hash
@@ -54,6 +56,7 @@ pub(crate) fn hash_inner_node_gadget<H, HG, F, TB, CS>(
     parameters: &HG::ParametersGadget,
     left_child: &TB,
     right_child: &TB,
+    mask_parameters: &HG::ParametersGadget,
     mask: &[UInt8],
 ) -> Result<HG::OutputGadget, SynthesisError>
 where
@@ -67,5 +70,5 @@ where
     let right_bytes = right_child.to_bytes(&mut cs.ns(|| "right_to_bytes"))?;
     let bytes = [left_bytes, right_bytes].concat();
 
-    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, &mask)
+    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, mask_parameters, &mask)
 }

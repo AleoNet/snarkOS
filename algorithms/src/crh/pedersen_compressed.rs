@@ -1,7 +1,7 @@
 use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
-    algorithms::CRH,
+    algorithms::{CRHParameters, CRH},
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, Group, ProjectiveCurve},
 };
 

@@ -110,6 +110,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
         mut cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
+        mask_parameters: &Self::ParametersGadget,
         mask: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
         // The mask will be extended to ensure constant hardness. This condition
@@ -118,8 +119,16 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
             return Err(SynthesisError::Unsatisfiable);
         }
         let mask = <Self as MaskedCRHGadget<PedersenCRH<G, S>, F>>::extend_mask(cs.ns(|| "extend mask"), mask)?;
-        // H(p) = sum of h_i^{p_i} for all i.
+        // H(p) = sum of g_i^{p_i} for all i.
         let mask_hash = Self::check_evaluation_gadget(cs.ns(|| "evaluate mask"), parameters, &mask)?;
+
+        // H_2(p) = sum of h_i^{1-2*p_i} for all i.
+        let mask_input_in_bits = pad_input_and_bitify::<S>(&mask);
+        let mask_symmetric_hash = GG::precomputed_base_symmetric_multiscalar_mul(
+            cs.ns(|| "evaluate mask with mask bases"),
+            &mask_parameters.parameters.bases,
+            mask_input_in_bits.chunks(S::WINDOW_SIZE),
+        )?;
 
         assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
         // Pad the input if it is not the correct length.
@@ -130,9 +139,12 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
             cs.ns(|| "multiscalar multiplication"),
             &parameters.parameters.bases,
             input_in_bits.chunks(S::WINDOW_SIZE),
+            &mask_parameters.parameters.bases,
             mask_in_bits.chunks(S::WINDOW_SIZE),
         )?;
-        masked_output.add(cs.ns(|| "remove mask"), &mask_hash)
+        masked_output
+            .add(cs.ns(|| "remove mask"), &mask_hash)?
+            .add(cs.ns(|| "remove mask with mask bases"), &mask_symmetric_hash)
     }
 }
 
@@ -166,9 +178,16 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
         cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
+        mask_parameters: &Self::ParametersGadget,
         mask: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError> {
-        let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget_masked(cs, parameters, input, mask)?;
+        let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget_masked(
+            cs,
+            parameters,
+            input,
+            mask_parameters,
+            mask,
+        )?;
         Ok(output.to_x_coordinate())
     }
 }

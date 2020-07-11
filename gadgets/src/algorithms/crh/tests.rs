@@ -19,7 +19,7 @@ use snarkos_curves::{
     edwards_bls12::{EdwardsAffine, EdwardsProjective},
 };
 use snarkos_models::{
-    algorithms::CRH,
+    algorithms::{CRHParameters, CRH},
     curves::{Field, PrimeField},
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
@@ -46,6 +46,10 @@ impl PedersenSize for BoweHopwoodSize {
     const WINDOW_SIZE: usize = 48;
 }
 
+const PEDERSEN_HASH_CONSTRAINTS: usize = 5632;
+const PEDERSEN_HASH_CONSTRAINTS_ON_AFFINE: usize = 6656;
+const BOWE_HOPWOOD_HASH_CONSTRAINTS: usize = 3974;
+
 fn generate_input<F: Field, CS: ConstraintSystem<F>, R: Rng>(
     mut cs: CS,
     rng: &mut R,
@@ -70,12 +74,12 @@ fn generate_input<F: Field, CS: ConstraintSystem<F>, R: Rng>(
     (input, input_bytes, mask_bytes)
 }
 
-fn primitive_crh_gadget_test<F: Field, H: CRH, CG: CRHGadget<H, F>>() {
+fn primitive_crh_gadget_test<F: Field, H: CRH, CG: CRHGadget<H, F>>(hash_constraints: usize) {
     let rng = &mut thread_rng();
     let mut cs = TestConstraintSystem::<F>::new();
 
     let (input, input_bytes, _mask_bytes) = generate_input(&mut cs, rng);
-    println!("number of constraints for input: {}", cs.num_constraints());
+    assert_eq!(cs.num_constraints(), 1536);
 
     let crh = H::setup(rng);
     let native_result = crh.hash(&input).unwrap();
@@ -83,7 +87,7 @@ fn primitive_crh_gadget_test<F: Field, H: CRH, CG: CRHGadget<H, F>>() {
     let parameters_gadget =
         <CG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || Ok(crh.parameters()))
             .unwrap();
-    println!("number of constraints for input + params: {}", cs.num_constraints());
+    assert_eq!(cs.num_constraints(), 1536);
 
     let output_gadget = <CG as CRHGadget<_, _>>::check_evaluation_gadget(
         &mut cs.ns(|| "gadget_evaluation"),
@@ -91,8 +95,7 @@ fn primitive_crh_gadget_test<F: Field, H: CRH, CG: CRHGadget<H, F>>() {
         &input_bytes,
     )
     .unwrap();
-
-    println!("number of constraints total: {}", cs.num_constraints());
+    assert_eq!(cs.num_constraints(), hash_constraints);
 
     let native_result_gadget =
         <CG as CRHGadget<_, _>>::OutputGadget::alloc(&mut cs.ns(|| "native_result"), || Ok(&native_result)).unwrap();
@@ -112,25 +115,33 @@ fn masked_crh_gadget_test<F: PrimeField, H: CRH, CG: MaskedCRHGadget<H, F>>() {
     let mut cs = TestConstraintSystem::<F>::new();
 
     let (input, input_bytes, mask_bytes) = generate_input(&mut cs, rng);
-    println!("number of constraints for input: {}", cs.num_constraints());
+    assert_eq!(cs.num_constraints(), 1536);
 
     let crh = H::setup(rng);
+    let mask_parameters = H::Parameters::setup(rng);
     let native_result = crh.hash(&input).unwrap();
 
     let parameters_gadget =
         <CG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_parameters"), || Ok(crh.parameters()))
             .unwrap();
-    println!("number of constraints for input + params: {}", cs.num_constraints());
+    assert_eq!(cs.num_constraints(), 1536);
+
+    let mask_parameters_gadget =
+        <CG as CRHGadget<_, _>>::ParametersGadget::alloc(&mut cs.ns(|| "gadget_mask_parameters"), || {
+            Ok(mask_parameters)
+        })
+        .unwrap();
+    assert_eq!(cs.num_constraints(), 1536);
 
     let masked_output_gadget = <CG as MaskedCRHGadget<_, _>>::check_evaluation_gadget_masked(
         &mut cs.ns(|| "masked_gadget_evaluation"),
         &parameters_gadget,
         &input_bytes,
+        &mask_parameters_gadget,
         &mask_bytes,
     )
     .unwrap();
-
-    println!("number of constraints total: {}", cs.num_constraints());
+    assert_eq!(cs.num_constraints(), 17932);
 
     let native_result_gadget =
         <CG as CRHGadget<_, _>>::OutputGadget::alloc(&mut cs.ns(|| "native_result"), || Ok(&native_result)).unwrap();
@@ -153,7 +164,7 @@ mod pedersen_crh_gadget_on_projective {
 
     #[test]
     fn primitive_gadget_test() {
-        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>(PEDERSEN_HASH_CONSTRAINTS)
     }
 
     #[test]
@@ -170,7 +181,7 @@ mod pedersen_crh_gadget_on_affine {
 
     #[test]
     fn primitive_gadget_test() {
-        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>(PEDERSEN_HASH_CONSTRAINTS_ON_AFFINE)
     }
 }
 
@@ -182,7 +193,7 @@ mod pedersen_compressed_crh_gadget_on_projective {
 
     #[test]
     fn primitive_gadget_test() {
-        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>(PEDERSEN_HASH_CONSTRAINTS)
     }
 
     #[test]
@@ -201,7 +212,7 @@ mod bowe_hopwood_pedersen_crh_gadget_on_projective {
 
     #[test]
     fn primitive_gadget_test() {
-        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>(BOWE_HOPWOOD_HASH_CONSTRAINTS)
     }
 }
 
@@ -213,6 +224,6 @@ mod bowe_hopwood_pedersen_compressed_crh_gadget_on_projective {
 
     #[test]
     fn primitive_gadget_test() {
-        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>()
+        primitive_crh_gadget_test::<Fr, TestCRH, TestCRHGadget>(BOWE_HOPWOOD_HASH_CONSTRAINTS)
     }
 }

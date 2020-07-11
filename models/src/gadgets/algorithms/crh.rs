@@ -57,6 +57,7 @@ pub trait MaskedCRHGadget<H: CRH, F: PrimeField>: CRHGadget<H, F> {
         cs: CS,
         parameters: &Self::ParametersGadget,
         input: &[UInt8],
+        mask_parameters: &Self::ParametersGadget,
         mask: &[UInt8],
     ) -> Result<Self::OutputGadget, SynthesisError>;
 }
