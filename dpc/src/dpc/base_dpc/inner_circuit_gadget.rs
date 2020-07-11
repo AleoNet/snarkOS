@@ -1079,17 +1079,14 @@ where
             let mut record_group_encoding_gadgets = Vec::with_capacity(record_group_encoding.len());
 
             for (i, (x, y, fq_high)) in record_group_encoding.iter().enumerate() {
-                let x_bytes = to_bytes![x]?;
-                let y_bytes = to_bytes![y]?;
-
                 let x_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
                     &mut encryption_cs.ns(|| format!("record_group_encoding_x_{}", i)),
-                    || Ok(&x_bytes[..]),
+                    || Ok(x),
                 )?;
 
                 let y_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
                     &mut encryption_cs.ns(|| format!("record_group_encoding_y_{}", i)),
-                    || Ok(&y_bytes[..]),
+                    || Ok(y),
                 )?;
 
                 let fq_high_gadget =
