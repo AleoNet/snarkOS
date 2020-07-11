@@ -10,7 +10,7 @@ use snarkos_algorithms::{
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
-    curves::{Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
+    curves::{AffineCurve, Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
@@ -830,6 +830,7 @@ where
         // Record encoding
 
         let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
             let serialized_record = RecordSerializer::<
                 Components,
@@ -838,7 +839,10 @@ where
             >::serialize(&record)?;
 
             let mut record_field_elements = vec![];
+            let mut record_group_encoding = vec![];
             for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
+                let element_affine = element.into_affine();
+
                 if i == 0 {
                     // Serial number nonce
                     let record_field_element = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
@@ -847,13 +851,23 @@ where
                     let record_field_element = Elligator2::<
                         <Components as BaseDPCComponents>::EncryptionModelParameters,
                         <Components as BaseDPCComponents>::EncryptionGroup,
-                    >::decode(&element.into_affine(), *fq_high)
+                    >::decode(&element_affine, *fq_high)
                     .unwrap();
 
                     record_field_elements.push(record_field_element);
                 }
-            }
 
+                let x =
+                    <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
+                        &to_bytes![element_affine.to_x_coordinate()]?[..],
+                    )?;
+                let y =
+                    <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
+                        &to_bytes![element_affine.to_y_coordinate()]?[..],
+                    )?;
+                record_group_encoding.push((x, y, *fq_high));
+            }
+            new_records_group_encoding.push(record_group_encoding);
             new_records_field_elements.push(record_field_elements);
         }
 
@@ -870,6 +884,7 @@ where
                 &new_sn_nonce_randomness,
                 &new_commitments,
                 &new_records_field_elements,
+                &new_records_group_encoding,
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,

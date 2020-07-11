@@ -53,7 +53,12 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
-    new_record_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
+    new_records_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
+    new_records_group_encoding: &[Vec<(
+        <C::EncryptionModelParameters as ModelParameters>::BaseField,
+        <C::EncryptionModelParameters as ModelParameters>::BaseField,
+        bool,
+    )>],
 
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -104,7 +109,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records,
         new_sn_nonce_randomness,
         new_commitments,
-        new_record_field_elements,
+        new_records_field_elements,
         //
         predicate_commitment,
         predicate_randomness,
@@ -160,7 +165,7 @@ fn base_dpc_execute_gadget_helper<
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[RecordCommitment::Output],
-    new_record_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
+    new_records_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
 
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -643,7 +648,7 @@ where
         .iter()
         .zip(new_sn_nonce_randomness)
         .zip(new_commitments)
-        .zip(new_record_field_elements)
+        .zip(new_records_field_elements)
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
