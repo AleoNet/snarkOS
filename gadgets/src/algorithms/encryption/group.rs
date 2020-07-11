@@ -142,7 +142,9 @@ impl<G: Group, F: PrimeField> AllocGadget<Vec<G::ScalarField>, F> for GroupEncry
 
         let mut blinding_exponents = Vec::with_capacity(values.len());
         for (i, value) in values.into_iter().enumerate() {
-            let alloc = UInt8::alloc_vec(cs.ns(|| format!("Iteration {}", i)), &to_bytes![value.borrow()]?)?;
+            let alloc = UInt8::alloc_vec(cs.ns(|| format!("Blinding Exponent Iteration {}", i)), &to_bytes![
+                value.borrow()
+            ]?)?;
             blinding_exponents.push(alloc);
         }
 
@@ -161,7 +163,9 @@ impl<G: Group, F: PrimeField> AllocGadget<Vec<G::ScalarField>, F> for GroupEncry
 
         let mut blinding_exponents = Vec::with_capacity(values.len());
         for (i, value) in values.into_iter().enumerate() {
-            let alloc = UInt8::alloc_input_vec(cs.ns(|| format!("Iteration {}", i)), &to_bytes![value.borrow()]?)?;
+            let alloc = UInt8::alloc_input_vec(cs.ns(|| format!("Blinding Exponent Iteration {}", i)), &to_bytes![
+                value.borrow()
+            ]?)?;
             blinding_exponents.push(alloc);
         }
 
@@ -281,7 +285,7 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ve
 
         let mut plaintext = Vec::with_capacity(values.len());
         for (i, value) in values.into_iter().enumerate() {
-            let alloc_group = GG::alloc_checked(cs.ns(|| format!("Iteration {}", i)), || Ok(value.borrow()))?;
+            let alloc_group = GG::alloc(cs.ns(|| format!("Plaintext Iteration {}", i)), || Ok(value.borrow()))?;
             plaintext.push(alloc_group);
         }
 
@@ -300,7 +304,7 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ve
 
         let mut plaintext = Vec::with_capacity(values.len());
         for (i, value) in values.into_iter().enumerate() {
-            let alloc_group = GG::alloc_input(cs.ns(|| format!("Iteration {}", i)), || Ok(value.borrow()))?;
+            let alloc_group = GG::alloc_input(cs.ns(|| format!("Plaintext Iteration {}", i)), || Ok(value.borrow()))?;
             plaintext.push(alloc_group);
         }
 
@@ -367,7 +371,7 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ve
 
         let mut ciphertext = Vec::with_capacity(values.len());
         for (i, value) in values.into_iter().enumerate() {
-            let alloc_group = GG::alloc_checked(cs.ns(|| format!("Iteration {}", i)), || Ok(value.borrow()))?;
+            let alloc_group = GG::alloc(cs.ns(|| format!("Ciphertext Iteration {}", i)), || Ok(value.borrow()))?;
             ciphertext.push(alloc_group);
         }
 
@@ -386,7 +390,7 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ve
 
         let mut ciphertext = Vec::with_capacity(values.len());
         for (i, value) in values.into_iter().enumerate() {
-            let alloc_group = GG::alloc_input(cs.ns(|| format!("Iteration {}", i)), || Ok(value.borrow()))?;
+            let alloc_group = GG::alloc_input(cs.ns(|| format!("Ciphertext Iteration {}", i)), || Ok(value.borrow()))?;
             ciphertext.push(alloc_group);
         }
 

@@ -17,7 +17,7 @@ pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type CiphertextGadget: AllocGadget<Vec<E::Text>, F> + EqGadget<F> + Clone + Sized + Debug;
     type PlaintextGadget: AllocGadget<Vec<E::Text>, F> + EqGadget<F> + Clone + Sized + Debug;
     type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
-    type BlindingExponentGadget: AllocGadget<E::BlindingExponents, F> + Clone + Sized + Debug;
+    type BlindingExponentGadget: AllocGadget<Vec<E::BlindingExponent>, F> + Clone + Sized + Debug;
 
     fn check_public_key_gadget<CS: ConstraintSystem<F>>(
         cs: CS,

@@ -76,7 +76,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         bool,
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-    new_records_encryption_blinding_exponents: &[<C::AccountEncryption as EncryptionScheme>::BlindingExponents],
+    new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
     new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
 
     // Rest
@@ -195,7 +195,7 @@ fn base_dpc_execute_gadget_helper<
         bool,
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-    new_records_encryption_blinding_exponents: &[<C::AccountEncryption as EncryptionScheme>::BlindingExponents],
+    new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
     new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
 
     //
@@ -1242,37 +1242,35 @@ where
                 || Ok(encryption_randomness),
             )?;
 
-            // UNCOMMENTING THIS BLINDING EXPONENTS ALLOC CAUSES THE OUTER SNARK CONSTRAINT TEST TO FAIL
-            //            let encryption_blinding_exponents_gadget = AccountEncryptionGadget::BlindingExponentGadget::alloc(
-            //                &mut encryption_cs.ns(|| format!("output record {} encryption_blinding_exponents", j)),
-            //                || Ok(encryption_blinding_exponents),
-            //            )?;
+            let encryption_blinding_exponents_gadget = AccountEncryptionGadget::BlindingExponentGadget::alloc(
+                &mut encryption_cs.ns(|| format!("output record {} encryption_blinding_exponents", j)),
+                || Ok(encryption_blinding_exponents),
+            )?;
 
             let encryption_plaintext_gadget = AccountEncryptionGadget::PlaintextGadget::alloc(
                 &mut encryption_cs.ns(|| format!("output record {} encryption_plaintext", j)),
                 || Ok(encryption_plaintext),
             )?;
 
-            // UNCOMMENTING THIS CIPHERTEXT ALLOC CAUSES THE OUTER SNARK CONSTRAINT TEST TO FAIL
             // TODO (raychu86) Make this ciphertext a public input with alloc_input
-            //            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc(
-            //                &mut encryption_cs.ns(|| format!("output record {} encryption_ciphertext", j)),
-            //                || Ok(encryption_ciphertext),
-            //            )?;
+            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc(
+                &mut encryption_cs.ns(|| format!("output record {} encryption_ciphertext", j)),
+                || Ok(encryption_ciphertext),
+            )?;
 
-            //            let candidate_ciphertext_gadget = AccountEncryptionGadget::check_encryption_gadget(
-            //                &mut encryption_cs.ns(|| format!("output record {} check_encryption_gadget", j)),
-            //                &account_encryption_parameters,
-            //                &encryption_randomness_gadget,
-            //                &given_account_address,
-            //                &encryption_plaintext_gadget,
-            //                &encryption_blinding_exponents_gadget,
-            //            )?;
-            //
-            //            encryption_ciphertext_gadget.enforce_equal(
-            //                encryption_cs.ns(|| format!("output record {} encryption is valid", j)),
-            //                &candidate_ciphertext_gadget,
-            //            )?;
+            let candidate_ciphertext_gadget = AccountEncryptionGadget::check_encryption_gadget(
+                &mut encryption_cs.ns(|| format!("output record {} check_encryption_gadget", j)),
+                &account_encryption_parameters,
+                &encryption_randomness_gadget,
+                &given_account_address,
+                &encryption_plaintext_gadget,
+                &encryption_blinding_exponents_gadget,
+            )?;
+
+            encryption_ciphertext_gadget.enforce_equal(
+                encryption_cs.ns(|| format!("output record {} encryption is valid", j)),
+                &candidate_ciphertext_gadget,
+            )?;
         }
     }
     // *******************************************************************

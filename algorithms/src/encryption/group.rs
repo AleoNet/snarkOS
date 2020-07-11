@@ -46,7 +46,7 @@ impl<G: Group + ProjectiveCurve> Default for GroupEncryptionPublicKey<G> {
 }
 
 impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
-    type BlindingExponents = Vec<<G as Group>::ScalarField>;
+    type BlindingExponent = <G as Group>::ScalarField;
     type Parameters = G;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = GroupEncryptionPublicKey<G>;
@@ -99,7 +99,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
         message_length: usize,
-    ) -> Result<Self::BlindingExponents, EncryptionError> {
+    ) -> Result<Vec<Self::BlindingExponent>, EncryptionError> {
         let record_view_key = public_key.0.mul(&randomness);
 
         let affine = record_view_key.into_affine();

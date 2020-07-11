@@ -13,7 +13,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
     type Text: Clone + Debug + Default + Eq + ToBytes + FromBytes;
     type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
-    type BlindingExponents: Clone + Debug + Default + Eq + Hash + ToBytes;
+    type BlindingExponent: Clone + Debug + Default + Eq + Hash + ToBytes;
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
@@ -32,7 +32,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
         message_length: usize,
-    ) -> Result<Self::BlindingExponents, EncryptionError>;
+    ) -> Result<Vec<Self::BlindingExponent>, EncryptionError>;
 
     fn encrypt(
         &self,

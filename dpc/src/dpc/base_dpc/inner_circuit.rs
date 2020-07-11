@@ -48,7 +48,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     >,
     new_records_encryption_randomness: Option<Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>>,
     new_records_encryption_blinding_exponents:
-        Option<Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponents>>,
+        Option<Vec<Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>>>,
     new_records_encryption_ciphertexts: Option<Vec<Vec<<C::AccountEncryption as EncryptionScheme>::Text>>>,
 
     // Commitment to Predicates and to local data.
@@ -87,19 +87,21 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let new_records = vec![DPCRecord::default(); num_output_records];
 
         // TODO (raychu86) Fix the lengths to be generic
-        let encoding_length = 7;
+        let record_encoding_length = 7;
         let base_field_default = <C::EncryptionModelParameters as ModelParameters>::BaseField::default();
-        let new_records_field_elements = vec![vec![base_field_default; encoding_length]; num_output_records];
+        let new_records_field_elements = vec![vec![base_field_default; record_encoding_length]; num_output_records];
         let new_records_group_encoding =
-            vec![vec![(base_field_default, base_field_default, false); encoding_length]; num_output_records];
+            vec![vec![(base_field_default, base_field_default, false); record_encoding_length]; num_output_records];
 
         let new_records_encryption_randomness =
             vec![<C::AccountEncryption as EncryptionScheme>::Randomness::default(); num_output_records];
-        let new_records_encryption_blinding_exponents =
-            vec![<C::AccountEncryption as EncryptionScheme>::BlindingExponents::default(); num_output_records];
+        let new_records_encryption_blinding_exponents = vec![
+                vec![<C::AccountEncryption as EncryptionScheme>::BlindingExponent::default(); record_encoding_length];
+                num_output_records
+            ];
         let new_records_encryption_ciphertexts =
             vec![
-                vec![<C::AccountEncryption as EncryptionScheme>::Text::default(); encoding_length];
+                vec![<C::AccountEncryption as EncryptionScheme>::Text::default(); record_encoding_length + 1];
                 num_output_records
             ];
 
@@ -195,7 +197,9 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             bool,
         )>],
         new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-        new_records_encryption_blinding_exponents: &[<C::AccountEncryption as EncryptionScheme>::BlindingExponents],
+        new_records_encryption_blinding_exponents: &[Vec<
+            <C::AccountEncryption as EncryptionScheme>::BlindingExponent,
+        >],
         new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
 
         // Other stuff
