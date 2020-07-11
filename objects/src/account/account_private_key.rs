@@ -22,6 +22,9 @@ pub struct AccountPrivateKey<C: DPCComponents> {
     pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
+    // This dummy flag is set to true for use in the `inner_snark` setup.
+    #[derivative(Default(value = "true"))]
+    pub is_dummy: bool,
 }
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
@@ -42,7 +45,12 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct the account private key.
-        let mut private_key = Self { sk_sig, sk_prf, r_pk };
+        let mut private_key = Self {
+            sk_sig,
+            sk_prf,
+            r_pk,
+            is_dummy: false,
+        };
 
         // Sample randomly until a valid private key is found.
         loop {
@@ -62,8 +70,10 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
     ) -> bool {
-        self.to_decryption_key(signature_parameters, commitment_parameters)
-            .is_ok()
+        self.is_dummy
+            || self
+                .to_decryption_key(signature_parameters, commitment_parameters)
+                .is_ok()
     }
 
     /// Returns the decryption key for the account view key.
@@ -77,7 +87,10 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
 
         // This operation implicitly enforces that the unused MSB bits
         // for the scalar field representation are correctly set to 0.
-        let decryption_key = <C::AccountEncryption as EncryptionScheme>::PrivateKey::read(&decryption_key_bytes[..])?;
+        let decryption_key = match self.is_dummy {
+            true => <C::AccountEncryption as EncryptionScheme>::PrivateKey::default(),
+            false => <C::AccountEncryption as EncryptionScheme>::PrivateKey::read(&decryption_key_bytes[..])?,
+        };
 
         // This operation explicitly enforces that the unused MSB bits
         // for the scalar field representation are correctly set to 0.
@@ -85,7 +98,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         // To simplify verification of this isomorphism from the base field
         // to the scalar field in the `inner_snark`, we additionally enforce
         // that the MSB bit of the scalar field is also set to 0.
-        {
+        if !self.is_dummy {
             let account_decryption_key_bits = bytes_to_bits(&decryption_key_bytes[..]);
             let account_decryption_key_length = account_decryption_key_bits.len();
 
@@ -152,7 +165,12 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
         let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
 
-        Ok(Self { sk_sig, sk_prf, r_pk })
+        Ok(Self {
+            sk_sig,
+            sk_prf,
+            r_pk,
+            is_dummy: false,
+        })
     }
 }
 

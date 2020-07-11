@@ -5,7 +5,7 @@ use rand::Rng;
 
 pub trait AccountScheme: Sized {
     type AccountPublicKey: Default;
-    type AccountPrivateKey: Default;
+    type AccountPrivateKey;
     type CommitmentScheme: CommitmentScheme;
     type EncryptionScheme: EncryptionScheme;
     type SignatureScheme: SignatureScheme;
