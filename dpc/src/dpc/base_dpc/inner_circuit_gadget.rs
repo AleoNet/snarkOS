@@ -110,6 +110,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_sn_nonce_randomness,
         new_commitments,
         new_records_field_elements,
+        new_records_group_encoding,
         //
         predicate_commitment,
         predicate_randomness,
@@ -166,6 +167,11 @@ fn base_dpc_execute_gadget_helper<
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[RecordCommitment::Output],
     new_records_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
+    new_records_group_encoding: &[Vec<(
+        <C::EncryptionModelParameters as ModelParameters>::BaseField,
+        <C::EncryptionModelParameters as ModelParameters>::BaseField,
+        bool,
+    )>],
 
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -644,12 +650,14 @@ where
         }
     }
 
-    for (j, (((record, sn_nonce_randomness), commitment), record_field_elements)) in new_records
-        .iter()
-        .zip(new_sn_nonce_randomness)
-        .zip(new_commitments)
-        .zip(new_records_field_elements)
-        .enumerate()
+    for (j, ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding)) in
+        new_records
+            .iter()
+            .zip(new_sn_nonce_randomness)
+            .zip(new_commitments)
+            .zip(new_records_field_elements)
+            .zip(new_records_group_encoding)
+            .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
@@ -1085,6 +1093,30 @@ where
 
             // TODO Check the actual encoding correctness
             // Check encoding
+
+            let mut record_group_encoding_gadgets = Vec::with_capacity(record_group_encoding.len());
+
+            for (i, (x, y, fq_high)) in record_group_encoding.iter().enumerate() {
+                let x_bytes = to_bytes![x]?;
+                let y_bytes = to_bytes![y]?;
+
+                let x_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
+                    &mut encryption_cs.ns(|| format!("record_group_encoding_x_{}", i)),
+                    || Ok(&x_bytes[..]),
+                )?;
+
+                let y_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
+                    &mut encryption_cs.ns(|| format!("record_group_encoding_y_{}", i)),
+                    || Ok(&y_bytes[..]),
+                )?;
+
+                let fq_high_gadget =
+                    Boolean::alloc(&mut encryption_cs.ns(|| format!("fq_high_{}", i)), || Ok(fq_high))?;
+
+                record_group_encoding_gadgets.push((x_gadget, y_gadget, fq_high_gadget));
+            }
+
+            assert_eq!(record_field_elements_gadgets.len(), record_group_encoding_gadgets.len());
         }
     }
     // *******************************************************************

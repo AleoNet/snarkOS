@@ -15,7 +15,7 @@ use snarkos_algorithms::{encoding::Elligator2, snark::PreparedVerifyingKey};
 use snarkos_curves::bls12_377::Fr;
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
-    curves::{ModelParameters, ProjectiveCurve},
+    curves::{AffineCurve, ModelParameters, ProjectiveCurve},
     dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
@@ -297,6 +297,8 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     let mut new_records_field_elements = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_records_group_encoding = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+
     for record in &new_records {
         let serialized_record = RecordSerializer::<
             Components,
@@ -306,7 +308,10 @@ fn test_execute_base_dpc_constraints() {
         .unwrap();
 
         let mut record_field_elements = vec![];
+        let mut record_group_encoding = vec![];
         for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
+            let element_affine = element.into_affine();
+
             if i == 0 {
                 // Serial number nonce
                 let record_field_element =
@@ -324,8 +329,18 @@ fn test_execute_base_dpc_constraints() {
 
                 record_field_elements.push(record_field_element);
             }
-        }
 
+            let x = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
+                &to_bytes![element_affine.to_x_coordinate()].unwrap()[..],
+            )
+            .unwrap();
+            let y = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
+                &to_bytes![element_affine.to_y_coordinate()].unwrap()[..],
+            )
+            .unwrap();
+            record_group_encoding.push((x, y, *fq_high));
+        }
+        new_records_group_encoding.push(record_group_encoding);
         new_records_field_elements.push(record_field_elements);
     }
 
@@ -346,6 +361,7 @@ fn test_execute_base_dpc_constraints() {
         &new_sn_nonce_randomness,
         &new_commitments,
         &new_records_field_elements,
+        &new_records_group_encoding,
         &predicate_comm,
         &predicate_rand,
         &local_data_comm,
