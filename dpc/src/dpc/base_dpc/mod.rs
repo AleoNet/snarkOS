@@ -833,7 +833,7 @@ where
         let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        //        let mut new_records_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
             let serialized_record = RecordSerializer::<
                 Components,
@@ -870,7 +870,12 @@ where
                         &to_bytes![element_affine.to_y_coordinate()]?[..],
                     )?;
                 record_group_encoding.push((x, y, *fq_high));
-                record_plaintexts.push(element);
+
+                let plaintext_element =
+                    <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
+                        &to_bytes![element]?[..],
+                    )?;
+                record_plaintexts.push(plaintext_element);
             }
 
             new_records_group_encoding.push(record_group_encoding);
@@ -885,11 +890,15 @@ where
                 &encryption_randomness,
                 record_plaintexts.len(),
             )?;
-            //            let record_ciphertext = &circuit_parameters.account_encryption.encrypt(record_public_key, encryption_randomness, record_plaintexts)?;
+            let record_ciphertext = circuit_parameters.account_encryption.encrypt(
+                record_public_key,
+                &encryption_randomness,
+                &record_plaintexts,
+            )?;
 
             new_records_encryption_randomness.push(encryption_randomness);
             new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
-            //            new_records_ciphertexts.push(record_ciphertext);
+            new_records_ciphertexts.push(record_ciphertext);
         }
 
         let inner_proof = {
