@@ -233,7 +233,7 @@ where
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
     let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_account_addresss_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
     let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
@@ -241,7 +241,7 @@ where
     let mut old_death_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_account_public_keys_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_account_addresss_gadgets = Vec::with_capacity(new_records.len());
     let mut new_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
     let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
@@ -365,7 +365,7 @@ where
 
         // Declare record contents
         let (
-            given_account_public_key,
+            given_account_address,
             given_commitment,
             given_is_dummy,
             given_value,
@@ -382,11 +382,11 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_account_public_key = AccountEncryptionGadget::PublicKeyGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_public_key"),
-                || Ok(record.account_public_key().into_repr()),
+            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
+                &mut declare_cs.ns(|| "given_account_address"),
+                || Ok(record.account_address().into_repr()),
             )?;
-            old_account_public_keys_gadgets.push(given_account_public_key.clone());
+            old_account_addresss_gadgets.push(given_account_address.clone());
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
@@ -425,7 +425,7 @@ where
                     Ok(record.serial_number_nonce())
                 })?;
             (
-                given_account_public_key,
+                given_account_address,
                 given_commitment,
                 given_is_dummy,
                 given_value,
@@ -461,7 +461,7 @@ where
         // ********************************************************************
 
         // ********************************************************************
-        // Check that the account public key and private key form a valid key
+        // Check that the account address and private key form a valid key
         // pair.
         // ********************************************************************
 
@@ -551,7 +551,7 @@ where
 
                 candidate_account_address.enforce_equal(
                     &mut account_cs.ns(|| "Check that declared and computed addresses are equal"),
-                    &given_account_public_key,
+                    &given_account_address,
                 )?;
             }
 
@@ -651,12 +651,12 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_public_key_bytes =
-                given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
+            let account_address_bytes =
+                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_public_key_bytes);
+            commitment_input.extend_from_slice(&account_address_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
@@ -690,7 +690,7 @@ where
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
         let (
-            given_account_public_key,
+            given_account_address,
             given_record_commitment,
             given_commitment,
             given_is_dummy,
@@ -704,11 +704,11 @@ where
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
-            let given_account_public_key = AccountEncryptionGadget::PublicKeyGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_public_key"),
-                || Ok(record.account_public_key().into_repr()),
+            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
+                &mut declare_cs.ns(|| "given_account_address"),
+                || Ok(record.account_address().into_repr()),
             )?;
-            new_account_public_keys_gadgets.push(given_account_public_key.clone());
+            new_account_addresss_gadgets.push(given_account_address.clone());
 
             let given_record_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_record_commitment"), || {
@@ -756,7 +756,7 @@ where
                 serial_number_nonce.to_bytes(&mut declare_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             (
-                given_account_public_key,
+                given_account_address,
                 given_record_commitment,
                 given_commitment,
                 given_is_dummy,
@@ -847,12 +847,12 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_public_key_bytes =
-                given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
+            let account_address_bytes =
+                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_public_key_bytes);
+            commitment_input.extend_from_slice(&account_address_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);

@@ -1,4 +1,4 @@
-use crate::account::{PrivateKey, PublicKey};
+use crate::account::{Address, PrivateKey};
 
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
@@ -17,15 +17,15 @@ pub fn private_key_test() {
 }
 
 #[test]
-pub fn public_key_test() {
+pub fn address_test() {
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
     let private_key = PrivateKey::new(rng).unwrap();
-    let public_key = PublicKey::from(&private_key);
-    assert!(public_key.is_ok());
+    let address = Address::from(&private_key);
+    assert!(address.is_ok());
 
-    let expected_public_key = "aleo1xuelf4cm7amwe44p822y9qgc3m2gn4trjsn8lksjqeznq3462szql8jz4y";
-    let candidate_public_key = public_key.unwrap().to_string();
+    let expected_address = "aleo1xuelf4cm7amwe44p822y9qgc3m2gn4trjsn8lksjqeznq3462szql8jz4y";
+    let candidate_address = address.unwrap().to_string();
 
-    println!("{} == {}", expected_public_key, candidate_public_key);
-    assert_eq!(expected_public_key, candidate_public_key);
+    println!("{} == {}", expected_address, candidate_address);
+    assert_eq!(expected_address, candidate_address);
 }

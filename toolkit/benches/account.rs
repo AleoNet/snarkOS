@@ -1,4 +1,4 @@
-use snarkos_toolkit::account::{PrivateKey, PublicKey};
+use snarkos_toolkit::account::{Address, PrivateKey};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::SeedableRng;
@@ -18,9 +18,9 @@ fn account_bench(c: &mut Criterion) {
 
     let private_key = PrivateKey::new(None, rng).unwrap();
 
-    group.bench_function("public_key", |b| {
+    group.bench_function("address", |b| {
         b.iter(|| {
-            let _public_key = PublicKey::from(&private_key).unwrap();
+            let _address = Address::from(&private_key).unwrap();
         });
     });
 }

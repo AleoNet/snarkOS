@@ -31,7 +31,7 @@ mod miner_instance_integration {
 
             // 2. Create miner instance
 
-            let miner_address = FIXTURE_VK.test_accounts[0].public_key.clone();
+            let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
 
             let miner = MinerInstance::new(
                 miner_address,
