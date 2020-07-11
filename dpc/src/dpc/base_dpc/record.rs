@@ -3,7 +3,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::Record,
 };
-use snarkos_objects::AccountPublicKey;
+use snarkos_objects::AccountAddress;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -22,7 +22,7 @@ use std::{
     Clone(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCRecord<C: BaseDPCComponents> {
-    pub(super) account_public_key: AccountPublicKey<C>,
+    pub(super) account_public_key: AccountAddress<C>,
 
     pub(super) is_dummy: bool,
     pub(super) value: u64,
@@ -46,7 +46,7 @@ fn default_predicate_hash<C: CRH>() -> Vec<u8> {
 }
 
 impl<C: BaseDPCComponents> Record for DPCRecord<C> {
-    type AccountPublicKey = AccountPublicKey<C>;
+    type AccountAddress = AccountAddress<C>;
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Payload = RecordPayload;
@@ -55,7 +55,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
     type Value = u64;
 
-    fn account_public_key(&self) -> &Self::AccountPublicKey {
+    fn account_public_key(&self) -> &Self::AccountAddress {
         &self.account_public_key
     }
 
@@ -116,7 +116,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
 impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let account_public_key: AccountPublicKey<C> = FromBytes::read(&mut reader)?;
+        let account_public_key: AccountAddress<C> = FromBytes::read(&mut reader)?;
         let is_dummy: bool = FromBytes::read(&mut reader)?;
         let value: u64 = FromBytes::read(&mut reader)?;
         let payload: RecordPayload = FromBytes::read(&mut reader)?;

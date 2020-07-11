@@ -8,7 +8,7 @@ mod protected_rpc_tests {
     };
     use snarkos_models::dpc::Record;
     use snarkos_network::Context;
-    use snarkos_objects::{AccountPrivateKey, AccountPublicKey};
+    use snarkos_objects::{AccountAddress, AccountPrivateKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
@@ -234,7 +234,7 @@ mod protected_rpc_tests {
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
         let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _public_key = AccountPublicKey::<Components>::from_str(&account.public_key).unwrap();
+        let _public_key = AccountAddress::<Components>::from_str(&account.public_key).unwrap();
 
         // Request with specified metadata
         let request_with_metadata = format!(
@@ -248,7 +248,7 @@ mod protected_rpc_tests {
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
         let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _public_key = AccountPublicKey::<Components>::from_str(&account.public_key).unwrap();
+        let _public_key = AccountAddress::<Components>::from_str(&account.public_key).unwrap();
 
         drop(rpc);
         kill_storage_sync(storage);

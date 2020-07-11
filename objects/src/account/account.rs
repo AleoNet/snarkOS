@@ -1,4 +1,4 @@
-use crate::{AccountPrivateKey, AccountPublicKey};
+use crate::{AccountAddress, AccountPrivateKey};
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{dpc::DPCComponents, objects::AccountScheme};
 
@@ -9,12 +9,12 @@ use std::fmt;
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct Account<C: DPCComponents> {
     pub private_key: AccountPrivateKey<C>,
-    pub public_key: AccountPublicKey<C>,
+    pub public_key: AccountAddress<C>,
 }
 
 impl<C: DPCComponents> AccountScheme for Account<C> {
+    type AccountAddress = AccountAddress<C>;
     type AccountPrivateKey = AccountPrivateKey<C>;
-    type AccountPublicKey = AccountPublicKey<C>;
     type CommitmentScheme = C::AccountCommitment;
     type EncryptionScheme = C::AccountEncryption;
     type SignatureScheme = C::AccountSignature;
@@ -27,7 +27,7 @@ impl<C: DPCComponents> AccountScheme for Account<C> {
         rng: &mut R,
     ) -> Result<Self, AccountError> {
         let private_key = AccountPrivateKey::new(signature_parameters, commitment_parameters, rng)?;
-        let public_key = AccountPublicKey::from_private_key(
+        let public_key = AccountAddress::from_private_key(
             signature_parameters,
             commitment_parameters,
             encryption_parameters,
