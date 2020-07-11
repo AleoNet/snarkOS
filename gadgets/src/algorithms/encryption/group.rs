@@ -19,7 +19,7 @@ use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-// Parameters
+/// Group encryption parameters gadget
 #[derive(Debug, PartialEq, Eq)]
 pub struct GroupEncryptionParametersGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     parameters: GG,
@@ -63,7 +63,7 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> Clone for Grou
     }
 }
 
-// GroupEncryption Private Key Gadget
+/// Group encryption private key gadget
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupEncryptionPrivateKeyGadget<G: Group>(pub Vec<UInt8>, PhantomData<G>);
 
@@ -101,7 +101,7 @@ impl<G: Group, F: PrimeField> ToBytesGadget<F> for GroupEncryptionPrivateKeyGadg
     }
 }
 
-// GroupEncryption Randomness Gadget
+/// Group encryption randomness gadget
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupEncryptionRandomnessGadget<G: Group>(pub Vec<UInt8>, PhantomData<G>);
 
@@ -129,7 +129,7 @@ impl<G: Group, F: PrimeField> AllocGadget<G::ScalarField, F> for GroupEncryption
     }
 }
 
-// GroupEncryption Blinding Exponents Gadget
+/// Group encryption blinding exponents gadget
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupEncryptionBlindingExponentsGadget<G: Group>(pub Vec<Vec<UInt8>>, PhantomData<G>);
 
@@ -169,7 +169,7 @@ impl<G: Group, F: PrimeField> AllocGadget<Vec<G::ScalarField>, F> for GroupEncry
     }
 }
 
-// GroupEncryption Public Key Gadget
+/// Group encryption public key gadget
 #[derive(Debug, PartialEq, Eq)]
 pub struct GroupEncryptionPublicKeyGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     public_key: GG,
@@ -262,7 +262,7 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
 
 impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionPublicKeyGadget<G, F, GG> {}
 
-// GroupEncryption Plaintext Gadget
+/// Group encryption plaintext gadget
 #[derive(Debug, PartialEq, Eq)]
 pub struct GroupEncryptionPlaintextGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     plaintext: Vec<GG>,
@@ -348,7 +348,7 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
 
 impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionPlaintextGadget<G, F, GG> {}
 
-// GroupEncryption Ciphertext Gadget
+/// Group encryption ciphertext gadget
 #[derive(Debug, PartialEq, Eq)]
 pub struct GroupEncryptionCiphertextGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     ciphertext: Vec<GG>,
@@ -434,8 +434,7 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
 
 impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionCiphertextGadget<G, F, GG> {}
 
-// Group Encryption Gadget
-
+/// Group encryption gadget
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupEncryptionGadget<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>> {
     _group: PhantomData<fn() -> G>,
