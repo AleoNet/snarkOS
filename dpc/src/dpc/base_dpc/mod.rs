@@ -827,10 +827,13 @@ where
                 rng,
             )?;
 
-        // Record encoding
+        // Record encoding and encryption
 
         let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        //        let mut new_records_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
             let serialized_record = RecordSerializer::<
                 Components,
@@ -840,6 +843,8 @@ where
 
             let mut record_field_elements = vec![];
             let mut record_group_encoding = vec![];
+            let mut record_plaintexts = vec![];
+
             for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
                 let element_affine = element.into_affine();
 
@@ -851,8 +856,7 @@ where
                     let record_field_element = Elligator2::<
                         <Components as BaseDPCComponents>::EncryptionModelParameters,
                         <Components as BaseDPCComponents>::EncryptionGroup,
-                    >::decode(&element_affine, *fq_high)
-                    .unwrap();
+                    >::decode(&element_affine, *fq_high)?;
 
                     record_field_elements.push(record_field_element);
                 }
@@ -866,9 +870,26 @@ where
                         &to_bytes![element_affine.to_y_coordinate()]?[..],
                     )?;
                 record_group_encoding.push((x, y, *fq_high));
+                record_plaintexts.push(element);
             }
+
             new_records_group_encoding.push(record_group_encoding);
             new_records_field_elements.push(record_field_elements);
+
+            let record_public_key = record.account_public_key().into_repr();
+            let encryption_randomness = circuit_parameters
+                .account_encryption
+                .generate_randomness(record_public_key, rng)?;
+            let encryption_blinding_exponents = circuit_parameters.account_encryption.generate_blinding_exponents(
+                record_public_key,
+                &encryption_randomness,
+                record_plaintexts.len(),
+            )?;
+            //            let record_ciphertext = &circuit_parameters.account_encryption.encrypt(record_public_key, encryption_randomness, record_plaintexts)?;
+
+            new_records_encryption_randomness.push(encryption_randomness);
+            new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
+            //            new_records_ciphertexts.push(record_ciphertext);
         }
 
         let inner_proof = {
