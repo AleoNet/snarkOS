@@ -155,7 +155,7 @@ where
 
         // f1 = r.conjugate() = f^(p^6)
         let mut f1 = *f;
-        f1.frobenius_map(6);
+        f1.conjugate();
 
         match f.inverse() {
             Some(mut f2) => {
