@@ -11,6 +11,9 @@ include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
 
+[lib]
+crate-type = ["lib", "cdylib"]
+
 [[bench]]
 name = "account"
 harness = false

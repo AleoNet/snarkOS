@@ -1,4 +1,4 @@
-use crate::snark::{
+use super::{
     create_random_proof,
     generate_random_parameters,
     prepare_verifying_key,

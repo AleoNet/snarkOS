@@ -1,4 +1,4 @@
-use crate::snark::{PreparedVerifyingKey, Proof, VerifyingKey};
+use crate::snark::gm17::{PreparedVerifyingKey, Proof, VerifyingKey};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::{AffineCurve, One, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve};
 

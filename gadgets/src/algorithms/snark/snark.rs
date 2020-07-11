@@ -1,4 +1,4 @@
-use snarkos_algorithms::snark::{Proof, VerifyingKey, GM17};
+use snarkos_algorithms::snark::gm17::{Proof, VerifyingKey, GM17};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, PairingEngine},
