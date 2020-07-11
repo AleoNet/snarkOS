@@ -17,6 +17,7 @@ impl PublicKey {
         let public_key = AccountPublicKey::<Components>::from(
             &parameters.account_signature,
             &parameters.account_commitment,
+            &parameters.account_encryption,
             &private_key.private_key,
         )?;
         Ok(Self { public_key })

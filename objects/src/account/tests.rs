@@ -10,7 +10,12 @@ fn test_account_new() {
     let rng = &mut thread_rng();
     let parameters = CircuitParameters::<Components>::load().unwrap();
 
-    let account = Account::<Components>::new(&parameters.account_signature, &parameters.account_commitment, rng);
+    let account = Account::<Components>::new(
+        &parameters.account_signature,
+        &parameters.account_commitment,
+        &parameters.account_encryption,
+        rng,
+    );
     assert!(account.is_ok());
     println!("{}", account.unwrap());
 }
