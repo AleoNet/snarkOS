@@ -447,69 +447,92 @@ where
             // Declare variables for account contents.
             let account_cs = &mut cs.ns(|| "Check account");
 
-            let pk_sig_native = account_private_key
-                .pk_sig(&circuit_parameters.account_signature)
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
-            let pk_sig =
-                AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
-                    Ok(&pk_sig_native)
-                })?;
+            // Allocate the account private key.
+            let (pk_sig, sk_prf, r_pk) = {
+                let pk_sig_native = account_private_key
+                    .pk_sig(&circuit_parameters.account_signature)
+                    .map_err(|_| SynthesisError::AssignmentMissing)?;
+                let pk_sig =
+                    AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
+                        Ok(&pk_sig_native)
+                    })?;
+                let sk_prf = PGadget::new_seed(&mut account_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
+                let r_pk =
+                    AccountCommitmentGadget::RandomnessGadget::alloc(&mut account_cs.ns(|| "Declare r_pk"), || {
+                        Ok(&account_private_key.r_pk)
+                    })?;
 
-            let pk_sig_bytes = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
+                (pk_sig, sk_prf, r_pk)
+            };
 
-            let sk_prf = PGadget::new_seed(&mut account_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
-            let r_pk = AccountCommitmentGadget::RandomnessGadget::alloc(&mut account_cs.ns(|| "Declare r_pk"), || {
-                Ok(&account_private_key.r_pk)
-            })?;
+            // Construct the account view key.
+            let candidate_account_view_key = {
+                let mut account_view_key_input = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
+                account_view_key_input.extend_from_slice(&sk_prf);
 
-            let mut account_view_key_input = pk_sig_bytes.clone();
-            account_view_key_input.extend_from_slice(&sk_prf);
+                // This is the record decryption key.
+                let candidate_account_commitment = AccountCommitmentGadget::check_commitment_gadget(
+                    &mut account_cs.ns(|| "Compute the account commitment."),
+                    &account_commitment_parameters,
+                    &account_view_key_input,
+                    &r_pk,
+                )?;
 
-            // Decryption key
-            let account_view_key = AccountCommitmentGadget::check_commitment_gadget(
-                &mut account_cs.ns(|| "Compute account view key"),
-                &account_commitment_parameters,
-                &account_view_key_input,
-                &r_pk,
-            )?;
+                // TODO (howardwu): Enforce 6 MSB bits are 0.
+                {
+                    // TODO (howardwu): Enforce 6 MSB bits are 0.
+                }
 
-            let given_account_view_key = account_private_key
-                .to_decryption_key(
-                    &circuit_parameters.account_signature,
-                    &circuit_parameters.account_commitment,
-                )
-                .unwrap();
+                // Enforce the account commitment bytes (padded) correspond to the
+                // given account's view key bytes (padded). This is equivalent to
+                // verifying that the base field element from the computed account
+                // commitment contains the same bit-value as the scalar field element
+                // computed from the given account private key.
+                let given_account_view_key = {
+                    // TODO (howardwu): Change this to a to_view_key impl so it is on scalar field.
+                    // Derive the given account view key based on the given account private key.
+                    let given_account_view_key = AccountEncryptionGadget::PrivateKeyGadget::alloc(
+                        &mut account_cs.ns(|| "Allocate account view key"),
+                        || {
+                            Ok(account_private_key
+                                .to_decryption_key(
+                                    &circuit_parameters.account_signature,
+                                    &circuit_parameters.account_commitment,
+                                )
+                                .map_err(|_| SynthesisError::AssignmentMissing)?)
+                        },
+                    )?;
 
-            let given_account_view_key_gadget = AccountEncryptionGadget::PrivateKeyGadget::alloc(
-                &mut account_cs.ns(|| "Allocate account view key"),
-                || Ok(given_account_view_key),
-            )?;
+                    let given_account_view_key_bytes =
+                        given_account_view_key.to_bytes(&mut account_cs.ns(|| "given_account_view_key to_bytes"))?;
 
-            let account_view_key_bytes =
-                account_view_key.to_bytes(&mut account_cs.ns(|| "account_view_key to_bytes"))?;
-            let given_account_view_key_bytes =
-                given_account_view_key_gadget.to_bytes(&mut account_cs.ns(|| "private_key_gadget to_bytes"))?;
+                    let candidate_account_commitment_bytes = candidate_account_commitment
+                        .to_bytes(&mut account_cs.ns(|| "candidate_account_commitment to_bytes"))?;
 
-            // Enforce that derived key are equivalent
-            // Temporary solution: compare the byte converions
-            // TODO (raychu86) Need to figure out how to cast `account_view_key` into a type `check_public_key_gadget` can use
-            given_account_view_key_bytes.enforce_equal(
-                &mut account_cs.ns(|| "Check that declared and computed encryption private keys are equal"),
-                &account_view_key_bytes,
-            )?;
+                    candidate_account_commitment_bytes.enforce_equal(
+                        &mut account_cs.ns(|| "Check that candidate and given account view keys are equal"),
+                        &given_account_view_key_bytes,
+                    )?;
 
-            // TODO (howardwu): Enforce 6 MSB bits are 0.
+                    given_account_view_key
+                };
 
-            let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
-                &mut account_cs.ns(|| "Compute account address"),
-                &account_encryption_parameters,
-                &given_account_view_key_gadget,
-            )?;
+                given_account_view_key
+            };
 
-            candidate_account_address.enforce_equal(
-                &mut account_cs.ns(|| "Check that declared and computed addresses are equal"),
-                &given_account_public_key,
-            )?;
+            // Construct and verify the account address.
+            {
+                let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
+                    &mut account_cs.ns(|| "Compute the candidate account address"),
+                    &account_encryption_parameters,
+                    &candidate_account_view_key,
+                )?;
+
+                candidate_account_address.enforce_equal(
+                    &mut account_cs.ns(|| "Check that declared and computed addresses are equal"),
+                    &given_account_public_key,
+                )?;
+            }
 
             (sk_prf, pk_sig)
         };
