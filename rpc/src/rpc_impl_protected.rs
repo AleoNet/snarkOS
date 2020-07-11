@@ -170,7 +170,7 @@ impl ProtectedRpcFunctions for RpcImpl {
                 .hash(&[64u8; 1])?;
 
             let private_key = old_account_private_keys[0].clone();
-            let public_key = AccountPublicKey::<Components>::from(
+            let public_key = AccountPublicKey::<Components>::from_private_key(
                 self.parameters.account_signature_parameters(),
                 self.parameters.account_commitment_parameters(),
                 self.parameters.account_encryption_parameters(),

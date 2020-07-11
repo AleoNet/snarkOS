@@ -49,4 +49,8 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     ) -> Result<Self::Plaintext, EncryptionError>;
 
     fn parameters(&self) -> &Self::Parameters;
+
+    fn private_key_size_in_bits() -> usize;
+
+    fn public_key_size_in_bits() -> usize;
 }

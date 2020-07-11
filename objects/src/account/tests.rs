@@ -16,7 +16,10 @@ fn test_account_new() {
         &parameters.account_encryption,
         rng,
     );
+
+    println!("{:?}", account);
     assert!(account.is_ok());
+
     println!("{}", account.unwrap());
 }
 

@@ -1,11 +1,11 @@
 use crate::account_format;
+use snarkos_algorithms::crh::bytes_to_bits;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, PRF},
-    curves::PrimeField,
     dpc::DPCComponents,
 };
-use snarkos_utilities::{rand::UniformRand, to_bytes, BigInteger, FromBytes, ToBytes};
+use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;
@@ -77,21 +77,31 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
 
         // This operation implicitly enforces that the unused MSB bits
         // for the scalar field representation are correctly set to 0.
-        let decryption_key = C::AccountDecryptionKey::read(&decryption_key_bytes[..])?;
+        let decryption_key = <C::AccountEncryption as EncryptionScheme>::PrivateKey::read(&decryption_key_bytes[..])?;
 
+        // This operation explicitly enforces that the unused MSB bits
+        // for the scalar field representation are correctly set to 0.
+        //
         // To simplify verification of this isomorphism from the base field
         // to the scalar field in the `inner_snark`, we additionally enforce
         // that the MSB bit of the scalar field is also set to 0.
-        if decryption_key
-            .into_repr()
-            .get_bit(C::AccountDecryptionKey::size_in_bits() - 1)
         {
-            return Err(AccountError::InvalidAccountCommitment);
+            let account_decryption_key_bits = bytes_to_bits(&decryption_key_bytes[..]);
+            let account_decryption_key_length = account_decryption_key_bits.len();
+
+            let decryption_private_key_length = C::AccountEncryption::private_key_size_in_bits();
+            assert!(decryption_private_key_length > 0);
+            assert!(decryption_private_key_length <= account_decryption_key_length);
+
+            for i in (decryption_private_key_length - 1)..account_decryption_key_length {
+                let bit_index = account_decryption_key_length - i - 1;
+                if account_decryption_key_bits[bit_index] {
+                    return Err(AccountError::InvalidAccountCommitment);
+                }
+            }
         }
 
-        Ok(<C::AccountEncryption as EncryptionScheme>::PrivateKey::read(
-            &decryption_key_bytes[..],
-        )?)
+        Ok(decryption_key)
     }
 
     /// Returns the signature public key for deriving the account view key.
@@ -129,15 +139,15 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
     /// Reads in an account private key string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = s.from_base58()?;
-        if data.len() != 132 {
+        if data.len() != 101 {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..4] != account_format::PRIVATE_KEY_PREFIX {
-            return Err(AccountError::InvalidPrefixBytes(data[0..4].to_vec()));
+        if &data[0..5] != account_format::PRIVATE_KEY_PREFIX {
+            return Err(AccountError::InvalidPrefixBytes(data[0..5].to_vec()));
         }
 
-        let mut reader = &data[4..];
+        let mut reader = &data[5..];
         let sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
         let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
         let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;

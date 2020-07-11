@@ -489,7 +489,6 @@ where
                 // commitment contains the same bit-value as the scalar field element
                 // computed from the given account private key.
                 let given_account_view_key = {
-                    // TODO (howardwu): Change this to a to_view_key impl so it is on scalar field.
                     // Derive the given account view key based on the given account private key.
                     let given_account_view_key = AccountEncryptionGadget::PrivateKeyGadget::alloc(
                         &mut account_cs.ns(|| "Allocate account view key"),

@@ -4,7 +4,7 @@ use crate::{
 };
 use snarkos_errors::curves::GroupError;
 use snarkos_models::{
-    curves::{ModelParameters, MontgomeryModelParameters, TEModelParameters},
+    curves::{pairing_engine::AffineCurve, ModelParameters, MontgomeryModelParameters, TEModelParameters},
     field,
 };
 use snarkos_utilities::biginteger::BigInteger256;

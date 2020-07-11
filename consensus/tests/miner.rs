@@ -17,7 +17,7 @@ mod miner {
         let enc_params = C::AccountEncryption::setup(rng);
 
         let key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
-        let pubkey = AccountPublicKey::from(&sig_params, &comm_params, &enc_params, &key).unwrap();
+        let pubkey = AccountPublicKey::from_private_key(&sig_params, &comm_params, &enc_params, &key).unwrap();
 
         (key, pubkey)
     }
