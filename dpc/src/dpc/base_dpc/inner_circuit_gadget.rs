@@ -967,17 +967,6 @@ where
             );
 
             // *******************************************************************
-            // Feed in Field elements of the serialization and convert them to bits
-
-            // TODO figure out how to alloc the fp gadgets
-            //            let serial_number_nonce_fp = FpGadget::<
-            //                C::InnerField,
-            //            >::alloc(
-            //                &mut encryption_cs.ns(|| "serial_number_nonce_fp"),
-            //                || Ok(record_field_elements[0]),
-            //            )?;
-
-            // *******************************************************************
             // Alloc and square each of the record field elements as gadgets.
 
             use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
@@ -986,11 +975,11 @@ where
             // let mut record_field_elements_squared_gadgets = Vec::with_capacity(record_field_elements.len());
 
             for (i, element) in record_field_elements.iter().enumerate() {
-                let element_bytes = to_bytes![element]?;
+                // let element_bytes = to_bytes![element]?;
                 let record_field_element_gadget =
                     Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
                         &mut encryption_cs.ns(|| format!("record_field_element_{}", i)),
-                        || Ok(&element_bytes[..]),
+                        || Ok(*element),
                     )?;
 
                 record_field_elements_gadgets.push(record_field_element_gadget);
@@ -999,38 +988,31 @@ where
                 // record_field_elements_squared_gadgets.push(record_field_element_gadget);
             }
 
-            let given_serial_number_nonce_bytes =
-                UInt8::alloc_vec(&mut encryption_cs.ns(|| "given_serial_number_nonce_bytes"), &to_bytes![
-                    record_field_elements[0]
-                ]?)?;
+            // *******************************************************************
+            // Feed in Field elements of the serialization and convert them to bits
+
+            let given_serial_number_nonce_bytes = &record_field_elements_gadgets[0]
+                .to_bytes(&mut encryption_cs.ns(|| "given_serial_number_nonce_bytes"))?;
             let given_serial_number_nonce_bits = given_serial_number_nonce_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_serial_number_nonce_bytes to bits"))?;
 
-            let given_commitment_randomness_bytes = UInt8::alloc_vec(
-                &mut encryption_cs.ns(|| "given_commitment_randomness_bytes"),
-                &to_bytes![record_field_elements[1]]?,
-            )?;
+            let given_commitment_randomness_bytes = &record_field_elements_gadgets[1]
+                .to_bytes(&mut encryption_cs.ns(|| "given_commitment_randomness_bytes"))?;
             let given_commitment_randomness_bits = given_commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_commitment_randomness_bytes to bits"))?;
 
-            let given_birth_predicate_repr_bytes = UInt8::alloc_vec(
-                &mut encryption_cs.ns(|| "given_birth_predicate_repr_bytes"),
-                &to_bytes![record_field_elements[2]]?,
-            )?;
+            let given_birth_predicate_repr_bytes = &record_field_elements_gadgets[2]
+                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_repr_bytes"))?;
             let given_birth_predicate_repr_bits = given_birth_predicate_repr_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_repr_bytes to bits"))?;
 
-            let given_death_predicate_repr_bytes = UInt8::alloc_vec(
-                &mut encryption_cs.ns(|| "given_death_predicate_repr_bytes"),
-                &to_bytes![record_field_elements[3]]?,
-            )?;
+            let given_death_predicate_repr_bytes = &record_field_elements_gadgets[3]
+                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_repr_bytes"))?;
             let given_death_predicate_repr_bits = given_death_predicate_repr_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_repr_bytes to bits"))?;
 
-            let given_predicate_repr_remainder_bytes = UInt8::alloc_vec(
-                &mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"),
-                &to_bytes![record_field_elements[4]]?,
-            )?;
+            let given_predicate_repr_remainder_bytes = &record_field_elements_gadgets[4]
+                .to_bytes(&mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"))?;
             let given_predicate_repr_remainder_bits = given_predicate_repr_remainder_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_predicate_repr_remainder_bytes to bits"))?;
 
@@ -1062,13 +1044,13 @@ where
                 &given_predicate_repr_remainder_bits,
             )?;
 
-            for (i, (payload_element, field_element)) in
-                payload_elements.iter().zip(&record_field_elements[5..]).enumerate()
+            for (i, (payload_element, field_element)) in payload_elements
+                .iter()
+                .zip(&record_field_elements_gadgets[5..])
+                .enumerate()
             {
-                let given_element_bytes = UInt8::alloc_vec(
-                    &mut encryption_cs.ns(|| format!("given_payload_bytes - {}", i)),
-                    &to_bytes![field_element]?,
-                )?;
+                let given_element_bytes =
+                    field_element.to_bytes(&mut encryption_cs.ns(|| format!("given_payload_bytes - {}", i)))?;
                 let given_element_bits = given_element_bytes
                     .to_bits(&mut encryption_cs.ns(|| format!("Convert given_payload_bytes - {} to bits", i)))?;
 
