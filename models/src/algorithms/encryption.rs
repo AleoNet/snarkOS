@@ -11,7 +11,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
-    type Text: Clone + Debug + Eq + ToBytes + FromBytes;
+    type Text: Clone + Debug + Default + Eq + ToBytes + FromBytes;
     type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type BlindingExponents: Clone + Debug + Default + Eq + Hash + ToBytes;
 
