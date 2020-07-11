@@ -974,6 +974,36 @@ where
             // *******************************************************************
             // Feed in Field elements of the serialization and convert them to bits
 
+            // TODO figure out how to alloc the fp gadgets
+            //            let serial_number_nonce_fp = FpGadget::<
+            //                C::InnerField,
+            //            >::alloc(
+            //                &mut encryption_cs.ns(|| "serial_number_nonce_fp"),
+            //                || Ok(record_field_elements[0]),
+            //            )?;
+
+            // *******************************************************************
+            // Alloc and square each of the record field elements as gadgets.
+
+            use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
+
+            let mut record_field_elements_gadgets = Vec::with_capacity(record_field_elements.len());
+            // let mut record_field_elements_squared_gadgets = Vec::with_capacity(record_field_elements.len());
+
+            for (i, element) in record_field_elements.iter().enumerate() {
+                let element_bytes = to_bytes![element]?;
+                let record_field_element_gadget =
+                    Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
+                        &mut encryption_cs.ns(|| format!("record_field_element_{}", i)),
+                        || Ok(&element_bytes[..]),
+                    )?;
+
+                record_field_elements_gadgets.push(record_field_element_gadget);
+
+                // record_field_element_gadget.0.mul
+                // record_field_elements_squared_gadgets.push(record_field_element_gadget);
+            }
+
             let given_serial_number_nonce_bytes =
                 UInt8::alloc_vec(&mut encryption_cs.ns(|| "given_serial_number_nonce_bytes"), &to_bytes![
                     record_field_elements[0]
@@ -1055,30 +1085,6 @@ where
 
             // TODO Check the actual encoding correctness
             // Check encoding
-
-            // TODO figure out how to alloc the fp gadgets
-            //            let serial_number_nonce_fp = FpGadget::<
-            //                C::InnerField,
-            //            >::alloc(
-            //                &mut encryption_cs.ns(|| "serial_number_nonce_fp"),
-            //                || Ok(record_field_elements[0]),
-            //            )?;
-
-            // *******************************************************************
-            // Alloc and square each of the record field elements as gadgets.
-
-            use snarkos_curves::edwards_bls12::{EdwardsProjective, Fq};
-            use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
-            use snarkos_utilities::bytes::FromBytes;
-
-            let mut record_field_element_gadgets = Vec::with_capacity(record_field_elements.len());
-            for (i, element) in record_field_elements.iter().enumerate() {
-                let record_field_element_gadget = Elligator2FieldGadget::<EdwardsProjective>::alloc(
-                    &mut encryption_cs.ns(|| format!("record_field_element_{}", i)),
-                    || Ok(Fq::read(&to_bytes![element]?[..])?),
-                )?;
-                record_field_element_gadgets.push(record_field_element_gadget);
-            }
         }
     }
     // *******************************************************************
