@@ -35,10 +35,10 @@ pub fn test_private_key_from_str() {
 }
 
 #[test]
-pub fn test_public_key_from_str() {
-    let public_key_string = "aleo1xuelf4cm7amwe44p822y9qgc3m2gn4trjsn8lksjqeznq3462szql8jz4y";
+pub fn test_address_from_str() {
+    let address_string = "aleo1xuelf4cm7amwe44p822y9qgc3m2gn4trjsn8lksjqeznq3462szql8jz4y";
 
-    let public_key = AccountAddress::<Components>::from_str(public_key_string);
-    assert!(public_key.is_ok());
-    assert_eq!(public_key_string, public_key.unwrap().to_string());
+    let address = AccountAddress::<Components>::from_str(address_string);
+    assert!(address.is_ok());
+    assert_eq!(address_string, address.unwrap().to_string());
 }

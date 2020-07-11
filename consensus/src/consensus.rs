@@ -371,7 +371,7 @@ impl ConsensusParameters {
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,
                 &old_sn_nonce,
-                &new_account.public_key,
+                &new_account.address,
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),

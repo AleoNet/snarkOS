@@ -173,7 +173,7 @@ mod protected_rpc_tests {
         let old_account_private_keys = vec![sender.private_key.to_string()];
 
         let recipients = vec![TransactionRecipient {
-            address: receiver.public_key.to_string(),
+            address: receiver.address.to_string(),
             amount: 100,
         }];
 
@@ -234,7 +234,7 @@ mod protected_rpc_tests {
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
         let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _public_key = AccountAddress::<Components>::from_str(&account.public_key).unwrap();
+        let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
 
         // Request with specified metadata
         let request_with_metadata = format!(
@@ -248,7 +248,7 @@ mod protected_rpc_tests {
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
         let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _public_key = AccountAddress::<Components>::from_str(&account.public_key).unwrap();
+        let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
 
         drop(rpc);
         kill_storage_sync(storage);

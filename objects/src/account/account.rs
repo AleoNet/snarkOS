@@ -9,7 +9,7 @@ use std::fmt;
 #[derivative(Clone(bound = "C: DPCComponents"))]
 pub struct Account<C: DPCComponents> {
     pub private_key: AccountPrivateKey<C>,
-    pub public_key: AccountAddress<C>,
+    pub address: AccountAddress<C>,
 }
 
 impl<C: DPCComponents> AccountScheme for Account<C> {
@@ -27,17 +27,14 @@ impl<C: DPCComponents> AccountScheme for Account<C> {
         rng: &mut R,
     ) -> Result<Self, AccountError> {
         let private_key = AccountPrivateKey::new(signature_parameters, commitment_parameters, rng)?;
-        let public_key = AccountAddress::from_private_key(
+        let address = AccountAddress::from_private_key(
             signature_parameters,
             commitment_parameters,
             encryption_parameters,
             &private_key,
         )?;
 
-        Ok(Self {
-            private_key,
-            public_key,
-        })
+        Ok(Self { private_key, address })
     }
 }
 
@@ -45,8 +42,8 @@ impl<C: DPCComponents> fmt::Display for Account<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Account {{ private_key: {}, public_key: {} }}",
-            self.private_key, self.public_key,
+            "Account {{ private_key: {}, address: {} }}",
+            self.private_key, self.address,
         )
     }
 }
@@ -55,8 +52,8 @@ impl<C: DPCComponents> fmt::Debug for Account<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Account {{ private_key: {:?}, public_key: {:?} }}",
-            self.private_key, self.public_key,
+            "Account {{ private_key: {:?}, address: {:?} }}",
+            self.private_key, self.address,
         )
     }
 }

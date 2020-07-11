@@ -109,7 +109,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         let old_record = DPC::generate_record(
             &parameters.circuit_parameters,
             &old_sn_nonce,
-            &dummy_account.public_key,
+            &dummy_account.address,
             true, // The input record is dummy
             0,
             &RecordPayload::default(),

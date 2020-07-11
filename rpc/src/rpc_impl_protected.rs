@@ -170,7 +170,7 @@ impl ProtectedRpcFunctions for RpcImpl {
                 .hash(&[64u8; 1])?;
 
             let private_key = old_account_private_keys[0].clone();
-            let public_key = AccountAddress::<Components>::from_private_key(
+            let address = AccountAddress::<Components>::from_private_key(
                 self.parameters.account_signature_parameters(),
                 self.parameters.account_commitment_parameters(),
                 self.parameters.account_encryption_parameters(),
@@ -180,7 +180,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             let dummy_record = InstantiatedDPC::generate_record(
                 &self.parameters.circuit_parameters,
                 &old_sn_nonce,
-                &public_key,
+                &address,
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
@@ -291,7 +291,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
-            public_key: account.public_key.to_string(),
+            address: account.address.to_string(),
         })
     }
 }

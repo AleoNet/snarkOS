@@ -7,33 +7,31 @@ use snarkos_utilities::bytes::ToBytes;
 use std::fmt;
 
 #[derive(Debug)]
-pub struct PublicKey {
-    public_key: AccountAddress<Components>,
+pub struct Address {
+    address: AccountAddress<Components>,
 }
 
-impl PublicKey {
+impl Address {
     pub fn from(private_key: &PrivateKey) -> Result<Self, PublicKeyError> {
         let parameters = CircuitParameters::<Components>::load()?;
-        let public_key = AccountAddress::<Components>::from_private_key(
+        let address = AccountAddress::<Components>::from_private_key(
             &parameters.account_signature,
             &parameters.account_commitment,
             &parameters.account_encryption,
             &private_key.private_key,
         )?;
-        Ok(Self { public_key })
+        Ok(Self { address })
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut output = vec![];
-        self.public_key
-            .write(&mut output)
-            .expect("serialization to bytes failed");
+        self.address.write(&mut output).expect("serialization to bytes failed");
         output
     }
 }
 
-impl fmt::Display for PublicKey {
+impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.public_key.to_string())
+        write!(f, "{}", self.address.to_string())
     }
 }

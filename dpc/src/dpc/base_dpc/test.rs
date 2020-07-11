@@ -93,7 +93,7 @@ fn test_execute_base_dpc_constraints() {
     let old_record = DPC::generate_record(
         &circuit_parameters,
         &sn_nonce,
-        &dummy_account.public_key,
+        &dummy_account.address,
         true,
         0,
         &RecordPayload::default(),
@@ -122,7 +122,7 @@ fn test_execute_base_dpc_constraints() {
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_account_addresss = vec![new_account.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_addresss = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];

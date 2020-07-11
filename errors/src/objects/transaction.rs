@@ -17,12 +17,6 @@ pub enum TransactionError {
     #[error("invalid coinbase transaction")]
     InvalidCoinbaseTransaction,
 
-    #[error("invalid pub key hash script_pub_key: {} script_sig: {}", _0, _1)]
-    InvalidPubKeyHash(String, String),
-
-    #[error("invalid script pub key for format: {}", _0)]
-    InvalidScriptPubKey(String),
-
     #[error("invalid transaction id {:?}", _0)]
     InvalidTransactionId(usize),
 

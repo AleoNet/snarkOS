@@ -212,5 +212,5 @@ pub struct CreateRawTransactionOuput {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcAccount {
     pub private_key: String,
-    pub public_key: String,
+    pub address: String,
 }

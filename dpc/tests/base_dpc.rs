@@ -85,7 +85,7 @@ fn base_dpc_integration_test() {
         let old_record = DPC::generate_record(
             &parameters.circuit_parameters,
             &old_sn_nonce,
-            &genesis_account.public_key,
+            &genesis_account.address,
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
@@ -102,7 +102,7 @@ fn base_dpc_integration_test() {
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(predicate_vk_hash.clone());
 
-    let new_account_addresss = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_addresss = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];

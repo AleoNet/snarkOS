@@ -74,17 +74,17 @@ impl<C: DPCComponents> FromStr for AccountAddress<C> {
     type Err = AccountError;
 
     /// Reads in an account address string.
-    fn from_str(public_key: &str) -> Result<Self, Self::Err> {
-        if public_key.len() != 63 {
-            return Err(AccountError::InvalidCharacterLength(public_key.len()));
+    fn from_str(address: &str) -> Result<Self, Self::Err> {
+        if address.len() != 63 {
+            return Err(AccountError::InvalidCharacterLength(address.len()));
         }
 
-        let prefix = &public_key.to_lowercase()[0..4];
+        let prefix = &address.to_lowercase()[0..4];
         if prefix != account_format::ADDRESS_PREFIX.to_string() {
             return Err(AccountError::InvalidPrefix(prefix.to_string()));
         };
 
-        let bech32 = Bech32::from_str(&public_key)?;
+        let bech32 = Bech32::from_str(&address)?;
         if bech32.data().is_empty() {
             return Err(AccountError::InvalidByteLength(0));
         }

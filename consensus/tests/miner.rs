@@ -16,10 +16,10 @@ mod miner {
         let comm_params = C::AccountCommitment::setup(rng);
         let enc_params = C::AccountEncryption::setup(rng);
 
-        let key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
-        let pubkey = AccountAddress::from_private_key(&sig_params, &comm_params, &enc_params, &key).unwrap();
+        let private_key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
+        let address = AccountAddress::from_private_key(&sig_params, &comm_params, &enc_params, &private_key).unwrap();
 
-        (key, pubkey)
+        (private_key, address)
     }
 
     // this test ensures that a block is found by running the proof of work

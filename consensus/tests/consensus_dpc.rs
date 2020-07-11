@@ -18,7 +18,7 @@ mod consensus_dpc {
         let mut rng = FIXTURE.rng.clone();
 
         let consensus = TEST_CONSENSUS.clone();
-        let miner = Miner::new(miner_acc.public_key, consensus.clone());
+        let miner = Miner::new(miner_acc.address, consensus.clone());
 
         println!("Creating block with coinbase transaction");
         let transactions = DPCTransactions::<Tx>::new();
@@ -55,7 +55,7 @@ mod consensus_dpc {
 
         // OUTPUTS
 
-        let new_account_addresss = vec![recipient.public_key.clone(); NUM_OUTPUT_RECORDS];
+        let new_account_addresss = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![predicate; NUM_OUTPUT_RECORDS];
         let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
         let new_values = vec![10; NUM_OUTPUT_RECORDS];
