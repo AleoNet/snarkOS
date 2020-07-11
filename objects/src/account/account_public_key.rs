@@ -113,41 +113,17 @@ impl<C: DPCComponents> FromStr for AccountPublicKey<C> {
         }
 
         let buffer = Vec::from_base32(&bech32.data())?;
-        let mut encryption_key_bits = bytes_to_bits(&buffer);
-
-        // Extract the bit above the MSB of the encryption key as the y_high bit.
-        let size_in_bits = <C::AccountEncryption as EncryptionScheme>::public_key_size_in_bits();
-        assert!(size_in_bits < encryption_key_bits.len());
-        let y_high = encryption_key_bits[size_in_bits];
-
-        // Zero the y_high bit position in the encryption key.
-        encryption_key_bits[size_in_bits] = false;
-
-        // Add the y_high indicator as an additional byte for the reader.
-        let mut encryption_key = bits_to_bytes(&encryption_key_bits);
-        encryption_key.push(y_high as u8);
-
-        Ok(Self::read(&encryption_key[..])?)
+        Ok(Self::read(&buffer[..])?)
     }
 }
 
 impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Write the encryption key to a buffer.
-        let mut encryption_key = [0u8; 33];
+        let mut address = [0u8; 32];
         self.encryption_key
-            .write(&mut encryption_key[0..33])
+            .write(&mut address[0..32])
             .expect("encryption_key formatting failed");
-
-        let mut encryption_key_bits = bytes_to_bits(&encryption_key[0..32]);
-        let y_high = encryption_key[32] != 0;
-
-        // Set the bit above the MSB of the encryption key as the y_high indicator bit.
-        let size_in_bits = <C::AccountEncryption as EncryptionScheme>::public_key_size_in_bits();
-        assert!(size_in_bits < encryption_key_bits.len());
-        encryption_key_bits[size_in_bits] = y_high;
-
-        let address = bits_to_bytes(&encryption_key_bits);
 
         let prefix = account_format::ADDRESS_PREFIX.to_string();
 

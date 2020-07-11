@@ -16,39 +16,23 @@ pub struct GroupEncryption<G: Group + ProjectiveCurve> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GroupEncryptionPublicKey<G: Group + ProjectiveCurve>(pub G);
 
-impl<G: Group + ProjectiveCurve> GroupEncryptionPublicKey<G> {
-    pub fn size_in_bits() -> usize {
-        // TODO (howardwu): Remove this hardcoded value. Deriving the size in bits from a
-        //  Field trait is not possible, and doesn't make sense. Either determine a stricter bound
-        //  for what constitutes a public key here or get the characteristic & explicitly compute it.
-        253
-    }
-}
-
 impl<G: Group + ProjectiveCurve> ToBytes for GroupEncryptionPublicKey<G> {
-    /// Writes the x-coordinate of the encryption public key, along with an indicator bit
-    /// to denote whether the y-coordinate is the high or low value for deterministic recovery.
+    /// Writes the x-coordinate of the encryption public key.
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let affine = self.0.into_affine();
         let x_coordinate = affine.to_x_coordinate();
-        let y_coordinate = affine.to_y_coordinate();
-        let y_high = y_coordinate > -y_coordinate;
-
-        x_coordinate.write(&mut writer)?;
-        y_high.write(writer)
+        x_coordinate.write(&mut writer)
     }
 }
 
 impl<G: Group + ProjectiveCurve> FromBytes for GroupEncryptionPublicKey<G> {
-    /// Reads the x-coordinate of the encryption public key, along with an indicator bit
-    /// to denote whether the y-coordinate is the high or low value for deterministic recovery.
+    /// Reads the x-coordinate of the encryption public key.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let x_coordinate = <G::Affine as AffineCurve>::BaseField::read(&mut reader)?;
-        let y_high = bool::read(&mut reader)?;
 
-        match <G as ProjectiveCurve>::Affine::get_point_from_x(x_coordinate, y_high) {
+        match <G as ProjectiveCurve>::Affine::get_point_from_x(x_coordinate, true) {
             Some(element) => Ok(Self(element.into_projective())),
             _ => Err(EncryptionError::Message("Failed to read encryption public key".into()).into()),
         }
@@ -215,10 +199,6 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
 
     fn private_key_size_in_bits() -> usize {
         Self::PrivateKey::size_in_bits()
-    }
-
-    fn public_key_size_in_bits() -> usize {
-        Self::PublicKey::size_in_bits()
     }
 }
 
