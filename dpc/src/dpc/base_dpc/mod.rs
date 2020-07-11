@@ -833,7 +833,7 @@ where
         let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
             let serialized_record = RecordSerializer::<
                 Components,
@@ -881,7 +881,7 @@ where
             new_records_group_encoding.push(record_group_encoding);
             new_records_field_elements.push(record_field_elements);
 
-            let record_public_key = record.account_public_key().into_repr();
+            let record_public_key = record.account_address().into_repr();
             let encryption_randomness = circuit_parameters
                 .account_encryption
                 .generate_randomness(record_public_key, rng)?;
@@ -898,7 +898,7 @@ where
 
             new_records_encryption_randomness.push(encryption_randomness);
             new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
-            new_records_ciphertexts.push(record_ciphertext);
+            new_records_encryption_ciphertexts.push(record_ciphertext);
         }
 
         let inner_proof = {
@@ -915,6 +915,9 @@ where
                 &new_commitments,
                 &new_records_field_elements,
                 &new_records_group_encoding,
+                &new_records_encryption_randomness,
+                &new_records_encryption_blinding_exponents,
+                &new_records_encryption_ciphertexts,
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,

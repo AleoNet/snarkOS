@@ -62,7 +62,7 @@ fn test_record_serialization() {
         let record = DPC::generate_record(
             &circuit_parameters,
             &sn_nonce,
-            &dummy_account.public_key,
+            &dummy_account.address,
             true,
             0,
             &RecordPayload::default(),

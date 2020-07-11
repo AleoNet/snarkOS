@@ -2,6 +2,8 @@ use super::instantiated::*;
 use crate::dpc::base_dpc::{
     binding_signature::*,
     execute_inner_proof_gadget,
+    execute_outer_proof_gadget,
+    inner_circuit::InnerCircuit,
     predicate::PrivatePredicateInput,
     predicate_circuit::{PredicateCircuit, PredicateLocalData},
     record_payload::RecordPayload,
@@ -11,11 +13,11 @@ use crate::dpc::base_dpc::{
     DPC,
 };
 use snarkos_algorithms::{encoding::Elligator2, snark::gm17::PreparedVerifyingKey};
-use snarkos_curves::bls12_377::Fr;
+use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, CRH, SNARK},
     curves::{AffineCurve, ModelParameters, ProjectiveCurve},
-    dpc::Record,
+    dpc::{DPCComponents, Record},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
@@ -297,7 +299,9 @@ fn test_execute_base_dpc_constraints() {
 
     let mut new_records_field_elements = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_group_encoding = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-
+    let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_records_encryption_blinding_exponents = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_records_encryption_ciphertexts = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     for record in &new_records {
         let serialized_record = RecordSerializer::<
             Components,
@@ -308,6 +312,8 @@ fn test_execute_base_dpc_constraints() {
 
         let mut record_field_elements = vec![];
         let mut record_group_encoding = vec![];
+        let mut record_plaintexts = vec![];
+
         for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
             let element_affine = element.into_affine();
 
@@ -323,7 +329,7 @@ fn test_execute_base_dpc_constraints() {
                 let record_field_element = Elligator2::<
                     <Components as BaseDPCComponents>::EncryptionModelParameters,
                     <Components as BaseDPCComponents>::EncryptionGroup,
-                >::decode(&element.into_affine(), *fq_high)
+                >::decode(&element_affine, *fq_high)
                 .unwrap();
 
                 record_field_elements.push(record_field_element);
@@ -338,9 +344,34 @@ fn test_execute_base_dpc_constraints() {
             )
             .unwrap();
             record_group_encoding.push((x, y, *fq_high));
+
+            let plaintext_element = <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
+                &to_bytes![element].unwrap()[..],
+            )
+            .unwrap();
+            record_plaintexts.push(plaintext_element);
         }
+
         new_records_group_encoding.push(record_group_encoding);
         new_records_field_elements.push(record_field_elements);
+
+        let record_public_key = record.account_address().into_repr();
+        let encryption_randomness = circuit_parameters
+            .account_encryption
+            .generate_randomness(record_public_key, &mut rng)
+            .unwrap();
+        let encryption_blinding_exponents = circuit_parameters
+            .account_encryption
+            .generate_blinding_exponents(record_public_key, &encryption_randomness, record_plaintexts.len())
+            .unwrap();
+        let record_ciphertext = circuit_parameters
+            .account_encryption
+            .encrypt(record_public_key, &encryption_randomness, &record_plaintexts)
+            .unwrap();
+
+        new_records_encryption_randomness.push(encryption_randomness);
+        new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
+        new_records_encryption_ciphertexts.push(record_ciphertext);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -361,6 +392,9 @@ fn test_execute_base_dpc_constraints() {
         &new_commitments,
         &new_records_field_elements,
         &new_records_group_encoding,
+        &new_records_encryption_randomness,
+        &new_records_encryption_blinding_exponents,
+        &new_records_encryption_ciphertexts,
         &predicate_comm,
         &predicate_rand,
         &local_data_comm,
@@ -395,101 +429,106 @@ fn test_execute_base_dpc_constraints() {
 
     assert!(core_cs.is_satisfied());
 
-    //    // Generate inner snark parameters and proof for verification in the outer snark
-    //    let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
-    //        InnerCircuit::blank(&circuit_parameters, ledger.parameters()),
-    //        &mut rng,
-    //    )
-    //    .unwrap();
-    //
-    //    let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
-    //        &inner_snark_parameters.0,
-    //        InnerCircuit::new(
-    //            &circuit_parameters,
-    //            ledger.parameters(),
-    //            &ledger_digest,
-    //            old_records,
-    //            &old_witnesses,
-    //            old_account_private_keys,
-    //            &old_serial_numbers,
-    //            &new_records,
-    //            &new_sn_nonce_randomness,
-    //            &new_commitments,
-    //            &predicate_comm,
-    //            &predicate_rand,
-    //            &local_data_comm,
-    //            &local_data_commitment_randomizers,
-    //            &memo,
-    //            &old_value_commits,
-    //            &old_value_commit_randomness,
-    //            &new_value_commits,
-    //            &new_value_commit_randomness,
-    //            value_balance,
-    //            &binding_signature,
-    //            network_id,
-    //        ),
-    //        &mut rng,
-    //    )
-    //    .unwrap();
-    //
-    //    let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
-    //        inner_snark_parameters.1.clone().into();
-    //
-    //    // Check that the proof check constraint system was satisfied.
-    //    let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
-    //
-    //    execute_outer_proof_gadget::<_, _>(
-    //        &mut pf_check_cs.ns(|| "Check predicate proofs"),
-    //        &circuit_parameters,
-    //        ledger.parameters(),
-    //        &ledger_digest,
-    //        &old_serial_numbers,
-    //        &new_commitments,
-    //        &memo,
-    //        value_balance,
-    //        network_id,
-    //        &inner_snark_vk,
-    //        &inner_snark_proof,
-    //        &old_proof_and_vk,
-    //        &new_proof_and_vk,
-    //        &predicate_comm,
-    //        &predicate_rand,
-    //        &local_data_comm,
-    //    )
-    //    .unwrap();
-    //
-    //    if !pf_check_cs.is_satisfied() {
-    //        println!("=========================================================");
-    //        println!("num constraints: {:?}", pf_check_cs.num_constraints());
-    //        println!("Unsatisfied constraints:");
-    //        println!("{}", pf_check_cs.which_is_unsatisfied().unwrap());
-    //        println!("=========================================================");
-    //    }
-    //    if pf_check_cs.is_satisfied() {
-    //        println!("\n\n\n\nAll Proof check constraints:");
-    //        // pf_check_cs.print_named_objects();
-    //        println!("num constraints: {:?}", pf_check_cs.num_constraints());
-    //    }
-    //    println!("=========================================================");
-    //    println!("=========================================================");
-    //    println!("=========================================================");
-    //
-    //    assert!(pf_check_cs.is_satisfied());
-    //
-    //    let verify_binding_signature = verify_binding_signature::<
-    //        <Components as BaseDPCComponents>::ValueCommitment,
-    //        <Components as BaseDPCComponents>::BindingSignatureGroup,
-    //    >(
-    //        &circuit_parameters.value_commitment,
-    //        &old_value_commits,
-    //        &new_value_commits,
-    //        value_balance,
-    //        &sighash,
-    //        &binding_signature,
-    //    )
-    //    .unwrap();
-    //
-    //    assert!(verify_binding_signature);
+    // Generate inner snark parameters and proof for verification in the outer snark
+    let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
+        InnerCircuit::blank(&circuit_parameters, ledger.parameters()),
+        &mut rng,
+    )
+    .unwrap();
+
+    let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
+        &inner_snark_parameters.0,
+        InnerCircuit::new(
+            &circuit_parameters,
+            ledger.parameters(),
+            &ledger_digest,
+            old_records,
+            &old_witnesses,
+            old_account_private_keys,
+            &old_serial_numbers,
+            &new_records,
+            &new_sn_nonce_randomness,
+            &new_commitments,
+            &new_records_field_elements,
+            &new_records_group_encoding,
+            &new_records_encryption_randomness,
+            &new_records_encryption_blinding_exponents,
+            &new_records_encryption_ciphertexts,
+            &predicate_comm,
+            &predicate_rand,
+            &local_data_comm,
+            &local_data_commitment_randomizers,
+            &memo,
+            &old_value_commits,
+            &old_value_commit_randomness,
+            &new_value_commits,
+            &new_value_commit_randomness,
+            value_balance,
+            &binding_signature,
+            network_id,
+        ),
+        &mut rng,
+    )
+    .unwrap();
+
+    let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
+        inner_snark_parameters.1.clone().into();
+
+    // Check that the proof check constraint system was satisfied.
+    let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
+
+    execute_outer_proof_gadget::<_, _>(
+        &mut pf_check_cs.ns(|| "Check predicate proofs"),
+        &circuit_parameters,
+        ledger.parameters(),
+        &ledger_digest,
+        &old_serial_numbers,
+        &new_commitments,
+        &memo,
+        value_balance,
+        network_id,
+        &inner_snark_vk,
+        &inner_snark_proof,
+        &old_proof_and_vk,
+        &new_proof_and_vk,
+        &predicate_comm,
+        &predicate_rand,
+        &local_data_comm,
+    )
+    .unwrap();
+
+    if !pf_check_cs.is_satisfied() {
+        println!("=========================================================");
+        println!("num constraints: {:?}", pf_check_cs.num_constraints());
+        println!("Unsatisfied constraints:");
+        println!("{}", pf_check_cs.which_is_unsatisfied().unwrap());
+        println!("=========================================================");
+    }
+    if pf_check_cs.is_satisfied() {
+        println!("\n\n\n\nAll Proof check constraints:");
+        // pf_check_cs.print_named_objects();
+        println!("num constraints: {:?}", pf_check_cs.num_constraints());
+    }
+    println!("=========================================================");
+    println!("=========================================================");
+    println!("=========================================================");
+
+    assert!(pf_check_cs.is_satisfied());
+
+    let verify_binding_signature = verify_binding_signature::<
+        <Components as BaseDPCComponents>::ValueCommitment,
+        <Components as BaseDPCComponents>::BindingSignatureGroup,
+    >(
+        &circuit_parameters.value_commitment,
+        &old_value_commits,
+        &new_value_commits,
+        value_balance,
+        &sighash,
+        &binding_signature,
+    )
+    .unwrap();
+
+    assert!(verify_binding_signature);
 
     kill_storage(ledger);
 }

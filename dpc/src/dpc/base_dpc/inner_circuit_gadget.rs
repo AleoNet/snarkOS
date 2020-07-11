@@ -9,7 +9,17 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF},
-    curves::{Field, Group, ModelParameters, MontgomeryModelParameters, One, PrimeField, TEModelParameters},
+    curves::{
+        AffineCurve,
+        Field,
+        Group,
+        ModelParameters,
+        MontgomeryModelParameters,
+        One,
+        PrimeField,
+        ProjectiveCurve,
+        TEModelParameters,
+    },
     dpc::Record,
     gadgets::{
         algorithms::{
@@ -65,6 +75,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         bool,
     )>],
+    new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
+    new_records_encryption_blinding_exponents: &[<C::AccountEncryption as EncryptionScheme>::BlindingExponents],
+    new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
 
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -117,6 +130,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_commitments,
         new_records_field_elements,
         new_records_group_encoding,
+        new_records_encryption_randomness,
+        new_records_encryption_blinding_exponents,
+        new_records_encryption_ciphertexts,
         //
         predicate_commitment,
         predicate_randomness,
@@ -178,6 +194,9 @@ fn base_dpc_execute_gadget_helper<
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         bool,
     )>],
+    new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
+    new_records_encryption_blinding_exponents: &[<C::AccountEncryption as EncryptionScheme>::BlindingExponents],
+    new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
 
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -678,14 +697,28 @@ where
         }
     }
 
-    for (j, ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding)) in
-        new_records
-            .iter()
-            .zip(new_sn_nonce_randomness)
-            .zip(new_commitments)
-            .zip(new_records_field_elements)
-            .zip(new_records_group_encoding)
-            .enumerate()
+    for (
+        j,
+        (
+            (
+                (
+                    ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
+                    encryption_randomness,
+                ),
+                encryption_blinding_exponents,
+            ),
+            encryption_ciphertext,
+        ),
+    ) in new_records
+        .iter()
+        .zip(new_sn_nonce_randomness)
+        .zip(new_commitments)
+        .zip(new_records_field_elements)
+        .zip(new_records_group_encoding)
+        .zip(new_records_encryption_randomness)
+        .zip(new_records_encryption_blinding_exponents)
+        .zip(new_records_encryption_ciphertexts)
+        .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
@@ -1008,7 +1041,7 @@ where
             );
 
             // *******************************************************************
-            // Alloc and square each of the record field elements as gadgets.
+            // Alloc each of the record field elements as gadgets.
 
             use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
 
@@ -1024,9 +1057,6 @@ where
                     )?;
 
                 record_field_elements_gadgets.push(record_field_element_gadget);
-
-                // record_field_element_gadget.0.mul
-                // record_field_elements_squared_gadgets.push(record_field_element_gadget);
             }
 
             // *******************************************************************
@@ -1105,8 +1135,14 @@ where
             // Check group encoding correctness
 
             let mut record_group_encoding_gadgets = Vec::with_capacity(record_group_encoding.len());
+            let mut encryption_plaintext = Vec::with_capacity(record_group_encoding.len());
 
             for (i, (x, y, fq_high)) in record_group_encoding.iter().enumerate() {
+                let affine = <C::EncryptionGroup as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?;
+                encryption_plaintext.push(<C::AccountEncryption as EncryptionScheme>::Text::read(
+                    &to_bytes![affine.into_projective()]?[..],
+                )?);
+
                 let x_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
                     &mut encryption_cs.ns(|| format!("record_group_encoding_x_{}", i)),
                     || Ok(x),
@@ -1197,6 +1233,46 @@ where
                     &Boolean::Constant(false),
                 )?;
             }
+
+            // *******************************************************************
+            // Check the record encryption
+
+            let encryption_randomness_gadget = AccountEncryptionGadget::RandomnessGadget::alloc(
+                &mut encryption_cs.ns(|| format!("output record {} encryption_randomness", j)),
+                || Ok(encryption_randomness),
+            )?;
+
+            // UNCOMMENTING THIS BLINDING EXPONENTS ALLOC CAUSES THE OUTER SNARK CONSTRAINT TEST TO FAIL
+            //            let encryption_blinding_exponents_gadget = AccountEncryptionGadget::BlindingExponentGadget::alloc(
+            //                &mut encryption_cs.ns(|| format!("output record {} encryption_blinding_exponents", j)),
+            //                || Ok(encryption_blinding_exponents),
+            //            )?;
+
+            let encryption_plaintext_gadget = AccountEncryptionGadget::PlaintextGadget::alloc(
+                &mut encryption_cs.ns(|| format!("output record {} encryption_plaintext", j)),
+                || Ok(encryption_plaintext),
+            )?;
+
+            // UNCOMMENTING THIS CIPHERTEXT ALLOC CAUSES THE OUTER SNARK CONSTRAINT TEST TO FAIL
+            // TODO (raychu86) Make this ciphertext a public input with alloc_input
+            //            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc(
+            //                &mut encryption_cs.ns(|| format!("output record {} encryption_ciphertext", j)),
+            //                || Ok(encryption_ciphertext),
+            //            )?;
+
+            //            let candidate_ciphertext_gadget = AccountEncryptionGadget::check_encryption_gadget(
+            //                &mut encryption_cs.ns(|| format!("output record {} check_encryption_gadget", j)),
+            //                &account_encryption_parameters,
+            //                &encryption_randomness_gadget,
+            //                &given_account_address,
+            //                &encryption_plaintext_gadget,
+            //                &encryption_blinding_exponents_gadget,
+            //            )?;
+            //
+            //            encryption_ciphertext_gadget.enforce_equal(
+            //                encryption_cs.ns(|| format!("output record {} encryption is valid", j)),
+            //                &candidate_ciphertext_gadget,
+            //            )?;
         }
     }
     // *******************************************************************
