@@ -28,30 +28,3 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: -Dwarnings
-    strategy:
-      matrix:
-        rust:
-          - stable
-          - nightly
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Rust (${{ matrix.rust }})
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
