@@ -2,7 +2,7 @@ use crate::dpc::base_dpc::{parameters::CircuitParameters, predicate::PrivatePred
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
@@ -72,6 +72,8 @@ where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
+    <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
+
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
@@ -120,6 +122,10 @@ where
 
     let account_commitment_parameters_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_commitment.parameters())
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+
+    let account_encryption_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_encryption.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let account_signature_fe =
@@ -196,6 +202,9 @@ where
     let account_commitment_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &account_commitment_parameters_fe, "account commitment pp")?;
 
+    let account_encryption_fe_bytes =
+        field_element_to_bytes::<C, _>(cs, &account_encryption_parameters_fe, "account encryption pp")?;
+
     let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, &account_signature_fe, "account signature pp")?;
     let record_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &record_commitment_parameters_fe, "record commitment pp")?;
@@ -241,6 +250,7 @@ where
 
     let mut inner_snark_input_bytes = vec![];
     inner_snark_input_bytes.extend(account_commitment_fe_bytes);
+    inner_snark_input_bytes.extend(account_encryption_fe_bytes);
     inner_snark_input_bytes.extend(account_signature_fe_bytes);
     inner_snark_input_bytes.extend(record_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(predicate_vk_commitment_parameters_fe_bytes);

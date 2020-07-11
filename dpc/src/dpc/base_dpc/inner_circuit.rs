@@ -76,7 +76,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             vec![<C::AccountSignature as SignatureScheme>::PublicKey::default(); num_input_records];
         let old_records = vec![DPCRecord::default(); num_input_records];
         let old_witnesses = vec![MerklePath::default(); num_input_records];
-        // TODO default is not a valid account_private key anymore because it must be a specific format
         let old_account_private_keys = vec![AccountPrivateKey::default(); num_input_records];
 
         let new_commitments = vec![<C::RecordCommitment as CommitmentScheme>::Output::default(); num_output_records];

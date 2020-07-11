@@ -13,10 +13,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     type Parameters;
     type Predicate: Predicate<PrivateWitness = Self::PrivatePredInput>;
     type PrivatePredInput;
-    type Record: Record<
-        AccountPublicKey = <Self::Account as AccountScheme>::AccountPublicKey,
-        Predicate = Self::Predicate,
-    >;
+    type Record: Record<AccountAddress = <Self::Account as AccountScheme>::AccountAddress, Predicate = Self::Predicate>;
     type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
     type LocalData;
 
@@ -35,7 +32,7 @@ pub trait DPCScheme<L: LedgerScheme> {
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         old_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_key: &[<Self::Account as AccountScheme>::AccountPublicKey],
+        new_account_public_key: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[<Self::Record as Record>::Value],
         new_payloads: &[Self::Payload],

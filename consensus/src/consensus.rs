@@ -19,8 +19,8 @@ use snarkos_models::{
 use snarkos_objects::{
     dpc::DPCTransactions,
     Account,
+    AccountAddress,
     AccountPrivateKey,
-    AccountPublicKey,
     Block,
     BlockHeader,
     BlockHeaderHash,
@@ -334,7 +334,7 @@ impl ConsensusParameters {
         predicate_vk_hash: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
-        recipient: AccountPublicKey<Components>,
+        recipient: AccountAddress<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -413,7 +413,7 @@ impl ConsensusParameters {
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
-        new_account_public_keys: Vec<AccountPublicKey<Components>>,
+        new_account_public_keys: Vec<AccountAddress<Components>>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         new_dummy_flags: Vec<bool>,

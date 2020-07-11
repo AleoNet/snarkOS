@@ -1,20 +1,20 @@
 use crate::{account::PrivateKey, errors::PublicKeyError};
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::CircuitParameters};
-use snarkos_objects::AccountPublicKey;
+use snarkos_objects::AccountAddress;
 use snarkos_utilities::bytes::ToBytes;
 
 use std::fmt;
 
 #[derive(Debug)]
 pub struct PublicKey {
-    public_key: AccountPublicKey<Components>,
+    public_key: AccountAddress<Components>,
 }
 
 impl PublicKey {
     pub fn from(private_key: &PrivateKey) -> Result<Self, PublicKeyError> {
         let parameters = CircuitParameters::<Components>::load()?;
-        let public_key = AccountPublicKey::<Components>::from_private_key(
+        let public_key = AccountAddress::<Components>::from_private_key(
             &parameters.account_signature,
             &parameters.account_commitment,
             &parameters.account_encryption,

@@ -2,7 +2,7 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner
 use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::dpc::{DPCScheme, Record};
-use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
+use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkos_testing::consensus::*;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -102,7 +102,7 @@ fn send<R: Rng>(
     consensus: &ConsensusParameters,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,
-    receiver: &AccountPublicKey<Components>,
+    receiver: &AccountAddress<Components>,
     amount: u64,
     rng: &mut R,
 ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {

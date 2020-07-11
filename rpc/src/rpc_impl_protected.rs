@@ -6,7 +6,7 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::AccountScheme};
-use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -170,7 +170,7 @@ impl ProtectedRpcFunctions for RpcImpl {
                 .hash(&[64u8; 1])?;
 
             let private_key = old_account_private_keys[0].clone();
-            let public_key = AccountPublicKey::<Components>::from_private_key(
+            let public_key = AccountAddress::<Components>::from_private_key(
                 self.parameters.account_signature_parameters(),
                 self.parameters.account_commitment_parameters(),
                 self.parameters.account_encryption_parameters(),
@@ -201,7 +201,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let mut new_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            new_account_public_keys.push(AccountPublicKey::<Components>::from_str(&recipient.address)?);
+            new_account_public_keys.push(AccountAddress::<Components>::from_str(&recipient.address)?);
             new_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }

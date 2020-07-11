@@ -2,7 +2,7 @@ use crate::dpc::base_dpc::{inner_circuit_verifier_input::InnerCircuitVerifierInp
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -22,6 +22,8 @@ where
 
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
 
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,

@@ -7,8 +7,8 @@ pub use self::account_format::*;
 pub mod account_private_key;
 pub use self::account_private_key::*;
 
-pub mod account_public_key;
-pub use self::account_public_key::*;
+pub mod account_address;
+pub use self::account_address::*;
 
 pub mod account_view_key;
 pub use self::account_view_key::*;

@@ -15,7 +15,7 @@ use snarkos_models::{
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
-use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -308,7 +308,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        account_public_key: &AccountPublicKey<Components>,
+        account_public_key: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
@@ -362,7 +362,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_account_public_keys: &[AccountPublicKey<Components>],
+        new_account_public_keys: &[AccountAddress<Components>],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
@@ -663,7 +663,7 @@ where
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
+        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],

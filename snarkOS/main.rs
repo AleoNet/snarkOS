@@ -14,7 +14,7 @@ use snarkos_network::{
     protocol::SyncHandler,
     server::{MinerInstance, Server},
 };
-use snarkos_objects::AccountPublicKey;
+use snarkos_objects::AccountAddress;
 use snarkos_posw::Posw;
 use snarkos_rpc::start_rpc_server;
 
@@ -117,7 +117,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     // Start miner thread
 
     if config.is_miner {
-        let miner_address = AccountPublicKey::<Components>::from_str(&config.miner_address)?;
+        let miner_address = AccountAddress::<Components>::from_str(&config.miner_address)?;
         MinerInstance::new(
             miner_address,
             consensus.clone(),

@@ -4,20 +4,20 @@ mod miner {
         algorithms::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
         dpc::DPCComponents,
     };
-    use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader};
+    use snarkos_objects::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader};
     use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
 
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
-    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
+    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountAddress<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
         let enc_params = C::AccountEncryption::setup(rng);
 
         let key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
-        let pubkey = AccountPublicKey::from_private_key(&sig_params, &comm_params, &enc_params, &key).unwrap();
+        let pubkey = AccountAddress::from_private_key(&sig_params, &comm_params, &enc_params, &key).unwrap();
 
         (key, pubkey)
     }

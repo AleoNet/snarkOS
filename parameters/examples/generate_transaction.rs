@@ -14,7 +14,7 @@ use snarkos_models::{
     objects::{account::AccountScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{Account, AccountPublicKey};
+use snarkos_objects::{Account, AccountAddress};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_posw::Posw;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
@@ -70,7 +70,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
-    let recipient = AccountPublicKey::<Components>::from_str(&recipient)?;
+    let recipient = AccountAddress::<Components>::from_str(&recipient)?;
 
     let crh_parameters =
         <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
