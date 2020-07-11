@@ -1,5 +1,4 @@
 use crate::{account_format, AccountPrivateKey, AccountViewKey};
-use snarkos_algorithms::crh::bytes_to_bits;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{algorithms::EncryptionScheme, dpc::DPCComponents};
 use snarkos_utilities::{FromBytes, ToBytes};
@@ -10,28 +9,6 @@ use std::{
     io::{Read, Result as IoResult, Write},
     str::FromStr,
 };
-
-// TODO (howardwu): Remove this and put it in snarkos-utilities.
-pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
-    // Pad the bits if it not a correct size
-    let mut bits = bits.to_vec();
-    if bits.len() % 8 != 0 {
-        let current_length = bits.len();
-        for _ in 0..(8 - current_length % 8) {
-            bits.push(false);
-        }
-    }
-    let mut bytes = Vec::with_capacity(bits.len() / 8);
-    for bits in bits.chunks(8) {
-        let mut result = 0u8;
-        for (i, bit) in bits.iter().enumerate() {
-            let bit_value = *bit as u8;
-            result = result + (bit_value << i as u8);
-        }
-        bytes.push(result);
-    }
-    bytes
-}
 
 #[derive(Derivative)]
 #[derivative(
@@ -123,7 +100,7 @@ impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
         let mut address = [0u8; 32];
         self.encryption_key
             .write(&mut address[0..32])
-            .expect("encryption_key formatting failed");
+            .expect("address formatting failed");
 
         let prefix = account_format::ADDRESS_PREFIX.to_string();
 

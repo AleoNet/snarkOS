@@ -211,13 +211,20 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Gr
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryptionPublicKeyGadget<G, F, GG> {
+impl<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> ToBytesGadget<F>
+    for GroupEncryptionPublicKeyGadget<G, F, GG>
+{
+    /// Writes the x-coordinate of the encryption public key.
     fn to_bytes<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
-        self.public_key.to_bytes(&mut cs.ns(|| "to_bytes"))
+        self.public_key.to_x_coordinate().to_bytes(&mut cs.ns(|| "to_bytes"))
     }
 
+    /// Writes the x-coordinate of the encryption public key. Additionally checks if the
+    /// generated list of booleans is 'valid'.
     fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
-        self.public_key.to_bytes_strict(&mut cs.ns(|| "to_bytes_strict"))
+        self.public_key
+            .to_x_coordinate()
+            .to_bytes_strict(&mut cs.ns(|| "to_bytes_strict"))
     }
 }
 
