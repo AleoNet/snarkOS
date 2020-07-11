@@ -229,6 +229,12 @@ impl_params!(
     1742404
 );
 impl_params!(
+    RecordCiphertextCRHParameters,
+    record_ciphertext_crh_test,
+    "record_ciphertext_crh",
+    532492
+);
+impl_params!(
     SerialNumberNonceCRHParameters,
     serial_number_nonce_crh_test,
     "serial_number_nonce_crh",

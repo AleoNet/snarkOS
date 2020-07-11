@@ -228,44 +228,49 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Record commitment scheme setup");
-        let rec_comm_pp = Components::RecordCommitment::setup(rng);
+        let record_commitment = Components::RecordCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Record ciphertext CRH setup");
+        let record_ciphertext_crh = Components::RecordCiphertextCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification key commitment setup");
-        let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
+        let predicate_verification_key_commitment = Components::PredicateVerificationKeyCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local data CRH setup");
-        let local_data_crh_pp = Components::LocalDataCRH::setup(rng);
+        let local_data_crh = Components::LocalDataCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local data commitment setup");
-        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
+        let local_data_commitment = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Value commitment setup");
-        let value_comm_pp = Components::ValueCommitment::setup(rng);
+        let value_commitment = Components::ValueCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Serial nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
+        let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification key CRH setup");
-        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
+        let predicate_verification_key_hash = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
         let comm_crh_sig_pp = CircuitParameters {
             account_commitment,
             account_encryption,
             account_signature,
-            record_commitment: rec_comm_pp,
-            predicate_verification_key_commitment: pred_vk_comm_pp,
-            predicate_verification_key_hash: pred_vk_crh_pp,
-            local_data_crh: local_data_crh_pp,
-            local_data_commitment: local_data_comm_pp,
-            value_commitment: value_comm_pp,
-            serial_number_nonce: sn_nonce_crh_pp,
+            record_commitment,
+            record_ciphertext_crh,
+            predicate_verification_key_commitment,
+            predicate_verification_key_hash,
+            local_data_crh,
+            local_data_commitment,
+            value_commitment,
+            serial_number_nonce,
         };
 
         Ok(comm_crh_sig_pp)
