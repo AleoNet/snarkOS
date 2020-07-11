@@ -134,7 +134,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
     ) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
-        // Construct the commitment input for the account public key.
+        // Construct the commitment input for the account address.
         let pk_sig = self.pk_sig(signature_parameters)?;
         let commit_input = to_bytes![pk_sig, self.sk_prf]?;
 

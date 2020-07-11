@@ -123,7 +123,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     // Construct new records
 
-    let new_account_public_keys = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_account_addresss = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
@@ -152,7 +152,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
             &parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_addresss,
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,

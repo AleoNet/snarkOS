@@ -295,7 +295,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        account_public_key: &AccountAddress<Components>,
+        account_address: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
@@ -312,7 +312,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let death_predicate_repr = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_public_key,   // 256 bits = 32 bytes
+            account_address,      // 256 bits = 32 bytes
             is_dummy,             // 1 bit = 1 byte
             value,                // 64 bits = 8 bytes
             payload,              // 256 bits = 32 bytes
@@ -328,7 +328,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         )?;
 
         let record = DPCRecord {
-            account_public_key: account_public_key.clone(),
+            account_address: account_address.clone(),
             is_dummy,
             value,
             payload: payload.clone(),
@@ -349,7 +349,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_account_public_keys: &[AccountAddress<Components>],
+        new_account_addresss: &[AccountAddress<Components>],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
@@ -375,7 +375,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_public_keys.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_addresss.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -432,7 +432,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_account_public_keys[j],
+                &new_account_addresss[j],
                 new_is_dummy_flags[j],
                 new_values[j],
                 &new_payloads[j],
@@ -650,7 +650,7 @@ where
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountAddress],
+        new_account_addresss: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
@@ -668,7 +668,7 @@ where
             &parameters.circuit_parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_addresss,
             new_is_dummy_flags,
             new_values,
             new_payloads,

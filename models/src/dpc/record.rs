@@ -12,8 +12,8 @@ pub trait Record: Default + FromBytes + ToBytes {
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type Value: FromBytes + ToBytes;
 
-    /// Returns the account public key.
-    fn account_public_key(&self) -> &Self::AccountAddress;
+    /// Returns the account address.
+    fn account_address(&self) -> &Self::AccountAddress;
 
     /// Returns whether or not the record is dummy.
     fn is_dummy(&self) -> bool;

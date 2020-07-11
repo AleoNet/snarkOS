@@ -197,23 +197,23 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_account_public_keys = vec![];
+        let mut new_account_addresss = vec![];
         let mut new_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            new_account_public_keys.push(AccountAddress::<Components>::from_str(&recipient.address)?);
+            new_account_addresss.push(AccountAddress::<Components>::from_str(&recipient.address)?);
             new_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_account_public_keys.len() < Components::NUM_OUTPUT_RECORDS {
-            new_account_public_keys.push(new_account_public_keys[0].clone());
+        while new_account_addresss.len() < Components::NUM_OUTPUT_RECORDS {
+            new_account_addresss.push(new_account_addresss[0].clone());
             new_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_account_public_keys.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_account_addresss.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
@@ -233,7 +233,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             &self.parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_addresss,
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,
