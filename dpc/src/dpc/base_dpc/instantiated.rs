@@ -16,7 +16,7 @@ use snarkos_algorithms::{
     define_merkle_tree_parameters,
     prf::Blake2s,
     signature::SchnorrSignature,
-    snark::GM17,
+    snark::{Groth16, GM17},
 };
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
@@ -169,7 +169,7 @@ pub type PredicateVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<Edwards
 
 pub type Predicate = DPCPredicate<Components>;
 pub type CoreCheckNIZK = GM17<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
-pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
+pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
 pub type PredicateSNARK<C> = GM17<InnerPairing, PredicateCircuit<C>, PredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
