@@ -1,5 +1,5 @@
 #[cfg(debug_assertions)]
-use snarkos_algorithms::snark::PreparedVerifyingKey;
+use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     predicate::PrivatePredicateInput,

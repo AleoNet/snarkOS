@@ -1,10 +1,7 @@
-use crate::{account_format, AccountPrivateKey};
+use crate::{account_format, AccountPrivateKey, AccountViewKey};
 use snarkos_errors::objects::AccountError;
-use snarkos_models::{
-    algorithms::{CommitmentScheme, EncryptionScheme},
-    dpc::DPCComponents,
-};
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkos_models::{algorithms::EncryptionScheme, dpc::DPCComponents};
+use snarkos_utilities::{FromBytes, ToBytes};
 
 use bech32::{Bech32, FromBase32, ToBase32};
 use std::{
@@ -25,8 +22,8 @@ pub struct AccountPublicKey<C: DPCComponents> {
 }
 
 impl<C: DPCComponents> AccountPublicKey<C> {
-    /// Creates a new account address from an account private key.
-    pub fn from(
+    /// Derives the account address from an account private key.
+    pub fn from_private_key(
         signature_parameters: &C::AccountSignature,
         commitment_parameters: &C::AccountCommitment,
         encryption_parameters: &C::AccountEncryption,
@@ -39,16 +36,22 @@ impl<C: DPCComponents> AccountPublicKey<C> {
         Ok(Self { encryption_key })
     }
 
+    /// Derives the account address from an account view key.
+    pub fn from_view_key(
+        encryption_parameters: &C::AccountEncryption,
+        view_key: &AccountViewKey<C>,
+    ) -> Result<Self, AccountError> {
+        let encryption_key = <C::AccountEncryption as EncryptionScheme>::generate_public_key(
+            encryption_parameters,
+            &view_key.decryption_key,
+        );
+
+        Ok(Self { encryption_key })
+    }
+
     pub fn into_repr(&self) -> &<C::AccountEncryption as EncryptionScheme>::PublicKey {
         &self.encryption_key
     }
-
-    // pub fn as_commitment(&self) -> Result<<C::AccountCommitment as CommitmentScheme>::Output, AccountError> {
-    //     let commitment_bytes = to_bytes![self.decryption_key]?;
-    //     Ok(<C::AccountCommitment as CommitmentScheme>::Output::read(
-    //         &commitment_bytes[..],
-    //     )?)
-    // }
 }
 
 impl<C: DPCComponents> ToBytes for AccountPublicKey<C> {
@@ -93,6 +96,7 @@ impl<C: DPCComponents> FromStr for AccountPublicKey<C> {
 
 impl<C: DPCComponents> fmt::Display for AccountPublicKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Write the encryption key to a buffer.
         let mut address = [0u8; 32];
         self.encryption_key
             .write(&mut address[0..32])

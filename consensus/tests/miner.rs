@@ -1,7 +1,7 @@
 mod miner {
     use snarkos_consensus::Miner;
     use snarkos_models::{
-        algorithms::{commitment::CommitmentScheme, signature::SignatureScheme},
+        algorithms::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
         dpc::DPCComponents,
     };
     use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader};
@@ -14,9 +14,10 @@ mod miner {
     fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
+        let enc_params = C::AccountEncryption::setup(rng);
 
         let key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
-        let pubkey = AccountPublicKey::from(&sig_params, &comm_params, &key).unwrap();
+        let pubkey = AccountPublicKey::from_private_key(&sig_params, &comm_params, &enc_params, &key).unwrap();
 
         (key, pubkey)
     }

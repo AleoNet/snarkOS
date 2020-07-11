@@ -22,7 +22,7 @@ use snarkos_algorithms::{
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
     bw6_761::BW6_761,
-    edwards_bls12::{fr::Fr as EdwardsFr, EdwardsAffine, EdwardsParameters, EdwardsProjective as EdwardsBls},
+    edwards_bls12::{EdwardsAffine, EdwardsParameters, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
 };
 use snarkos_gadgets::{
@@ -112,7 +112,6 @@ pub struct Components;
 impl DPCComponents for Components {
     type AccountCommitment = AccountCommitment;
     type AccountCommitmentGadget = AccountCommitmentGadget;
-    type AccountDecryptionKey = AccountDecryptionKey;
     type AccountEncryption = AccountEncryption;
     type AccountEncryptionGadget = AccountEncryptionGadget;
     type AccountSignature = AccountSignature;
@@ -163,7 +162,6 @@ pub type OuterField = Bls12_377Fq;
 
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
 pub type AccountEncryption = GroupEncryption<EdwardsBls>;
-pub type AccountDecryptionKey = EdwardsFr;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;

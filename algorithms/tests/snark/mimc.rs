@@ -38,7 +38,7 @@ use snarkos_curves::{bls12_381::{Bls12_381, Fr}, models::fields::Field};
 use snarkos_r1cs::{ConstraintSynthesizer, ConstraintSystem, SynthesisError};
 
 // We're going to use the GM17 proving system.
-use snarkos_algorithms::snark::{
+use snarkos_algorithms::snark::gm17::{
     create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
 };
 

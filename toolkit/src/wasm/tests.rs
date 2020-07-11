@@ -2,8 +2,8 @@ use crate::wasm::Account;
 
 #[wasm_bindgen_test]
 pub fn account_from_private_key_test() {
-    let given_private_key = "AKey1KqF7t1fXt4ie38R3nyqbWokKru23zkLBTiSBjyfK96matiT3FEcLjmBabc3goXPXbZKcU1XLFHBuQ75mCsjCeLo8AbWQ7DMCmCyGRJGf8RKBvXQjnL51sZgqesMMaoxujzBm6gBfx2fmAW4QbQFQqxJSojna2rd6fJYS8v5D8zmy6R1";
-    let given_public_key = "aleo173xscwe62kten0v44up5e678kj7j62d24ex2htkks34cutjlssqqmwnv76";
+    let given_private_key = "AKey1zm4r3SatBhwyk681f3BXQMguhbrtUVmXDgzz4f6fDNiVhj84MDKarpNKTwpJrzEQ5FFoyAYXL3cWyrXNt3dSrw32Fut2bv8e9uowfSbmKrVjPv1uF1xKn4f8V5HmpYEdUxS9g";
+    let given_public_key = "aleo1xuelf4cm7amwe44p822y9qgc3m2gn4trjsn8lksjqeznq3462szql8jz4y";
 
     let account = Account::from_private_key(given_private_key);
 

@@ -57,7 +57,7 @@ impl Default for Config {
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
-            miner_address: "aleo184tp8thxkexvf3ht2kc32ps4tum0hckntu602tp2cz25vrhz2qzqs4rykh".into(),
+            miner_address: "aleo1xuelf4cm7amwe44p822y9qgc3m2gn4trjsn8lksjqeznq3462szql8jz4y".into(),
             mempool_interval: 5,
             min_peers: 2,
             max_peers: 20,

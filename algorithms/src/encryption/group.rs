@@ -1,7 +1,7 @@
 use snarkos_errors::algorithms::EncryptionError;
 use snarkos_models::{
     algorithms::EncryptionScheme,
-    curves::{AffineCurve, Field, Group, One, ProjectiveCurve, Zero},
+    curves::{AffineCurve, Field, Group, One, PrimeField, ProjectiveCurve, Zero},
 };
 use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
@@ -17,19 +17,25 @@ pub struct GroupEncryption<G: Group + ProjectiveCurve> {
 pub struct GroupEncryptionPublicKey<G: Group + ProjectiveCurve>(pub G);
 
 impl<G: Group + ProjectiveCurve> ToBytes for GroupEncryptionPublicKey<G> {
+    /// Writes the x-coordinate of the encryption public key.
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let affine = self.0.into_affine();
-        affine.write(&mut writer)
+        let x_coordinate = affine.to_x_coordinate();
+        x_coordinate.write(&mut writer)
     }
 }
 
 impl<G: Group + ProjectiveCurve> FromBytes for GroupEncryptionPublicKey<G> {
+    /// Reads the x-coordinate of the encryption public key.
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let affine = <G as ProjectiveCurve>::Affine::read(&mut reader)?;
+        let x_coordinate = <G::Affine as AffineCurve>::BaseField::read(&mut reader)?;
 
-        Ok(Self(affine.into_projective()))
+        match <G as ProjectiveCurve>::Affine::get_point_from_x(x_coordinate, true) {
+            Some(element) => Ok(Self(element.into_projective())),
+            _ => Err(EncryptionError::Message("Failed to read encryption public key".into()).into()),
+        }
     }
 }
 
@@ -189,6 +195,10 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
 
     fn parameters(&self) -> &Self::Parameters {
         &self.parameters
+    }
+
+    fn private_key_size_in_bits() -> usize {
+        Self::PrivateKey::size_in_bits()
     }
 }
 

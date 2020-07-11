@@ -20,7 +20,6 @@ pub trait DPCComponents: 'static + Sized {
     /// Encryption scheme for account records.
     type AccountEncryption: EncryptionScheme;
     type AccountEncryptionGadget: EncryptionGadget<Self::AccountEncryption, Self::InnerField>;
-    type AccountDecryptionKey: PrimeField;
 
     /// Commitment scheme for account contents. Invoked only over `Self::InnerField`.
     type AccountCommitment: CommitmentScheme;

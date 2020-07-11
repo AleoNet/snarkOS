@@ -1,7 +1,5 @@
-use crate::{
-    msm::VariableBaseMSM,
-    snark::{r1cs_to_sap::R1CStoSAP, Parameters, Proof},
-};
+use super::{r1cs_to_sap::R1CStoSAP, Parameters, Proof};
+use crate::msm::VariableBaseMSM;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, One, PairingEngine, PrimeField, ProjectiveCurve, Zero},

@@ -14,9 +14,10 @@ pub struct PublicKey {
 impl PublicKey {
     pub fn from(private_key: &PrivateKey) -> Result<Self, PublicKeyError> {
         let parameters = CircuitParameters::<Components>::load()?;
-        let public_key = AccountPublicKey::<Components>::from(
+        let public_key = AccountPublicKey::<Components>::from_private_key(
             &parameters.account_signature,
             &parameters.account_commitment,
+            &parameters.account_encryption,
             &private_key.private_key,
         )?;
         Ok(Self { public_key })

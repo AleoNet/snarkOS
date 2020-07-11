@@ -26,7 +26,12 @@ use snarkos_curves::bls12_377::{Bls12_377, Fr};
 use snarkos_models::curves::Field;
 
 // We're going to use the Groth-Maller 17 proving system.
-use snarkos_algorithms::snark::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
+use snarkos_algorithms::snark::gm17::{
+    create_random_proof,
+    generate_random_parameters,
+    prepare_verifying_key,
+    verify_proof,
+};
 
 use std::{env, fs::OpenOptions, path::PathBuf, process};
 
