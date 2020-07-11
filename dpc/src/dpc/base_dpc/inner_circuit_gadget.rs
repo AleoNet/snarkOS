@@ -9,7 +9,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF},
-    curves::{Group, ModelParameters, PrimeField},
+    curves::{Field, Group, ModelParameters, MontgomeryModelParameters, One, PrimeField, TEModelParameters},
     dpc::Record,
     gadgets::{
         algorithms::{
@@ -20,11 +20,12 @@ use snarkos_models::{
             PRFGadget,
             SignaturePublicKeyRandomizationGadget,
         },
+        curves::FieldGadget,
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
             boolean::Boolean,
-            eq::{ConditionalEqGadget, EqGadget},
+            eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
             uint::UInt8,
             ToBitsGadget,
             ToBytesGadget,
@@ -32,7 +33,12 @@ use snarkos_models::{
     },
 };
 use snarkos_objects::AccountPrivateKey;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
+
+use std::ops::Mul;
 
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
@@ -1073,8 +1079,8 @@ where
                 )?;
             }
 
-            // TODO Check the actual encoding correctness
-            // Check encoding
+            // *******************************************************************
+            // Check group encoding correctness
 
             let mut record_group_encoding_gadgets = Vec::with_capacity(record_group_encoding.len());
 
@@ -1096,6 +1102,85 @@ where
             }
 
             assert_eq!(record_field_elements_gadgets.len(), record_group_encoding_gadgets.len());
+
+            let coeff_a = <C::EncryptionModelParameters as MontgomeryModelParameters>::COEFF_A;
+            let coeff_b = <C::EncryptionModelParameters as MontgomeryModelParameters>::COEFF_B;
+
+            let a = coeff_a.mul(&coeff_b.inverse().unwrap());
+            let u = <C::EncryptionModelParameters as TEModelParameters>::COEFF_D;
+            let ua = a.mul(&u);
+
+            let a = C::InnerField::read(&to_bytes![a]?[..])?;
+            let b = C::InnerField::read(&to_bytes![coeff_b]?[..])?;
+            let u = C::InnerField::read(&to_bytes![u]?[..])?;
+            let ua = C::InnerField::read(&to_bytes![ua]?[..])?;
+
+            for (i, (element, (affine_x, affine_y, f_high))) in record_field_elements_gadgets
+                .iter()
+                .skip(1)
+                .zip(record_group_encoding_gadgets.iter().skip(1))
+                .enumerate()
+            {
+                // Get reconstructed x value
+                let numerator = affine_y
+                    .0
+                    .add_constant(encryption_cs.ns(|| format!("1 + y_{}", i)), &C::InnerField::one())?;
+                let neg_y = affine_y.0.negate(encryption_cs.ns(|| format!("-y_{}", i)))?;
+                let denominator = neg_y
+                    .add_constant(encryption_cs.ns(|| format!("1 - y_{}", i)), &C::InnerField::one())?
+                    .inverse(encryption_cs.ns(|| format!("(1 - y_{})_inverse", i)))?;
+
+                let temp_u = numerator.mul(
+                    encryption_cs.ns(|| format!("u = (1 + y_{}) * (1 - y_{})_inverse", i, i)),
+                    &denominator_inverse,
+                )?;
+                let x = temp_u.mul_by_constant(
+                    encryption_cs.ns(|| format!("(1 + y_{}) * (1 - y_{})_inverse * b_inverse", i, i)),
+                    &b.inverse().unwrap(),
+                )?;
+
+                let ux = x.mul_by_constant(encryption_cs.ns(|| format!("x_{} * u", i)), &u)?;
+                let neg_x = x.negate(encryption_cs.ns(|| format!("-x_{}", i)))?;
+
+                // Construct a_i
+                let ux_plus_ua = ux.add_constant(encryption_cs.ns(|| format!("ux_{} + uA", i)), &ua)?;
+                let ux_plus_ua_inverse = ux_plus_ua.inverse(encryption_cs.ns(|| format!("1 d (ux_{} + uA)", i)))?;
+                let a_i = neg_x.mul(
+                    encryption_cs.ns(|| format!("-x_{} * (ux + uA)_inverse", i)),
+                    &ux_plus_ua_inverse,
+                )?;
+
+                // Construct b_i
+                let neg_x_minus_a = neg_x.add_constant(encryption_cs.ns(|| format!("-x_{} - A", i)), &-a)?;
+                let ux_inverse = ux.inverse(encryption_cs.ns(|| format!("ux_{}_inverse", i)))?;
+                let b_i =
+                    neg_x_minus_a.mul(encryption_cs.ns(|| format!("(-x_{} - A) * ux_inverse", i)), &ux_inverse)?;
+
+                let element_squared = element
+                    .0
+                    .mul(encryption_cs.ns(|| format!("element_{} ^ 2", i)), &element.0)?;
+
+                let a_i_is_correct =
+                    element_squared.evaluate_equal(encryption_cs.ns(|| format!("element_squared == a_{}", i)), &a_i)?;
+                let b_i_is_correct =
+                    element_squared.evaluate_equal(encryption_cs.ns(|| format!("element_squared == b_{}", i)), &b_i)?;
+
+                println!("{} element_squared: {}", i, element_squared.get_value().unwrap());
+                println!("{} a_i: {}", i, a_i.get_value().unwrap());
+                println!("{} b_i: {}", i, b_i.get_value().unwrap());
+                println!("element_squared == a_{}: {:?}", i, a_i_is_correct);
+                println!("element_squared == b_{}: {:?}\n", i, b_i_is_correct);
+
+                // Enforce that either a_i or b_i was valid
+                let single_valid_recovery = a_i_is_correct.evaluate_equal(
+                    encryption_cs.ns(|| format!("(element_squared == a_{}) == (element_squared == b_{})", i, i)),
+                    &b_i_is_correct,
+                )?;
+                single_valid_recovery.enforce_equal(
+                    encryption_cs.ns(|| format!("single_valid_recovery_{} == false", i)),
+                    &Boolean::Constant(false),
+                )?;
+            }
         }
     }
     // *******************************************************************
