@@ -1165,12 +1165,6 @@ where
                 let b_i_is_correct =
                     element_squared.evaluate_equal(encryption_cs.ns(|| format!("element_squared == b_{}", i)), &b_i)?;
 
-                println!("{} element_squared: {}", i, element_squared.get_value().unwrap());
-                println!("{} a_i: {}", i, a_i.get_value().unwrap());
-                println!("{} b_i: {}", i, b_i.get_value().unwrap());
-                println!("element_squared == a_{}: {:?}", i, a_i_is_correct);
-                println!("element_squared == b_{}: {:?}\n", i, b_i_is_correct);
-
                 // Enforce that either a_i or b_i was valid
                 let single_valid_recovery = a_i_is_correct.evaluate_equal(
                     encryption_cs.ns(|| format!("(element_squared == a_{}) == (element_squared == b_{})", i, i)),
