@@ -2,7 +2,16 @@ use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
+    algorithms::{
+        CommitmentScheme,
+        EncryptionScheme,
+        LoadableMerkleParameters,
+        MerkleParameters,
+        SignatureScheme,
+        CRH,
+        PRF,
+        SNARK,
+    },
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
@@ -68,7 +77,7 @@ mod test;
 /// one.
 pub trait BaseDPCComponents: DPCComponents {
     /// Ledger digest type.
-    type MerkleParameters: MerkleParameters;
+    type MerkleParameters: LoadableMerkleParameters;
     type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
 
     /// Commitment scheme for committing to a record value

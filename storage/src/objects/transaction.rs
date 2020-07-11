@@ -1,7 +1,7 @@
 use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
 use snarkos_errors::storage::StorageError;
 use snarkos_models::{
-    algorithms::MerkleParameters,
+    algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::BlockHeaderHash;
@@ -11,7 +11,7 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Returns a transaction location given the transaction ID if it exists. Returns `None` otherwise.
     pub fn get_transaction_location(
         &self,

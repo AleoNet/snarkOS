@@ -1,10 +1,10 @@
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
+use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     pub(crate) fn process_transaction(
         &self,
         sn_index: &mut usize,

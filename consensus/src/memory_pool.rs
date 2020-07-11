@@ -4,7 +4,7 @@
 
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
-    algorithms::MerkleParameters,
+    algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
@@ -49,7 +49,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Load the memory pool from previously stored state in storage
     #[inline]
-    pub fn from_storage<P: MerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, ConsensusError> {
+    pub fn from_storage<P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
         if let Ok(serialized_transactions) = storage.get_memory_pool() {
@@ -67,7 +67,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Store the memory pool state to the database
     #[inline]
-    pub fn store<P: MerkleParameters>(&self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
+    pub fn store<P: LoadableMerkleParameters>(&self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
         let mut transactions = DPCTransactions::<T>::new();
 
         for (_transaction_id, entry) in self.transactions.iter() {
@@ -83,7 +83,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Adds entry to memory pool if valid in the current ledger.
     #[inline]
-    pub fn insert<P: MerkleParameters>(
+    pub fn insert<P: LoadableMerkleParameters>(
         &mut self,
         storage: &Ledger<T, P>,
         entry: Entry<T>,
@@ -135,7 +135,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Cleanse the memory pool of outdated transactions.
     #[inline]
-    pub fn cleanse<P: MerkleParameters>(&mut self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
+    pub fn cleanse<P: LoadableMerkleParameters>(&mut self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
         let mut new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.iter() {
@@ -189,7 +189,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Get candidate transactions for a new block.
     #[inline]
-    pub fn get_candidates<P: MerkleParameters>(
+    pub fn get_candidates<P: LoadableMerkleParameters>(
         &self,
         storage: &Ledger<T, P>,
         max_size: usize,

@@ -1,5 +1,8 @@
 use snarkos_errors::curves::ConstraintFieldError;
-use snarkos_models::curves::{to_field_vec::ToConstraintField, Field, Group};
+use snarkos_models::{
+    algorithms::crh::CRHParameters,
+    curves::{to_field_vec::ToConstraintField, Field, Group},
+};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use rand::Rng;
@@ -20,15 +23,17 @@ pub struct PedersenCRHParameters<G: Group, S: PedersenSize> {
     _size: PhantomData<S>,
 }
 
-impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
-    pub fn setup<R: Rng>(rng: &mut R) -> Self {
+impl<G: Group, S: PedersenSize> CRHParameters for PedersenCRHParameters<G, S> {
+    fn setup<R: Rng>(rng: &mut R) -> Self {
         let bases = (0..S::NUM_WINDOWS).map(|_| Self::base(S::WINDOW_SIZE, rng)).collect();
         Self {
             bases,
             _size: PhantomData,
         }
     }
+}
 
+impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
     pub fn from(bases: Vec<Vec<G>>) -> Self {
         Self {
             bases,

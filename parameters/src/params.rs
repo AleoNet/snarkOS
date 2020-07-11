@@ -244,7 +244,7 @@ impl_params!(
 );
 
 // POSW SNARK
-impl_params!(PoswSNARKPKParameters, posw_snark_pk_test, "posw_snark_pk", 26204306);
+impl_params!(PoswSNARKPKParameters, posw_snark_pk_test, "posw_snark_pk", 32169122);
 impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 1165);
 
 // Predicate SNARK

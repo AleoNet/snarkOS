@@ -6,7 +6,7 @@ use snarkos_utilities::bytes::ToBytes;
 use rand::Rng;
 use std::io::Cursor;
 
-pub trait MerkleParameters: Clone + Default + From<<Self as MerkleParameters>::H> {
+pub trait MerkleParameters: Clone + Default {
     type H: CRH;
 
     const DEPTH: usize;
@@ -17,7 +17,7 @@ pub trait MerkleParameters: Clone + Default + From<<Self as MerkleParameters>::H
     /// Returns the collision-resistant hash function used by the Merkle tree.
     fn crh(&self) -> &Self::H;
 
-    /// Returns the collision-resistant hash function used by the Merkle tree.
+    /// Returns the collision-resistant hash function parameters used by the Merkle tree.
     fn parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters;
 
     /// Returns the hash of a given leaf.
@@ -52,4 +52,11 @@ pub trait MerkleParameters: Clone + Default + From<<Self as MerkleParameters>::H
         let empty_buffer = vec![0u8; <Self::H as CRH>::INPUT_SIZE_BITS / 8];
         Ok(self.crh().hash(&empty_buffer)?)
     }
+}
+
+pub trait LoadableMerkleParameters: MerkleParameters + From<<Self as MerkleParameters>::H> {}
+
+pub trait MaskedMerkleParameters: MerkleParameters {
+    /// Returns the collision-resistant hash function masking parameters used by the Merkle tree.
+    fn mask_parameters(&self) -> &<<Self as MerkleParameters>::H as CRH>::Parameters;
 }
