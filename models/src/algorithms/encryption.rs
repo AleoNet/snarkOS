@@ -11,8 +11,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
-    type Plaintext: Clone + Debug + Default + Eq + Hash;
-    type Ciphertext: Clone + Debug + Default + Eq + Hash;
+    type Text: Clone + Debug + Eq + ToBytes + FromBytes;
     type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type BlindingExponents: Clone + Debug + Default + Eq + Hash + ToBytes;
 
@@ -39,14 +38,14 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
         &self,
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
-        message: &Self::Plaintext,
-    ) -> Result<Self::Ciphertext, EncryptionError>;
+        message: &Vec<Self::Text>,
+    ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn decrypt(
         &self,
         private_key: &Self::PrivateKey,
-        ciphertext: &Self::Ciphertext,
-    ) -> Result<Self::Plaintext, EncryptionError>;
+        ciphertext: &Vec<Self::Text>,
+    ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn parameters(&self) -> &Self::Parameters;
 

@@ -47,12 +47,11 @@ impl<G: Group + ProjectiveCurve> Default for GroupEncryptionPublicKey<G> {
 
 impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     type BlindingExponents = Vec<<G as Group>::ScalarField>;
-    type Ciphertext = Vec<G>;
     type Parameters = G;
-    type Plaintext = Vec<G>;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = GroupEncryptionPublicKey<G>;
     type Randomness = <G as Group>::ScalarField;
+    type Text = G;
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
@@ -130,8 +129,8 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         &self,
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
-        message: &Self::Plaintext,
-    ) -> Result<Self::Ciphertext, EncryptionError> {
+        message: &Vec<Self::Text>,
+    ) -> Result<Vec<Self::Text>, EncryptionError> {
         let record_view_key = public_key.0.mul(&randomness);
 
         let c_0 = self.parameters.mul(&randomness);
@@ -159,8 +158,8 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     fn decrypt(
         &self,
         private_key: &Self::PrivateKey,
-        ciphertext: &Self::Ciphertext,
-    ) -> Result<Self::Plaintext, EncryptionError> {
+        ciphertext: &Vec<Self::Text>,
+    ) -> Result<Vec<Self::Text>, EncryptionError> {
         assert!(ciphertext.len() > 0);
         let c_0 = &ciphertext[0];
 
