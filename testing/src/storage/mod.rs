@@ -1,7 +1,7 @@
 use crate::consensus::TestTx;
 use snarkos_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
 use snarkos_models::{
-    algorithms::merkle_tree::MerkleParameters,
+    algorithms::merkle_tree::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::Block;
@@ -18,7 +18,7 @@ pub fn random_storage_path() -> String {
 }
 
 // Initialize a test blockchain given genesis attributes
-pub fn initialize_test_blockchain<T: Transaction, P: MerkleParameters>(
+pub fn initialize_test_blockchain<T: Transaction, P: LoadableMerkleParameters>(
     parameters: P,
     genesis_block: Block<T>,
 ) -> Ledger<T, P> {
@@ -33,7 +33,7 @@ pub fn initialize_test_blockchain<T: Transaction, P: MerkleParameters>(
 }
 
 // Open a test blockchain from stored genesis attributes
-pub fn open_test_blockchain<T: Transaction, P: MerkleParameters>() -> (Arc<Ledger<T, P>>, PathBuf) {
+pub fn open_test_blockchain<T: Transaction, P: LoadableMerkleParameters>() -> (Arc<Ledger<T, P>>, PathBuf) {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
@@ -44,18 +44,18 @@ pub fn open_test_blockchain<T: Transaction, P: MerkleParameters>() -> (Arc<Ledge
     (storage, path)
 }
 
-pub fn kill_storage<T: Transaction, P: MerkleParameters>(ledger: Ledger<T, P>) {
+pub fn kill_storage<T: Transaction, P: LoadableMerkleParameters>(ledger: Ledger<T, P>) {
     let path = ledger.storage.db.path().to_owned();
 
     drop(ledger);
     Ledger::<T, P>::destroy_storage(path).unwrap();
 }
 
-pub fn kill_storage_async<T: Transaction, P: MerkleParameters>(path: PathBuf) {
+pub fn kill_storage_async<T: Transaction, P: LoadableMerkleParameters>(path: PathBuf) {
     Ledger::<T, P>::destroy_storage(path).unwrap();
 }
 
-pub fn kill_storage_sync<T: Transaction, P: MerkleParameters>(ledger: Arc<Ledger<T, P>>) {
+pub fn kill_storage_sync<T: Transaction, P: LoadableMerkleParameters>(ledger: Arc<Ledger<T, P>>) {
     let path = ledger.storage.db.path().to_owned();
 
     drop(ledger);
