@@ -2335,6 +2335,7 @@ dependencies = [
  "criterion",
  "derivative",
  "hex",
+ "itertools",
  "rand",
  "rand_xorshift",
  "snarkos-algorithms",
