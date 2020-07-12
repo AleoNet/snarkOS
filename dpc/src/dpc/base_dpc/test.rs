@@ -344,7 +344,7 @@ fn test_execute_base_dpc_constraints() {
                 &to_bytes![element_affine.to_y_coordinate()].unwrap()[..],
             )
             .unwrap();
-            record_group_encoding.push((x, y, *fq_high));
+            record_group_encoding.push((x, y));
 
             let plaintext_element = <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
                 &to_bytes![element].unwrap()[..],

@@ -875,7 +875,7 @@ where
                     <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
                         &to_bytes![element_affine.to_y_coordinate()]?[..],
                     )?;
-                record_group_encoding.push((x, y, *fq_high));
+                record_group_encoding.push((x, y));
 
                 let plaintext_element =
                     <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(

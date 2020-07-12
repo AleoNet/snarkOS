@@ -73,7 +73,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_records_group_encoding: &[Vec<(
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        bool,
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
@@ -198,7 +197,6 @@ fn base_dpc_execute_gadget_helper<
     new_records_group_encoding: &[Vec<(
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        bool,
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
@@ -1160,7 +1158,7 @@ where
             let mut record_group_encoding_gadgets = Vec::with_capacity(record_group_encoding.len());
             let mut encryption_plaintext = Vec::with_capacity(record_group_encoding.len());
 
-            for (i, (x, y, fq_high)) in record_group_encoding.iter().enumerate() {
+            for (i, (x, y)) in record_group_encoding.iter().enumerate() {
                 let affine = <C::EncryptionGroup as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?;
                 encryption_plaintext.push(<C::AccountEncryption as EncryptionScheme>::Text::read(
                     &to_bytes![affine.into_projective()]?[..],
@@ -1176,10 +1174,7 @@ where
                     || Ok(y),
                 )?;
 
-                let fq_high_gadget =
-                    Boolean::alloc(&mut encryption_cs.ns(|| format!("fq_high_{}", i)), || Ok(fq_high))?;
-
-                record_group_encoding_gadgets.push((x_gadget, y_gadget, fq_high_gadget));
+                record_group_encoding_gadgets.push((x_gadget, y_gadget));
             }
 
             assert_eq!(record_field_elements_gadgets.len(), record_group_encoding_gadgets.len());
@@ -1196,7 +1191,7 @@ where
             let u = C::InnerField::read(&to_bytes![u]?[..])?;
             let ua = C::InnerField::read(&to_bytes![ua]?[..])?;
 
-            for (i, (element, (affine_x, affine_y, fq_high))) in record_field_elements_gadgets
+            for (i, (element, (affine_x, affine_y))) in record_field_elements_gadgets
                 .iter()
                 .skip(1)
                 .zip(record_group_encoding_gadgets.iter().skip(1))

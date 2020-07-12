@@ -42,7 +42,6 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
             Vec<(
                 <C::EncryptionModelParameters as ModelParameters>::BaseField,
                 <C::EncryptionModelParameters as ModelParameters>::BaseField,
-                bool,
             )>,
         >,
     >,
@@ -92,7 +91,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let base_field_default = <C::EncryptionModelParameters as ModelParameters>::BaseField::default();
         let new_records_field_elements = vec![vec![base_field_default; record_encoding_length]; num_output_records];
         let new_records_group_encoding =
-            vec![vec![(base_field_default, base_field_default, false); record_encoding_length]; num_output_records];
+            vec![vec![(base_field_default, base_field_default); record_encoding_length]; num_output_records];
 
         let new_records_encryption_randomness =
             vec![<C::AccountEncryption as EncryptionScheme>::Randomness::default(); num_output_records];
@@ -198,7 +197,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         new_records_group_encoding: &[Vec<(
             <C::EncryptionModelParameters as ModelParameters>::BaseField,
             <C::EncryptionModelParameters as ModelParameters>::BaseField,
-            bool,
         )>],
         new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
         new_records_encryption_blinding_exponents: &[Vec<
