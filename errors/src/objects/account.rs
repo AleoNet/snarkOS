@@ -1,4 +1,4 @@
-use crate::algorithms::{CRHError, CommitmentError, PRFError, SignatureError};
+use crate::algorithms::{CRHError, CommitmentError, EncryptionError, PRFError, SignatureError};
 
 #[derive(Debug, Error)]
 pub enum AccountError {
@@ -10,6 +10,9 @@ pub enum AccountError {
 
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[error("{}", _0)]
+    EncryptionError(EncryptionError),
 
     #[error("invalid account commitment")]
     InvalidAccountCommitment,
@@ -45,6 +48,12 @@ impl From<CommitmentError> for AccountError {
 impl From<CRHError> for AccountError {
     fn from(error: CRHError) -> Self {
         AccountError::CRHError(error)
+    }
+}
+
+impl From<EncryptionError> for AccountError {
+    fn from(error: EncryptionError) -> Self {
+        AccountError::EncryptionError(error)
     }
 }
 
