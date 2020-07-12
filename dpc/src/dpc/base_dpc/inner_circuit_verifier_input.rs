@@ -45,6 +45,8 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
+    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -86,6 +88,13 @@ where
             &self
                 .circuit_parameters
                 .record_commitment
+                .parameters()
+                .to_field_elements()?,
+        );
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .record_ciphertext_crh
                 .parameters()
                 .to_field_elements()?,
         );

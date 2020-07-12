@@ -50,6 +50,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     new_records_encryption_blinding_exponents:
         Option<Vec<Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>>>,
     new_records_encryption_ciphertexts: Option<Vec<Vec<<C::AccountEncryption as EncryptionScheme>::Text>>>,
+    new_records_ciphertext_hashes: Option<Vec<<C::RecordCiphertextCRH as CRH>::Output>>,
 
     // Commitment to Predicates and to local data.
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
@@ -104,6 +105,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
                 vec![<C::AccountEncryption as EncryptionScheme>::Text::default(); record_encoding_length + 1];
                 num_output_records
             ];
+        let new_records_ciphertext_hashes =
+            vec![<C::RecordCiphertextCRH as CRH>::Output::default(); num_output_records];
 
         let memo = [0u8; 32];
 
@@ -153,6 +156,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_records_encryption_randomness: Some(new_records_encryption_randomness),
             new_records_encryption_blinding_exponents: Some(new_records_encryption_blinding_exponents),
             new_records_encryption_ciphertexts: Some(new_records_encryption_ciphertexts),
+            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes),
 
             // Other stuff
             predicate_commitment: Some(predicate_commitment),
@@ -201,6 +205,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             <C::AccountEncryption as EncryptionScheme>::BlindingExponent,
         >],
         new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
+        new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
 
         // Other stuff
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -240,6 +245,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_output_records, new_records_encryption_randomness.len());
         assert_eq!(num_output_records, new_records_encryption_blinding_exponents.len());
         assert_eq!(num_output_records, new_records_encryption_ciphertexts.len());
+        assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
 
         Self {
             // Parameters
@@ -264,6 +270,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_records_encryption_randomness: Some(new_records_encryption_randomness.to_vec()),
             new_records_encryption_blinding_exponents: Some(new_records_encryption_blinding_exponents.to_vec()),
             new_records_encryption_ciphertexts: Some(new_records_encryption_ciphertexts.to_vec()),
+            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes.to_vec()),
 
             // Other stuff
             predicate_commitment: Some(predicate_commitment.clone()),
@@ -309,6 +316,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_records_encryption_randomness.get()?,
             self.new_records_encryption_blinding_exponents.get()?,
             self.new_records_encryption_ciphertexts.get()?,
+            self.new_records_ciphertext_hashes.get()?,
             // Other stuff
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,

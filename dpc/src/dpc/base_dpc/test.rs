@@ -302,6 +302,7 @@ fn test_execute_base_dpc_constraints() {
     let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_blinding_exponents = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_ciphertexts = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_records_ciphertext_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     for record in &new_records {
         let serialized_record = RecordSerializer::<
             Components,
@@ -369,9 +370,15 @@ fn test_execute_base_dpc_constraints() {
             .encrypt(record_public_key, &encryption_randomness, &record_plaintexts)
             .unwrap();
 
+        let ciphertext_hash = circuit_parameters
+            .record_ciphertext_crh
+            .hash(&to_bytes![record_ciphertext].unwrap())
+            .unwrap();
+
         new_records_encryption_randomness.push(encryption_randomness);
         new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
         new_records_encryption_ciphertexts.push(record_ciphertext);
+        new_records_ciphertext_hashes.push(ciphertext_hash);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -395,6 +402,7 @@ fn test_execute_base_dpc_constraints() {
         &new_records_encryption_randomness,
         &new_records_encryption_blinding_exponents,
         &new_records_encryption_ciphertexts,
+        &new_records_ciphertext_hashes,
         &predicate_comm,
         &predicate_rand,
         &local_data_comm,
@@ -454,6 +462,7 @@ fn test_execute_base_dpc_constraints() {
             &new_records_encryption_randomness,
             &new_records_encryption_blinding_exponents,
             &new_records_encryption_ciphertexts,
+            &new_records_ciphertext_hashes,
             &predicate_comm,
             &predicate_rand,
             &local_data_comm,

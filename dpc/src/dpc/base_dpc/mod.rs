@@ -839,6 +839,7 @@ where
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
             let serialized_record = RecordSerializer::<
                 Components,
@@ -901,9 +902,15 @@ where
                 &record_plaintexts,
             )?;
 
+            // TODO (raychu86) currently hashing on a vec of projective elements, should condense to affine elements
+            let ciphertext_hash = circuit_parameters
+                .record_ciphertext_crh
+                .hash(&to_bytes![record_ciphertext]?)?;
+
             new_records_encryption_randomness.push(encryption_randomness);
             new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
             new_records_encryption_ciphertexts.push(record_ciphertext);
+            new_records_ciphertext_hashes.push(ciphertext_hash);
         }
 
         let inner_proof = {
@@ -923,6 +930,7 @@ where
                 &new_records_encryption_randomness,
                 &new_records_encryption_blinding_exponents,
                 &new_records_encryption_ciphertexts,
+                &new_records_ciphertext_hashes,
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,

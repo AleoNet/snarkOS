@@ -80,6 +80,8 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
+    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
     <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -134,6 +136,10 @@ where
 
     let record_commitment_parameters_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_commitment.parameters())
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+
+    let record_ciphertext_crh_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_ciphertext_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let predicate_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
@@ -208,6 +214,8 @@ where
     let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, &account_signature_fe, "account signature pp")?;
     let record_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &record_commitment_parameters_fe, "record commitment pp")?;
+    let record_ciphertext_crh_parameters_fe_bytes =
+        field_element_to_bytes::<C, _>(cs, &record_ciphertext_crh_parameters_fe, "record ciphertext crh pp")?;
     let predicate_vk_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &predicate_vk_commitment_parameters_fe, "predicate vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
@@ -253,6 +261,7 @@ where
     inner_snark_input_bytes.extend(account_encryption_fe_bytes);
     inner_snark_input_bytes.extend(account_signature_fe_bytes);
     inner_snark_input_bytes.extend(record_commitment_parameters_fe_bytes);
+    inner_snark_input_bytes.extend(record_ciphertext_crh_parameters_fe_bytes);
     inner_snark_input_bytes.extend(predicate_vk_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(local_data_commitment_parameters_fe_bytes.clone());
     inner_snark_input_bytes.extend(serial_number_nonce_crh_parameters_fe_bytes);

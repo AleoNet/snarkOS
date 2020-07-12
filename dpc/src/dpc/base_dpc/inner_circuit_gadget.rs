@@ -78,6 +78,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
     new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
+    new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
 
     // Rest
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -100,6 +101,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::AccountEncryption,
         C::AccountSignature,
         C::RecordCommitment,
+        C::RecordCiphertextCRH,
         C::LocalDataCRH,
         C::LocalDataCommitment,
         C::SerialNumberNonceCRH,
@@ -108,6 +110,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::AccountEncryptionGadget,
         C::AccountSignatureGadget,
         C::RecordCommitmentGadget,
+        C::RecordCiphertextCRHGadget,
         C::LocalDataCRHGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceCRHGadget,
@@ -133,6 +136,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records_encryption_randomness,
         new_records_encryption_blinding_exponents,
         new_records_encryption_ciphertexts,
+        new_records_ciphertext_hashes,
         //
         predicate_commitment,
         predicate_randomness,
@@ -156,6 +160,7 @@ fn base_dpc_execute_gadget_helper<
     AccountEncryption,
     AccountSignature,
     RecordCommitment,
+    RecordCiphertextCRH,
     LocalDataCRH,
     LocalDataCommitment,
     SerialNumberNonceCRH,
@@ -164,6 +169,7 @@ fn base_dpc_execute_gadget_helper<
     AccountEncryptionGadget,
     AccountSignatureGadget,
     RecordCommitmentGadget,
+    RecordCiphertextCRHGadget,
     LocalDataCRHGadget,
     LocalDataCommitmentGadget,
     SerialNumberNonceCRHGadget,
@@ -197,6 +203,7 @@ fn base_dpc_execute_gadget_helper<
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
     new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
+    new_records_ciphertext_hashes: &[RecordCiphertextCRH::Output],
 
     //
     predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -218,6 +225,7 @@ where
         AccountEncryption = AccountEncryption,
         AccountSignature = AccountSignature,
         RecordCommitment = RecordCommitment,
+        RecordCiphertextCRH = RecordCiphertextCRH,
         LocalDataCRH = LocalDataCRH,
         LocalDataCommitment = LocalDataCommitment,
         SerialNumberNonceCRH = SerialNumberNonceCRH,
@@ -226,6 +234,7 @@ where
         AccountEncryptionGadget = AccountEncryptionGadget,
         AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitmentGadget = RecordCommitmentGadget,
+        RecordCiphertextCRHGadget = RecordCiphertextCRHGadget,
         LocalDataCRHGadget = LocalDataCRHGadget,
         LocalDataCommitmentGadget = LocalDataCommitmentGadget,
         SerialNumberNonceCRHGadget = SerialNumberNonceCRHGadget,
@@ -235,6 +244,7 @@ where
     AccountEncryption: EncryptionScheme,
     AccountSignature: SignatureScheme,
     RecordCommitment: CommitmentScheme,
+    RecordCiphertextCRH: CRH,
     LocalDataCRH: CRH,
     LocalDataCommitment: CommitmentScheme,
     SerialNumberNonceCRH: CRH,
@@ -244,6 +254,7 @@ where
     AccountEncryptionGadget: EncryptionGadget<AccountEncryption, C::InnerField>,
     AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<AccountSignature, C::InnerField>,
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
+    RecordCiphertextCRHGadget: CRHGadget<RecordCiphertextCRH, C::InnerField>,
     LocalDataCRHGadget: CRHGadget<LocalDataCRH, C::InnerField>,
     LocalDataCommitmentGadget: CommitmentGadget<LocalDataCommitment, C::InnerField>,
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
@@ -272,23 +283,25 @@ where
     // 2. account_encryption_parameters
     // 3. account_signature_parameters
     // 4. record_commitment_parameters
-    // 5. predicate_vk_commitment_parameters
-    // 6. local_data_crh_parameters
-    // 7. local_data_commitment_parameters
-    // 8. serial_number_nonce_crh_parameters
-    // 9. value_commitment_parameters
-    // 10. ledger_parameters
-    // 11. ledger_digest
-    // 12. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
-    // 13. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
-    // 14. predicate_commitment
-    // 15. local_data_commitment
-    // 16. binding_signature
+    // 5. record_ciphertext_crh_parameters
+    // 6. predicate_vk_commitment_parameters
+    // 7. local_data_crh_parameters
+    // 8. local_data_commitment_parameters
+    // 9. serial_number_nonce_crh_parameters
+    // 10. value_commitment_parameters
+    // 11. ledger_parameters
+    // 12. ledger_digest
+    // 13. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
+    // 14. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
+    // 15. predicate_commitment
+    // 16. local_data_commitment
+    // 17. binding_signature
     let (
         account_commitment_parameters,
         account_encryption_parameters,
         account_signature_parameters,
         record_commitment_parameters,
+        record_ciphertext_crh_parameters,
         predicate_vk_commitment_parameters,
         local_data_crh_parameters,
         local_data_commitment_parameters,
@@ -316,6 +329,11 @@ where
         let record_commitment_parameters = RecordCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record commitment parameters"),
             || Ok(circuit_parameters.record_commitment.parameters()),
+        )?;
+
+        let record_ciphertext_crh_parameters = RecordCiphertextCRHGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare record ciphertext CRH parameters"),
+            || Ok(circuit_parameters.record_ciphertext_crh.parameters()),
         )?;
 
         let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
@@ -357,6 +375,7 @@ where
             account_encryption_parameters,
             account_signature_parameters,
             record_commitment_parameters,
+            record_ciphertext_crh_parameters,
             predicate_vk_commitment_parameters,
             local_data_crh_parameters,
             local_data_commitment_parameters,
@@ -702,12 +721,15 @@ where
         (
             (
                 (
-                    ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
-                    encryption_randomness,
+                    (
+                        ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
+                        encryption_randomness,
+                    ),
+                    encryption_blinding_exponents,
                 ),
-                encryption_blinding_exponents,
+                encryption_ciphertext,
             ),
-            encryption_ciphertext,
+            record_ciphertext_hash,
         ),
     ) in new_records
         .iter()
@@ -718,6 +740,7 @@ where
         .zip(new_records_encryption_randomness)
         .zip(new_records_encryption_blinding_exponents)
         .zip(new_records_encryption_ciphertexts)
+        .zip(new_records_ciphertext_hashes)
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
@@ -1270,6 +1293,30 @@ where
             encryption_ciphertext_gadget.enforce_equal(
                 encryption_cs.ns(|| format!("output record {} encryption is valid", j)),
                 &candidate_ciphertext_gadget,
+            )?;
+
+            // Check that the record ciphertext hash is correct
+
+            let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc(
+                &mut encryption_cs.ns(|| format!("output record {} ciphertext hash", j)),
+                || Ok(record_ciphertext_hash),
+            )?;
+
+            // TODO (raychu86) currently hashing on a vec of projective elements, should condense to affine elements
+            let encryption_ciphertext_bytes = UInt8::alloc_vec(
+                encryption_cs.ns(|| format!("output record {} ciphertext bytes", j)),
+                &to_bytes![encryption_ciphertext]?,
+            )?;
+
+            let candidate_ciphertext_hash = RecordCiphertextCRHGadget::check_evaluation_gadget(
+                &mut encryption_cs.ns(|| format!("Compute ciphertext hash {}", j)),
+                &record_ciphertext_crh_parameters,
+                &encryption_ciphertext_bytes,
+            )?;
+
+            record_ciphertext_hash_gadget.enforce_equal(
+                encryption_cs.ns(|| format!("output record {} ciphertext hash is valid", j)),
+                &candidate_ciphertext_hash,
             )?;
         }
     }
