@@ -44,7 +44,7 @@ impl<C: DPCComponents> AccountAddress<C> {
         let encryption_key = <C::AccountEncryption as EncryptionScheme>::generate_public_key(
             encryption_parameters,
             &view_key.decryption_key,
-        );
+        )?;
 
         Ok(Self { encryption_key })
     }
