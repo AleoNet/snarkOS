@@ -28,8 +28,17 @@ pub fn setup() -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), DPCError> {
     Ok((posw_snark_pk, posw_snark_vk, srs_bytes))
 }
 
+fn versioned_filename(checksum: &str) -> String {
+    match checksum.get(0..7) {
+        Some(sum) => format!("posw_snark_pk-{}.params", sum),
+        _ => format!("posw_snark_pk.params"),
+    }
+}
+
 pub fn main() {
     let (posw_snark_pk, posw_snark_vk, srs) = setup().unwrap();
+    let posw_snark_pk_checksum = hex::encode(sha256(&posw_snark_pk));
+
     store(
         &PathBuf::from("posw_srs.params"),
         &PathBuf::from("posw_srs.checksum"),
@@ -37,11 +46,11 @@ pub fn main() {
     )
     .unwrap();
     store(
-        &PathBuf::from("posw_snark_pk.params"),
+        &PathBuf::from(&versioned_filename(&posw_snark_pk_checksum)),
         &PathBuf::from("posw_snark_pk.checksum"),
         &posw_snark_pk,
     )
-    .unwrap();
+        .unwrap();
     store(
         &PathBuf::from("posw_snark_vk.params"),
         &PathBuf::from("posw_snark_vk.checksum"),
