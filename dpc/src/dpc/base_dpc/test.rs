@@ -370,9 +370,18 @@ fn test_execute_base_dpc_constraints() {
             .encrypt(record_public_key, &encryption_randomness, &record_plaintexts)
             .unwrap();
 
+        let mut ciphertext_affine = vec![];
+        for ciphertext_element in &record_ciphertext {
+            let ciphertext_element_affine =
+                <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element].unwrap()[..])
+                    .unwrap()
+                    .into_affine();
+            ciphertext_affine.push(ciphertext_element_affine);
+        }
+
         let ciphertext_hash = circuit_parameters
             .record_ciphertext_crh
-            .hash(&to_bytes![record_ciphertext].unwrap())
+            .hash(&to_bytes![ciphertext_affine].unwrap())
             .unwrap();
 
         new_records_encryption_randomness.push(encryption_randomness);

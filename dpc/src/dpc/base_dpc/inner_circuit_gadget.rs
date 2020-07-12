@@ -1196,7 +1196,7 @@ where
             let u = C::InnerField::read(&to_bytes![u]?[..])?;
             let ua = C::InnerField::read(&to_bytes![ua]?[..])?;
 
-            for (i, (element, (affine_x, affine_y, f_high))) in record_field_elements_gadgets
+            for (i, (element, (affine_x, affine_y, fq_high))) in record_field_elements_gadgets
                 .iter()
                 .skip(1)
                 .zip(record_group_encoding_gadgets.iter().skip(1))
@@ -1301,10 +1301,16 @@ where
                 || Ok(record_ciphertext_hash),
             )?;
 
-            // TODO (raychu86) currently hashing on a vec of projective elements, should condense to affine elements
+            let mut ciphertext_affine = vec![];
+            for ciphertext_element in encryption_ciphertext {
+                let ciphertext_element_affine =
+                    <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
+                ciphertext_affine.push(ciphertext_element_affine);
+            }
+
             let encryption_ciphertext_bytes = UInt8::alloc_vec(
                 encryption_cs.ns(|| format!("output record {} ciphertext bytes", j)),
-                &to_bytes![encryption_ciphertext]?,
+                &to_bytes![ciphertext_affine]?,
             )?;
 
             let candidate_ciphertext_hash = RecordCiphertextCRHGadget::check_evaluation_gadget(

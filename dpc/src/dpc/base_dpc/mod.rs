@@ -902,10 +902,17 @@ where
                 &record_plaintexts,
             )?;
 
-            // TODO (raychu86) currently hashing on a vec of projective elements, should condense to affine elements
+            let mut ciphertext_affine = vec![];
+            for ciphertext_element in &record_ciphertext {
+                let ciphertext_element_affine =
+                    <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
+                        .into_affine();
+                ciphertext_affine.push(ciphertext_element_affine);
+            }
+
             let ciphertext_hash = circuit_parameters
                 .record_ciphertext_crh
-                .hash(&to_bytes![record_ciphertext]?)?;
+                .hash(&to_bytes![ciphertext_affine]?)?;
 
             new_records_encryption_randomness.push(encryption_randomness);
             new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);

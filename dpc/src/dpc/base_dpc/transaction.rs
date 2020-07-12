@@ -3,6 +3,7 @@ use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH, SNARK},
+    curves::{AffineCurve, ProjectiveCurve},
     objects::Transaction,
 };
 use snarkos_utilities::{
@@ -180,6 +181,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
         self.transaction_proof.write(&mut writer)?;
         self.predicate_commitment.write(&mut writer)?;
         self.local_data_commitment.write(&mut writer)?;
+
         self.value_balance.write(&mut writer)?;
         self.network_id.write(&mut writer)?;
 
@@ -192,7 +194,10 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
         for ciphertext in &self.record_ciphertexts {
             variable_length_integer(ciphertext.len() as u64).write(&mut writer)?;
             for ciphertext_element in ciphertext {
-                ciphertext_element.write(&mut writer)?;
+                let ciphertext_element_affine =
+                    <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
+
+                ciphertext_element_affine.write(&mut writer)?;
             }
         }
 
@@ -239,13 +244,16 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
 
         let num_ciphertexts = read_variable_length_integer(&mut reader)?;
         let mut record_ciphertexts = vec![];
-        for _ in 0..num_signatures {
+        for _ in 0..num_ciphertexts {
             let mut ciphertext = vec![];
 
             let num_ciphertext_elements = read_variable_length_integer(&mut reader)?;
             for _ in 0..num_ciphertext_elements {
-                let ciphertext_element: <C::AccountEncryption as EncryptionScheme>::Text =
+                let ciphertext_element_affine: <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine =
                     FromBytes::read(&mut reader)?;
+                let ciphertext_element: <C::AccountEncryption as EncryptionScheme>::Text =
+                    FromBytes::read(&to_bytes![ciphertext_element_affine.into_projective()]?[..])?;
+
                 ciphertext.push(ciphertext_element);
             }
 
