@@ -232,7 +232,7 @@ impl_params!(
     RecordCiphertextCRHParameters,
     record_ciphertext_crh_test,
     "record_ciphertext_crh",
-    532492
+    539924
 );
 impl_params!(
     SerialNumberNonceCRHParameters,
@@ -246,7 +246,7 @@ impl_params!(
     AccountEncryptionParameters,
     account_encryption_test,
     "account_encryption",
-    128
+    32772
 );
 
 // POSW SNARK
@@ -268,9 +268,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 421629022);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 556339774);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2717);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 944119354);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 953997866);
 impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 5022);
