@@ -24,7 +24,7 @@ pub fn prng() -> impl Rng {
 macro_rules! define_merkle_tree_parameters {
     ($struct_name:ident, $hash:ty, $depth:expr) => {
         #[allow(unused_imports)]
-        use snarkos_models::algorithms::{MerkleParameters, CRH};
+        use snarkos_models::algorithms::{LoadableMerkleParameters, MaskedMerkleParameters, MerkleParameters, CRH};
         #[allow(unused_imports)]
         use $crate::merkle_tree::MerkleTree;
 
@@ -52,6 +52,14 @@ macro_rules! define_merkle_tree_parameters {
             }
         }
 
+        impl From<$hash> for $struct_name {
+            fn from(crh: $hash) -> Self {
+                Self(crh)
+            }
+        }
+
+        impl LoadableMerkleParameters for $struct_name {}
+
         impl Default for $struct_name {
             fn default() -> Self {
                 Self(<Self as MerkleParameters>::H::setup(
@@ -59,10 +67,53 @@ macro_rules! define_merkle_tree_parameters {
                 ))
             }
         }
+    };
+}
 
-        impl From<$hash> for $struct_name {
-            fn from(crh: $hash) -> Self {
-                Self(crh)
+#[macro_export]
+macro_rules! define_masked_merkle_tree_parameters {
+    ($struct_name:ident, $hash:ty, $depth:expr) => {
+        #[allow(unused_imports)]
+        use snarkos_models::algorithms::{CRHParameters, MaskedMerkleParameters, MerkleParameters, CRH};
+        #[allow(unused_imports)]
+        use $crate::merkle_tree::MerkleTree;
+
+        #[allow(unused_imports)]
+        use rand::Rng;
+
+        #[derive(Clone, PartialEq, Eq, Debug)]
+        pub struct $struct_name($hash, <$hash as CRH>::Parameters);
+
+        impl MerkleParameters for $struct_name {
+            type H = $hash;
+
+            const DEPTH: usize = $depth;
+
+            fn setup<R: Rng>(rng: &mut R) -> Self {
+                Self(Self::H::setup(rng), <Self::H as CRH>::Parameters::setup(rng))
+            }
+
+            fn crh(&self) -> &Self::H {
+                &self.0
+            }
+
+            fn parameters(&self) -> &<Self::H as CRH>::Parameters {
+                self.crh().parameters()
+            }
+        }
+
+        impl MaskedMerkleParameters for $struct_name {
+            fn mask_parameters(&self) -> &<Self::H as CRH>::Parameters {
+                &self.1
+            }
+        }
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                Self(
+                    <Self as MerkleParameters>::H::setup(&mut $crate::merkle_tree::prng()),
+                    <<Self as MerkleParameters>::H as CRH>::Parameters::setup(&mut $crate::merkle_tree::prng()),
+                )
             }
         }
     };

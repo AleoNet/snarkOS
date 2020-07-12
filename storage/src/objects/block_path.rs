@@ -1,6 +1,6 @@
 use crate::Ledger;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
+use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::{BlockHeader, BlockHeaderHash};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
@@ -24,7 +24,7 @@ pub struct SideChainPath {
     pub path: Vec<BlockHeaderHash>,
 }
 
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();

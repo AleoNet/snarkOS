@@ -3,7 +3,7 @@ use crate::message::{
     Channel,
 };
 use snarkos_errors::network::SendError;
-use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
+use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_storage::Ledger;
 
@@ -67,7 +67,7 @@ impl SyncHandler {
     }
 
     /// Finish syncing or ask for the next block from the sync node.
-    pub async fn increment<T: Transaction, P: MerkleParameters>(
+    pub async fn increment<T: Transaction, P: LoadableMerkleParameters>(
         &mut self,
         channel: Arc<Channel>,
         storage: Arc<Ledger<T, P>>,

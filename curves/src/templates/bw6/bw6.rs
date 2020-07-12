@@ -86,7 +86,7 @@ impl<P: BW6Parameters> BW6<P> {
 
         // elt_q3 = elt^(q^3)
         let mut elt_q3 = elt.clone();
-        elt_q3.frobenius_map(3);
+        elt_q3.conjugate();
         // elt_q3_over_elt = elt^(q^3-1)
         let elt_q3_over_elt = elt_q3 * elt_inv;
         // alpha = elt^((q^3-1) * q)
@@ -135,20 +135,20 @@ impl<P: BW6Parameters> BW6<P> {
 
         // step 5
         let mut f5p_p3 = f5p;
-        f5p_p3.frobenius_map(3);
+        f5p_p3.conjugate();
         let result1 = f3p * &f6p * &f5p_p3;
 
         // step 6
         let result2 = result1.square();
         let f4_2p = f4 * &f2p;
         let mut tmp1_p3 = f0 * &f1 * &f3 * &f4_2p * &f8p;
-        tmp1_p3.frobenius_map(3);
+        tmp1_p3.conjugate();
         let result3 = result2 * &f5 * &f0p * &tmp1_p3;
 
         // step 7
         let result4 = result3.square();
         let mut f7_p3 = f7;
-        f7_p3.frobenius_map(3);
+        f7_p3.conjugate();
         let result5 = result4 * &f9p * &f7_p3;
 
         // step 8
@@ -156,13 +156,13 @@ impl<P: BW6Parameters> BW6<P> {
         let f2_4p = f2 * &f4p;
         let f4_2p_5p = f4_2p * &f5p;
         let mut tmp2_p3 = f2_4p * &f3 * &f3p;
-        tmp2_p3.frobenius_map(3);
+        tmp2_p3.conjugate();
         let result7 = result6 * &f4_2p_5p * &f6 * &f7p * &tmp2_p3;
 
         // step 9
         let result8 = result7.square();
         let mut tmp3_p3 = f0p * &f9p;
-        tmp3_p3.frobenius_map(3);
+        tmp3_p3.conjugate();
         let result9 = result8 * &f0 * &f7 * &f1p * &tmp3_p3;
 
         // step 10
@@ -170,7 +170,7 @@ impl<P: BW6Parameters> BW6<P> {
         let f6p_8p = f6p * &f8p;
         let f5_7p = f5 * &f7p;
         let mut tmp4_p3 = f6p_8p;
-        tmp4_p3.frobenius_map(3);
+        tmp4_p3.conjugate();
         let result11 = result10 * &f5_7p * &f2p * &tmp4_p3;
 
         // step 11
@@ -178,25 +178,25 @@ impl<P: BW6Parameters> BW6<P> {
         let f3_6 = f3 * &f6;
         let f1_7 = f1 * &f7;
         let mut tmp5_p3 = f1_7 * &f2;
-        tmp5_p3.frobenius_map(3);
+        tmp5_p3.conjugate();
         let result13 = result12 * &f3_6 * &f9p * &tmp5_p3;
 
         // step 12
         let result14 = result13.square();
         let mut tmp6_p3 = f4_2p * &f5_7p * &f6p_8p;
-        tmp6_p3.frobenius_map(3);
+        tmp6_p3.conjugate();
         let result15 = result14 * &f0 * &f0p * &f3p * &f5p * &tmp6_p3;
 
         // step 13
         let result16 = result15.square();
         let mut tmp7_p3 = f3_6;
-        tmp7_p3.frobenius_map(3);
+        tmp7_p3.conjugate();
         let result17 = result16 * &f1p * &tmp7_p3;
 
         // step 14
         let result18 = result17.square();
         let mut tmp8_p3 = f2_4p * &f4_2p_5p * &f9p;
-        tmp8_p3.frobenius_map(3);
+        tmp8_p3.conjugate();
         let result19 = result18 * &f1_7 * &f5_7p * &f0p * &tmp8_p3;
 
         result19

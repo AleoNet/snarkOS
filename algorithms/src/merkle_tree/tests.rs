@@ -3,11 +3,14 @@ use crate::{
     define_merkle_tree_parameters,
     merkle_tree::MerkleTree,
 };
-use snarkos_models::algorithms::{crh::CRH, merkle_tree::MerkleParameters};
+use snarkos_models::algorithms::{crh::CRH, merkle_tree::LoadableMerkleParameters};
 use snarkos_utilities::{to_bytes, ToBytes};
 
 /// Generates a valid Merkle tree and verifies the Merkle path witness for each leaf.
-fn generate_merkle_tree<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> MerkleTree<P> {
+fn generate_merkle_tree<P: LoadableMerkleParameters, L: ToBytes + Clone + Eq>(
+    leaves: &[L],
+    parameters: &P,
+) -> MerkleTree<P> {
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
@@ -18,7 +21,7 @@ fn generate_merkle_tree<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[
 }
 
 /// Generates a valid Merkle tree and verifies the Merkle path witness for each leaf does not verify to an invalid root hash.
-fn bad_merkle_tree_verify<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> () {
+fn bad_merkle_tree_verify<P: LoadableMerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> () {
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
@@ -26,12 +29,12 @@ fn bad_merkle_tree_verify<P: MerkleParameters, L: ToBytes + Clone + Eq>(leaves: 
     }
 }
 
-fn run_empty_merkle_tree_test<P: MerkleParameters>() {
+fn run_empty_merkle_tree_test<P: LoadableMerkleParameters>() {
     let parameters = &P::default();
     generate_merkle_tree::<P, Vec<u8>>(&vec![], parameters);
 }
 
-fn run_good_root_test<P: MerkleParameters>() {
+fn run_good_root_test<P: LoadableMerkleParameters>() {
     let parameters = &P::default();
 
     let mut leaves = vec![];
@@ -47,7 +50,7 @@ fn run_good_root_test<P: MerkleParameters>() {
     generate_merkle_tree::<P, _>(&leaves, parameters);
 }
 
-fn run_bad_root_test<P: MerkleParameters>() {
+fn run_bad_root_test<P: LoadableMerkleParameters>() {
     let parameters = &P::default();
 
     let mut leaves = vec![];
@@ -63,7 +66,7 @@ fn run_bad_root_test<P: MerkleParameters>() {
     bad_merkle_tree_verify::<P, _>(&leaves, parameters);
 }
 
-fn run_merkle_tree_matches_hashing_test<P: MerkleParameters>() {
+fn run_merkle_tree_matches_hashing_test<P: LoadableMerkleParameters>() {
     let parameters = &P::default();
 
     // Evaluate the Merkle tree root
@@ -101,7 +104,7 @@ fn run_merkle_tree_matches_hashing_test<P: MerkleParameters>() {
     assert_eq!(merkle_tree_root, expected_root);
 }
 
-fn run_padded_merkle_tree_matches_hashing_test<P: MerkleParameters>() {
+fn run_padded_merkle_tree_matches_hashing_test<P: LoadableMerkleParameters>() {
     let parameters = &P::default();
 
     // Evaluate the Merkle tree root

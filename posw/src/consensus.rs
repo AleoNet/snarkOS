@@ -10,7 +10,7 @@ use snarkos_errors::posw::PoswError;
 use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkos_marlin::snark::SRS;
 use snarkos_models::{
-    algorithms::{MerkleParameters, SNARK},
+    algorithms::{MaskedMerkleParameters, SNARK},
     curves::{to_field_vec::ToConstraintField, PairingEngine, PrimeField},
     gadgets::algorithms::MaskedCRHGadget,
     parameters::Parameters,
@@ -43,7 +43,7 @@ pub struct Posw<S, F, M, HG, CP>
 where
     S: SNARK,
     F: PrimeField,
-    M: MerkleParameters,
+    M: MaskedMerkleParameters,
     HG: MaskedCRHGadget<M::H, F>,
     CP: POSWCircuitParameters,
 {

@@ -1,10 +1,10 @@
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
+use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::{Block, BlockHeaderHash, DPCTransactions};
 use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the latest block in the chain.
     pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
         self.get_block_from_block_number(self.get_latest_block_height())

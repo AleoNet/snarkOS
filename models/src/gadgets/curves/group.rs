@@ -101,11 +101,38 @@ pub trait GroupGadget<G: Group, F: Field>:
         Ok(())
     }
 
-    fn precomputed_base_scalar_mul_masked<'a, CS, I, M, B>(&mut self, _: CS, _: I, _: M) -> Result<(), SynthesisError>
+    fn precomputed_base_symmetric_scalar_mul<'a, CS, I, B>(
+        &mut self,
+        mut cs: CS,
+        scalar_bits_with_base_powers: I,
+    ) -> Result<(), SynthesisError>
     where
         CS: ConstraintSystem<F>,
         I: Iterator<Item = (B, &'a G)>,
-        M: Iterator<Item = B>,
+        B: Borrow<Boolean>,
+        G: 'a,
+    {
+        for (i, (bit, base_power)) in scalar_bits_with_base_powers.enumerate() {
+            let new_encoded_plus =
+                self.add_constant(&mut cs.ns(|| format!("Add {}-th base power plus", i)), &base_power)?;
+            let new_encoded_minus = self.add_constant(
+                &mut cs.ns(|| format!("Add {}-th base power minus", i)),
+                &base_power.neg(),
+            )?;
+            *self = Self::conditionally_select(
+                &mut cs.ns(|| format!("Conditional Select {}", i)),
+                bit.borrow(),
+                &new_encoded_plus,
+                &new_encoded_minus,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn precomputed_base_scalar_mul_masked<'a, CS, I, B>(&mut self, _: CS, _: I, _: I) -> Result<(), SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+        I: Iterator<Item = (B, &'a G)>,
         B: Borrow<Boolean>,
         G: 'a,
     {
@@ -147,12 +174,39 @@ pub trait GroupGadget<G: Group, F: Field>:
         Ok(result)
     }
 
-    /// Compute ∏((h_i * 1[p_i = 0] + h_i^{-1} * 1[p_i = 1])^{m_i \xor p_i}) for all i, m_i
-    /// being the scalars, p_i being the masks and h_i being the bases.
+    fn precomputed_base_symmetric_multiscalar_mul<'a, CS, T, I, B>(
+        mut cs: CS,
+        bases: &[B],
+        scalars: I,
+    ) -> Result<Self, SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+        T: 'a + ToBitsGadget<F> + ?Sized,
+        I: Iterator<Item = &'a T>,
+        B: Borrow<[G]>,
+    {
+        let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
+        // Compute ∏(h_i^{1  - 2*m_i}) for all i.
+        for (i, (bits, base_powers)) in scalars.zip(bases).enumerate() {
+            let base_powers = base_powers.borrow();
+            let bits = bits.to_bits(&mut cs.ns(|| format!("Convert Scalar {} to bits", i)))?;
+            result.precomputed_base_symmetric_scalar_mul(
+                cs.ns(|| format!("Chunk {}", i)),
+                bits.iter().zip(base_powers),
+            )?;
+        }
+        Ok(result)
+    }
+
+    /// Compute ∏((h_i^{-1} * 1[p_i = 0] + h_i * 1[p_i = 1])^{1 - m_i \xor p_i})((g_i h_i^{-1} *
+    /// 1[p_i = 0] + g_i^{-1} h_i * 1[p_i = 1])^{m_i \xor p_i}) for all i, m_i
+    /// being the scalars, p_i being the masks, h_i being the symmetric Pedersen bases and g_i the
+    /// Pedersen bases.
     fn precomputed_base_multiscalar_mul_masked<'a, CS, T, I, B>(
         mut cs: CS,
         bases: &[B],
         scalars: I,
+        mask_bases: &[B],
         masks: I,
     ) -> Result<Self, SynthesisError>
     where
@@ -162,15 +216,19 @@ pub trait GroupGadget<G: Group, F: Field>:
         B: Borrow<[G]>,
     {
         let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
-        for (i, ((scalar, mask), base_powers)) in scalars.zip(masks).zip(bases).enumerate() {
+        for (i, (((scalar, mask), base_powers), mask_powers)) in
+            scalars.zip(masks).zip(bases).zip(mask_bases).enumerate()
+        {
             let base_powers = base_powers.borrow();
+            let mask_powers = mask_powers.borrow();
             let scalar_bits = scalar.to_bits(&mut cs.ns(|| format!("Convert scalar {} to bits", i)))?;
             let mask_bits = mask.to_bits(&mut cs.ns(|| format!("Convert mask {} to bits", i)))?;
             let scalar_bits_with_base_powers = scalar_bits.into_iter().zip(base_powers);
+            let mask_bits_with_mask_powers = mask_bits.into_iter().zip(mask_powers);
             result.precomputed_base_scalar_mul_masked(
                 cs.ns(|| format!("Chunk {}", i)),
                 scalar_bits_with_base_powers,
-                mask_bits.into_iter(),
+                mask_bits_with_mask_powers,
             )?;
         }
         Ok(result)
