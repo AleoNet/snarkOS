@@ -1275,8 +1275,7 @@ where
                 || Ok(encryption_plaintext),
             )?;
 
-            // TODO (raychu86) Make this ciphertext a public input with alloc_input
-            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc(
+            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc_input(
                 &mut encryption_cs.ns(|| format!("output record {} encryption_ciphertext", j)),
                 || Ok(encryption_ciphertext),
             )?;

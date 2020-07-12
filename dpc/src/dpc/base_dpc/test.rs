@@ -493,6 +493,7 @@ fn test_execute_base_dpc_constraints() {
         &ledger_digest,
         &old_serial_numbers,
         &new_commitments,
+        &new_records_encryption_ciphertexts,
         &memo,
         value_balance,
         network_id,

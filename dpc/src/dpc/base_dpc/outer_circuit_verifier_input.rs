@@ -24,6 +24,7 @@ where
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::AccountEncryption as EncryptionScheme>::Text: ToConstraintField<C::InnerField>,
 
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,

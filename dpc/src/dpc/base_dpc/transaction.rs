@@ -192,7 +192,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
         for ciphertext in &self.record_ciphertexts {
             variable_length_integer(ciphertext.len() as u64).write(&mut writer)?;
             for ciphertext_element in ciphertext {
-                ciphertext.write(&mut writer)?;
+                ciphertext_element.write(&mut writer)?;
             }
         }
 
