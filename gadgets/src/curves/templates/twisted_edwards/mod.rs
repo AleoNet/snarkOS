@@ -847,27 +847,82 @@ mod projective_impl {
             Ok(())
         }
 
-        fn precomputed_base_scalar_mul_masked<'a, CS, I, M, B>(
+        fn precomputed_base_symmetric_scalar_mul<'a, CS, I, B>(
             &mut self,
             mut cs: CS,
             scalar_bits_with_base_powers: I,
-            mask_bits: M,
         ) -> Result<(), SynthesisError>
         where
             CS: ConstraintSystem<F>,
             I: Iterator<Item = (B, &'a TEProjective<P>)>,
-            M: Iterator<Item = B>,
             B: Borrow<Boolean>,
         {
-            let zero = TEProjective::zero();
-            for (i, ((bit, base), mask)) in scalar_bits_with_base_powers.zip(mask_bits).enumerate() {
+            let scalar_bits_with_base_powers: Vec<_> = scalar_bits_with_base_powers
+                .map(|(bit, base)| (bit.borrow().clone(), base.clone()))
+                .collect();
+            for (i, bits_base_powers) in scalar_bits_with_base_powers.chunks(2).enumerate() {
+                let mut cs = cs.ns(|| format!("Chunk {}", i));
+                if bits_base_powers.len() == 2 {
+                    // The symmetric hash with two-bit lookup has the result incremented by:
+                    //   1. g_i*g_{i+1} if the first input bit is 0 and the second input bit is 0.
+                    //   2. g_i^-1*g_{i+1} if the first input bit is 1 and the second input bit is 0.
+                    //   3. g_i*g_{i+1}^-1 if the first input bit is 0 and the second input bit is 1.
+                    //   4. g_i^-1*g_{i+1}^-1 if the first input bit is 1 and the second input bit is 1.
+                    let bits = [bits_base_powers[0].0, bits_base_powers[1].0];
+                    let base_powers = [bits_base_powers[0].1, bits_base_powers[1].1];
+                    let table = [
+                        base_powers[0] + &base_powers[1],
+                        base_powers[0].neg() + &base_powers[1],
+                        base_powers[0] + &base_powers[1].neg(),
+                        base_powers[0].neg() + &base_powers[1].neg(),
+                    ];
+                    let adder: Self = two_bit_lookup_helper(cs.ns(|| "two bit lookup"), bits, table)?;
+                    *self = <Self as GroupGadget<TEProjective<P>, F>>::add(self, &mut cs.ns(|| "Add"), &adder)?;
+                } else if bits_base_powers.len() == 1 {
+                    let bit = bits_base_powers[0].0;
+                    let base_power = bits_base_powers[0].1;
+                    let new_encoded_plus = self.add_constant(&mut cs.ns(|| "Add base power plus"), &base_power)?;
+                    let new_encoded_minus =
+                        self.add_constant(&mut cs.ns(|| "Add base power minus"), &base_power.neg())?;
+                    *self = Self::conditionally_select(
+                        &mut cs.ns(|| "Conditional Select"),
+                        &bit,
+                        &new_encoded_plus,
+                        &new_encoded_minus,
+                    )?;
+                }
+            }
+
+            Ok(())
+        }
+
+        fn precomputed_base_scalar_mul_masked<'a, CS, I, B>(
+            &mut self,
+            mut cs: CS,
+            scalar_bits_with_base_powers: I,
+            mask_bits_with_mask_powers: I,
+        ) -> Result<(), SynthesisError>
+        where
+            CS: ConstraintSystem<F>,
+            I: Iterator<Item = (B, &'a TEProjective<P>)>,
+            B: Borrow<Boolean>,
+        {
+            for (i, ((bit, base), (mask, mask_base))) in
+                scalar_bits_with_base_powers.zip(mask_bits_with_mask_powers).enumerate()
+            {
                 let mut cs = cs.ns(|| format!("Bit {}", i));
                 // The masking algorithm specifies that the result must be incremented by:
-                //   1. g_i if the input bit is 1 and the mask is 0.
-                //   2. g_i^-1 if the input bit is 0 and the mask is 1.
-                //   3. 0 otherwise.
+                //   1. h_i^-1 if the input bit is 0 and the mask is 0.
+                //   2. g_i*h_i^-1 if the input bit is 1 and the mask is 0.
+                //   3. g_i^-1*h_i if the input bit is 0 and the mask is 1.
+                //   4. h_i if the input bit is 1 and the mask is 1.
                 let bits = [*bit.borrow(), *mask.borrow()];
-                let table = [zero, *base, base.neg(), zero];
+                let table = [
+                    mask_base.neg(),
+                    mask_base.neg() + base,
+                    base.neg() + mask_base,
+                    *mask_base,
+                ];
                 let adder: Self = two_bit_lookup_helper(cs.ns(|| "two bit lookup"), bits, table)?;
                 *self = <Self as GroupGadget<TEProjective<P>, F>>::add(self, &mut cs.ns(|| "Add"), &adder)?;
             }

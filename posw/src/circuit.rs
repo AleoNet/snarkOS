@@ -4,7 +4,7 @@
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::compute_root;
 use snarkos_models::{
-    algorithms::{MerkleParameters, CRH},
+    algorithms::{MaskedMerkleParameters, CRH},
     curves::PrimeField,
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
@@ -21,7 +21,12 @@ pub trait POSWCircuitParameters {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct POSWCircuit<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters> {
+pub struct POSWCircuit<
+    F: PrimeField,
+    M: MaskedMerkleParameters,
+    HG: MaskedCRHGadget<M::H, F>,
+    CP: POSWCircuitParameters,
+> {
     pub leaves: Vec<Option<<M::H as CRH>::Output>>,
     pub merkle_parameters: M,
     pub mask: Option<Vec<u8>>,
@@ -32,7 +37,7 @@ pub struct POSWCircuit<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M
     pub circuit_parameters_type: PhantomData<CP>,
 }
 
-impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters>
+impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters>
     ConstraintSynthesizer<F> for POSWCircuit<F, M, HG, CP>
 {
     fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
@@ -48,7 +53,11 @@ impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWC
                 let crh_parameters = self.merkle_parameters.parameters();
                 Ok(crh_parameters)
             })?;
-
+        let mask_crh_parameters =
+            <HG as CRHGadget<M::H, F>>::ParametersGadget::alloc(&mut cs.ns(|| "new_mask_parameters"), || {
+                let crh_parameters = self.merkle_parameters.mask_parameters();
+                Ok(crh_parameters)
+            })?;
         let leaves_number = 2u32.pow(M::DEPTH as u32) as usize;
         assert!(self.leaves.len() <= leaves_number);
 
@@ -74,6 +83,7 @@ impl<F: PrimeField, M: MerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWC
         let computed_root = compute_root::<M::H, HG, _, _, _>(
             cs.ns(|| "compute masked root"),
             &crh_parameters,
+            &mask_crh_parameters,
             &mask_bytes,
             &leaf_gadgets,
         )?;
@@ -91,7 +101,7 @@ mod test {
     use super::{POSWCircuit, POSWCircuitParameters};
     use snarkos_algorithms::{
         crh::{PedersenCompressedCRH, PedersenSize},
-        define_merkle_tree_parameters,
+        define_masked_merkle_tree_parameters,
         snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof},
     };
     use snarkos_curves::{
@@ -120,7 +130,7 @@ mod test {
     }
 
     // We use a small tree in this test
-    define_merkle_tree_parameters!(EdwardsMaskedMerkleParameters, PedersenCompressedCRH<Edwards, Size>, 4);
+    define_masked_merkle_tree_parameters!(EdwardsMaskedMerkleParameters, PedersenCompressedCRH<Edwards, Size>, 4);
 
     type HashGadget = PedersenCompressedCRHGadget<Edwards, Fq, EdwardsBlsGadget>;
     type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
