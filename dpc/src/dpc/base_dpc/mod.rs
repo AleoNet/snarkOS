@@ -995,6 +995,7 @@ where
             value_balance,
             network_id,
             signatures,
+            new_records_encryption_ciphertexts,
         );
 
         end_timer!(exec_time);
