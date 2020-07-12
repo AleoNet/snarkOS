@@ -19,7 +19,7 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
 
     fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Self::PrivateKey;
 
-    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, EncryptionError>;
 
     fn generate_randomness<R: Rng>(
         &self,

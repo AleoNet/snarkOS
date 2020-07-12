@@ -1,3 +1,4 @@
+use crate::{crh::bytes_to_bits, encryption::GroupEncryptionParameters};
 use snarkos_errors::algorithms::EncryptionError;
 use snarkos_models::{
     algorithms::EncryptionScheme,
@@ -5,13 +6,9 @@ use snarkos_models::{
 };
 use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
+use itertools::Itertools;
 use rand::Rng;
 use std::io::{Read, Result as IoResult, Write};
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct GroupEncryption<G: Group + ProjectiveCurve> {
-    pub parameters: G,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GroupEncryptionPublicKey<G: Group + ProjectiveCurve>(pub G);
@@ -45,9 +42,14 @@ impl<G: Group + ProjectiveCurve> Default for GroupEncryptionPublicKey<G> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupEncryption<G: Group + ProjectiveCurve> {
+    pub parameters: GroupEncryptionParameters<G>,
+}
+
 impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     type BlindingExponent = <G as Group>::ScalarField;
-    type Parameters = G;
+    type Parameters = GroupEncryptionParameters<G>;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = GroupEncryptionPublicKey<G>;
     type Randomness = <G as Group>::ScalarField;
@@ -55,7 +57,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
 
     fn setup<R: Rng>(rng: &mut R) -> Self {
         Self {
-            parameters: G::rand(rng),
+            parameters: Self::Parameters::setup(rng, Self::PrivateKey::size_in_bits()),
         }
     }
 
@@ -67,12 +69,21 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         private_key
     }
 
-    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey {
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, EncryptionError> {
         let keygen_time = start_timer!(|| "GroupEncryption::generate_public_key");
-        let public_key = self.parameters.mul(&private_key);
+
+        let mut public_key = G::zero();
+        for (bit, base_power) in bytes_to_bits(&to_bytes![private_key]?)
+            .iter()
+            .zip_eq(&self.parameters.generator_powers)
+        {
+            if *bit {
+                public_key += &base_power;
+            }
+        }
         end_timer!(keygen_time);
 
-        GroupEncryptionPublicKey(public_key)
+        Ok(GroupEncryptionPublicKey(public_key))
     }
 
     fn generate_randomness<R: Rng>(
@@ -133,7 +144,15 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     ) -> Result<Vec<Self::Text>, EncryptionError> {
         let record_view_key = public_key.0.mul(&randomness);
 
-        let c_0 = self.parameters.mul(&randomness);
+        let mut c_0 = G::zero();
+        for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?)
+            .iter()
+            .zip_eq(&self.parameters.generator_powers)
+        {
+            if *bit {
+                c_0 += &base_power;
+            }
+        }
         let mut ciphertext = vec![c_0];
 
         let one = Self::Randomness::one();
@@ -201,8 +220,8 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     }
 }
 
-impl<G: Group + ProjectiveCurve> From<G> for GroupEncryption<G> {
-    fn from(parameters: G) -> Self {
+impl<G: Group + ProjectiveCurve> From<GroupEncryptionParameters<G>> for GroupEncryption<G> {
+    fn from(parameters: GroupEncryptionParameters<G>) -> Self {
         Self { parameters }
     }
 }

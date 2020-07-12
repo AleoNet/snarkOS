@@ -25,6 +25,7 @@ snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features
 blake2 = { version = "0.8.1" }
 derivative = { version = "2" }
 digest = { version = "0.8.1" }
+itertools = { version = "0.9.0" }
 rand = { version = "0.7" }
 rand_chacha = { version = "0.2.2" }
 rayon = { version = "1" }
