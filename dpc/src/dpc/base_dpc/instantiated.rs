@@ -16,7 +16,7 @@ use snarkos_algorithms::{
     define_merkle_tree_parameters,
     prf::Blake2s,
     signature::SchnorrSignature,
-    snark::GM17,
+    snark::{Groth16, GM17},
 };
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
@@ -31,7 +31,7 @@ use snarkos_gadgets::{
         crh::BoweHopwoodPedersenCompressedCRHGadget,
         prf::Blake2sGadget,
         signature::SchnorrPublicKeyRandomizationGadget,
-        snark::GM17VerifierGadget,
+        snark::{GM17VerifierGadget, Groth16VerifierGadget},
     },
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
@@ -168,8 +168,8 @@ pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonc
 pub type PredicateVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
 pub type Predicate = DPCPredicate<Components>;
-pub type CoreCheckNIZK = GM17<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
-pub type ProofCheckNIZK = GM17<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
+pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
+pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
 pub type PredicateSNARK<C> = GM17<InnerPairing, PredicateCircuit<C>, PredicateLocalData<C>>;
 pub type PRF = Blake2s;
 
@@ -197,4 +197,4 @@ pub type PredicateVerificationKeyHashGadget =
 
 pub type PRFGadget = Blake2sGadget;
 pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
-pub type InnerSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
+pub type InnerSNARKGadget = Groth16VerifierGadget<InnerPairing, OuterField, PairingGadget>;
