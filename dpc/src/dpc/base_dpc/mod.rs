@@ -861,6 +861,7 @@ where
             let mut record_field_elements = vec![];
             let mut record_group_encoding = vec![];
             let mut record_plaintexts = vec![];
+            // The first fq_high selector is false to account for the c_0 element in the ciphertext
             let mut fq_high_selectors = vec![false];
             for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
                 let element_affine = element.into_affine();
@@ -925,10 +926,10 @@ where
                 &record_plaintexts,
             )?;
 
-            // Compose the record ciphertext and fq_high selectors
+            // Compose the record ciphertext and fq_high selectors for storage in a transaction
             let mut ciphertext_and_selector = vec![];
 
-            // Compute the ciphertext hash
+            // Compute the ciphertext hash which will be validated in the inner circuit
             let mut ciphertext_affine = vec![];
             for (ciphertext_element, fq_high) in record_ciphertext.iter().zip_eq(fq_high_selectors) {
                 let ciphertext_element_affine =

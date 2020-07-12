@@ -926,7 +926,7 @@ where
         // *******************************************************************
 
         // *******************************************************************
-        // Check that the record encryption well-formed.
+        // Check that the record encryption is well-formed.
         // *******************************************************************
         {
             let encryption_cs = &mut cs.ns(|| "Check that record encryption is well-formed");
@@ -935,11 +935,6 @@ where
 
             // *******************************************************************
             // Convert serial number nonce, commitment_randomness, birth predicate repr, death predicate repr, payload, and value into bits
-
-            //            let serial_number_nonce_bits = serial_number_nonce_bytes
-            //                .iter()
-            //                .flat_map(|byte| byte.to_bits_le())
-            //                .collect::<Vec<_>>();
 
             let serial_number_nonce_bits = serial_number_nonce_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert serial_number_nonce_bytes to bits"))?;
@@ -959,7 +954,7 @@ where
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
 
             // *******************************************************************
-            // Pack the bits into serialization format
+            // Pack the record bits into serialization format
 
             let scalar_field_bitsize = <C::BindingSignatureGroup as Group>::ScalarField::size_in_bits();
             let base_field_bitsize = <C::InnerField as PrimeField>::size_in_bits();
@@ -1241,7 +1236,7 @@ where
             }
 
             // *******************************************************************
-            // Check the record encryption
+            // Construct the record encryption
 
             let encryption_randomness_gadget = AccountEncryptionGadget::RandomnessGadget::alloc(
                 &mut encryption_cs.ns(|| format!("output record {} encryption_randomness", j)),
@@ -1267,6 +1262,7 @@ where
                 &encryption_blinding_exponents_gadget,
             )?;
 
+            // *******************************************************************
             // Check that the record ciphertext hash is correct
 
             let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc_input(
