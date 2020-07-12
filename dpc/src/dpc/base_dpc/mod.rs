@@ -936,7 +936,6 @@ where
                 &new_records_group_encoding,
                 &new_records_encryption_randomness,
                 &new_records_encryption_blinding_exponents,
-                &new_records_encryption_ciphertexts,
                 &new_records_ciphertext_hashes,
                 &predicate_commitment,
                 &predicate_randomness,

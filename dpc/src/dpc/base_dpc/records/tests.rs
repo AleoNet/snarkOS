@@ -13,6 +13,7 @@ use rand_xorshift::XorShiftRng;
 
 pub(crate) const ITERATIONS: usize = 100;
 
+///TODO Move this into utilities along with the `bits_to_bytes` impl
 #[test]
 fn test_bits_to_bytes() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
