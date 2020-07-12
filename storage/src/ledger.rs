@@ -2,7 +2,7 @@ use crate::*;
 use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_errors::storage::StorageError;
 use snarkos_models::{
-    algorithms::MerkleParameters,
+    algorithms::LoadableMerkleParameters,
     genesis::Genesis,
     objects::{LedgerScheme, Transaction},
     parameters::Parameters,
@@ -19,7 +19,7 @@ use std::{
     sync::Arc,
 };
 
-pub struct Ledger<T: Transaction, P: MerkleParameters> {
+pub struct Ledger<T: Transaction, P: LoadableMerkleParameters> {
     pub latest_block_height: RwLock<u32>,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -27,7 +27,7 @@ pub struct Ledger<T: Transaction, P: MerkleParameters> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Instantiates a new ledger storage.
     pub fn open() -> Result<Self, StorageError> {
         let mut path = std::env::current_dir()?;

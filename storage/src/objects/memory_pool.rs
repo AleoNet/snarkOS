@@ -1,8 +1,8 @@
 use crate::{DatabaseTransaction, Ledger, Op, COL_META, KEY_MEMORY_POOL};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::MerkleParameters, objects::Transaction};
+use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 
-impl<T: Transaction, P: MerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the stored memory pool transactions.
     pub fn get_memory_pool(&self) -> Result<Vec<u8>, StorageError> {
         Ok(self.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())?)

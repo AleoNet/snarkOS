@@ -346,7 +346,7 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
 impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionPlaintextGadget<G, F, GG> {}
 
 /// Group encryption ciphertext gadget
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupEncryptionCiphertextGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
     ciphertext: Vec<GG>,
     _group: PhantomData<*const G>,
@@ -414,16 +414,6 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryp
         }
 
         Ok(output_bytes)
-    }
-}
-
-impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> Clone for GroupEncryptionCiphertextGadget<G, F, GG> {
-    fn clone(&self) -> Self {
-        Self {
-            ciphertext: self.ciphertext.clone(),
-            _group: PhantomData,
-            _engine: PhantomData,
-        }
     }
 }
 
@@ -502,6 +492,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
 
         let randomness_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
+
         let mut c_0 = zero.clone();
         c_0.precomputed_base_scalar_mul(
             cs.ns(|| "c_0"),
@@ -511,14 +502,15 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
         let record_view_key_gadget =
             public_key
                 .public_key
-                .mul_bits(cs.ns(|| "shared_key"), &zero, randomness_bits.iter())?;
+                .mul_bits(cs.ns(|| "record_view_key"), &zero, randomness_bits.iter())?;
 
         let z = record_view_key_gadget.to_x_coordinate();
         let z_bytes = z.to_bytes(&mut cs.ns(|| "z_to_bytes"))?;
         let z_bits: Vec<_> = z_bytes.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
 
         let mut ciphertext = vec![c_0];
-        for (index, (blinding_exponent, m_j)) in blinding_exponents.0.iter().zip(&input.plaintext).enumerate() {
+
+        for (index, (blinding_exponent, m_j)) in blinding_exponents.0.iter().zip_eq(&input.plaintext).enumerate() {
             let j = index + 1;
 
             let cs = &mut cs.ns(|| format!("c_{}", j));
@@ -528,35 +520,34 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
                 .flat_map(|byte| byte.clone().to_bits_le())
                 .collect();
 
-            let h_j = record_view_key_gadget.mul_bits(cs.ns(|| "h_j"), &zero, blinding_exponent_bits.iter())?;
+            let h = record_view_key_gadget.mul_bits(cs.ns(|| "h"), &zero, blinding_exponent_bits.iter())?;
 
-            // z * h_j
-            let zh_j = h_j.mul_bits(cs.ns(|| "z * h_j"), &zero, z_bits.iter())?;
+            // z * h
+            let h_z = h.mul_bits(cs.ns(|| "z * h"), &zero, z_bits.iter())?;
 
-            // j * h_j
-            let jh_j = {
-                let mut jh_j_cs = cs.ns(|| format!("Construct {} * h_{}", j, j));
+            // j * h
+            let h_j = {
+                let mut internal_cs = cs.ns(|| format!("Construct {} * h_{}", j, j));
 
-                let mut jh_j = h_j.clone();
+                let mut h_j = h.clone();
 
                 let num_doubling = (j as f64).log2() as u32;
-
                 for i in 0..num_doubling {
-                    jh_j.double_in_place(jh_j_cs.ns(|| format!("Double {}", i)))?;
+                    h_j.double_in_place(internal_cs.ns(|| format!("Double {}", i)))?;
                 }
 
                 let num_exponentiations = 2usize.pow(num_doubling);
-
                 if j > num_exponentiations {
                     for i in 0..(j - num_exponentiations) {
-                        jh_j = jh_j.add(jh_j_cs.ns(|| format!("Add: {}", i)), &h_j)?;
+                        h_j = h_j.add(internal_cs.ns(|| format!("Add: {}", i)), &h)?;
                     }
                 }
-                jh_j
+
+                h_j
             };
 
             // (z_i [+] j) * h_i,j
-            let expected_record_view_key = zh_j.add(cs.ns(|| "expected record view key"), &jh_j)?;
+            let expected_record_view_key = h_z.add(cs.ns(|| "expected record view key"), &h_j)?;
 
             expected_record_view_key.enforce_equal(
                 &mut cs.ns(|| "Check that declared and computed record view keys are equal"),
@@ -564,7 +555,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
             )?;
 
             // Construct c_j
-            let c_j = h_j.add(cs.ns(|| "construct c_j"), &m_j)?;
+            let c_j = h.add(cs.ns(|| "construct c_j"), &m_j)?;
 
             ciphertext.push(c_j);
         }

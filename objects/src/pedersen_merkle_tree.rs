@@ -1,4 +1,4 @@
-use snarkos_algorithms::{crh::PedersenCompressedCRH, define_merkle_tree_parameters, merkle_tree::prng};
+use snarkos_algorithms::{crh::PedersenCompressedCRH, define_masked_merkle_tree_parameters, merkle_tree::prng};
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
@@ -24,7 +24,7 @@ pub type MerkleTreeCRH = PedersenCompressedCRH<EdwardsBls, window::TwoToOneWindo
 // We instantiate the tree here with depth = 2. This may change in the future.
 pub const MASKED_TREE_DEPTH: usize = 2;
 
-define_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, MASKED_TREE_DEPTH);
+define_masked_merkle_tree_parameters!(MaskedMerkleTreeParameters, MerkleTreeCRH, MASKED_TREE_DEPTH);
 
 /// A Merkle Tree instantiated with the Masked Pedersen hasher over BLS12-377
 pub type EdwardsMaskedMerkleTree = MerkleTree<MaskedMerkleTreeParameters>;

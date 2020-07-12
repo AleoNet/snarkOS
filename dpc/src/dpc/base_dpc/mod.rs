@@ -9,7 +9,16 @@ use snarkos_algorithms::{
 };
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
+    algorithms::{
+        CommitmentScheme,
+        EncryptionScheme,
+        LoadableMerkleParameters,
+        MerkleParameters,
+        SignatureScheme,
+        CRH,
+        PRF,
+        SNARK,
+    },
     curves::{AffineCurve, Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
@@ -78,7 +87,7 @@ mod test;
 /// one.
 pub trait BaseDPCComponents: DPCComponents {
     /// Ledger digest type.
-    type MerkleParameters: MerkleParameters;
+    type MerkleParameters: LoadableMerkleParameters;
     type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
 
     /// Commitment scheme for committing to a record value
