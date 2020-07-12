@@ -842,6 +842,7 @@ where
         let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
+            // Serialize the record into group elements and fq_high bits
             let serialized_record = RecordSerializer::<
                 Components,
                 Components::EncryptionModelParameters,
@@ -855,11 +856,14 @@ where
             for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
                 let element_affine = element.into_affine();
 
+                // Decode the field elements from the serialized group element
+                // These values will be used in the inner circuit to validate bit packing and serialization
                 if i == 0 {
                     // Serial number nonce
                     let record_field_element = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
                     record_field_elements.push(record_field_element);
                 } else {
+                    // Decode the encoded groups into their respective field elements
                     let record_field_element = Elligator2::<
                         <Components as BaseDPCComponents>::EncryptionModelParameters,
                         <Components as BaseDPCComponents>::EncryptionGroup,
@@ -868,6 +872,8 @@ where
                     record_field_elements.push(record_field_element);
                 }
 
+                // Fetch the x and y coordinates of the serialized group elements
+                // These values will be used in the inner circuit to validate the Elligator2 encoding
                 let x =
                     <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
                         &to_bytes![element_affine.to_x_coordinate()]?[..],
@@ -878,17 +884,23 @@ where
                     )?;
                 record_group_encoding.push((x, y));
 
+                // Construct the plaintext element from the serialized group elements
+                // This value will be used in the inner circuit to validate the encryption
                 let plaintext_element =
                     <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
                         &to_bytes![element]?[..],
                     )?;
                 record_plaintexts.push(plaintext_element);
+
+                // Store the fq_high selector for future decoding of the plaintext
                 fq_high_selectors.push(*fq_high);
             }
 
-            new_records_group_encoding.push(record_group_encoding);
+            // Store the field elements and group encodings for each new record
             new_records_field_elements.push(record_field_elements);
+            new_records_group_encoding.push(record_group_encoding);
 
+            // Encrypt the record plaintext
             let record_public_key = record.account_address().into_repr();
             let encryption_randomness = circuit_parameters
                 .account_encryption
@@ -909,7 +921,6 @@ where
 
             // Compute the ciphertext hash
             let mut ciphertext_affine = vec![];
-            // TODO Add the fq_high bit to the hash
             for (ciphertext_element, fq_high) in record_ciphertext.iter().zip_eq(fq_high_selectors) {
                 let ciphertext_element_affine =
                     <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
@@ -918,6 +929,7 @@ where
                 ciphertext_and_selector.push((ciphertext_element.clone(), fq_high));
             }
 
+            // TODO Add the fq_high bits to the hash
             let ciphertext_hash = circuit_parameters
                 .record_ciphertext_crh
                 .hash(&to_bytes![ciphertext_affine]?)?;
@@ -1091,14 +1103,15 @@ where
         let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for ciphertext in &transaction.record_ciphertexts {
             let mut ciphertext_affine = vec![];
-            // TODO Add the fq_high bit to the hash
             for (ciphertext_element, _fq_high) in ciphertext {
+                // Convert the ciphertext group to the affine representation to be hashed
                 let ciphertext_element_affine =
                     <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
                         .into_affine();
                 ciphertext_affine.push(ciphertext_element_affine);
             }
 
+            // TODO Add the fq_high bits to the hash
             let ciphertext_hash = parameters
                 .circuit_parameters
                 .record_ciphertext_crh
