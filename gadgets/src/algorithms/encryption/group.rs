@@ -395,6 +395,28 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ve
     }
 }
 
+impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryptionCiphertextGadget<G, F, GG> {
+    fn to_bytes<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        let mut output_bytes = vec![];
+        for (i, group_gadget) in self.ciphertext.iter().enumerate() {
+            let group_bytes = group_gadget.to_bytes(&mut cs.ns(|| format!("to_bytes {}", i)))?;
+            output_bytes.extend(group_bytes);
+        }
+
+        Ok(output_bytes)
+    }
+
+    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
+        let mut output_bytes = vec![];
+        for (i, group_gadget) in self.ciphertext.iter().enumerate() {
+            let group_bytes = group_gadget.to_bytes_strict(&mut cs.ns(|| format!("to_bytes_strict {}", i)))?;
+            output_bytes.extend(group_bytes);
+        }
+
+        Ok(output_bytes)
+    }
+}
+
 impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> Clone for GroupEncryptionCiphertextGadget<G, F, GG> {
     fn clone(&self) -> Self {
         Self {

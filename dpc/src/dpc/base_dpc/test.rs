@@ -301,7 +301,6 @@ fn test_execute_base_dpc_constraints() {
     let mut new_records_group_encoding = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_blinding_exponents = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-    let mut new_records_encryption_ciphertexts = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_ciphertext_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     for record in &new_records {
         let serialized_record = RecordSerializer::<
@@ -344,7 +343,7 @@ fn test_execute_base_dpc_constraints() {
                 &to_bytes![element_affine.to_y_coordinate()].unwrap()[..],
             )
             .unwrap();
-            record_group_encoding.push((x, y, *fq_high));
+            record_group_encoding.push((x, y));
 
             let plaintext_element = <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
                 &to_bytes![element].unwrap()[..],
@@ -386,7 +385,6 @@ fn test_execute_base_dpc_constraints() {
 
         new_records_encryption_randomness.push(encryption_randomness);
         new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
-        new_records_encryption_ciphertexts.push(record_ciphertext);
         new_records_ciphertext_hashes.push(ciphertext_hash);
     }
 
@@ -410,7 +408,6 @@ fn test_execute_base_dpc_constraints() {
         &new_records_group_encoding,
         &new_records_encryption_randomness,
         &new_records_encryption_blinding_exponents,
-        &new_records_encryption_ciphertexts,
         &new_records_ciphertext_hashes,
         &predicate_comm,
         &predicate_rand,
@@ -470,7 +467,6 @@ fn test_execute_base_dpc_constraints() {
             &new_records_group_encoding,
             &new_records_encryption_randomness,
             &new_records_encryption_blinding_exponents,
-            &new_records_encryption_ciphertexts,
             &new_records_ciphertext_hashes,
             &predicate_comm,
             &predicate_rand,
@@ -502,7 +498,7 @@ fn test_execute_base_dpc_constraints() {
         &ledger_digest,
         &old_serial_numbers,
         &new_commitments,
-        &new_records_encryption_ciphertexts,
+        &new_records_ciphertext_hashes,
         &memo,
         value_balance,
         network_id,

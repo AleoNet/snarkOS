@@ -73,11 +73,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_records_group_encoding: &[Vec<(
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        bool,
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
-    new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
     new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
 
     // Rest
@@ -135,7 +133,6 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records_group_encoding,
         new_records_encryption_randomness,
         new_records_encryption_blinding_exponents,
-        new_records_encryption_ciphertexts,
         new_records_ciphertext_hashes,
         //
         predicate_commitment,
@@ -198,11 +195,9 @@ fn base_dpc_execute_gadget_helper<
     new_records_group_encoding: &[Vec<(
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        bool,
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
-    new_records_encryption_ciphertexts: &[Vec<<C::AccountEncryption as EncryptionScheme>::Text>],
     new_records_ciphertext_hashes: &[RecordCiphertextCRH::Output],
 
     //
@@ -721,13 +716,10 @@ where
         (
             (
                 (
-                    (
-                        ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
-                        encryption_randomness,
-                    ),
-                    encryption_blinding_exponents,
+                    ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
+                    encryption_randomness,
                 ),
-                encryption_ciphertext,
+                encryption_blinding_exponents,
             ),
             record_ciphertext_hash,
         ),
@@ -739,7 +731,6 @@ where
         .zip(new_records_group_encoding)
         .zip(new_records_encryption_randomness)
         .zip(new_records_encryption_blinding_exponents)
-        .zip(new_records_encryption_ciphertexts)
         .zip(new_records_ciphertext_hashes)
         .enumerate()
     {
@@ -1160,26 +1151,18 @@ where
             let mut record_group_encoding_gadgets = Vec::with_capacity(record_group_encoding.len());
             let mut encryption_plaintext = Vec::with_capacity(record_group_encoding.len());
 
-            for (i, (x, y, fq_high)) in record_group_encoding.iter().enumerate() {
+            for (i, (x, y)) in record_group_encoding.iter().enumerate() {
                 let affine = <C::EncryptionGroup as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?;
                 encryption_plaintext.push(<C::AccountEncryption as EncryptionScheme>::Text::read(
                     &to_bytes![affine.into_projective()]?[..],
                 )?);
-
-                let x_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
-                    &mut encryption_cs.ns(|| format!("record_group_encoding_x_{}", i)),
-                    || Ok(x),
-                )?;
 
                 let y_gadget = Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
                     &mut encryption_cs.ns(|| format!("record_group_encoding_y_{}", i)),
                     || Ok(y),
                 )?;
 
-                let fq_high_gadget =
-                    Boolean::alloc(&mut encryption_cs.ns(|| format!("fq_high_{}", i)), || Ok(fq_high))?;
-
-                record_group_encoding_gadgets.push((x_gadget, y_gadget, fq_high_gadget));
+                record_group_encoding_gadgets.push(y_gadget);
             }
 
             assert_eq!(record_field_elements_gadgets.len(), record_group_encoding_gadgets.len());
@@ -1196,17 +1179,17 @@ where
             let u = C::InnerField::read(&to_bytes![u]?[..])?;
             let ua = C::InnerField::read(&to_bytes![ua]?[..])?;
 
-            for (i, (element, (affine_x, affine_y, fq_high))) in record_field_elements_gadgets
+            for (i, (element, y_gadget)) in record_field_elements_gadgets
                 .iter()
                 .skip(1)
                 .zip(record_group_encoding_gadgets.iter().skip(1))
                 .enumerate()
             {
                 // Get reconstructed x value
-                let numerator = affine_y
+                let numerator = y_gadget
                     .0
                     .add_constant(encryption_cs.ns(|| format!("1 + y_{}", i)), &C::InnerField::one())?;
-                let neg_y = affine_y.0.negate(encryption_cs.ns(|| format!("-y_{}", i)))?;
+                let neg_y = y_gadget.0.negate(encryption_cs.ns(|| format!("-y_{}", i)))?;
                 let denominator = neg_y
                     .add_constant(encryption_cs.ns(|| format!("1 - y_{}", i)), &C::InnerField::one())?
                     .inverse(encryption_cs.ns(|| format!("(1 - y_{})_inverse", i)))?;
@@ -1275,11 +1258,6 @@ where
                 || Ok(encryption_plaintext),
             )?;
 
-            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc_input(
-                &mut encryption_cs.ns(|| format!("output record {} encryption_ciphertext", j)),
-                || Ok(encryption_ciphertext),
-            )?;
-
             let candidate_ciphertext_gadget = AccountEncryptionGadget::check_encryption_gadget(
                 &mut encryption_cs.ns(|| format!("output record {} check_encryption_gadget", j)),
                 &account_encryption_parameters,
@@ -1289,29 +1267,15 @@ where
                 &encryption_blinding_exponents_gadget,
             )?;
 
-            encryption_ciphertext_gadget.enforce_equal(
-                encryption_cs.ns(|| format!("output record {} encryption is valid", j)),
-                &candidate_ciphertext_gadget,
-            )?;
-
             // Check that the record ciphertext hash is correct
 
-            let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc(
+            let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc_input(
                 &mut encryption_cs.ns(|| format!("output record {} ciphertext hash", j)),
                 || Ok(record_ciphertext_hash),
             )?;
 
-            let mut ciphertext_affine = vec![];
-            for ciphertext_element in encryption_ciphertext {
-                let ciphertext_element_affine =
-                    <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
-                ciphertext_affine.push(ciphertext_element_affine);
-            }
-
-            let encryption_ciphertext_bytes = UInt8::alloc_vec(
-                encryption_cs.ns(|| format!("output record {} ciphertext bytes", j)),
-                &to_bytes![ciphertext_affine]?,
-            )?;
+            let encryption_ciphertext_bytes = candidate_ciphertext_gadget
+                .to_bytes(encryption_cs.ns(|| format!("output record {} ciphertext bytes", j)))?;
 
             let candidate_ciphertext_hash = RecordCiphertextCRHGadget::check_evaluation_gadget(
                 &mut encryption_cs.ns(|| format!("Compute ciphertext hash {}", j)),
