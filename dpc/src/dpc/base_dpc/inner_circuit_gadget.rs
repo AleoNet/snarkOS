@@ -1270,7 +1270,7 @@ where
                 || Ok(encryption_plaintext),
             )?;
 
-            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc_input(
+            let encryption_ciphertext_gadget = AccountEncryptionGadget::CiphertextGadget::alloc(
                 &mut encryption_cs.ns(|| format!("output record {} encryption_ciphertext", j)),
                 || Ok(encryption_ciphertext),
             )?;
@@ -1291,7 +1291,7 @@ where
 
             // Check that the record ciphertext hash is correct
 
-            let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc(
+            let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc_input(
                 &mut encryption_cs.ns(|| format!("output record {} ciphertext hash", j)),
                 || Ok(record_ciphertext_hash),
             )?;

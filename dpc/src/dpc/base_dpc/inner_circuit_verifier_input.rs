@@ -22,8 +22,8 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
-    // New record ciphertexts
-    pub new_records_ciphertexts: Vec<Vec<<C::AccountEncryption as EncryptionScheme>::Text>>,
+    // New record ciphertext hashes
+    pub new_records_ciphertext_hashes: Vec<<C::RecordCiphertextCRH as CRH>::Output>,
 
     // Predicate input commitment and memo
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -41,7 +41,6 @@ where
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::AccountEncryption as EncryptionScheme>::Text: ToConstraintField<C::InnerField>,
 
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
@@ -50,6 +49,7 @@ where
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -138,12 +138,9 @@ where
             v.extend_from_slice(&sn.to_field_elements()?);
         }
 
-        for (cm, ciphertext) in self.new_commitments.iter().zip(&self.new_records_ciphertexts) {
+        for (cm, ciphertext_hash) in self.new_commitments.iter().zip(&self.new_records_ciphertext_hashes) {
             v.extend_from_slice(&cm.to_field_elements()?);
-
-            for ciphertext_element in ciphertext {
-                v.extend_from_slice(&ciphertext_element.to_field_elements()?);
-            }
+            v.extend_from_slice(&ciphertext_hash.to_field_elements()?);
         }
 
         v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);

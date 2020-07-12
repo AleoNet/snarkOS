@@ -49,7 +49,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
     old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    new_records_encryption_ciphertexts: &Vec<Vec<<C::AccountEncryption as EncryptionScheme>::Text>>,
+    new_records_ciphertext_hashes: &Vec<<C::RecordCiphertextCRH as CRH>::Output>,
     memo: &[u8; 32],
     value_balance: i64,
     network_id: u8,
@@ -74,7 +74,6 @@ where
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::AccountEncryption as EncryptionScheme>::Text: ToConstraintField<C::InnerField>,
 
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
@@ -83,6 +82,7 @@ where
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -183,16 +183,12 @@ where
         commitments_fe.push(commitment_fe);
     }
 
-    let mut record_ciphertexts_fe = vec![];
-    for ciphertext in new_records_encryption_ciphertexts {
-        let mut ciphertext_fe = vec![];
-        for ciphertext_element in ciphertext {
-            let ciphertext_element_fe = ToConstraintField::<C::InnerField>::to_field_elements(ciphertext_element)
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
-            ciphertext_fe.push(ciphertext_element_fe);
-        }
+    let mut record_ciphertext_hashes_fe = vec![];
+    for ciphertext_hash in new_records_ciphertext_hashes {
+        let ciphertext_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(ciphertext_hash)
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        record_ciphertexts_fe.push(ciphertext_fe);
+        record_ciphertext_hashes_fe.push(ciphertext_hash_fe);
     }
 
     let predicate_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(predicate_commitment)
@@ -250,21 +246,21 @@ where
         )?);
     }
 
-    let mut commitment_and_ciphertext_fe_bytes = vec![];
-    for (index, (cm_fe, record_ciphertext_fe)) in commitments_fe.iter().zip(record_ciphertexts_fe).enumerate() {
-        commitment_and_ciphertext_fe_bytes.extend(field_element_to_bytes::<C, _>(
+    let mut commitment_and_ciphertext_hash_fe_bytes = vec![];
+    for (index, (cm_fe, record_ciphertext_hash_fe)) in
+        commitments_fe.iter().zip(&record_ciphertext_hashes_fe).enumerate()
+    {
+        commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
             cm_fe,
             &format!("Allocate record commitment {:?}", index),
         )?);
 
-        for (ciphertext_index, ciphertext_element_fe) in record_ciphertext_fe.iter().enumerate() {
-            commitment_and_ciphertext_fe_bytes.extend(field_element_to_bytes::<C, _>(
-                cs,
-                ciphertext_element_fe,
-                &format!("Allocate record {} ciphertext {}", index, ciphertext_index),
-            )?);
-        }
+        commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
+            cs,
+            record_ciphertext_hash_fe,
+            &format!("Allocate record ciphertext hash {:?}", index),
+        )?);
     }
 
     let predicate_commitment_fe_bytes =
@@ -291,7 +287,7 @@ where
     inner_snark_input_bytes.extend(ledger_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_digest_fe_bytes);
     inner_snark_input_bytes.extend(serial_number_fe_bytes);
-    inner_snark_input_bytes.extend(commitment_and_ciphertext_fe_bytes);
+    inner_snark_input_bytes.extend(commitment_and_ciphertext_hash_fe_bytes);
     inner_snark_input_bytes.extend(predicate_commitment_fe_bytes);
     inner_snark_input_bytes.extend(memo_fe_bytes);
     inner_snark_input_bytes.extend(network_id_fe_bytes);

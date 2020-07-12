@@ -971,7 +971,7 @@ where
                 &ledger_digest,
                 &old_serial_numbers,
                 &new_commitments,
-                &new_records_encryption_ciphertexts,
+                &new_records_ciphertext_hashes,
                 &memorandum,
                 value_balance,
                 network_id,
@@ -1081,13 +1081,31 @@ where
 
         end_timer!(signature_time);
 
+        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for ciphertext in &transaction.record_ciphertexts {
+            let mut ciphertext_affine = vec![];
+            for ciphertext_element in ciphertext {
+                let ciphertext_element_affine =
+                    <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
+                        .into_affine();
+                ciphertext_affine.push(ciphertext_element_affine);
+            }
+
+            let ciphertext_hash = parameters
+                .circuit_parameters
+                .record_ciphertext_crh
+                .hash(&to_bytes![ciphertext_affine]?)?;
+
+            new_records_ciphertext_hashes.push(ciphertext_hash);
+        }
+
         let inner_snark_input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
             ledger_parameters: ledger.parameters().clone(),
             ledger_digest: transaction.ledger_digest().clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
-            new_records_ciphertexts: transaction.ciphertexts().to_vec(),
+            new_records_ciphertext_hashes,
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.predicate_commitment().clone(),
             local_data_commitment: transaction.local_data_commitment().clone(),
