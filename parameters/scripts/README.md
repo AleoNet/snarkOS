@@ -3,7 +3,6 @@
 To perform a full parameter generation, run:
 ```$xslt
 ./parameter_setup.sh
-./genesis_block_setup.sh
 ```
 
 ## Subroutines

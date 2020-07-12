@@ -46,3 +46,5 @@ mv value_commitment.checksum ../src/params
 ./outer_snark.sh
 
 ./posw_snark.sh
+
+./genesis_block_setup.sh
