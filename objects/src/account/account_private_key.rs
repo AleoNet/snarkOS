@@ -1,11 +1,11 @@
 use crate::account_format;
-use snarkos_algorithms::crh::bytes_to_bits;
+use snarkos_algorithms::{crh::bytes_to_bits, prf::Blake2s};
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, PRF},
     dpc::DPCComponents,
 };
-use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;
@@ -19,6 +19,8 @@ use std::{fmt, str::FromStr};
     Eq(bound = "C: DPCComponents")
 )]
 pub struct AccountPrivateKey<C: DPCComponents> {
+    pub seed: [u8; 32],
+    // Derived private attributes from the seed.
     pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
@@ -34,34 +36,59 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         commitment_parameters: &C::AccountCommitment,
         rng: &mut R,
     ) -> Result<Self, AccountError> {
-        // Sample SIG key pair.
-        let sk_sig = C::AccountSignature::generate_private_key(signature_parameters, rng)?;
-
-        // Sample PRF secret key.
-        let sk_bytes: [u8; 32] = rng.gen();
-        let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&sk_bytes[..])?;
-
-        // Sample randomness rpk for the commitment scheme.
-        let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-        // Construct the account private key.
-        let mut private_key = Self {
-            sk_sig,
-            sk_prf,
-            r_pk,
-            is_dummy: false,
-        };
-
         // Sample randomly until a valid private key is found.
         loop {
-            // Sample randomness rpk for the commitment scheme.
-            private_key.r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let seed: [u8; 32] = rng.gen();
+
+            // Construct the account private key.
+            let private_key = match Self::from_seed(&seed) {
+                Ok(private_key) => private_key,
+                _ => continue,
+            };
 
             // Returns the private key if it is valid.
             if private_key.is_valid(signature_parameters, commitment_parameters) {
                 return Ok(private_key);
             }
         }
+    }
+
+    /// Derives the account private key from a given seed.
+    pub fn from_seed(seed: &[u8; 32]) -> Result<Self, AccountError> {
+        // Derive the private key attributes.
+        let (sk_sig, sk_prf, r_pk) = {
+            let mut input_sk_sig = [0u8; 32];
+            input_sk_sig[0] = 0x00;
+
+            let mut input_sk_prf = [0u8; 32];
+            input_sk_prf[0] = 0x01;
+
+            let mut input_r_pk = [0u8; 32];
+            input_r_pk[0] = 0x02;
+
+            // Generate the SIG key pair.
+            let sk_sig_bytes = Blake2s::evaluate(&seed, &input_sk_sig)?;
+            let sk_sig = <C::AccountSignature as SignatureScheme>::PrivateKey::read(&sk_sig_bytes[..])?;
+
+            // Generate the PRF secret key.
+            let sk_prf_bytes = Blake2s::evaluate(&seed, &input_sk_prf)?;
+            let sk_prf = <C::PRF as PRF>::Seed::read(&sk_prf_bytes[..])?;
+
+            // Generate the randomness rpk for the commitment scheme.
+            let r_pk_bytes = Blake2s::evaluate(&seed, &input_r_pk)?;
+            let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::read(&r_pk_bytes[..])?;
+
+            (sk_sig, sk_prf, r_pk)
+        };
+
+        // Construct the account private key.
+        Ok(Self {
+            seed: *seed,
+            sk_sig,
+            sk_prf,
+            r_pk,
+            is_dummy: false,
+        })
     }
 
     /// Returns `true` if the private key is well-formed. Otherwise, returns `false`.
@@ -152,44 +179,31 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
     /// Reads in an account private key string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = s.from_base58()?;
-        if data.len() != 101 {
+        if data.len() != 53 {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..5] != account_format::PRIVATE_KEY_PREFIX {
-            return Err(AccountError::InvalidPrefixBytes(data[0..5].to_vec()));
+        if &data[0..4] != account_format::PRIVATE_KEY_PREFIX {
+            return Err(AccountError::InvalidPrefixBytes(data[0..4].to_vec()));
         }
 
         let mut reader = &data[5..];
-        let sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey = FromBytes::read(&mut reader)?;
-        let sk_prf: <C::PRF as PRF>::Seed = FromBytes::read(&mut reader)?;
-        let r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness = FromBytes::read(&mut reader)?;
+        let seed: [u8; 32] = FromBytes::read(&mut reader)?;
 
-        Ok(Self {
-            sk_sig,
-            sk_prf,
-            r_pk,
-            is_dummy: false,
-        })
+        Self::from_seed(&seed)
     }
 }
 
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut private_key = [0u8; 101];
+        let mut private_key = [0u8; 36];
         let prefix = account_format::PRIVATE_KEY_PREFIX;
 
-        private_key[0..5].copy_from_slice(&prefix);
+        private_key[0..4].copy_from_slice(&prefix);
 
-        self.sk_sig
-            .write(&mut private_key[5..37])
-            .expect("sk_sig formatting failed");
-        self.sk_prf
-            .write(&mut private_key[37..69])
-            .expect("sk_prf formatting failed");
-        self.r_pk
-            .write(&mut private_key[69..101])
-            .expect("r_pk formatting failed");
+        self.seed
+            .write(&mut private_key[4..36])
+            .expect("seed formatting failed");
 
         write!(f, "{}", private_key.to_base58())
     }
@@ -197,10 +211,6 @@ impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
 
 impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "AccountPrivateKey {{ sk_sig: {:?}, sk_prf: {:?}, r_pk: {:?} }}",
-            self.sk_sig, self.sk_prf, self.r_pk,
-        )
+        write!(f, "AccountPrivateKey {{ seed: {:?} }}", self.seed,)
     }
 }
