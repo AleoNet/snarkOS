@@ -17,7 +17,6 @@ use rand::Rng;
 use std::{
     hash::Hash,
     io::{Read, Result as IoResult, Write},
-    marker::PhantomData,
 };
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
