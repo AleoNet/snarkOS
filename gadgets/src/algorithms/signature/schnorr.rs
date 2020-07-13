@@ -18,23 +18,25 @@ use snarkos_models::{
 use snarkos_utilities::serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use digest::Digest;
+use itertools::Itertools;
 use std::{borrow::Borrow, marker::PhantomData};
 
-pub struct SchnorrParametersGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
-    generator: GG,
+#[derive(Clone)]
+pub struct SchnorrParametersGadget<G: Group, F: Field, D: Digest> {
+    parameters: SchnorrParameters<G, D>,
     _group: PhantomData<*const G>,
     _engine: PhantomData<*const F>,
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>, D: Digest> AllocGadget<SchnorrParameters<G, D>, F>
-    for SchnorrParametersGadget<G, F, GG>
-{
+impl<G: Group, F: Field, D: Digest> AllocGadget<SchnorrParameters<G, D>, F> for SchnorrParametersGadget<G, F, D> {
     fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<SchnorrParameters<G, D>>, CS: ConstraintSystem<F>>(
-        cs: CS,
-        f: Fn,
+        _cs: CS,
+        value_gen: Fn,
     ) -> Result<Self, SynthesisError> {
+        let value = value_gen()?;
+        let parameters = value.borrow().clone();
         Ok(Self {
-            generator: GG::alloc_checked(cs, || f().map(|pp| pp.borrow().generator))?,
+            parameters,
             _engine: PhantomData,
             _group: PhantomData,
         })
@@ -45,24 +47,16 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>, D: Digest> AllocGadget<SchnorrPa
         T: Borrow<SchnorrParameters<G, D>>,
         CS: ConstraintSystem<F>,
     >(
-        cs: CS,
-        f: Fn,
+        _cs: CS,
+        value_gen: Fn,
     ) -> Result<Self, SynthesisError> {
+        let value = value_gen()?;
+        let parameters = value.borrow().clone();
         Ok(Self {
-            generator: GG::alloc_input(cs, || f().map(|pp| pp.borrow().generator))?,
+            parameters,
             _engine: PhantomData,
             _group: PhantomData,
         })
-    }
-}
-
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> Clone for SchnorrParametersGadget<G, F, GG> {
-    fn clone(&self) -> Self {
-        Self {
-            generator: self.generator.clone(),
-            _group: PhantomData,
-            _engine: PhantomData,
-        }
     }
 }
 
@@ -145,7 +139,7 @@ pub struct SchnorrPublicKeyRandomizationGadget<G: Group, F: Field, GG: GroupGadg
 impl<G: Group + CanonicalSerialize + CanonicalDeserialize, GG: GroupGadget<G, F>, D: Digest + Send + Sync, F: Field>
     SignaturePublicKeyRandomizationGadget<SchnorrSignature<G, D>, F> for SchnorrPublicKeyRandomizationGadget<G, F, GG>
 {
-    type ParametersGadget = SchnorrParametersGadget<G, F, GG>;
+    type ParametersGadget = SchnorrParametersGadget<G, F, D>;
     type PublicKeyGadget = SchnorrPublicKeyGadget<G, F, GG>;
 
     fn check_randomization_gadget<CS: ConstraintSystem<F>>(
@@ -154,13 +148,13 @@ impl<G: Group + CanonicalSerialize + CanonicalDeserialize, GG: GroupGadget<G, F>
         public_key: &Self::PublicKeyGadget,
         randomness: &[UInt8],
     ) -> Result<Self::PublicKeyGadget, SynthesisError> {
-        let base = parameters.generator.clone();
         let randomness = randomness.iter().flat_map(|b| b.to_bits_le()).collect::<Vec<_>>();
-        let rand_pk = base.mul_bits(
-            &mut cs.ns(|| "check_randomization_gadget"),
-            &public_key.public_key,
-            randomness.iter(),
+        let mut rand_pk = public_key.public_key.clone();
+        rand_pk.precomputed_base_scalar_mul(
+            cs.ns(|| "check_randomization_gadget"),
+            randomness.iter().zip_eq(&parameters.parameters.generator_powers),
         )?;
+
         Ok(SchnorrPublicKeyGadget {
             public_key: rand_pk,
             _group: PhantomData,

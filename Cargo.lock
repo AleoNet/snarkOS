@@ -2231,6 +2231,7 @@ dependencies = [
  "csv",
  "derivative",
  "digest 0.8.1",
+ "itertools",
  "rand",
  "rand_chacha",
  "rand_xorshift",
@@ -2370,6 +2371,7 @@ dependencies = [
  "blake2",
  "derivative",
  "digest 0.8.1",
+ "itertools",
  "rand",
  "rand_xorshift",
  "snarkos-algorithms",
@@ -2405,6 +2407,7 @@ version = "0.8.0"
 dependencies = [
  "bincode",
  "derivative",
+ "itertools",
  "rand",
  "rand_xorshift",
  "serde",
