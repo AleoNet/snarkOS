@@ -179,7 +179,7 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
     /// Reads in an account private key string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = s.from_base58()?;
-        if data.len() != 53 {
+        if data.len() != 36 {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
@@ -187,7 +187,7 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
             return Err(AccountError::InvalidPrefixBytes(data[0..4].to_vec()));
         }
 
-        let mut reader = &data[5..];
+        let mut reader = &data[4..];
         let seed: [u8; 32] = FromBytes::read(&mut reader)?;
 
         Self::from_seed(&seed)
