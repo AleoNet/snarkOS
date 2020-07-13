@@ -9,7 +9,7 @@ use crate::{
 use snarkos_errors::gadgets::SynthesisError;
 
 pub trait SignaturePublicKeyRandomizationGadget<S: SignatureScheme, F: Field> {
-    type ParametersGadget: AllocGadget<S::Parameters, F> + Clone;
+    type ParametersGadget: AllocGadget<S::Parameters, F>;
     type PublicKeyGadget: ToBytesGadget<F> + EqGadget<F> + AllocGadget<S::PublicKey, F> + Clone;
 
     fn check_randomization_gadget<CS: ConstraintSystem<F>>(
