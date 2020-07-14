@@ -91,6 +91,14 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
 
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+
       - uses: jetli/wasm-pack-action@v0.3.0
         with:
           version: 'latest'
