@@ -1,6 +1,5 @@
 name: CI - Branches
 on:
-  pull_request:
   push:
     branches-ignore:
       - 'master'
