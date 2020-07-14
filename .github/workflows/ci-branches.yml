@@ -91,6 +91,10 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
 
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: 'latest'
+
       - name: Test
         run: |
           cd toolkit
