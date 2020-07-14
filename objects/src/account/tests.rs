@@ -1,4 +1,4 @@
-use crate::account::{Account, AccountPrivateKey, AccountPublicKey};
+use crate::account::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::CircuitParameters};
 use snarkos_models::objects::account::AccountScheme;
 
@@ -13,16 +13,19 @@ fn test_account_new() {
     let account = Account::<Components>::new(
         &parameters.account_signature,
         &parameters.account_commitment,
-        &[0u8; 32],
+        &parameters.account_encryption,
         rng,
     );
+
+    println!("{:?}", account);
     assert!(account.is_ok());
+
     println!("{}", account.unwrap());
 }
 
 #[test]
 pub fn test_private_key_from_str() {
-    let private_key_string = "AKey1PJBq5DcamxmsfM8pRL6Vowi6tSPozrqbpZzBvk9nbGmM1gMJACtbCA2SQku1DFDnG8f4Lw3jYNEoTp2XQ78MUy6bjxTw2SuVqzACs3rGquduSwJE82h7UM6UvRufrrcBByiR91USfuPEK6aUvcz6D34kqhqRPLJktVkkDEqJDYc7AyE";
+    let private_key_string = "AKEY1YXwhewzuVjBqXpALejm7TFcdqGJZDpR74B8P6Q9iwsuu";
 
     let private_key = AccountPrivateKey::<Components>::from_str(private_key_string);
     println!("{:?}", private_key);
@@ -32,10 +35,10 @@ pub fn test_private_key_from_str() {
 }
 
 #[test]
-pub fn test_public_key_from_str() {
-    let public_key_string = "aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8";
+pub fn test_address_from_str() {
+    let address_string = "aleo1wztym2rpv8f7f7j47xz2tyfdsgh36u86q6ph6qkhtlfc0g0segqqlge0gm";
 
-    let public_key = AccountPublicKey::<Components>::from_str(public_key_string);
-    assert!(public_key.is_ok());
-    assert_eq!(public_key_string, public_key.unwrap().to_string());
+    let address = AccountAddress::<Components>::from_str(address_string);
+    assert!(address.is_ok());
+    assert_eq!(address_string, address.unwrap().to_string());
 }

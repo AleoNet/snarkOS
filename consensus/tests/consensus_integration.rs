@@ -8,7 +8,7 @@ mod consensus_integration {
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<Tx>, parent_header: &BlockHeader) {
         let consensus = TEST_CONSENSUS.clone();
-        let miner_address = FIXTURE_VK.test_accounts[0].public_key.clone();
+        let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = Miner::new(miner_address, consensus);
 
         let header = miner.find_block(transactions, parent_header).unwrap();

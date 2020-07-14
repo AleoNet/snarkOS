@@ -14,6 +14,7 @@ use snarkos_algorithms::{
     commitment::{Blake2sCommitment, PedersenCompressedCommitment},
     crh::{BoweHopwoodPedersenCompressedCRH, PedersenSize},
     define_merkle_tree_parameters,
+    encryption::GroupEncryption,
     prf::Blake2s,
     signature::SchnorrSignature,
     snark::{Groth16, GM17},
@@ -29,6 +30,7 @@ use snarkos_gadgets::{
         binding_signature::BindingSignatureVerificationGadget,
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::BoweHopwoodPedersenCompressedCRHGadget,
+        encryption::GroupEncryptionGadget,
         prf::Blake2sGadget,
         signature::SchnorrPublicKeyRandomizationGadget,
         snark::{GM17VerifierGadget, Groth16VerifierGadget},
@@ -85,7 +87,7 @@ impl PedersenSize for TwoToOneWindow {
 pub struct RecordWindow;
 impl PedersenSize for RecordWindow {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 225;
+    const WINDOW_SIZE: usize = 233;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -110,6 +112,8 @@ pub struct Components;
 impl DPCComponents for Components {
     type AccountCommitment = AccountCommitment;
     type AccountCommitmentGadget = AccountCommitmentGadget;
+    type AccountEncryption = AccountEncryption;
+    type AccountEncryptionGadget = AccountEncryptionGadget;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
     type InnerField = InnerField;
@@ -155,6 +159,7 @@ pub type InnerField = Bls12_377Fr;
 pub type OuterField = Bls12_377Fq;
 
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
+pub type AccountEncryption = GroupEncryption<EdwardsBls>;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
@@ -181,6 +186,7 @@ pub type LocalData = DPCLocalData<Components>;
 // Gadgets
 
 pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type AccountEncryptionGadget = GroupEncryptionGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;

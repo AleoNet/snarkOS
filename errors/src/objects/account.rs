@@ -11,6 +11,9 @@ pub enum AccountError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[error("invalid account commitment")]
+    InvalidAccountCommitment,
+
     #[error("invalid byte length: {}", _0)]
     InvalidByteLength(usize),
 
@@ -22,6 +25,9 @@ pub enum AccountError {
 
     #[error("invalid prefix bytes: {:?}", _0)]
     InvalidPrefixBytes(Vec<u8>),
+
+    #[error("invalid account private key seed")]
+    InvalidPrivateKeySeed,
 
     #[error("{}", _0)]
     Message(String),

@@ -48,15 +48,12 @@ pub fn generate_test_accounts<R: Rng>(
 ) -> [Account<Components>; 3] {
     let signature_parameters = &parameters.circuit_parameters.account_signature;
     let commitment_parameters = &parameters.circuit_parameters.account_commitment;
+    let encryption_parameters = &parameters.circuit_parameters.account_encryption;
 
-    let genesis_metadata = [1u8; 32];
-    let genesis_account = Account::new(signature_parameters, commitment_parameters, &genesis_metadata, rng).unwrap();
-
-    let metadata_1 = [2u8; 32];
-    let account_1 = Account::new(signature_parameters, commitment_parameters, &metadata_1, rng).unwrap();
-
-    let metadata_2 = [3u8; 32];
-    let account_2 = Account::new(signature_parameters, commitment_parameters, &metadata_2, rng).unwrap();
+    let genesis_account =
+        Account::new(signature_parameters, commitment_parameters, encryption_parameters, rng).unwrap();
+    let account_1 = Account::new(signature_parameters, commitment_parameters, encryption_parameters, rng).unwrap();
+    let account_2 = Account::new(signature_parameters, commitment_parameters, encryption_parameters, rng).unwrap();
 
     [genesis_account, account_1, account_2]
 }

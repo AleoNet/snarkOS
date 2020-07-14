@@ -1,14 +1,14 @@
 use crate::{context::Context, server::propagate_block};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
-use snarkos_objects::{AccountPublicKey, Block};
+use snarkos_objects::{AccountAddress, Block};
 
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
-    miner_address: AccountPublicKey<Components>,
+    miner_address: AccountAddress<Components>,
     consensus: ConsensusParameters,
     parameters: PublicParameters<Components>,
     storage: Arc<MerkleTreeLedger>,
@@ -19,7 +19,7 @@ pub struct MinerInstance {
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
     pub fn new(
-        miner_address: AccountPublicKey<Components>,
+        miner_address: AccountAddress<Components>,
         consensus: ConsensusParameters,
         parameters: PublicParameters<Components>,
         storage: Arc<MerkleTreeLedger>,

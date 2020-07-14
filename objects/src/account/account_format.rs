@@ -1,2 +1,2 @@
-pub static PRIVATE_KEY_PREFIX: [u8; 4] = [13, 235, 192, 10]; // AKey1
-pub static PUBLIC_KEY_PREFIX: &str = "aleo";
+pub static PRIVATE_KEY_PREFIX: [u8; 4] = [21, 38, 63, 229]; // AKEY1
+pub static ADDRESS_PREFIX: &str = "aleo";

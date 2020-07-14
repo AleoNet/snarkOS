@@ -246,6 +246,16 @@ pub trait AffineCurve:
     /// Returns the y-coordinate of the point.
     #[must_use]
     fn to_y_coordinate(&self) -> Self::BaseField;
+
+    /// Attempts to construct an affine point given an x-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn get_point_from_x(x: Self::BaseField, greatest: bool) -> Option<Self>;
+
+    /// Checks that the current point is on the elliptic curve.
+    fn is_on_curve(&self) -> bool;
 }
 
 pub trait PairingCurve: AffineCurve {

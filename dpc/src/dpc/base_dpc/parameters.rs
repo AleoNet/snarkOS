@@ -9,6 +9,7 @@ use std::io::Result as IoResult;
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct CircuitParameters<C: BaseDPCComponents> {
     pub account_commitment: C::AccountCommitment,
+    pub account_encryption: C::AccountEncryption,
     pub account_signature: C::AccountSignature,
     pub record_commitment: C::RecordCommitment,
     pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
@@ -24,6 +25,8 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
     pub fn load() -> IoResult<Self> {
         let account_commitment: C::AccountCommitment =
             From::from(FromBytes::read(AccountCommitmentParameters::load_bytes()?.as_slice())?);
+        let account_encryption: C::AccountEncryption =
+            From::from(FromBytes::read(AccountEncryptionParameters::load_bytes()?.as_slice())?);
         let account_signature: C::AccountSignature =
             From::from(FromBytes::read(AccountSignatureParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =
@@ -45,6 +48,7 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
 
         Ok(Self {
             account_commitment,
+            account_encryption,
             account_signature,
             record_commitment,
             predicate_verification_key_commitment,
@@ -98,6 +102,10 @@ pub struct PublicParameters<C: BaseDPCComponents> {
 impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn account_commitment_parameters(&self) -> &C::AccountCommitment {
         &self.circuit_parameters.account_commitment
+    }
+
+    pub fn account_encryption_parameters(&self) -> &C::AccountEncryption {
+        &self.circuit_parameters.account_encryption
     }
 
     pub fn account_signature_parameters(&self) -> &C::AccountSignature {

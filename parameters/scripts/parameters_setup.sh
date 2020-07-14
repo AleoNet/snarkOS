@@ -3,6 +3,7 @@
 # If the parameter size has changed, you will need to manually update these in each corresponding struct.
 
 cargo run --release --example account_commitment
+cargo run --release --example account_encryption
 cargo run --release --example account_signature
 cargo run --release --example ledger_merkle_tree
 cargo run --release --example local_data_crh
@@ -14,6 +15,9 @@ cargo run --release --example value_commitment
 
 mv account_commitment.params ../src/params
 mv account_commitment.checksum ../src/params
+
+mv account_encryption.params ../src/params
+mv account_encryption.checksum ../src/params
 
 mv account_signature.params ../src/params
 mv account_signature.checksum ../src/params

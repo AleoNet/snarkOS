@@ -59,5 +59,5 @@ pub trait ProtectedRpcFunctions {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 
     /// Generate a new account with optional metadata
-    fn create_account(&self, metadata: Option<String>) -> Result<RpcAccount, RpcError>;
+    fn create_account(&self) -> Result<RpcAccount, RpcError>;
 }

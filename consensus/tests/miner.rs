@@ -1,24 +1,25 @@
 mod miner {
     use snarkos_consensus::Miner;
     use snarkos_models::{
-        algorithms::{commitment::CommitmentScheme, signature::SignatureScheme},
+        algorithms::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
         dpc::DPCComponents,
     };
-    use snarkos_objects::{dpc::DPCTransactions, AccountPrivateKey, AccountPublicKey, BlockHeader};
+    use snarkos_objects::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader};
     use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
 
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
-    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountPublicKey<C>) {
+    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountAddress<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
+        let enc_params = C::AccountEncryption::setup(rng);
 
-        let key = AccountPrivateKey::<C>::new(&sig_params, &[0; 32], rng).unwrap();
-        let pubkey = AccountPublicKey::from(&comm_params, &sig_params, &key).unwrap();
+        let private_key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
+        let address = AccountAddress::from_private_key(&sig_params, &comm_params, &enc_params, &private_key).unwrap();
 
-        (key, pubkey)
+        (private_key, address)
     }
 
     // this test ensures that a block is found by running the proof of work

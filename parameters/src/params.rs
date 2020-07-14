@@ -211,7 +211,7 @@ impl_params!(
     RecordCommitmentParameters,
     record_commitment_test,
     "record_commitment",
-    489676
+    507084
 );
 impl_params!(
     ValueCommitmentParameters,
@@ -235,6 +235,14 @@ impl_params!(
     258180
 );
 
+// Encryption
+impl_params!(
+    AccountEncryptionParameters,
+    account_encryption_test,
+    "account_encryption",
+    128
+);
+
 // POSW SNARK
 impl_params!(PoswSNARKPKParameters, posw_snark_pk_test, "posw_snark_pk", 32169122);
 impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 1165);
@@ -254,9 +262,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 210199697);
-impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2232);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 212265409);
+impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2426);
 
 // Outer SNARK
 impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 467030109);
-impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4057);
+impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);

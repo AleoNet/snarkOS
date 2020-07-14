@@ -2,7 +2,7 @@ use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
 };
 
@@ -37,6 +37,8 @@ where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
+    <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
+
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
@@ -63,6 +65,13 @@ where
             &self
                 .circuit_parameters
                 .account_commitment
+                .parameters()
+                .to_field_elements()?,
+        );
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
+                .account_encryption
                 .parameters()
                 .to_field_elements()?,
         );
