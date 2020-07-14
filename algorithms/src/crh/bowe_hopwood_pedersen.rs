@@ -1,10 +1,10 @@
-use crate::crh::{bytes_to_bits, PedersenCRH, PedersenCRHParameters, PedersenSize};
+use crate::crh::{PedersenCRH, PedersenCRHParameters, PedersenSize};
 use snarkos_errors::{algorithms::CRHError, curves::ConstraintFieldError};
 use snarkos_models::{
     algorithms::CRH,
     curves::{to_field_vec::ToConstraintField, Field, Group, PrimeField},
 };
-use snarkos_utilities::biginteger::biginteger::BigInteger;
+use snarkos_utilities::{biginteger::biginteger::BigInteger, bytes_to_bits};
 
 use rand::Rng;
 

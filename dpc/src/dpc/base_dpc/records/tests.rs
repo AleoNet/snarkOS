@@ -1,6 +1,5 @@
 use super::record_serializer::*;
 use crate::dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, DPC};
-use snarkos_algorithms::crh::bytes_to_bits;
 use snarkos_curves::edwards_bls12::{EdwardsParameters, EdwardsProjective as EdwardsBls};
 use snarkos_models::{algorithms::CRH, objects::AccountScheme};
 
@@ -12,21 +11,6 @@ use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 pub(crate) const ITERATIONS: usize = 100;
-
-///TODO Move this into utilities along with the `bits_to_bytes` impl
-#[test]
-fn test_bits_to_bytes() {
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-
-    for _ in 0..ITERATIONS {
-        let bytes: [u8; 32] = rng.gen();
-
-        let bits = bytes_to_bits(&bytes);
-
-        let recovered_bytes = bits_to_bytes(&bits);
-        assert_eq!(bytes.to_vec(), recovered_bytes);
-    }
-}
 
 #[test]
 fn test_record_serialization() {

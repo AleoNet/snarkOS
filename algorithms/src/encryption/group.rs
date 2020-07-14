@@ -1,10 +1,10 @@
-use crate::{crh::bytes_to_bits, encryption::GroupEncryptionParameters};
+use crate::encryption::GroupEncryptionParameters;
 use snarkos_errors::algorithms::EncryptionError;
 use snarkos_models::{
     algorithms::EncryptionScheme,
     curves::{AffineCurve, Field, Group, One, PrimeField, ProjectiveCurve, Zero},
 };
-use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
+use snarkos_utilities::{bytes_to_bits, rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
 use itertools::Itertools;
 use rand::Rng;

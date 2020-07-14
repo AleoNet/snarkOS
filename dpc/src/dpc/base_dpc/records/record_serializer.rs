@@ -1,12 +1,12 @@
 use crate::base_dpc::{record::DPCRecord, record_payload::RecordPayload, BaseDPCComponents};
-use snarkos_algorithms::{crh::bytes_to_bits, encoding::Elligator2};
+use snarkos_algorithms::encoding::Elligator2;
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{AffineCurve, Group, MontgomeryModelParameters, PrimeField, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, Record},
 };
-use snarkos_utilities::{to_bytes, BigInteger, FromBytes, ToBytes};
+use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, BigInteger, FromBytes, ToBytes};
 
 use std::marker::PhantomData;
 
@@ -45,29 +45,6 @@ pub fn decode_from_group<P: MontgomeryModelParameters + TEModelParameters, G: Gr
 ) -> Result<Vec<u8>, DPCError> {
     let output = Elligator2::<P, G>::decode(&affine, fq_high)?;
     Ok(to_bytes![output]?)
-}
-
-//TODO (raychu86) move bits_to_bytes and bytes_to_bits into utilities
-pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
-    // Pad the bits if it not a correct size
-    let mut bits = bits.to_vec();
-    if bits.len() % 8 != 0 {
-        let current_length = bits.len();
-        for _ in 0..(8 - current_length % 8) {
-            bits.push(false);
-        }
-    }
-
-    let mut bytes = Vec::with_capacity(bits.len() / 8);
-    for bits in bits.chunks(8) {
-        let mut result = 0u8;
-        for (i, bit) in bits.iter().enumerate() {
-            let bit_value = *bit as u8;
-            result = result + (bit_value << i as u8);
-        }
-        bytes.push(result);
-    }
-    bytes
 }
 
 pub trait SerializeRecord {

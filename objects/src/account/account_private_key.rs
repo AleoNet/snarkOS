@@ -1,11 +1,10 @@
 use crate::account_format;
-use snarkos_algorithms::crh::bytes_to_bits;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, PRF},
     dpc::DPCComponents,
 };
-use snarkos_utilities::{rand::UniformRand, to_bytes, FromBytes, ToBytes};
+use snarkos_utilities::{bytes_to_bits, rand::UniformRand, to_bytes, FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;
