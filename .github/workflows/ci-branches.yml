@@ -98,5 +98,5 @@ jobs:
       - name: Test
         run: |
           cd toolkit
-          wasm-pack test --headless --chrome
+          wasm-pack test --node
 #          cargo test --target wasm32-unknown-unknown --features wasm
