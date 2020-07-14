@@ -82,7 +82,7 @@ impl<F: PrimeField> EvaluationDomain<F> {
         }
 
         let size_as_bigint = F::BigInt::from(size);
-        let size_as_field_element = F::from_repr(size_as_bigint);
+        let size_as_field_element = F::from_repr(size_as_bigint)?;
         let size_inv = size_as_field_element.inverse()?;
 
         Some(EvaluationDomain {

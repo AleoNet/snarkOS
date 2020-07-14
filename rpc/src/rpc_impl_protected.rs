@@ -6,7 +6,7 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::AccountScheme};
-use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -14,7 +14,7 @@ use snarkos_utilities::{
 
 use base64;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
-use rand::{thread_rng, Rng};
+use rand::thread_rng;
 use std::{str::FromStr, sync::Arc};
 
 type JsonrpcError = jsonrpc_core::Error;
@@ -99,26 +99,9 @@ impl RpcImpl {
     pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
-        let value = match params {
-            Params::Array(arr) => arr,
-            _ => vec![],
-        };
+        params.expect_no_params()?;
 
-        let metadata: Option<String> = match value.len() {
-            0 => None,
-            1 => Some(
-                serde_json::from_value(value[0].clone())
-                    .map_err(|e| JsonrpcError::invalid_params(format!("Invalid params: {}.", e)))?,
-            ),
-            _ => {
-                return Err(JsonrpcError::invalid_params(format!(
-                    "invalid length {}, expected at most 1 element",
-                    value.len()
-                )));
-            }
-        };
-
-        match self.create_account(metadata) {
+        match self.create_account() {
             Ok(account) => Ok(serde_json::to_value(account).expect("account serialization failed")),
             Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
         }
@@ -187,16 +170,17 @@ impl ProtectedRpcFunctions for RpcImpl {
                 .hash(&[64u8; 1])?;
 
             let private_key = old_account_private_keys[0].clone();
-            let public_key = AccountPublicKey::<Components>::from(
-                &self.parameters.circuit_parameters.account_commitment,
-                &self.parameters.circuit_parameters.account_signature,
+            let address = AccountAddress::<Components>::from_private_key(
+                self.parameters.account_signature_parameters(),
+                self.parameters.account_commitment_parameters(),
+                self.parameters.account_encryption_parameters(),
                 &private_key,
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
                 &self.parameters.circuit_parameters,
                 &old_sn_nonce,
-                &public_key,
+                &address,
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
@@ -213,23 +197,23 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_account_public_keys = vec![];
+        let mut new_account_addresss = vec![];
         let mut new_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            new_account_public_keys.push(AccountPublicKey::<Components>::from_str(&recipient.address)?);
+            new_account_addresss.push(AccountAddress::<Components>::from_str(&recipient.address)?);
             new_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_account_public_keys.len() < Components::NUM_OUTPUT_RECORDS {
-            new_account_public_keys.push(new_account_public_keys[0].clone());
+        while new_account_addresss.len() < Components::NUM_OUTPUT_RECORDS {
+            new_account_addresss.push(new_account_addresss[0].clone());
             new_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_account_public_keys.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_account_addresss.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
@@ -249,7 +233,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             &self.parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_addresss,
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,
@@ -295,31 +279,19 @@ impl ProtectedRpcFunctions for RpcImpl {
     }
 
     /// Generate a new account with optional metadata
-    fn create_account(&self, metadata: Option<String>) -> Result<RpcAccount, RpcError> {
+    fn create_account(&self) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
-
-        let metadata: [u8; 32] = match metadata {
-            Some(metadata_string) => match hex::decode(&metadata_string) {
-                Ok(bytes) => {
-                    let mut metadata = [0u8; 32];
-                    bytes.write(&mut metadata[..])?;
-                    metadata
-                }
-                Err(_) => return Err(RpcError::InvalidMetadata(metadata_string)),
-            },
-            None => rng.gen(),
-        };
 
         let account = Account::<Components>::new(
             self.parameters.account_signature_parameters(),
             self.parameters.account_commitment_parameters(),
-            &metadata,
+            self.parameters.account_encryption_parameters(),
             rng,
         )?;
 
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
-            public_key: account.public_key.to_string(),
+            address: account.address.to_string(),
         })
     }
 }

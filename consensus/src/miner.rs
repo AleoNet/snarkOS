@@ -9,7 +9,7 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{dpc::DPCTransactions, AccountPublicKey, Block, BlockHeader};
+use snarkos_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
 use snarkos_posw::{txids_to_roots, Posw};
 use snarkos_storage::Ledger;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -24,7 +24,7 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct Miner {
     /// Receiving address that block rewards will be sent to.
-    address: AccountPublicKey<Components>,
+    address: AccountAddress<Components>,
 
     /// Parameters for current blockchain consensus.
     pub consensus: ConsensusParameters,
@@ -35,7 +35,7 @@ pub struct Miner {
 
 impl Miner {
     /// Returns a new instance of a miner with consensus params.
-    pub fn new(address: AccountPublicKey<Components>, consensus: ConsensusParameters) -> Self {
+    pub fn new(address: AccountAddress<Components>, consensus: ConsensusParameters) -> Self {
         Self {
             address,
             consensus,

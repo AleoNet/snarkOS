@@ -19,8 +19,8 @@ use snarkos_models::{
 use snarkos_objects::{
     dpc::DPCTransactions,
     Account,
+    AccountAddress,
     AccountPrivateKey,
-    AccountPublicKey,
     Block,
     BlockHeader,
     BlockHeaderHash,
@@ -334,7 +334,7 @@ impl ConsensusParameters {
         predicate_vk_hash: &Vec<u8>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
-        recipient: AccountPublicKey<Components>,
+        recipient: AccountAddress<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -351,11 +351,10 @@ impl ConsensusParameters {
         }
 
         // Generate a new account that owns the dummy input records
-        let account_metadata: [u8; 32] = rng.gen();
         let new_account = Account::new(
             &parameters.circuit_parameters.account_signature,
             &parameters.circuit_parameters.account_commitment,
-            &account_metadata,
+            &parameters.circuit_parameters.account_encryption,
             rng,
         )
         .unwrap();
@@ -372,7 +371,7 @@ impl ConsensusParameters {
             let old_record = InstantiatedDPC::generate_record(
                 &parameters.circuit_parameters,
                 &old_sn_nonce,
-                &new_account.public_key,
+                &new_account.address,
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
@@ -385,7 +384,7 @@ impl ConsensusParameters {
             old_records.push(old_record);
         }
 
-        let new_account_public_keys = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_account_addresss = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
@@ -396,7 +395,7 @@ impl ConsensusParameters {
             parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_addresss,
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,
@@ -414,7 +413,7 @@ impl ConsensusParameters {
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
-        new_account_public_keys: Vec<AccountPublicKey<Components>>,
+        new_account_addresss: Vec<AccountAddress<Components>>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
         new_dummy_flags: Vec<bool>,
@@ -517,7 +516,7 @@ impl ConsensusParameters {
             &old_records,
             &old_account_private_keys,
             &old_death_vk_and_proof_generator,
-            &new_account_public_keys,
+            &new_account_addresss,
             &new_dummy_flags,
             &new_values,
             &new_payloads,

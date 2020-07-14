@@ -2,7 +2,7 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner
 use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::dpc::{DPCScheme, Record};
-use snarkos_objects::{dpc::DPCTransactions, Account, AccountPublicKey, Block};
+use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkos_testing::consensus::*;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -18,7 +18,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     let consensus = TEST_CONSENSUS.clone();
 
     // setup the miner
-    let miner = Miner::new(miner_acc.public_key.clone(), consensus.clone());
+    let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
     let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
@@ -31,7 +31,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
         &consensus,
         &miner_acc,
         coinbase_records.clone(),
-        &acc_1.public_key,
+        &acc_1.address,
         10,
         &mut rng,
     )?;
@@ -102,7 +102,7 @@ fn send<R: Rng>(
     consensus: &ConsensusParameters,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,
-    receiver: &AccountPublicKey<Components>,
+    receiver: &AccountAddress<Components>,
     amount: u64,
     rng: &mut R,
 ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
@@ -116,7 +116,7 @@ fn send<R: Rng>(
     let in_predicates = vec![FIXTURE.predicate.clone(); NUM_INPUT_RECORDS];
     let out_predicates = vec![FIXTURE.predicate.clone(); NUM_OUTPUT_RECORDS];
 
-    let to = vec![receiver.clone(), from.public_key.clone()];
+    let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
     let output = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let dummy_flags = vec![false; NUM_OUTPUT_RECORDS];

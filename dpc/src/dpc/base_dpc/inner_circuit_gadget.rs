@@ -8,13 +8,14 @@ use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, PRF},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF},
     dpc::Record,
     gadgets::{
         algorithms::{
             BindingSignatureGadget,
             CRHGadget,
             CommitmentGadget,
+            EncryptionGadget,
             PRFGadget,
             SignaturePublicKeyRandomizationGadget,
         },
@@ -69,6 +70,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C,
         CS,
         C::AccountCommitment,
+        C::AccountEncryption,
         C::AccountSignature,
         C::RecordCommitment,
         C::LocalDataCRH,
@@ -76,6 +78,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::SerialNumberNonceCRH,
         C::PRF,
         C::AccountCommitmentGadget,
+        C::AccountEncryptionGadget,
         C::AccountSignatureGadget,
         C::RecordCommitmentGadget,
         C::LocalDataCRHGadget,
@@ -118,6 +121,7 @@ fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
     AccountCommitment,
+    AccountEncryption,
     AccountSignature,
     RecordCommitment,
     LocalDataCRH,
@@ -125,6 +129,7 @@ fn base_dpc_execute_gadget_helper<
     SerialNumberNonceCRH,
     P,
     AccountCommitmentGadget,
+    AccountEncryptionGadget,
     AccountSignatureGadget,
     RecordCommitmentGadget,
     LocalDataCRHGadget,
@@ -169,6 +174,7 @@ fn base_dpc_execute_gadget_helper<
 where
     C: BaseDPCComponents<
         AccountCommitment = AccountCommitment,
+        AccountEncryption = AccountEncryption,
         AccountSignature = AccountSignature,
         RecordCommitment = RecordCommitment,
         LocalDataCRH = LocalDataCRH,
@@ -176,6 +182,7 @@ where
         SerialNumberNonceCRH = SerialNumberNonceCRH,
         PRF = P,
         AccountCommitmentGadget = AccountCommitmentGadget,
+        AccountEncryptionGadget = AccountEncryptionGadget,
         AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitmentGadget = RecordCommitmentGadget,
         LocalDataCRHGadget = LocalDataCRHGadget,
@@ -184,6 +191,7 @@ where
         PRFGadget = PGadget,
     >,
     AccountCommitment: CommitmentScheme,
+    AccountEncryption: EncryptionScheme,
     AccountSignature: SignatureScheme,
     RecordCommitment: CommitmentScheme,
     LocalDataCRH: CRH,
@@ -192,6 +200,7 @@ where
     P: PRF,
     RecordCommitment::Output: Eq,
     AccountCommitmentGadget: CommitmentGadget<AccountCommitment, C::InnerField>,
+    AccountEncryptionGadget: EncryptionGadget<AccountEncryption, C::InnerField>,
     AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<AccountSignature, C::InnerField>,
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
     LocalDataCRHGadget: CRHGadget<LocalDataCRH, C::InnerField>,
@@ -202,7 +211,7 @@ where
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
     let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_account_public_keys_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_account_addresss_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
     let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
@@ -210,7 +219,7 @@ where
     let mut old_death_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_account_public_keys_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_account_addresss_gadgets = Vec::with_capacity(new_records.len());
     let mut new_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
     let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
@@ -219,22 +228,24 @@ where
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
-    // 2. account_signature_parameters
-    // 3. record_commitment_parameters
-    // 4. predicate_vk_commitment_parameters
-    // 5. local_data_crh_parameters
-    // 6. local_data_commitment_parameters
-    // 7. serial_number_nonce_crh_parameters
-    // 8. value_commitment_parameters
-    // 9. ledger_parameters
-    // 10. ledger_digest
-    // 11. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
-    // 12. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
-    // 13. predicate_commitment
-    // 14. local_data_commitment
-    // 15. binding_signature
+    // 2. account_encryption_parameters
+    // 3. account_signature_parameters
+    // 4. record_commitment_parameters
+    // 5. predicate_vk_commitment_parameters
+    // 6. local_data_crh_parameters
+    // 7. local_data_commitment_parameters
+    // 8. serial_number_nonce_crh_parameters
+    // 9. value_commitment_parameters
+    // 10. ledger_parameters
+    // 11. ledger_digest
+    // 12. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
+    // 13. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
+    // 14. predicate_commitment
+    // 15. local_data_commitment
+    // 16. binding_signature
     let (
         account_commitment_parameters,
+        account_encryption_parameters,
         account_signature_parameters,
         record_commitment_parameters,
         predicate_vk_commitment_parameters,
@@ -249,6 +260,11 @@ where
         let account_commitment_parameters = AccountCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account commit parameters"),
             || Ok(circuit_parameters.account_commitment.parameters()),
+        )?;
+
+        let account_encryption_parameters = AccountEncryptionGadget::ParametersGadget::alloc_input(
+            &mut cs.ns(|| "Declare account encryption parameters"),
+            || Ok(circuit_parameters.account_encryption.parameters()),
         )?;
 
         let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
@@ -297,6 +313,7 @@ where
 
         (
             account_commitment_parameters,
+            account_encryption_parameters,
             account_signature_parameters,
             record_commitment_parameters,
             predicate_vk_commitment_parameters,
@@ -326,7 +343,7 @@ where
 
         // Declare record contents
         let (
-            given_account_public_key,
+            given_account_address,
             given_commitment,
             given_is_dummy,
             given_value,
@@ -343,11 +360,11 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_public_key"),
-                || Ok(&record.account_public_key().commitment),
+            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
+                &mut declare_cs.ns(|| "given_account_address"),
+                || Ok(record.account_address().into_repr()),
             )?;
-            old_account_public_keys_gadgets.push(given_account_public_key.clone());
+            old_account_addresss_gadgets.push(given_account_address.clone());
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
@@ -386,7 +403,7 @@ where
                     Ok(record.serial_number_nonce())
                 })?;
             (
-                given_account_public_key,
+                given_account_address,
                 given_commitment,
                 given_is_dummy,
                 given_value,
@@ -422,7 +439,7 @@ where
         // ********************************************************************
 
         // ********************************************************************
-        // Check that the account public key and private key form a valid key
+        // Check that the account address and private key form a valid key
         // pair.
         // ********************************************************************
 
@@ -430,37 +447,92 @@ where
             // Declare variables for account contents.
             let account_cs = &mut cs.ns(|| "Check account");
 
-            let pk_sig_native = account_private_key
-                .pk_sig(&circuit_parameters.account_signature)
-                .map_err(|_| SynthesisError::AssignmentMissing)?;
-            let pk_sig =
-                AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
-                    Ok(&pk_sig_native)
-                })?;
+            // Allocate the account private key.
+            let (pk_sig, sk_prf, r_pk) = {
+                let pk_sig_native = account_private_key
+                    .pk_sig(&circuit_parameters.account_signature)
+                    .map_err(|_| SynthesisError::AssignmentMissing)?;
+                let pk_sig =
+                    AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
+                        Ok(&pk_sig_native)
+                    })?;
+                let sk_prf = PGadget::new_seed(&mut account_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
+                let r_pk =
+                    AccountCommitmentGadget::RandomnessGadget::alloc(&mut account_cs.ns(|| "Declare r_pk"), || {
+                        Ok(&account_private_key.r_pk)
+                    })?;
 
-            let pk_sig_bytes = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
+                (pk_sig, sk_prf, r_pk)
+            };
 
-            let sk_prf = PGadget::new_seed(&mut account_cs.ns(|| "Declare sk_prf"), &account_private_key.sk_prf);
-            let metadata = UInt8::alloc_vec(&mut account_cs.ns(|| "Declare metadata"), &account_private_key.metadata)?;
-            let r_pk = AccountCommitmentGadget::RandomnessGadget::alloc(&mut account_cs.ns(|| "Declare r_pk"), || {
-                Ok(&account_private_key.r_pk)
-            })?;
+            // Construct the account view key.
+            let candidate_account_view_key = {
+                let mut account_view_key_input = pk_sig.to_bytes(&mut account_cs.ns(|| "pk_sig to_bytes"))?;
+                account_view_key_input.extend_from_slice(&sk_prf);
 
-            let mut account_public_key_input = pk_sig_bytes.clone();
-            account_public_key_input.extend_from_slice(&sk_prf);
-            account_public_key_input.extend_from_slice(&metadata);
+                // This is the record decryption key.
+                let candidate_account_commitment = AccountCommitmentGadget::check_commitment_gadget(
+                    &mut account_cs.ns(|| "Compute the account commitment."),
+                    &account_commitment_parameters,
+                    &account_view_key_input,
+                    &r_pk,
+                )?;
 
-            let candidate_account_public_key = AccountCommitmentGadget::check_commitment_gadget(
-                &mut account_cs.ns(|| "Compute account public key"),
-                &account_commitment_parameters,
-                &account_public_key_input,
-                &r_pk,
-            )?;
+                // TODO (howardwu): Enforce 6 MSB bits are 0.
+                {
+                    // TODO (howardwu): Enforce 6 MSB bits are 0.
+                }
 
-            candidate_account_public_key.enforce_equal(
-                &mut account_cs.ns(|| "Check that declared and computed public keys are equal"),
-                &given_account_public_key,
-            )?;
+                // Enforce the account commitment bytes (padded) correspond to the
+                // given account's view key bytes (padded). This is equivalent to
+                // verifying that the base field element from the computed account
+                // commitment contains the same bit-value as the scalar field element
+                // computed from the given account private key.
+                let given_account_view_key = {
+                    // Derive the given account view key based on the given account private key.
+                    let given_account_view_key = AccountEncryptionGadget::PrivateKeyGadget::alloc(
+                        &mut account_cs.ns(|| "Allocate account view key"),
+                        || {
+                            Ok(account_private_key
+                                .to_decryption_key(
+                                    &circuit_parameters.account_signature,
+                                    &circuit_parameters.account_commitment,
+                                )
+                                .map_err(|_| SynthesisError::AssignmentMissing)?)
+                        },
+                    )?;
+
+                    let given_account_view_key_bytes =
+                        given_account_view_key.to_bytes(&mut account_cs.ns(|| "given_account_view_key to_bytes"))?;
+
+                    let candidate_account_commitment_bytes = candidate_account_commitment
+                        .to_bytes(&mut account_cs.ns(|| "candidate_account_commitment to_bytes"))?;
+
+                    candidate_account_commitment_bytes.enforce_equal(
+                        &mut account_cs.ns(|| "Check that candidate and given account view keys are equal"),
+                        &given_account_view_key_bytes,
+                    )?;
+
+                    given_account_view_key
+                };
+
+                given_account_view_key
+            };
+
+            // Construct and verify the account address.
+            {
+                let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
+                    &mut account_cs.ns(|| "Compute the candidate account address"),
+                    &account_encryption_parameters,
+                    &candidate_account_view_key,
+                )?;
+
+                candidate_account_address.enforce_equal(
+                    &mut account_cs.ns(|| "Check that declared and computed addresses are equal"),
+                    &given_account_address,
+                )?;
+            }
+
             (sk_prf, pk_sig)
         };
         // ********************************************************************
@@ -557,12 +629,12 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_public_key_bytes =
-                given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
+            let account_address_bytes =
+                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_public_key_bytes);
+            commitment_input.extend_from_slice(&account_address_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
@@ -593,7 +665,7 @@ where
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
         let (
-            given_account_public_key,
+            given_account_address,
             given_record_commitment,
             given_commitment,
             given_is_dummy,
@@ -606,11 +678,11 @@ where
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
-            let given_account_public_key = AccountCommitmentGadget::OutputGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_public_key"),
-                || Ok(&record.account_public_key().commitment),
+            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
+                &mut declare_cs.ns(|| "given_account_address"),
+                || Ok(record.account_address().into_repr()),
             )?;
-            new_account_public_keys_gadgets.push(given_account_public_key.clone());
+            new_account_addresss_gadgets.push(given_account_address.clone());
 
             let given_record_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_record_commitment"), || {
@@ -655,7 +727,7 @@ where
                 })?;
 
             (
-                given_account_public_key,
+                given_account_address,
                 given_record_commitment,
                 given_commitment,
                 given_is_dummy,
@@ -745,13 +817,13 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_public_key_bytes =
-                given_account_public_key.to_bytes(&mut commitment_cs.ns(|| "Convert account_public_key to bytes"))?;
+            let account_address_bytes =
+                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
             let sn_nonce_bytes = serial_number_nonce.to_bytes(&mut commitment_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_public_key_bytes);
+            commitment_input.extend_from_slice(&account_address_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);

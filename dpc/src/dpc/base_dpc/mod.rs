@@ -2,13 +2,22 @@ use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, LoadableMerkleParameters, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
+    algorithms::{
+        CommitmentScheme,
+        EncryptionScheme,
+        LoadableMerkleParameters,
+        MerkleParameters,
+        SignatureScheme,
+        CRH,
+        PRF,
+        SNARK,
+    },
     curves::{Group, ProjectiveCurve},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
-use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -206,6 +215,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
+        let time = start_timer!(|| "Account encryption scheme setup");
+        let account_encryption = Components::AccountEncryption::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Account signature setup");
+        let account_signature = Components::AccountSignature::setup(rng)?;
+        end_timer!(time);
+
         let time = start_timer!(|| "Record commitment scheme setup");
         let rec_comm_pp = Components::RecordCommitment::setup(rng);
         end_timer!(time);
@@ -234,12 +251,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Account signature setup");
-        let account_signature = Components::AccountSignature::setup(rng)?;
-        end_timer!(time);
-
         let comm_crh_sig_pp = CircuitParameters {
             account_commitment,
+            account_encryption,
             account_signature,
             record_commitment: rec_comm_pp,
             predicate_verification_key_commitment: pred_vk_comm_pp,
@@ -290,7 +304,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        account_public_key: &AccountPublicKey<Components>,
+        account_address: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
@@ -307,13 +321,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let death_predicate_repr = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_public_key.commitment, // 256 bits = 32 bytes
-            is_dummy,                      // 1 bit = 1 byte
-            value,                         // 64 bits = 8 bytes
-            payload,                       // 256 bits = 32 bytes
-            birth_predicate_repr,          // 256 bits = 32 bytes
-            death_predicate_repr,          // 256 bits = 32 bytes
-            sn_nonce                       // 256 bits = 32 bytes
+            account_address,      // 256 bits = 32 bytes
+            is_dummy,             // 1 bit = 1 byte
+            value,                // 64 bits = 8 bytes
+            payload,              // 256 bits = 32 bytes
+            birth_predicate_repr, // 256 bits = 32 bytes
+            death_predicate_repr, // 256 bits = 32 bytes
+            sn_nonce              // 256 bits = 32 bytes
         ]?;
 
         let commitment = Components::RecordCommitment::commit(
@@ -323,7 +337,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         )?;
 
         let record = DPCRecord {
-            account_public_key: account_public_key.clone(),
+            account_address: account_address.clone(),
             is_dummy,
             value,
             payload: payload.clone(),
@@ -344,7 +358,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_account_public_keys: &[AccountPublicKey<Components>],
+        new_account_addresss: &[AccountAddress<Components>],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
@@ -370,7 +384,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_public_keys.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_addresss.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -427,7 +441,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_account_public_keys[j],
+                &new_account_addresss[j],
                 new_is_dummy_flags[j],
                 new_values[j],
                 &new_payloads[j],
@@ -621,16 +635,18 @@ where
         })
     }
 
-    fn create_account<R: Rng>(
-        parameters: &Self::Parameters,
-        metadata: &Self::Metadata,
-        rng: &mut R,
-    ) -> Result<Self::Account, DPCError> {
+    fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError> {
         let time = start_timer!(|| "BaseDPC::create_account");
 
         let account_signature_parameters = &parameters.circuit_parameters.account_signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(account_signature_parameters, commitment_parameters, metadata, rng)?;
+        let encryption_parameters = &parameters.circuit_parameters.account_encryption;
+        let account = Account::new(
+            account_signature_parameters,
+            commitment_parameters,
+            encryption_parameters,
+            rng,
+        )?;
 
         end_timer!(time);
 
@@ -643,7 +659,7 @@ where
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
+        new_account_addresss: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
@@ -661,7 +677,7 @@ where
             &parameters.circuit_parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_addresss,
             new_is_dummy_flags,
             new_values,
             new_payloads,

@@ -62,10 +62,16 @@ fn test_execute_base_dpc_constraints() {
 
     let signature_parameters = &circuit_parameters.account_signature;
     let commitment_parameters = &circuit_parameters.account_commitment;
+    let encryption_parameters = &circuit_parameters.account_encryption;
 
     // Generate metadata and an account for a dummy initial record.
-    let meta_data = [1u8; 32];
-    let dummy_account = Account::new(signature_parameters, commitment_parameters, &meta_data, &mut rng).unwrap();
+    let dummy_account = Account::new(
+        signature_parameters,
+        commitment_parameters,
+        encryption_parameters,
+        &mut rng,
+    )
+    .unwrap();
 
     let genesis_block = Block {
         header: BlockHeader {
@@ -87,7 +93,7 @@ fn test_execute_base_dpc_constraints() {
     let old_record = DPC::generate_record(
         &circuit_parameters,
         &sn_nonce,
-        &dummy_account.public_key,
+        &dummy_account.address,
         true,
         0,
         &RecordPayload::default(),
@@ -105,13 +111,18 @@ fn test_execute_base_dpc_constraints() {
 
     // Create an account for an actual new record.
 
-    let new_metadata = [1u8; 32];
-    let new_account = Account::new(signature_parameters, commitment_parameters, &new_metadata, &mut rng).unwrap();
+    let new_account = Account::new(
+        signature_parameters,
+        commitment_parameters,
+        encryption_parameters,
+        &mut rng,
+    )
+    .unwrap();
 
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_account_public_keys = vec![new_account.public_key.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_addresss = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
@@ -123,7 +134,7 @@ fn test_execute_base_dpc_constraints() {
         &circuit_parameters,
         &old_records,
         &old_account_private_keys,
-        &new_account_public_keys,
+        &new_account_addresss,
         &new_dummy_flags,
         &new_values,
         &new_payloads,

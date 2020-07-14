@@ -17,19 +17,19 @@ impl From<std::io::Error> for PrivateKeyError {
 }
 
 #[derive(Debug, Error)]
-pub enum PublicKeyError {
+pub enum AddressError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 }
 
-impl From<snarkos_errors::objects::account::AccountError> for PublicKeyError {
+impl From<snarkos_errors::objects::account::AccountError> for AddressError {
     fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
-        PublicKeyError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+        AddressError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
     }
 }
 
-impl From<std::io::Error> for PublicKeyError {
+impl From<std::io::Error> for AddressError {
     fn from(error: std::io::Error) -> Self {
-        PublicKeyError::Crate("std::io", format!("{:?}", error))
+        AddressError::Crate("std::io", format!("{:?}", error))
     }
 }
