@@ -75,3 +75,30 @@ jobs:
         with:
           command: test
           args: --all -- --skip dpc --skip integration_test --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
+
+  test-wasm:
+    name: Check Tests (Wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - uses: actions/cache@v2
+          with:
+            path: |
+              ~/.cargo/registry
+              ~/.cargo/git
+              target
+            key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test
+        run: |
+          cd toolkit
+          cargo test --target wasm32-unknown-unknown --features wasm
