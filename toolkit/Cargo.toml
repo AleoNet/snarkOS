@@ -26,13 +26,9 @@ snarkos-utilities = { path = "../utilities", version = "0.8.0" }
 
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }
-wasm-bindgen = { version = "0.2.64", optional = true }
+wasm-bindgen = { version = "0.2.64" }
 
 [dev-dependencies]
 criterion = { version = "0.3.1" }
 rand_chacha = { version = "0.2", default-features = false }
 wasm-bindgen-test = { version = "0.3.14" }
-
-[features]
-default = []
-wasm = ["wasm-bindgen"]

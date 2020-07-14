@@ -95,11 +95,8 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli --vers "0.2.64"
-
       - name: Test
         run: |
           cd toolkit
-          wasm-pack
+          wasm-pack test --headless --chrome
 #          cargo test --target wasm32-unknown-unknown --features wasm
