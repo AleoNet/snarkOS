@@ -32,8 +32,6 @@ jobs:
   test:
     name: Check Tests (Simple)
     runs-on: [self-hosted, snarkos-ci1]
-    env:
-#      RUSTFLAGS: -Dwarnings
     steps:
       - name: Checkout
         uses: actions/checkout@v2
