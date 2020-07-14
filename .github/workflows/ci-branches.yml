@@ -2,8 +2,8 @@ name: CI - Branches
 on:
   pull_request:
   push:
-    branches:
-      - '!master'
+    branches-ignore:
+      - 'master'
 env:
   RUST_BACKTRACE: 1
 
