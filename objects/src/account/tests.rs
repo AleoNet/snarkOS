@@ -25,7 +25,7 @@ fn test_account_new() {
 
 #[test]
 pub fn test_private_key_from_str() {
-    let private_key_string = "AKEY1d6WnCerdm8CoF2qhPgQfHpfgNmmptxcZoKy6E6nvyCCK";
+    let private_key_string = "AKEY1YXwhewzuVjBqXpALejm7TFcdqGJZDpR74B8P6Q9iwsuu";
 
     let private_key = AccountPrivateKey::<Components>::from_str(private_key_string);
     println!("{:?}", private_key);
@@ -36,7 +36,7 @@ pub fn test_private_key_from_str() {
 
 #[test]
 pub fn test_address_from_str() {
-    let address_string = "aleo12pfv0ta2k9p6mvpsxe54zqzdc9vwqrav0trec4hzdjaj756x5vgqc2f7fl";
+    let address_string = "aleo1wztym2rpv8f7f7j47xz2tyfdsgh36u86q6ph6qkhtlfc0g0segqqlge0gm";
 
     let address = AccountAddress::<Components>::from_str(address_string);
     assert!(address.is_ok());
