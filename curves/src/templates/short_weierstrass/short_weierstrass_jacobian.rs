@@ -169,23 +169,6 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         self.y.clone()
     }
 
-    /// Attempts to construct an affine point given an x-coordinate. The
-    /// point is not guaranteed to be in the prime order subgroup.
-    ///
-    /// If and only if `greatest` is set will the lexicographically
-    /// largest y-coordinate be selected.
-    fn get_point_from_x(x: Self::BaseField, greatest: bool) -> Option<Self> {
-        // Compute x^3 + ax + b
-        let x3b = P::add_b(&((x.square() * &x) + &P::mul_by_a(&x)));
-
-        x3b.sqrt().map(|y| {
-            let negy = -y;
-
-            let y = if (y < negy) ^ greatest { y } else { negy };
-            Self::new(x, y, false)
-        })
-    }
-
     /// Checks that the current point is on the elliptic curve.
     fn is_on_curve(&self) -> bool {
         if self.is_zero() {
