@@ -94,8 +94,8 @@ impl PedersenSize for RecordWindow {
 pub struct RecordCiphertextWindow;
 
 impl PedersenSize for RecordCiphertextWindow {
-    const NUM_WINDOWS: usize = 68;
-    const WINDOW_SIZE: usize = 62;
+    const NUM_WINDOWS: usize = 48;
+    const WINDOW_SIZE: usize = 44;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

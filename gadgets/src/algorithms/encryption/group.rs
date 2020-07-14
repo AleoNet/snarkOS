@@ -343,17 +343,20 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionPlaintextGadget<G, F, GG> {}
+impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> EqGadget<F>
+    for GroupEncryptionPlaintextGadget<G, F, GG>
+{
+}
 
 /// Group encryption ciphertext gadget
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GroupEncryptionCiphertextGadget<G: Group, F: Field, GG: GroupGadget<G, F>> {
+pub struct GroupEncryptionCiphertextGadget<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> {
     ciphertext: Vec<GG>,
     _group: PhantomData<*const G>,
     _engine: PhantomData<*const F>,
 }
 
-impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Vec<G>, F>
+impl<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> AllocGadget<Vec<G>, F>
     for GroupEncryptionCiphertextGadget<G, F, GG>
 {
     fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<Vec<G>>, CS: ConstraintSystem<F>>(
@@ -395,11 +398,15 @@ impl<G: Group + ProjectiveCurve, F: Field, GG: GroupGadget<G, F>> AllocGadget<Ve
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryptionCiphertextGadget<G, F, GG> {
+impl<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> ToBytesGadget<F>
+    for GroupEncryptionCiphertextGadget<G, F, GG>
+{
     fn to_bytes<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
         let mut output_bytes = vec![];
         for (i, group_gadget) in self.ciphertext.iter().enumerate() {
-            let group_bytes = group_gadget.to_bytes(&mut cs.ns(|| format!("to_bytes {}", i)))?;
+            let group_bytes = group_gadget
+                .to_x_coordinate()
+                .to_bytes(&mut cs.ns(|| format!("to_bytes {}", i)))?;
             output_bytes.extend(group_bytes);
         }
 
@@ -409,7 +416,9 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryp
     fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
         let mut output_bytes = vec![];
         for (i, group_gadget) in self.ciphertext.iter().enumerate() {
-            let group_bytes = group_gadget.to_bytes_strict(&mut cs.ns(|| format!("to_bytes_strict {}", i)))?;
+            let group_bytes = group_gadget
+                .to_x_coordinate()
+                .to_bytes_strict(&mut cs.ns(|| format!("to_bytes_strict {}", i)))?;
             output_bytes.extend(group_bytes);
         }
 
@@ -417,7 +426,9 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ToBytesGadget<F> for GroupEncryp
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for GroupEncryptionCiphertextGadget<G, F, GG> {
+impl<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> ConditionalEqGadget<F>
+    for GroupEncryptionCiphertextGadget<G, F, GG>
+{
     #[inline]
     fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
         &self,
@@ -441,7 +452,10 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
     }
 }
 
-impl<G: Group, F: Field, GG: GroupGadget<G, F>> EqGadget<F> for GroupEncryptionCiphertextGadget<G, F, GG> {}
+impl<G: Group + ProjectiveCurve, F: Field, GG: CompressedGroupGadget<G, F>> EqGadget<F>
+    for GroupEncryptionCiphertextGadget<G, F, GG>
+{
+}
 
 /// Group encryption gadget
 #[derive(Clone, Debug, PartialEq, Eq)]

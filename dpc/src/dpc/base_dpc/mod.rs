@@ -935,7 +935,7 @@ where
                 let ciphertext_element_affine =
                     <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
                         .into_affine();
-                ciphertext_affine.push(ciphertext_element_affine);
+                ciphertext_affine.push(ciphertext_element_affine.to_x_coordinate());
                 ciphertext_and_selector.push((ciphertext_element.clone(), fq_high));
             }
 
@@ -1118,7 +1118,7 @@ where
                 let ciphertext_element_affine =
                     <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
                         .into_affine();
-                ciphertext_affine.push(ciphertext_element_affine);
+                ciphertext_affine.push(ciphertext_element_affine.to_x_coordinate());
             }
 
             // TODO Add the fq_high bits to the hash

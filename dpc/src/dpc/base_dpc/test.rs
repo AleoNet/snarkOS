@@ -375,7 +375,7 @@ fn test_execute_base_dpc_constraints() {
                 <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element].unwrap()[..])
                     .unwrap()
                     .into_affine();
-            ciphertext_affine.push(ciphertext_element_affine);
+            ciphertext_affine.push(ciphertext_element_affine.to_x_coordinate());
         }
 
         let ciphertext_hash = circuit_parameters
