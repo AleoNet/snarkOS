@@ -3,4 +3,3 @@ rustflags = ["-C", "target-cpu=native"]
 
 [target.wasm32-unknown-unknown]
 runner = 'wasm-bindgen-test-runner'
-crate-type = ["cdylib"]
