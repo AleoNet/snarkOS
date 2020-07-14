@@ -231,10 +231,13 @@ fn base_dpc_integration_test() {
         let record_ciphertexts = transaction.ciphertexts();
         let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
 
-        for ((ciphertext_and_selectors, private_key), new_record) in
-            record_ciphertexts.iter().zip(new_account_private_keys).zip(new_records)
+        for (((ciphertext, private_key), new_record), selector_bits) in record_ciphertexts
+            .iter()
+            .zip(new_account_private_keys)
+            .zip(new_records)
+            .zip(&transaction.new_records_ciphertext_and_fq_high_selectors)
         {
-            let (ciphertext, fq_high_selectors): (Vec<_>, Vec<_>) = ciphertext_and_selectors.iter().cloned().unzip();
+            let fq_high_selectors_bits = selector_bits.1.clone();
 
             let view_key = AccountViewKey::from_private_key(
                 &parameters.circuit_parameters.account_signature,
@@ -252,7 +255,7 @@ fn base_dpc_integration_test() {
             let plaintext_encoding = plaintext
                 .iter()
                 .cloned()
-                .zip_eq(fq_high_selectors.iter().cloned().skip(1))
+                .zip_eq(fq_high_selectors_bits.iter().cloned().skip(1))
                 .collect();
 
             let record_components = RecordSerializer::<

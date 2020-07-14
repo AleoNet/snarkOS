@@ -7,7 +7,7 @@ use snarkos_objects::Account;
 
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 pub(crate) const ITERATIONS: usize = 100;

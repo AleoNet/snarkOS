@@ -26,7 +26,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
+    bytes::{bits_to_bytes, FromBytes, ToBytes},
     has_duplicates,
     rand::UniformRand,
     to_bytes,
@@ -849,6 +849,7 @@ where
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_and_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for record in &new_records {
             // Serialize the record into group elements and fq_high bits
@@ -862,7 +863,7 @@ where
             let mut record_group_encoding = vec![];
             let mut record_plaintexts = vec![];
             // The first fq_high selector is false to account for the c_0 element in the ciphertext
-            let mut fq_high_selectors = vec![false];
+            let mut fq_high_selector_bits = vec![false];
             for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
                 let element_affine = element.into_affine();
 
@@ -903,7 +904,7 @@ where
                 record_plaintexts.push(plaintext_element);
 
                 // Store the fq_high selector for future decoding of the plaintext
-                fq_high_selectors.push(*fq_high);
+                fq_high_selector_bits.push(*fq_high);
             }
 
             // Store the field elements and group encodings for each new record
@@ -926,28 +927,41 @@ where
                 &record_plaintexts,
             )?;
 
-            // Compose the record ciphertext and fq_high selectors for storage in a transaction
-            let mut ciphertext_and_selector = vec![];
+            // Compose the record ciphertext for storage in a transaction
+            let mut ciphertext = vec![];
 
             // Compute the ciphertext hash which will be validated in the inner circuit
-            let mut ciphertext_affine = vec![];
-            for (ciphertext_element, fq_high) in record_ciphertext.iter().zip_eq(fq_high_selectors) {
+            let mut ciphertext_affine_x = vec![];
+            let mut ciphertext_selectors = vec![];
+            for ciphertext_element in record_ciphertext.iter() {
                 let ciphertext_element_affine =
                     <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
                         .into_affine();
-                ciphertext_affine.push(ciphertext_element_affine.to_x_coordinate());
-                ciphertext_and_selector.push((ciphertext_element.clone(), fq_high));
+                let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
+
+                let greatest = match <<Components as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(ciphertext_x_coordinate.clone(), true) {
+                    Some(affine) => ciphertext_element_affine == affine,
+                    None => false,
+                };
+
+                ciphertext_affine_x.push(ciphertext_x_coordinate);
+                ciphertext_selectors.push(greatest);
+                ciphertext.push(ciphertext_element.clone());
             }
 
-            // TODO Add the fq_high bits to the hash
+            // Concatenate the fq_high selector bits and plaintext decoding selector bit
+            let selector_bits = [ciphertext_selectors.clone(), fq_high_selector_bits.clone()].concat();
+            let selector_bytes = bits_to_bytes(&selector_bits);
+
             let ciphertext_hash = circuit_parameters
                 .record_ciphertext_crh
-                .hash(&to_bytes![ciphertext_affine]?)?;
+                .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
 
             new_records_encryption_randomness.push(encryption_randomness);
             new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
-            new_records_encryption_ciphertexts.push(ciphertext_and_selector);
+            new_records_encryption_ciphertexts.push(ciphertext);
             new_records_ciphertext_hashes.push(ciphertext_hash);
+            new_records_ciphertext_and_fq_high_selectors.push((ciphertext_selectors, fq_high_selector_bits));
         }
 
         let inner_proof = {
@@ -966,6 +980,7 @@ where
                 &new_records_group_encoding,
                 &new_records_encryption_randomness,
                 &new_records_encryption_blinding_exponents,
+                &new_records_ciphertext_and_fq_high_selectors,
                 &new_records_ciphertext_hashes,
                 &predicate_commitment,
                 &predicate_randomness,
@@ -1033,6 +1048,7 @@ where
             network_id,
             signatures,
             new_records_encryption_ciphertexts,
+            new_records_ciphertext_and_fq_high_selectors,
         );
 
         end_timer!(exec_time);
@@ -1111,21 +1127,26 @@ where
         end_timer!(signature_time);
 
         let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for ciphertext in &transaction.record_ciphertexts {
-            let mut ciphertext_affine = vec![];
-            for (ciphertext_element, _fq_high) in ciphertext {
+        for (ciphertext, (encryption_selector_bits, fq_high_selector_bits)) in transaction
+            .record_ciphertexts
+            .iter()
+            .zip_eq(&transaction.new_records_ciphertext_and_fq_high_selectors)
+        {
+            let mut ciphertext_affine_x = vec![];
+            for ciphertext_element in ciphertext {
                 // Convert the ciphertext group to the affine representation to be hashed
                 let ciphertext_element_affine =
                     <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
                         .into_affine();
-                ciphertext_affine.push(ciphertext_element_affine.to_x_coordinate());
+                ciphertext_affine_x.push(ciphertext_element_affine.to_x_coordinate());
             }
 
-            // TODO Add the fq_high bits to the hash
+            let selector_bytes = bits_to_bytes(&[&encryption_selector_bits[..], &fq_high_selector_bits[..]].concat());
+
             let ciphertext_hash = parameters
                 .circuit_parameters
                 .record_ciphertext_crh
-                .hash(&to_bytes![ciphertext_affine]?)?;
+                .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
 
             new_records_ciphertext_hashes.push(ciphertext_hash);
         }

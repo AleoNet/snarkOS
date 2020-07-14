@@ -44,6 +44,7 @@ use snarkos_models::{
 };
 use snarkos_objects::AccountPrivateKey;
 use snarkos_utilities::{
+    bits_to_bytes,
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
@@ -76,6 +77,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
+    new_records_ciphertext_and_fq_high_selectors: &[(Vec<bool>, Vec<bool>)],
     new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
 
     // Rest
@@ -133,6 +135,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records_group_encoding,
         new_records_encryption_randomness,
         new_records_encryption_blinding_exponents,
+        new_records_ciphertext_and_fq_high_selectors,
         new_records_ciphertext_hashes,
         //
         predicate_commitment,
@@ -198,6 +201,7 @@ fn base_dpc_execute_gadget_helper<
     )>],
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
+    new_records_ciphertext_and_fq_high_selectors: &[(Vec<bool>, Vec<bool>)],
     new_records_ciphertext_hashes: &[RecordCiphertextCRH::Output],
 
     //
@@ -716,12 +720,15 @@ where
         (
             (
                 (
-                    ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
-                    encryption_randomness,
+                    (
+                        ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
+                        encryption_randomness,
+                    ),
+                    encryption_blinding_exponents,
                 ),
-                encryption_blinding_exponents,
+                record_ciphertext_hash,
             ),
-            record_ciphertext_hash,
+            ciphertext_and_fq_high_selectors,
         ),
     ) in new_records
         .iter()
@@ -732,6 +739,7 @@ where
         .zip(new_records_encryption_randomness)
         .zip(new_records_encryption_blinding_exponents)
         .zip(new_records_ciphertext_hashes)
+        .zip(new_records_ciphertext_and_fq_high_selectors)
         .enumerate()
     {
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
@@ -1273,10 +1281,25 @@ where
             let encryption_ciphertext_bytes = candidate_ciphertext_gadget
                 .to_bytes(encryption_cs.ns(|| format!("output record {} ciphertext bytes", j)))?;
 
+            let ciphertext_and_fq_high_selectors_bytes = UInt8::alloc_vec(
+                &mut encryption_cs.ns(|| format!("ciphertext and fq_high selector bits to bytes {}", j)),
+                &bits_to_bytes(
+                    &[
+                        &ciphertext_and_fq_high_selectors.0[..],
+                        &ciphertext_and_fq_high_selectors.1[..],
+                    ]
+                    .concat(),
+                ),
+            )?;
+
+            let mut ciphertext_hash_input = Vec::new();
+            ciphertext_hash_input.extend_from_slice(&encryption_ciphertext_bytes);
+            ciphertext_hash_input.extend_from_slice(&ciphertext_and_fq_high_selectors_bytes);
+
             let candidate_ciphertext_hash = RecordCiphertextCRHGadget::check_evaluation_gadget(
                 &mut encryption_cs.ns(|| format!("Compute ciphertext hash {}", j)),
                 &record_ciphertext_crh_parameters,
-                &encryption_ciphertext_bytes,
+                &ciphertext_hash_input,
             )?;
 
             record_ciphertext_hash_gadget.enforce_equal(

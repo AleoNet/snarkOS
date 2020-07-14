@@ -34,7 +34,7 @@ use snarkos_objects::{
 };
 use snarkos_testing::storage::*;
 use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
+    bytes::{bits_to_bytes, FromBytes, ToBytes},
     rand::UniformRand,
     to_bytes,
 };
@@ -301,6 +301,7 @@ fn test_execute_base_dpc_constraints() {
     let mut new_records_group_encoding = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_blinding_exponents = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_records_ciphertext_and_fq_high_selectors = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_ciphertext_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     for record in &new_records {
         let serialized_record = RecordSerializer::<
@@ -313,7 +314,7 @@ fn test_execute_base_dpc_constraints() {
         let mut record_field_elements = vec![];
         let mut record_group_encoding = vec![];
         let mut record_plaintexts = vec![];
-
+        let mut fq_high_selector_bits = vec![false];
         for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
             let element_affine = element.into_affine();
 
@@ -333,6 +334,7 @@ fn test_execute_base_dpc_constraints() {
                 .unwrap();
 
                 record_field_elements.push(record_field_element);
+                fq_high_selector_bits.push(*fq_high);
             }
 
             let x = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
@@ -369,23 +371,41 @@ fn test_execute_base_dpc_constraints() {
             .encrypt(record_public_key, &encryption_randomness, &record_plaintexts)
             .unwrap();
 
-        let mut ciphertext_affine = vec![];
+        let mut ciphertext_affine_x = vec![];
+        let mut ciphertext_selectors = vec![];
         for ciphertext_element in &record_ciphertext {
             let ciphertext_element_affine =
                 <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element].unwrap()[..])
                     .unwrap()
                     .into_affine();
-            ciphertext_affine.push(ciphertext_element_affine.to_x_coordinate());
+
+            let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
+
+            let greatest =
+                match <<Components as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
+                    ciphertext_x_coordinate.clone(),
+                    true,
+                ) {
+                    Some(affine) => ciphertext_element_affine == affine,
+                    None => false,
+                };
+
+            ciphertext_affine_x.push(ciphertext_x_coordinate);
+            ciphertext_selectors.push(greatest);
         }
+
+        let selector_bits = [ciphertext_selectors.clone(), fq_high_selector_bits.clone()].concat();
+        let selector_bytes = bits_to_bytes(&selector_bits);
 
         let ciphertext_hash = circuit_parameters
             .record_ciphertext_crh
-            .hash(&to_bytes![ciphertext_affine].unwrap())
+            .hash(&to_bytes![ciphertext_affine_x, selector_bytes].unwrap())
             .unwrap();
 
         new_records_encryption_randomness.push(encryption_randomness);
         new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
         new_records_ciphertext_hashes.push(ciphertext_hash);
+        new_records_ciphertext_and_fq_high_selectors.push((ciphertext_selectors, fq_high_selector_bits));
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -408,6 +428,7 @@ fn test_execute_base_dpc_constraints() {
         &new_records_group_encoding,
         &new_records_encryption_randomness,
         &new_records_encryption_blinding_exponents,
+        &new_records_ciphertext_and_fq_high_selectors,
         &new_records_ciphertext_hashes,
         &predicate_comm,
         &predicate_rand,
@@ -467,6 +488,7 @@ fn test_execute_base_dpc_constraints() {
             &new_records_group_encoding,
             &new_records_encryption_randomness,
             &new_records_encryption_blinding_exponents,
+            &new_records_ciphertext_and_fq_high_selectors,
             &new_records_ciphertext_hashes,
             &predicate_comm,
             &predicate_rand,
