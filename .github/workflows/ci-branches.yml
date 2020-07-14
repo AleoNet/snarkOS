@@ -31,7 +31,7 @@ jobs:
 
   test:
     name: Check Tests (Simple)
-    runs-on: snarkos-ci1
+    runs-on: [self-hosted, snarkos-ci1]
     env:
       RUSTFLAGS: -Dwarnings
     steps:
