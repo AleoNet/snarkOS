@@ -74,7 +74,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all -- --skip dpc --skip integration_test --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
+          args: --all -- --skip consensus --skip dpc --skip network --skip objects --skip posw --skip rpc
 
   test-wasm:
     name: Check Tests (Wasm)
