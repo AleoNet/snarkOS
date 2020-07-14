@@ -88,6 +88,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
+          target: wasm32-unknown-unknown
           override: true
 
       - name: Test
