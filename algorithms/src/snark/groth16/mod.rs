@@ -1,13 +1,6 @@
 //! An implementation of the [`Groth16`] zkSNARK.
 //!
 //! [`Groth16`]: https://eprint.iacr.org/2016/260.pdf
-#![deny(unused_import_braces, unused_qualifications, trivial_casts)]
-#![deny(trivial_numeric_casts, private_in_public, variant_size_differences)]
-#![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
-#![deny(unused_attributes, unused_imports, unused_mut)]
-#![deny(renamed_and_removed_lints, stable_features, unused_allocation)]
-#![deny(unused_comparisons, bare_trait_objects, unused_must_use, const_err)]
-#![forbid(unsafe_code)]
 
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::{
@@ -17,16 +10,16 @@ use snarkos_models::{
 use snarkos_utilities::serialize::*;
 
 /// Reduce an R1CS instance to a *Quadratic Arithmetic Program* instance.
-pub mod r1cs_to_qap;
+mod r1cs_to_qap;
 
 /// Generate public parameters for the Groth16 zkSNARK construction.
-pub mod generator;
+mod generator;
 
 /// Create proofs for the Groth16 zkSNARK construction.
-pub mod prover;
+mod prover;
 
 /// Verify proofs for the Groth16 zkSNARK construction.
-pub mod verifier;
+mod verifier;
 
 #[cfg(test)]
 mod test;

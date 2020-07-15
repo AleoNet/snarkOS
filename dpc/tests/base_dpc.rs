@@ -14,7 +14,7 @@ use snarkos_dpc::{
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, CRH, SNARK},
-    dpc::{DPCScheme, Record},
+    dpc::{DPCScheme, Record, RecordSerializerScheme},
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
