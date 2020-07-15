@@ -34,7 +34,7 @@ use snarkos_objects::{
 };
 use snarkos_testing::storage::*;
 use snarkos_utilities::{
-    bytes::{bits_to_bytes, FromBytes, ToBytes},
+    bytes::{bits_to_bytes, bytes_to_bits, FromBytes, ToBytes},
     rand::UniformRand,
     to_bytes,
 };
@@ -301,21 +301,34 @@ fn test_execute_base_dpc_constraints() {
     let mut new_records_group_encoding = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_blinding_exponents = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-    let mut new_records_ciphertext_and_fq_high_selectors = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_records_ciphertext_and_fq_high_selectors_gadget = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_ciphertext_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     for record in &new_records {
-        let serialized_record = RecordSerializer::<
+        let (serialized_record, final_fq_high_bit) = RecordSerializer::<
             Components,
             <Components as BaseDPCComponents>::EncryptionModelParameters,
             <Components as BaseDPCComponents>::EncryptionGroup,
         >::serialize(&record)
         .unwrap();
 
+        // Extract the fq_bits
+        let final_element = &serialized_record[serialized_record.len() - 1];
+        let final_element_bytes = decode_from_group::<
+            <Components as BaseDPCComponents>::EncryptionModelParameters,
+            <Components as BaseDPCComponents>::EncryptionGroup,
+        >(final_element.into_affine(), final_fq_high_bit)
+        .unwrap();
+        let final_element_bits = bytes_to_bits(&final_element_bytes);
+        let fq_high_bits = [
+            &final_element_bits[1..serialized_record.len()],
+            &[final_fq_high_bit][..],
+        ]
+        .concat();
+
         let mut record_field_elements = vec![];
         let mut record_group_encoding = vec![];
         let mut record_plaintexts = vec![];
-        let mut fq_high_selector_bits = vec![false];
-        for (i, (element, fq_high)) in serialized_record.iter().enumerate() {
+        for (i, (element, fq_high)) in serialized_record.iter().zip(&fq_high_bits).enumerate() {
             let element_affine = element.into_affine();
 
             if i == 0 {
@@ -334,7 +347,6 @@ fn test_execute_base_dpc_constraints() {
                 .unwrap();
 
                 record_field_elements.push(record_field_element);
-                fq_high_selector_bits.push(*fq_high);
             }
 
             let x = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
@@ -394,7 +406,7 @@ fn test_execute_base_dpc_constraints() {
             ciphertext_selectors.push(greatest);
         }
 
-        let selector_bits = [ciphertext_selectors.clone(), fq_high_selector_bits.clone()].concat();
+        let selector_bits = [ciphertext_selectors.clone(), vec![final_fq_high_bit]].concat();
         let selector_bytes = bits_to_bytes(&selector_bits);
 
         let ciphertext_hash = circuit_parameters
@@ -405,7 +417,7 @@ fn test_execute_base_dpc_constraints() {
         new_records_encryption_randomness.push(encryption_randomness);
         new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
         new_records_ciphertext_hashes.push(ciphertext_hash);
-        new_records_ciphertext_and_fq_high_selectors.push((ciphertext_selectors, fq_high_selector_bits));
+        new_records_ciphertext_and_fq_high_selectors_gadget.push((ciphertext_selectors, fq_high_bits));
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -428,7 +440,7 @@ fn test_execute_base_dpc_constraints() {
         &new_records_group_encoding,
         &new_records_encryption_randomness,
         &new_records_encryption_blinding_exponents,
-        &new_records_ciphertext_and_fq_high_selectors,
+        &new_records_ciphertext_and_fq_high_selectors_gadget,
         &new_records_ciphertext_hashes,
         &predicate_comm,
         &predicate_rand,
@@ -488,7 +500,7 @@ fn test_execute_base_dpc_constraints() {
             &new_records_group_encoding,
             &new_records_encryption_randomness,
             &new_records_encryption_blinding_exponents,
-            &new_records_ciphertext_and_fq_high_selectors,
+            &new_records_ciphertext_and_fq_high_selectors_gadget,
             &new_records_ciphertext_hashes,
             &predicate_comm,
             &predicate_rand,

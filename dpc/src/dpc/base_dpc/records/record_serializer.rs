@@ -8,6 +8,7 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, BigInteger, FromBytes, ToBytes};
 
+use itertools::Itertools;
 use std::marker::PhantomData;
 
 pub fn recover_from_x_coordinate<G: Group + ProjectiveCurve>(
@@ -55,9 +56,12 @@ pub trait SerializeRecord {
     type Record: Record;
     type RecordComponents;
 
-    fn serialize(record: &Self::Record) -> Result<Vec<(Self::Group, bool)>, DPCError>;
+    fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError>;
 
-    fn deserialize(serialized_record: Vec<(Self::Group, bool)>) -> Result<Self::RecordComponents, DPCError>;
+    fn deserialize(
+        serialized_record: Vec<Self::Group>,
+        final_fq_high_bit: bool,
+    ) -> Result<Self::RecordComponents, DPCError>;
 }
 
 pub struct RecordComponents<C: BaseDPCComponents> {
@@ -89,7 +93,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
     type Record = DPCRecord<C>;
     type RecordComponents = RecordComponents<C>;
 
-    fn serialize(record: &Self::Record) -> Result<Vec<(Self::Group, bool)>, DPCError> {
+    fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError> {
         let scalar_field_bitsize = <Self::Group as Group>::ScalarField::size_in_bits();
         let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
         let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
@@ -117,15 +121,19 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         // Create the vector for storing data elements.
 
         let mut data_elements = vec![];
+        let mut fq_high_bits = vec![];
 
         // These elements are already in the constraint field.
 
         let serial_number_nonce = record.serial_number_nonce();
-        data_elements.push(recover_from_x_coordinate::<Self::Group>(
-            &to_bytes![serial_number_nonce]?[..],
-        )?);
+        let (serial_number_nonce_encoded, fq_high) =
+            recover_from_x_coordinate::<Self::Group>(&to_bytes![serial_number_nonce]?[..])?;
+
+        data_elements.push(serial_number_nonce_encoded);
+        fq_high_bits.push(fq_high);
 
         assert_eq!(data_elements.len(), 1);
+        assert_eq!(fq_high_bits.len(), 1);
 
         // These elements need to be represented in the constraint field.
 
@@ -137,11 +145,13 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Process commitment_randomness. (Assumption 1 applies)
 
-        data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-            &to_bytes![commitment_randomness]?[..],
-        )?);
+        let (encoded_commitment_randomness, fq_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&to_bytes![commitment_randomness]?[..])?;
+        data_elements.push(encoded_commitment_randomness);
+        fq_high_bits.push(fq_high);
 
         assert_eq!(data_elements.len(), 2);
+        assert_eq!(fq_high_bits.len(), 2);
 
         // Process birth_predicate_repr and death_predicate_repr. (Assumption 2 and 3 applies)
 
@@ -158,14 +168,6 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             death_predicate_repr_bits.push(death_predicate_repr_biginteger.get_bit(i));
         }
 
-        let mut birth_predicate_repr_bits2 = Vec::with_capacity(base_field_bitsize);
-        let birth_bits = bytes_to_bits(birth_predicate_repr);
-        for i in 0..data_field_bitsize {
-            birth_predicate_repr_bits2.push(birth_bits[i]);
-        }
-
-        assert_eq!(birth_predicate_repr_bits, birth_predicate_repr_bits2);
-
         // (Assumption 2 applies)
         for i in data_field_bitsize..outer_field_bitsize {
             birth_predicate_repr_remainder_bits.push(birth_predicate_repr_biginteger.get_bit(i));
@@ -174,17 +176,24 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         birth_predicate_repr_remainder_bits.extend_from_slice(&death_predicate_repr_remainder_bits);
 
         // (Assumption 3 applies)
-        data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-            &bits_to_bytes(&birth_predicate_repr_bits)[..],
-        )?);
-        data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-            &bits_to_bytes(&death_predicate_repr_bits)[..],
-        )?);
-        data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-            &bits_to_bytes(&birth_predicate_repr_remainder_bits)[..],
-        )?);
+
+        let (encoded_birth_predicate_repr, fq_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_repr_bits)[..])?;
+        data_elements.push(encoded_birth_predicate_repr);
+        fq_high_bits.push(fq_high);
+
+        let (encoded_death_predicate_repr, fq_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&death_predicate_repr_bits)[..])?;
+        data_elements.push(encoded_death_predicate_repr);
+        fq_high_bits.push(fq_high);
+
+        let (encoded_birth_predicate_repr_remainder, fq_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_repr_remainder_bits)[..])?;
+        data_elements.push(encoded_birth_predicate_repr_remainder);
+        fq_high_bits.push(fq_high);
 
         assert_eq!(data_elements.len(), 5);
+        assert_eq!(fq_high_bits.len(), 5);
 
         // Process payload.
 
@@ -196,32 +205,39 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         for (i, bit) in payload_bits.iter().enumerate() {
             payload_field_bits.push(*bit);
 
-            if i > 0 && i % payload_field_bitsize == 0 {
+            if (i > 0) && ((i + 1) % payload_field_bitsize == 0) {
                 // (Assumption 4)
                 payload_field_bits.push(true);
+                let (encoded_payload_field, fq_high) =
+                    encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&payload_field_bits)[..])?;
 
-                data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-                    &bits_to_bytes(&payload_field_bits)[..],
-                )?);
+                data_elements.push(encoded_payload_field);
+                fq_high_bits.push(fq_high);
+
                 payload_field_bits.clear();
             }
         }
 
         let num_payload_elements = payload_bits.len() / payload_field_bitsize;
         assert_eq!(data_elements.len(), 5 + num_payload_elements);
+        assert_eq!(fq_high_bits.len(), 5 + num_payload_elements);
 
         // Process payload remainder and value.
 
         // Determine if value can fit in current payload_field_bits.
-        let value_does_not_fit = (payload_field_bits.len() + std::mem::size_of_val(&value)) > payload_field_bitsize;
+        let value_does_not_fit = (payload_field_bits.len() + fq_high_bits.len() + (std::mem::size_of_val(&value) * 8))
+            > payload_field_bitsize;
 
         if value_does_not_fit {
             // (Assumption 4)
             payload_field_bits.push(true);
 
-            data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-                &bits_to_bytes(&payload_field_bits)[..],
-            )?);
+            let (encoded_payload_field, fq_high) =
+                encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&payload_field_bits)[..])?;
+
+            data_elements.push(encoded_payload_field);
+            fq_high_bits.push(fq_high);
+
             payload_field_bits.clear();
         }
 
@@ -232,14 +248,14 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Append the value bits and create the final base element.
         let value_bits = bytes_to_bits(&to_bytes![value]?);
-        payload_field_bits.extend_from_slice(&value_bits);
 
         // (Assumption 4)
-        payload_field_bits.push(true);
+        let fq_high_and_payload_and_value_bits = [vec![true], fq_high_bits, value_bits, payload_field_bits].concat();
 
-        data_elements.push(encode_to_group::<Self::Parameters, Self::Group>(
-            &bits_to_bytes(&payload_field_bits)[..],
-        )?);
+        let (encoded_fq_high_and_payload_and_value_field, final_fq_high_bit) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&fq_high_and_payload_and_value_bits)[..])?;
+
+        data_elements.push(encoded_fq_high_and_payload_and_value_field);
 
         assert_eq!(
             data_elements.len(),
@@ -251,29 +267,42 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         let mut output = Vec::with_capacity(data_elements.len());
 
         for element in data_elements.iter() {
-            output.push((element.0.into_projective(), element.1));
+            output.push(element.into_projective());
         }
 
-        Ok(output)
+        Ok((output, final_fq_high_bit))
     }
 
-    fn deserialize(serialized_record: Vec<(Self::Group, bool)>) -> Result<Self::RecordComponents, DPCError> {
+    fn deserialize(
+        serialized_record: Vec<Self::Group>,
+        final_fq_high_bit: bool,
+    ) -> Result<Self::RecordComponents, DPCError> {
         let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
         let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
 
         let data_field_bitsize = base_field_bitsize - 1;
         let remainder_size = outer_field_bitsize - data_field_bitsize;
 
+        let payload_field_bitsize = data_field_bitsize - 1;
+
+        // Extract the fq_bits
+        let final_element = &serialized_record[serialized_record.len() - 1];
+        let final_element_bytes =
+            decode_from_group::<Self::Parameters, Self::Group>(final_element.into_affine(), final_fq_high_bit)?;
+        let final_element_bits = bytes_to_bits(&final_element_bytes);
+
+        let fq_high_bits = &final_element_bits[1..serialized_record.len()];
+
         // Deserialize serial number nonce
 
-        let (serial_number_nonce, serial_number_nonce_fq_high) = &serialized_record[0];
+        let (serial_number_nonce, serial_number_nonce_fq_high) = &(serialized_record[0], fq_high_bits[0]);
         let serial_number_nonce_bytes =
             recover_x_coordinate::<Self::Group>(serial_number_nonce.into_affine(), *serial_number_nonce_fq_high)?;
         let serial_number_nonce = <C::SerialNumberNonceCRH as CRH>::Output::read(&serial_number_nonce_bytes[..])?;
 
         // Deserialize commitment randomness
 
-        let (commitment_randomness, commitment_randomness_fq_high) = &serialized_record[1];
+        let (commitment_randomness, commitment_randomness_fq_high) = &(serialized_record[1], fq_high_bits[1]);
         let commitment_randomness_bytes = decode_from_group::<Self::Parameters, Self::Group>(
             commitment_randomness.into_affine(),
             *commitment_randomness_fq_high,
@@ -286,11 +315,11 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Deserialize birth and death predicates
 
-        let (birth_predicate_repr, birth_pred_repr_fq_high) = &serialized_record[2];
+        let (birth_predicate_repr, birth_pred_repr_fq_high) = &(serialized_record[2], fq_high_bits[2]);
 
-        let (death_predicate_repr, death_pred_repr_fq_high) = &serialized_record[3];
+        let (death_predicate_repr, death_pred_repr_fq_high) = &(serialized_record[3], fq_high_bits[3]);
 
-        let (predicate_repr_remainder, pred_repr_remainder_fq_high) = &serialized_record[4];
+        let (predicate_repr_remainder, pred_repr_remainder_fq_high) = &(serialized_record[4], fq_high_bits[4]);
 
         let birth_predicate_repr_bytes = decode_from_group::<Self::Parameters, Self::Group>(
             birth_predicate_repr.into_affine(),
@@ -315,18 +344,27 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         let birth_predicate_repr = bits_to_bytes(&birth_predicate_repr_bits);
         let death_predicate_repr = bits_to_bytes(&death_predicate_repr_bits);
 
+        // Deserialize the value
+
+        let value_start = serialized_record.len();
+        let value_end = value_start + (std::mem::size_of_val(&<Self::Record as Record>::Value::default()) * 8);
+        let value: <Self::Record as Record>::Value =
+            FromBytes::read(&bits_to_bytes(&final_element_bits[value_start..value_end])[..])?;
+
         // Deserialize payload
 
-        let mut payload_and_value_bits = vec![];
-        for (element, iterations) in serialized_record[5..].iter() {
-            let element_bytes = decode_from_group::<Self::Parameters, Self::Group>(element.into_affine(), *iterations)?;
-            payload_and_value_bits.extend(&bytes_to_bits(&element_bytes)[0..data_field_bitsize]);
+        let mut payload_bits = vec![];
+        for (element, fq_high) in serialized_record[5..serialized_record.len() - 1]
+            .iter()
+            .zip_eq(&fq_high_bits[5..])
+        {
+            let element_bytes = decode_from_group::<Self::Parameters, Self::Group>(element.into_affine(), *fq_high)?;
+            payload_bits.extend_from_slice(&bytes_to_bits(&element_bytes)[..payload_field_bitsize]);
         }
 
-        let payload_and_value_bytes = bits_to_bytes(&payload_and_value_bits);
+        payload_bits.extend_from_slice(&final_element_bits[value_end..]);
 
-        let payload = RecordPayload::read(&payload_and_value_bytes[..])?;
-        let value: u64 = FromBytes::read(&payload_and_value_bytes[payload.size()..])?;
+        let payload = RecordPayload::read(&bits_to_bytes(&payload_bits)[..])?;
 
         Ok(RecordComponents {
             value,

@@ -103,7 +103,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             (vec![false; record_encoding_length + 1], vec![
                 false;
                 record_encoding_length
-                    + 1
             ]);
             num_output_records
         ];
@@ -248,6 +247,25 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_output_records, new_records_encryption_blinding_exponents.len());
         assert_eq!(num_output_records, new_records_ciphertext_and_fq_high_selectors.len());
         assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
+
+        let record_encoding_length = 7;
+
+        for field_elements in new_records_field_elements {
+            assert_eq!(field_elements.len(), record_encoding_length);
+        }
+
+        for group_encoding in new_records_group_encoding {
+            assert_eq!(group_encoding.len(), record_encoding_length);
+        }
+
+        for blinding_exponents in new_records_encryption_blinding_exponents {
+            assert_eq!(blinding_exponents.len(), record_encoding_length);
+        }
+
+        for (ciphertext_selectors, fq_high_selectors) in new_records_ciphertext_and_fq_high_selectors {
+            assert_eq!(ciphertext_selectors.len(), record_encoding_length);
+            assert_eq!(fq_high_selectors.len(), record_encoding_length + 1);
+        }
 
         Self {
             // Parameters

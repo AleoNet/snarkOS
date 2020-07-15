@@ -960,6 +960,17 @@ where
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
+            let mut fq_high_bits = vec![];
+            for (i, fq_high_bit) in ciphertext_and_fq_high_selectors.1[0..ciphertext_and_fq_high_selectors.1.len() - 1]
+                .iter()
+                .enumerate()
+            {
+                let boolean = Boolean::alloc(
+                    encryption_cs.ns(|| format!("Allocate fq_high_bit {} - {}", i, j)),
+                    || Ok(fq_high_bit),
+                )?;
+                fq_high_bits.push(boolean);
+            }
 
             // *******************************************************************
             // Pack the record bits into serialization format
@@ -1016,7 +1027,7 @@ where
             for (i, bit) in payload_bits.iter().enumerate() {
                 payload_field_bits.push(*bit);
 
-                if i > 0 && i % payload_field_bitsize == 0 {
+                if (i > 0) && ((i + 1) % payload_field_bitsize == 0) {
                     // (Assumption 4)
                     payload_field_bits.push(Boolean::Constant(true));
 
@@ -1030,7 +1041,9 @@ where
             assert_eq!(payload_elements.len(), num_payload_elements);
 
             // Determine if value can fit in current payload_field_bits.
-            let value_does_not_fit = (payload_field_bits.len() + value_bits.len()) > payload_field_bitsize;
+
+            let value_does_not_fit =
+                (payload_field_bits.len() + fq_high_bits.len() + value_bits.len()) > payload_field_bitsize;
 
             if value_does_not_fit {
                 // (Assumption 4)
@@ -1046,9 +1059,14 @@ where
                 num_payload_elements + (value_does_not_fit as usize)
             );
 
-            payload_field_bits.extend_from_slice(&value_bits);
-            payload_field_bits.push(Boolean::Constant(true));
-            payload_elements.push(payload_field_bits.clone());
+            let fq_high_and_payload_and_value_bits = [
+                &vec![Boolean::Constant(true)],
+                &fq_high_bits[..],
+                &value_bits[..],
+                &payload_field_bits[..],
+            ]
+            .concat();
+            payload_elements.push(fq_high_and_payload_and_value_bits.clone());
 
             let num_payload_elements = payload_bits.len() / payload_field_bitsize;
 
@@ -1063,10 +1081,8 @@ where
             use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
 
             let mut record_field_elements_gadgets = Vec::with_capacity(record_field_elements.len());
-            // let mut record_field_elements_squared_gadgets = Vec::with_capacity(record_field_elements.len());
 
             for (i, element) in record_field_elements.iter().enumerate() {
-                // let element_bytes = to_bytes![element]?;
                 let record_field_element_gadget =
                     Elligator2FieldGadget::<C::EncryptionModelParameters, C::InnerField>::alloc(
                         &mut encryption_cs.ns(|| format!("record_field_element_{}", i)),
@@ -1284,10 +1300,9 @@ where
             let ciphertext_and_fq_high_selectors_bytes = UInt8::alloc_vec(
                 &mut encryption_cs.ns(|| format!("ciphertext and fq_high selector bits to bytes {}", j)),
                 &bits_to_bytes(
-                    &[
-                        &ciphertext_and_fq_high_selectors.0[..],
-                        &ciphertext_and_fq_high_selectors.1[..],
-                    ]
+                    &[&ciphertext_and_fq_high_selectors.0[..], &[
+                        ciphertext_and_fq_high_selectors.1[ciphertext_and_fq_high_selectors.1.len() - 1],
+                    ]]
                     .concat(),
                 ),
             )?;
