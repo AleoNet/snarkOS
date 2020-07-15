@@ -232,7 +232,7 @@ impl_params!(
     RecordCiphertextCRHParameters,
     record_ciphertext_crh_test,
     "record_ciphertext_crh",
-    539924
+    270532
 );
 impl_params!(
     SerialNumberNonceCRHParameters,
