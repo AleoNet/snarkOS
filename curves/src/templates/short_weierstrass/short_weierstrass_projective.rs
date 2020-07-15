@@ -135,7 +135,7 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         unimplemented!()
     }
 
-    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, by: S) -> GroupProjective<P> {
+    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&self, by: S) -> GroupProjective<P> {
         let bits = BitIterator::new(by.into());
         self.mul_bits(bits)
     }
@@ -465,7 +465,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         }
     }
 
-    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&mut self, other: S) {
+    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&mut self, other: S) {
         let mut res = Self::zero();
 
         let mut found_one = false;
@@ -489,7 +489,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         (*self).into()
     }
 
-    fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize {
+    fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize {
         P::empirical_recommended_wnaf_for_scalar(scalar)
     }
 

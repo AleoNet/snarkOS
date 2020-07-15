@@ -34,7 +34,7 @@ pub trait Group:
     + for<'a> AddAssign<&'a Self>
     + for<'a> SubAssign<&'a Self>
 {
-    type ScalarField: PrimeField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
 
     /// Returns `self + self`.
     #[must_use]

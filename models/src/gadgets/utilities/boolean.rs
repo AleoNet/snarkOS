@@ -545,7 +545,7 @@ impl Boolean {
         let mut run_i = 0;
         let mut nand_i = 0;
 
-        let char_num_bits = <NativeF as PrimeField>::Params::MODULUS_BITS as usize;
+        let char_num_bits = <NativeF as PrimeField>::Parameters::MODULUS_BITS as usize;
         if bits.len() > char_num_bits {
             let num_extra_bits = bits.len() - char_num_bits;
             let mut or_result = Boolean::constant(false);

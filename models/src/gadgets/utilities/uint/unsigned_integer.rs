@@ -118,7 +118,7 @@ impl UInt8 {
         let values_len = values.len();
         let field_elements: Vec<F> = ToConstraintField::<F>::to_field_elements(values).unwrap();
 
-        let max_size = 8 * (F::Params::CAPACITY / 8) as usize;
+        let max_size = 8 * (F::Parameters::CAPACITY / 8) as usize;
         let mut allocated_bits = Vec::new();
         for (i, field_element) in field_elements.into_iter().enumerate() {
             let fe = FpGadget::alloc_input(&mut cs.ns(|| format!("Field element {}", i)), || Ok(field_element))?;

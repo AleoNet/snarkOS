@@ -16,7 +16,7 @@ use crate::curves::Zero;
 
 pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
     /// This is the scalar field of the G1/G2 groups.
-    type Fr: PrimeField + SquareRootField + Into<<Self::Fr as PrimeField>::BigInt>;
+    type Fr: PrimeField + SquareRootField + Into<<Self::Fr as PrimeField>::BigInteger>;
 
     /// The projective representation of an element in G1.
     type G1Projective: ProjectiveCurve<BaseField = Self::Fq, ScalarField = Self::Fr, Affine = Self::G1Affine>
@@ -116,7 +116,7 @@ pub trait ProjectiveCurve:
     + for<'a> SubAssign<&'a Self>
     + From<<Self as ProjectiveCurve>::Affine>
 {
-    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
     type BaseField: Field;
     type Affine: AffineCurve<Projective = Self, ScalarField = Self::ScalarField> + From<Self> + Into<Self>;
 
@@ -155,7 +155,7 @@ pub trait ProjectiveCurve:
     fn add_assign_mixed(&mut self, other: &Self::Affine);
 
     /// Performs scalar multiplication of this element.
-    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&mut self, other: S);
+    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&mut self, other: S);
 
     /// Converts this element into its affine representation.
     #[must_use]
@@ -196,7 +196,7 @@ pub trait AffineCurve:
     + 'static
     + From<<Self as AffineCurve>::Projective>
 {
-    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
     type BaseField: Field;
     type Projective: ProjectiveCurve<Affine = Self, ScalarField = Self::ScalarField> + From<Self> + Into<Self>;
 
@@ -215,7 +215,7 @@ pub trait AffineCurve:
 
     /// Performs scalar multiplication of this element with mixed addition.
     #[must_use]
-    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, other: S) -> Self::Projective;
+    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&self, other: S) -> Self::Projective;
 
     /// Multiply this element by the cofactor and output the
     /// resulting projective element.
@@ -292,7 +292,7 @@ impl<C: ProjectiveCurve> Group for C {
 
 pub trait ModelParameters: Send + Sync + 'static {
     type BaseField: Field + SquareRootField;
-    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
 }
 
 pub trait SWModelParameters: ModelParameters {
@@ -317,7 +317,7 @@ pub trait SWModelParameters: ModelParameters {
     }
 
     #[inline(always)]
-    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize {
+    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize {
         let num_bits = scalar.num_bits() as usize;
 
         if num_bits >= 103 {
@@ -361,7 +361,7 @@ pub trait TEModelParameters: ModelParameters {
     }
 
     #[inline(always)]
-    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize {
+    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize {
         let num_bits = scalar.num_bits() as usize;
 
         if num_bits >= 130 {
