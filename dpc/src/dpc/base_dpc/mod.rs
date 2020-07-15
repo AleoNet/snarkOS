@@ -1,7 +1,7 @@
 use crate::dpc::base_dpc::{
     binding_signature::*,
     record_payload::RecordPayload,
-    records::record_serializer::{decode_from_group, RecordSerializer, SerializeRecord},
+    records::record_serializer::{decode_from_group, RecordSerializer, RecordSerializerScheme},
 };
 use snarkos_algorithms::{
     encoding::Elligator2,
