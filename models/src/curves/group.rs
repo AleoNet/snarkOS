@@ -55,7 +55,7 @@ pub trait Group:
         for i in BitIterator::new(other.into_repr()) {
             res.double_in_place();
             if i {
-                res += self
+                res += self;
             }
         }
         *self = res

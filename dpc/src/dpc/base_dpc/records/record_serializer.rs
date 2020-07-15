@@ -8,6 +8,8 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, BigInteger, FromBytes, ToBytes};
 
+use snarkos_models::curves::fp_parameters::FpParameters;
+
 use itertools::Itertools;
 use std::marker::PhantomData;
 
@@ -56,6 +58,10 @@ pub trait SerializeRecord {
     type Record: Record;
     type RecordComponents;
 
+    const SCALAR_FIELD_BITSIZE: usize =
+        <<Self::Group as Group>::ScalarField as PrimeField>::Parameters::MODULUS_BITS as usize;
+    const BASE_FIELD_BITSIZE: usize = <Self::InnerField as PrimeField>::Parameters::MODULUS_BITS as usize;
+
     fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError>;
 
     fn deserialize(
@@ -93,8 +99,9 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
     type Record = DPCRecord<C>;
     type RecordComponents = RecordComponents<C>;
 
+    /// Records are serialized in a specialized format to be space-saving.
+    ///
     fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError> {
-        let scalar_field_bitsize = <Self::Group as Group>::ScalarField::size_in_bits();
         let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
         let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
 
@@ -103,7 +110,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Assumption 1 - The scalar field bit size must be strictly less than the base field bit size
         // for the logic below to work correctly.
-        assert!(scalar_field_bitsize < base_field_bitsize);
+        assert!(Self::SCALAR_FIELD_BITSIZE < base_field_bitsize);
 
         // Assumption 2 - this implementation assumes the outer field bit size is larger than
         // the data field bit size by at most one additional scalar field bit size.

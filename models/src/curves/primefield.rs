@@ -1,15 +1,15 @@
 use crate::curves::{Field, FpParameters};
-use snarkos_utilities::biginteger::*;
+use snarkos_utilities::biginteger::BigInteger;
 
 use std::str::FromStr;
 
 /// The interface for a prime field.
 pub trait PrimeField: Field + FromStr {
-    type Parameters: FpParameters<BigInt = Self::BigInteger>;
+    type Parameters: FpParameters<BigInteger = Self::BigInteger>;
     type BigInteger: BigInteger;
 
     /// Returns a prime field element from its underlying representation.
-    fn from_repr(repr: <Self::Parameters as FpParameters>::BigInt) -> Option<Self>;
+    fn from_repr(repr: Self::BigInteger) -> Option<Self>;
 
     /// Returns the underlying representation of the prime field element.
     fn into_repr(&self) -> Self::BigInteger;

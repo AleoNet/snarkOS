@@ -38,7 +38,7 @@ macro_rules! impl_prime_field_from_int {
             fn from(other: u128) -> Self {
                 let upper = (other >> 64) as u64;
                 let lower = ((other << 64) >> 64) as u64;
-                let mut default_int = P::BigInt::default();
+                let mut default_int = P::BigInteger::default();
                 default_int.0[0] = lower;
                 default_int.0[1] = upper;
                 Self::from_repr(default_int).unwrap()
@@ -50,7 +50,7 @@ macro_rules! impl_prime_field_from_int {
             /// Attempts to convert an integer into a field element.
             /// Panics if the provided integer is invalid (e.g. larger than the field modulus).
             fn from(other: $int) -> Self {
-                Self::from_repr(P::BigInt::from(u64::from(other))).unwrap()
+                Self::from_repr(P::BigInteger::from(u64::from(other))).unwrap()
             }
         }
     };
@@ -142,7 +142,7 @@ macro_rules! impl_prime_field_serializer {
 
         impl<P: $params> ConstantSerializedSize for $field<P> {
             const SERIALIZED_SIZE: usize = snarkos_utilities::serialize::buffer_byte_size(
-                <$field<P> as crate::curves::PrimeField>::Params::MODULUS_BITS as usize,
+                <$field<P> as crate::curves::PrimeField>::Parameters::MODULUS_BITS as usize,
             );
             const UNCOMPRESSED_SIZE: usize = Self::SERIALIZED_SIZE;
         }

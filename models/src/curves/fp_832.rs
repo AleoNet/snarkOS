@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
 };
 
-pub trait Fp832Parameters: FpParameters<BigInt = BigInteger> {}
+pub trait Fp832Parameters: FpParameters<BigInteger = BigInteger> {}
 
 #[derive(Derivative)]
 #[derivative(
