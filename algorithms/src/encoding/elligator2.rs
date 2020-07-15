@@ -25,10 +25,15 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
     const D: P::BaseField = <P as TEModelParameters>::COEFF_D;
 
     /// Returns the encoded group element for a given base field element.
-    pub fn encode(fq_element: &P::BaseField) -> Result<(<G as ProjectiveCurve>::Affine, bool), EncodingError> {
-        let fq_high = fq_element > &fq_element.neg();
+    pub fn encode(input: &P::BaseField) -> Result<(<G as ProjectiveCurve>::Affine, bool), EncodingError> {
+        // The input base field must be nonzero, otherwise inverses will fail.
+        if input.is_zero() {
+            return Err(EncodingError::InputMustBeNonzero);
+        }
 
-        let fq_element = if fq_high { *fq_element } else { fq_element.neg() };
+        // We define as convention for the input to be of high sign.
+        let sign_high = input > &input.neg();
+        let input = if sign_high { *input } else { input.neg() };
 
         // Compute the parameters for the alternate Montgomery form: v^2 == u^3 + A * u^2 + B * u.
         let (a, b) = {
@@ -40,7 +45,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
         // Compute the mapping from Fq to E(Fq) as an alternate Montgomery element (u, v).
         let (u, v) = {
             // Let r = element.
-            let r = fq_element;
+            let r = input;
 
             // Let u = D.
             // TODO (howardwu): change to 5.
@@ -50,9 +55,6 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             let ur2 = r.square() * &u;
 
             {
-                // Verify r is nonzero.
-                assert!(!r.is_zero());
-
                 // Verify u is a quadratic nonresidue.
                 #[cfg(debug_assertions)]
                 assert!(u.legendre().is_qnr());
@@ -136,13 +138,18 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             (x, y)
         };
 
-        Ok((<G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?, fq_high))
+        Ok((<G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?, sign_high))
     }
 
     pub fn decode(
         group_element: &<G as ProjectiveCurve>::Affine,
-        fq_high: bool,
+        sign_high: bool,
     ) -> Result<P::BaseField, EncodingError> {
+        // The input group element must be nonzero, otherwise inverses will fail.
+        if group_element.is_zero() {
+            return Err(EncodingError::InputMustBeNonzero);
+        }
+
         let x = P::BaseField::read(&to_bytes![group_element.to_x_coordinate()]?[..])?;
         let y = P::BaseField::read(&to_bytes![group_element.to_y_coordinate()]?[..])?;
 
@@ -223,7 +230,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             (numerator * &denominator.inverse().unwrap()).sqrt().unwrap()
         };
 
-        let element = if fq_high {
+        let element = if sign_high {
             cmp::max(element, -element)
         } else {
             cmp::min(element, -element)
