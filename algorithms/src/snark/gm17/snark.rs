@@ -66,6 +66,13 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
         let verify_time = start_timer!(|| "{Groth-Maller 2017}::Verify");
         let conversion_time = start_timer!(|| "Convert input to E::Fr");
         let input = input.to_field_elements()?;
+
+        println!("START VERIFIER PRINT {}", input.len());
+        for i in &input {
+            println!("{}", i);
+        }
+        println!("END VERIFIER PRINT");
+
         end_timer!(conversion_time);
         let verification = start_timer!(|| format!("Verify proof w/ input len: {}", input.len()));
         let result = verify_proof(&vk, proof, &input)?;

@@ -103,7 +103,6 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             (vec![false; record_encoding_length + 1], vec![
                 false;
                 record_encoding_length
-                    + 1
             ]);
             num_output_records
         ];

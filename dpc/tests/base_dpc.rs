@@ -1,18 +1,21 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
-use snarkos_dpc::base_dpc::{
-    instantiated::*,
-    predicate::PrivatePredicateInput,
-    predicate_circuit::*,
-    record_payload::RecordPayload,
-    records::record_serializer::*,
-    LocalData,
-    DPC,
+use snarkos_dpc::{
+    base_dpc::{
+        instantiated::*,
+        predicate::PrivatePredicateInput,
+        predicate_circuit::*,
+        record_payload::RecordPayload,
+        records::record_serializer::*,
+        LocalData,
+        DPC,
+    },
+    dpc::base_dpc::BaseDPCComponents,
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, CRH, SNARK},
     dpc::{DPCScheme, Record},
-    objects::LedgerScheme,
+    objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
@@ -31,16 +34,13 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use itertools::Itertools;
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
-use snarkos_dpc::dpc::base_dpc::BaseDPCComponents;
-use snarkos_models::objects::Transaction;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn base_dpc_integration_test() {
-    let mut rng = XorShiftRng::seed_from_u64(23472342u64);
+    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
     let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
@@ -237,7 +237,7 @@ fn base_dpc_integration_test() {
             .zip(new_records)
             .zip(&transaction.new_records_ciphertext_and_fq_high_selectors)
         {
-            let fq_high_selectors_bits = selector_bits.1.clone();
+            let final_fq_high_bit = selector_bits.1.clone();
 
             let view_key = AccountViewKey::from_private_key(
                 &parameters.circuit_parameters.account_signature,
@@ -252,17 +252,11 @@ fn base_dpc_integration_test() {
                 .decrypt(&view_key.decryption_key, &ciphertext)
                 .unwrap();
 
-            let plaintext_encoding = plaintext
-                .iter()
-                .cloned()
-                .zip_eq(fq_high_selectors_bits.iter().cloned().skip(1))
-                .collect();
-
             let record_components = RecordSerializer::<
                 Components,
                 <Components as BaseDPCComponents>::EncryptionModelParameters,
                 <Components as BaseDPCComponents>::EncryptionGroup,
-            >::deserialize(plaintext_encoding)
+            >::deserialize(plaintext, final_fq_high_bit)
             .unwrap();
 
             assert_eq!(record_components.value, new_record.value());

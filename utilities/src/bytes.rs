@@ -333,7 +333,7 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     let mut bits = bits.to_vec();
     if bits.len() % 8 != 0 {
         let current_length = bits.len();
-        for _ in 0..(8 - current_length % 8) {
+        for _ in 0..(8 - (current_length % 8)) {
             bits.push(false);
         }
     }
@@ -388,12 +388,12 @@ mod test {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
         for _ in 0..ITERATIONS {
-            let bytes: [u8; 32] = rng.gen();
+            let given_bytes: [u8; 32] = rng.gen();
 
-            let bits = bytes_to_bits(&bytes);
-
+            let bits = bytes_to_bits(&given_bytes);
             let recovered_bytes = bits_to_bytes(&bits);
-            assert_eq!(bytes.to_vec(), recovered_bytes);
+
+            assert_eq!(given_bytes.to_vec(), recovered_bytes);
         }
     }
 }
