@@ -886,7 +886,8 @@ where
                 // These values will be used in the inner circuit to validate bit packing and serialization
                 if i == 0 {
                     // Serial number nonce
-                    let record_field_element = <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
+                    let record_field_element =
+                        <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
                     record_field_elements.push(record_field_element);
                 } else {
                     // Decode the encoded groups into their respective field elements
@@ -954,7 +955,10 @@ where
                         .into_affine();
                 let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
 
-                let greatest = match <<Components as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(ciphertext_x_coordinate.clone(), true) {
+                let greatest = match <<Components as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
+                    ciphertext_x_coordinate.clone(),
+                    true,
+                ) {
                     Some(affine) => ciphertext_element_affine == affine,
                     None => false,
                 };

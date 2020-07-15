@@ -100,10 +100,10 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
                 num_output_records
             ];
         let new_records_ciphertext_and_fq_high_selectors = vec![
-            (vec![false; record_encoding_length + 1], vec![
-                false;
-                record_encoding_length
-            ]);
+            (
+                vec![false; record_encoding_length + 1],
+                vec![false; record_encoding_length]
+            );
             num_output_records
         ];
 

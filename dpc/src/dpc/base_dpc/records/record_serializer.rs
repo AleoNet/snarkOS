@@ -51,16 +51,23 @@ pub fn decode_from_group<P: MontgomeryModelParameters + TEModelParameters, G: Gr
 }
 
 pub trait SerializeRecord {
+    /// The group is composed of base field elements in `Self::InnerField`.
     type Group: Group + ProjectiveCurve;
+    /// The inner field is equivalent to the base field in `Self::Group`.
     type InnerField: PrimeField;
+    /// The outer field is unrelated to `Self::Group` and `Self::InnerField`.
     type OuterField: PrimeField;
     type Parameters: MontgomeryModelParameters + TEModelParameters;
     type Record: Record;
     type RecordComponents;
 
+    /// This is the bitsize of the scalar field modulus in `Self::Group`.
     const SCALAR_FIELD_BITSIZE: usize =
         <<Self::Group as Group>::ScalarField as PrimeField>::Parameters::MODULUS_BITS as usize;
-    const BASE_FIELD_BITSIZE: usize = <Self::InnerField as PrimeField>::Parameters::MODULUS_BITS as usize;
+    /// This is the bitsize of the base field modulus in `Self::Group` and equivalent to `Self::InnerField`.
+    const INNER_FIELD_BITSIZE: usize = <Self::InnerField as PrimeField>::Parameters::MODULUS_BITS as usize;
+    /// This is the bitsize of the field modulus in `Self::OuterField`.
+    const OUTER_FIELD_BITSIZE: usize = <Self::OuterField as PrimeField>::Parameters::MODULUS_BITS as usize;
 
     fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError>;
 
@@ -102,23 +109,20 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
     /// Records are serialized in a specialized format to be space-saving.
     ///
     fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError> {
-        let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
-        let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
-
         // A standard unit for packing bits into data storage
-        let data_field_bitsize = base_field_bitsize - 1;
+        let data_field_bitsize = Self::INNER_FIELD_BITSIZE - 1;
 
         // Assumption 1 - The scalar field bit size must be strictly less than the base field bit size
         // for the logic below to work correctly.
-        assert!(Self::SCALAR_FIELD_BITSIZE < base_field_bitsize);
+        assert!(Self::SCALAR_FIELD_BITSIZE < Self::INNER_FIELD_BITSIZE);
 
         // Assumption 2 - this implementation assumes the outer field bit size is larger than
         // the data field bit size by at most one additional scalar field bit size.
-        assert!((outer_field_bitsize - data_field_bitsize) <= data_field_bitsize);
+        assert!((Self::OUTER_FIELD_BITSIZE - data_field_bitsize) <= data_field_bitsize);
 
         // Assumption 3 - this implementation assumes the remainder of two outer field bit sizes
         // can fit within one data field element's bit size.
-        assert!((2 * (outer_field_bitsize - data_field_bitsize)) <= data_field_bitsize);
+        assert!((2 * (Self::OUTER_FIELD_BITSIZE - data_field_bitsize)) <= data_field_bitsize);
 
         // Assumption 4 - this implementation assumes the payload and value may be zero values.
         // As such, to ensure the values are non-zero for encoding and decoding, we explicitly
@@ -165,10 +169,12 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         let birth_predicate_repr_biginteger = Self::OuterField::read(&birth_predicate_repr[..])?.into_repr();
         let death_predicate_repr_biginteger = Self::OuterField::read(&death_predicate_repr[..])?.into_repr();
 
-        let mut birth_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
-        let mut death_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
-        let mut birth_predicate_repr_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
-        let mut death_predicate_repr_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+        let mut birth_predicate_repr_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
+        let mut death_predicate_repr_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
+        let mut birth_predicate_repr_remainder_bits =
+            Vec::with_capacity(Self::OUTER_FIELD_BITSIZE - data_field_bitsize);
+        let mut death_predicate_repr_remainder_bits =
+            Vec::with_capacity(Self::OUTER_FIELD_BITSIZE - data_field_bitsize);
 
         for i in 0..data_field_bitsize {
             birth_predicate_repr_bits.push(birth_predicate_repr_biginteger.get_bit(i));
@@ -176,7 +182,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         }
 
         // (Assumption 2 applies)
-        for i in data_field_bitsize..outer_field_bitsize {
+        for i in data_field_bitsize..Self::OUTER_FIELD_BITSIZE {
             birth_predicate_repr_remainder_bits.push(birth_predicate_repr_biginteger.get_bit(i));
             death_predicate_repr_remainder_bits.push(death_predicate_repr_biginteger.get_bit(i));
         }
@@ -284,11 +290,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         serialized_record: Vec<Self::Group>,
         final_fq_high_bit: bool,
     ) -> Result<Self::RecordComponents, DPCError> {
-        let base_field_bitsize = <Self::InnerField as PrimeField>::size_in_bits();
-        let outer_field_bitsize = <Self::OuterField as PrimeField>::size_in_bits();
-
-        let data_field_bitsize = base_field_bitsize - 1;
-        let remainder_size = outer_field_bitsize - data_field_bitsize;
+        let data_field_bitsize = Self::INNER_FIELD_BITSIZE - 1;
+        let remainder_size = Self::OUTER_FIELD_BITSIZE - data_field_bitsize;
 
         let payload_field_bitsize = data_field_bitsize - 1;
 
