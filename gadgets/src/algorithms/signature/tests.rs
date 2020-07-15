@@ -57,7 +57,7 @@ fn test_schnorr_signature_randomize_public_key_gadget() {
 
     // Circuit Schnorr randomized public key (candidate)
 
-    let candidate_parameters_gadget = SchnorrParametersGadget::<EdwardsAffine, Fr, EdwardsBlsGadget>::alloc_input(
+    let candidate_parameters_gadget = SchnorrParametersGadget::<EdwardsAffine, Fr, Blake2s>::alloc_input(
         &mut cs.ns(|| "candidate_parameters"),
         || Ok(schnorr_signature.parameters()),
     )

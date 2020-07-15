@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [[bench]]
 name = "account"

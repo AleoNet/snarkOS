@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-colored = { version = "1", optional = true }
+colored = { version = "2", optional = true }
 
 [features]
 print-trace = [ "colored" ]
