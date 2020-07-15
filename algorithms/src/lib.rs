@@ -12,6 +12,7 @@ extern crate derivative;
 #[macro_use]
 extern crate snarkos_profiler;
 
+pub mod algebraic_hash;
 pub mod commitment;
 pub mod crh;
 pub mod encryption;

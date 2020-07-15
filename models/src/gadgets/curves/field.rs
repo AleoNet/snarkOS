@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
+use snarkos_utilities::bititerator::BitIterator;
 
 use std::fmt::Debug;
 
@@ -166,6 +167,30 @@ pub trait FieldGadget<NativeF: Field, F: Field>:
             let tmp = res.mul(cs.ns(|| format!("Add {}-th base power", i)), self)?;
             res = Self::conditionally_select(cs.ns(|| format!("Conditional Select {}", i)), bit, &tmp, &res)?;
         }
+        Ok(res)
+    }
+
+    fn pow_by_constant<S: AsRef<[u64]>, CS: ConstraintSystem<F>>(
+        &self,
+        mut cs: CS,
+        exp: S,
+    ) -> Result<Self, SynthesisError> {
+        let mut res = self.clone();
+        let mut found_one = false;
+
+        for (i, bit) in BitIterator::new(exp).enumerate() {
+            if found_one {
+                res = res.square(cs.ns(|| format!("square for bit {:?}", i)))?;
+            }
+
+            if bit {
+                if found_one {
+                    res = res.mul(cs.ns(|| format!("mul for bit {:?}", i)), self)?;
+                }
+                found_one = true;
+            }
+        }
+
         Ok(res)
     }
 

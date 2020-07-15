@@ -1,3 +1,4 @@
+pub mod algebraic_hash;
 pub mod binding_signature;
 pub mod commitment;
 pub mod crh;
