@@ -358,7 +358,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_account_addresss: &[AccountAddress<Components>],
+        new_account_address: &[AccountAddress<Components>],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
@@ -384,7 +384,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_addresss.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_address.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -441,7 +441,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_account_addresss[j],
+                &new_account_address[j],
                 new_is_dummy_flags[j],
                 new_values[j],
                 &new_payloads[j],
@@ -659,7 +659,7 @@ where
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_addresss: &[<Self::Account as AccountScheme>::AccountAddress],
+        new_account_address: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
@@ -677,7 +677,7 @@ where
             &parameters.circuit_parameters,
             old_records,
             old_account_private_keys,
-            new_account_addresss,
+            new_account_address,
             new_is_dummy_flags,
             new_values,
             new_payloads,

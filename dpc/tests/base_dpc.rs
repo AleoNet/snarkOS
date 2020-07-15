@@ -102,7 +102,7 @@ fn base_dpc_integration_test() {
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(predicate_vk_hash.clone());
 
-    let new_account_addresss = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_address = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
@@ -200,7 +200,7 @@ fn base_dpc_integration_test() {
         &old_records,
         &old_account_private_keys,
         &old_death_vk_and_proof_generator,
-        &new_account_addresss,
+        &new_account_address,
         &new_dummy_flags,
         &new_values,
         &new_payloads,
