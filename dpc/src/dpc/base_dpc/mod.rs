@@ -878,6 +878,7 @@ where
             let mut record_group_encoding = vec![];
             let mut record_plaintexts = vec![];
             // The first fq_high selector is false to account for the c_0 element in the ciphertext
+
             for (i, (element, fq_high)) in serialized_record.iter().zip_eq(&fq_high_bits).enumerate() {
                 let element_affine = element.into_affine();
 

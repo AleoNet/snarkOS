@@ -248,6 +248,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_output_records, new_records_ciphertext_and_fq_high_selectors.len());
         assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
 
+        // TODO (raychu86) Fix the lengths to be generic
         let record_encoding_length = 7;
 
         for field_elements in new_records_field_elements {
@@ -263,8 +264,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         }
 
         for (ciphertext_selectors, fq_high_selectors) in new_records_ciphertext_and_fq_high_selectors {
-            assert_eq!(ciphertext_selectors.len(), record_encoding_length);
-            assert_eq!(fq_high_selectors.len(), record_encoding_length + 1);
+            assert_eq!(ciphertext_selectors.len(), record_encoding_length + 1);
+            assert_eq!(fq_high_selectors.len(), record_encoding_length);
         }
 
         Self {

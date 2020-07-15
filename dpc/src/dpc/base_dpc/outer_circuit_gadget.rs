@@ -17,6 +17,8 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
+use itertools::Itertools;
+
 fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     field_elements: &Vec<C::InnerField>,
@@ -248,7 +250,7 @@ where
 
     let mut commitment_and_ciphertext_hash_fe_bytes = vec![];
     for (index, (cm_fe, record_ciphertext_hash_fe)) in
-        commitments_fe.iter().zip(&record_ciphertext_hashes_fe).enumerate()
+        commitments_fe.iter().zip_eq(&record_ciphertext_hashes_fe).enumerate()
     {
         commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,

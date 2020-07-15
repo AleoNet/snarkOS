@@ -10,7 +10,7 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-pub(crate) const ITERATIONS: usize = 5;
+pub(crate) const ITERATIONS: usize = 10;
 
 #[test]
 fn test_record_serialization() {
