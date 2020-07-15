@@ -160,7 +160,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
 
         let blinding_exponents = self.generate_blinding_exponents(public_key, randomness, message.len())?;
 
-        for (m_i, blinding_exp) in message.iter().zip(blinding_exponents) {
+        for (m_i, blinding_exp) in message.iter().zip_eq(blinding_exponents) {
             // h_i <- 1 [/] (z [+] i) * record_view_key
             let h_i = record_view_key.mul(&blinding_exp);
 
