@@ -216,16 +216,6 @@ where
     circuit.generate_constraints(&mut prover)?;
     end_timer!(synthesis_time);
 
-    println!("STARTING PROVER PRINT {}", prover.num_inputs);
-    for i in &prover.input_assignment {
-        println!("{}", i);
-    }
-    println!("WITNESS");
-    for i in &prover.aux_assignment {
-        println!("{}", i);
-    }
-    println!("ENDING PROVER PRINT");
-
     let witness_map_time = start_timer!(|| "R1CS to SAP witness map");
     let (full_input_assignment, h, _) = R1CStoSAP::witness_map::<E>(&prover, &d1, &d2)?;
     end_timer!(witness_map_time);

@@ -878,7 +878,7 @@ where
             let mut record_group_encoding = vec![];
             let mut record_plaintexts = vec![];
             // The first fq_high selector is false to account for the c_0 element in the ciphertext
-            let mut fq_high_selector_bits = vec![false];
+
             for (i, (element, fq_high)) in serialized_record.iter().zip_eq(&fq_high_bits).enumerate() {
                 let element_affine = element.into_affine();
 
@@ -918,9 +918,6 @@ where
                         &to_bytes![element]?[..],
                     )?;
                 record_plaintexts.push(plaintext_element);
-
-                // Store the fq_high selector for bit packing check in the circuit
-                fq_high_selector_bits.push(*fq_high);
             }
 
             // Store the field elements and group encodings for each new record
@@ -976,17 +973,12 @@ where
                 .record_ciphertext_crh
                 .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
 
-            println!("ciphertext_hash prove: {:?}", to_bytes![ciphertext_hash]?);
-            println!("selector_bytes prove: {:?}", selector_bytes);
-
             new_records_encryption_randomness.push(encryption_randomness);
             new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
             new_records_encryption_ciphertexts.push(ciphertext);
             new_records_ciphertext_hashes.push(ciphertext_hash);
 
-            fq_high_selector_bits.push(final_fq_high_bit.clone());
-            new_records_ciphertext_and_fq_high_selectors_gadget
-                .push((ciphertext_selectors.clone(), fq_high_selector_bits));
+            new_records_ciphertext_and_fq_high_selectors_gadget.push((ciphertext_selectors.clone(), fq_high_bits));
             new_records_ciphertext_and_fq_high_selectors.push((ciphertext_selectors, final_fq_high_bit));
         }
 
@@ -1195,9 +1187,6 @@ where
                 .circuit_parameters
                 .record_ciphertext_crh
                 .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
-
-            println!("ciphertext_hash verify: {:?}", to_bytes![ciphertext_hash]?);
-            println!("selector_bytes verify: {:?}", selector_bytes);
 
             new_records_ciphertext_hashes.push(ciphertext_hash);
         }

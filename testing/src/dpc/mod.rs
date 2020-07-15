@@ -26,18 +26,14 @@ pub fn setup_or_load_parameters<R: Rng>(
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
-    //    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(verify_only) {
-    //        Ok(parameters) => parameters,
-    //        Err(err) => {
-    //            println!("error - {}, re-running parameter Setup", err);
-    //            <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_merkle_tree_parameters, rng)
-    //                .expect("DPC setup failed")
-    //        }
-    //    };
-
-    println!("regnerate parameters");
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_merkle_tree_parameters, rng)
-        .expect("DPC setup failed");
+    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(verify_only) {
+        Ok(parameters) => parameters,
+        Err(err) => {
+            println!("error - {}, re-running parameter Setup", err);
+            <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::setup(&ledger_merkle_tree_parameters, rng)
+                .expect("DPC setup failed")
+        }
+    };
 
     (ledger_merkle_tree_parameters, parameters)
 }

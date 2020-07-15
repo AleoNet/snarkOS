@@ -369,17 +369,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             .zip_eq(&fq_high_bits[5..])
         {
             let element_bytes = decode_from_group::<Self::Parameters, Self::Group>(element.into_affine(), *fq_high)?;
-            payload_bits.extend_from_slice(&bytes_to_bits(&element_bytes));
+            payload_bits.extend_from_slice(&bytes_to_bits(&element_bytes)[..payload_field_bitsize]);
         }
-
-        println!("payload_bits len: {:?}", payload_bits.len());
-        payload_bits.pop();
-        payload_bits.pop();
-        payload_bits.pop();
-        payload_bits.pop();
-        payload_bits.pop();
-
-        println!("payload_bits len after pop: {:?}", payload_bits.len());
 
         payload_bits.extend_from_slice(&final_element_bits[value_end..]);
 
