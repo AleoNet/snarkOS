@@ -280,8 +280,8 @@ mod rpc_tests {
         let account_address = hex::encode(to_bytes![record.account_address()].unwrap());
         let is_dummy = record.is_dummy();
         let value = record.value();
-        let birth_predicate_repr = hex::encode(to_bytes![record.birth_predicate_repr()].unwrap());
-        let death_predicate_repr = hex::encode(to_bytes![record.death_predicate_repr()].unwrap());
+        let birth_predicate_hash = hex::encode(to_bytes![record.birth_predicate_hash()].unwrap());
+        let death_predicate_hash = hex::encode(to_bytes![record.death_predicate_hash()].unwrap());
         let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()].unwrap());
         let commitment = hex::encode(to_bytes![record.commitment()].unwrap());
         let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()].unwrap());
@@ -289,8 +289,8 @@ mod rpc_tests {
         assert_eq!(account_address, record_info["account_address"]);
         assert_eq!(is_dummy, record_info["is_dummy"]);
         assert_eq!(value, record_info["value"]);
-        assert_eq!(birth_predicate_repr, record_info["birth_predicate_repr"]);
-        assert_eq!(death_predicate_repr, record_info["death_predicate_repr"]);
+        assert_eq!(birth_predicate_hash, record_info["birth_predicate_hash"]);
+        assert_eq!(death_predicate_hash, record_info["death_predicate_hash"]);
         assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
         assert_eq!(commitment, record_info["commitment"]);
         assert_eq!(commitment_randomness, record_info["commitment_randomness"]);

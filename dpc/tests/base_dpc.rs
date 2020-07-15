@@ -262,12 +262,12 @@ fn base_dpc_integration_test() {
             assert_eq!(record_components.value, new_record.value());
             assert_eq!(record_components.payload, *new_record.payload());
             assert_eq!(
-                record_components.birth_predicate_repr,
-                new_record.birth_predicate_repr().to_vec()
+                record_components.birth_predicate_hash,
+                new_record.birth_predicate_hash().to_vec()
             );
             assert_eq!(
-                record_components.death_predicate_repr,
-                new_record.death_predicate_repr().to_vec()
+                record_components.death_predicate_hash,
+                new_record.death_predicate_hash().to_vec()
             );
             assert_eq!(&record_components.serial_number_nonce, new_record.serial_number_nonce());
             assert_eq!(

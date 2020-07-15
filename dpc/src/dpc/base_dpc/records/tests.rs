@@ -1,7 +1,7 @@
 use super::record_serializer::*;
 use crate::dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, DPC};
 use snarkos_curves::edwards_bls12::{EdwardsParameters, EdwardsProjective as EdwardsBls};
-use snarkos_models::{algorithms::CRH, objects::AccountScheme};
+use snarkos_models::{algorithms::CRH, dpc::RecordSerializerScheme, objects::AccountScheme};
 
 use snarkos_objects::Account;
 
@@ -71,12 +71,12 @@ fn test_record_serialization() {
                 record_components.commitment_randomness
             );
             assert_eq!(
-                given_record.birth_predicate_repr,
-                record_components.birth_predicate_repr
+                given_record.birth_predicate_hash,
+                record_components.birth_predicate_hash
             );
             assert_eq!(
-                given_record.death_predicate_repr,
-                record_components.death_predicate_repr
+                given_record.death_predicate_hash,
+                record_components.death_predicate_hash
             );
             assert_eq!(given_record.value, record_components.value);
             assert_eq!(given_record.payload, record_components.payload);

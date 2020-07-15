@@ -1,7 +1,7 @@
 use crate::dpc::base_dpc::{
     binding_signature::*,
     record_payload::RecordPayload,
-    records::record_serializer::{decode_from_group, RecordSerializer, RecordSerializerScheme},
+    records::record_serializer::{decode_from_group, RecordSerializer},
 };
 use snarkos_algorithms::{
     encoding::Elligator2,
@@ -20,7 +20,7 @@ use snarkos_models::{
         SNARK,
     },
     curves::{AffineCurve, Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
-    dpc::{DPCComponents, DPCScheme, Predicate, Record},
+    dpc::{DPCComponents, DPCScheme, Predicate, Record, RecordSerializerScheme},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
@@ -336,16 +336,16 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct a record commitment.
-        let birth_predicate_repr = birth_predicate.into_compact_repr();
-        let death_predicate_repr = death_predicate.into_compact_repr();
+        let birth_predicate_hash = birth_predicate.into_compact_repr();
+        let death_predicate_hash = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
             account_address,      // 256 bits = 32 bytes
             is_dummy,             // 1 bit = 1 byte
             value,                // 64 bits = 8 bytes
             payload,              // 256 bits = 32 bytes
-            birth_predicate_repr, // 256 bits = 32 bytes
-            death_predicate_repr, // 256 bits = 32 bytes
+            birth_predicate_hash, // 256 bits = 32 bytes
+            death_predicate_hash, // 256 bits = 32 bytes
             sn_nonce              // 256 bits = 32 bytes
         ]?;
 
@@ -360,8 +360,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             is_dummy,
             value,
             payload: payload.clone(),
-            birth_predicate_repr,
-            death_predicate_repr,
+            birth_predicate_hash,
+            death_predicate_hash,
             serial_number_nonce: sn_nonce.clone(),
             commitment,
             commitment_randomness,
@@ -434,7 +434,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
             old_serial_numbers.push(sn);
             old_randomizers.push(randomizer);
-            old_death_pred_hashes.push(record.death_predicate_repr().to_vec());
+            old_death_pred_hashes.push(record.death_predicate_hash().to_vec());
 
             end_timer!(input_record_time);
         }
@@ -475,7 +475,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             new_commitments.push(record.commitment.clone());
             new_sn_nonce_randomness.push(sn_randomness);
-            new_birth_pred_hashes.push(record.birth_predicate_repr().to_vec());
+            new_birth_pred_hashes.push(record.birth_predicate_hash().to_vec());
             new_records.push(record);
 
             end_timer!(output_record_time);

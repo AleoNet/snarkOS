@@ -4,11 +4,9 @@ use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::{AffineCurve, Group, MontgomeryModelParameters, PrimeField, ProjectiveCurve, TEModelParameters},
-    dpc::{DPCComponents, Record},
+    dpc::{DPCComponents, Record, RecordSerializerScheme},
 };
 use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, BigInteger, FromBytes, ToBytes};
-
-use snarkos_models::curves::fp_parameters::FpParameters;
 
 use itertools::Itertools;
 use std::marker::PhantomData;
@@ -35,45 +33,11 @@ pub fn decode_from_group<P: MontgomeryModelParameters + TEModelParameters, G: Gr
     Ok(to_bytes![output]?)
 }
 
-pub trait RecordSerializerScheme {
-    /// The group is composed of base field elements in `Self::InnerField`.
-    type Group: Group + ProjectiveCurve;
-    /// The inner field is equivalent to the base field in `Self::Group`.
-    type InnerField: PrimeField;
-    /// The outer field is unrelated to `Self::Group` and `Self::InnerField`.
-    type OuterField: PrimeField;
-    type Parameters: MontgomeryModelParameters + TEModelParameters;
-    type Record: Record;
-    type DeserializedRecord;
-
-    /// This is the bitsize of the scalar field modulus in `Self::Group`.
-    const SCALAR_FIELD_BITSIZE: usize =
-        <<Self::Group as Group>::ScalarField as PrimeField>::Parameters::MODULUS_BITS as usize;
-    /// This is the bitsize of the base field modulus in `Self::Group` and equivalent to `Self::InnerField`.
-    const INNER_FIELD_BITSIZE: usize = <Self::InnerField as PrimeField>::Parameters::MODULUS_BITS as usize;
-    /// This is the bitsize of the field modulus in `Self::OuterField`.
-    const OUTER_FIELD_BITSIZE: usize = <Self::OuterField as PrimeField>::Parameters::MODULUS_BITS as usize;
-
-    /// This is the bitsize of each data ciphertext element serialized by this struct.
-    /// Represents a standard unit for packing bits into data elements for storage.
-    const DATA_ELEMENT_BITSIZE: usize = Self::INNER_FIELD_BITSIZE - 1;
-    /// This is the bitsize of each payload ciphertext element serialized by this struct.
-    /// Represents a standard unit for packing the payload into data elements for storage.
-    const PAYLOAD_ELEMENT_BITSIZE: usize = Self::DATA_ELEMENT_BITSIZE - 1;
-
-    fn serialize(record: &Self::Record) -> Result<(Vec<Self::Group>, bool), DPCError>;
-
-    fn deserialize(
-        serialized_record: Vec<Self::Group>,
-        final_fq_high_bit: bool,
-    ) -> Result<Self::DeserializedRecord, DPCError>;
-}
-
 pub struct DeserializedRecord<C: BaseDPCComponents> {
     pub serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
     pub commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness,
-    pub birth_predicate_repr: Vec<u8>,
-    pub death_predicate_repr: Vec<u8>,
+    pub birth_predicate_hash: Vec<u8>,
+    pub death_predicate_hash: Vec<u8>,
     pub payload: RecordPayload,
     pub value: u64,
 }
@@ -143,8 +107,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         // These elements need to be represented in the constraint field.
 
         let commitment_randomness = record.commitment_randomness();
-        let birth_predicate_repr = record.birth_predicate_repr();
-        let death_predicate_repr = record.death_predicate_repr();
+        let birth_predicate_hash = record.birth_predicate_hash();
+        let death_predicate_hash = record.death_predicate_hash();
         let payload = record.payload();
         let value = record.value();
 
@@ -158,45 +122,45 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         assert_eq!(data_elements.len(), 2);
         assert_eq!(data_high_bits.len(), 2);
 
-        // Process birth_predicate_repr and death_predicate_repr. (Assumption 2 and 3 applies)
+        // Process birth_predicate_hash and death_predicate_hash. (Assumption 2 and 3 applies)
 
-        let birth_predicate_repr_biginteger = Self::OuterField::read(&birth_predicate_repr[..])?.into_repr();
-        let death_predicate_repr_biginteger = Self::OuterField::read(&death_predicate_repr[..])?.into_repr();
+        let birth_predicate_hash_biginteger = Self::OuterField::read(&birth_predicate_hash[..])?.into_repr();
+        let death_predicate_hash_biginteger = Self::OuterField::read(&death_predicate_hash[..])?.into_repr();
 
-        let mut birth_predicate_repr_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
-        let mut death_predicate_repr_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
-        let mut birth_predicate_repr_remainder_bits =
+        let mut birth_predicate_hash_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
+        let mut death_predicate_hash_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
+        let mut birth_predicate_hash_remainder_bits =
             Vec::with_capacity(Self::OUTER_FIELD_BITSIZE - Self::DATA_ELEMENT_BITSIZE);
-        let mut death_predicate_repr_remainder_bits =
+        let mut death_predicate_hash_remainder_bits =
             Vec::with_capacity(Self::OUTER_FIELD_BITSIZE - Self::DATA_ELEMENT_BITSIZE);
 
         for i in 0..Self::DATA_ELEMENT_BITSIZE {
-            birth_predicate_repr_bits.push(birth_predicate_repr_biginteger.get_bit(i));
-            death_predicate_repr_bits.push(death_predicate_repr_biginteger.get_bit(i));
+            birth_predicate_hash_bits.push(birth_predicate_hash_biginteger.get_bit(i));
+            death_predicate_hash_bits.push(death_predicate_hash_biginteger.get_bit(i));
         }
 
         // (Assumption 2 applies)
         for i in Self::DATA_ELEMENT_BITSIZE..Self::OUTER_FIELD_BITSIZE {
-            birth_predicate_repr_remainder_bits.push(birth_predicate_repr_biginteger.get_bit(i));
-            death_predicate_repr_remainder_bits.push(death_predicate_repr_biginteger.get_bit(i));
+            birth_predicate_hash_remainder_bits.push(birth_predicate_hash_biginteger.get_bit(i));
+            death_predicate_hash_remainder_bits.push(death_predicate_hash_biginteger.get_bit(i));
         }
-        birth_predicate_repr_remainder_bits.extend_from_slice(&death_predicate_repr_remainder_bits);
+        birth_predicate_hash_remainder_bits.extend_from_slice(&death_predicate_hash_remainder_bits);
 
         // (Assumption 3 applies)
 
-        let (encoded_birth_predicate_repr, sign_high) =
-            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_repr_bits)[..])?;
-        data_elements.push(encoded_birth_predicate_repr);
+        let (encoded_birth_predicate_hash, sign_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_hash_bits)[..])?;
+        data_elements.push(encoded_birth_predicate_hash);
         data_high_bits.push(sign_high);
 
-        let (encoded_death_predicate_repr, sign_high) =
-            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&death_predicate_repr_bits)[..])?;
-        data_elements.push(encoded_death_predicate_repr);
+        let (encoded_death_predicate_hash, sign_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&death_predicate_hash_bits)[..])?;
+        data_elements.push(encoded_death_predicate_hash);
         data_high_bits.push(sign_high);
 
-        let (encoded_birth_predicate_repr_remainder, sign_high) =
-            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_repr_remainder_bits)[..])?;
-        data_elements.push(encoded_birth_predicate_repr_remainder);
+        let (encoded_birth_predicate_hash_remainder, sign_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_hash_remainder_bits)[..])?;
+        data_elements.push(encoded_birth_predicate_hash_remainder);
         data_high_bits.push(sign_high);
 
         assert_eq!(data_elements.len(), 5);
@@ -312,16 +276,16 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Deserialize birth and death predicates
 
-        let (birth_predicate_repr, birth_predicate_repr_sign_high) = &(serialized_record[2], fq_high_bits[2]);
-        let birth_predicate_repr_bytes = decode_from_group::<Self::Parameters, Self::Group>(
-            birth_predicate_repr.into_affine(),
-            *birth_predicate_repr_sign_high,
+        let (birth_predicate_hash, birth_predicate_hash_sign_high) = &(serialized_record[2], fq_high_bits[2]);
+        let birth_predicate_hash_bytes = decode_from_group::<Self::Parameters, Self::Group>(
+            birth_predicate_hash.into_affine(),
+            *birth_predicate_hash_sign_high,
         )?;
 
-        let (death_predicate_repr, death_predicate_repr_sign_high) = &(serialized_record[3], fq_high_bits[3]);
-        let death_predicate_repr_bytes = decode_from_group::<Self::Parameters, Self::Group>(
-            death_predicate_repr.into_affine(),
-            *death_predicate_repr_sign_high,
+        let (death_predicate_hash, death_predicate_hash_sign_high) = &(serialized_record[3], fq_high_bits[3]);
+        let death_predicate_hash_bytes = decode_from_group::<Self::Parameters, Self::Group>(
+            death_predicate_hash.into_affine(),
+            *death_predicate_hash_sign_high,
         )?;
 
         let (predicate_repr_remainder, predicate_repr_sign_high) = &(serialized_record[4], fq_high_bits[4]);
@@ -330,17 +294,17 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             *predicate_repr_sign_high,
         )?;
 
-        let mut birth_predicate_repr_bits =
-            bytes_to_bits(&birth_predicate_repr_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
-        let mut death_predicate_repr_bits =
-            bytes_to_bits(&death_predicate_repr_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
+        let mut birth_predicate_hash_bits =
+            bytes_to_bits(&birth_predicate_hash_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
+        let mut death_predicate_hash_bits =
+            bytes_to_bits(&death_predicate_hash_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
 
         let predicate_repr_remainder_bits = bytes_to_bits(&predicate_repr_remainder_bytes);
-        birth_predicate_repr_bits.extend(&predicate_repr_remainder_bits[0..remainder_size]);
-        death_predicate_repr_bits.extend(&predicate_repr_remainder_bits[remainder_size..remainder_size * 2]);
+        birth_predicate_hash_bits.extend(&predicate_repr_remainder_bits[0..remainder_size]);
+        death_predicate_hash_bits.extend(&predicate_repr_remainder_bits[remainder_size..remainder_size * 2]);
 
-        let birth_predicate_repr = bits_to_bytes(&birth_predicate_repr_bits);
-        let death_predicate_repr = bits_to_bytes(&death_predicate_repr_bits);
+        let birth_predicate_hash = bits_to_bytes(&birth_predicate_hash_bits);
+        let death_predicate_hash = bits_to_bytes(&death_predicate_hash_bits);
 
         // Deserialize the value
 
@@ -366,8 +330,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         Ok(DeserializedRecord {
             serial_number_nonce,
             commitment_randomness,
-            birth_predicate_repr,
-            death_predicate_repr,
+            birth_predicate_hash,
+            death_predicate_hash,
             payload,
             value,
         })

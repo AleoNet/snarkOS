@@ -442,13 +442,13 @@ where
 
             let given_birth_predicate_crh = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_birth_predicate_crh"),
-                &record.birth_predicate_repr(),
+                &record.birth_predicate_hash(),
             )?;
             old_birth_predicate_hashes_gadgets.push(given_birth_predicate_crh.clone());
 
             let given_death_predicate_crh = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_death_predicate_crh"),
-                &record.death_predicate_repr(),
+                &record.death_predicate_hash(),
             )?;
             old_death_predicate_hashes_gadgets.push(given_death_predicate_crh.clone());
 
@@ -787,13 +787,13 @@ where
 
             let given_birth_predicate_hash = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_birth_predicate_hash"),
-                &record.birth_predicate_repr(),
+                &record.birth_predicate_hash(),
             )?;
             new_birth_predicate_hashes_gadgets.push(given_birth_predicate_hash.clone());
 
             let given_death_predicate_hash = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_death_predicate_hash"),
-                &record.death_predicate_repr(),
+                &record.death_predicate_hash(),
             )?;
             new_death_predicate_hashes_gadgets.push(given_death_predicate_hash.clone());
 
@@ -942,7 +942,7 @@ where
             // Check serialization
 
             // *******************************************************************
-            // Convert serial number nonce, commitment_randomness, birth predicate repr, death predicate repr, payload, and value into bits
+            // Convert serial number nonce, commitment_randomness, birth predicate hash, death predicate hash, payload, and value into bits
 
             let serial_number_nonce_bits = serial_number_nonce_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert serial_number_nonce_bytes to bits"))?;
@@ -954,9 +954,9 @@ where
 
             let commitment_randomness_bits = commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert commitment_randomness_bytes to bits"))?;
-            let full_birth_predicate_repr_bits = given_birth_predicate_hash
+            let full_birth_predicate_hash_bits = given_birth_predicate_hash
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash to bits"))?;
-            let full_death_predicate_repr_bits = given_death_predicate_hash
+            let full_death_predicate_hash_bits = given_death_predicate_hash
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
@@ -1001,22 +1001,22 @@ where
 
             // Birth and death predicates
 
-            let mut birth_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
-            let mut death_predicate_repr_bits = Vec::with_capacity(base_field_bitsize);
-            let mut birth_predicate_repr_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
-            let mut death_predicate_repr_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut birth_predicate_hash_bits = Vec::with_capacity(base_field_bitsize);
+            let mut death_predicate_hash_bits = Vec::with_capacity(base_field_bitsize);
+            let mut birth_predicate_hash_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut death_predicate_hash_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
 
             for i in 0..data_field_bitsize {
-                birth_predicate_repr_bits.push(full_birth_predicate_repr_bits[i]);
-                death_predicate_repr_bits.push(full_death_predicate_repr_bits[i]);
+                birth_predicate_hash_bits.push(full_birth_predicate_hash_bits[i]);
+                death_predicate_hash_bits.push(full_death_predicate_hash_bits[i]);
             }
 
             // (Assumption 2 applies)
             for i in data_field_bitsize..outer_field_bitsize {
-                birth_predicate_repr_remainder_bits.push(full_birth_predicate_repr_bits[i]);
-                death_predicate_repr_remainder_bits.push(full_death_predicate_repr_bits[i]);
+                birth_predicate_hash_remainder_bits.push(full_birth_predicate_hash_bits[i]);
+                death_predicate_hash_remainder_bits.push(full_death_predicate_hash_bits[i]);
             }
-            birth_predicate_repr_remainder_bits.extend_from_slice(&death_predicate_repr_remainder_bits);
+            birth_predicate_hash_remainder_bits.extend_from_slice(&death_predicate_hash_remainder_bits);
 
             // Payload
 
@@ -1105,15 +1105,15 @@ where
             let given_commitment_randomness_bits = given_commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_commitment_randomness_bytes to bits"))?;
 
-            let given_birth_predicate_repr_bytes = &record_field_elements_gadgets[2]
-                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_repr_bytes"))?;
-            let given_birth_predicate_repr_bits = given_birth_predicate_repr_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_repr_bytes to bits"))?;
+            let given_birth_predicate_hash_bytes = &record_field_elements_gadgets[2]
+                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_hash_bytes"))?;
+            let given_birth_predicate_hash_bits = given_birth_predicate_hash_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash_bytes to bits"))?;
 
-            let given_death_predicate_repr_bytes = &record_field_elements_gadgets[3]
-                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_repr_bytes"))?;
-            let given_death_predicate_repr_bits = given_death_predicate_repr_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_repr_bytes to bits"))?;
+            let given_death_predicate_hash_bytes = &record_field_elements_gadgets[3]
+                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_hash_bytes"))?;
+            let given_death_predicate_hash_bits = given_death_predicate_hash_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash_bytes to bits"))?;
 
             let given_predicate_repr_remainder_bytes = &record_field_elements_gadgets[4]
                 .to_bytes(&mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"))?;
@@ -1133,17 +1133,17 @@ where
                 &given_commitment_randomness_bits,
             )?;
 
-            birth_predicate_repr_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_repr_bits match"),
-                &given_birth_predicate_repr_bits,
+            birth_predicate_hash_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_hash_bits match"),
+                &given_birth_predicate_hash_bits,
             )?;
 
-            death_predicate_repr_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_repr_bits match"),
-                &given_death_predicate_repr_bits,
+            death_predicate_hash_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_hash_bits match"),
+                &given_death_predicate_hash_bits,
             )?;
 
-            birth_predicate_repr_remainder_bits.enforce_equal(
+            birth_predicate_hash_remainder_bits.enforce_equal(
                 &mut encryption_cs.ns(|| "Check that computed and declared predicate_repr_remainder_bits match"),
                 &given_predicate_repr_remainder_bits,
             )?;

@@ -17,7 +17,7 @@ use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, CRH, SNARK},
     curves::{AffineCurve, ModelParameters, ProjectiveCurve},
-    dpc::{DPCComponents, Record},
+    dpc::{DPCComponents, Record, RecordSerializerScheme},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
