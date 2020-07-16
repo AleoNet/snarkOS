@@ -10,7 +10,7 @@ pub fn private_key_test() {
     let private_key = PrivateKey::new(rng);
     assert!(private_key.is_ok());
 
-    let expected_private_key = "AKEY1b47dMA8f9GfXPsW9s16qWfiYYmWGAAcorK9RkaVpBeFA";
+    let expected_private_key = "AKEY1jX43RQfASsUBYGfMK7AtD3Dr1uymW7AvJJaxdvjC39BZ";
     let candidate_private_key = private_key.unwrap().to_string();
 
     println!("{} == {}", expected_private_key, candidate_private_key);
