@@ -3,6 +3,6 @@
 
 # Generate test_data
 
-RUST_BACKTRACE=1 cargo run --release --example test_data
+cargo run --release --example test_data
 
 mv test_data ../src/consensus
