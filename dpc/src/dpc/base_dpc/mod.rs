@@ -1104,7 +1104,7 @@ where
             return Ok(false);
         }
 
-        // Returns false if there are duplicate serial numbers in the transaction.
+        // Returns false if there are duplicate commitments numbers in the transaction.
         if has_duplicates(transaction.new_commitments().iter()) {
             eprintln!("Transaction contains duplicate commitments");
             return Ok(false);
