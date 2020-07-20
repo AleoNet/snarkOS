@@ -1075,6 +1075,12 @@ where
             Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
 
+        assert_eq!(new_records_encryption_ciphertexts.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(
+            new_records_encryption_ciphertexts.len(),
+            new_records_ciphertext_and_fq_high_selectors.len()
+        );
+
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
