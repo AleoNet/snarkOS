@@ -4,6 +4,9 @@ pub use self::commitment::*;
 pub mod crh;
 pub use self::crh::*;
 
+pub mod encoding;
+pub use self::encoding::*;
+
 pub mod encryption;
 pub use self::encryption::*;
 

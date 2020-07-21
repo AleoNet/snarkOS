@@ -14,7 +14,7 @@ use snarkos_utilities::{
 
 use base64;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 use std::{str::FromStr, sync::Arc};
 
 type JsonrpcError = jsonrpc_core::Error;
@@ -161,13 +161,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
+        let sn_randomness: [u8; 32] = rng.gen();
         // Fill any unused old_record indices with dummy records
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
                 .parameters
                 .circuit_parameters
                 .serial_number_nonce
-                .hash(&[64u8; 1])?;
+                .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
             let address = AccountAddress::<Components>::from_private_key(

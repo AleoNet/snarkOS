@@ -79,6 +79,18 @@ impl<P: Parameters> GroupAffine<P> {
         }
         res
     }
+
+    /// Checks that the current point is on the elliptic curve.
+    pub fn is_on_curve(&self) -> bool {
+        if self.is_zero() {
+            true
+        } else {
+            // Check that the point is on the curve
+            let y2 = self.y.square();
+            let x3b = P::add_b(&((self.x.square() * &self.x) + &P::mul_by_a(&self.x)));
+            y2 == x3b
+        }
+    }
 }
 
 impl<P: Parameters> Zero for GroupAffine<P> {
@@ -102,11 +114,28 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         Self::new(P::AFFINE_GENERATOR_COEFFS.0, P::AFFINE_GENERATOR_COEFFS.1, false)
     }
 
+    /// Attempts to construct an affine point given an x-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_x_coordinate(x: Self::BaseField, greatest: bool) -> Option<Self> {
+        // Compute x^3 + ax + b
+        let x3b = P::add_b(&((x.square() * &x) + &P::mul_by_a(&x)));
+
+        x3b.sqrt().map(|y| {
+            let negy = -y;
+
+            let y = if (y < negy) ^ greatest { y } else { negy };
+            Self::new(x, y, false)
+        })
+    }
+
     fn add(self, _other: &Self) -> Self {
         unimplemented!()
     }
 
-    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, by: S) -> GroupProjective<P> {
+    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&self, by: S) -> GroupProjective<P> {
         let bits = BitIterator::new(by.into());
         self.mul_bits(bits)
     }
@@ -134,23 +163,6 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
 
     fn to_y_coordinate(&self) -> Self::BaseField {
         self.y.clone()
-    }
-
-    /// Attempts to construct an affine point given an x-coordinate. The
-    /// point is not guaranteed to be in the prime order subgroup.
-    ///
-    /// If and only if `greatest` is set will the lexicographically
-    /// largest y-coordinate be selected.
-    fn get_point_from_x(x: Self::BaseField, greatest: bool) -> Option<Self> {
-        // Compute x^3 + ax + b
-        let x3b = P::add_b(&((x.square() * &x) + &P::mul_by_a(&x)));
-
-        x3b.sqrt().map(|y| {
-            let negy = -y;
-
-            let y = if (y < negy) ^ greatest { y } else { negy };
-            Self::new(x, y, false)
-        })
     }
 
     /// Checks that the current point is on the elliptic curve.
@@ -453,7 +465,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         }
     }
 
-    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&mut self, other: S) {
+    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&mut self, other: S) {
         let mut res = Self::zero();
 
         let mut found_one = false;
@@ -477,7 +489,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         (*self).into()
     }
 
-    fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize {
+    fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize {
         P::empirical_recommended_wnaf_for_scalar(scalar)
     }
 

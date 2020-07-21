@@ -396,7 +396,7 @@ impl<E: PairingEngine> KZG10<E> {
     }
 }
 
-fn skip_leading_zeros_and_convert_to_bigints<F: PrimeField>(p: &Polynomial<F>) -> (usize, Vec<F::BigInt>) {
+fn skip_leading_zeros_and_convert_to_bigints<F: PrimeField>(p: &Polynomial<F>) -> (usize, Vec<F::BigInteger>) {
     let mut num_leading_zeros = 0;
     while p.coeffs[num_leading_zeros].is_zero() && num_leading_zeros < p.coeffs.len() {
         num_leading_zeros += 1;
@@ -405,7 +405,7 @@ fn skip_leading_zeros_and_convert_to_bigints<F: PrimeField>(p: &Polynomial<F>) -
     (num_leading_zeros, coeffs)
 }
 
-fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
+fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInteger> {
     let to_bigint_time = start_timer!(|| "Converting polynomial coeffs to bigints");
     let coeffs = cfg_iter!(p).map(|s| s.into_repr()).collect::<Vec<_>>();
     end_timer!(to_bigint_time);

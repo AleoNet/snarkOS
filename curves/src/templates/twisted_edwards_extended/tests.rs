@@ -131,7 +131,7 @@ where
     }
 
     for _ in 0..ITERATIONS {
-        let biginteger = <<GroupAffine<P> as AffineCurve>::BaseField as PrimeField>::BigInt::rand(&mut rng);
+        let biginteger = <<GroupAffine<P> as AffineCurve>::BaseField as PrimeField>::BigInteger::rand(&mut rng);
         let mut bytes = to_bytes![biginteger].unwrap();
         let mut g = GroupAffine::<P>::from_random_bytes(&bytes);
         while g.is_none() {

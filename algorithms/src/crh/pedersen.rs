@@ -4,22 +4,12 @@ use snarkos_models::{
     algorithms::{CRHParameters, CRH},
     curves::{to_field_vec::ToConstraintField, Field, Group},
 };
+use snarkos_utilities::bytes_to_bits;
 
 use rand::Rng;
 
 #[cfg(feature = "pedersen-parallel")]
 use rayon::prelude::*;
-
-pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = Vec::with_capacity(bytes.len() * 8);
-    for byte in bytes {
-        for i in 0..8 {
-            let bit = (*byte >> i) & 1;
-            bits.push(bit == 1)
-        }
-    }
-    bits
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PedersenCRH<G: Group, S: PedersenSize> {

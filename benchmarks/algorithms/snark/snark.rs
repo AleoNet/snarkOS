@@ -1,7 +1,6 @@
-use rand;
-
 #[macro_use]
 extern crate criterion;
+
 use snarkos_algorithms::snark::GM17;
 use snarkos_curves::bls12_377::{Bls12_377, Fr};
 use snarkos_errors::gadgets::SynthesisError;
@@ -12,9 +11,9 @@ use snarkos_models::{
 };
 
 use criterion::Criterion;
-use rand::{thread_rng, Rng};
+use rand::{self, thread_rng, Rng};
 
-type Snark = GM17<Bls12_377, Benchmark<Fr>, Fr>;
+type GM17SNARK = GM17<Bls12_377, Benchmark<Fr>, Fr>;
 
 struct Benchmark<F: Field> {
     inputs: Vec<Option<F>>,
@@ -69,7 +68,7 @@ fn snark_setup(c: &mut Criterion) {
 
     c.bench_function("snark_setup", move |b| {
         b.iter(|| {
-            Snark::setup(
+            GM17SNARK::setup(
                 Benchmark::<Fr> {
                     inputs: vec![None; num_inputs],
                     num_constraints,
@@ -90,7 +89,7 @@ fn snark_prove(c: &mut Criterion) {
         inputs.push(Some(rng.gen()));
     }
 
-    let params = Snark::setup(
+    let params = GM17SNARK::setup(
         Benchmark::<Fr> {
             inputs: vec![None; num_inputs],
             num_constraints,
@@ -101,7 +100,7 @@ fn snark_prove(c: &mut Criterion) {
 
     c.bench_function("snark_prove", move |b| {
         b.iter(|| {
-            Snark::prove(
+            GM17SNARK::prove(
                 &params.0,
                 Benchmark {
                     inputs: inputs.clone(),
@@ -115,9 +114,9 @@ fn snark_prove(c: &mut Criterion) {
 }
 
 criterion_group! {
-    name = snark;
+    name = gm17_snark;
     config = Criterion::default().sample_size(10);
     targets = snark_setup, snark_prove
 }
 
-criterion_main!(snark);
+criterion_main!(gm17_snark);

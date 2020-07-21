@@ -14,10 +14,10 @@ pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
     type ParametersGadget: AllocGadget<E::Parameters, F> + Clone;
     type PrivateKeyGadget: AllocGadget<E::PrivateKey, F> + ToBytesGadget<F> + Clone + Sized + Debug;
     type PublicKeyGadget: AllocGadget<E::PublicKey, F> + EqGadget<F> + ToBytesGadget<F> + Clone + Sized + Debug;
-    type CiphertextGadget: AllocGadget<E::Ciphertext, F> + EqGadget<F> + Clone + Sized + Debug;
-    type PlaintextGadget: AllocGadget<E::Plaintext, F> + EqGadget<F> + Clone + Sized + Debug;
+    type CiphertextGadget: AllocGadget<Vec<E::Text>, F> + ToBytesGadget<F> + EqGadget<F> + Clone + Sized + Debug;
+    type PlaintextGadget: AllocGadget<Vec<E::Text>, F> + EqGadget<F> + Clone + Sized + Debug;
     type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
-    type BlindingExponentGadget: AllocGadget<Vec<E::Randomness>, F> + Clone + Sized + Debug;
+    type BlindingExponentGadget: AllocGadget<Vec<E::BlindingExponent>, F> + Clone + Sized + Debug;
 
     fn check_public_key_gadget<CS: ConstraintSystem<F>>(
         cs: CS,

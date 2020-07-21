@@ -6,14 +6,14 @@ use rayon::prelude::*;
 pub struct VariableBaseMSM;
 
 impl VariableBaseMSM {
-    fn msm_inner<G: AffineCurve>(bases: &[G], scalars: &[<G::ScalarField as PrimeField>::BigInt]) -> G::Projective {
+    fn msm_inner<G: AffineCurve>(bases: &[G], scalars: &[<G::ScalarField as PrimeField>::BigInteger]) -> G::Projective {
         let c = if scalars.len() < 32 {
             3
         } else {
             (2.0 / 3.0 * (f64::from(scalars.len() as u32)).log2() + 2.0).ceil() as usize
         };
 
-        let num_bits = <G::ScalarField as PrimeField>::Params::MODULUS_BITS as usize;
+        let num_bits = <G::ScalarField as PrimeField>::Parameters::MODULUS_BITS as usize;
         let fr_one = G::ScalarField::one().into_repr();
 
         let zero = G::zero().into_projective();
@@ -83,7 +83,7 @@ impl VariableBaseMSM {
 
     pub fn multi_scalar_mul<G: AffineCurve>(
         bases: &[G],
-        scalars: &[<G::ScalarField as PrimeField>::BigInt],
+        scalars: &[<G::ScalarField as PrimeField>::BigInteger],
     ) -> G::Projective {
         Self::msm_inner(bases, scalars)
     }

@@ -22,6 +22,9 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Output record commitments and birth predicate commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
+    // New record ciphertext hashes
+    pub new_records_ciphertext_hashes: Vec<<C::RecordCiphertextCRH as CRH>::Output>,
+
     // Predicate input commitment and memo
     pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
     pub local_data_commitment: <C::LocalDataCRH as CRH>::Output,
@@ -44,6 +47,9 @@ where
 
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -92,6 +98,13 @@ where
         v.extend_from_slice(
             &self
                 .circuit_parameters
+                .record_ciphertext_crh
+                .parameters()
+                .to_field_elements()?,
+        );
+        v.extend_from_slice(
+            &self
+                .circuit_parameters
                 .predicate_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
@@ -125,8 +138,9 @@ where
             v.extend_from_slice(&sn.to_field_elements()?);
         }
 
-        for cm in &self.new_commitments {
+        for (cm, ciphertext_hash) in self.new_commitments.iter().zip(&self.new_records_ciphertext_hashes) {
             v.extend_from_slice(&cm.to_field_elements()?);
+            v.extend_from_slice(&ciphertext_hash.to_field_elements()?);
         }
 
         v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);

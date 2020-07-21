@@ -171,7 +171,7 @@ impl UInt for UInt128 {
     fn addmany<F: PrimeField, CS: ConstraintSystem<F>>(mut cs: CS, operands: &[Self]) -> Result<Self, SynthesisError> {
         // Make some arbitrary bounds for ourselves to avoid overflows
         // in the scalar field
-        assert!(F::Params::MODULUS_BITS <= 253);
+        assert!(F::Parameters::MODULUS_BITS <= 253);
         assert!(operands.len() >= 2); // Weird trivial cases that should never happen
 
         // Compute the maximum value of the sum so we allocate enough bits for

@@ -25,6 +25,7 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
 pub struct TestTx;
 
 impl Transaction for TestTx {
+    type Ciphertext = [u8; 32];
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
     type LocalDataCommitment = [u8; 32];
@@ -66,6 +67,10 @@ impl Transaction for TestTx {
 
     fn memorandum(&self) -> &Self::Memorandum {
         &[0u8; 32]
+    }
+
+    fn ciphertexts(&self) -> &[Self::Ciphertext] {
+        &[[0u8; 32]]
     }
 
     fn size(&self) -> usize {

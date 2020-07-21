@@ -1,21 +1,26 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
-use snarkos_dpc::base_dpc::{
-    instantiated::*,
-    predicate::PrivatePredicateInput,
-    predicate_circuit::*,
-    record_payload::RecordPayload,
-    LocalData,
-    DPC,
+use snarkos_dpc::{
+    base_dpc::{
+        instantiated::*,
+        predicate::PrivatePredicateInput,
+        predicate_circuit::*,
+        record_payload::RecordPayload,
+        records::record_serializer::*,
+        LocalData,
+        DPC,
+    },
+    dpc::base_dpc::BaseDPCComponents,
 };
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::DPCScheme,
-    objects::LedgerScheme,
+    algorithms::{CommitmentScheme, EncryptionScheme, CRH, SNARK},
+    dpc::{DPCScheme, Record, RecordSerializerScheme},
+    objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
     dpc::DPCTransactions,
     merkle_root,
+    AccountViewKey,
     Block,
     BlockHeader,
     BlockHeaderHash,
@@ -24,7 +29,10 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_testing::{dpc::*, storage::*};
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
@@ -32,7 +40,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn base_dpc_integration_test() {
-    let mut rng = XorShiftRng::seed_from_u64(23472342u64);
+    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
     let (ledger_parameters, parameters) = setup_or_load_parameters(false, &mut rng);
@@ -195,7 +203,7 @@ fn base_dpc_integration_test() {
         Ok(new_proof_and_vk)
     };
 
-    let (_new_records, transaction) = InstantiatedDPC::execute(
+    let (new_records, transaction) = InstantiatedDPC::execute(
         &parameters,
         &old_records,
         &old_account_private_keys,
@@ -213,6 +221,61 @@ fn base_dpc_integration_test() {
         &mut rng,
     )
     .unwrap();
+
+    let transaction_bytes = to_bytes![transaction].unwrap();
+    let _recovered_transaction = Tx::read(&transaction_bytes[..]).unwrap();
+
+    {
+        // Check that new_records can be decrypted from the transaction
+
+        let record_ciphertexts = transaction.ciphertexts();
+        let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
+
+        for (((ciphertext, private_key), new_record), selector_bits) in record_ciphertexts
+            .iter()
+            .zip(new_account_private_keys)
+            .zip(new_records)
+            .zip(&transaction.new_records_ciphertext_and_fq_high_selectors)
+        {
+            let final_fq_high_bit = selector_bits.1.clone();
+
+            let view_key = AccountViewKey::from_private_key(
+                &parameters.circuit_parameters.account_signature,
+                &parameters.circuit_parameters.account_commitment,
+                &private_key,
+            )
+            .unwrap();
+
+            let plaintext = parameters
+                .circuit_parameters
+                .account_encryption
+                .decrypt(&view_key.decryption_key, &ciphertext)
+                .unwrap();
+
+            let record_components = RecordSerializer::<
+                Components,
+                <Components as BaseDPCComponents>::EncryptionModelParameters,
+                <Components as BaseDPCComponents>::EncryptionGroup,
+            >::deserialize(plaintext, final_fq_high_bit)
+            .unwrap();
+
+            assert_eq!(record_components.value, new_record.value());
+            assert_eq!(record_components.payload, *new_record.payload());
+            assert_eq!(
+                record_components.birth_predicate_hash,
+                new_record.birth_predicate_hash().to_vec()
+            );
+            assert_eq!(
+                record_components.death_predicate_hash,
+                new_record.death_predicate_hash().to_vec()
+            );
+            assert_eq!(&record_components.serial_number_nonce, new_record.serial_number_nonce());
+            assert_eq!(
+                record_components.commitment_randomness,
+                new_record.commitment_randomness()
+            );
+        }
+    }
 
     // Craft the block
 

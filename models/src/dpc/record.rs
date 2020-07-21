@@ -21,11 +21,11 @@ pub trait Record: Default + FromBytes + ToBytes {
     /// Returns the record payload.
     fn payload(&self) -> &Self::Payload;
 
-    /// Returns the birth predicate of this record.
-    fn birth_predicate_repr(&self) -> &[u8];
+    /// Returns the birth predicate hash of this record.
+    fn birth_predicate_hash(&self) -> &[u8];
 
-    /// Returns the death predicate of this record.
-    fn death_predicate_repr(&self) -> &[u8];
+    /// Returns the death predicate hash of this record.
+    fn death_predicate_hash(&self) -> &[u8];
 
     /// Returns the randomness used for the serial number.
     fn serial_number_nonce(&self) -> &Self::SerialNumberNonce;

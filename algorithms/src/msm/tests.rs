@@ -8,7 +8,7 @@ use rand_xorshift::XorShiftRng;
 
 fn naive_variable_base_msm<G: AffineCurve>(
     bases: &[G],
-    scalars: &[<G::ScalarField as PrimeField>::BigInt],
+    scalars: &[<G::ScalarField as PrimeField>::BigInteger],
 ) -> G::Projective {
     let mut acc = G::Projective::zero();
 

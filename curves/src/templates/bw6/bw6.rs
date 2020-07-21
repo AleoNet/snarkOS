@@ -25,14 +25,14 @@ pub enum TwistType {
 }
 
 pub trait BW6Parameters: 'static {
-    const X: <Self::Fp as PrimeField>::BigInt;
+    const X: <Self::Fp as PrimeField>::BigInteger;
     const X_IS_NEGATIVE: bool;
     const ATE_LOOP_COUNT_1: &'static [u64];
     const ATE_LOOP_COUNT_1_IS_NEGATIVE: bool;
     const ATE_LOOP_COUNT_2: &'static [i8];
     const ATE_LOOP_COUNT_2_IS_NEGATIVE: bool;
     const TWIST_TYPE: TwistType;
-    type Fp: PrimeField + SquareRootField + Into<<Self::Fp as PrimeField>::BigInt>;
+    type Fp: PrimeField + SquareRootField + Into<<Self::Fp as PrimeField>::BigInteger>;
     type Fp3Params: Fp3Parameters<Fp = Self::Fp>;
     type Fp6Params: Fp6Parameters<Fp3Params = Self::Fp3Params>;
     type G1Parameters: SWModelParameters<BaseField = Self::Fp>;

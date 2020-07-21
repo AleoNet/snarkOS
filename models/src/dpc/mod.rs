@@ -9,3 +9,6 @@ pub use self::predicate::*;
 
 pub mod record;
 pub use self::record::*;
+
+pub mod record_serializer;
+pub use self::record_serializer::*;

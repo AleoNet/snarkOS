@@ -16,7 +16,7 @@ use crate::curves::Zero;
 
 pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
     /// This is the scalar field of the G1/G2 groups.
-    type Fr: PrimeField + SquareRootField + Into<<Self::Fr as PrimeField>::BigInt>;
+    type Fr: PrimeField + SquareRootField + Into<<Self::Fr as PrimeField>::BigInteger>;
 
     /// The projective representation of an element in G1.
     type G1Projective: ProjectiveCurve<BaseField = Self::Fq, ScalarField = Self::Fr, Affine = Self::G1Affine>
@@ -116,7 +116,7 @@ pub trait ProjectiveCurve:
     + for<'a> SubAssign<&'a Self>
     + From<<Self as ProjectiveCurve>::Affine>
 {
-    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
     type BaseField: Field;
     type Affine: AffineCurve<Projective = Self, ScalarField = Self::ScalarField> + From<Self> + Into<Self>;
 
@@ -155,7 +155,7 @@ pub trait ProjectiveCurve:
     fn add_assign_mixed(&mut self, other: &Self::Affine);
 
     /// Performs scalar multiplication of this element.
-    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&mut self, other: S);
+    fn mul_assign<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&mut self, other: S);
 
     /// Converts this element into its affine representation.
     #[must_use]
@@ -164,7 +164,7 @@ pub trait ProjectiveCurve:
     /// Recommends a wNAF window table size given a scalar. Always returns a
     /// number between 2 and 22, inclusive.
     #[must_use]
-    fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize;
+    fn recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize;
 
     /// Recommends a wNAF window size given the number of scalars you intend to
     /// multiply a base by. Always returns a number between 2 and 22,
@@ -196,7 +196,7 @@ pub trait AffineCurve:
     + 'static
     + From<<Self as AffineCurve>::Projective>
 {
-    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
     type BaseField: Field;
     type Projective: ProjectiveCurve<Affine = Self, ScalarField = Self::ScalarField> + From<Self> + Into<Self>;
 
@@ -204,11 +204,18 @@ pub trait AffineCurve:
     #[must_use]
     fn prime_subgroup_generator() -> Self;
 
+    /// Attempts to construct an affine point given an x-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_x_coordinate(x: Self::BaseField, greatest: bool) -> Option<Self>;
+
     fn add(self, other: &Self) -> Self;
 
     /// Performs scalar multiplication of this element with mixed addition.
     #[must_use]
-    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInt>>(&self, other: S) -> Self::Projective;
+    fn mul<S: Into<<Self::ScalarField as PrimeField>::BigInteger>>(&self, other: S) -> Self::Projective;
 
     /// Multiply this element by the cofactor and output the
     /// resulting projective element.
@@ -246,13 +253,6 @@ pub trait AffineCurve:
     /// Returns the y-coordinate of the point.
     #[must_use]
     fn to_y_coordinate(&self) -> Self::BaseField;
-
-    /// Attempts to construct an affine point given an x-coordinate. The
-    /// point is not guaranteed to be in the prime order subgroup.
-    ///
-    /// If and only if `greatest` is set will the lexicographically
-    /// largest y-coordinate be selected.
-    fn get_point_from_x(x: Self::BaseField, greatest: bool) -> Option<Self>;
 
     /// Checks that the current point is on the elliptic curve.
     fn is_on_curve(&self) -> bool;
@@ -292,7 +292,7 @@ impl<C: ProjectiveCurve> Group for C {
 
 pub trait ModelParameters: Send + Sync + 'static {
     type BaseField: Field + SquareRootField;
-    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInt>;
+    type ScalarField: PrimeField + SquareRootField + Into<<Self::ScalarField as PrimeField>::BigInteger>;
 }
 
 pub trait SWModelParameters: ModelParameters {
@@ -317,7 +317,7 @@ pub trait SWModelParameters: ModelParameters {
     }
 
     #[inline(always)]
-    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize {
+    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize {
         let num_bits = scalar.num_bits() as usize;
 
         if num_bits >= 103 {
@@ -361,7 +361,7 @@ pub trait TEModelParameters: ModelParameters {
     }
 
     #[inline(always)]
-    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInt) -> usize {
+    fn empirical_recommended_wnaf_for_scalar(scalar: <Self::ScalarField as PrimeField>::BigInteger) -> usize {
         let num_bits = scalar.num_bits() as usize;
 
         if num_bits >= 130 {

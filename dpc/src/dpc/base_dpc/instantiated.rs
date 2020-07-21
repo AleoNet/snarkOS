@@ -22,7 +22,7 @@ use snarkos_algorithms::{
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
     bw6_761::BW6_761,
-    edwards_bls12::{EdwardsAffine, EdwardsProjective as EdwardsBls},
+    edwards_bls12::{EdwardsAffine, EdwardsParameters, EdwardsProjective as EdwardsBls},
     edwards_sw6::EdwardsProjective as EdwardsSW,
 };
 use snarkos_gadgets::{
@@ -91,6 +91,14 @@ impl PedersenSize for RecordWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct RecordCiphertextWindow;
+
+impl PedersenSize for RecordCiphertextWindow {
+    const NUM_WINDOWS: usize = 48;
+    const WINDOW_SIZE: usize = 44;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AccountWindow;
 impl PedersenSize for AccountWindow {
     const NUM_WINDOWS: usize = 8;
@@ -128,6 +136,8 @@ impl DPCComponents for Components {
     type PredicateVerificationKeyCommitmentGadget = PredicateVerificationKeyCommitmentGadget;
     type PredicateVerificationKeyHash = PredicateVerificationKeyHash;
     type PredicateVerificationKeyHashGadget = PredicateVerificationKeyHashGadget;
+    type RecordCiphertextCRH = RecordCiphertextCRH;
+    type RecordCiphertextCRHGadget = RecordCiphertextCRHGadget;
     type RecordCommitment = RecordCommitment;
     type RecordCommitmentGadget = RecordCommitmentGadget;
     type SerialNumberNonceCRH = SerialNumberNonce;
@@ -140,6 +150,8 @@ impl DPCComponents for Components {
 impl BaseDPCComponents for Components {
     type BindingSignatureGadget = BindingSignatureGadget;
     type BindingSignatureGroup = EdwardsBls;
+    type EncryptionGroup = EdwardsBls;
+    type EncryptionModelParameters = EdwardsParameters;
     type InnerSNARK = CoreCheckNIZK;
     type InnerSNARKGadget = InnerSNARKGadget;
     type MerkleHashGadget = MerkleTreeCRHGadget;
@@ -169,6 +181,7 @@ pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
+pub type RecordCiphertextCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, RecordCiphertextWindow>;
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredicateVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
@@ -197,6 +210,7 @@ pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls,
 pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type RecordCiphertextCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyHashGadget =
     BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;

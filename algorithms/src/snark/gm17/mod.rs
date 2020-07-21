@@ -7,27 +7,26 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::io::{self, Read, Result as IoResult, Write};
 
-/// Reduce an R1CS instance to a *Square Arithmetic Program* instance.
-pub mod r1cs_to_sap;
-
 /// GM17 zkSNARK construction.
 pub mod snark;
 pub use self::snark::*;
 
+/// Reduce an R1CS instance to a *Square Arithmetic Program* instance.
+mod r1cs_to_sap;
+
 /// Generate public parameters for the GM17 zkSNARK construction.
-pub mod generator;
-pub use self::generator::*;
+mod generator;
 
 /// Create proofs for the GM17 zkSNARK construction.
-pub mod prover;
-pub use self::prover::*;
+mod prover;
 
 /// Verify proofs for the GM17 zkSNARK construction.
-pub mod verifier;
-pub use self::verifier::*;
+mod verifier;
 
 #[cfg(test)]
 mod tests;
+
+pub use self::{generator::*, prover::*, verifier::*};
 
 /// A proof in the GM17 SNARK.
 #[derive(Clone, Debug, Eq)]

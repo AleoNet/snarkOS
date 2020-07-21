@@ -11,16 +11,15 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
     type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
-    type Plaintext: Clone + Debug + Default + Eq + Hash;
-    type Ciphertext: Clone + Debug + Default + Eq + Hash;
+    type Text: Clone + Debug + Default + Eq + ToBytes + FromBytes;
     type Randomness: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
-    type BlindingExponents: Clone + Debug + Default + Eq + Hash + ToBytes;
+    type BlindingExponent: Clone + Debug + Default + Eq + Hash + ToBytes;
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
     fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Self::PrivateKey;
 
-    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Self::PublicKey;
+    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, EncryptionError>;
 
     fn generate_randomness<R: Rng>(
         &self,
@@ -33,20 +32,20 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
         message_length: usize,
-    ) -> Result<Self::BlindingExponents, EncryptionError>;
+    ) -> Result<Vec<Self::BlindingExponent>, EncryptionError>;
 
     fn encrypt(
         &self,
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
-        message: &Self::Plaintext,
-    ) -> Result<Self::Ciphertext, EncryptionError>;
+        message: &Vec<Self::Text>,
+    ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn decrypt(
         &self,
         private_key: &Self::PrivateKey,
-        ciphertext: &Self::Ciphertext,
-    ) -> Result<Self::Plaintext, EncryptionError>;
+        ciphertext: &Vec<Self::Text>,
+    ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn parameters(&self) -> &Self::Parameters;
 

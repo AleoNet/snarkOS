@@ -580,55 +580,29 @@ fn test_g2_generator() {
     assert!(generator.is_in_correct_subgroup_assuming_on_curve());
 }
 
-//    #[test]
-//    fn test_bilinearity() {
-//        let a: G1Projective = rand::random();
-//        let b: G2Projective = rand::random();
-//        let s: Fr = rand::random();
-//
-//        let sa = a * &s;
-//        let sb = b * &s;
-//
-//        let ans1 = Bls12_377::pairing(sa, b);
-//        let ans2 = Bls12_377::pairing(a, sb);
-//        let ans3 = Bls12_377::pairing(a, b).pow(s.into_repr());
-//
-//        assert_eq!(ans1, ans2);
-//        assert_eq!(ans2, ans3);
-//
-//        assert_ne!(ans1, Fq12::one());
-//        assert_ne!(ans2, Fq12::one());
-//        assert_ne!(ans3, Fq12::one());
-//
-//        assert_eq!(ans1.pow(Fr::characteristic()), Fq12::one());
-//        assert_eq!(ans2.pow(Fr::characteristic()), Fq12::one());
-//        assert_eq!(ans3.pow(Fr::characteristic()), Fq12::one());
-//    }
-
 #[test]
 fn test_bilinearity() {
-    let a: G1Projective = G1Projective::prime_subgroup_generator();
-    let b: G2Projective = G2Projective::prime_subgroup_generator();
-    let s: Fr = Fr::one() + &Fr::one();
+    let a: G1Projective = rand::random();
+    let b: G2Projective = rand::random();
+    let s: Fr = rand::random();
 
     let sa = a * &s;
     let sb = b * &s;
 
-    println!("a\n{:?}\n", a.into_affine());
-    println!("b\n{:?}\n", b.into_affine());
-    println!("s\n{:?}\n", s);
-    println!("sa\n{:?}\n", sa.into_affine());
-    println!("sb\n{:?}\n", sb.into_affine());
-
     let ans1 = Bls12_377::pairing(sa, b);
     let ans2 = Bls12_377::pairing(a, sb);
+    let ans3 = Bls12_377::pairing(a, b).pow(s.into_repr());
 
     assert_eq!(ans1, ans2);
+    assert_eq!(ans2, ans3);
 
     assert_ne!(ans1, Fq12::one());
     assert_ne!(ans2, Fq12::one());
+    assert_ne!(ans3, Fq12::one());
+
     assert_eq!(ans1.pow(Fr::characteristic()), Fq12::one());
     assert_eq!(ans2.pow(Fr::characteristic()), Fq12::one());
+    assert_eq!(ans3.pow(Fr::characteristic()), Fq12::one());
 }
 
 #[test]

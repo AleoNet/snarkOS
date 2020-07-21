@@ -25,8 +25,8 @@ impl RecordPayload {
         Self(payload)
     }
 
-    pub fn size(&self) -> u64 {
-        32
+    pub fn size(&self) -> usize {
+        self.0.len()
     }
 }
 

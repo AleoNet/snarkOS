@@ -116,7 +116,7 @@ macro_rules! impl_sw_curve_serializer {
                 if flags.is_infinity() {
                     Ok(Self::zero())
                 } else {
-                    let p = GroupAffine::<P>::get_point_from_x(x, flags.is_positive().unwrap())
+                    let p = GroupAffine::<P>::from_x_coordinate(x, flags.is_positive().unwrap())
                         .ok_or(snarkos_errors::serialization::SerializationError::InvalidData)?;
                     if !p.is_in_correct_subgroup_assuming_on_curve() {
                         return Err(snarkos_errors::serialization::SerializationError::InvalidData);
@@ -252,7 +252,7 @@ macro_rules! impl_edwards_curve_serializer {
                 if x == P::BaseField::zero() {
                     Ok(Self::zero())
                 } else {
-                    let p = GroupAffine::<P>::get_point_from_x(x, flags.is_positive())
+                    let p = GroupAffine::<P>::from_x_coordinate(x, flags.is_positive())
                         .ok_or(snarkos_errors::serialization::SerializationError::InvalidData)?;
                     if !p.is_in_correct_subgroup_assuming_on_curve() {
                         return Err(snarkos_errors::serialization::SerializationError::InvalidData);

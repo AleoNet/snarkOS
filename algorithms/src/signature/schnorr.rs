@@ -5,7 +5,7 @@ use snarkos_models::{
     curves::{to_field_vec::ToConstraintField, Field, Group, One, PrimeField, Zero},
 };
 use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
+    bytes::{bytes_to_bits, FromBytes, ToBytes},
     rand::UniformRand,
     serialize::*,
     to_bytes,
@@ -18,17 +18,6 @@ use std::{
     hash::Hash,
     io::{Read, Result as IoResult, Write},
 };
-
-pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = Vec::with_capacity(bytes.len() * 8);
-    for byte in bytes {
-        for i in 0..8 {
-            let bit = (*byte >> i) & 1;
-            bits.push(bit == 1);
-        }
-    }
-    bits
-}
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "G: Group"), Debug(bound = "G: Group"), Default(bound = "G: Group"))]
