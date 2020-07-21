@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
 };
 
-pub trait Fp256Parameters: FpParameters<BigInt = BigInteger> {}
+pub trait Fp256Parameters: FpParameters<BigInteger = BigInteger> {}
 
 #[derive(Derivative)]
 #[derivative(
@@ -269,8 +269,8 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
 }
 
 impl<P: Fp256Parameters> PrimeField for Fp256<P> {
-    type BigInt = BigInteger;
-    type Params = P;
+    type BigInteger = BigInteger;
+    type Parameters = P;
 
     #[inline]
     fn from_repr(r: BigInteger) -> Option<Self> {
@@ -405,7 +405,7 @@ impl<P: Fp256Parameters> FromStr for Fp256<P> {
 
         let mut res = Self::zero();
 
-        let ten = Self::from_repr(<Self as PrimeField>::BigInt::from(10)).ok_or(FieldError::InvalidFieldElement)?;
+        let ten = Self::from_repr(<Self as PrimeField>::BigInteger::from(10)).ok_or(FieldError::InvalidFieldElement)?;
 
         let mut first_digit = true;
 
@@ -422,7 +422,7 @@ impl<P: Fp256Parameters> FromStr for Fp256<P> {
 
                     res.mul_assign(&ten);
                     res.add_assign(
-                        &Self::from_repr(<Self as PrimeField>::BigInt::from(u64::from(c)))
+                        &Self::from_repr(<Self as PrimeField>::BigInteger::from(u64::from(c)))
                             .ok_or(FieldError::InvalidFieldElement)?,
                     );
                 }

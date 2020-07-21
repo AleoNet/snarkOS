@@ -14,7 +14,7 @@ use snarkos_utilities::{
 
 use base64;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 use std::{str::FromStr, sync::Arc};
 
 type JsonrpcError = jsonrpc_core::Error;
@@ -161,13 +161,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
+        let sn_randomness: [u8; 32] = rng.gen();
         // Fill any unused old_record indices with dummy records
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
                 .parameters
                 .circuit_parameters
                 .serial_number_nonce
-                .hash(&[64u8; 1])?;
+                .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
             let address = AccountAddress::<Components>::from_private_key(
@@ -197,23 +198,23 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_account_addresss = vec![];
+        let mut new_account_address = vec![];
         let mut new_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            new_account_addresss.push(AccountAddress::<Components>::from_str(&recipient.address)?);
+            new_account_address.push(AccountAddress::<Components>::from_str(&recipient.address)?);
             new_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_account_addresss.len() < Components::NUM_OUTPUT_RECORDS {
-            new_account_addresss.push(new_account_addresss[0].clone());
+        while new_account_address.len() < Components::NUM_OUTPUT_RECORDS {
+            new_account_address.push(new_account_address[0].clone());
             new_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_account_addresss.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_account_address.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
@@ -233,7 +234,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             &self.parameters,
             old_records,
             old_account_private_keys,
-            new_account_addresss,
+            new_account_address,
             new_birth_predicates,
             new_death_predicates,
             new_dummy_flags,

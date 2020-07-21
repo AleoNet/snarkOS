@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
 };
 
-pub trait Fp384Parameters: FpParameters<BigInt = BigInteger> {}
+pub trait Fp384Parameters: FpParameters<BigInteger = BigInteger> {}
 
 #[derive(Derivative)]
 #[derivative(
@@ -323,8 +323,8 @@ impl<P: Fp384Parameters> Field for Fp384<P> {
 }
 
 impl<P: Fp384Parameters> PrimeField for Fp384<P> {
-    type BigInt = BigInteger;
-    type Params = P;
+    type BigInteger = BigInteger;
+    type Parameters = P;
 
     #[inline]
     fn from_repr(r: BigInteger) -> Option<Self> {
@@ -465,7 +465,7 @@ impl<P: Fp384Parameters> FromStr for Fp384<P> {
 
         let mut res = Self::zero();
 
-        let ten = Self::from_repr(<Self as PrimeField>::BigInt::from(10)).ok_or(FieldError::InvalidFieldElement)?;
+        let ten = Self::from_repr(<Self as PrimeField>::BigInteger::from(10)).ok_or(FieldError::InvalidFieldElement)?;
 
         let mut first_digit = true;
 
@@ -482,7 +482,7 @@ impl<P: Fp384Parameters> FromStr for Fp384<P> {
 
                     res.mul_assign(&ten);
                     res.add_assign(
-                        &Self::from_repr(<Self as PrimeField>::BigInt::from(u64::from(c)))
+                        &Self::from_repr(<Self as PrimeField>::BigInteger::from(u64::from(c)))
                             .ok_or(FieldError::InvalidFieldElement)?,
                     );
                 }

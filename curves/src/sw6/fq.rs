@@ -8,7 +8,7 @@ pub struct FqParameters;
 impl Fp832Parameters for FqParameters {}
 
 impl FpParameters for FqParameters {
-    type BigInt = BigInteger;
+    type BigInteger = BigInteger;
 
     const CAPACITY: u32 = Self::MODULUS_BITS - 1;
     /// GENERATOR = 13

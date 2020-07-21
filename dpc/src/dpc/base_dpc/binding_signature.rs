@@ -588,7 +588,8 @@ mod tests {
             &mut cs.ns(|| "value_balance_commitment"),
             &parameters_gadget,
             &value_balance_bytes,
-        ).unwrap();
+        )
+        .unwrap();
 
         <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, G>>::check_binding_signature_gadget(
             &mut cs.ns(|| "verify_binding_signature"),

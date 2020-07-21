@@ -75,7 +75,7 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         fn calculate_num_chunks_in_segment<F: PrimeField>() -> usize {
             let upper_limit = F::modulus_minus_one_div_two();
             let mut c = 0;
-            let mut range = F::BigInt::from(2_u64);
+            let mut range = F::BigInteger::from(2_u64);
             while range < upper_limit {
                 range.muln(4);
                 c += 1;

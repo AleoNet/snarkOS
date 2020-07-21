@@ -2,10 +2,10 @@ use snarkos_utilities::biginteger::*;
 
 /// A trait that defines parameters for a prime field.
 pub trait FpParameters: 'static + Send + Sync + Sized {
-    type BigInt: BigInteger;
+    type BigInteger: BigInteger;
 
     /// The modulus of the field.
-    const MODULUS: Self::BigInt;
+    const MODULUS: Self::BigInteger;
 
     /// The number of bits needed to represent the `Self::MODULUS`.
     const MODULUS_BITS: u32;
@@ -15,10 +15,10 @@ pub trait FpParameters: 'static + Send + Sync + Sized {
     const REPR_SHAVE_BITS: u32;
 
     /// R = 2^256 % Self::MODULUS
-    const R: Self::BigInt;
+    const R: Self::BigInteger;
 
     /// R2 = R^2 % Self::MODULUS
-    const R2: Self::BigInt;
+    const R2: Self::BigInteger;
 
     /// INV = -(MODULUS^{-1} mod MODULUS) mod MODULUS
     const INV: u64;
@@ -28,7 +28,7 @@ pub trait FpParameters: 'static + Send + Sync + Sized {
     /// `Self::MODULUS - 1`.
     /// There also does not exist `x` such that `Self::GENERATOR = x^2 %
     /// Self::MODULUS`
-    const GENERATOR: Self::BigInt;
+    const GENERATOR: Self::BigInteger;
 
     /// The number of bits that can be reliably stored.
     /// (Should equal `SELF::MODULUS_BITS - 1`)
@@ -38,14 +38,14 @@ pub trait FpParameters: 'static + Send + Sync + Sized {
     const TWO_ADICITY: u32;
 
     /// 2^s root of unity computed by GENERATOR^t
-    const ROOT_OF_UNITY: Self::BigInt;
+    const ROOT_OF_UNITY: Self::BigInteger;
 
     /// t for 2^s * t = MODULUS - 1
-    const T: Self::BigInt;
+    const T: Self::BigInteger;
 
     /// (t - 1) / 2
-    const T_MINUS_ONE_DIV_TWO: Self::BigInt;
+    const T_MINUS_ONE_DIV_TWO: Self::BigInteger;
 
     /// (Self::MODULUS - 1) / 2
-    const MODULUS_MINUS_ONE_DIV_TWO: Self::BigInt;
+    const MODULUS_MINUS_ONE_DIV_TWO: Self::BigInteger;
 }

@@ -5,6 +5,9 @@ pub enum EncodingError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[error("Input must be nonzero")]
+    InputMustBeNonzero,
+
     #[error("Invalid group element")]
     InvalidGroupElement,
 

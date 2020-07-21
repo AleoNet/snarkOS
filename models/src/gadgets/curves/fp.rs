@@ -314,7 +314,7 @@ impl<F: PrimeField> ToBitsGadget<F> for FpGadget<F> {
     /// Outputs the binary representation of the value in `self` in *big-endian*
     /// form.
     fn to_bits<CS: ConstraintSystem<F>>(&self, mut cs: CS) -> Result<Vec<Boolean>, SynthesisError> {
-        let num_bits = F::Params::MODULUS_BITS;
+        let num_bits = F::Parameters::MODULUS_BITS;
         let bit_values = match self.value {
             Some(value) => {
                 let mut field_char = BitIterator::new(F::characteristic());

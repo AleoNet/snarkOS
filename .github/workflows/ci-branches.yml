@@ -1,9 +1,8 @@
 name: CI - Branches
 on:
-  pull_request:
   push:
-    branches:
-      - '!master'
+    branches-ignore:
+      - 'master'
 env:
   RUST_BACKTRACE: 1
 
@@ -28,3 +27,84 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+
+  test:
+    name: Check Tests (Simple)
+    runs-on: [self-hosted, snarkos-ci1]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --lib
+
+#  test-ga:
+#    name: Check Tests (Simple)
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#
+#      - name: Install Rust (nightly)
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: nightly
+#          override: true
+#
+#      - uses: actions/cache@v2
+#        with:
+#          path: |
+#            ~/.cargo/registry
+#            ~/.cargo/git
+#            target
+#          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+#
+#      - name: Test
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: test
+#          args: --all --lib
+
+  test-wasm:
+    name: Check Tests (Wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: wasm32-unknown-unknown
+          override: true
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: 'latest'
+
+      - name: Test
+        run: |
+          cd toolkit
+          wasm-pack test --node
+#          cargo test --target wasm32-unknown-unknown --features wasm

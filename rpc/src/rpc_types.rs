@@ -130,11 +130,11 @@ pub struct RecordInfo {
     /// Record payload
     pub payload: RPCRecordPayload,
 
-    /// Record birth predicate bytes
-    pub birth_predicate_repr: String,
+    /// Record birth predicate hash
+    pub birth_predicate_hash: String,
 
-    /// Record death predicate bytes
-    pub death_predicate_repr: String,
+    /// Record death predicate hash
+    pub death_predicate_hash: String,
 
     /// Record serial number nonce
     pub serial_number_nonce: String,

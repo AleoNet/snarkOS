@@ -14,7 +14,7 @@ use snarkos_dpc::{
 };
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, CRH, SNARK},
-    dpc::{DPCScheme, Record},
+    dpc::{DPCScheme, Record, RecordSerializerScheme},
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
@@ -110,7 +110,7 @@ fn base_dpc_integration_test() {
     // Set the new records' predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(predicate_vk_hash.clone());
 
-    let new_account_addresss = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_address = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
@@ -208,7 +208,7 @@ fn base_dpc_integration_test() {
         &old_records,
         &old_account_private_keys,
         &old_death_vk_and_proof_generator,
-        &new_account_addresss,
+        &new_account_address,
         &new_dummy_flags,
         &new_values,
         &new_payloads,
@@ -262,12 +262,12 @@ fn base_dpc_integration_test() {
             assert_eq!(record_components.value, new_record.value());
             assert_eq!(record_components.payload, *new_record.payload());
             assert_eq!(
-                record_components.birth_predicate_repr,
-                new_record.birth_predicate_repr().to_vec()
+                record_components.birth_predicate_hash,
+                new_record.birth_predicate_hash().to_vec()
             );
             assert_eq!(
-                record_components.death_predicate_repr,
-                new_record.death_predicate_repr().to_vec()
+                record_components.death_predicate_hash,
+                new_record.death_predicate_hash().to_vec()
             );
             assert_eq!(&record_components.serial_number_nonce, new_record.serial_number_nonce());
             assert_eq!(

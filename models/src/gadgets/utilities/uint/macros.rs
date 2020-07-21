@@ -145,7 +145,7 @@ macro_rules! uint_impl {
             ) -> Result<Self, SynthesisError> {
                 // Make some arbitrary bounds for ourselves to avoid overflows
                 // in the scalar field
-                assert!(F::Params::MODULUS_BITS >= 128);
+                assert!(F::Parameters::MODULUS_BITS >= 128);
                 assert!(operands.len() >= 2); // Weird trivial cases that should never happen
 
                 // Compute the maximum value of the sum we allocate enough bits for the result

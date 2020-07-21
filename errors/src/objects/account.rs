@@ -29,6 +29,9 @@ pub enum AccountError {
     #[error("invalid prefix bytes: {:?}", _0)]
     InvalidPrefixBytes(Vec<u8>),
 
+    #[error("invalid account private key seed")]
+    InvalidPrivateKeySeed,
+
     #[error("{}", _0)]
     Message(String),
 

@@ -320,7 +320,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             value_balance,
             signatures,
             record_ciphertexts,
-            new_records_ciphertext_and_fq_high_selectors: vec![],
+            new_records_ciphertext_and_fq_high_selectors,
             transaction_proof,
             memorandum,
         })

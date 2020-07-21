@@ -1,9 +1,11 @@
 use crate::wasm::Account;
 
+use wasm_bindgen_test::*;
+
 #[wasm_bindgen_test]
 pub fn account_from_private_key_test() {
-    let given_private_key = "AKey1zm4r3SatBhwyk681f3BXQMguhbrtUVmXDgzz4f6fDNiVhj84MDKarpNKTwpJrzEQ5FFoyAYXL3cWyrXNt3dSrw32FseE66etWaZBWWNTLAr32WKeNjB4Gt8nMFTuXg1JyUByJ";
-    let given_address = "aleo1ps5gw9yx3lkngl9kjdgrd47fzye6jy4ws4zj37njk446sn6euvrqzc4uqk";
+    let given_private_key = "AKEY1b47dMA8f9GfXPsW9s16qWfiYYmWGAAcorK9RkaVpBeFA";
+    let given_address = "aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348";
 
     let account = Account::from_private_key(given_private_key);
 

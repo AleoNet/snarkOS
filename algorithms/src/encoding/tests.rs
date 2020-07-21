@@ -1,6 +1,6 @@
 use crate::encoding::Elligator2;
 use snarkos_curves::edwards_bls12::*;
-
+use snarkos_models::curves::Zero;
 use snarkos_utilities::rand::UniformRand;
 
 use rand::SeedableRng;
@@ -20,4 +20,13 @@ fn test_elligator2_encode_decode() {
 
         assert_eq!(original, decoded)
     }
+}
+
+#[test]
+fn test_elligator2_zero() {
+    let encode = Elligator2::<EdwardsParameters, EdwardsProjective>::encode(&Fq::zero());
+    assert!(encode.is_err());
+
+    let decode = Elligator2::<EdwardsParameters, EdwardsProjective>::decode(&EdwardsAffine::zero(), false);
+    assert!(decode.is_err());
 }

@@ -12,11 +12,11 @@ use snarkos_utilities::{
 };
 
 use digest::Digest;
+use itertools::Itertools;
 use rand::Rng;
 use std::{
     hash::Hash,
     io::{Read, Result as IoResult, Write},
-    marker::PhantomData,
 };
 
 #[derive(Derivative)]
@@ -105,18 +105,8 @@ where
 
     fn setup<R: Rng>(rng: &mut R) -> Result<Self, SignatureError> {
         let setup_time = start_timer!(|| "SchnorrSignature::setup");
-
-        let mut salt = [0u8; 32];
-        rng.fill_bytes(&mut salt);
-        let generator = G::rand(rng);
-
+        let parameters = Self::Parameters::setup(rng, Self::PrivateKey::size_in_bits());
         end_timer!(setup_time);
-
-        let parameters = SchnorrParameters {
-            _hash: PhantomData,
-            generator,
-            salt,
-        };
 
         Ok(Self { parameters })
     }
@@ -129,13 +119,21 @@ where
         let keygen_time = start_timer!(|| "SchnorrSignature::generate_private_key");
         let private_key = <G as Group>::ScalarField::rand(rng);
         end_timer!(keygen_time);
-
         Ok(private_key)
     }
 
     fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, SignatureError> {
         let keygen_time = start_timer!(|| "SchnorrSignature::generate_public_key");
-        let public_key = self.parameters.generator.mul(private_key);
+
+        let mut public_key = G::zero();
+        for (bit, base_power) in bytes_to_bits(&to_bytes![private_key]?)
+            .iter()
+            .zip_eq(&self.parameters.generator_powers)
+        {
+            if *bit {
+                public_key += &base_power;
+            }
+        }
         end_timer!(keygen_time);
 
         Ok(SchnorrPublicKey(public_key))
@@ -154,7 +152,15 @@ where
             let random_scalar: <G as Group>::ScalarField = <G as Group>::ScalarField::rand(rng);
             // Commit to the random scalar via r := k · g.
             // This is the prover's first msg in the Sigma protocol.
-            let prover_commitment: G = self.parameters.generator.mul(&random_scalar);
+            let mut prover_commitment = G::zero();
+            for (bit, base_power) in bytes_to_bits(&to_bytes![random_scalar]?)
+                .iter()
+                .zip_eq(&self.parameters.generator_powers)
+            {
+                if *bit {
+                    prover_commitment += &base_power;
+                }
+            }
 
             // Hash everything to get verifier challenge.
             let mut hash_input = Vec::new();
@@ -191,7 +197,17 @@ where
             prover_response,
             verifier_challenge,
         } = signature;
-        let mut claimed_prover_commitment = self.parameters.generator.mul(prover_response);
+
+        let mut claimed_prover_commitment = G::zero();
+        for (bit, base_power) in bytes_to_bits(&to_bytes![prover_response]?)
+            .iter()
+            .zip_eq(&self.parameters.generator_powers)
+        {
+            if *bit {
+                claimed_prover_commitment += &base_power;
+            }
+        }
+
         let public_key_times_verifier_challenge = public_key.0.mul(verifier_challenge);
         claimed_prover_commitment += &public_key_times_verifier_challenge;
 
@@ -219,13 +235,15 @@ where
         let rand_pk_time = start_timer!(|| "SchnorrSignature::randomize_public_key");
 
         let mut randomized_pk = public_key.0.clone();
-        let mut base = self.parameters.generator;
+
         let mut encoded = G::zero();
-        for bit in bytes_to_bits(randomness) {
-            if bit {
-                encoded += &base;
+        for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?)
+            .iter()
+            .zip_eq(&self.parameters.generator_powers)
+        {
+            if *bit {
+                encoded += &base_power;
             }
-            <G as Group>::double_in_place(&mut base);
         }
         randomized_pk += &encoded;
 

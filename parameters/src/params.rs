@@ -193,7 +193,7 @@ impl_params!(
     AccountSignatureParameters,
     account_signature_test,
     "account_signature",
-    96
+    16420
 );
 impl_params!(
     LedgerMerkleTreeParameters,
@@ -232,7 +232,7 @@ impl_params!(
     RecordCiphertextCRHParameters,
     record_ciphertext_crh_test,
     "record_ciphertext_crh",
-    539924
+    270532
 );
 impl_params!(
     SerialNumberNonceCRHParameters,
@@ -268,9 +268,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 556339774);
-impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2717);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 212265409);
+impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2426);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 953997866);
-impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 5022);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 467030109);
+impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);

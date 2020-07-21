@@ -12,11 +12,11 @@ fn account_bench(c: &mut Criterion) {
 
     group.bench_function("private_key", |b| {
         b.iter(|| {
-            let _private_key = PrivateKey::new(None, rng).unwrap();
+            let _private_key = PrivateKey::new(rng).unwrap();
         });
     });
 
-    let private_key = PrivateKey::new(None, rng).unwrap();
+    let private_key = PrivateKey::new(rng).unwrap();
 
     group.bench_function("address", |b| {
         b.iter(|| {

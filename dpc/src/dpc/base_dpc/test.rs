@@ -17,7 +17,7 @@ use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, CRH, SNARK},
     curves::{AffineCurve, ModelParameters, ProjectiveCurve},
-    dpc::{DPCComponents, Record},
+    dpc::{DPCComponents, Record, RecordSerializerScheme},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
@@ -128,7 +128,7 @@ fn test_execute_base_dpc_constraints() {
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_account_addresss = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_account_address = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
     let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
@@ -140,7 +140,7 @@ fn test_execute_base_dpc_constraints() {
         &circuit_parameters,
         &old_records,
         &old_account_private_keys,
-        &new_account_addresss,
+        &new_account_address,
         &new_dummy_flags,
         &new_values,
         &new_payloads,
