@@ -107,6 +107,18 @@ impl RpcImpl {
         }
     }
 
+    /// Wrap authentication around `create_dummy_transaction`
+    pub fn create_dummy_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
+        self.validate_auth(meta)?;
+
+        params.expect_no_params()?;
+
+        match self.create_dummy_transaction() {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
+            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
+        }
+    }
+
     /// Expose the protected functions as RPC enpoints
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
@@ -115,6 +127,7 @@ impl RpcImpl {
         d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
         d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
         d.add_method_with_meta("createaccount", Self::create_account_protected);
+        d.add_method_with_meta("createdummytransaction", Self::create_dummy_transaction_protected);
 
         io.extend_with(d)
     }
@@ -293,6 +306,126 @@ impl ProtectedRpcFunctions for RpcImpl {
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
             address: account.address.to_string(),
+        })
+    }
+
+    /// Create a dummy transaction and return encoded transaction and output records
+    fn create_dummy_transaction(&self) -> Result<CreateRawTransactionOuput, RpcError> {
+        let rng = &mut thread_rng();
+
+        let new_spender = AccountPrivateKey::<Components>::new(
+            &self.parameters.circuit_parameters.account_signature,
+            &self.parameters.circuit_parameters.account_commitment,
+            rng,
+        )?;
+        let new_recipient_private_key = AccountPrivateKey::<Components>::new(
+            &self.parameters.circuit_parameters.account_signature,
+            &self.parameters.circuit_parameters.account_commitment,
+            rng,
+        )?;
+        let new_recipient = AccountAddress::<Components>::from_private_key(
+            self.parameters.account_signature_parameters(),
+            self.parameters.account_commitment_parameters(),
+            self.parameters.account_encryption_parameters(),
+            &new_recipient_private_key,
+        )?;
+
+        // Fetch birth/death predicates
+        let predicate_vk_hash = self
+            .parameters
+            .circuit_parameters
+            .predicate_verification_key_hash
+            .hash(&to_bytes![self.parameters.predicate_snark_parameters.verification_key]?)?;
+        let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
+
+        let predicate = Predicate::new(predicate_vk_hash_bytes.clone());
+        let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
+
+        let mut old_records = vec![];
+        let mut old_account_private_keys = vec![];
+
+        while old_records.len() < Components::NUM_OUTPUT_RECORDS {
+            let sn_randomness: [u8; 32] = rng.gen();
+            let old_sn_nonce = self
+                .parameters
+                .circuit_parameters
+                .serial_number_nonce
+                .hash(&sn_randomness)?;
+
+            let private_key = new_spender.clone();
+            let address = AccountAddress::<Components>::from_private_key(
+                self.parameters.account_signature_parameters(),
+                self.parameters.account_commitment_parameters(),
+                self.parameters.account_encryption_parameters(),
+                &private_key,
+            )?;
+
+            let dummy_record = InstantiatedDPC::generate_record(
+                &self.parameters.circuit_parameters,
+                &old_sn_nonce,
+                &address,
+                true, // The input record is dummy
+                0,
+                &RecordPayload::default(),
+                &predicate,
+                &predicate,
+                rng,
+            )?;
+
+            old_records.push(dummy_record);
+            old_account_private_keys.push(private_key);
+        }
+
+        assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
+        assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
+
+        // Decode new recipient data
+        let mut new_account_address = vec![];
+        let mut new_dummy_flags = vec![];
+        let mut new_values = vec![];
+
+        while new_account_address.len() < Components::NUM_OUTPUT_RECORDS {
+            new_account_address.push(new_recipient.clone());
+            new_dummy_flags.push(true);
+            new_values.push(0);
+        }
+
+        assert_eq!(new_account_address.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
+
+        // Default record payload
+        let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
+
+        // Generate a random memo
+        let memo = rng.gen();
+
+        // Generate transaction
+        let (records, transaction) = self.consensus.create_transaction(
+            &self.parameters,
+            old_records,
+            old_account_private_keys,
+            new_account_address,
+            new_birth_predicates,
+            new_death_predicates,
+            new_dummy_flags,
+            new_values,
+            new_payloads,
+            memo,
+            &self.storage,
+            rng,
+        )?;
+
+        let encoded_transaction = hex::encode(to_bytes![transaction]?);
+        let mut encoded_records = vec![];
+        for record in records {
+            encoded_records.push(hex::encode(to_bytes![record]?));
+        }
+
+        Ok(CreateRawTransactionOuput {
+            encoded_transaction,
+            encoded_records,
         })
     }
 }

@@ -60,4 +60,7 @@ pub trait ProtectedRpcFunctions {
 
     /// Generate a new account with optional metadata
     fn create_account(&self) -> Result<RpcAccount, RpcError>;
+
+    /// Create a dummy transaction and return encoded transaction and output records
+    fn create_dummy_transaction(&self) -> Result<CreateRawTransactionOuput, RpcError>;
 }
