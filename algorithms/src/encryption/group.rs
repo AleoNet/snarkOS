@@ -29,10 +29,19 @@ impl<G: Group + ProjectiveCurve> FromBytes for GroupEncryptionPublicKey<G> {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let x_coordinate = <G::Affine as AffineCurve>::BaseField::read(&mut reader)?;
 
-        match <G as ProjectiveCurve>::Affine::from_x_coordinate(x_coordinate, true) {
-            Some(element) => Ok(Self(element.into_projective())),
-            _ => Err(EncryptionError::Message("Failed to read encryption public key".into()).into()),
+        if let Some(element) = <G as ProjectiveCurve>::Affine::from_x_coordinate(x_coordinate, true) {
+            if element.is_in_correct_subgroup_assuming_on_curve() {
+                return Ok(Self(element.into_projective()));
+            }
         }
+
+        if let Some(element) = <G as ProjectiveCurve>::Affine::from_x_coordinate(x_coordinate, false) {
+            if element.is_in_correct_subgroup_assuming_on_curve() {
+                return Ok(Self(element.into_projective()));
+            }
+        }
+
+        Err(EncryptionError::Message("Failed to read encryption public key".into()).into())
     }
 }
 
