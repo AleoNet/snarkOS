@@ -45,6 +45,11 @@ pub async fn process_transaction_internal(
             return Ok(());
         }
 
+        if transaction.value_balance.is_negative() {
+            error!("Received transaction was a coinbase transaction");
+            return Ok(());
+        }
+
         let entry = Entry::<Tx> {
             size: transaction_bytes.len(),
             transaction,
