@@ -11,7 +11,6 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct OuterCircuitVerifierInput<C: BaseDPCComponents> {
     pub inner_snark_verifier_input: InnerCircuitVerifierInput<C>,
-    pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
 }
 
 impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVerifierInput<C>
@@ -78,7 +77,12 @@ where
             )?);
         }
 
-        v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);
+        v.extend_from_slice(
+            &self
+                .inner_snark_verifier_input
+                .predicate_commitment
+                .to_field_elements()?,
+        );
         Ok(v)
     }
 }

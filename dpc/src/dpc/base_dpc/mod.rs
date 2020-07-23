@@ -1213,7 +1213,6 @@ where
 
         let outer_snark_input = OuterCircuitVerifierInput {
             inner_snark_verifier_input: inner_snark_input,
-            predicate_commitment: transaction.predicate_commitment().clone(),
         };
 
         if !Components::OuterSNARK::verify(
