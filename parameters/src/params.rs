@@ -12,7 +12,7 @@ use std::{
 use curl::easy::Easy;
 
 #[cfg(any(test, feature = "remote"))]
-pub const REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-1.amazonaws.com";
+pub const REMOTE_URL: &str = "https://snarkos-testnet.s3-us-west-2.amazonaws.com";
 
 macro_rules! impl_params {
     ($name: ident, $test_name: ident, $fname: tt, $size: tt) => {
