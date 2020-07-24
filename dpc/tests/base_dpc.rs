@@ -219,8 +219,11 @@ fn base_dpc_integration_test() {
     )
     .unwrap();
 
+    // Check that the transaction is serialized and deserialized correctly
     let transaction_bytes = to_bytes![transaction].unwrap();
-    let _recovered_transaction = Tx::read(&transaction_bytes[..]).unwrap();
+    let recovered_transaction = Tx::read(&transaction_bytes[..]).unwrap();
+
+    assert_eq!(transaction, recovered_transaction);
 
     {
         // Check that new_records can be decrypted from the transaction
@@ -228,11 +231,8 @@ fn base_dpc_integration_test() {
         let record_ciphertexts = transaction.ciphertexts();
         let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
 
-        for (((ciphertext, private_key), new_record), final_fq_high_selector) in record_ciphertexts
-            .iter()
-            .zip(new_account_private_keys)
-            .zip(new_records)
-            .zip(&transaction.new_records_final_fq_high_selectors)
+        for ((record_ciphertext, private_key), new_record) in
+            record_ciphertexts.iter().zip(new_account_private_keys).zip(new_records)
         {
             let account_view_key = AccountViewKey::from_private_key(
                 &parameters.circuit_parameters.account_signature,
@@ -241,13 +241,9 @@ fn base_dpc_integration_test() {
             )
             .unwrap();
 
-            let decrypted_record = RecordEncryption::decrypt_record(
-                &parameters.circuit_parameters,
-                &account_view_key,
-                ciphertext,
-                *final_fq_high_selector,
-            )
-            .unwrap();
+            let decrypted_record =
+                RecordEncryption::decrypt_record(&parameters.circuit_parameters, &account_view_key, record_ciphertext)
+                    .unwrap();
 
             assert_eq!(decrypted_record, new_record);
         }

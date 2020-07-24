@@ -293,38 +293,28 @@ fn test_execute_base_dpc_constraints() {
     )
     .unwrap();
 
-    // Encode and Encrypt the new records
+    // Encrypt the new records
 
     let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_encryption_ciphertexts = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     let mut new_records_ciphertext_selectors = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-    let mut new_records_final_fq_high_selectors = Vec::with_capacity(NUM_OUTPUT_RECORDS);
 
     for record in &new_records {
-        let (
-            record_encryption_randomness,
-            record_encryption_ciphertexts,
-            record_ciphertext_selectors,
-            record_final_fq_high_selectors,
-        ) = RecordEncryption::encrypt_record(&circuit_parameters, record, &mut rng).unwrap();
+        let (record_encryption_randomness, record_encryption_ciphertext, record_ciphertext_selectors) =
+            RecordEncryption::encrypt_record(&circuit_parameters, record, &mut rng).unwrap();
 
         new_records_encryption_randomness.push(record_encryption_randomness);
-        new_records_encryption_ciphertexts.push(record_encryption_ciphertexts);
+        new_records_encryption_ciphertexts.push(record_encryption_ciphertext);
         new_records_ciphertext_selectors.push(record_ciphertext_selectors);
-        new_records_final_fq_high_selectors.push(record_final_fq_high_selectors);
     }
 
     // Construct the ciphertext hashes
 
     let mut new_records_ciphertext_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
 
-    for (record_ciphertext, final_fq_high_selector) in new_records_encryption_ciphertexts
-        .iter()
-        .zip_eq(new_records_final_fq_high_selectors)
-    {
+    for record_ciphertext in &new_records_encryption_ciphertexts {
         let ciphertext_hash =
-            RecordEncryption::record_ciphertext_hash(&circuit_parameters, &record_ciphertext, final_fq_high_selector)
-                .unwrap();
+            RecordEncryption::record_ciphertext_hash(&circuit_parameters, &record_ciphertext).unwrap();
 
         new_records_ciphertext_hashes.push(ciphertext_hash);
     }
@@ -342,7 +332,7 @@ fn test_execute_base_dpc_constraints() {
             record_group_encoding,
             record_fq_high_selectors,
             record_encryption_blinding_exponents,
-        ) = RecordEncryption::prepare_encryption_gadget_components(&circuit_parameters, record, ciphertext_randomness)
+        ) = RecordEncryption::prepare_encryption_gadget_components(&circuit_parameters, &record, ciphertext_randomness)
             .unwrap();
 
         new_records_field_elements.push(record_field_elements);
