@@ -128,22 +128,28 @@ pub fn prepare_encryption_gadget_components<C: BaseDPCComponents>(
 pub fn record_ciphertext_hash<C: BaseDPCComponents>(
     circuit_parameters: &CircuitParameters<C>,
     record_ciphertext: &Vec<<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Text>,
-    record_ciphertext_selectors: Vec<bool>,
     final_fq_high_selector: bool,
 ) -> Result<<<C as DPCComponents>::RecordCiphertextCRH as CRH>::Output, DPCError> {
-    assert_eq!(record_ciphertext.len(), record_ciphertext_selectors.len());
-
     let mut ciphertext_affine_x = vec![];
+    let mut selector_bits = vec![];
     for ciphertext_element in record_ciphertext.iter() {
         let ciphertext_element_affine =
             <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
         let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
 
+        let greatest = match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
+            ciphertext_x_coordinate.clone(),
+            true,
+        ) {
+            Some(affine) => ciphertext_element_affine == affine,
+            None => false,
+        };
+
+        selector_bits.push(greatest);
         ciphertext_affine_x.push(ciphertext_x_coordinate);
     }
 
     // Concatenate the ciphertext selector bits and the final fq_high selector bit
-    let mut selector_bits = record_ciphertext_selectors;
     selector_bits.push(final_fq_high_selector);
     let selector_bytes = bits_to_bytes(&selector_bits);
 
@@ -155,26 +161,15 @@ pub fn record_ciphertext_hash<C: BaseDPCComponents>(
 pub fn record_ciphertext_hashes<C: BaseDPCComponents>(
     circuit_parameters: &CircuitParameters<C>,
     record_ciphertexts: &Vec<Vec<<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Text>>,
-    record_ciphertexts_selectors: Vec<Vec<bool>>,
     final_fq_high_selectors: Vec<bool>,
 ) -> Result<Vec<<<C as DPCComponents>::RecordCiphertextCRH as CRH>::Output>, DPCError> {
     assert_eq!(record_ciphertexts.len(), C::NUM_OUTPUT_RECORDS);
-    assert_eq!(record_ciphertexts_selectors.len(), C::NUM_OUTPUT_RECORDS);
     assert_eq!(final_fq_high_selectors.len(), C::NUM_OUTPUT_RECORDS);
 
     let mut ciphertext_hashes = vec![];
 
-    for ((record_ciphertext, record_ciphertext_selectors), final_fq_high_selector) in record_ciphertexts
-        .iter()
-        .zip_eq(record_ciphertexts_selectors)
-        .zip_eq(final_fq_high_selectors)
-    {
-        let ciphertext_hash = record_ciphertext_hash(
-            circuit_parameters,
-            record_ciphertext,
-            record_ciphertext_selectors,
-            final_fq_high_selector,
-        )?;
+    for (record_ciphertext, final_fq_high_selector) in record_ciphertexts.iter().zip_eq(final_fq_high_selectors) {
+        let ciphertext_hash = record_ciphertext_hash(circuit_parameters, record_ciphertext, final_fq_high_selector)?;
         ciphertext_hashes.push(ciphertext_hash);
     }
 

@@ -12,14 +12,14 @@ use snarkos_models::{
         PRF,
         SNARK,
     },
-    curves::{AffineCurve, Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
+    curves::{Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
-    bytes::{bits_to_bytes, FromBytes, ToBytes},
+    bytes::{FromBytes, ToBytes},
     has_duplicates,
     rand::UniformRand,
     to_bytes,
@@ -848,7 +848,6 @@ where
         let new_records_ciphertext_hashes = record_ciphertext_hashes(
             &circuit_parameters,
             &new_records_encryption_ciphertexts,
-            new_records_ciphertext_selectors.clone(),
             new_records_final_fq_high_selectors.clone(),
         )?;
 
@@ -864,17 +863,17 @@ where
             &new_records_encryption_randomness,
         )?;
 
-        let new_records_ciphertext_and_fq_high_selectors_gadget: Vec<(Vec<bool>, Vec<bool>)> =
+        let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, Vec<bool>)> =
             new_records_ciphertext_selectors
                 .iter()
                 .cloned()
                 .zip_eq(fq_high_selectors)
                 .collect();
-        let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, bool)> = new_records_ciphertext_selectors
-            .iter()
-            .cloned()
-            .zip_eq(new_records_final_fq_high_selectors)
-            .collect();
+        //        let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, bool)> = new_records_ciphertext_selectors
+        //            .iter()
+        //            .cloned()
+        //            .zip_eq(new_records_final_fq_high_selectors)
+        //            .collect();
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
@@ -892,7 +891,7 @@ where
                 &new_records_group_encoding,
                 &new_records_encryption_randomness,
                 &new_records_encryption_blinding_exponents,
-                &new_records_ciphertext_and_fq_high_selectors_gadget,
+                &new_records_ciphertext_and_fq_high_selectors,
                 &new_records_ciphertext_hashes,
                 &predicate_commitment,
                 &predicate_randomness,
@@ -987,7 +986,7 @@ where
             network_id,
             signatures,
             new_records_encryption_ciphertexts,
-            new_records_ciphertext_and_fq_high_selectors,
+            new_records_final_fq_high_selectors,
         );
 
         end_timer!(exec_time);
@@ -1065,31 +1064,11 @@ where
 
         end_timer!(signature_time);
 
-        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for (ciphertext, (encryption_selector_bits, final_fq_high_selector_bit)) in transaction
-            .record_ciphertexts
-            .iter()
-            .zip_eq(&transaction.new_records_ciphertext_and_fq_high_selectors)
-        {
-            let mut ciphertext_affine_x = vec![];
-            for ciphertext_element in ciphertext {
-                // Convert the ciphertext group to the affine representation to be hashed
-                let ciphertext_element_affine =
-                    <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
-                        .into_affine();
-                ciphertext_affine_x.push(ciphertext_element_affine.to_x_coordinate());
-            }
-
-            let selector_bytes =
-                bits_to_bytes(&[&encryption_selector_bits[..], &[*final_fq_high_selector_bit][..]].concat());
-
-            let ciphertext_hash = parameters
-                .circuit_parameters
-                .record_ciphertext_crh
-                .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
-
-            new_records_ciphertext_hashes.push(ciphertext_hash);
-        }
+        let new_records_ciphertext_hashes = record_ciphertext_hashes(
+            &parameters.circuit_parameters,
+            &transaction.record_ciphertexts,
+            transaction.new_records_final_fq_high_selectors.clone(),
+        )?;
 
         let inner_snark_input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),

@@ -306,7 +306,6 @@ fn test_execute_base_dpc_constraints() {
     let new_records_ciphertext_hashes = record_ciphertext_hashes(
         &circuit_parameters,
         &new_records_encryption_ciphertexts,
-        new_records_ciphertext_selectors.clone(),
         new_records_final_fq_high_selectors.clone(),
     )
     .unwrap();
@@ -320,12 +319,11 @@ fn test_execute_base_dpc_constraints() {
     ) = prepare_encryption_gadget_components(&circuit_parameters, &new_records, &new_records_encryption_randomness)
         .unwrap();
 
-    let new_records_ciphertext_and_fq_high_selectors_gadget: Vec<(Vec<bool>, Vec<bool>)> =
-        new_records_ciphertext_selectors
-            .iter()
-            .cloned()
-            .zip_eq(fq_high_selectors)
-            .collect();
+    let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, Vec<bool>)> = new_records_ciphertext_selectors
+        .iter()
+        .cloned()
+        .zip_eq(fq_high_selectors)
+        .collect();
 
     //////////////////////////////////////////////////////////////////////////
     // Check that the core check constraint system was satisfied.
@@ -347,7 +345,7 @@ fn test_execute_base_dpc_constraints() {
         &new_records_group_encoding,
         &new_records_encryption_randomness,
         &new_records_encryption_blinding_exponents,
-        &new_records_ciphertext_and_fq_high_selectors_gadget,
+        &new_records_ciphertext_and_fq_high_selectors,
         &new_records_ciphertext_hashes,
         &predicate_comm,
         &predicate_rand,
@@ -407,7 +405,7 @@ fn test_execute_base_dpc_constraints() {
             &new_records_group_encoding,
             &new_records_encryption_randomness,
             &new_records_encryption_blinding_exponents,
-            &new_records_ciphertext_and_fq_high_selectors_gadget,
+            &new_records_ciphertext_and_fq_high_selectors,
             &new_records_ciphertext_hashes,
             &predicate_comm,
             &predicate_rand,
