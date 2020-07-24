@@ -3,7 +3,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::Record,
 };
-use snarkos_objects::AccountPublicKey;
+use snarkos_objects::AccountAddress;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -22,16 +22,16 @@ use std::{
     Clone(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCRecord<C: BaseDPCComponents> {
-    pub(super) account_public_key: AccountPublicKey<C>,
+    pub(super) account_address: AccountAddress<C>,
 
     pub(super) is_dummy: bool,
     pub(super) value: u64,
     pub(super) payload: RecordPayload,
 
     #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
-    pub(super) birth_predicate_repr: Vec<u8>,
+    pub(super) birth_predicate_hash: Vec<u8>,
     #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
-    pub(super) death_predicate_repr: Vec<u8>,
+    pub(super) death_predicate_hash: Vec<u8>,
 
     pub(super) serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
 
@@ -46,7 +46,7 @@ fn default_predicate_hash<C: CRH>() -> Vec<u8> {
 }
 
 impl<C: BaseDPCComponents> Record for DPCRecord<C> {
-    type AccountPublicKey = AccountPublicKey<C>;
+    type AccountAddress = AccountAddress<C>;
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Payload = RecordPayload;
@@ -55,8 +55,8 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
     type Value = u64;
 
-    fn account_public_key(&self) -> &Self::AccountPublicKey {
-        &self.account_public_key
+    fn account_address(&self) -> &Self::AccountAddress {
+        &self.account_address
     }
 
     fn is_dummy(&self) -> bool {
@@ -67,12 +67,12 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
         &self.payload
     }
 
-    fn birth_predicate_repr(&self) -> &[u8] {
-        &self.birth_predicate_repr
+    fn birth_predicate_hash(&self) -> &[u8] {
+        &self.birth_predicate_hash
     }
 
-    fn death_predicate_repr(&self) -> &[u8] {
-        &self.death_predicate_repr
+    fn death_predicate_hash(&self) -> &[u8] {
+        &self.death_predicate_hash
     }
 
     fn serial_number_nonce(&self) -> &Self::SerialNumberNonce {
@@ -95,17 +95,17 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
 impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.account_public_key.write(&mut writer)?;
+        self.account_address.write(&mut writer)?;
 
         self.is_dummy.write(&mut writer)?;
         self.value.write(&mut writer)?;
         self.payload.write(&mut writer)?;
 
-        variable_length_integer(self.birth_predicate_repr.len() as u64).write(&mut writer)?;
-        self.birth_predicate_repr.write(&mut writer)?;
+        variable_length_integer(self.birth_predicate_hash.len() as u64).write(&mut writer)?;
+        self.birth_predicate_hash.write(&mut writer)?;
 
-        variable_length_integer(self.death_predicate_repr.len() as u64).write(&mut writer)?;
-        self.death_predicate_repr.write(&mut writer)?;
+        variable_length_integer(self.death_predicate_hash.len() as u64).write(&mut writer)?;
+        self.death_predicate_hash.write(&mut writer)?;
 
         self.serial_number_nonce.write(&mut writer)?;
         self.commitment.write(&mut writer)?;
@@ -116,7 +116,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
 impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let account_public_key: AccountPublicKey<C> = FromBytes::read(&mut reader)?;
+        let account_address: AccountAddress<C> = FromBytes::read(&mut reader)?;
         let is_dummy: bool = FromBytes::read(&mut reader)?;
         let value: u64 = FromBytes::read(&mut reader)?;
         let payload: RecordPayload = FromBytes::read(&mut reader)?;
@@ -144,12 +144,12 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             FromBytes::read(&mut reader)?;
 
         Ok(Self {
-            account_public_key,
+            account_address,
             is_dummy,
             value,
             payload,
-            birth_predicate_repr: birth_pred_repr.to_vec(),
-            death_predicate_repr: death_pred_repr.to_vec(),
+            birth_predicate_hash: birth_pred_repr.to_vec(),
+            death_predicate_hash: death_pred_repr.to_vec(),
             serial_number_nonce,
             commitment,
             commitment_randomness,

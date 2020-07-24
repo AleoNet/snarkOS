@@ -317,10 +317,49 @@ impl<'a, T: 'a + ToBytes> ToBytes for &'a T {
     }
 }
 
+pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bits = Vec::with_capacity(bytes.len() * 8);
+    for byte in bytes {
+        for i in 0..8 {
+            let bit = (*byte >> i) & 1;
+            bits.push(bit == 1);
+        }
+    }
+    bits
+}
+
+pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
+    // Pad the bits if it not a correct size
+    let mut bits = bits.to_vec();
+    if bits.len() % 8 != 0 {
+        let current_length = bits.len();
+        for _ in 0..(8 - (current_length % 8)) {
+            bits.push(false);
+        }
+    }
+
+    let mut bytes = Vec::with_capacity(bits.len() / 8);
+    for bits in bits.chunks(8) {
+        let mut result = 0u8;
+        for (i, bit) in bits.iter().enumerate() {
+            let bit_value = *bit as u8;
+            result = result + (bit_value << i as u8);
+        }
+        bytes.push(result);
+    }
+    bytes
+}
+
 #[cfg(test)]
 mod test {
-    use super::ToBytes;
+    use super::{bits_to_bytes, bytes_to_bits, ToBytes};
     use crate::Vec;
+
+    use rand::{Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
+
+    const ITERATIONS: usize = 1000;
+
     #[test]
     fn test_macro_empty() {
         let array: Vec<u8> = vec![];
@@ -342,5 +381,19 @@ mod test {
         actual_bytes.extend_from_slice(&array2);
         actual_bytes.extend_from_slice(&array3);
         assert_eq!(bytes, actual_bytes);
+    }
+
+    #[test]
+    fn test_bits_to_bytes() {
+        let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+        for _ in 0..ITERATIONS {
+            let given_bytes: [u8; 32] = rng.gen();
+
+            let bits = bytes_to_bits(&given_bytes);
+            let recovered_bytes = bits_to_bytes(&bits);
+
+            assert_eq!(given_bytes.to_vec(), recovered_bytes);
+        }
     }
 }

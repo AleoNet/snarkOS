@@ -14,7 +14,7 @@ edition = "2018"
 [dependencies]
 snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "0.8.0" } # TODO: Add default-features=false back in.
 
 derivative = { version = "2" }
 rand = { version = "0.7" }

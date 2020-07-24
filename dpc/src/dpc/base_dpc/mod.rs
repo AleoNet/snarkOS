@@ -1,21 +1,38 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use crate::dpc::base_dpc::{
+    binding_signature::*,
+    record_payload::RecordPayload,
+    records::record_serializer::{decode_from_group, RecordSerializer},
+};
+use snarkos_algorithms::{
+    encoding::Elligator2,
+    merkle_tree::{MerklePath, MerkleTreeDigest},
+};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, LoadableMerkleParameters, MerkleParameters, SignatureScheme, CRH, PRF, SNARK},
-    curves::{Group, ProjectiveCurve},
-    dpc::{DPCComponents, DPCScheme, Predicate, Record},
+    algorithms::{
+        CommitmentScheme,
+        EncryptionScheme,
+        LoadableMerkleParameters,
+        MerkleParameters,
+        SignatureScheme,
+        CRH,
+        PRF,
+        SNARK,
+    },
+    curves::{AffineCurve, Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
+    dpc::{DPCComponents, DPCScheme, Predicate, Record, RecordSerializerScheme},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
-use snarkos_objects::{Account, AccountPrivateKey, AccountPublicKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
+    bytes::{bits_to_bytes, bytes_to_bits, FromBytes, ToBytes},
     has_duplicates,
     rand::UniformRand,
     to_bytes,
 };
 
+use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
 
@@ -54,6 +71,8 @@ use self::outer_circuit_verifier_input::*;
 pub mod parameters;
 use self::parameters::*;
 
+pub mod records;
+
 pub mod record_payload;
 
 pub mod instantiated;
@@ -82,6 +101,10 @@ pub trait BaseDPCComponents: DPCComponents {
         Self::InnerField,
         Self::BindingSignatureGroup,
     >;
+
+    /// Group and Model Parameters for record encryption
+    type EncryptionGroup: Group + ProjectiveCurve;
+    type EncryptionModelParameters: MontgomeryModelParameters + TEModelParameters;
 
     /// SNARK for non-proof-verification checks
     type InnerSNARK: SNARK<
@@ -206,48 +229,58 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Record commitment scheme setup");
-        let rec_comm_pp = Components::RecordCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Verification key commitment setup");
-        let pred_vk_comm_pp = Components::PredicateVerificationKeyCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Local data CRH setup");
-        let local_data_crh_pp = Components::LocalDataCRH::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Local data commitment setup");
-        let local_data_comm_pp = Components::LocalDataCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Value commitment setup");
-        let value_comm_pp = Components::ValueCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Serial nonce CRH setup");
-        let sn_nonce_crh_pp = Components::SerialNumberNonceCRH::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Verification key CRH setup");
-        let pred_vk_crh_pp = Components::PredicateVerificationKeyHash::setup(rng);
+        let time = start_timer!(|| "Account encryption scheme setup");
+        let account_encryption = Components::AccountEncryption::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Account signature setup");
         let account_signature = Components::AccountSignature::setup(rng)?;
         end_timer!(time);
 
+        let time = start_timer!(|| "Record commitment scheme setup");
+        let record_commitment = Components::RecordCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Record ciphertext CRH setup");
+        let record_ciphertext_crh = Components::RecordCiphertextCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Verification key commitment setup");
+        let predicate_verification_key_commitment = Components::PredicateVerificationKeyCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Local data CRH setup");
+        let local_data_crh = Components::LocalDataCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Local data commitment setup");
+        let local_data_commitment = Components::LocalDataCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Value commitment setup");
+        let value_commitment = Components::ValueCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Serial nonce CRH setup");
+        let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Verification key CRH setup");
+        let predicate_verification_key_hash = Components::PredicateVerificationKeyHash::setup(rng);
+        end_timer!(time);
+
         let comm_crh_sig_pp = CircuitParameters {
             account_commitment,
+            account_encryption,
             account_signature,
-            record_commitment: rec_comm_pp,
-            predicate_verification_key_commitment: pred_vk_comm_pp,
-            predicate_verification_key_hash: pred_vk_crh_pp,
-            local_data_crh: local_data_crh_pp,
-            local_data_commitment: local_data_comm_pp,
-            value_commitment: value_comm_pp,
-            serial_number_nonce: sn_nonce_crh_pp,
+            record_commitment,
+            record_ciphertext_crh,
+            predicate_verification_key_commitment,
+            predicate_verification_key_hash,
+            local_data_crh,
+            local_data_commitment,
+            value_commitment,
+            serial_number_nonce,
         };
 
         Ok(comm_crh_sig_pp)
@@ -290,7 +323,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     pub fn generate_record<R: Rng>(
         parameters: &CircuitParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        account_public_key: &AccountPublicKey<Components>,
+        account_address: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
@@ -303,17 +336,17 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct a record commitment.
-        let birth_predicate_repr = birth_predicate.into_compact_repr();
-        let death_predicate_repr = death_predicate.into_compact_repr();
+        let birth_predicate_hash = birth_predicate.into_compact_repr();
+        let death_predicate_hash = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_public_key.commitment, // 256 bits = 32 bytes
-            is_dummy,                      // 1 bit = 1 byte
-            value,                         // 64 bits = 8 bytes
-            payload,                       // 256 bits = 32 bytes
-            birth_predicate_repr,          // 256 bits = 32 bytes
-            death_predicate_repr,          // 256 bits = 32 bytes
-            sn_nonce                       // 256 bits = 32 bytes
+            account_address,      // 256 bits = 32 bytes
+            is_dummy,             // 1 bit = 1 byte
+            value,                // 64 bits = 8 bytes
+            payload,              // 256 bits = 32 bytes
+            birth_predicate_hash, // 256 bits = 32 bytes
+            death_predicate_hash, // 256 bits = 32 bytes
+            sn_nonce              // 256 bits = 32 bytes
         ]?;
 
         let commitment = Components::RecordCommitment::commit(
@@ -323,12 +356,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         )?;
 
         let record = DPCRecord {
-            account_public_key: account_public_key.clone(),
+            account_address: account_address.clone(),
             is_dummy,
             value,
             payload: payload.clone(),
-            birth_predicate_repr,
-            death_predicate_repr,
+            birth_predicate_hash,
+            death_predicate_hash,
             serial_number_nonce: sn_nonce.clone(),
             commitment,
             commitment_randomness,
@@ -344,7 +377,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_account_public_keys: &[AccountPublicKey<Components>],
+        new_account_address: &[AccountAddress<Components>],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
@@ -370,7 +403,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_public_keys.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_address.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
@@ -401,7 +434,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
             old_serial_numbers.push(sn);
             old_randomizers.push(randomizer);
-            old_death_pred_hashes.push(record.death_predicate_repr().to_vec());
+            old_death_pred_hashes.push(record.death_predicate_hash().to_vec());
 
             end_timer!(input_record_time);
         }
@@ -427,7 +460,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_account_public_keys[j],
+                &new_account_address[j],
                 new_is_dummy_flags[j],
                 new_values[j],
                 &new_payloads[j],
@@ -442,7 +475,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             new_commitments.push(record.commitment.clone());
             new_sn_nonce_randomness.push(sn_randomness);
-            new_birth_pred_hashes.push(record.birth_predicate_repr().to_vec());
+            new_birth_pred_hashes.push(record.birth_predicate_hash().to_vec());
             new_records.push(record);
 
             end_timer!(output_record_time);
@@ -621,16 +654,18 @@ where
         })
     }
 
-    fn create_account<R: Rng>(
-        parameters: &Self::Parameters,
-        metadata: &Self::Metadata,
-        rng: &mut R,
-    ) -> Result<Self::Account, DPCError> {
+    fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError> {
         let time = start_timer!(|| "BaseDPC::create_account");
 
         let account_signature_parameters = &parameters.circuit_parameters.account_signature;
         let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let account = Account::new(account_signature_parameters, commitment_parameters, metadata, rng)?;
+        let encryption_parameters = &parameters.circuit_parameters.account_encryption;
+        let account = Account::new(
+            account_signature_parameters,
+            commitment_parameters,
+            encryption_parameters,
+            rng,
+        )?;
 
         end_timer!(time);
 
@@ -643,7 +678,7 @@ where
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
         mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
 
-        new_account_public_keys: &[<Self::Account as AccountScheme>::AccountPublicKey],
+        new_account_address: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
@@ -661,7 +696,7 @@ where
             &parameters.circuit_parameters,
             old_records,
             old_account_private_keys,
-            new_account_public_keys,
+            new_account_address,
             new_is_dummy_flags,
             new_values,
             new_payloads,
@@ -807,6 +842,146 @@ where
                 rng,
             )?;
 
+        // Record encoding and encryption
+
+        let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_and_fq_high_selectors_gadget =
+            Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_and_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for record in &new_records {
+            // Serialize the record into group elements and fq_high bits
+            let (serialized_record, final_fq_high_bit) = RecordSerializer::<
+                Components,
+                Components::EncryptionModelParameters,
+                Components::EncryptionGroup,
+            >::serialize(&record)?;
+
+            // Extract the fq_bits
+            let final_element = &serialized_record[serialized_record.len() - 1];
+            let final_element_bytes = decode_from_group::<
+                Components::EncryptionModelParameters,
+                Components::EncryptionGroup,
+            >(final_element.into_affine(), final_fq_high_bit)?;
+            let final_element_bits = bytes_to_bits(&final_element_bytes);
+            let fq_high_bits = [
+                &final_element_bits[1..serialized_record.len()],
+                &[final_fq_high_bit][..],
+            ]
+            .concat();
+
+            let mut record_field_elements = vec![];
+            let mut record_group_encoding = vec![];
+            let mut record_plaintexts = vec![];
+            // The first fq_high selector is false to account for the c_0 element in the ciphertext
+
+            for (i, (element, fq_high)) in serialized_record.iter().zip_eq(&fq_high_bits).enumerate() {
+                let element_affine = element.into_affine();
+
+                // Decode the field elements from the serialized group element
+                // These values will be used in the inner circuit to validate bit packing and serialization
+                if i == 0 {
+                    // Serial number nonce
+                    let record_field_element =
+                        <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
+                    record_field_elements.push(record_field_element);
+                } else {
+                    // Decode the encoded groups into their respective field elements
+                    let record_field_element = Elligator2::<
+                        <Components as BaseDPCComponents>::EncryptionModelParameters,
+                        <Components as BaseDPCComponents>::EncryptionGroup,
+                    >::decode(&element_affine, *fq_high)?;
+
+                    record_field_elements.push(record_field_element);
+                }
+
+                // Fetch the x and y coordinates of the serialized group elements
+                // These values will be used in the inner circuit to validate the Elligator2 encoding
+                let x =
+                    <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
+                        &to_bytes![element_affine.to_x_coordinate()]?[..],
+                    )?;
+                let y =
+                    <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
+                        &to_bytes![element_affine.to_y_coordinate()]?[..],
+                    )?;
+                record_group_encoding.push((x, y));
+
+                // Construct the plaintext element from the serialized group elements
+                // This value will be used in the inner circuit to validate the encryption
+                let plaintext_element =
+                    <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
+                        &to_bytes![element]?[..],
+                    )?;
+                record_plaintexts.push(plaintext_element);
+            }
+
+            // Store the field elements and group encodings for each new record
+            new_records_field_elements.push(record_field_elements);
+            new_records_group_encoding.push(record_group_encoding);
+
+            // Encrypt the record plaintext
+            let record_public_key = record.account_address().into_repr();
+            let encryption_randomness = circuit_parameters
+                .account_encryption
+                .generate_randomness(record_public_key, rng)?;
+            let encryption_blinding_exponents = circuit_parameters.account_encryption.generate_blinding_exponents(
+                record_public_key,
+                &encryption_randomness,
+                record_plaintexts.len(),
+            )?;
+            let record_ciphertext = circuit_parameters.account_encryption.encrypt(
+                record_public_key,
+                &encryption_randomness,
+                &record_plaintexts,
+            )?;
+
+            // Compose the record ciphertext for storage in a transaction
+            let mut ciphertext = vec![];
+
+            // Compute the ciphertext hash which will be validated in the inner circuit
+            let mut ciphertext_affine_x = vec![];
+            let mut ciphertext_selectors = vec![];
+            for ciphertext_element in record_ciphertext.iter() {
+                let ciphertext_element_affine =
+                    <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
+                        .into_affine();
+                let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
+
+                let greatest = match <<Components as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
+                    ciphertext_x_coordinate.clone(),
+                    true,
+                ) {
+                    Some(affine) => ciphertext_element_affine == affine,
+                    None => false,
+                };
+
+                ciphertext_affine_x.push(ciphertext_x_coordinate);
+                ciphertext_selectors.push(greatest);
+                ciphertext.push(ciphertext_element.clone());
+            }
+
+            // Concatenate the fq_high selector bits and plaintext decoding selector bit
+            let selector_bits = [ciphertext_selectors.clone(), vec![final_fq_high_bit]].concat();
+            let selector_bytes = bits_to_bytes(&selector_bits);
+
+            let ciphertext_hash = circuit_parameters
+                .record_ciphertext_crh
+                .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
+
+            new_records_encryption_randomness.push(encryption_randomness);
+            new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
+            new_records_encryption_ciphertexts.push(ciphertext);
+            new_records_ciphertext_hashes.push(ciphertext_hash);
+
+            new_records_ciphertext_and_fq_high_selectors_gadget.push((ciphertext_selectors.clone(), fq_high_bits));
+            new_records_ciphertext_and_fq_high_selectors.push((ciphertext_selectors, final_fq_high_bit));
+        }
+
         let inner_proof = {
             let circuit = InnerCircuit::new(
                 &parameters.circuit_parameters,
@@ -819,6 +994,12 @@ where
                 &new_records,
                 &new_sn_nonce_randomness,
                 &new_commitments,
+                &new_records_field_elements,
+                &new_records_group_encoding,
+                &new_records_encryption_randomness,
+                &new_records_encryption_blinding_exponents,
+                &new_records_ciphertext_and_fq_high_selectors_gadget,
+                &new_records_ciphertext_hashes,
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,
@@ -841,6 +1022,27 @@ where
             Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
         };
 
+        // Verify that the inner proof passes
+        {
+            let input = InnerCircuitVerifierInput {
+                circuit_parameters: parameters.circuit_parameters.clone(),
+                ledger_parameters: ledger.parameters().clone(),
+                ledger_digest: ledger_digest.clone(),
+                old_serial_numbers: old_serial_numbers.clone(),
+                new_commitments: new_commitments.clone(),
+                new_records_ciphertext_hashes: new_records_ciphertext_hashes.clone(),
+                memo: memorandum.clone(),
+                predicate_commitment: predicate_commitment.clone(),
+                local_data_commitment: local_data_commitment.clone(),
+                value_balance,
+                network_id,
+            };
+
+            let verification_key = &parameters.inner_snark_parameters.1;
+
+            assert!(Components::InnerSNARK::verify(verification_key, &input, &inner_proof)?);
+        }
+
         let transaction_proof = {
             let ledger_parameters = ledger.parameters();
             let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
@@ -852,6 +1054,7 @@ where
                 &ledger_digest,
                 &old_serial_numbers,
                 &new_commitments,
+                &new_records_ciphertext_hashes,
                 &memorandum,
                 value_balance,
                 network_id,
@@ -872,6 +1075,12 @@ where
             Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
 
+        assert_eq!(new_records_encryption_ciphertexts.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(
+            new_records_encryption_ciphertexts.len(),
+            new_records_ciphertext_and_fq_high_selectors.len()
+        );
+
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
@@ -883,6 +1092,8 @@ where
             value_balance,
             network_id,
             signatures,
+            new_records_encryption_ciphertexts,
+            new_records_ciphertext_and_fq_high_selectors,
         );
 
         end_timer!(exec_time);
@@ -899,7 +1110,7 @@ where
             return Ok(false);
         }
 
-        // Returns false if there are duplicate serial numbers in the transaction.
+        // Returns false if there are duplicate commitments numbers in the transaction.
         if has_duplicates(transaction.new_commitments().iter()) {
             eprintln!("Transaction contains duplicate commitments");
             return Ok(false);
@@ -960,12 +1171,39 @@ where
 
         end_timer!(signature_time);
 
+        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for (ciphertext, (encryption_selector_bits, final_fq_high_selector_bit)) in transaction
+            .record_ciphertexts
+            .iter()
+            .zip_eq(&transaction.new_records_ciphertext_and_fq_high_selectors)
+        {
+            let mut ciphertext_affine_x = vec![];
+            for ciphertext_element in ciphertext {
+                // Convert the ciphertext group to the affine representation to be hashed
+                let ciphertext_element_affine =
+                    <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
+                        .into_affine();
+                ciphertext_affine_x.push(ciphertext_element_affine.to_x_coordinate());
+            }
+
+            let selector_bytes =
+                bits_to_bytes(&[&encryption_selector_bits[..], &[*final_fq_high_selector_bit][..]].concat());
+
+            let ciphertext_hash = parameters
+                .circuit_parameters
+                .record_ciphertext_crh
+                .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
+
+            new_records_ciphertext_hashes.push(ciphertext_hash);
+        }
+
         let inner_snark_input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
             ledger_parameters: ledger.parameters().clone(),
             ledger_digest: transaction.ledger_digest().clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
+            new_records_ciphertext_hashes,
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.predicate_commitment().clone(),
             local_data_commitment: transaction.local_data_commitment().clone(),

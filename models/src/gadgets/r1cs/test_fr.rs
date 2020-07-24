@@ -9,7 +9,7 @@ pub struct FrParameters;
 impl Fp256Parameters for FrParameters {}
 
 impl FpParameters for FrParameters {
-    type BigInt = BigInteger;
+    type BigInteger = BigInteger;
 
     const CAPACITY: u32 = Self::MODULUS_BITS - 1;
     // GENERATOR = 11

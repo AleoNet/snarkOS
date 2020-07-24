@@ -10,7 +10,7 @@ use crate::{
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
+    algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
@@ -25,6 +25,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
     old_serial_numbers: Option<Vec<<C::AccountSignature as SignatureScheme>::PublicKey>>,
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
+    new_records_ciphertext_hashes: Option<Vec<<C::RecordCiphertextCRH as CRH>::Output>>,
     memo: Option<[u8; 32]>,
     value_balance: Option<i64>,
     network_id: Option<u8>,
@@ -61,6 +62,10 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             <C::RecordCommitment as CommitmentScheme>::Output::default();
             num_output_records
         ]);
+        let new_records_ciphertext_hashes = Some(vec![
+            <C::RecordCiphertextCRH as CRH>::Output::default();
+            num_output_records
+        ]);
         let memo = Some([0u8; 32]);
         let value_balance = Some(0);
         let network_id = Some(0);
@@ -81,6 +86,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             old_serial_numbers,
             new_commitments,
             memo,
+            new_records_ciphertext_hashes,
             value_balance,
             network_id,
 
@@ -104,6 +110,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
         old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
         new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+        new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
         memo: &[u8; 32],
         value_balance: i64,
         network_id: u8,
@@ -129,14 +136,17 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         assert_eq!(num_input_records, old_private_predicate_inputs.len());
         assert_eq!(num_output_records, new_private_predicate_inputs.len());
+        assert_eq!(num_output_records, new_commitments.len());
+        assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
 
         Self {
             circuit_parameters: Some(circuit_parameters.clone()),
 
             ledger_parameters: Some(ledger_parameters.clone()),
             ledger_digest: Some(ledger_digest.clone()),
-            old_serial_numbers: Some(old_serial_numbers.clone()),
-            new_commitments: Some(new_commitments.clone()),
+            old_serial_numbers: Some(old_serial_numbers.to_vec()),
+            new_commitments: Some(new_commitments.to_vec()),
+            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes.to_vec()),
             memo: Some(memo.clone()),
             value_balance: Some(value_balance),
             network_id: Some(network_id),
@@ -159,11 +169,16 @@ where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
+    <C::AccountEncryption as EncryptionScheme>::Parameters: ToConstraintField<C::InnerField>,
+
     <C::AccountSignature as SignatureScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountSignature as SignatureScheme>::PublicKey: ToConstraintField<C::InnerField>,
 
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+
+    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -186,6 +201,7 @@ where
             self.ledger_digest.get()?,
             self.old_serial_numbers.get()?,
             self.new_commitments.get()?,
+            self.new_records_ciphertext_hashes.get()?,
             self.memo.get()?,
             *self.value_balance.get()?,
             *self.network_id.get()?,

@@ -1,11 +1,11 @@
-use crate::curves::{Field, FpParameters, LegendreSymbol, PrimeField, SquareRootField};
+use crate::curves::{Field, FpParameters, LegendreSymbol, One, PrimeField, SquareRootField, Zero};
+use snarkos_errors::curves::FieldError;
 use snarkos_utilities::{
     biginteger::{arithmetic as fa, BigInteger as _BigInteger, BigInteger256 as BigInteger},
     bytes::{FromBytes, ToBytes},
     serialize::CanonicalDeserialize,
 };
 
-use crate::curves::{One, Zero};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt::{Display, Formatter, Result as FmtResult},
@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
 };
 
-pub trait Fp256Parameters: FpParameters<BigInt = BigInteger> {}
+pub trait Fp256Parameters: FpParameters<BigInteger = BigInteger> {}
 
 #[derive(Derivative)]
 #[derivative(
@@ -269,17 +269,19 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
 }
 
 impl<P: Fp256Parameters> PrimeField for Fp256<P> {
-    type BigInt = BigInteger;
-    type Params = P;
+    type BigInteger = BigInteger;
+    type Parameters = P;
 
     #[inline]
-    fn from_repr(r: BigInteger) -> Self {
+    fn from_repr(r: BigInteger) -> Option<Self> {
         let mut r = Fp256(r, PhantomData);
-        if r.is_valid() {
-            r.mul_assign(&Fp256(P::R2, PhantomData));
-            r
+        if r.is_zero() {
+            Some(r)
+        } else if r.is_valid() {
+            r *= &Fp256(P::R2, PhantomData);
+            Some(r)
         } else {
-            Self::zero()
+            None
         }
     }
 
@@ -319,7 +321,9 @@ impl<P: Fp256Parameters> SquareRootField for Fp256<P> {
         use crate::curves::LegendreSymbol::*;
 
         // s = self^((MODULUS - 1) // 2)
-        let s = self.pow(P::MODULUS_MINUS_ONE_DIV_TWO);
+        let mut s = self.pow(P::MODULUS_MINUS_ONE_DIV_TWO);
+        s.reduce();
+
         if s.is_zero() {
             Zero
         } else if s.is_one() {
@@ -363,7 +367,10 @@ impl<P: Fp256Parameters> ToBytes for Fp256<P> {
 impl<P: Fp256Parameters> FromBytes for Fp256<P> {
     #[inline]
     fn read<R: Read>(reader: R) -> IoResult<Self> {
-        BigInteger::read(reader).map(Fp256::from_repr)
+        BigInteger::read(reader).and_then(|b| match Self::from_repr(b) {
+            Some(f) => Ok(f),
+            None => Err(FieldError::InvalidFieldElement.into()),
+        })
     }
 }
 
@@ -383,13 +390,13 @@ impl<P: Fp256Parameters> PartialOrd for Fp256<P> {
 }
 
 impl<P: Fp256Parameters> FromStr for Fp256<P> {
-    type Err = ();
+    type Err = FieldError;
 
     /// Interpret a string of numbers as a (congruent) prime field element.
     /// Does not accept unnecessary leading zeroes or a blank string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            return Err(());
+            return Err(FieldError::ParsingEmptyString);
         }
 
         if s == "0" {
@@ -398,7 +405,7 @@ impl<P: Fp256Parameters> FromStr for Fp256<P> {
 
         let mut res = Self::zero();
 
-        let ten = Self::from_repr(<Self as PrimeField>::BigInt::from(10));
+        let ten = Self::from_repr(<Self as PrimeField>::BigInteger::from(10)).ok_or(FieldError::InvalidFieldElement)?;
 
         let mut first_digit = true;
 
@@ -407,21 +414,29 @@ impl<P: Fp256Parameters> FromStr for Fp256<P> {
                 Some(c) => {
                     if first_digit {
                         if c == 0 {
-                            return Err(());
+                            return Err(FieldError::InvalidString);
                         }
 
                         first_digit = false;
                     }
 
                     res.mul_assign(&ten);
-                    res.add_assign(&Self::from_repr(<Self as PrimeField>::BigInt::from(u64::from(c))));
+                    res.add_assign(
+                        &Self::from_repr(<Self as PrimeField>::BigInteger::from(u64::from(c)))
+                            .ok_or(FieldError::InvalidFieldElement)?,
+                    );
                 }
                 None => {
-                    return Err(());
+                    return Err(FieldError::ParsingNonDigitCharacter);
                 }
             }
         }
-        if !res.is_valid() { Err(()) } else { Ok(res) }
+
+        if !res.is_valid() {
+            Err(FieldError::InvalidFieldElement)
+        } else {
+            Ok(res)
+        }
     }
 }
 

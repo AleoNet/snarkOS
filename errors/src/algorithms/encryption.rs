@@ -15,3 +15,9 @@ impl From<std::io::Error> for EncryptionError {
         EncryptionError::Crate("std::io", format!("{:?}", error))
     }
 }
+
+impl From<EncryptionError> for std::io::Error {
+    fn from(error: EncryptionError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("{}", error))
+    }
+}

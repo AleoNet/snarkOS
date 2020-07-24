@@ -1,24 +1,24 @@
 use crate::curves::{Field, FpParameters};
-use snarkos_utilities::biginteger::*;
+use snarkos_utilities::biginteger::BigInteger;
 
 use std::str::FromStr;
 
 /// The interface for a prime field.
 pub trait PrimeField: Field + FromStr {
-    type Params: FpParameters<BigInt = Self::BigInt>;
-    type BigInt: BigInteger;
+    type Parameters: FpParameters<BigInteger = Self::BigInteger>;
+    type BigInteger: BigInteger;
 
     /// Returns a prime field element from its underlying representation.
-    fn from_repr(repr: <Self::Params as FpParameters>::BigInt) -> Self;
+    fn from_repr(repr: Self::BigInteger) -> Option<Self>;
 
     /// Returns the underlying representation of the prime field element.
-    fn into_repr(&self) -> Self::BigInt;
+    fn into_repr(&self) -> Self::BigInteger;
 
     /// Returns a prime field element from its underlying raw representation.
-    fn from_repr_raw(repr: Self::BigInt) -> Self;
+    fn from_repr_raw(repr: Self::BigInteger) -> Self;
 
     /// Returns the underlying raw representation of the prime field element.
-    fn into_repr_raw(&self) -> Self::BigInt;
+    fn into_repr_raw(&self) -> Self::BigInteger;
 
     /// Returns the multiplicative generator of `char()` - 1 order.
     fn multiplicative_generator() -> Self;
@@ -33,21 +33,21 @@ pub trait PrimeField: Field + FromStr {
 
     /// Returns the field size in bits.
     fn size_in_bits() -> usize {
-        Self::Params::MODULUS_BITS as usize
+        Self::Parameters::MODULUS_BITS as usize
     }
 
     /// Returns the trace.
-    fn trace() -> Self::BigInt {
-        Self::Params::T
+    fn trace() -> Self::BigInteger {
+        Self::Parameters::T
     }
 
     /// Returns the trace minus one divided by two.
-    fn trace_minus_one_div_two() -> Self::BigInt {
-        Self::Params::T_MINUS_ONE_DIV_TWO
+    fn trace_minus_one_div_two() -> Self::BigInteger {
+        Self::Parameters::T_MINUS_ONE_DIV_TWO
     }
 
     /// Returns the modulus minus one divided by two.
-    fn modulus_minus_one_div_two() -> Self::BigInt {
-        Self::Params::MODULUS_MINUS_ONE_DIV_TWO
+    fn modulus_minus_one_div_two() -> Self::BigInteger {
+        Self::Parameters::MODULUS_MINUS_ONE_DIV_TWO
     }
 }

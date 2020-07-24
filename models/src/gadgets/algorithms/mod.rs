@@ -7,6 +7,9 @@ pub use self::commitment::*;
 pub mod crh;
 pub use self::crh::*;
 
+pub mod encryption;
+pub use self::encryption::*;
+
 pub mod prf;
 pub use self::prf::*;
 

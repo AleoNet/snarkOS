@@ -9,8 +9,10 @@ use std::io::Result as IoResult;
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct CircuitParameters<C: BaseDPCComponents> {
     pub account_commitment: C::AccountCommitment,
+    pub account_encryption: C::AccountEncryption,
     pub account_signature: C::AccountSignature,
     pub record_commitment: C::RecordCommitment,
+    pub record_ciphertext_crh: C::RecordCiphertextCRH,
     pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
     pub predicate_verification_key_hash: C::PredicateVerificationKeyHash,
     pub local_data_crh: C::LocalDataCRH,
@@ -24,10 +26,15 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
     pub fn load() -> IoResult<Self> {
         let account_commitment: C::AccountCommitment =
             From::from(FromBytes::read(AccountCommitmentParameters::load_bytes()?.as_slice())?);
+        let account_encryption: C::AccountEncryption =
+            From::from(FromBytes::read(AccountEncryptionParameters::load_bytes()?.as_slice())?);
         let account_signature: C::AccountSignature =
             From::from(FromBytes::read(AccountSignatureParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =
             From::from(FromBytes::read(RecordCommitmentParameters::load_bytes()?.as_slice())?);
+        let record_ciphertext_crh: C::RecordCiphertextCRH = From::from(FromBytes::read(
+            RecordCiphertextCRHParameters::load_bytes()?.as_slice(),
+        )?);
         let predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment =
             From::from(FromBytes::read(vec![].as_slice())?);
         let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
@@ -45,8 +52,10 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
 
         Ok(Self {
             account_commitment,
+            account_encryption,
             account_signature,
             record_commitment,
+            record_ciphertext_crh,
             predicate_verification_key_commitment,
             predicate_verification_key_hash,
             local_data_crh,
@@ -100,6 +109,10 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.circuit_parameters.account_commitment
     }
 
+    pub fn account_encryption_parameters(&self) -> &C::AccountEncryption {
+        &self.circuit_parameters.account_encryption
+    }
+
     pub fn account_signature_parameters(&self) -> &C::AccountSignature {
         &self.circuit_parameters.account_signature
     }
@@ -144,6 +157,10 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn record_commitment_parameters(&self) -> &C::RecordCommitment {
         &self.circuit_parameters.record_commitment
+    }
+
+    pub fn record_ciphertext_crh_parameters(&self) -> &C::RecordCiphertextCRH {
+        &self.circuit_parameters.record_ciphertext_crh
     }
 
     pub fn value_commitment_parameters(&self) -> &C::ValueCommitment {

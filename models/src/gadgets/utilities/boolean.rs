@@ -405,7 +405,7 @@ impl Boolean {
         input_bits
     }
 
-    /// Construct a boolean from a known constant
+    /// Construct a boolean from a known constant.
     pub fn constant(b: bool) -> Self {
         Boolean::Constant(b)
     }
@@ -419,7 +419,7 @@ impl Boolean {
         }
     }
 
-    /// Perform XOR over two boolean operands
+    /// Perform XOR over two boolean operands.
     pub fn xor<'a, F, CS>(cs: CS, a: &'a Self, b: &'a Self) -> Result<Self, SynthesisError>
     where
         F: Field,
@@ -439,7 +439,7 @@ impl Boolean {
         }
     }
 
-    /// Perform OR over two boolean operands
+    /// Perform OR over two boolean operands.
     pub fn or<'a, F, CS>(cs: CS, a: &'a Self, b: &'a Self) -> Result<Self, SynthesisError>
     where
         F: Field,
@@ -456,7 +456,7 @@ impl Boolean {
         }
     }
 
-    /// Perform AND over two boolean operands
+    /// Perform AND over two boolean operands.
     pub fn and<'a, F: Field, CS: ConstraintSystem<F>>(
         cs: CS,
         a: &'a Self,
@@ -478,6 +478,7 @@ impl Boolean {
         }
     }
 
+    /// Perform AND over all the given boolean operands.
     pub fn kary_and<F, CS>(mut cs: CS, bits: &[Self]) -> Result<Self, SynthesisError>
     where
         F: Field,
@@ -545,7 +546,7 @@ impl Boolean {
         let mut run_i = 0;
         let mut nand_i = 0;
 
-        let char_num_bits = <NativeF as PrimeField>::Params::MODULUS_BITS as usize;
+        let char_num_bits = <NativeF as PrimeField>::Parameters::MODULUS_BITS as usize;
         if bits.len() > char_num_bits {
             let num_extra_bits = bits.len() - char_num_bits;
             let mut or_result = Boolean::constant(false);

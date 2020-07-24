@@ -14,6 +14,7 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
+use itertools::Itertools;
 use std::{borrow::Borrow, fmt::Debug};
 
 pub trait GroupGadget<G: Group, F: Field>:
@@ -166,10 +167,10 @@ pub trait GroupGadget<G: Group, F: Field>:
     {
         let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
         // Compute ∏(h_i^{m_i}) for all i.
-        for (i, (bits, base_powers)) in scalars.zip(bases).enumerate() {
+        for (i, (bits, base_powers)) in scalars.zip_eq(bases).enumerate() {
             let base_powers = base_powers.borrow();
             let bits = bits.to_bits(&mut cs.ns(|| format!("Convert Scalar {} to bits", i)))?;
-            result.precomputed_base_scalar_mul(cs.ns(|| format!("Chunk {}", i)), bits.iter().zip(base_powers))?;
+            result.precomputed_base_scalar_mul(cs.ns(|| format!("Chunk {}", i)), bits.iter().zip_eq(base_powers))?;
         }
         Ok(result)
     }
@@ -187,12 +188,13 @@ pub trait GroupGadget<G: Group, F: Field>:
     {
         let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
         // Compute ∏(h_i^{1  - 2*m_i}) for all i.
-        for (i, (bits, base_powers)) in scalars.zip(bases).enumerate() {
+        for (i, (bits, base_powers)) in scalars.zip_eq(bases).enumerate() {
             let base_powers = base_powers.borrow();
             let bits = bits.to_bits(&mut cs.ns(|| format!("Convert Scalar {} to bits", i)))?;
+
             result.precomputed_base_symmetric_scalar_mul(
                 cs.ns(|| format!("Chunk {}", i)),
-                bits.iter().zip(base_powers),
+                bits.iter().zip_eq(base_powers),
             )?;
         }
         Ok(result)
@@ -217,14 +219,16 @@ pub trait GroupGadget<G: Group, F: Field>:
     {
         let mut result = Self::zero(&mut cs.ns(|| "Declare Result"))?;
         for (i, (((scalar, mask), base_powers), mask_powers)) in
-            scalars.zip(masks).zip(bases).zip(mask_bases).enumerate()
+            scalars.zip_eq(masks).zip_eq(bases).zip_eq(mask_bases).enumerate()
         {
             let base_powers = base_powers.borrow();
             let mask_powers = mask_powers.borrow();
             let scalar_bits = scalar.to_bits(&mut cs.ns(|| format!("Convert scalar {} to bits", i)))?;
             let mask_bits = mask.to_bits(&mut cs.ns(|| format!("Convert mask {} to bits", i)))?;
-            let scalar_bits_with_base_powers = scalar_bits.into_iter().zip(base_powers);
-            let mask_bits_with_mask_powers = mask_bits.into_iter().zip(mask_powers);
+
+            let scalar_bits_with_base_powers = scalar_bits.into_iter().zip_eq(base_powers);
+            let mask_bits_with_mask_powers = mask_bits.into_iter().zip_eq(mask_powers);
+
             result.precomputed_base_scalar_mul_masked(
                 cs.ns(|| format!("Chunk {}", i)),
                 scalar_bits_with_base_powers,

@@ -49,7 +49,7 @@ impl FixedBaseMSM {
         for outer in 0..outerc {
             let mut inner = 0usize;
             for i in 0..window {
-                if outer * window + i < (<T::ScalarField as PrimeField>::Params::MODULUS_BITS as usize)
+                if outer * window + i < (<T::ScalarField as PrimeField>::Parameters::MODULUS_BITS as usize)
                     && scalar_val[outer * window + i]
                 {
                     inner |= 1 << i;

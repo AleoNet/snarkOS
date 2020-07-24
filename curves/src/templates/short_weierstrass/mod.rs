@@ -16,7 +16,7 @@ macro_rules! impl_sw_from_random_bytes {
                     Some(Self::zero())
                 } else {
                     let is_positive = flags & positive_flag_mask != 0;
-                    Self::get_point_from_x(x, is_positive)
+                    Self::from_x_coordinate(x, is_positive)
                 }
             })
         }

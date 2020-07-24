@@ -60,7 +60,7 @@ pub fn recover_affine_from_x_coord<G: Group + ProjectiveCurve>(
 ) -> Result<<G as ProjectiveCurve>::Affine, BindingSignatureError> {
     let x: <<EdwardsBls12 as ProjectiveCurve>::Affine as AffineCurve>::BaseField = FromBytes::read(x_bytes)?;
 
-    if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::get_point_from_x(x, false) {
+    if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::from_x_coordinate(x, false) {
         if affine.is_in_correct_subgroup_assuming_on_curve() {
             let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
 
@@ -68,7 +68,7 @@ pub fn recover_affine_from_x_coord<G: Group + ProjectiveCurve>(
         }
     }
 
-    if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::get_point_from_x(x, true) {
+    if let Some(affine) = <EdwardsBls12 as ProjectiveCurve>::Affine::from_x_coordinate(x, true) {
         if affine.is_in_correct_subgroup_assuming_on_curve() {
             let affine: <G as ProjectiveCurve>::Affine = FromBytes::read(&to_bytes![affine]?[..])?;
 
@@ -588,7 +588,8 @@ mod tests {
             &mut cs.ns(|| "value_balance_commitment"),
             &parameters_gadget,
             &value_balance_bytes,
-        ).unwrap();
+        )
+        .unwrap();
 
         <VerificationGadget as BindingSignatureGadget<ValueCommitment, _, G>>::check_binding_signature_gadget(
             &mut cs.ns(|| "verify_binding_signature"),

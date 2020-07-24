@@ -70,19 +70,19 @@ impl<F: PrimeField> EvaluationDomain<F> {
         let size = num_coeffs.next_power_of_two() as u64;
         let log_size_of_group = size.trailing_zeros();
 
-        if log_size_of_group >= F::Params::TWO_ADICITY {
+        if log_size_of_group >= F::Parameters::TWO_ADICITY {
             return None;
         }
 
         // Compute the generator for the multiplicative subgroup.
         // It should be 2^(log_size_of_group) root of unity.
         let mut group_gen = F::root_of_unity();
-        for _ in log_size_of_group..F::Params::TWO_ADICITY {
+        for _ in log_size_of_group..F::Parameters::TWO_ADICITY {
             group_gen.square_in_place();
         }
 
-        let size_as_bigint = F::BigInt::from(size);
-        let size_as_field_element = F::from_repr(size_as_bigint);
+        let size_as_bigint = F::BigInteger::from(size);
+        let size_as_field_element = F::from_repr(size_as_bigint)?;
         let size_inv = size_as_field_element.inverse()?;
 
         Some(EvaluationDomain {
@@ -100,7 +100,7 @@ impl<F: PrimeField> EvaluationDomain<F> {
     /// having `num_coeffs` coefficients.
     pub fn compute_size_of_domain(num_coeffs: usize) -> Option<usize> {
         let size = num_coeffs.next_power_of_two();
-        if size.trailing_zeros() < F::Params::TWO_ADICITY {
+        if size.trailing_zeros() < F::Parameters::TWO_ADICITY {
             Some(size)
         } else {
             None

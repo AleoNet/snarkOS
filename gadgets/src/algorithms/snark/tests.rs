@@ -16,8 +16,8 @@ use rand::{thread_rng, Rng};
 
 type TestProofSystem = GM17<Bls12_377, Bench<Fr>, Fr>;
 type TestVerifierGadget = GM17VerifierGadget<Bls12_377, Fq, Bls12_377PairingGadget>;
-type TestProofGadget = ProofGadget<Bls12_377, Fq, Bls12_377PairingGadget>;
-type TestVkGadget = VerifyingKeyGadget<Bls12_377, Fq, Bls12_377PairingGadget>;
+type TestProofGadget = GM17ProofGadget<Bls12_377, Fq, Bls12_377PairingGadget>;
+type TestVkGadget = GM17VerifyingKeyGadget<Bls12_377, Fq, Bls12_377PairingGadget>;
 
 struct Bench<F: Field> {
     inputs: Vec<Option<F>>,

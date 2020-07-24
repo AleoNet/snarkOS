@@ -1,15 +1,17 @@
 use crate::wasm::Account;
 
+use wasm_bindgen_test::*;
+
 #[wasm_bindgen_test]
 pub fn account_from_private_key_test() {
-    let given_private_key = "AKey1KqF7t1fXt4ie38R3nyqbWokKru23zkLBTiSBjyfK96matiT3FEcLjmBabc3goXPXbZKcU1XLFHBuQ75mCsjCeLo8AbWQ7DMCmCyGRJGf8RKBvXQjnL51sZgqesMMaoxujzBm6gBfx2fmAW4QbQFQqxJSojna2rd6fJYS8v5D8zmy6R1";
-    let given_public_key = "aleo173xscwe62kten0v44up5e678kj7j62d24ex2htkks34cutjlssqqmwnv76";
+    let given_private_key = "AKEY1b47dMA8f9GfXPsW9s16qWfiYYmWGAAcorK9RkaVpBeFA";
+    let given_address = "aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348";
 
     let account = Account::from_private_key(given_private_key);
 
     println!("{} == {}", given_private_key, account.private_key.to_string());
     assert_eq!(given_private_key, account.private_key.to_string());
 
-    println!("{} == {}", given_public_key, account.public_key.to_string());
-    assert_eq!(given_public_key, account.public_key.to_string());
+    println!("{} == {}", given_address, account.address.to_string());
+    assert_eq!(given_address, account.address.to_string());
 }

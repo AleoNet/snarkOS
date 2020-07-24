@@ -50,7 +50,7 @@ impl<P: Fp2Parameters> ToConstraintField<P::Fp> for Fp2<P> {
 impl<F: PrimeField> ToConstraintField<F> for [u8] {
     #[inline]
     fn to_field_elements(&self) -> Result<Vec<F>, ConstraintFieldError> {
-        let max_size = <F as PrimeField>::Params::CAPACITY / 8;
+        let max_size = <F as PrimeField>::Parameters::CAPACITY / 8;
         let max_size = max_size as usize;
         let fes = self
             .chunks(max_size)
