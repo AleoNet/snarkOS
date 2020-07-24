@@ -36,6 +36,7 @@ use snarkos_utilities::{
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
+use snarkos_dpc::dpc::base_dpc::records::record_encryption::RecordEncryption;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -237,41 +238,22 @@ fn base_dpc_integration_test() {
             .zip(new_records)
             .zip(&transaction.new_records_final_fq_high_selectors)
         {
-            let view_key = AccountViewKey::from_private_key(
+            let account_view_key = AccountViewKey::from_private_key(
                 &parameters.circuit_parameters.account_signature,
                 &parameters.circuit_parameters.account_commitment,
                 &private_key,
             )
             .unwrap();
 
-            let plaintext = parameters
-                .circuit_parameters
-                .account_encryption
-                .decrypt(&view_key.decryption_key, &ciphertext)
-                .unwrap();
-
-            let record_components = RecordSerializer::<
-                Components,
-                <Components as BaseDPCComponents>::EncryptionModelParameters,
-                <Components as BaseDPCComponents>::EncryptionGroup,
-            >::deserialize(plaintext, *final_fq_high_selector)
+            let decrypted_record = RecordEncryption::decrypt_record(
+                &parameters.circuit_parameters,
+                &account_view_key,
+                ciphertext,
+                *final_fq_high_selector,
+            )
             .unwrap();
 
-            assert_eq!(record_components.value, new_record.value());
-            assert_eq!(record_components.payload, *new_record.payload());
-            assert_eq!(
-                record_components.birth_predicate_hash,
-                new_record.birth_predicate_hash().to_vec()
-            );
-            assert_eq!(
-                record_components.death_predicate_hash,
-                new_record.death_predicate_hash().to_vec()
-            );
-            assert_eq!(&record_components.serial_number_nonce, new_record.serial_number_nonce());
-            assert_eq!(
-                record_components.commitment_randomness,
-                new_record.commitment_randomness()
-            );
+            assert_eq!(decrypted_record, new_record);
         }
     }
 

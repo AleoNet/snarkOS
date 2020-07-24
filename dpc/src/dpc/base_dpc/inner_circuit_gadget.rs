@@ -6,7 +6,7 @@ use crate::dpc::base_dpc::{
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
+use snarkos_gadgets::algorithms::{encoding::Elligator2FieldGadget, merkle_tree::merkle_path::MerklePathGadget};
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF},
     curves::{
@@ -1077,8 +1077,6 @@ where
 
             // *******************************************************************
             // Alloc each of the record field elements as gadgets.
-
-            use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
 
             let mut record_field_elements_gadgets = Vec::with_capacity(record_field_elements.len());
 

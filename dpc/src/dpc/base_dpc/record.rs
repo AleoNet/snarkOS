@@ -19,7 +19,9 @@ use std::{
 #[derivative(
     Default(bound = "C: BaseDPCComponents"),
     Debug(bound = "C: BaseDPCComponents"),
-    Clone(bound = "C: BaseDPCComponents")
+    Clone(bound = "C: BaseDPCComponents"),
+    PartialEq(bound = "C: BaseDPCComponents"),
+    Eq(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) account_address: AccountAddress<C>,
