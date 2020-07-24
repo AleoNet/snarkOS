@@ -46,7 +46,6 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         (
             <<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Randomness,
             RecordCiphertext<C>,
-            Vec<bool>,
         ),
         DPCError,
     > {
@@ -74,32 +73,12 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             &record_plaintexts,
         )?;
 
-        // Compute the compressed ciphertext selector bits
-        let mut ciphertext_selectors = vec![];
-        for ciphertext_element in ciphertext.iter() {
-            // Compress the ciphertext element to the affine x coordinate
-            let ciphertext_element_affine =
-                <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
-
-            // Fetch the ciphertext selector bit
-            let greatest =
-                match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                    ciphertext_element_affine.to_x_coordinate(),
-                    true,
-                ) {
-                    Some(affine) => ciphertext_element_affine == affine,
-                    None => false,
-                };
-
-            ciphertext_selectors.push(greatest);
-        }
-
         let record_ciphertext = RecordCiphertext {
             ciphertext,
             final_fq_high_selector,
         };
 
-        Ok((encryption_randomness, record_ciphertext, ciphertext_selectors))
+        Ok((encryption_randomness, record_ciphertext))
     }
 
     /// Decrypt and reconstruct the encrypted record
@@ -233,6 +212,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
                 <C::EncryptionModelParameters as ModelParameters>::BaseField,
             )>,
             Vec<bool>,
+            Vec<bool>,
             Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>,
         ),
         DPCError,
@@ -305,9 +285,36 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             record_plaintexts.len(),
         )?;
 
+        let ciphertext = circuit_parameters.account_encryption.encrypt(
+            record_public_key,
+            &encryption_randomness,
+            &record_plaintexts,
+        )?;
+
+        // Compute the compressed ciphertext selector bits
+        let mut ciphertext_selectors = vec![];
+        for ciphertext_element in ciphertext.iter() {
+            // Compress the ciphertext element to the affine x coordinate
+            let ciphertext_element_affine =
+                <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
+
+            // Fetch the ciphertext selector bit
+            let greatest =
+                match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
+                    ciphertext_element_affine.to_x_coordinate(),
+                    true,
+                ) {
+                    Some(affine) => ciphertext_element_affine == affine,
+                    None => false,
+                };
+
+            ciphertext_selectors.push(greatest);
+        }
+
         Ok((
             record_field_elements,
             record_group_encoding,
+            ciphertext_selectors,
             fq_high_selectors,
             encryption_blinding_exponents,
         ))

@@ -228,6 +228,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
 impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the old serial numbers
         let num_old_serial_numbers = C::NUM_INPUT_RECORDS;
         let mut old_serial_numbers = vec![];
         for _ in 0..num_old_serial_numbers {
@@ -237,6 +238,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             old_serial_numbers.push(old_serial_number);
         }
 
+        // Read the new commitments
         let num_new_commitments = C::NUM_OUTPUT_RECORDS;
         let mut new_commitments = vec![];
         for _ in 0..num_new_commitments {
@@ -255,6 +257,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let value_balance: i64 = FromBytes::read(&mut reader)?;
         let network_id: u8 = FromBytes::read(&mut reader)?;
 
+        // Read the signatures
         let num_signatures = C::NUM_INPUT_RECORDS;
         let mut signatures = vec![];
         for _ in 0..num_signatures {

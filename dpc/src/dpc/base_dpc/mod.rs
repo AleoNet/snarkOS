@@ -839,15 +839,13 @@ where
 
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_ciphertext_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
         for record in &new_records {
-            let (record_encryption_randomness, record_encryption_ciphertext, record_ciphertext_selectors) =
+            let (record_encryption_randomness, record_encryption_ciphertext) =
                 RecordEncryption::encrypt_record(&circuit_parameters, record, rng)?;
 
             new_records_encryption_randomness.push(record_encryption_randomness);
             new_records_encryption_ciphertexts.push(record_encryption_ciphertext);
-            new_records_ciphertext_selectors.push(record_ciphertext_selectors);
         }
 
         // Construct the ciphertext hashes
@@ -864,6 +862,7 @@ where
 
         let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
@@ -871,6 +870,7 @@ where
             let (
                 record_field_elements,
                 record_group_encoding,
+                new_record_ciphertext_selectors,
                 record_fq_high_selectors,
                 record_encryption_blinding_exponents,
             ) = RecordEncryption::prepare_encryption_gadget_components(
@@ -881,6 +881,7 @@ where
 
             new_records_field_elements.push(record_field_elements);
             new_records_group_encoding.push(record_group_encoding);
+            new_records_ciphertext_selectors.push(new_record_ciphertext_selectors);
             new_records_fq_high_selectors.push(record_fq_high_selectors);
             new_records_encryption_blinding_exponents.push(record_encryption_blinding_exponents);
         }
