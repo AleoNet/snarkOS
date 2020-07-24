@@ -835,45 +835,75 @@ where
                 rng,
             )?;
 
-        // Encode and Encrypt the new records
+        // Encrypt the new records
 
-        let (
-            new_records_encryption_randomness,
-            new_records_encryption_ciphertexts,
-            new_records_ciphertext_selectors,
-            new_records_final_fq_high_selectors,
-        ) = encrypt_records(&circuit_parameters, &new_records, rng)?;
+        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_ciphertext_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_final_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+
+        for record in &new_records {
+            let (
+                record_encryption_randomness,
+                record_encryption_ciphertexts,
+                record_ciphertext_selectors,
+                record_final_fq_high_selectors,
+            ) = RecordEncryption::encrypt_record(&circuit_parameters, record, rng)?;
+
+            new_records_encryption_randomness.push(record_encryption_randomness);
+            new_records_encryption_ciphertexts.push(record_encryption_ciphertexts);
+            new_records_ciphertext_selectors.push(record_ciphertext_selectors);
+            new_records_final_fq_high_selectors.push(record_final_fq_high_selectors);
+        }
 
         // Construct the ciphertext hashes
-        let new_records_ciphertext_hashes = record_ciphertext_hashes(
-            &circuit_parameters,
-            &new_records_encryption_ciphertexts,
-            new_records_final_fq_high_selectors.clone(),
-        )?;
+
+        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+
+        for (record_ciphertext, final_fq_high_selector) in new_records_encryption_ciphertexts
+            .iter()
+            .zip_eq(&new_records_final_fq_high_selectors)
+        {
+            let ciphertext_hash = RecordEncryption::record_ciphertext_hash(
+                &circuit_parameters,
+                &record_ciphertext,
+                *final_fq_high_selector,
+            )?;
+
+            new_records_ciphertext_hashes.push(ciphertext_hash);
+        }
 
         // Prepare record encryption components used in the inner SNARK
-        let (
-            new_records_field_elements,
-            new_records_group_encoding,
-            fq_high_selectors,
-            new_records_encryption_blinding_exponents,
-        ) = prepare_encryption_gadget_components(
-            &circuit_parameters,
-            &new_records,
-            &new_records_encryption_randomness,
-        )?;
+
+        let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+
+        for (record, ciphertext_randomness) in new_records.iter().zip_eq(&new_records_encryption_randomness) {
+            let (
+                record_field_elements,
+                record_group_encoding,
+                record_fq_high_selectors,
+                record_encryption_blinding_exponents,
+            ) = RecordEncryption::prepare_encryption_gadget_components(
+                &circuit_parameters,
+                &record,
+                ciphertext_randomness,
+            )?;
+
+            new_records_field_elements.push(record_field_elements);
+            new_records_group_encoding.push(record_group_encoding);
+            new_records_fq_high_selectors.push(record_fq_high_selectors);
+            new_records_encryption_blinding_exponents.push(record_encryption_blinding_exponents);
+        }
 
         let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, Vec<bool>)> =
             new_records_ciphertext_selectors
                 .iter()
                 .cloned()
-                .zip_eq(fq_high_selectors)
+                .zip_eq(new_records_fq_high_selectors)
                 .collect();
-        //        let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, bool)> = new_records_ciphertext_selectors
-        //            .iter()
-        //            .cloned()
-        //            .zip_eq(new_records_final_fq_high_selectors)
-        //            .collect();
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
@@ -1064,11 +1094,23 @@ where
 
         end_timer!(signature_time);
 
-        let new_records_ciphertext_hashes = record_ciphertext_hashes(
-            &parameters.circuit_parameters,
-            &transaction.record_ciphertexts,
-            transaction.new_records_final_fq_high_selectors.clone(),
-        )?;
+        // Construct the ciphertext hashes
+
+        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+
+        for (record_ciphertext, final_fq_high_selector) in transaction
+            .record_ciphertexts
+            .iter()
+            .zip_eq(&transaction.new_records_final_fq_high_selectors)
+        {
+            let ciphertext_hash = RecordEncryption::record_ciphertext_hash(
+                &parameters.circuit_parameters,
+                &record_ciphertext,
+                *final_fq_high_selector,
+            )?;
+
+            new_records_ciphertext_hashes.push(ciphertext_hash);
+        }
 
         let inner_snark_input = InnerCircuitVerifierInput {
             circuit_parameters: parameters.circuit_parameters.clone(),
