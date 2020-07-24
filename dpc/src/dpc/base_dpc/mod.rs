@@ -1,12 +1,5 @@
-use crate::dpc::base_dpc::{
-    binding_signature::*,
-    record_payload::RecordPayload,
-    records::record_serializer::{decode_from_group, RecordSerializer},
-};
-use snarkos_algorithms::{
-    encoding::Elligator2,
-    merkle_tree::{MerklePath, MerkleTreeDigest},
-};
+use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload, records::record_encryption::*};
+use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{
@@ -19,14 +12,14 @@ use snarkos_models::{
         PRF,
         SNARK,
     },
-    curves::{AffineCurve, Group, ModelParameters, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
-    dpc::{DPCComponents, DPCScheme, Predicate, Record, RecordSerializerScheme},
+    curves::{AffineCurve, Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
+    dpc::{DPCComponents, DPCScheme, Predicate, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
 use snarkos_utilities::{
-    bytes::{bits_to_bytes, bytes_to_bits, FromBytes, ToBytes},
+    bytes::{bits_to_bytes, FromBytes, ToBytes},
     has_duplicates,
     rand::UniformRand,
     to_bytes,
@@ -842,145 +835,46 @@ where
                 rng,
             )?;
 
-        // Record encoding and encryption
+        // Encode and Encrypt the new records
 
-        let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_ciphertext_and_fq_high_selectors_gadget =
-            Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_ciphertext_and_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for record in &new_records {
-            // Serialize the record into group elements and fq_high bits
-            let (serialized_record, final_fq_high_bit) = RecordSerializer::<
-                Components,
-                Components::EncryptionModelParameters,
-                Components::EncryptionGroup,
-            >::serialize(&record)?;
+        let (
+            new_records_encryption_randomness,
+            new_records_encryption_ciphertexts,
+            new_records_ciphertext_selectors,
+            new_records_final_fq_high_selectors,
+        ) = encrypt_records(&circuit_parameters, &new_records, rng)?;
 
-            // Extract the fq_bits
-            let final_element = &serialized_record[serialized_record.len() - 1];
-            let final_element_bytes = decode_from_group::<
-                Components::EncryptionModelParameters,
-                Components::EncryptionGroup,
-            >(final_element.into_affine(), final_fq_high_bit)?;
-            let final_element_bits = bytes_to_bits(&final_element_bytes);
-            let fq_high_bits = [
-                &final_element_bits[1..serialized_record.len()],
-                &[final_fq_high_bit][..],
-            ]
-            .concat();
+        // Construct the ciphertext hashes
+        let new_records_ciphertext_hashes = record_ciphertext_hashes(
+            &circuit_parameters,
+            &new_records_encryption_ciphertexts,
+            new_records_ciphertext_selectors.clone(),
+            new_records_final_fq_high_selectors.clone(),
+        )?;
 
-            let mut record_field_elements = vec![];
-            let mut record_group_encoding = vec![];
-            let mut record_plaintexts = vec![];
-            // The first fq_high selector is false to account for the c_0 element in the ciphertext
+        // Prepare record encryption components used in the inner SNARK
+        let (
+            new_records_field_elements,
+            new_records_group_encoding,
+            fq_high_selectors,
+            new_records_encryption_blinding_exponents,
+        ) = prepare_encryption_gadget_components(
+            &circuit_parameters,
+            &new_records,
+            &new_records_encryption_randomness,
+        )?;
 
-            for (i, (element, fq_high)) in serialized_record.iter().zip_eq(&fq_high_bits).enumerate() {
-                let element_affine = element.into_affine();
-
-                // Decode the field elements from the serialized group element
-                // These values will be used in the inner circuit to validate bit packing and serialization
-                if i == 0 {
-                    // Serial number nonce
-                    let record_field_element =
-                        <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(&to_bytes![element]?[..])?;
-                    record_field_elements.push(record_field_element);
-                } else {
-                    // Decode the encoded groups into their respective field elements
-                    let record_field_element = Elligator2::<
-                        <Components as BaseDPCComponents>::EncryptionModelParameters,
-                        <Components as BaseDPCComponents>::EncryptionGroup,
-                    >::decode(&element_affine, *fq_high)?;
-
-                    record_field_elements.push(record_field_element);
-                }
-
-                // Fetch the x and y coordinates of the serialized group elements
-                // These values will be used in the inner circuit to validate the Elligator2 encoding
-                let x =
-                    <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
-                        &to_bytes![element_affine.to_x_coordinate()]?[..],
-                    )?;
-                let y =
-                    <<Components as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField::read(
-                        &to_bytes![element_affine.to_y_coordinate()]?[..],
-                    )?;
-                record_group_encoding.push((x, y));
-
-                // Construct the plaintext element from the serialized group elements
-                // This value will be used in the inner circuit to validate the encryption
-                let plaintext_element =
-                    <<Components as DPCComponents>::AccountEncryption as EncryptionScheme>::Text::read(
-                        &to_bytes![element]?[..],
-                    )?;
-                record_plaintexts.push(plaintext_element);
-            }
-
-            // Store the field elements and group encodings for each new record
-            new_records_field_elements.push(record_field_elements);
-            new_records_group_encoding.push(record_group_encoding);
-
-            // Encrypt the record plaintext
-            let record_public_key = record.account_address().into_repr();
-            let encryption_randomness = circuit_parameters
-                .account_encryption
-                .generate_randomness(record_public_key, rng)?;
-            let encryption_blinding_exponents = circuit_parameters.account_encryption.generate_blinding_exponents(
-                record_public_key,
-                &encryption_randomness,
-                record_plaintexts.len(),
-            )?;
-            let record_ciphertext = circuit_parameters.account_encryption.encrypt(
-                record_public_key,
-                &encryption_randomness,
-                &record_plaintexts,
-            )?;
-
-            // Compose the record ciphertext for storage in a transaction
-            let mut ciphertext = vec![];
-
-            // Compute the ciphertext hash which will be validated in the inner circuit
-            let mut ciphertext_affine_x = vec![];
-            let mut ciphertext_selectors = vec![];
-            for ciphertext_element in record_ciphertext.iter() {
-                let ciphertext_element_affine =
-                    <Components as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?
-                        .into_affine();
-                let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
-
-                let greatest = match <<Components as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                    ciphertext_x_coordinate.clone(),
-                    true,
-                ) {
-                    Some(affine) => ciphertext_element_affine == affine,
-                    None => false,
-                };
-
-                ciphertext_affine_x.push(ciphertext_x_coordinate);
-                ciphertext_selectors.push(greatest);
-                ciphertext.push(ciphertext_element.clone());
-            }
-
-            // Concatenate the fq_high selector bits and plaintext decoding selector bit
-            let selector_bits = [ciphertext_selectors.clone(), vec![final_fq_high_bit]].concat();
-            let selector_bytes = bits_to_bytes(&selector_bits);
-
-            let ciphertext_hash = circuit_parameters
-                .record_ciphertext_crh
-                .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?;
-
-            new_records_encryption_randomness.push(encryption_randomness);
-            new_records_encryption_blinding_exponents.push(encryption_blinding_exponents);
-            new_records_encryption_ciphertexts.push(ciphertext);
-            new_records_ciphertext_hashes.push(ciphertext_hash);
-
-            new_records_ciphertext_and_fq_high_selectors_gadget.push((ciphertext_selectors.clone(), fq_high_bits));
-            new_records_ciphertext_and_fq_high_selectors.push((ciphertext_selectors, final_fq_high_bit));
-        }
+        let new_records_ciphertext_and_fq_high_selectors_gadget: Vec<(Vec<bool>, Vec<bool>)> =
+            new_records_ciphertext_selectors
+                .iter()
+                .cloned()
+                .zip_eq(fq_high_selectors)
+                .collect();
+        let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, bool)> = new_records_ciphertext_selectors
+            .iter()
+            .cloned()
+            .zip_eq(new_records_final_fq_high_selectors)
+            .collect();
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
