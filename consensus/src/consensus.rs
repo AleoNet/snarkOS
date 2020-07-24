@@ -130,7 +130,9 @@ impl ConsensusParameters {
         } else if header.merkle_root_hash != *merkle_root_hash {
             return Err(ConsensusError::MerkleRoot(header.merkle_root_hash.to_string()));
         } else if header.pedersen_merkle_root_hash != *pedersen_merkle_root_hash {
-            return Err(ConsensusError::PedersenMerkleRoot(header.merkle_root_hash.to_string()));
+            return Err(ConsensusError::PedersenMerkleRoot(
+                header.pedersen_merkle_root_hash.to_string(),
+            ));
         } else if header.time > future_timelimit {
             return Err(ConsensusError::FuturisticTimestamp(future_timelimit, header.time));
         } else if header.time < parent_header.time {
@@ -219,7 +221,7 @@ impl ConsensusParameters {
 
         // Check that there is only 1 coinbase transaction
         if coinbase_transaction_count > 1 {
-            println!("multiple coinbase error");
+            println!("error - multiple coinbase transactions");
             return Ok(false);
         }
 
