@@ -225,7 +225,6 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
 
             // Write the ciphertext and fq_high selector bits
             let selector_bytes = bits_to_bytes(&ciphertext_selector_bits);
-            variable_length_integer(selector_bytes.len() as u64).write(&mut writer)?;
             selector_bytes.write(&mut writer)?;
         }
 
@@ -285,7 +284,8 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             }
 
             // Read the selector bits
-            let num_selector_bytes = read_variable_length_integer(&mut reader)?;
+
+            let num_selector_bytes = num_ciphertext_elements / 8 + 1;
             let mut selector_bytes = vec![0u8; num_selector_bytes];
             reader.read_exact(&mut selector_bytes)?;
 

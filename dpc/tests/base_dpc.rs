@@ -1,20 +1,17 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
-use snarkos_dpc::{
-    base_dpc::{
-        instantiated::*,
-        predicate::PrivatePredicateInput,
-        predicate_circuit::*,
-        record_payload::RecordPayload,
-        records::record_serializer::*,
-        LocalData,
-        DPC,
-    },
-    dpc::base_dpc::BaseDPCComponents,
+use snarkos_dpc::base_dpc::{
+    instantiated::*,
+    predicate::PrivatePredicateInput,
+    predicate_circuit::*,
+    record_payload::RecordPayload,
+    records::record_encryption::RecordEncryption,
+    LocalData,
+    DPC,
 };
 use snarkos_models::{
-    algorithms::{CommitmentScheme, EncryptionScheme, CRH, SNARK},
-    dpc::{DPCScheme, Record, RecordSerializerScheme},
+    algorithms::{CommitmentScheme, CRH, SNARK},
+    dpc::DPCScheme,
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
@@ -36,7 +33,6 @@ use snarkos_utilities::{
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
-use snarkos_dpc::dpc::base_dpc::records::record_encryption::RecordEncryption;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
