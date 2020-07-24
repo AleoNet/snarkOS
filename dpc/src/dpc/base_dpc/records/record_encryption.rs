@@ -2,7 +2,7 @@ use crate::base_dpc::{
     parameters::CircuitParameters,
     record::DPCRecord,
     record_payload::RecordPayload,
-    records::record_serializer::*,
+    records::{record_ciphertext::*, record_serializer::*},
     BaseDPCComponents,
 };
 use snarkos_algorithms::encoding::Elligator2;
@@ -18,17 +18,6 @@ use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, FromBytes, ToByt
 use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
-
-#[derive(Derivative)]
-#[derivative(
-    Clone(bound = "C: BaseDPCComponents"),
-    PartialEq(bound = "C: BaseDPCComponents"),
-    Eq(bound = "C: BaseDPCComponents")
-)]
-pub struct RecordCiphertext<C: BaseDPCComponents> {
-    pub ciphertext: Vec<<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Text>,
-    pub final_fq_high_selector: bool,
-}
 
 pub struct RecordEncryption<C: BaseDPCComponents>(PhantomData<C>);
 
@@ -200,6 +189,11 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
 
     /// Returns the intermediate components of the encryption algorithm that the inner snark
     /// needs to validate the new record was encrypted correctly
+    /// 1. Record field element reprentations
+    /// 2. Record group element encodings - Represented in (x,y) affine coordinates
+    /// 3. Record ciphertext selectors - Used for ciphertext compression/decompression
+    /// 4. Record fq high selectors - Used for plaintext serialization/deserialization
+    /// 5. Record ciphertext blinding exponents used to encrypt the record
     pub fn prepare_encryption_gadget_components(
         circuit_parameters: &CircuitParameters<C>,
         record: &DPCRecord<C>,

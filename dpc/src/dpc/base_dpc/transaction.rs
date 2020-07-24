@@ -1,24 +1,20 @@
-use crate::dpc::base_dpc::{records::record_encryption::RecordCiphertext, BaseDPCComponents};
+use crate::dpc::base_dpc::{records::record_ciphertext::*, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH, SNARK},
-    curves::{AffineCurve, ProjectiveCurve},
+    algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
     objects::Transaction,
 };
 use snarkos_utilities::{
-    bytes::{bits_to_bytes, FromBytes, ToBytes},
-    bytes_to_bits,
+    bytes::{FromBytes, ToBytes},
     serialize::{CanonicalDeserialize, CanonicalSerialize},
     to_bytes,
-    variable_length_integer::{read_variable_length_integer, variable_length_integer},
 };
 
 use blake2::{digest::Digest, Blake2s as b2s};
-use itertools::Itertools;
 use std::{
     fmt,
-    io::{Error, ErrorKind, Read, Result as IoResult, Write},
+    io::{Read, Result as IoResult, Write},
 };
 
 #[derive(Derivative)]
@@ -189,36 +185,8 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
             signature.write(&mut writer)?;
         }
 
-        // Write the ciphertext and selector bits
         for record_ciphertext in &self.record_ciphertexts {
-            let mut ciphertext_selector_bits = vec![];
-
-            // Write the ciphertext element x coordinates
-            variable_length_integer(record_ciphertext.ciphertext.len() as u64).write(&mut writer)?;
-            for ciphertext_element in &record_ciphertext.ciphertext {
-                let ciphertext_element_affine =
-                    <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
-
-                let x_coordinate = ciphertext_element_affine.to_x_coordinate();
-                x_coordinate.write(&mut writer)?;
-
-                let greatest =
-                    match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                        x_coordinate,
-                        true,
-                    ) {
-                        Some(affine) => ciphertext_element_affine == affine,
-                        None => false,
-                    };
-
-                ciphertext_selector_bits.push(greatest);
-            }
-
-            ciphertext_selector_bits.push(record_ciphertext.final_fq_high_selector);
-
-            // Write the ciphertext and fq_high selector bits
-            let selector_bytes = bits_to_bytes(&ciphertext_selector_bits);
-            selector_bytes.write(&mut writer)?;
+            record_ciphertext.write(&mut writer)?;
         }
 
         Ok(())
@@ -269,49 +237,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let num_ciphertexts = C::NUM_OUTPUT_RECORDS;
         let mut record_ciphertexts = vec![];
         for _ in 0..num_ciphertexts {
-            // Read the ciphertext x coordinates
-            let mut ciphertext_x_coordinates = vec![];
-            let num_ciphertext_elements = read_variable_length_integer(&mut reader)?;
-            for _ in 0..num_ciphertext_elements {
-                let ciphertext_element_x_coordinate: <<<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine as AffineCurve>::BaseField =
-                    FromBytes::read(&mut reader)?;
-                ciphertext_x_coordinates.push(ciphertext_element_x_coordinate);
-            }
-
-            // Read the selector bits
-
-            let num_selector_bytes = num_ciphertext_elements / 8 + 1;
-            let mut selector_bytes = vec![0u8; num_selector_bytes];
-            reader.read_exact(&mut selector_bytes)?;
-
-            let selector_bits = bytes_to_bits(&selector_bytes);
-            let ciphertext_selector_bits = &selector_bits[0..num_ciphertext_elements];
-            let final_fq_high_selector = selector_bits[num_ciphertext_elements];
-
-            // Recover the ciphertext
-            let mut ciphertext = vec![];
-            for (x_coordinate, ciphertext_selector_bit) in
-                ciphertext_x_coordinates.iter().zip_eq(ciphertext_selector_bits)
-            {
-                let ciphertext_element_affine =
-                    match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                        *x_coordinate,
-                        *ciphertext_selector_bit,
-                    ) {
-                        Some(affine) => affine,
-                        None => return Err(Error::new(ErrorKind::Other, "Could not read ciphertext")),
-                    };
-
-                let ciphertext_element: <C::AccountEncryption as EncryptionScheme>::Text =
-                    FromBytes::read(&to_bytes![ciphertext_element_affine.into_projective()]?[..])?;
-
-                ciphertext.push(ciphertext_element);
-            }
-
-            let record_ciphertext = RecordCiphertext {
-                ciphertext,
-                final_fq_high_selector,
-            };
+            let record_ciphertext: RecordCiphertext<C> = FromBytes::read(&mut reader)?;
 
             record_ciphertexts.push(record_ciphertext);
         }

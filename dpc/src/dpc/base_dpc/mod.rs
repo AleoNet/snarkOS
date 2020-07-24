@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload, records::record_encryption::*};
+use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -65,6 +65,7 @@ pub mod parameters;
 use self::parameters::*;
 
 pub mod records;
+pub use self::records::*;
 
 pub mod record_payload;
 
