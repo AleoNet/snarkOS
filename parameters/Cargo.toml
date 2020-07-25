@@ -17,7 +17,7 @@ snarkos-errors = { path = "../errors", version = "0.8.0", default-features = fal
 snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
 
-curl = { version = "0.4.30", optional = true }
+curl = { version = "0.4.31", optional = true }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
@@ -32,7 +32,7 @@ snarkos-storage = { path = "../storage", version = "0.8.0" }
 snarkos-marlin = { path = "../marlin", version = "0.1.0" }
 
 chrono = { version = "0.4", features = ["serde"] }
-curl = { version = "0.4.30" }
+curl = { version = "0.4.31" }
 hex = { version = "0.4.2" }
 parking_lot = { version = "0.11.0" }
 rand = { version = "0.7" }
