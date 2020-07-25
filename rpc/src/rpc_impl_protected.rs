@@ -6,7 +6,7 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::AccountScheme};
-use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -95,7 +95,7 @@ impl RpcImpl {
         }
     }
 
-    /// Wrap authentication around `generate_account`
+    /// Wrap authentication around `create_account`
     pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
         self.validate_auth(meta)?;
 
@@ -270,7 +270,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         Ok(record_commitment_strings)
     }
 
-    /// Returns hex encoded bytes of a record from its record commitment
+    /// Returns the hex encoded bytes of a record from its record commitment
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
@@ -295,8 +295,15 @@ impl ProtectedRpcFunctions for RpcImpl {
             rng,
         )?;
 
+        let view_key = AccountViewKey::<Components>::from_private_key(
+            self.parameters.account_signature_parameters(),
+            self.parameters.account_commitment_parameters(),
+            &account.private_key,
+        )?;
+
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
+            view_key: hex::encode(to_bytes![view_key]?),
             address: account.address.to_string(),
         })
     }

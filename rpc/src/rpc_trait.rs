@@ -41,6 +41,9 @@ pub trait RpcFunctions {
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
 
+    #[rpc(name = "decryptrecord")]
+    fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
+
     #[rpc(name = "decoderecord")]
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 }

@@ -56,6 +56,13 @@ pub struct BlockInfo {
     pub transactions: Vec<String>,
 }
 
+/// Input for the `decryptrecord` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DecryptRecordInput {
+    pub record_ciphertext: String,
+    pub account_view_key: String,
+}
+
 /// Returned value for the `getpeerinfo` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerInfo {
@@ -103,6 +110,9 @@ pub struct TransactionInfo {
 
     /// Transaction signatures (Delegated DPC)
     pub signatures: Vec<String>,
+
+    /// Record ciphertexts
+    pub record_ciphertexts: Vec<String>,
 
     /// Block the transaction lives in
     pub transaction_metadata: TransactionMetadata,
@@ -208,9 +218,10 @@ pub struct CreateRawTransactionOuput {
     pub encoded_records: Vec<String>,
 }
 
-/// Output for the `generateaccount` rpc call
+/// Output for the `createaccount` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcAccount {
     pub private_key: String,
+    pub view_key: String,
     pub address: String,
 }
