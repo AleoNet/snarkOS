@@ -5,14 +5,14 @@ use crate::dpc::base_dpc::{
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
     predicate::PrivatePredicateInput,
-    predicate_circuit::{PredicateCircuit, PredicateLocalData},
+    predicate_circuit::PredicateCircuit,
     record_payload::RecordPayload,
     records::record_serializer::*,
     BaseDPCComponents,
     ExecuteContext,
     DPC,
 };
-use snarkos_algorithms::{encoding::Elligator2, snark::gm17::PreparedVerifyingKey};
+use snarkos_algorithms::encoding::Elligator2;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, CRH, SNARK},
@@ -41,6 +41,12 @@ use snarkos_utilities::{
 
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
+
+#[cfg(debug_assertions)]
+use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
+
+#[cfg(debug_assertions)]
+use crate::dpc::base_dpc::predicate_circuit::PredicateLocalData;
 
 #[test]
 fn test_execute_base_dpc_constraints() {

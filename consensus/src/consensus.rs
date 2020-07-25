@@ -27,9 +27,10 @@ use snarkos_objects::{
     MerkleRootHash,
     PedersenMerkleRootHash,
 };
-use snarkos_posw::{txids_to_roots, Posw, GM17};
+use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
+use snarkos_utilities::bytes::FromBytes;
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};
@@ -52,7 +53,7 @@ pub struct ConsensusParameters {
     pub network_id: u8,
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
-    pub verifier: Posw,
+    pub verifier: PoswMarlin,
 }
 
 /// Calculate a block reward that halves every 1000 blocks.
@@ -147,7 +148,7 @@ impl ConsensusParameters {
         }
 
         // Verify the proof
-        let proof = <GM17<Bls12_377> as SNARK>::Proof::read(&header.proof.0[..])?;
+        let proof = <Marlin<Bls12_377> as SNARK>::Proof::read(&header.proof.0[..])?;
         let verification_timer = start_timer!(|| "POSW verify");
         self.verifier
             .verify(header.nonce, &proof, &header.pedersen_merkle_root_hash)?;
@@ -537,17 +538,15 @@ impl ConsensusParameters {
 mod tests {
     use super::*;
     use snarkos_objects::PedersenMerkleRootHash;
+    use snarkos_testing::consensus::DATA;
 
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
     #[test]
     fn verify_header() {
-        let rng = &mut XorShiftRng::seed_from_u64(1234567);
-
         // mine a PoSW proof
-        let posw = Posw::load().unwrap();
-        let difficulty_target = u64::MAX;
+        let posw = PoswMarlin::load().unwrap();
 
         let consensus: ConsensusParameters = ConsensusParameters {
             max_block_size: 1_000_000usize,
@@ -557,42 +556,13 @@ mod tests {
             verifier: posw,
         };
 
-        // mine PoSW for block 1
-        let transaction_ids = vec![vec![1u8; 32]; 8];
-        let (merkle_root_hash1, pedersen_merkle_root1, subroots1) = txids_to_roots(&transaction_ids);
-        let (nonce1, proof1) = consensus
-            .verifier
-            .mine(&subroots1, difficulty_target, rng, std::u32::MAX)
-            .unwrap();
+        let b1 = DATA.block_1.clone();
+        let h1 = b1.header.clone();
 
-        let h1 = BlockHeader {
-            previous_block_hash: BlockHeaderHash([0; 32]),
-            merkle_root_hash: merkle_root_hash1,
-            pedersen_merkle_root_hash: pedersen_merkle_root1,
-            nonce: nonce1,
-            proof: proof1.into(),
-            difficulty_target,
-            time: 9999999,
-        };
-
-        // mine PoSW for block 2
-        let other_transaction_ids = vec![vec![2u8; 32]; 8];
-        let (merkle_root_hash, pedersen_merkle_root, subroots) = txids_to_roots(&other_transaction_ids);
-        let new_difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp());
-        let (nonce2, proof2) = consensus
-            .verifier
-            .mine(&subroots, new_difficulty_target, rng, std::u32::MAX)
-            .unwrap();
-
-        let h2 = BlockHeader {
-            previous_block_hash: h1.get_hash(),
-            merkle_root_hash: merkle_root_hash.clone(),
-            pedersen_merkle_root_hash: pedersen_merkle_root.clone(),
-            nonce: nonce2,
-            proof: proof2.into(),
-            difficulty_target: new_difficulty_target,
-            time: 9999999,
-        };
+        let b2 = DATA.block_2.clone();
+        let h2 = b2.header.clone();
+        let merkle_root_hash = h2.merkle_root_hash.clone();
+        let pedersen_merkle_root = h2.pedersen_merkle_root_hash.clone();
 
         // OK
         consensus

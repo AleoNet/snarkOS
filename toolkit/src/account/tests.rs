@@ -10,7 +10,7 @@ pub fn private_key_test() {
     let private_key = PrivateKey::new(rng);
     assert!(private_key.is_ok());
 
-    let expected_private_key = "AKEY1jX43RQfASsUBYGfMK7AtD3Dr1uymW7AvJJaxdvjC39BZ";
+    let expected_private_key = "AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn";
     let candidate_private_key = private_key.unwrap().to_string();
 
     println!("{} == {}", expected_private_key, candidate_private_key);
@@ -19,11 +19,11 @@ pub fn private_key_test() {
 
 #[test]
 pub fn address_test() {
-    let private_key = PrivateKey::from_str("AKEY1b47dMA8f9GfXPsW9s16qWfiYYmWGAAcorK9RkaVpBeFA").unwrap();
+    let private_key = PrivateKey::from_str("AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn").unwrap();
     let address = Address::from(&private_key);
     assert!(address.is_ok());
 
-    let expected_address = "aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348";
+    let expected_address = "aleo1fuge6ah8c9custvmlju5t30gk8p8lar5x36jlfa2glhgy9n0fuxsreeh2c";
     let candidate_address = address.unwrap().to_string();
 
     println!("{} == {}", expected_address, candidate_address);

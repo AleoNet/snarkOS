@@ -29,6 +29,8 @@ snarkos-objects = { path = "../objects", version = "0.8.0" }
 snarkos-posw = { path = "../posw", version = "0.8.0", features = ["test-helpers"] }
 snarkos-storage = { path = "../storage", version = "0.8.0" }
 
+snarkos-marlin = { path = "../marlin", version = "0.1.0" }
+
 chrono = { version = "0.4", features = ["serde"] }
 curl = { version = "0.4.30" }
 hex = { version = "0.4.2" }
