@@ -4,6 +4,7 @@ use crate::{
         inner_circuit_gadget::execute_inner_proof_gadget,
         parameters::CircuitParameters,
         record::DPCRecord,
+        record_encryption::RecordEncryptionGadgetComponents,
         BaseDPCComponents,
     },
     Assignment,
@@ -12,7 +13,6 @@ use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH},
-    curves::ModelParameters,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 use snarkos_objects::AccountPrivateKey;
@@ -36,19 +36,10 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     new_records: Option<Vec<DPCRecord<C>>>,
     new_serial_number_nonce_randomness: Option<Vec<[u8; 32]>>,
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
-    new_records_field_elements: Option<Vec<Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>>>,
-    new_records_group_encoding: Option<
-        Vec<
-            Vec<(
-                <C::EncryptionModelParameters as ModelParameters>::BaseField,
-                <C::EncryptionModelParameters as ModelParameters>::BaseField,
-            )>,
-        >,
-    >,
+
+    // Inputs for encryption of new records.
     new_records_encryption_randomness: Option<Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>>,
-    new_records_encryption_blinding_exponents:
-        Option<Vec<Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>>>,
-    new_records_ciphertext_and_fq_high_selectors: Option<Vec<(Vec<bool>, Vec<bool>)>>,
+    new_records_encryption_gadget_components: Option<Vec<RecordEncryptionGadgetComponents<C>>>,
     new_records_ciphertext_hashes: Option<Vec<<C::RecordCiphertextCRH as CRH>::Output>>,
 
     // Commitment to Predicates and to local data.
@@ -86,26 +77,11 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let new_serial_number_nonce_randomness = vec![[0u8; 32]; num_output_records];
         let new_records = vec![DPCRecord::default(); num_output_records];
 
-        // TODO (raychu86) Fix the lengths to be generic
-        let record_encoding_length = 7;
-        let base_field_default = <C::EncryptionModelParameters as ModelParameters>::BaseField::default();
-        let new_records_field_elements = vec![vec![base_field_default; record_encoding_length]; num_output_records];
-        let new_records_group_encoding =
-            vec![vec![(base_field_default, base_field_default); record_encoding_length]; num_output_records];
-
         let new_records_encryption_randomness =
             vec![<C::AccountEncryption as EncryptionScheme>::Randomness::default(); num_output_records];
-        let new_records_encryption_blinding_exponents = vec![
-                vec![<C::AccountEncryption as EncryptionScheme>::BlindingExponent::default(); record_encoding_length];
-                num_output_records
-            ];
-        let new_records_ciphertext_and_fq_high_selectors = vec![
-            (
-                vec![false; record_encoding_length + 1],
-                vec![false; record_encoding_length]
-            );
-            num_output_records
-        ];
+
+        let new_records_encryption_gadget_components =
+            vec![RecordEncryptionGadgetComponents::<C>::default(); num_output_records];
 
         let new_records_ciphertext_hashes =
             vec![<C::RecordCiphertextCRH as CRH>::Output::default(); num_output_records];
@@ -152,12 +128,9 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_records: Some(new_records),
             new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness),
             new_commitments: Some(new_commitments),
-            new_records_field_elements: Some(new_records_field_elements),
-            new_records_group_encoding: Some(new_records_group_encoding),
 
             new_records_encryption_randomness: Some(new_records_encryption_randomness),
-            new_records_encryption_blinding_exponents: Some(new_records_encryption_blinding_exponents),
-            new_records_ciphertext_and_fq_high_selectors: Some(new_records_ciphertext_and_fq_high_selectors),
+            new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components),
             new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes),
 
             // Other stuff
@@ -196,16 +169,9 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         new_records: &[DPCRecord<C>],
         new_serial_number_nonce_randomness: &[[u8; 32]],
         new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
-        new_records_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
-        new_records_group_encoding: &[Vec<(
-            <C::EncryptionModelParameters as ModelParameters>::BaseField,
-            <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        )>],
+
         new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-        new_records_encryption_blinding_exponents: &[Vec<
-            <C::AccountEncryption as EncryptionScheme>::BlindingExponent,
-        >],
-        new_records_ciphertext_and_fq_high_selectors: &[(Vec<bool>, Vec<bool>)],
+        new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
         new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
 
         // Other stuff
@@ -241,31 +207,23 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_output_records, new_commitments.len());
         assert_eq!(num_output_records, output_value_commitments.len());
         assert_eq!(num_output_records, output_value_commitment_randomness.len());
-        assert_eq!(num_output_records, new_records_field_elements.len());
-        assert_eq!(num_output_records, new_records_group_encoding.len());
+
         assert_eq!(num_output_records, new_records_encryption_randomness.len());
-        assert_eq!(num_output_records, new_records_encryption_blinding_exponents.len());
-        assert_eq!(num_output_records, new_records_ciphertext_and_fq_high_selectors.len());
+        assert_eq!(num_output_records, new_records_encryption_gadget_components.len());
         assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
 
         // TODO (raychu86) Fix the lengths to be generic
         let record_encoding_length = 7;
 
-        for field_elements in new_records_field_elements {
-            assert_eq!(field_elements.len(), record_encoding_length);
-        }
-
-        for group_encoding in new_records_group_encoding {
-            assert_eq!(group_encoding.len(), record_encoding_length);
-        }
-
-        for blinding_exponents in new_records_encryption_blinding_exponents {
-            assert_eq!(blinding_exponents.len(), record_encoding_length);
-        }
-
-        for (ciphertext_selectors, fq_high_selectors) in new_records_ciphertext_and_fq_high_selectors {
-            assert_eq!(ciphertext_selectors.len(), record_encoding_length + 1);
-            assert_eq!(fq_high_selectors.len(), record_encoding_length);
+        for gadget_components in new_records_encryption_gadget_components {
+            assert_eq!(gadget_components.record_field_elements.len(), record_encoding_length);
+            assert_eq!(gadget_components.record_group_encoding.len(), record_encoding_length);
+            assert_eq!(gadget_components.ciphertext_selectors.len(), record_encoding_length + 1);
+            assert_eq!(gadget_components.fq_high_selectors.len(), record_encoding_length);
+            assert_eq!(
+                gadget_components.encryption_blinding_exponents.len(),
+                record_encoding_length
+            );
         }
 
         Self {
@@ -286,11 +244,9 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_records: Some(new_records.to_vec()),
             new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness.to_vec()),
             new_commitments: Some(new_commitments.to_vec()),
-            new_records_field_elements: Some(new_records_field_elements.to_vec()),
-            new_records_group_encoding: Some(new_records_group_encoding.to_vec()),
+
             new_records_encryption_randomness: Some(new_records_encryption_randomness.to_vec()),
-            new_records_encryption_blinding_exponents: Some(new_records_encryption_blinding_exponents.to_vec()),
-            new_records_ciphertext_and_fq_high_selectors: Some(new_records_ciphertext_and_fq_high_selectors.to_vec()),
+            new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components.to_vec()),
             new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes.to_vec()),
 
             // Other stuff
@@ -332,11 +288,8 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_records.get()?,
             self.new_serial_number_nonce_randomness.get()?,
             self.new_commitments.get()?,
-            self.new_records_field_elements.get()?,
-            self.new_records_group_encoding.get()?,
             self.new_records_encryption_randomness.get()?,
-            self.new_records_encryption_blinding_exponents.get()?,
-            self.new_records_ciphertext_and_fq_high_selectors.get()?,
+            self.new_records_encryption_gadget_components.get()?,
             self.new_records_ciphertext_hashes.get()?,
             // Other stuff
             self.predicate_commitment.get()?,

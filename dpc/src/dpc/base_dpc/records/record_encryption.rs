@@ -19,6 +19,53 @@ use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
 
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "C: BaseDPCComponents"),
+    PartialEq(bound = "C: BaseDPCComponents"),
+    Eq(bound = "C: BaseDPCComponents")
+)]
+pub struct RecordEncryptionGadgetComponents<C: BaseDPCComponents> {
+    // Record field element reprentations
+    pub record_field_elements: Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>,
+    // Record group element encodings - Represented in (x,y) affine coordinates
+    pub record_group_encoding: Vec<(
+        <C::EncryptionModelParameters as ModelParameters>::BaseField,
+        <C::EncryptionModelParameters as ModelParameters>::BaseField,
+    )>,
+    // Record ciphertext selectors - Used for ciphertext compression/decompression
+    pub ciphertext_selectors: Vec<bool>,
+    // Record fq high selectors - Used for plaintext serialization/deserialization
+    pub fq_high_selectors: Vec<bool>,
+    // Record ciphertext blinding exponents used to encrypt the record
+    pub encryption_blinding_exponents: Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>,
+}
+
+impl<C: BaseDPCComponents> Default for RecordEncryptionGadgetComponents<C> {
+    fn default() -> Self {
+        // TODO (raychu86) Fix the lengths to be generic
+        let record_encoding_length = 7;
+        let base_field_default = <C::EncryptionModelParameters as ModelParameters>::BaseField::default();
+
+        let record_field_elements = vec![base_field_default; record_encoding_length];
+        let record_group_encoding = vec![(base_field_default, base_field_default); record_encoding_length];
+
+        let ciphertext_selectors = vec![false; record_encoding_length + 1];
+        let fq_high_selectors = vec![false; record_encoding_length];
+
+        let encryption_blinding_exponents =
+            vec![<C::AccountEncryption as EncryptionScheme>::BlindingExponent::default(); record_encoding_length];
+
+        Self {
+            record_field_elements,
+            record_group_encoding,
+            ciphertext_selectors,
+            fq_high_selectors,
+            encryption_blinding_exponents,
+        }
+    }
+}
+
 pub struct RecordEncryption<C: BaseDPCComponents>(PhantomData<C>);
 
 impl<C: BaseDPCComponents> RecordEncryption<C> {
@@ -56,7 +103,8 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         let encryption_randomness = circuit_parameters
             .account_encryption
             .generate_randomness(record_public_key, rng)?;
-        let ciphertext = circuit_parameters.account_encryption.encrypt(
+        let ciphertext = C::AccountEncryption::encrypt(
+            &circuit_parameters.account_encryption,
             record_public_key,
             &encryption_randomness,
             &record_plaintexts,
@@ -200,19 +248,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         circuit_parameters: &CircuitParameters<C>,
         record: &DPCRecord<C>,
         encryption_randomness: &<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Randomness,
-    ) -> Result<
-        (
-            Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>,
-            Vec<(
-                <C::EncryptionModelParameters as ModelParameters>::BaseField,
-                <C::EncryptionModelParameters as ModelParameters>::BaseField,
-            )>,
-            Vec<bool>,
-            Vec<bool>,
-            Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>,
-        ),
-        DPCError,
-    > {
+    ) -> Result<RecordEncryptionGadgetComponents<C>, DPCError> {
         // Serialize the record into group elements and fq_high bits
         let (serialized_record, final_fq_high_selector) =
             RecordSerializer::<C, C::EncryptionModelParameters, C::EncryptionGroup>::serialize(&record)?;
@@ -283,7 +319,8 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             record_plaintexts.len(),
         )?;
 
-        let ciphertext = circuit_parameters.account_encryption.encrypt(
+        let ciphertext = C::AccountEncryption::encrypt(
+            &circuit_parameters.account_encryption,
             record_public_key,
             &encryption_randomness,
             &record_plaintexts,
@@ -309,12 +346,12 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             ciphertext_selectors.push(selector);
         }
 
-        Ok((
+        Ok(RecordEncryptionGadgetComponents {
             record_field_elements,
             record_group_encoding,
             ciphertext_selectors,
             fq_high_selectors,
             encryption_blinding_exponents,
-        ))
+        })
     }
 }

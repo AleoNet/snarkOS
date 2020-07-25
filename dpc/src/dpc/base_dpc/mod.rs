@@ -861,38 +861,17 @@ where
 
         // Prepare record encryption components used in the inner SNARK
 
-        let mut new_records_field_elements = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_group_encoding = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_ciphertext_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_fq_high_selectors = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_encryption_blinding_exponents = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_records_encryption_gadget_components = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
         for (record, ciphertext_randomness) in new_records.iter().zip_eq(&new_records_encryption_randomness) {
-            let (
-                record_field_elements,
-                record_group_encoding,
-                new_record_ciphertext_selectors,
-                record_fq_high_selectors,
-                record_encryption_blinding_exponents,
-            ) = RecordEncryption::prepare_encryption_gadget_components(
+            let record_encryption_gadget_components = RecordEncryption::prepare_encryption_gadget_components(
                 &circuit_parameters,
                 &record,
                 ciphertext_randomness,
             )?;
 
-            new_records_field_elements.push(record_field_elements);
-            new_records_group_encoding.push(record_group_encoding);
-            new_records_ciphertext_selectors.push(new_record_ciphertext_selectors);
-            new_records_fq_high_selectors.push(record_fq_high_selectors);
-            new_records_encryption_blinding_exponents.push(record_encryption_blinding_exponents);
+            new_records_encryption_gadget_components.push(record_encryption_gadget_components);
         }
-
-        let new_records_ciphertext_and_fq_high_selectors: Vec<(Vec<bool>, Vec<bool>)> =
-            new_records_ciphertext_selectors
-                .iter()
-                .cloned()
-                .zip_eq(new_records_fq_high_selectors)
-                .collect();
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
@@ -906,11 +885,8 @@ where
                 &new_records,
                 &new_sn_nonce_randomness,
                 &new_commitments,
-                &new_records_field_elements,
-                &new_records_group_encoding,
                 &new_records_encryption_randomness,
-                &new_records_encryption_blinding_exponents,
-                &new_records_ciphertext_and_fq_high_selectors,
+                &new_records_encryption_gadget_components,
                 &new_records_ciphertext_hashes,
                 &predicate_commitment,
                 &predicate_randomness,
@@ -986,12 +962,6 @@ where
 
             Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
-
-        assert_eq!(new_records_encryption_ciphertexts.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(
-            new_records_encryption_ciphertexts.len(),
-            new_records_ciphertext_and_fq_high_selectors.len()
-        );
 
         let transaction = Self::Transaction::new(
             old_serial_numbers,
