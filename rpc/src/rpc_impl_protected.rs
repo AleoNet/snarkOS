@@ -229,6 +229,11 @@ impl ProtectedRpcFunctions for RpcImpl {
             }
         }
 
+        // If the request did not specify a valid memo, generate one from random
+        if memo == [0u8; 32] {
+            memo = rng.gen();
+        }
+
         // Generate transaction
         let (records, transaction) = self.consensus.create_transaction(
             &self.parameters,
