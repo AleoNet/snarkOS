@@ -26,16 +26,17 @@ impl<C: BaseDPCComponents> ToBytes for RecordCiphertext<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let mut ciphertext_selectors = vec![];
 
-        // Write the ciphertext element x coordinates
+        // Write the ciphertext
         variable_length_integer(self.ciphertext.len() as u64).write(&mut writer)?;
         for ciphertext_element in &self.ciphertext {
+            // Compress the ciphertext representation to the affine x-coordinate and the selector bit
             let ciphertext_element_affine =
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
 
             let x_coordinate = ciphertext_element_affine.to_x_coordinate();
             x_coordinate.write(&mut writer)?;
 
-            let greatest =
+            let selector =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
                     x_coordinate,
                     true,
@@ -44,7 +45,7 @@ impl<C: BaseDPCComponents> ToBytes for RecordCiphertext<C> {
                     None => false,
                 };
 
-            ciphertext_selectors.push(greatest);
+            ciphertext_selectors.push(selector);
         }
 
         ciphertext_selectors.push(self.final_fq_high_selector);

@@ -106,9 +106,11 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             value,
         } = record_components;
 
-        // Reconstruct the record
+        // Construct the record account address
 
         let account_address = AccountAddress::from_view_key(&circuit_parameters.account_encryption, &account_view_key)?;
+
+        // Determine if the record is a dummy
 
         // TODO (raychu86) Establish `is_dummy` flag properly by checking that the value is 0 and the predicates are equivalent to a global dummy
         let dummy_predicate = birth_predicate_hash.clone();
@@ -165,7 +167,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             let ciphertext_x_coordinate = ciphertext_element_affine.to_x_coordinate();
 
             // Fetch the ciphertext selector bit
-            let greatest =
+            let selector =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
                     ciphertext_x_coordinate.clone(),
                     true,
@@ -174,7 +176,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
                     None => false,
                 };
 
-            selector_bits.push(greatest);
+            selector_bits.push(selector);
             ciphertext_affine_x.push(ciphertext_x_coordinate);
         }
 
@@ -187,7 +189,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?)
     }
 
-    /// Returns the intermediate components of the encryption algorithm that the inner snark
+    /// Returns the intermediate components of the encryption algorithm that the inner SNARK
     /// needs to validate the new record was encrypted correctly
     /// 1. Record field element reprentations
     /// 2. Record group element encodings - Represented in (x,y) affine coordinates
@@ -216,17 +218,19 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             RecordSerializer::<C, C::EncryptionModelParameters, C::EncryptionGroup>::serialize(&record)?;
 
         // Extract the fq_bits from the serialized record
-        let final_element = &serialized_record[serialized_record.len() - 1];
-        let final_element_bytes = decode_from_group::<C::EncryptionModelParameters, C::EncryptionGroup>(
-            final_element.into_affine(),
-            final_fq_high_selector,
-        )?;
-        let final_element_bits = bytes_to_bits(&final_element_bytes);
-        let fq_high_selectors = [
-            &final_element_bits[1..serialized_record.len()],
-            &[final_fq_high_selector][..],
-        ]
-        .concat();
+        let fq_high_selectors = {
+            let final_element = &serialized_record[serialized_record.len() - 1];
+            let final_element_bytes = decode_from_group::<C::EncryptionModelParameters, C::EncryptionGroup>(
+                final_element.into_affine(),
+                final_fq_high_selector,
+            )?;
+            let final_element_bits = bytes_to_bits(&final_element_bytes);
+            [
+                &final_element_bits[1..serialized_record.len()],
+                &[final_fq_high_selector][..],
+            ]
+            .concat()
+        };
 
         let mut record_field_elements = vec![];
         let mut record_group_encoding = vec![];
@@ -293,7 +297,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
 
             // Fetch the ciphertext selector bit
-            let greatest =
+            let selector =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
                     ciphertext_element_affine.to_x_coordinate(),
                     true,
@@ -302,7 +306,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
                     None => false,
                 };
 
-            ciphertext_selectors.push(greatest);
+            ciphertext_selectors.push(selector);
         }
 
         Ok((

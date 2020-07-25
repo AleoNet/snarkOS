@@ -11,6 +11,7 @@ use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, BigInteger, From
 use itertools::Itertools;
 use std::marker::PhantomData;
 
+/// Encode a base field element bytes to a group representation
 pub fn encode_to_group<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve>(
     x_bytes: &[u8],
 ) -> Result<(<G as ProjectiveCurve>::Affine, bool), DPCError> {
@@ -25,6 +26,7 @@ pub fn encode_to_group<P: MontgomeryModelParameters + TEModelParameters, G: Grou
     Ok((output, fq_high))
 }
 
+/// Decode a group into the byte representation of a base field element
 pub fn decode_from_group<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurve>(
     affine: <G as ProjectiveCurve>::Affine,
     fq_high: bool,
@@ -242,6 +244,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         Ok((output, final_sign_high))
     }
 
+    /// Deserialize and return the record components
     fn deserialize(
         serialized_record: Vec<Self::Group>,
         final_sign_high: bool,
