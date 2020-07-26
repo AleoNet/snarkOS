@@ -1,5 +1,3 @@
-## createrawtransaction
-
 Create a new transaction, returning the encoded transaction and the new records.
 
 ### Protected Endpoint

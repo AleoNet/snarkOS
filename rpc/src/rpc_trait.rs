@@ -66,25 +66,21 @@ pub trait RpcFunctions {
 
 /// Definition of private RPC endpoints that require authentication.
 pub trait ProtectedRpcFunctions {
-    /// Generate a new account private key and account address.
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createaccount.md"))]
     fn create_account(&self) -> Result<RpcAccount, RpcError>;
 
-    /// Create a new transaction, returning the encoded transaction and the new records.
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createrawtransaction.md"))]
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError>;
 
-    /// Returns a list of record commitments that are stored on the full node.
     #[cfg_attr(
         nightly,
         doc(include = "../documentation/private_endpoints/fetchrecordcommitments.md")
     )]
     fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError>;
 
-    /// Returns hex encoded bytes of a record from its record commitment.
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrawrecord.md"))]
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 }

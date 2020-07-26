@@ -1,5 +1,3 @@
-## getpeerinfo
-
 Returns the node's connected peers.
 
 ### Arguments

@@ -1,5 +1,3 @@
-## getbestblockhash
-
 Returns the block hash of the head of the best valid chain.
 
 ### Arguments

@@ -1,5 +1,3 @@
-## getblock
-
 Returns information about a block from a block hash.
 
 ### Arguments

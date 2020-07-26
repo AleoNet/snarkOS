@@ -1,5 +1,3 @@
-## validaterawtransaction
-
 Validate and return if the transaction is valid.
 
 ### Arguments

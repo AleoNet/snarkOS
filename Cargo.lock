@@ -2546,6 +2546,7 @@ dependencies = [
  "jsonrpc-http-server",
  "jsonrpc-test",
  "rand",
+ "rustc_version",
  "serde",
  "serde_json",
  "snarkos-consensus",

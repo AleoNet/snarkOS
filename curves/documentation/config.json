@@ -1,0 +1,9 @@
+[
+  {
+    "folderName": "the_aleo_curves",
+    "config": {
+      "match_topic_titles_with_ids": false,
+      "show_topic_titles_in_readme": false
+    }
+  }
+]

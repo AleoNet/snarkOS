@@ -3,8 +3,8 @@
 #![forbid(unsafe_code)]
 // Documentation
 #![cfg_attr(nightly, feature(doc_cfg, external_doc))]
-#![cfg_attr(nightly, deny(missing_docs))]
-#![cfg_attr(nightly, doc(include = "../documentation/general/overview.md"))]
+#![cfg_attr(nightly, warn(missing_docs))]
+#![cfg_attr(nightly, doc(include = "../documentation/getting_started/00_overview.md"))]
 
 pub mod rpc_impl;
 #[doc(inline)]
