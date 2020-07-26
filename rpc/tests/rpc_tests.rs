@@ -1,4 +1,4 @@
-/// Test unguarded rpc endpoints
+/// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
     use snarkos_dpc::dpc::base_dpc::instantiated::Tx;

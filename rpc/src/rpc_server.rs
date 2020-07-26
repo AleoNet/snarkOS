@@ -1,6 +1,8 @@
+//! Logic for instantiating the RPC server.
+
 use crate::{
+    rpc_trait::RpcFunctions,
     rpc_types::{Meta, RpcCredentials},
-    RpcFunctions,
     RpcImpl,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};

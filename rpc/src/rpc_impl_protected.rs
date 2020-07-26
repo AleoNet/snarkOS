@@ -1,3 +1,6 @@
+//! Implementation of private RPC endpoints that require authentication.
+// #![doc(include = "../docs/private_endpoints/*.md")]
+
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, InstantiatedDPC, Predicate},
@@ -17,113 +20,29 @@ use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value
 use rand::{thread_rng, Rng};
 use std::{str::FromStr, sync::Arc};
 
-type JsonrpcError = jsonrpc_core::Error;
-
-impl RpcImpl {
-    /// Validate the authentication header in the request metadata
-    pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonrpcError> {
-        if let Some(credentials) = &self.credentials {
-            let auth = meta.auth.unwrap_or_else(String::new);
-            let basic_auth_encoding = format!(
-                "Basic {}",
-                base64::encode(format!("{}:{}", credentials.username, credentials.password))
-            );
-
-            if basic_auth_encoding != auth {
-                return Err(JsonrpcError::invalid_params("Authentication Error"));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// The following `*_protected` functions wrap an authentication check around sensitive functions
-    /// before being exposed as an RPC endpoint
-
-    /// Wrap authentication around `create_raw_transaction`
-    pub fn create_raw_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        self.validate_auth(meta)?;
-
-        let value = match params {
-            Params::Array(arr) => arr,
-            _ => return Err(JsonrpcError::invalid_request()),
-        };
-
-        let val: TransactionInputs = serde_json::from_value(value[0].clone())
-            .map_err(|e| JsonrpcError::invalid_params(format!("Invalid params: {}.", e)))?;
-
-        match self.create_raw_transaction(val) {
-            Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
-            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
-        }
-    }
-
-    /// Wrap authentication around `fetch_record_commitments`
-    pub fn fetch_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        self.validate_auth(meta)?;
-
-        params.expect_no_params()?;
-
-        match self.fetch_record_commitments() {
-            Ok(record_commitments) => Ok(Value::from(record_commitments)),
-            Err(_) => Err(JsonrpcError::invalid_request()),
-        }
-    }
-
-    /// Wrap authentication around `get_raw_record`
-    pub fn get_raw_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        self.validate_auth(meta)?;
-
-        let value = match params {
-            Params::Array(arr) => arr,
-            _ => return Err(JsonrpcError::invalid_request()),
-        };
-
-        if value.len() != 1 {
-            return Err(JsonrpcError::invalid_params(format!(
-                "invalid length {}, expected 1 element",
-                value.len()
-            )));
-        }
-
-        let record_commitment: String = serde_json::from_value(value[0].clone())
-            .map_err(|e| JsonrpcError::invalid_params(format!("Invalid params: {}.", e)))?;
-
-        match self.get_raw_record(record_commitment) {
-            Ok(record) => Ok(Value::from(record)),
-            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
-        }
-    }
-
-    /// Wrap authentication around `generate_account`
-    pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonrpcError> {
-        self.validate_auth(meta)?;
-
-        params.expect_no_params()?;
-
-        match self.create_account() {
-            Ok(account) => Ok(serde_json::to_value(account).expect("account serialization failed")),
-            Err(err) => Err(JsonrpcError::invalid_params(err.to_string())),
-        }
-    }
-
-    /// Expose the protected functions as RPC enpoints
-    pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
-        let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
-
-        d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
-        d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
-        d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
-        d.add_method_with_meta("createaccount", Self::create_account_protected);
-
-        io.extend_with(d)
-    }
-}
+type JsonRPCError = jsonrpc_core::Error;
 
 /// Functions that are sensitive and need to be protected with authentication.
 /// The authentication logic is defined in `validate_auth`
 impl ProtectedRpcFunctions for RpcImpl {
-    /// Create a transaction and return encoded transaction and output records
+    /// Generate a new account private key and account address.
+    fn create_account(&self) -> Result<RpcAccount, RpcError> {
+        let rng = &mut thread_rng();
+
+        let account = Account::<Components>::new(
+            self.parameters.account_signature_parameters(),
+            self.parameters.account_commitment_parameters(),
+            self.parameters.account_encryption_parameters(),
+            rng,
+        )?;
+
+        Ok(RpcAccount {
+            private_key: account.private_key.to_string(),
+            address: account.address.to_string(),
+        })
+    }
+
+    /// Create a transaction and return encoded transaction and output records.
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
@@ -257,7 +176,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
-    /// Fetch the node's stored record commitments
+    /// Fetches record commitments that are stored on the node.
     fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError> {
         let record_commitments = self.storage.get_record_commitments(100)?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
@@ -265,7 +184,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         Ok(record_commitment_strings)
     }
 
-    /// Returns hex encoded bytes of a record from its record commitment
+    /// Returns hex encoded bytes of a record from its record commitment.
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
@@ -278,21 +197,105 @@ impl ProtectedRpcFunctions for RpcImpl {
             None => Ok("Record not found".to_string()),
         }
     }
+}
 
-    /// Generate a new account with optional metadata
-    fn create_account(&self) -> Result<RpcAccount, RpcError> {
-        let rng = &mut thread_rng();
+impl RpcImpl {
+    /// Validate the authentication header in the request metadata
+    pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonRPCError> {
+        if let Some(credentials) = &self.credentials {
+            let auth = meta.auth.unwrap_or_else(String::new);
+            let basic_auth_encoding = format!(
+                "Basic {}",
+                base64::encode(format!("{}:{}", credentials.username, credentials.password))
+            );
 
-        let account = Account::<Components>::new(
-            self.parameters.account_signature_parameters(),
-            self.parameters.account_commitment_parameters(),
-            self.parameters.account_encryption_parameters(),
-            rng,
-        )?;
+            if basic_auth_encoding != auth {
+                return Err(JsonRPCError::invalid_params("Authentication Error"));
+            }
+        }
 
-        Ok(RpcAccount {
-            private_key: account.private_key.to_string(),
-            address: account.address.to_string(),
-        })
+        Ok(())
+    }
+
+    /// The following `*_protected` functions wrap an authentication check around sensitive functions
+    /// before being exposed as an RPC endpoint
+
+    /// Wrap authentication around `create_raw_transaction`
+    pub fn create_raw_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let val: TransactionInputs = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.create_raw_transaction(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `fetch_record_commitments`
+    pub fn fetch_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        params.expect_no_params()?;
+
+        match self.fetch_record_commitments() {
+            Ok(record_commitments) => Ok(Value::from(record_commitments)),
+            Err(_) => Err(JsonRPCError::invalid_request()),
+        }
+    }
+
+    /// Wrap authentication around `get_raw_record`
+    pub fn get_raw_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        if value.len() != 1 {
+            return Err(JsonRPCError::invalid_params(format!(
+                "invalid length {}, expected 1 element",
+                value.len()
+            )));
+        }
+
+        let record_commitment: String = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.get_raw_record(record_commitment) {
+            Ok(record) => Ok(Value::from(record)),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `generate_account`
+    pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        params.expect_no_params()?;
+
+        match self.create_account() {
+            Ok(account) => Ok(serde_json::to_value(account).expect("account serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Expose the protected functions as RPC enpoints
+    pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
+        let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
+
+        d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
+        d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
+        d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
+        d.add_method_with_meta("createaccount", Self::create_account_protected);
+
+        io.extend_with(d)
     }
 }

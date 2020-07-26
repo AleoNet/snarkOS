@@ -1,0 +1,16 @@
+
+Aleo full nodes support the [JSON-RPC 2.0](https://www.jsonrpc.org/specification) protocol
+to enable API calls for fetching data and interacting with peers connected to the network.
+
+## RPC Port
+
+The default RPC port is 3030. This can be specified with the `-rpc-port` flag when starting the node.
+
+## Authentication
+
+The RPC server exposes protected RPC endpoints for account specific operations, such as creating an account,
+creating a transaction, and fetching record commitments.
+RPC requests to protected RPC endpoints can be optionally guarded with an authentication header.
+
+To enable this authentication layer, provide the authentication credentials to
+the `-rpc-username` and `-rpc-password` flags when booting up a full node.
