@@ -349,6 +349,10 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "validate
 
 Generate a new account private key and its corresponding account address.
 
+### Protected Endpoint
+
+Yes
+
 ### Arguments
 
 `None`
@@ -366,6 +370,12 @@ curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentat
 ```
 
 ## createrawtransaction
+
+Create a new transaction, returning the encoded transaction and the new records.
+
+### Protected Endpoint
+
+Yes
 
 ### Arguments
 
@@ -414,7 +424,11 @@ curl --user username:password --data-binary '{
 
 ## fetchrecordcommitments
 
-Return the node's stored record commitments.
+Returns a list of record commitments that are stored on the full node.
+
+### Protected Endpoint
+
+Yes
 
 ### Arguments
 
@@ -433,7 +447,11 @@ curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentat
 
 ## getrawrecord
 
-Returns hex encoded bytes of a record from its record commitment.
+Returns the hex encoded bytes of a record from its record commitment.
+
+### Protected Endpoint
+
+Yes
 
 ### Arguments
 
