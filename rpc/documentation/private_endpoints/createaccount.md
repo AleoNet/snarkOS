@@ -1,6 +1,6 @@
 ### createaccount
 
-Generate a new account private key and public key pair.
+Generate a new account private key and its corresponding account address.
 
 #### Arguments
 
@@ -11,7 +11,7 @@ Generate a new account private key and public key pair.
 |   Parameter   |  Type  |         Description         |
 |:------------- |:------:|:--------------------------- |
 | `private_key` | string | An Aleo account private key |
-| `public_key`  | string | An Aleo account public key  |
+| `address`     | string | An Aleo account address     |
 
 #### Example
 ```
