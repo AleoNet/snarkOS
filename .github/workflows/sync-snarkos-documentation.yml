@@ -1,7 +1,7 @@
 name: Sync snarkOS Documentation
 
 on:
-  pull_request:
+  push:
     paths:
       - '**/*.md'
     branches-ignore:
