@@ -1,18 +1,18 @@
-### getconnectioncount
+## getconnectioncount
 
 Returns the number of connected peers this node has.
 
-#### Arguments
+### Arguments
 
 None
 
-#### Response
+### Response
 
 | Parameter |  Type  |          Description          |
 |:---------:|:------:|:----------------------------- |
 | `result`  | number | The number of connected nodes |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectioncount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```

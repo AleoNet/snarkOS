@@ -1,6 +1,6 @@
-### createrawtransaction
+## createrawtransaction
 
-#### Arguments
+### Arguments
 
 |          Parameter         |  Type  | Required |                        Description                       |
 |:-------------------------- |:------:|:--------:|:-------------------------------------------------------- |
@@ -17,14 +17,14 @@ Transaction Recipient Object
 | `address` | string | The recipient address            |
 | `value`   | number | The amount sent to the recipient |
 
-#### Response
+### Response
 
 |       Parameter       |  Type  |                  Description                  |
 |:---------------------:|:------:|:--------------------------------------------- |
 | `encoded_transaction` | string | The hex encoding of the generated transaction |
 | `encoded_records`     | array  | The hex encodings of the generated records    |
 
-#### Example
+### Example
 ```
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",

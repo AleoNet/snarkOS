@@ -1,14 +1,14 @@
-### getblock
+## getblock
 
 Returns information about a block from a block hash.
 
-#### Arguments
+### Arguments
 
 |  Parameter   |  Type  | Required |              Description              |
 |:------------ |:------:|:--------:|:------------------------------------- |
 | `block_hash` | string |    Yes   | The block hash of the requested block |
 
-#### Response
+### Response
 
 |      Parameter      |  Type  |                    Description                    |
 |:------------------- |:------:|:------------------------------------------------- |
@@ -23,7 +23,7 @@ Returns information about a block from a block hash.
 | `time`              | number | The block time                                    |
 | `transactions`      | array  | The list of transaction ids included in the block |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": ["caf49293d36f0215cfb3296dbc871a0ef5e5dcfc61f91cd0c9ac2c730f84d853"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```

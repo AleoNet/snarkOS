@@ -1,14 +1,14 @@
-### decoderecord
+## decoderecord
 
 Returns information about a record from serialized record hex.
 
-#### Arguments
+### Arguments
 
 |    Parameter   |  Type  | Required |          Description         |
 |:--------------:|:------:|:--------:|:----------------------------:|
 | `record_bytes` | string |    Yes   | The raw record hex to decode |
 
-#### Response
+### Response
 
 |        Parameter        |  Type  |             Description            |
 |:----------------------- |:------:|:---------------------------------- |
@@ -22,11 +22,7 @@ Returns information about a record from serialized record hex.
 | `commitment`            | string | The record commitment              |
 | `commitment_randomness` | string | The record commitment randomness   |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
-
-## Protected Methods
-
-These RPC methods are protected and will require authentication if `-rpc-username` and `-rpc-password` are set.
