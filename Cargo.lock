@@ -2314,6 +2314,7 @@ dependencies = [
  "derivative",
  "rand",
  "rand_xorshift",
+ "rustc_version",
  "serde",
  "snarkos-errors",
  "snarkos-models",
