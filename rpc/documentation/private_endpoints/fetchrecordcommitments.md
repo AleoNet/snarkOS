@@ -1,6 +1,10 @@
 ## fetchrecordcommitments
 
-Return the node's stored record commitments.
+Returns a list of record commitments that are stored on the full node.
+
+### Protected Endpoint
+
+Yes
 
 ### Arguments
 

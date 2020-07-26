@@ -70,14 +70,14 @@ pub trait ProtectedRpcFunctions {
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createaccount.md"))]
     fn create_account(&self) -> Result<RpcAccount, RpcError>;
 
-    /// Create a transaction and return encoded transaction and output records.
+    /// Create a new transaction, returning the encoded transaction and the new records.
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createrawtransaction.md"))]
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError>;
 
-    /// Fetches record commitments that are stored on the node.
+    /// Returns a list of record commitments that are stored on the full node.
     #[cfg_attr(
         nightly,
         doc(include = "../documentation/private_endpoints/fetchrecordcommitments.md")

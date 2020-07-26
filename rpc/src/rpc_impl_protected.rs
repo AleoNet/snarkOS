@@ -41,7 +41,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
-    /// Create a transaction and return encoded transaction and output records.
+    /// Create a new transaction, returning the encoded transaction and the new records.
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
@@ -175,7 +175,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
-    /// Fetches record commitments that are stored on the node.
+    /// Returns a list of record commitments that are stored on the full node.
     fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError> {
         let record_commitments = self.storage.get_record_commitments(100)?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();

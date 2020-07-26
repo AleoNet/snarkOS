@@ -1,6 +1,10 @@
 ## getrawrecord
 
-Returns hex encoded bytes of a record from its record commitment.
+Returns the hex encoded bytes of a record from its record commitment.
+
+### Protected Endpoint
+
+Yes
 
 ### Arguments
 
