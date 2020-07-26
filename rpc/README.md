@@ -9,7 +9,6 @@
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
-
 In Aleo, full nodes run a [JSON-RPC](https://www.jsonrpc.org/specification) server
 to enable API calls for fetching data and interacting with peers connected to the network.
 
@@ -37,7 +36,6 @@ the `-rpc-username` and `-rpc-password` flags when booting up a full node.
 
 
 ## decoderawtransaction
-
 Returns information about a transaction from serialized transaction bytes.
 
 ### Arguments
@@ -69,7 +67,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decodera
 ```
 
 ## decoderecord
-
 Returns information about a record from serialized record hex.
 
 ### Arguments
@@ -98,7 +95,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decodere
 ```
 
 ## getbestblockhash
-
 Returns the block hash of the head of the best valid chain.
 
 ### Arguments
@@ -117,7 +113,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getbestb
 ```
 
 ## getblock
-
 Returns information about a block from a block hash.
 
 ### Arguments
@@ -147,7 +142,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 ```
 
 ## getblockcount
-
 Returns the number of blocks in the best valid chain.
 
 ### Arguments
@@ -166,7 +160,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 ```
 
 ## getblockhash
-
 Returns the block hash of a block at the given block height in the best valid chain.
 
 ### Arguments
@@ -187,7 +180,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 ```
 
 ## getblocktemplate
-
 Returns the current mempool and consensus information known by this node.
 
 ### Arguments
@@ -211,7 +203,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 ```
 
 ## getconnectioncount
-
 Returns the number of connected peers this node has.
 
 ### Arguments
@@ -230,7 +221,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconne
 ```
 
 ## getpeerinfo
-
 Returns the node's connected peers.
 
 ### Arguments
@@ -249,7 +239,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getpeeri
 ```
 
 ## getrawtransaction
-
 Returns hex encoded bytes of a transaction from its transaction id.
 
 ### Arguments
@@ -270,7 +259,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawtr
 ```
 
 ## gettransactioninfo
-
 Returns information about a transaction from a transaction id.
 
 ### Arguments
@@ -302,7 +290,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettrans
 ```
 
 ## sendtransaction
-
 Send raw transaction bytes to this node to be added into the mempool. If valid, the transaction will be stored and propagated to all peers.
 
 ### Arguments
@@ -323,7 +310,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtran
 ```
 
 ## validaterawtransaction
-
 Validate and return if the transaction is valid.
 
 ### Arguments
@@ -346,7 +332,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "validate
 
 
 ## createaccount
-
 Generate a new account private key and its corresponding account address.
 
 ### Protected Endpoint
@@ -370,7 +355,6 @@ curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentat
 ```
 
 ## createrawtransaction
-
 Create a new transaction, returning the encoded transaction and the new records.
 
 ### Protected Endpoint
@@ -423,7 +407,6 @@ curl --user username:password --data-binary '{
 ```
 
 ## fetchrecordcommitments
-
 Returns a list of record commitments that are stored on the full node.
 
 ### Protected Endpoint
@@ -446,7 +429,6 @@ curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentat
 ```
 
 ## getrawrecord
-
 Returns the hex encoded bytes of a record from its record commitment.
 
 ### Protected Endpoint
