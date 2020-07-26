@@ -3,7 +3,8 @@ name: Sync snarkOS Documentation - Branches
 on:
   push:
     paths:
-      - '**/*.md'
+      - '**/documentation/**.md'
+      - '**/documentation/config.json'
     branches-ignore:
       - 'master'
 
