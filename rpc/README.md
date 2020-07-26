@@ -36,17 +36,17 @@ the `-rpc-username` and `-rpc-password` flags when booting up a full node.
 
 
 
-### decoderawtransaction
+## decoderawtransaction
 
 Returns information about a transaction from serialized transaction bytes.
 
-#### Arguments
+### Arguments
 
 |      Parameter      |  Type  | Required |            Description            |
 |:------------------- |:------:|:--------:|:--------------------------------- |
 | `transaction_bytes` | string |    Yes   | The raw transaction hex to decode |
 
-#### Response
+### Response
 
 |        Parameter        |  Type  |                Description                |
 |:-----------------------:|:------:|:----------------------------------------- |
@@ -63,22 +63,22 @@ Returns information about a transaction from serialized transaction bytes.
 | `signatures`            | array  | The list of transaction signatures        |
 | `transaction_metadata`  | object | The transaction metadata                  |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### decoderecord
+## decoderecord
 
 Returns information about a record from serialized record hex.
 
-#### Arguments
+### Arguments
 
 |    Parameter   |  Type  | Required |          Description         |
 |:--------------:|:------:|:--------:|:----------------------------:|
 | `record_bytes` | string |    Yes   | The raw record hex to decode |
 
-#### Response
+### Response
 
 |        Parameter        |  Type  |             Description            |
 |:----------------------- |:------:|:---------------------------------- |
@@ -92,45 +92,41 @@ Returns information about a record from serialized record hex.
 | `commitment`            | string | The record commitment              |
 | `commitment_randomness` | string | The record commitment randomness   |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Protected Methods
-
-These RPC methods are protected and will require authentication if `-rpc-username` and `-rpc-password` are set.
-
-### getbestblockhash
+## getbestblockhash
 
 Returns the block hash of the head of the best valid chain.
 
-#### Arguments
+### Arguments
 
 None
 
-#### Response
+### Response
 
 | Parameter |  Type  |                  Description                  |
 |:---------:|:------:|:---------------------------------------------:|
 | `result`  | string | The block hash of the most recent valid block |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getbestblockhash", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getblock
+## getblock
 
 Returns information about a block from a block hash.
 
-#### Arguments
+### Arguments
 
 |  Parameter   |  Type  | Required |              Description              |
 |:------------ |:------:|:--------:|:------------------------------------- |
 | `block_hash` | string |    Yes   | The block hash of the requested block |
 
-#### Response
+### Response
 
 |      Parameter      |  Type  |                    Description                    |
 |:------------------- |:------:|:------------------------------------------------- |
@@ -145,60 +141,60 @@ Returns information about a block from a block hash.
 | `time`              | number | The block time                                    |
 | `transactions`      | array  | The list of transaction ids included in the block |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": ["caf49293d36f0215cfb3296dbc871a0ef5e5dcfc61f91cd0c9ac2c730f84d853"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getblockcount
+## getblockcount
 
 Returns the number of blocks in the best valid chain.
 
-#### Arguments
+### Arguments
 
 None
 
-#### Response
+### Response
 
 | Parameter |  Type  |                  Description                 |
 |:---------:|:------:|:--------------------------------------------:|
 | `result`  | string | The number of blocks in the best valid chain |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockcount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getblockhash
+## getblockhash
 
 Returns the block hash of a block at the given block height in the best valid chain.
 
-#### Arguments
+### Arguments
 
 |    Parameter   |  Type  | Required |                  Description                 |
 |:-------------- |:------:|:--------:|:-------------------------------------------- |
 | `block_height` | string |    Yes   | The block height of the requested block hash |
 
-#### Response
+### Response
 
 | Parameter |  Type  |                      Description                      |
 |:---------:|:------:|:-----------------------------------------------------:|
 | `result`  | string | The block hash of the block at the given block height |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getblocktemplate
+## getblocktemplate
 
 Returns the current mempool and consensus information known by this node.
 
-#### Arguments
+### Arguments
 
 None
 
-#### Response
+### Response
 
 |       Parameter       |  Type  |                      Description                      |
 |:--------------------- |:------:|:----------------------------------------------------- |
@@ -209,82 +205,81 @@ None
 | `transactions`        | array  | The list of raw transactions to include in the block  |
 | `coinbase_value`      | number | The amount spendable by the coinbase transaction      |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocktemplate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getconnectioncount
+## getconnectioncount
 
 Returns the number of connected peers this node has.
 
-#### Arguments
+### Arguments
 
 None
 
-#### Response
+### Response
 
 | Parameter |  Type  |          Description          |
 |:---------:|:------:|:----------------------------- |
 | `result`  | number | The number of connected nodes |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectioncount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getpeerinfo
+## getpeerinfo
 
 Returns the node's connected peers.
 
-#### Arguments
+### Arguments
 
 None 
 
-#### Response
+### Response
 
 | Parameter |  Type |           Description          |
 |:---------:|:-----:|:------------------------------:|
 | `peers`   | array | The list of connected peer IPs |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getpeerinfo", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### getrawtransaction
+## getrawtransaction
 
 Returns hex encoded bytes of a transaction from its transaction id.
 
-#### Arguments
+### Arguments
 
 |     Parameter    |  Type  | Required |                     Description                     |
 |:---------------- |:------:|:--------:|:--------------------------------------------------- |
 | `transaction_id` | string |    Yes   | The transaction id of the requested transaction hex |
 
-#### Response
+### Response
 
 | Parameter |  Type  |            Description            |
 |:---------:|:------:|:---------------------------------:|
 | `result`  | string | The hex-encoded transaction bytes |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawtransaction", "params": ["83fc73b8a104d7cdabe514ec4ddfeb7fd6284ff8e0a757d25d8479ed0ffe608b"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### gettransactioninfo
+## gettransactioninfo
 
 Returns information about a transaction from a transaction id.
 
-#### Arguments
-
+### Arguments
 
 |     Parameter    |  Type  | Required |                      Description                     |
 |:---------------- |:------:|:--------:|:---------------------------------------------------- |
 | `transaction_id` | string |    Yes   | The transaction id of the requested transaction info |
 
-#### Response
+### Response
 
 |        Parameter        |  Type  |                Description                |
 |:-----------------------:|:------:|:----------------------------------------- |
@@ -301,79 +296,78 @@ Returns information about a transaction from a transaction id.
 | `signatures`            | array  | The list of transaction signatures        |
 | `transaction_metadata`  | object | The transaction metadata                  |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettransactioninfo", "params": ["83fc73b8a104d7cdabe514ec4ddfeb7fd6284ff8e0a757d25d8479ed0ffe608b"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### sendtransaction
+## sendtransaction
 
 Send raw transaction bytes to this node to be added into the mempool. If valid, the transaction will be stored and propagated to all peers.
 
-#### Arguments
+### Arguments
 
 |      Parameter      |  Type  | Required |              Description             |
 |:------------------- |:------:|:--------:|:------------------------------------ |
 | `transaction_bytes` | string |    Yes   | The raw transaction hex to broadcast |
 
-#### Response
+### Response
 
 | Parameter |  Type  |                 Description                |
 |:---------:|:------:|:------------------------------------------ |
 | `result`  | string | The transaction id of the sent transaction |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### validaterawtransaction
+## validaterawtransaction
 
 Validate and return if the transaction is valid.
 
-#### Arguments
+### Arguments
 
 |      Parameter      |  Type  | Required |             Description             |
 |:------------------- |:------:|:--------:|:----------------------------------- |
 | `transaction_bytes` | string |    Yes   | The raw transaction hex to validate |
 
-#### Response
+### Response
 
 | Parameter |   Type  |             Description             |
 |:---------:|:-------:|:----------------------------------- |
 | `result`  | boolean | Check that the transaction is valid |
 
-#### Example
+### Example
 ```
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "validaterawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 
 
-
-### createaccount
+## createaccount
 
 Generate a new account private key and its corresponding account address.
 
-#### Arguments
+### Arguments
 
 `None`
 
-#### Response
+### Response
 
 |   Parameter   |  Type  |         Description         |
 |:------------- |:------:|:--------------------------- |
 | `private_key` | string | An Aleo account private key |
 | `address`     | string | An Aleo account address     |
 
-#### Example
+### Example
 ```
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "createaccount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
-### createrawtransaction
+## createrawtransaction
 
-#### Arguments
+### Arguments
 
 |          Parameter         |  Type  | Required |                        Description                       |
 |:-------------------------- |:------:|:--------:|:-------------------------------------------------------- |
@@ -390,14 +384,14 @@ Transaction Recipient Object
 | `address` | string | The recipient address            |
 | `value`   | number | The amount sent to the recipient |
 
-#### Response
+### Response
 
 |       Parameter       |  Type  |                  Description                  |
 |:---------------------:|:------:|:--------------------------------------------- |
 | `encoded_transaction` | string | The hex encoding of the generated transaction |
 | `encoded_records`     | array  | The hex encodings of the generated records    |
 
-#### Example
+### Example
 ```
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
@@ -418,42 +412,42 @@ curl --user username:password --data-binary '{
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-### fetchrecordcommitments
+## fetchrecordcommitments
 
 Return the node's stored record commitments.
 
-#### Arguments
+### Arguments
 
 `None`
 
-#### Response
+### Response
 
 | Parameter |  Type |             Description            |
 |:---------:|:-----:|:---------------------------------- |
 | `result`  | array | The list stored record commitments |
 
-#### Example
+### Example
 ```
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "fetchrecordcommitments", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
-### getrawrecord
+## getrawrecord
 
 Returns hex encoded bytes of a record from its record commitment.
 
-#### Arguments
+### Arguments
 
 |      Parameter      |  Type  | Required |      Description      |
 |:-------------------:|:------:|:--------:|:--------------------- |
 | `record_commitment` | string |    Yes   | The record commitment |
 
-#### Response
+### Response
 
 | Parameter |  Type  |          Description         |
 |:---------:|:------:|:---------------------------- |
 | `result`  | string | The hex-encoded record bytes |
 
-#### Example
+### Example
 ```
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawrecord", "params": ["86be61d5f3bd795e31615d6834efefca01ad023d57c0383e2231e094bcabfc05"] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
