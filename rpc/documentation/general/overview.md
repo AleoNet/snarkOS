@@ -12,6 +12,10 @@ The default RPC port is 3030. This can be specified with the `-rpc-port` flag wh
 
 ## Authentication
 
+```
+-rpc-username {USERNAME} -rpc-password {PASSWORD}
+```
+
 The RPC server exposes protected RPC endpoints for account specific operations, such as creating an account,
 creating a transaction, and fetching record commitments.
 RPC requests to protected RPC endpoints can be optionally guarded with an authentication header.
