@@ -1,5 +1,4 @@
 //! Implementation of private RPC endpoints that require authentication.
-// #![doc(include = "../docs/private_endpoints/*.md")]
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{

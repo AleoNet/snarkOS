@@ -2,9 +2,9 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
-#![deny(missing_docs)]
-#![feature(external_doc)]
-#![doc(include = "../documentation/overview.md")]
+#![cfg_attr(nightly, feature(doc_cfg, external_doc))]
+#![cfg_attr(nightly, deny(missing_docs))]
+#![cfg_attr(nightly, doc(include = "../documentation/general/overview.md"))]
 
 pub mod rpc_impl;
 #[doc(inline)]
