@@ -1,17 +1,26 @@
 [
   {
-    "title": "Getting Started",
     "folderName": "getting_started",
-    "match_topic_titles_with_id": false
+    "config": {
+      "match_topic_titles_with_ids": false,
+      "show_topic_titles_in_readme": false,
+      "are_files_numbered": true
+    }
   },
   {
-    "title": "Public Endpoints",
     "folderName": "public_endpoints",
-    "match_topic_titles_with_id": true
+    "config": {
+      "match_topic_titles_with_ids": true,
+      "show_topic_titles_in_readme": true,
+      "are_files_numbered": false
+    }
   },
   {
-    "title": "Private Endpoints",
     "folderName": "private_endpoints",
-    "match_topic_titles_with_id": true
+    "config": {
+      "match_topic_titles_with_ids": true,
+      "show_topic_titles_in_readme": true,
+      "are_files_numbered": false
+    }
   }
 ]

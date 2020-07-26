@@ -1,4 +1,3 @@
-
 In Aleo, full nodes run a [JSON-RPC](https://www.jsonrpc.org/specification) server
 to enable API calls for fetching data and interacting with peers connected to the network.
 

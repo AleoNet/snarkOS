@@ -1,5 +1,3 @@
-## getblockcount
-
 Returns the number of blocks in the best valid chain.
 
 ### Arguments

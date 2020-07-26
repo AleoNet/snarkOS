@@ -1,5 +1,3 @@
-## getblockhash
-
 Returns the block hash of a block at the given block height in the best valid chain.
 
 ### Arguments

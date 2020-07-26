@@ -1,5 +1,3 @@
-## decoderecord
-
 Returns information about a record from serialized record hex.
 
 ### Arguments

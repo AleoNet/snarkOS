@@ -1,5 +1,3 @@
-## gettransactioninfo
-
 Returns information about a transaction from a transaction id.
 
 ### Arguments

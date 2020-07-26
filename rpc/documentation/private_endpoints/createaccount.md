@@ -1,5 +1,3 @@
-## createaccount
-
 Generate a new account private key and its corresponding account address.
 
 ### Protected Endpoint

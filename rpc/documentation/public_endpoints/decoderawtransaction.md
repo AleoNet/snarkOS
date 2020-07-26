@@ -1,5 +1,3 @@
-## decoderawtransaction
-
 Returns information about a transaction from serialized transaction bytes.
 
 ### Arguments

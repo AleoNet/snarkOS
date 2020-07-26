@@ -1,5 +1,3 @@
-## getconnectioncount
-
 Returns the number of connected peers this node has.
 
 ### Arguments
