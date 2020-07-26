@@ -6,6 +6,11 @@ on:
       - '**/*.md'
     branches-ignore:
       - master
+  pull_request:
+    paths:
+      - '**/*.md'
+    branches-ignore:
+      - master
 
 jobs:
   sync:
