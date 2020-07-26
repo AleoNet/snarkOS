@@ -87,4 +87,4 @@ docker run -d -p 4130:4130 --name snarkos snarkos
 
 ## 4. License
 
-[LICENSE](./LICENSE.md)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)

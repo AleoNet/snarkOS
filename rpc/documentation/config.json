@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Getting Started",
+    "folderName": "getting_started",
+    "match_topic_titles_with_id": false
+  },
+  {
+    "title": "Public Endpoints",
+    "folderName": "public_endpoints",
+    "match_topic_titles_with_id": true
+  },
+  {
+    "title": "Private Endpoints",
+    "folderName": "private_endpoints",
+    "match_topic_titles_with_id": true
+  }
+]

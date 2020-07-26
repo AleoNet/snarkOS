@@ -1,4 +1,4 @@
-/// Test unguarded rpc endpoints
+/// Tests for protected RPC endpoints
 mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
     use snarkos_dpc::dpc::base_dpc::{

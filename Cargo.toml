@@ -66,6 +66,9 @@ tokio = { version = "0.2.13", features = ["full"] }
 [dev-dependencies]
 rusty-hook = { version = "0.11.2" }
 
+[build-dependencies]
+rustc_version = "0.2"
+
 [profile.release]
 opt-level = 3
 lto = "thin"

@@ -2208,6 +2208,7 @@ dependencies = [
  "hex",
  "log",
  "rand",
+ "rustc_version",
  "rusty-hook",
  "serde",
  "snarkos-consensus",
