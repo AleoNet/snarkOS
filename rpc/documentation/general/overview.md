@@ -4,7 +4,11 @@ to enable API calls for fetching data and interacting with peers connected to th
 
 ## RPC Port
 
-The default RPC port is 3030. This can be specified with the `-rpc-port` flag when starting the node.
+```
+-rpc-port 3030
+```
+
+The default RPC port is 3030. This can be specified with the `-rpc-port` flag when starting a full node.
 
 ## Authentication
 
