@@ -22,3 +22,4 @@ jobs:
             -u "${{ secrets.SYNC_USERNAME }}:${{ secrets.SYNC_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ secrets.SYNC_ORGANIZATION }}/${{ secrets.SYNC_APPLICATION }}/dispatches \
             -d '{"event_type":"sync-snarkos-documentation", "client_payload": { "branch": "${ BRANCH_NAME }" }}'
+
