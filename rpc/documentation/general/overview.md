@@ -1,5 +1,5 @@
 
-Aleo full nodes support the [JSON-RPC 2.0](https://www.jsonrpc.org/specification) protocol
+On Aleo, full nodes provide a [JSON-RPC 2.0](https://www.jsonrpc.org/specification) protocol
 to enable API calls for fetching data and interacting with peers connected to the network.
 
 ## RPC Port
