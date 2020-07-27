@@ -298,7 +298,7 @@ impl RpcFunctions for RpcImpl {
 
     // Record handling
 
-    /// Decrypts and returns the hex encoded bytes of the record.
+    /// Decrypts the record ciphertext and returns the hex encoded bytes of the record.
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
         // Read the record ciphertext
         let ciphertext_bytes = hex::decode(decryption_input.record_ciphertext)?;

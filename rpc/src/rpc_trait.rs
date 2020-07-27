@@ -63,7 +63,7 @@ pub trait RpcFunctions {
     #[rpc(name = "decoderecord")]
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 
-    // TODO (raychu86) Add documentation for `decryptrecord`
+    #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/decryptrecord.md"))]
     #[rpc(name = "decryptrecord")]
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
 }
