@@ -1,7 +1,7 @@
 ---
 name: "\U0001F680 Feature request"
 about: Submit a new feature request 💡
-title: "[Feature Request]"
+title: "[Feature]"
 labels: feature
 assignees: ''
 ---
