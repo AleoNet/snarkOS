@@ -9,6 +9,32 @@
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
+In Aleo, full nodes run a [JSON-RPC](https://www.jsonrpc.org/specification) server
+to enable API calls for fetching data and interacting with peers connected to the network.
+
+## RPC Port
+
+```
+-rpc-port 3030
+```
+
+The default RPC port is 3030. This can be specified with the `-rpc-port` flag when starting a full node.
+
+## Authentication for Private RPC Endpoints
+
+```
+-rpc-username {USERNAME} -rpc-password {PASSWORD}
+```
+
+The RPC server exposes protected RPC endpoints for account specific operations, such as creating an account,
+creating a transaction, and fetching record commitments.
+RPC requests to protected RPC endpoints can be optionally guarded with an authentication header.
+
+To enable this authentication layer, provide the authentication credentials to
+the `-rpc-username` and `-rpc-password` flags when booting up a full node.
+
+
+
 ## decoderawtransaction
 Returns information about a transaction from serialized transaction bytes.
 
@@ -425,32 +451,6 @@ Yes
 ```
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawrecord", "params": ["86be61d5f3bd795e31615d6834efefca01ad023d57c0383e2231e094bcabfc05"] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
-
-
-
-In Aleo, full nodes run a [JSON-RPC](https://www.jsonrpc.org/specification) server
-to enable API calls for fetching data and interacting with peers connected to the network.
-
-## RPC Port
-
-```
--rpc-port 3030
-```
-
-The default RPC port is 3030. This can be specified with the `-rpc-port` flag when starting a full node.
-
-## Authentication for Private RPC Endpoints
-
-```
--rpc-username {USERNAME} -rpc-password {PASSWORD}
-```
-
-The RPC server exposes protected RPC endpoints for account specific operations, such as creating an account,
-creating a transaction, and fetching record commitments.
-RPC requests to protected RPC endpoints can be optionally guarded with an authentication header.
-
-To enable this authentication layer, provide the authentication credentials to
-the `-rpc-username` and `-rpc-password` flags when booting up a full node.
 
 
 
