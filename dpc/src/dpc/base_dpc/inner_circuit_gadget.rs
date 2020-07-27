@@ -266,16 +266,16 @@ where
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
     let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_birth_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_death_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_birth_predicate_ids_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_death_predicate_ids_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
     let mut new_account_address_gadgets = Vec::with_capacity(new_records.len());
     let mut new_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
     let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_birth_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_death_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_birth_predicate_ids_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_death_predicate_ids_gadgets = Vec::with_capacity(new_records.len());
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
@@ -291,7 +291,7 @@ where
     // 11. ledger_parameters
     // 12. ledger_digest
     // 13. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
-    // 14. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
+    // 14. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i], ciphertext_hash[i]
     // 15. predicate_commitment
     // 16. local_data_commitment
     // 17. binding_signature
@@ -442,15 +442,15 @@ where
 
             let given_birth_predicate_crh = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_birth_predicate_crh"),
-                &record.birth_predicate_hash(),
+                &record.birth_predicate_id(),
             )?;
-            old_birth_predicate_hashes_gadgets.push(given_birth_predicate_crh.clone());
+            old_birth_predicate_ids_gadgets.push(given_birth_predicate_crh.clone());
 
             let given_death_predicate_crh = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_death_predicate_crh"),
-                &record.death_predicate_hash(),
+                &record.death_predicate_id(),
             )?;
-            old_death_predicate_hashes_gadgets.push(given_death_predicate_crh.clone());
+            old_death_predicate_ids_gadgets.push(given_death_predicate_crh.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -751,8 +751,8 @@ where
             given_is_dummy,
             given_value,
             given_payload,
-            given_birth_predicate_hash,
-            given_death_predicate_hash,
+            given_birth_predicate_id,
+            given_death_predicate_id,
             given_commitment_randomness,
             serial_number_nonce,
             serial_number_nonce_bytes,
@@ -785,17 +785,17 @@ where
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             new_payloads_gadgets.push(given_payload.clone());
 
-            let given_birth_predicate_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_birth_predicate_hash"),
-                &record.birth_predicate_hash(),
+            let given_birth_predicate_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_predicate_id"),
+                &record.birth_predicate_id(),
             )?;
-            new_birth_predicate_hashes_gadgets.push(given_birth_predicate_hash.clone());
+            new_birth_predicate_ids_gadgets.push(given_birth_predicate_id.clone());
 
-            let given_death_predicate_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_death_predicate_hash"),
-                &record.death_predicate_hash(),
+            let given_death_predicate_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_predicate_id"),
+                &record.death_predicate_id(),
             )?;
-            new_death_predicate_hashes_gadgets.push(given_death_predicate_hash.clone());
+            new_death_predicate_ids_gadgets.push(given_death_predicate_id.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -817,8 +817,8 @@ where
                 given_is_dummy,
                 given_value,
                 given_payload,
-                given_birth_predicate_hash,
-                given_death_predicate_hash,
+                given_birth_predicate_id,
+                given_death_predicate_id,
                 given_commitment_randomness,
                 serial_number_nonce,
                 serial_number_nonce_bytes,
@@ -911,8 +911,8 @@ where
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
-            commitment_input.extend_from_slice(&given_birth_predicate_hash);
-            commitment_input.extend_from_slice(&given_death_predicate_hash);
+            commitment_input.extend_from_slice(&given_birth_predicate_id);
+            commitment_input.extend_from_slice(&given_death_predicate_id);
             commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
@@ -942,7 +942,7 @@ where
             // Check serialization
 
             // *******************************************************************
-            // Convert serial number nonce, commitment_randomness, birth predicate hash, death predicate hash, payload, and value into bits
+            // Convert serial number nonce, commitment_randomness, birth predicate id, death predicate id, payload, and value into bits
 
             let serial_number_nonce_bits = serial_number_nonce_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert serial_number_nonce_bytes to bits"))?;
@@ -954,10 +954,10 @@ where
 
             let commitment_randomness_bits = commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert commitment_randomness_bytes to bits"))?;
-            let full_birth_predicate_hash_bits = given_birth_predicate_hash
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash to bits"))?;
-            let full_death_predicate_hash_bits = given_death_predicate_hash
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash to bits"))?;
+            let full_birth_predicate_id_bits = given_birth_predicate_id
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_id to bits"))?;
+            let full_death_predicate_id_bits = given_death_predicate_id
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_id to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
             let mut fq_high_bits = vec![];
@@ -1001,22 +1001,22 @@ where
 
             // Birth and death predicates
 
-            let mut birth_predicate_hash_bits = Vec::with_capacity(base_field_bitsize);
-            let mut death_predicate_hash_bits = Vec::with_capacity(base_field_bitsize);
-            let mut birth_predicate_hash_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
-            let mut death_predicate_hash_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut birth_predicate_id_bits = Vec::with_capacity(base_field_bitsize);
+            let mut death_predicate_id_bits = Vec::with_capacity(base_field_bitsize);
+            let mut birth_predicate_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut death_predicate_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
 
             for i in 0..data_field_bitsize {
-                birth_predicate_hash_bits.push(full_birth_predicate_hash_bits[i]);
-                death_predicate_hash_bits.push(full_death_predicate_hash_bits[i]);
+                birth_predicate_id_bits.push(full_birth_predicate_id_bits[i]);
+                death_predicate_id_bits.push(full_death_predicate_id_bits[i]);
             }
 
             // (Assumption 2 applies)
             for i in data_field_bitsize..outer_field_bitsize {
-                birth_predicate_hash_remainder_bits.push(full_birth_predicate_hash_bits[i]);
-                death_predicate_hash_remainder_bits.push(full_death_predicate_hash_bits[i]);
+                birth_predicate_id_remainder_bits.push(full_birth_predicate_id_bits[i]);
+                death_predicate_id_remainder_bits.push(full_death_predicate_id_bits[i]);
             }
-            birth_predicate_hash_remainder_bits.extend_from_slice(&death_predicate_hash_remainder_bits);
+            birth_predicate_id_remainder_bits.extend_from_slice(&death_predicate_id_remainder_bits);
 
             // Payload
 
@@ -1105,15 +1105,15 @@ where
             let given_commitment_randomness_bits = given_commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_commitment_randomness_bytes to bits"))?;
 
-            let given_birth_predicate_hash_bytes = &record_field_elements_gadgets[2]
-                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_hash_bytes"))?;
-            let given_birth_predicate_hash_bits = given_birth_predicate_hash_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash_bytes to bits"))?;
+            let given_birth_predicate_id_bytes = &record_field_elements_gadgets[2]
+                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_id_bytes"))?;
+            let given_birth_predicate_id_bits = given_birth_predicate_id_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_id_bytes to bits"))?;
 
-            let given_death_predicate_hash_bytes = &record_field_elements_gadgets[3]
-                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_hash_bytes"))?;
-            let given_death_predicate_hash_bits = given_death_predicate_hash_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash_bytes to bits"))?;
+            let given_death_predicate_id_bytes = &record_field_elements_gadgets[3]
+                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_id_bytes"))?;
+            let given_death_predicate_id_bits = given_death_predicate_id_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_id_bytes to bits"))?;
 
             let given_predicate_repr_remainder_bytes = &record_field_elements_gadgets[4]
                 .to_bytes(&mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"))?;
@@ -1133,17 +1133,17 @@ where
                 &given_commitment_randomness_bits,
             )?;
 
-            birth_predicate_hash_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_hash_bits match"),
-                &given_birth_predicate_hash_bits,
+            birth_predicate_id_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_id_bits match"),
+                &given_birth_predicate_id_bits,
             )?;
 
-            death_predicate_hash_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_hash_bits match"),
-                &given_death_predicate_hash_bits,
+            death_predicate_id_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_id_bits match"),
+                &given_death_predicate_id_bits,
             )?;
 
-            birth_predicate_hash_remainder_bits.enforce_equal(
+            birth_predicate_id_remainder_bits.enforce_equal(
                 &mut encryption_cs.ns(|| "Check that computed and declared predicate_repr_remainder_bits match"),
                 &given_predicate_repr_remainder_bits,
             )?;
@@ -1333,11 +1333,11 @@ where
 
         let mut input = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
+            input.extend_from_slice(&old_death_predicate_ids_gadgets[i]);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
+            input.extend_from_slice(&new_birth_predicate_ids_gadgets[j]);
         }
 
         let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<

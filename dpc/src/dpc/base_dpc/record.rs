@@ -28,10 +28,10 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) value: u64,
     pub(super) payload: RecordPayload,
 
-    #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
-    pub(super) birth_predicate_hash: Vec<u8>,
-    #[derivative(Default(value = "default_predicate_hash::<C::PredicateVerificationKeyHash>()"))]
-    pub(super) death_predicate_hash: Vec<u8>,
+    #[derivative(Default(value = "default_predicate_id::<C::PredicateVerificationKeyHash>()"))]
+    pub(super) birth_predicate_id: Vec<u8>,
+    #[derivative(Default(value = "default_predicate_id::<C::PredicateVerificationKeyHash>()"))]
+    pub(super) death_predicate_id: Vec<u8>,
 
     pub(super) serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
 
@@ -41,7 +41,7 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) _components: PhantomData<C>,
 }
 
-fn default_predicate_hash<C: CRH>() -> Vec<u8> {
+fn default_predicate_id<C: CRH>() -> Vec<u8> {
     to_bytes![C::Output::default()].unwrap()
 }
 
@@ -67,12 +67,12 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
         &self.payload
     }
 
-    fn birth_predicate_hash(&self) -> &[u8] {
-        &self.birth_predicate_hash
+    fn birth_predicate_id(&self) -> &[u8] {
+        &self.birth_predicate_id
     }
 
-    fn death_predicate_hash(&self) -> &[u8] {
-        &self.death_predicate_hash
+    fn death_predicate_id(&self) -> &[u8] {
+        &self.death_predicate_id
     }
 
     fn serial_number_nonce(&self) -> &Self::SerialNumberNonce {
@@ -101,11 +101,11 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
         self.value.write(&mut writer)?;
         self.payload.write(&mut writer)?;
 
-        variable_length_integer(self.birth_predicate_hash.len() as u64).write(&mut writer)?;
-        self.birth_predicate_hash.write(&mut writer)?;
+        variable_length_integer(self.birth_predicate_id.len() as u64).write(&mut writer)?;
+        self.birth_predicate_id.write(&mut writer)?;
 
-        variable_length_integer(self.death_predicate_hash.len() as u64).write(&mut writer)?;
-        self.death_predicate_hash.write(&mut writer)?;
+        variable_length_integer(self.death_predicate_id.len() as u64).write(&mut writer)?;
+        self.death_predicate_id.write(&mut writer)?;
 
         self.serial_number_nonce.write(&mut writer)?;
         self.commitment.write(&mut writer)?;
@@ -148,8 +148,8 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             is_dummy,
             value,
             payload,
-            birth_predicate_hash: birth_pred_repr.to_vec(),
-            death_predicate_hash: death_pred_repr.to_vec(),
+            birth_predicate_id: birth_pred_repr.to_vec(),
+            death_predicate_id: death_pred_repr.to_vec(),
             serial_number_nonce,
             commitment,
             commitment_randomness,

@@ -36,8 +36,8 @@ pub fn decode_from_group<P: MontgomeryModelParameters + TEModelParameters, G: Gr
 pub struct DeserializedRecord<C: BaseDPCComponents> {
     pub serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
     pub commitment_randomness: <C::RecordCommitment as CommitmentScheme>::Randomness,
-    pub birth_predicate_hash: Vec<u8>,
-    pub death_predicate_hash: Vec<u8>,
+    pub birth_predicate_id: Vec<u8>,
+    pub death_predicate_id: Vec<u8>,
     pub payload: RecordPayload,
     pub value: u64,
 }
@@ -62,9 +62,9 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
     ///
     /// Serialized element 1 - [ Serial number nonce ]
     /// Serialized element 2 - [ Commitment randomness ]
-    /// Serialized element 3 - [ Birth predicate hash (part 1) ]
-    /// Serialized element 4 - [ Death predicate hash (part 1) ]
-    /// Serialized element 5 - [ Birth predicate hash (part 2) || Death predicate hash (part 2) ]
+    /// Serialized element 3 - [ Birth predicate id (part 1) ]
+    /// Serialized element 4 - [ Death predicate id (part 1) ]
+    /// Serialized element 5 - [ Birth predicate id (part 2) || Death predicate id (part 2) ]
     /// Serialized element 6 - [ Payload (part 1) || 1 ]
     /// Serialized element 7 - [ 1 || Sign high bits (7 bits) || Value || Payload (part 2) ]
     ///
@@ -107,8 +107,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         // These elements need to be represented in the constraint field.
 
         let commitment_randomness = record.commitment_randomness();
-        let birth_predicate_hash = record.birth_predicate_hash();
-        let death_predicate_hash = record.death_predicate_hash();
+        let birth_predicate_id = record.birth_predicate_id();
+        let death_predicate_id = record.death_predicate_id();
         let payload = record.payload();
         let value = record.value();
 
@@ -122,45 +122,45 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         assert_eq!(data_elements.len(), 2);
         assert_eq!(data_high_bits.len(), 2);
 
-        // Process birth_predicate_hash and death_predicate_hash. (Assumption 2 and 3 applies)
+        // Process birth_predicate_id and death_predicate_id. (Assumption 2 and 3 applies)
 
-        let birth_predicate_hash_biginteger = Self::OuterField::read(&birth_predicate_hash[..])?.into_repr();
-        let death_predicate_hash_biginteger = Self::OuterField::read(&death_predicate_hash[..])?.into_repr();
+        let birth_predicate_id_biginteger = Self::OuterField::read(&birth_predicate_id[..])?.into_repr();
+        let death_predicate_id_biginteger = Self::OuterField::read(&death_predicate_id[..])?.into_repr();
 
-        let mut birth_predicate_hash_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
-        let mut death_predicate_hash_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
-        let mut birth_predicate_hash_remainder_bits =
+        let mut birth_predicate_id_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
+        let mut death_predicate_id_bits = Vec::with_capacity(Self::INNER_FIELD_BITSIZE);
+        let mut birth_predicate_id_remainder_bits =
             Vec::with_capacity(Self::OUTER_FIELD_BITSIZE - Self::DATA_ELEMENT_BITSIZE);
-        let mut death_predicate_hash_remainder_bits =
+        let mut death_predicate_id_remainder_bits =
             Vec::with_capacity(Self::OUTER_FIELD_BITSIZE - Self::DATA_ELEMENT_BITSIZE);
 
         for i in 0..Self::DATA_ELEMENT_BITSIZE {
-            birth_predicate_hash_bits.push(birth_predicate_hash_biginteger.get_bit(i));
-            death_predicate_hash_bits.push(death_predicate_hash_biginteger.get_bit(i));
+            birth_predicate_id_bits.push(birth_predicate_id_biginteger.get_bit(i));
+            death_predicate_id_bits.push(death_predicate_id_biginteger.get_bit(i));
         }
 
         // (Assumption 2 applies)
         for i in Self::DATA_ELEMENT_BITSIZE..Self::OUTER_FIELD_BITSIZE {
-            birth_predicate_hash_remainder_bits.push(birth_predicate_hash_biginteger.get_bit(i));
-            death_predicate_hash_remainder_bits.push(death_predicate_hash_biginteger.get_bit(i));
+            birth_predicate_id_remainder_bits.push(birth_predicate_id_biginteger.get_bit(i));
+            death_predicate_id_remainder_bits.push(death_predicate_id_biginteger.get_bit(i));
         }
-        birth_predicate_hash_remainder_bits.extend_from_slice(&death_predicate_hash_remainder_bits);
+        birth_predicate_id_remainder_bits.extend_from_slice(&death_predicate_id_remainder_bits);
 
         // (Assumption 3 applies)
 
-        let (encoded_birth_predicate_hash, sign_high) =
-            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_hash_bits)[..])?;
-        data_elements.push(encoded_birth_predicate_hash);
+        let (encoded_birth_predicate_id, sign_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_id_bits)[..])?;
+        data_elements.push(encoded_birth_predicate_id);
         data_high_bits.push(sign_high);
 
-        let (encoded_death_predicate_hash, sign_high) =
-            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&death_predicate_hash_bits)[..])?;
-        data_elements.push(encoded_death_predicate_hash);
+        let (encoded_death_predicate_id, sign_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&death_predicate_id_bits)[..])?;
+        data_elements.push(encoded_death_predicate_id);
         data_high_bits.push(sign_high);
 
-        let (encoded_birth_predicate_hash_remainder, sign_high) =
-            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_hash_remainder_bits)[..])?;
-        data_elements.push(encoded_birth_predicate_hash_remainder);
+        let (encoded_birth_predicate_id_remainder, sign_high) =
+            encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_predicate_id_remainder_bits)[..])?;
+        data_elements.push(encoded_birth_predicate_id_remainder);
         data_high_bits.push(sign_high);
 
         assert_eq!(data_elements.len(), 5);
@@ -276,16 +276,16 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Deserialize birth and death predicates
 
-        let (birth_predicate_hash, birth_predicate_hash_sign_high) = &(serialized_record[2], fq_high_bits[2]);
-        let birth_predicate_hash_bytes = decode_from_group::<Self::Parameters, Self::Group>(
-            birth_predicate_hash.into_affine(),
-            *birth_predicate_hash_sign_high,
+        let (birth_predicate_id, birth_predicate_id_sign_high) = &(serialized_record[2], fq_high_bits[2]);
+        let birth_predicate_id_bytes = decode_from_group::<Self::Parameters, Self::Group>(
+            birth_predicate_id.into_affine(),
+            *birth_predicate_id_sign_high,
         )?;
 
-        let (death_predicate_hash, death_predicate_hash_sign_high) = &(serialized_record[3], fq_high_bits[3]);
-        let death_predicate_hash_bytes = decode_from_group::<Self::Parameters, Self::Group>(
-            death_predicate_hash.into_affine(),
-            *death_predicate_hash_sign_high,
+        let (death_predicate_id, death_predicate_id_sign_high) = &(serialized_record[3], fq_high_bits[3]);
+        let death_predicate_id_bytes = decode_from_group::<Self::Parameters, Self::Group>(
+            death_predicate_id.into_affine(),
+            *death_predicate_id_sign_high,
         )?;
 
         let (predicate_repr_remainder, predicate_repr_sign_high) = &(serialized_record[4], fq_high_bits[4]);
@@ -294,17 +294,17 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             *predicate_repr_sign_high,
         )?;
 
-        let mut birth_predicate_hash_bits =
-            bytes_to_bits(&birth_predicate_hash_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
-        let mut death_predicate_hash_bits =
-            bytes_to_bits(&death_predicate_hash_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
+        let mut birth_predicate_id_bits =
+            bytes_to_bits(&birth_predicate_id_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
+        let mut death_predicate_id_bits =
+            bytes_to_bits(&death_predicate_id_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
 
         let predicate_repr_remainder_bits = bytes_to_bits(&predicate_repr_remainder_bytes);
-        birth_predicate_hash_bits.extend(&predicate_repr_remainder_bits[0..remainder_size]);
-        death_predicate_hash_bits.extend(&predicate_repr_remainder_bits[remainder_size..remainder_size * 2]);
+        birth_predicate_id_bits.extend(&predicate_repr_remainder_bits[0..remainder_size]);
+        death_predicate_id_bits.extend(&predicate_repr_remainder_bits[remainder_size..remainder_size * 2]);
 
-        let birth_predicate_hash = bits_to_bytes(&birth_predicate_hash_bits);
-        let death_predicate_hash = bits_to_bytes(&death_predicate_hash_bits);
+        let birth_predicate_id = bits_to_bytes(&birth_predicate_id_bits);
+        let death_predicate_id = bits_to_bytes(&death_predicate_id_bits);
 
         // Deserialize the value
 
@@ -330,8 +330,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         Ok(DeserializedRecord {
             serial_number_nonce,
             commitment_randomness,
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_predicate_id,
+            death_predicate_id,
             payload,
             value,
         })

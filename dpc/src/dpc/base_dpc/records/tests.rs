@@ -70,14 +70,8 @@ fn test_record_serialization() {
                 given_record.commitment_randomness,
                 record_components.commitment_randomness
             );
-            assert_eq!(
-                given_record.birth_predicate_hash,
-                record_components.birth_predicate_hash
-            );
-            assert_eq!(
-                given_record.death_predicate_hash,
-                record_components.death_predicate_hash
-            );
+            assert_eq!(given_record.birth_predicate_id, record_components.birth_predicate_id);
+            assert_eq!(given_record.death_predicate_id, record_components.death_predicate_id);
             assert_eq!(given_record.value, record_components.value);
             assert_eq!(given_record.payload, record_components.payload);
         }

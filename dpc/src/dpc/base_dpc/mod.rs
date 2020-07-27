@@ -336,17 +336,17 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct a record commitment.
-        let birth_predicate_hash = birth_predicate.into_compact_repr();
-        let death_predicate_hash = death_predicate.into_compact_repr();
+        let birth_predicate_id = birth_predicate.into_compact_repr();
+        let death_predicate_id = death_predicate.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_address,      // 256 bits = 32 bytes
-            is_dummy,             // 1 bit = 1 byte
-            value,                // 64 bits = 8 bytes
-            payload,              // 256 bits = 32 bytes
-            birth_predicate_hash, // 256 bits = 32 bytes
-            death_predicate_hash, // 256 bits = 32 bytes
-            sn_nonce              // 256 bits = 32 bytes
+            account_address,    // 256 bits = 32 bytes
+            is_dummy,           // 1 bit = 1 byte
+            value,              // 64 bits = 8 bytes
+            payload,            // 256 bits = 32 bytes
+            birth_predicate_id, // 256 bits = 32 bytes
+            death_predicate_id, // 256 bits = 32 bytes
+            sn_nonce            // 256 bits = 32 bytes
         ]?;
 
         let commitment = Components::RecordCommitment::commit(
@@ -360,8 +360,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             is_dummy,
             value,
             payload: payload.clone(),
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_predicate_id,
+            death_predicate_id,
             serial_number_nonce: sn_nonce.clone(),
             commitment,
             commitment_randomness,
@@ -413,7 +413,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut joint_serial_numbers = Vec::new();
-        let mut old_death_pred_hashes = Vec::new();
+        let mut old_death_predicate_ids = Vec::new();
 
         let mut value_balance: i64 = 0;
 
@@ -434,7 +434,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
             old_serial_numbers.push(sn);
             old_randomizers.push(randomizer);
-            old_death_pred_hashes.push(record.death_predicate_hash().to_vec());
+            old_death_predicate_ids.push(record.death_predicate_id().to_vec());
 
             end_timer!(input_record_time);
         }
@@ -442,7 +442,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let mut new_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_birth_pred_hashes = Vec::new();
+        let mut new_birth_predicate_ids = Vec::new();
 
         // Generate new records and commitments for them.
         for j in 0..Components::NUM_OUTPUT_RECORDS {
@@ -475,7 +475,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             new_commitments.push(record.commitment.clone());
             new_sn_nonce_randomness.push(sn_randomness);
-            new_birth_pred_hashes.push(record.birth_predicate_hash().to_vec());
+            new_birth_predicate_ids.push(record.birth_predicate_id().to_vec());
             new_records.push(record);
 
             end_timer!(output_record_time);
@@ -529,12 +529,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
         let (predicate_comm, predicate_rand) = {
             let mut input = Vec::new();
-            for hash in old_death_pred_hashes {
-                input.extend_from_slice(&hash);
+            for id in old_death_predicate_ids {
+                input.extend_from_slice(&id);
             }
 
-            for hash in new_birth_pred_hashes {
-                input.extend_from_slice(&hash);
+            for id in new_birth_predicate_ids {
+                input.extend_from_slice(&id);
             }
             let predicate_rand =
                 <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);

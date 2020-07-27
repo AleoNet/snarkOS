@@ -298,8 +298,8 @@ impl RpcFunctions for RpcImpl {
         let payload = RPCRecordPayload {
             payload: hex::encode(to_bytes![record.payload()]?),
         };
-        let birth_predicate_hash = hex::encode(record.birth_predicate_hash());
-        let death_predicate_hash = hex::encode(record.death_predicate_hash());
+        let birth_predicate_id = hex::encode(record.birth_predicate_id());
+        let death_predicate_id = hex::encode(record.death_predicate_id());
         let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
         let commitment = hex::encode(to_bytes![record.commitment()]?);
         let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
@@ -309,8 +309,8 @@ impl RpcFunctions for RpcImpl {
             is_dummy: record.is_dummy(),
             value: record.value(),
             payload,
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_predicate_id,
+            death_predicate_id,
             serial_number_nonce,
             commitment,
             commitment_randomness,

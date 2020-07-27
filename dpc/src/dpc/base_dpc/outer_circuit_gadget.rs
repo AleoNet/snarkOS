@@ -353,8 +353,8 @@ where
     // ************************************************************************
     // ************************************************************************
 
-    let mut old_death_predicate_hashes = Vec::new();
-    let mut new_birth_predicate_hashes = Vec::new();
+    let mut old_death_predicate_ids = Vec::new();
+    let mut new_birth_predicate_ids = Vec::new();
     for i in 0..C::NUM_INPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check death predicate for input record {}", i));
 
@@ -370,16 +370,16 @@ where
 
         let death_predicate_vk_bytes = death_predicate_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
-        let claimed_death_predicate_hash = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
+        let claimed_death_predicate_id = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death predicate vk hash"),
             &predicate_vk_crh_parameters,
             &death_predicate_vk_bytes,
         )?;
 
-        let claimed_death_predicate_hash_bytes =
-            claimed_death_predicate_hash.to_bytes(&mut cs.ns(|| "Convert death_pred vk hash to bytes"))?;
+        let claimed_death_predicate_id_bytes =
+            claimed_death_predicate_id.to_bytes(&mut cs.ns(|| "Convert death_pred vk hash to bytes"))?;
 
-        old_death_predicate_hashes.push(claimed_death_predicate_hash_bytes);
+        old_death_predicate_ids.push(claimed_death_predicate_id_bytes);
 
         let position = UInt8::constant(i as u8).to_bits_le();
 
@@ -408,16 +408,16 @@ where
 
         let birth_predicate_vk_bytes = birth_predicate_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
 
-        let claimed_birth_predicate_hash = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
+        let claimed_birth_predicate_id = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute birth predicate vk hash"),
             &predicate_vk_crh_parameters,
             &birth_predicate_vk_bytes,
         )?;
 
-        let claimed_birth_predicate_hash_bytes =
-            claimed_birth_predicate_hash.to_bytes(&mut cs.ns(|| "Convert birth_pred vk hash to bytes"))?;
+        let claimed_birth_predicate_id_bytes =
+            claimed_birth_predicate_id.to_bytes(&mut cs.ns(|| "Convert birth_pred vk hash to bytes"))?;
 
-        new_birth_predicate_hashes.push(claimed_birth_predicate_hash_bytes);
+        new_birth_predicate_ids.push(claimed_birth_predicate_id_bytes);
 
         let position = UInt8::constant(j as u8).to_bits_le();
 
@@ -435,11 +435,11 @@ where
 
         let mut input = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_predicate_hashes[i]);
+            input.extend_from_slice(&old_death_predicate_ids[i]);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_predicate_hashes[j]);
+            input.extend_from_slice(&new_birth_predicate_ids[j]);
         }
 
         let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
