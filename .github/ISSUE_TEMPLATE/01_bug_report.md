@@ -8,17 +8,19 @@ assignees: ''
 
 ## 🐛 Describe the Bug
 
-<!-- A clear and concise description of what the bug is.
-To report a security issue, please email security@aleo.org. -->
+<!-- A clear and concise description of what the bug is. -->
+<!-- To report a security issue, please email security@aleo.org. -->
 
 ## Steps to Reproduce
 
-**Code snippet to reproduce**
+#### Code snippet to reproduce
+
 ```rust
 # Add code here
 ```
 
-**Stack trace & error message**
+#### Stack trace & error message
+
 ```
 // Paste the output here
 ```
@@ -29,12 +31,8 @@ To report a security issue, please email security@aleo.org. -->
 
 ## System information
 
-**Please complete the following information:**
-
 - <!-- snarkOS Version -->
+
 - <!-- Rust Version -->
+
 - <!-- Computer OS -->
-
-## Relevant Context
-
-Add any other context about the problem here.
