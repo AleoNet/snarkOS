@@ -1,5 +1,3 @@
-# Edwards-BLS12
-
 ## Scalar Field
 
 ### Modulus

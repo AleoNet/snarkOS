@@ -1,5 +1,3 @@
-# Edwards-BW6
-
 ## Scalar Field
 
 ### Modulus
