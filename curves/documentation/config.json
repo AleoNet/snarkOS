@@ -1,6 +1,14 @@
 {
     "default": [
         {
+            "folderName": "getting_started",
+            "config": {
+                "set_topic_titles_using_ids": false,
+                "show_topic_titles_in_markdown": false,
+                "are_filenames_numbered": false
+            }
+        },
+        {
             "folderName": "the_aleo_curves",
             "config": {
                 "set_topic_titles_using_ids": false,
