@@ -1,6 +1,6 @@
-## Scalar Field
+### Scalar Field
 
-### Modulus
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -17,7 +17,7 @@
 [13356249993388743167, 5950279507993463550, 10965441865914903552, 336320092672043349]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
@@ -34,9 +34,9 @@
 [15170730761708361161, 13670723686578117817, 12803492266614043665, 50861023252832611]
 ```
 
-## Base Field
+### Base Field
 
-### Modulus
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -53,7 +53,7 @@
 [725501752471715841, 6461107452199829505, 6968279316240510977, 1345280370688173398]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
