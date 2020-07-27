@@ -1,26 +1,52 @@
 {
-    "default": [
+    "readme": [
         {
             "folderName": "getting_started",
             "config": {
-                "set_topic_titles_using_ids": false,
-                "show_topic_titles_in_markdown": false,
+                "use_filenames_for_section_titles": false,
+                "add_section_titles_to_readme": false,
                 "are_filenames_numbered": false
             }
         },
         {
             "folderName": "public_endpoints",
             "config": {
-                "set_topic_titles_using_ids": true,
-                "show_topic_titles_in_markdown": true,
+                "use_filenames_for_section_titles": true,
+                "add_section_titles_to_readme": true,
                 "are_filenames_numbered": false
             }
         },
         {
             "folderName": "private_endpoints",
             "config": {
-                "set_topic_titles_using_ids": true,
-                "show_topic_titles_in_markdown": true,
+                "use_filenames_for_section_titles": true,
+                "add_section_titles_to_readme": true,
+                "are_filenames_numbered": false
+            }
+        }
+    ],
+    "documentation": [
+        {
+            "folderName": "getting_started",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": false,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "public_endpoints",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": true,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "private_endpoints",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": true,
                 "are_filenames_numbered": false
             }
         }
