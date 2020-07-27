@@ -1,31 +1,39 @@
 {
     "readme": [
         {
-            "folderName": "public_endpoints",
-            "config": {
-                "use_filenames_for_section_titles": true,
-                "add_section_titles_to_readme": true,
-                "are_filenames_numbered": false
-            }
-        },
-        {
-            "folderName": "private_endpoints",
-            "config": {
-                "use_filenames_for_section_titles": true,
-                "add_section_titles_to_readme": true,
-                "are_filenames_numbered": false
-            }
-        },
-        {
             "folderName": "rpc_server",
             "config": {
                 "use_filenames_for_section_titles": false,
                 "add_section_titles_to_readme": false,
                 "are_filenames_numbered": false
             }
+        },
+        {
+            "folderName": "public_endpoints",
+            "config": {
+                "use_filenames_for_section_titles": true,
+                "add_section_titles_to_readme": true,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "private_endpoints",
+            "config": {
+                "use_filenames_for_section_titles": true,
+                "add_section_titles_to_readme": true,
+                "are_filenames_numbered": false
+            }
         }
     ],
     "documentation": [
+        {
+            "folderName": "rpc_server",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": false,
+                "are_filenames_numbered": false
+            }
+        },
         {
             "folderName": "public_endpoints",
             "config": {
@@ -39,14 +47,6 @@
             "config": {
                 "include_title_in_markdown_metadata": true,
                 "use_ids_for_topic_titles": true,
-                "are_filenames_numbered": false
-            }
-        },
-        {
-            "folderName": "rpc_server",
-            "config": {
-                "include_title_in_markdown_metadata": true,
-                "use_ids_for_topic_titles": false,
                 "are_filenames_numbered": false
             }
         }
