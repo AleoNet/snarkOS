@@ -9,6 +9,7 @@
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
+## The Aleo Curves
 Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficient proof verification.
 
 |                     |  Edwards BLS12  |     BLS12-377      |   Edwards BW6   |   BW6-761    |
@@ -21,13 +22,10 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 
 \* rounded to multiples of 8 bytes
 
+## Edwards BLS12
+### Scalar Field
 
-
-# Edwards-BLS12
-
-## Scalar Field
-
-### Modulus
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -44,7 +42,7 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [13356249993388743167, 5950279507993463550, 10965441865914903552, 336320092672043349]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
@@ -61,47 +59,9 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [15170730761708361161, 13670723686578117817, 12803492266614043665, 50861023252832611]
 ```
 
-## Base Field
+### Base Field
 
-### Modulus
-
-##### Integer Representation
-```
-8444461749428370424248824938781546531375899335154063827935233455917409239041
-```
-
-##### Hexadecimal Representation
-```
-12ab655e9a2ca55660b44d1e5c37b00159aa76fed00000010a11800000000001
-```
-
-##### U64 Representation (Little-Endian)
-```
-[725501752471715841, 6461107452199829505, 6968279316240510977, 1345280370688173398]
-```
-
-### Root of Unity
-
-##### Integer Representation
-```
-5928890464389279575069867463136436689218492512582288454256978381122364252082
-```
-
-##### Hexadecimal Representation
-```
-0d1ba211c5cc349cd7aacc7c597248269a14cda3ec99772b3c3d3ca739381fb2
-```
-
-##### U64 Representation (Little-Endian)
-```
-[4340692304772210610, 11102725085307959083, 15540458298643990566, 944526744080888988]
-```
-
-# BLS12-377
-
-## Scalar Field
-
-### Modulus
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -118,7 +78,7 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [725501752471715841, 6461107452199829505, 6968279316240510977, 1345280370688173398]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
@@ -135,9 +95,46 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [4340692304772210610, 11102725085307959083, 15540458298643990566, 944526744080888988]
 ```
 
-## Base Field
+## BLS12-377
+### Scalar Field
 
-### Modulus
+#### Modulus
+
+##### Integer Representation
+```
+8444461749428370424248824938781546531375899335154063827935233455917409239041
+```
+
+##### Hexadecimal Representation
+```
+12ab655e9a2ca55660b44d1e5c37b00159aa76fed00000010a11800000000001
+```
+
+##### U64 Representation (Little-Endian)
+```
+[725501752471715841, 6461107452199829505, 6968279316240510977, 1345280370688173398]
+```
+
+#### Root of Unity
+
+##### Integer Representation
+```
+5928890464389279575069867463136436689218492512582288454256978381122364252082
+```
+
+##### Hexadecimal Representation
+```
+0d1ba211c5cc349cd7aacc7c597248269a14cda3ec99772b3c3d3ca739381fb2
+```
+
+##### U64 Representation (Little-Endian)
+```
+[4340692304772210610, 11102725085307959083, 15540458298643990566, 944526744080888988]
+```
+
+### Base Field
+
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -154,7 +151,7 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [9586122913090633729, 1660523435060625408, 2230234197602682880, 1883307231910630287, 14284016967150029115, 121098312706494698]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
@@ -171,11 +168,10 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [2022196864061697551, 17419102863309525423, 8564289679875062096, 17152078065055548215, 17966377291017729567, 68610905582439508]
 ```
 
-# Edwards-BW6
+## Edwards BW6
+### Scalar Field
 
-## Scalar Field
-
-### Modulus
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -192,7 +188,7 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [4684667634276979349, 3748803659444032385, 16273581227874629698, 7152942431629910641, 6397188139321141543, 15137289088311837]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
@@ -209,47 +205,9 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [12119792640622387781, 8318439284650634613, 6931324077796168275, 12851391603681523141, 6881015057611215092, 1893962574900431]
 ```
 
-## Base Field
+### Base Field
 
-### Modulus
-
-##### Integer Representation
-```
-258664426012969094010652733694893533536393512754914660539884262666720468348340822774968888139573360124440321458177
-```
-
-##### Hexadecimal Representation
-```
-01ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508c00000000001
-```
-
-##### U64 Representation (Little-Endian)
-```
-[9586122913090633729, 1660523435060625408, 2230234197602682880, 1883307231910630287, 14284016967150029115, 121098312706494698]
-```
-
-### Root of Unity
-
-##### Integer Representation
-```
-146552004846884389553264564610149105174701957497228680529098805315416492923550540437026734404078567406251254115855
-```
-
-##### Hexadecimal Representation
-```
-00f3c1414ef58c54f95564f4cbc1b61fee086c1fe367c33776da78169a7f3950f1bd15c3898dd1af1c104955744e6e0f
-```
-
-##### U64 Representation (Little-Endian)
-```
-[2022196864061697551, 17419102863309525423, 8564289679875062096, 17152078065055548215, 17966377291017729567, 68610905582439508]
-```
-
-# BW6-761
-
-## Scalar Field
-
-### Modulus
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -266,7 +224,7 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [9586122913090633729, 1660523435060625408, 2230234197602682880, 1883307231910630287, 14284016967150029115, 121098312706494698]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
@@ -283,9 +241,46 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [2022196864061697551, 17419102863309525423, 8564289679875062096, 17152078065055548215, 17966377291017729567, 68610905582439508]
 ```
 
-## Base Field
+## BW6-761
+### Scalar Field
 
-### Modulus
+#### Modulus
+
+##### Integer Representation
+```
+258664426012969094010652733694893533536393512754914660539884262666720468348340822774968888139573360124440321458177
+```
+
+##### Hexadecimal Representation
+```
+01ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508c00000000001
+```
+
+##### U64 Representation (Little-Endian)
+```
+[9586122913090633729, 1660523435060625408, 2230234197602682880, 1883307231910630287, 14284016967150029115, 121098312706494698]
+```
+
+#### Root of Unity
+
+##### Integer Representation
+```
+146552004846884389553264564610149105174701957497228680529098805315416492923550540437026734404078567406251254115855
+```
+
+##### Hexadecimal Representation
+```
+00f3c1414ef58c54f95564f4cbc1b61fee086c1fe367c33776da78169a7f3950f1bd15c3898dd1af1c104955744e6e0f
+```
+
+##### U64 Representation (Little-Endian)
+```
+[2022196864061697551, 17419102863309525423, 8564289679875062096, 17152078065055548215, 17966377291017729567, 68610905582439508]
+```
+
+### Base Field
+
+#### Modulus
 
 ##### Integer Representation
 ```
@@ -302,7 +297,7 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 [17626244516597989515, 16614129118623039618, 1588918198704579639, 10998096788944562424, 8204665564953313070, 9694500593442880912, 274362232328168196, 8105254717682411801, 5945444129596489281, 13341377791855249032, 15098257552581525310, 81882988782276106]
 ```
 
-### Root of Unity
+#### Root of Unity
 
 ##### Integer Representation
 ```
