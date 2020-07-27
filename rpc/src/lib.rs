@@ -4,7 +4,7 @@
 // Documentation
 #![cfg_attr(nightly, feature(doc_cfg, external_doc))]
 #![cfg_attr(nightly, warn(missing_docs))]
-#![cfg_attr(nightly, doc(include = "../documentation/getting_started/rpc_server.md"))]
+#![cfg_attr(nightly, doc(include = "../documentation/rpc_server/configurations.md"))]
 
 pub mod rpc_impl;
 #[doc(inline)]

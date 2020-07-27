@@ -1,7 +1,7 @@
 {
     "readme": [
         {
-            "folderName": "getting_started",
+            "folderName": "rpc_server",
             "config": {
                 "use_filenames_for_section_titles": false,
                 "add_section_titles_to_readme": false,
@@ -27,7 +27,7 @@
     ],
     "documentation": [
         {
-            "folderName": "getting_started",
+            "folderName": "rpc_server",
             "config": {
                 "include_title_in_markdown_metadata": true,
                 "use_ids_for_topic_titles": false,

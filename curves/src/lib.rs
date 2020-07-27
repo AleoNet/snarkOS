@@ -21,7 +21,7 @@
 // Documentation
 #![cfg_attr(nightly, feature(doc_cfg, external_doc))]
 #![cfg_attr(nightly, warn(missing_docs))]
-#![cfg_attr(nightly, doc(include = "../documentation/getting_started/curves.md"))]
+#![cfg_attr(nightly, doc(include = "../documentation/the_aleo_curves/00_the_aleo_curves.md"))]
 
 #[macro_use]
 extern crate derivative;
