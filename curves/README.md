@@ -21,6 +21,8 @@ Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficien
 
 \* rounded to multiples of 8 bytes
 
+
+
 # Edwards-BLS12
 
 ## Scalar Field

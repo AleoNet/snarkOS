@@ -1,26 +1,28 @@
-[
-  {
-    "folderName": "getting_started",
-    "config": {
-      "match_topic_titles_with_ids": false,
-      "show_topic_titles_in_readme": false,
-      "are_files_numbered": true
-    }
-  },
-  {
-    "folderName": "public_endpoints",
-    "config": {
-      "match_topic_titles_with_ids": true,
-      "show_topic_titles_in_readme": true,
-      "are_files_numbered": false
-    }
-  },
-  {
-    "folderName": "private_endpoints",
-    "config": {
-      "match_topic_titles_with_ids": true,
-      "show_topic_titles_in_readme": true,
-      "are_files_numbered": false
-    }
-  }
-]
+{
+    "default": [
+        {
+            "folderName": "getting_started",
+            "config": {
+                "set_topic_titles_using_ids": false,
+                "show_topic_titles_in_markdown": false,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "public_endpoints",
+            "config": {
+                "set_topic_titles_using_ids": true,
+                "show_topic_titles_in_markdown": true,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "private_endpoints",
+            "config": {
+                "set_topic_titles_using_ids": true,
+                "show_topic_titles_in_markdown": true,
+                "are_filenames_numbered": false
+            }
+        }
+    ]
+}

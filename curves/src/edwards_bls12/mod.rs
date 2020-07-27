@@ -1,4 +1,4 @@
-#![cfg_attr(nightly, doc(include = "../../documentation/the_aleo_curves/01_edwards_bls12.md"))]
+#![cfg_attr(nightly, doc(include = "../../documentation/the_aleo_curves/00_edwards_bls12.md"))]
 
 pub mod fq;
 #[doc(inline)]
