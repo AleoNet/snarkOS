@@ -8,10 +8,6 @@ printf "\nParameter generation starting...\n\n"
 cd parameters/scripts || printf "\nError - cannot find 'parameters/scripts' folder\n\n"
 ./parameters_setup.sh
 
-# Generate genesis block
-
-./genesis_block_setup.sh
-
 # Generate test data
 
 cd ../../testing/scripts || printf "\nError - cannot find 'testing/scripts' folder\n\n"

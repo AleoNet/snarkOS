@@ -64,12 +64,12 @@ mod tests {
 
     #[test]
     fn load_params_verify() {
-        let _params = Posw::verify_only().unwrap();
+        let _params = PoswMarlin::verify_only().unwrap();
     }
 
     #[test]
     fn load_params() {
-        let _params = Posw::load().unwrap();
+        let _params = PoswMarlin::load().unwrap();
     }
 
     #[test]

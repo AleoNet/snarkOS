@@ -1,4 +1,8 @@
-use crate::{rpc_types::*, RpcFunctions};
+//! Implementation of public RPC endpoints.
+//!
+//! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
+
+use crate::{rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -45,6 +49,7 @@ pub struct RpcImpl {
 }
 
 impl RpcImpl {
+    /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
         parameters: PublicParameters<Components>,

@@ -15,7 +15,7 @@ use snarkos_network::{
     server::{MinerInstance, Server},
 };
 use snarkos_objects::AccountAddress;
-use snarkos_posw::Posw;
+use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 
 use dirs::home_dir;
@@ -52,7 +52,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
         network_id,
-        verifier: Posw::verify_only().expect("could not instantiate PoSW verifier"),
+        verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
     let mut path = home_dir().unwrap_or(std::env::current_dir()?);

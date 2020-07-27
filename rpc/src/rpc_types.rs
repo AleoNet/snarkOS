@@ -1,16 +1,22 @@
+//! Structures for RPC endpoint requests and responses.
+
 use jsonrpc_http_server::jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-/// Returned value for the `getblock` rpc call
+/// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcCredentials {
+    /// The username in the credential
     pub username: String,
+    /// The password in the credential
     pub password: String,
 }
 
+/// RPC metadata for encoding authentication
 #[derive(Default, Clone)]
 pub struct Meta {
+    /// An optional authentication string for protected RPC functions
     pub auth: Option<String>,
 }
 
@@ -66,12 +72,14 @@ pub struct DecryptRecordInput {
 /// Returned value for the `getpeerinfo` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerInfo {
+    /// The peers connected to this node
     pub peers: Vec<SocketAddr>,
 }
 
-/// Transaction Metadata
+/// Additional metadata included with a transaction response
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionMetadata {
+    /// The block number associated with this transaction
     pub block_number: Option<u32>,
 }
 
@@ -118,7 +126,7 @@ pub struct TransactionInfo {
     pub transaction_metadata: TransactionMetadata,
 }
 
-/// Record payload
+/// Record payload data
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RPCRecordPayload {
     /// Record payload
@@ -204,24 +212,28 @@ pub struct TransactionInputs {
 /// Recipient of a transaction
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionRecipient {
-    /// Recipient account address
+    /// The recipient's account address
     pub address: String,
-
-    /// Amount being sent
+    /// The amount being sent
     pub amount: u64,
 }
 
 /// Output for the `createrawtransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CreateRawTransactionOuput {
+    /// The newly created transaction from calling the `createrawtransaction` endpoint
     pub encoded_transaction: String,
+    /// The newly created records from calling the `createrawtransaction` endpoint
     pub encoded_records: Vec<String>,
 }
 
 /// Output for the `createaccount` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcAccount {
+    /// An account private key
     pub private_key: String,
+    /// An account view key corresponding to the account private key
     pub view_key: String,
+    /// An account address corresponding to the account private key
     pub address: String,
 }

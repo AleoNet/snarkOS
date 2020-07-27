@@ -23,3 +23,6 @@ rand_xorshift = { version = "0.2", default-features = false }
 
 [features]
 default = [ "snarkos-errors/default", "snarkos-models/default", "snarkos-utilities/default", ]
+
+[build-dependencies]
+rustc_version = "0.2"

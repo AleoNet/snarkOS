@@ -43,7 +43,7 @@ fn marlin_bench(c: &mut Criterion) {
     group.sample_size(10);
     let rng = &mut XorShiftRng::seed_from_u64(1234567);
 
-    let universal_srs = marlin::snark::Marlin::<Bls12_377>::universal_setup(10000, 10000, 100000, rng).unwrap();
+    let universal_srs = snarkos_marlin::snark::Marlin::<Bls12_377>::universal_setup(10000, 10000, 100000, rng).unwrap();
     let posw = PoswMarlin::index(universal_srs).unwrap();
 
     let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;

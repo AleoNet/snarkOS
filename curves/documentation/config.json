@@ -1,0 +1,22 @@
+{
+    "readme": [
+        {
+            "folderName": "the_aleo_curves",
+            "config": {
+                "use_filenames_for_section_titles": false,
+                "add_section_titles_to_readme": true,
+                "are_filenames_numbered": true
+            }
+        }
+    ],
+    "documentation": [
+        {
+            "folderName": "the_aleo_curves",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": false,
+                "are_filenames_numbered": true
+            }
+        }
+    ]
+}
