@@ -63,7 +63,7 @@ impl Miner {
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let predicate_vk_hash = to_bytes![PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &parameters.system_parameters.predicate_verification_key_hash,
             &to_bytes![parameters.predicate_snark_parameters.verification_key]?
         )?]?;
 

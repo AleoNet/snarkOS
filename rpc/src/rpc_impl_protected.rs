@@ -160,7 +160,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         // Fetch birth/death predicates
         let predicate_vk_hash = self
             .parameters
-            .circuit_parameters
+            .system_parameters
             .predicate_verification_key_hash
             .hash(&to_bytes![self.parameters.predicate_snark_parameters.verification_key]?)?;
         let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
@@ -186,7 +186,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
                 .parameters
-                .circuit_parameters
+                .system_parameters
                 .serial_number_nonce
                 .hash(&sn_randomness)?;
 
@@ -199,7 +199,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters.circuit_parameters,
+                &self.parameters.system_parameters,
                 &old_sn_nonce,
                 &address,
                 true, // The input record is dummy

@@ -2,7 +2,7 @@ use crate::{
     dpc::base_dpc::{
         binding_signature::BindingSignature,
         inner_circuit_gadget::execute_inner_proof_gadget,
-        parameters::CircuitParameters,
+        parameters::SystemParameters,
         record::DPCRecord,
         BaseDPCComponents,
     },
@@ -21,7 +21,7 @@ use snarkos_objects::AccountPrivateKey;
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct InnerCircuit<C: BaseDPCComponents> {
     // Parameters
-    circuit_parameters: Option<CircuitParameters<C>>,
+    system_parameters: Option<SystemParameters<C>>,
     ledger_parameters: Option<C::MerkleParameters>,
 
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
@@ -71,7 +71,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
-    pub fn blank(circuit_parameters: &CircuitParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
+    pub fn blank(system_parameters: &SystemParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
@@ -136,7 +136,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest
@@ -180,7 +180,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
     pub fn new(
         // Parameters
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         ledger_parameters: &C::MerkleParameters,
 
         // Digest
@@ -270,7 +270,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest
@@ -319,7 +319,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
         execute_inner_proof_gadget::<C, CS>(
             cs,
             // Parameters
-            self.circuit_parameters.get()?,
+            self.system_parameters.get()?,
             self.ledger_parameters.get()?,
             // Digest
             self.ledger_digest.get()?,

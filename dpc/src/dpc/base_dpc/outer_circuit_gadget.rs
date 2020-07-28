@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{parameters::CircuitParameters, predicate::PrivatePredicateInput, BaseDPCComponents};
+use crate::dpc::base_dpc::{parameters::SystemParameters, predicate::PrivatePredicateInput, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -44,7 +44,7 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
 
     // Inner snark verifier public inputs
     ledger_parameters: &C::MerkleParameters,
@@ -108,13 +108,13 @@ where
             C::OuterField,
         >>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare predicate_vk_commitment_parameters"),
-            || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
+            || Ok(system_parameters.predicate_verification_key_commitment.parameters()),
         )?;
 
         let predicate_vk_crh_parameters =
             <C::PredicateVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare predicate_vk_crh_parameters"),
-                || Ok(circuit_parameters.predicate_verification_key_hash.parameters()),
+                || Ok(system_parameters.predicate_verification_key_hash.parameters()),
             )?;
 
         (predicate_vk_commitment_parameters, predicate_vk_crh_parameters)
@@ -127,40 +127,40 @@ where
     // Declare inner snark verifier inputs as `CoreCheckF` field elements
 
     let account_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_commitment.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let account_encryption_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_encryption.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_encryption.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let account_signature_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_signature.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_signature.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let record_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_commitment.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.record_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let record_ciphertext_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_ciphertext_crh.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.record_ciphertext_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let predicate_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-        circuit_parameters.predicate_verification_key_commitment.parameters(),
+        system_parameters.predicate_verification_key_commitment.parameters(),
     )
     .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let local_data_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_crh.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.local_data_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let serial_number_nonce_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.serial_number_nonce.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.serial_number_nonce.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let value_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.value_commitment.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.value_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let ledger_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_parameters.parameters())

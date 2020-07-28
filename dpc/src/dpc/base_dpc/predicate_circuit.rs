@@ -1,5 +1,5 @@
 use crate::{
-    base_dpc::{parameters::CircuitParameters, *},
+    base_dpc::{parameters::SystemParameters, *},
     Assignment,
 };
 use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
@@ -36,7 +36,7 @@ where
 
 pub struct PredicateCircuit<C: BaseDPCComponents> {
     // Parameters
-    pub circuit_parameters: Option<CircuitParameters<C>>,
+    pub system_parameters: Option<SystemParameters<C>>,
 
     // Commitment to Predicate input.
     pub local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
@@ -44,23 +44,23 @@ pub struct PredicateCircuit<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> PredicateCircuit<C> {
-    pub fn blank(circuit_parameters: &CircuitParameters<C>) -> Self {
+    pub fn blank(system_parameters: &SystemParameters<C>) -> Self {
         let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
 
         Self {
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
             local_data_commitment: Some(local_data_commitment),
             position: 0u8,
         }
     }
 
     pub fn new(
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
         position: u8,
     ) -> Self {
         Self {
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
             local_data_commitment: Some(local_data_commitment.clone()),
             position,
         }
@@ -71,7 +71,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,
-            self.circuit_parameters.get()?,
+            self.system_parameters.get()?,
             self.local_data_commitment.get()?,
             self.position,
         )
@@ -80,7 +80,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCir
 
 fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
     local_data_commitment: &<C::LocalDataCommitment as CommitmentScheme>::Output,
     position: u8,
 ) -> Result<(), SynthesisError> {
@@ -88,8 +88,8 @@ fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::In
 
     let _local_data_commitment_parameters_gadget =
         <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare Pred Input Comm parameters"),
-            || Ok(circuit_parameters.local_data_commitment.parameters().clone()),
+            &mut cs.ns(|| "Declare local data commitment parameters"),
+            || Ok(system_parameters.local_data_commitment.parameters().clone()),
         )?;
 
     let _local_data_commitment_gadget =

@@ -1,6 +1,6 @@
 use crate::{account::PrivateKey, errors::AddressError};
 
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::CircuitParameters};
+use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_objects::AccountAddress;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -13,7 +13,7 @@ pub struct Address {
 
 impl Address {
     pub fn from(private_key: &PrivateKey) -> Result<Self, AddressError> {
-        let parameters = CircuitParameters::<Components>::load()?;
+        let parameters = SystemParameters::<Components>::load()?;
         let address = AccountAddress::<Components>::from_private_key(
             &parameters.account_signature,
             &parameters.account_commitment,

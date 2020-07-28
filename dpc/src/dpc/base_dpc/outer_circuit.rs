@@ -1,7 +1,7 @@
 use crate::{
     dpc::base_dpc::{
         outer_circuit_gadget::execute_outer_proof_gadget,
-        parameters::CircuitParameters,
+        parameters::SystemParameters,
         predicate::PrivatePredicateInput,
         BaseDPCComponents,
     },
@@ -18,7 +18,7 @@ use snarkos_models::{
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct OuterCircuit<C: BaseDPCComponents> {
-    circuit_parameters: Option<CircuitParameters<C>>,
+    system_parameters: Option<SystemParameters<C>>,
 
     // Inner snark verifier public inputs
     ledger_parameters: Option<C::MerkleParameters>,
@@ -44,7 +44,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
     pub fn blank(
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         ledger_parameters: &C::MerkleParameters,
         inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
         inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
@@ -79,7 +79,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let local_data_comm = Some(<C::LocalDataCRH as CRH>::Output::default());
 
         Self {
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
 
             ledger_parameters: Some(ledger_parameters.clone()),
             ledger_digest,
@@ -103,7 +103,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
     }
 
     pub fn new(
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
 
         // Inner snark public inputs
         ledger_parameters: &C::MerkleParameters,
@@ -140,7 +140,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
 
         Self {
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
 
             ledger_parameters: Some(ledger_parameters.clone()),
             ledger_digest: Some(ledger_digest.clone()),
@@ -196,7 +196,7 @@ where
     fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_outer_proof_gadget::<C, CS>(
             cs,
-            self.circuit_parameters.get()?,
+            self.system_parameters.get()?,
             self.ledger_parameters.get()?,
             self.ledger_digest.get()?,
             self.old_serial_numbers.get()?,

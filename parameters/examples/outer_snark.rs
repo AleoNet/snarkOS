@@ -3,7 +3,7 @@ use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
     outer_circuit::OuterCircuit,
-    parameters::{CircuitParameters, PredicateSNARKParameters},
+    parameters::{PredicateSNARKParameters, SystemParameters},
     predicate::PrivatePredicateInput,
     predicate_circuit::PredicateCircuit,
     BaseDPCComponents,
@@ -28,7 +28,7 @@ use utils::store;
 
 pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let rng = &mut thread_rng();
-    let circuit_parameters = CircuitParameters::<C>::load()?;
+    let system_parameters = SystemParameters::<C>::load()?;
 
     let merkle_tree_hash_parameters: <C::MerkleParameters as MerkleParameters>::H =
         From::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
@@ -44,7 +44,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     let inner_snark_proof = C::InnerSNARK::prove(
         &inner_snark_pk,
-        InnerCircuit::blank(&circuit_parameters, &ledger_merkle_tree_parameters),
+        InnerCircuit::blank(&system_parameters, &ledger_merkle_tree_parameters),
         rng,
     )?;
 
@@ -53,7 +53,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     let predicate_snark_proof = C::PredicateSNARK::prove(
         &predicate_snark_parameters.proving_key,
-        PredicateCircuit::blank(&circuit_parameters),
+        PredicateCircuit::blank(&system_parameters),
         rng,
     )?;
     let private_predicate_input = PrivatePredicateInput {
@@ -63,7 +63,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     let outer_snark_parameters = C::OuterSNARK::setup(
         OuterCircuit::blank(
-            &circuit_parameters,
+            &system_parameters,
             &ledger_merkle_tree_parameters,
             &inner_snark_vk,
             &inner_snark_proof,

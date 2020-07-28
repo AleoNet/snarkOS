@@ -1,6 +1,6 @@
 use crate::dpc::base_dpc::{
     binding_signature::{gadget_verification_setup, BindingSignature},
-    parameters::CircuitParameters,
+    parameters::SystemParameters,
     record::DPCRecord,
     BaseDPCComponents,
 };
@@ -54,7 +54,7 @@ use std::ops::Mul;
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
     ledger_parameters: &C::MerkleParameters,
 
     // Digest
@@ -118,7 +118,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     >(
         cs,
         //
-        circuit_parameters,
+        system_parameters,
         ledger_parameters,
         //
         ledger_digest,
@@ -178,7 +178,7 @@ fn base_dpc_execute_gadget_helper<
     cs: &mut CS,
 
     //
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
     ledger_parameters: &C::MerkleParameters,
 
     //
@@ -312,27 +312,27 @@ where
 
         let account_commitment_parameters = AccountCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account commit parameters"),
-            || Ok(circuit_parameters.account_commitment.parameters()),
+            || Ok(system_parameters.account_commitment.parameters()),
         )?;
 
         let account_encryption_parameters = AccountEncryptionGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account encryption parameters"),
-            || Ok(circuit_parameters.account_encryption.parameters()),
+            || Ok(system_parameters.account_encryption.parameters()),
         )?;
 
         let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account signature parameters"),
-            || Ok(circuit_parameters.account_signature.parameters()),
+            || Ok(system_parameters.account_signature.parameters()),
         )?;
 
         let record_commitment_parameters = RecordCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record commitment parameters"),
-            || Ok(circuit_parameters.record_commitment.parameters()),
+            || Ok(system_parameters.record_commitment.parameters()),
         )?;
 
         let record_ciphertext_crh_parameters = RecordCiphertextCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record ciphertext CRH parameters"),
-            || Ok(circuit_parameters.record_ciphertext_crh.parameters()),
+            || Ok(system_parameters.record_ciphertext_crh.parameters()),
         )?;
 
         let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
@@ -340,28 +340,28 @@ where
             C::InnerField,
         >>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare predicate vk commitment parameters"),
-            || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
+            || Ok(system_parameters.predicate_verification_key_commitment.parameters()),
         )?;
 
         let local_data_crh_parameters = LocalDataCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare local data CRH parameters"),
-            || Ok(circuit_parameters.local_data_crh.parameters()),
+            || Ok(system_parameters.local_data_crh.parameters()),
         )?;
 
         let local_data_commitment_parameters = LocalDataCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare local data commitment parameters"),
-            || Ok(circuit_parameters.local_data_commitment.parameters()),
+            || Ok(system_parameters.local_data_commitment.parameters()),
         )?;
 
         let serial_number_nonce_crh_parameters = SerialNumberNonceCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare serial number nonce CRH parameters"),
-            || Ok(circuit_parameters.serial_number_nonce.parameters()),
+            || Ok(system_parameters.serial_number_nonce.parameters()),
         )?;
 
         let value_commitment_parameters =
             <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare value commitment parameters"),
-                || Ok(circuit_parameters.value_commitment.parameters()),
+                || Ok(system_parameters.value_commitment.parameters()),
             )?;
 
         let ledger_parameters = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
@@ -509,7 +509,7 @@ where
             // Allocate the account private key.
             let (pk_sig, sk_prf, r_pk) = {
                 let pk_sig_native = account_private_key
-                    .pk_sig(&circuit_parameters.account_signature)
+                    .pk_sig(&system_parameters.account_signature)
                     .map_err(|_| SynthesisError::AssignmentMissing)?;
                 let pk_sig =
                     AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
@@ -554,8 +554,8 @@ where
                         || {
                             Ok(account_private_key
                                 .to_decryption_key(
-                                    &circuit_parameters.account_signature,
-                                    &circuit_parameters.account_commitment,
+                                    &system_parameters.account_signature,
+                                    &system_parameters.account_commitment,
                                 )
                                 .map_err(|_| SynthesisError::AssignmentMissing)?)
                         },
@@ -1477,7 +1477,7 @@ where
 
         let (c, partial_bvk, affine_r, recommit) =
             gadget_verification_setup::<C::ValueCommitment, C::BindingSignatureGroup>(
-                &circuit_parameters.value_commitment,
+                &system_parameters.value_commitment,
                 &input_value_commitments,
                 &output_value_commitments,
                 &to_bytes![local_data_comm]?,
@@ -1491,7 +1491,7 @@ where
             C::BindingSignatureGroup,
         >>::ParametersGadget::alloc(
             &mut cs.ns(|| "Declare value commitment parameters as binding signature parameters"),
-            || Ok(circuit_parameters.value_commitment.parameters()),
+            || Ok(system_parameters.value_commitment.parameters()),
         )?;
 
         let c_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<

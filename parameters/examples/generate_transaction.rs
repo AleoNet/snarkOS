@@ -81,7 +81,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
 
     let predicate_vk_hash = parameters
-        .circuit_parameters
+        .system_parameters
         .predicate_verification_key_hash
         .hash(&to_bytes![parameters.predicate_snark_parameters.verification_key]?)?;
     let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
@@ -89,9 +89,9 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     // Generate a new account that owns the dummy input records
     let dummy_account = Account::new(
-        &parameters.circuit_parameters.account_signature,
-        &parameters.circuit_parameters.account_commitment,
-        &parameters.circuit_parameters.account_encryption,
+        &parameters.system_parameters.account_signature,
+        &parameters.system_parameters.account_commitment,
+        &parameters.system_parameters.account_encryption,
         rng,
     )
     .unwrap();
@@ -102,12 +102,12 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let mut old_records = vec![];
     for i in 0..Components::NUM_INPUT_RECORDS {
         let old_sn_nonce = &parameters
-            .circuit_parameters
+            .system_parameters
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])
             .unwrap();
         let old_record = DPC::generate_record(
-            &parameters.circuit_parameters,
+            &parameters.system_parameters,
             &old_sn_nonce,
             &dummy_account.address,
             true, // The input record is dummy

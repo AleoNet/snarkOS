@@ -1,4 +1,4 @@
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::CircuitParameters, BaseDPCComponents, DPC};
+use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters, BaseDPCComponents, DPC};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::algorithms::SNARK;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
@@ -11,9 +11,9 @@ use utils::store;
 
 pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let rng = &mut thread_rng();
-    let circuit_parameters = CircuitParameters::<C>::load()?;
+    let system_parameters = SystemParameters::<C>::load()?;
 
-    let predicate_snark_parameters = DPC::<C>::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
+    let predicate_snark_parameters = DPC::<C>::generate_predicate_snark_parameters(&system_parameters, rng)?;
     let predicate_snark_pk = to_bytes![predicate_snark_parameters.proving_key]?;
     let predicate_snark_vk: <C::PredicateSNARK as SNARK>::VerificationParameters =
         predicate_snark_parameters.verification_key.into();

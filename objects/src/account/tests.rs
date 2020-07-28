@@ -1,5 +1,5 @@
 use crate::account::{Account, AccountAddress, AccountPrivateKey};
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::CircuitParameters};
+use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::objects::account::AccountScheme;
 
 use rand::thread_rng;
@@ -8,7 +8,7 @@ use std::str::FromStr;
 #[test]
 fn test_account_new() {
     let rng = &mut thread_rng();
-    let parameters = CircuitParameters::<Components>::load().unwrap();
+    let parameters = SystemParameters::<Components>::load().unwrap();
 
     let account = Account::<Components>::new(
         &parameters.account_signature,

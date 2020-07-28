@@ -353,9 +353,9 @@ impl ConsensusParameters {
 
         // Generate a new account that owns the dummy input records
         let new_account = Account::new(
-            &parameters.circuit_parameters.account_signature,
-            &parameters.circuit_parameters.account_commitment,
-            &parameters.circuit_parameters.account_encryption,
+            &parameters.system_parameters.account_signature,
+            &parameters.system_parameters.account_commitment,
+            &parameters.system_parameters.account_encryption,
             rng,
         )
         .unwrap();
@@ -367,10 +367,10 @@ impl ConsensusParameters {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
             let old_sn_nonce =
-                SerialNumberNonce::hash(&parameters.circuit_parameters.serial_number_nonce, &sn_nonce_input)?;
+                SerialNumberNonce::hash(&parameters.system_parameters.serial_number_nonce, &sn_nonce_input)?;
 
             let old_record = InstantiatedDPC::generate_record(
-                &parameters.circuit_parameters,
+                &parameters.system_parameters,
                 &old_sn_nonce,
                 &new_account.address,
                 true, // The input record is dummy
@@ -433,7 +433,7 @@ impl ConsensusParameters {
             for i in 0..Components::NUM_INPUT_RECORDS {
                 // Instantiate death predicate circuit
                 let death_predicate_circuit = PredicateCircuit::new(
-                    &local_data.circuit_parameters,
+                    &local_data.system_parameters,
                     &local_data.local_data_commitment,
                     i as u8,
                 );
@@ -448,7 +448,7 @@ impl ConsensusParameters {
                 {
                     let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
-                            .circuit_parameters
+                            .system_parameters
                             .local_data_commitment
                             .parameters()
                             .clone(),
@@ -476,7 +476,7 @@ impl ConsensusParameters {
             for j in 0..NUM_OUTPUT_RECORDS {
                 // Instantiate birth predicate circuit
                 let birth_predicate_circuit = PredicateCircuit::new(
-                    &local_data.circuit_parameters,
+                    &local_data.system_parameters,
                     &local_data.local_data_commitment,
                     j as u8,
                 );
@@ -491,7 +491,7 @@ impl ConsensusParameters {
                 {
                     let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                         local_data_commitment_parameters: local_data
-                            .circuit_parameters
+                            .system_parameters
                             .local_data_commitment
                             .parameters()
                             .clone(),

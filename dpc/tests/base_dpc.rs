@@ -70,7 +70,7 @@ fn base_dpc_integration_test() {
 
     let predicate_vk_hash = to_bytes![
         PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash,
+            &parameters.system_parameters.predicate_verification_key_hash,
             &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
         )
         .unwrap()
@@ -86,12 +86,12 @@ fn base_dpc_integration_test() {
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
-            &parameters.circuit_parameters.serial_number_nonce,
+            &parameters.system_parameters.serial_number_nonce,
             &[64u8 + (i as u8); 1],
         )
         .unwrap();
         let old_record = DPC::generate_record(
-            &parameters.circuit_parameters,
+            &parameters.system_parameters,
             &old_sn_nonce,
             &genesis_account.address,
             true, // The input record is dummy
@@ -125,7 +125,7 @@ fn base_dpc_integration_test() {
         for i in 0..NUM_INPUT_RECORDS {
             // Instantiate death predicate circuit
             let death_predicate_circuit = PredicateCircuit::new(
-                &local_data.circuit_parameters,
+                &local_data.system_parameters,
                 &local_data.local_data_commitment,
                 i as u8,
             );
@@ -141,7 +141,7 @@ fn base_dpc_integration_test() {
             {
                 let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                     local_data_commitment_parameters: local_data
-                        .circuit_parameters
+                        .system_parameters
                         .local_data_commitment
                         .parameters()
                         .clone(),
@@ -167,7 +167,7 @@ fn base_dpc_integration_test() {
         for j in 0..NUM_OUTPUT_RECORDS {
             // Instantiate birth predicate circuit
             let birth_predicate_circuit = PredicateCircuit::new(
-                &local_data.circuit_parameters,
+                &local_data.system_parameters,
                 &local_data.local_data_commitment,
                 j as u8,
             );
@@ -183,7 +183,7 @@ fn base_dpc_integration_test() {
             {
                 let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
                     local_data_commitment_parameters: local_data
-                        .circuit_parameters
+                        .system_parameters
                         .local_data_commitment
                         .parameters()
                         .clone(),
@@ -240,14 +240,14 @@ fn base_dpc_integration_test() {
             let final_fq_high_bit = selector_bits.1.clone();
 
             let view_key = AccountViewKey::from_private_key(
-                &parameters.circuit_parameters.account_signature,
-                &parameters.circuit_parameters.account_commitment,
+                &parameters.system_parameters.account_signature,
+                &parameters.system_parameters.account_commitment,
                 &private_key,
             )
             .unwrap();
 
             let plaintext = parameters
-                .circuit_parameters
+                .system_parameters
                 .account_encryption
                 .decrypt(&view_key.decryption_key, &ciphertext)
                 .unwrap();

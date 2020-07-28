@@ -53,7 +53,7 @@ where
         v.extend_from_slice(
             &self
                 .inner_snark_verifier_input
-                .circuit_parameters
+                .system_parameters
                 .predicate_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
@@ -61,7 +61,7 @@ where
         v.extend_from_slice(
             &self
                 .inner_snark_verifier_input
-                .circuit_parameters
+                .system_parameters
                 .predicate_verification_key_hash
                 .parameters()
                 .to_field_elements()?,

@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{parameters::CircuitParameters, BaseDPCComponents};
+use crate::dpc::base_dpc::{parameters::SystemParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
@@ -10,7 +10,7 @@ use snarkos_models::{
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // Commitment, CRH, and signature parameters
-    pub circuit_parameters: CircuitParameters<C>,
+    pub system_parameters: SystemParameters<C>,
 
     // Ledger parameters and digest
     pub ledger_parameters: C::MerkleParameters,
@@ -69,63 +69,57 @@ where
 
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .account_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .account_encryption
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .account_signature
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .record_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .record_ciphertext_crh
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .predicate_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
         );
+        v.extend_from_slice(&self.system_parameters.local_data_crh.parameters().to_field_elements()?);
         v.extend_from_slice(
             &self
-                .circuit_parameters
-                .local_data_crh
-                .parameters()
-                .to_field_elements()?,
-        );
-        v.extend_from_slice(
-            &self
-                .circuit_parameters
+                .system_parameters
                 .serial_number_nonce
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
-                .circuit_parameters
+                .system_parameters
                 .value_commitment
                 .parameters()
                 .to_field_elements()?,

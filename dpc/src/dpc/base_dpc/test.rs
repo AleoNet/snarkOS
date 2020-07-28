@@ -58,23 +58,23 @@ fn test_execute_base_dpc_constraints() {
     // Generate parameters for the ledger, commitment schemes, CRH, and the
     // "always-accept" predicate.
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
-    let circuit_parameters = InstantiatedDPC::generate_circuit_parameters(&mut rng).unwrap();
-    let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&circuit_parameters, &mut rng).unwrap();
+    let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
+    let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&system_parameters, &mut rng).unwrap();
     #[cfg(debug_assertions)]
     let pred_nizk_pvk: PreparedVerifyingKey<_> = pred_nizk_pp.verification_key.clone().into();
 
     let pred_nizk_vk_bytes = to_bytes![
         PredicateVerificationKeyHash::hash(
-            &circuit_parameters.predicate_verification_key_hash,
+            &system_parameters.predicate_verification_key_hash,
             &to_bytes![pred_nizk_pp.verification_key].unwrap()
         )
         .unwrap()
     ]
     .unwrap();
 
-    let signature_parameters = &circuit_parameters.account_signature;
-    let commitment_parameters = &circuit_parameters.account_commitment;
-    let encryption_parameters = &circuit_parameters.account_encryption;
+    let signature_parameters = &system_parameters.account_signature;
+    let commitment_parameters = &system_parameters.account_commitment;
+    let encryption_parameters = &system_parameters.account_encryption;
 
     // Generate metadata and an account for a dummy initial record.
     let dummy_account = Account::new(
@@ -101,9 +101,9 @@ fn test_execute_base_dpc_constraints() {
     // Use genesis record, serial number, and memo to initialize the ledger.
     let ledger = initialize_test_blockchain::<Tx, CommitmentMerkleParameters>(ledger_parameters, genesis_block);
 
-    let sn_nonce = SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
+    let sn_nonce = SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
     let old_record = DPC::generate_record(
-        &circuit_parameters,
+        &system_parameters,
         &sn_nonce,
         &dummy_account.address,
         true,
@@ -143,7 +143,7 @@ fn test_execute_base_dpc_constraints() {
     let memo = [0u8; 32];
 
     let context = DPC::execute_helper(
-        &circuit_parameters,
+        &system_parameters,
         &old_records,
         &old_account_private_keys,
         &new_record_owners,
@@ -160,7 +160,7 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     let ExecuteContext {
-        circuit_parameters: _comm_crh_sig_pp,
+        system_parameters: _comm_crh_sig_pp,
         ledger_digest,
 
         old_records,
@@ -185,14 +185,14 @@ fn test_execute_base_dpc_constraints() {
     for i in 0..NUM_INPUT_RECORDS {
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PredicateCircuit::new(&circuit_parameters, &local_data_comm, i as u8),
+            PredicateCircuit::new(&system_parameters, &local_data_comm, i as u8),
             &mut rng,
         )
         .expect("Proof should work");
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
-                local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
+                local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
                 position: i as u8,
             };
@@ -209,7 +209,7 @@ fn test_execute_base_dpc_constraints() {
     for j in 0..NUM_OUTPUT_RECORDS {
         let proof = PredicateSNARK::prove(
             &pred_nizk_pp.proving_key,
-            PredicateCircuit::new(&circuit_parameters, &local_data_comm, j as u8),
+            PredicateCircuit::new(&system_parameters, &local_data_comm, j as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -217,7 +217,7 @@ fn test_execute_base_dpc_constraints() {
         #[cfg(debug_assertions)]
         {
             let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
-                local_data_commitment_parameters: circuit_parameters.local_data_commitment.parameters().clone(),
+                local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
                 local_data_commitment: local_data_comm.clone(),
                 position: j as u8,
             };
@@ -250,7 +250,7 @@ fn test_execute_base_dpc_constraints() {
             <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
         // Generate the value commitment
-        let value_commitment = circuit_parameters
+        let value_commitment = system_parameters
             .value_commitment
             .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
             .unwrap();
@@ -276,7 +276,7 @@ fn test_execute_base_dpc_constraints() {
             <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
 
         // Generate the value commitment
-        let value_commitment = circuit_parameters
+        let value_commitment = system_parameters
             .value_commitment
             .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
             .unwrap();
@@ -292,7 +292,7 @@ fn test_execute_base_dpc_constraints() {
         <Components as BaseDPCComponents>::BindingSignatureGroup,
         _,
     >(
-        &circuit_parameters.value_commitment,
+        &system_parameters.value_commitment,
         &old_value_commits,
         &new_value_commits,
         &old_value_commit_randomness,
@@ -376,15 +376,15 @@ fn test_execute_base_dpc_constraints() {
         new_records_field_elements.push(record_field_elements);
 
         let record_public_key = record.owner().into_repr();
-        let encryption_randomness = circuit_parameters
+        let encryption_randomness = system_parameters
             .account_encryption
             .generate_randomness(record_public_key, &mut rng)
             .unwrap();
-        let encryption_blinding_exponents = circuit_parameters
+        let encryption_blinding_exponents = system_parameters
             .account_encryption
             .generate_blinding_exponents(record_public_key, &encryption_randomness, record_plaintexts.len())
             .unwrap();
-        let record_ciphertext = circuit_parameters
+        let record_ciphertext = system_parameters
             .account_encryption
             .encrypt(record_public_key, &encryption_randomness, &record_plaintexts)
             .unwrap();
@@ -415,7 +415,7 @@ fn test_execute_base_dpc_constraints() {
         let selector_bits = [ciphertext_selectors.clone(), vec![final_fq_high_bit]].concat();
         let selector_bytes = bits_to_bytes(&selector_bits);
 
-        let ciphertext_hash = circuit_parameters
+        let ciphertext_hash = system_parameters
             .record_ciphertext_crh
             .hash(&to_bytes![ciphertext_affine_x, selector_bytes].unwrap())
             .unwrap();
@@ -432,7 +432,7 @@ fn test_execute_base_dpc_constraints() {
 
     execute_inner_proof_gadget::<_, _>(
         &mut core_cs.ns(|| "Core checks"),
-        &circuit_parameters,
+        &system_parameters,
         ledger.parameters(),
         &ledger_digest,
         &old_records,
@@ -484,7 +484,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate inner snark parameters and proof for verification in the outer snark
     let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
-        InnerCircuit::blank(&circuit_parameters, ledger.parameters()),
+        InnerCircuit::blank(&system_parameters, ledger.parameters()),
         &mut rng,
     )
     .unwrap();
@@ -492,7 +492,7 @@ fn test_execute_base_dpc_constraints() {
     let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
         &inner_snark_parameters.0,
         InnerCircuit::new(
-            &circuit_parameters,
+            &system_parameters,
             ledger.parameters(),
             &ledger_digest,
             old_records,
@@ -533,7 +533,7 @@ fn test_execute_base_dpc_constraints() {
 
     execute_outer_proof_gadget::<_, _>(
         &mut pf_check_cs.ns(|| "Check predicate proofs"),
-        &circuit_parameters,
+        &system_parameters,
         ledger.parameters(),
         &ledger_digest,
         &old_serial_numbers,
@@ -574,7 +574,7 @@ fn test_execute_base_dpc_constraints() {
         <Components as BaseDPCComponents>::ValueCommitment,
         <Components as BaseDPCComponents>::BindingSignatureGroup,
     >(
-        &circuit_parameters.value_commitment,
+        &system_parameters.value_commitment,
         &old_value_commits,
         &new_value_commits,
         value_balance,

@@ -7,7 +7,7 @@ use std::io::Result as IoResult;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
-pub struct CircuitParameters<C: BaseDPCComponents> {
+pub struct SystemParameters<C: BaseDPCComponents> {
     pub account_commitment: C::AccountCommitment,
     pub account_encryption: C::AccountEncryption,
     pub account_signature: C::AccountSignature,
@@ -21,7 +21,7 @@ pub struct CircuitParameters<C: BaseDPCComponents> {
     pub serial_number_nonce: C::SerialNumberNonceCRH,
 }
 
-impl<C: BaseDPCComponents> CircuitParameters<C> {
+impl<C: BaseDPCComponents> SystemParameters<C> {
     // TODO (howardwu): Inspect what is going on with predicate_verification_key_commitment.
     pub fn load() -> IoResult<Self> {
         let account_commitment: C::AccountCommitment =
@@ -92,7 +92,7 @@ impl<C: BaseDPCComponents> PredicateSNARKParameters<C> {
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct PublicParameters<C: BaseDPCComponents> {
-    pub circuit_parameters: CircuitParameters<C>,
+    pub system_parameters: SystemParameters<C>,
     pub predicate_snark_parameters: PredicateSNARKParameters<C>,
     pub inner_snark_parameters: (
         Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
@@ -106,15 +106,15 @@ pub struct PublicParameters<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn account_commitment_parameters(&self) -> &C::AccountCommitment {
-        &self.circuit_parameters.account_commitment
+        &self.system_parameters.account_commitment
     }
 
     pub fn account_encryption_parameters(&self) -> &C::AccountEncryption {
-        &self.circuit_parameters.account_encryption
+        &self.system_parameters.account_encryption
     }
 
     pub fn account_signature_parameters(&self) -> &C::AccountSignature {
-        &self.circuit_parameters.account_signature
+        &self.system_parameters.account_signature
     }
 
     pub fn inner_snark_parameters(
@@ -127,11 +127,11 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn local_data_crh_parameters(&self) -> &C::LocalDataCRH {
-        &self.circuit_parameters.local_data_crh
+        &self.system_parameters.local_data_crh
     }
 
     pub fn local_data_commitment_parameters(&self) -> &C::LocalDataCommitment {
-        &self.circuit_parameters.local_data_commitment
+        &self.system_parameters.local_data_commitment
     }
 
     pub fn outer_snark_parameters(
@@ -148,31 +148,31 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn predicate_verification_key_commitment_parameters(&self) -> &C::PredicateVerificationKeyCommitment {
-        &self.circuit_parameters.predicate_verification_key_commitment
+        &self.system_parameters.predicate_verification_key_commitment
     }
 
     pub fn predicate_verification_key_hash_parameters(&self) -> &C::PredicateVerificationKeyHash {
-        &self.circuit_parameters.predicate_verification_key_hash
+        &self.system_parameters.predicate_verification_key_hash
     }
 
     pub fn record_commitment_parameters(&self) -> &C::RecordCommitment {
-        &self.circuit_parameters.record_commitment
+        &self.system_parameters.record_commitment
     }
 
     pub fn record_ciphertext_crh_parameters(&self) -> &C::RecordCiphertextCRH {
-        &self.circuit_parameters.record_ciphertext_crh
+        &self.system_parameters.record_ciphertext_crh
     }
 
     pub fn value_commitment_parameters(&self) -> &C::ValueCommitment {
-        &self.circuit_parameters.value_commitment
+        &self.system_parameters.value_commitment
     }
 
     pub fn serial_number_nonce_parameters(&self) -> &C::SerialNumberNonceCRH {
-        &self.circuit_parameters.serial_number_nonce
+        &self.system_parameters.serial_number_nonce
     }
 
     pub fn load(verify_only: bool) -> IoResult<Self> {
-        let circuit_parameters = CircuitParameters::<C>::load()?;
+        let system_parameters = SystemParameters::<C>::load()?;
         let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
@@ -208,7 +208,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         };
 
         Ok(Self {
-            circuit_parameters,
+            system_parameters,
             predicate_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
@@ -216,7 +216,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn load_vk_direct() -> IoResult<Self> {
-        let circuit_parameters = CircuitParameters::<C>::load()?;
+        let system_parameters = SystemParameters::<C>::load()?;
         let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
@@ -238,7 +238,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         };
 
         Ok(Self {
-            circuit_parameters,
+            system_parameters,
             predicate_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,

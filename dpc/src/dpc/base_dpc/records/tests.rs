@@ -19,12 +19,12 @@ fn test_record_serialization() {
     for _ in 0..5 {
         // Generate parameters for the ledger, commitment schemes, CRH, and the
         // "always-accept" predicate.
-        let circuit_parameters = InstantiatedDPC::generate_circuit_parameters(&mut rng).unwrap();
-        let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&circuit_parameters, &mut rng).unwrap();
+        let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
+        let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&system_parameters, &mut rng).unwrap();
 
         let pred_nizk_vk_bytes = to_bytes![
             PredicateVerificationKeyHash::hash(
-                &circuit_parameters.predicate_verification_key_hash,
+                &system_parameters.predicate_verification_key_hash,
                 &to_bytes![pred_nizk_pp.verification_key].unwrap()
             )
             .unwrap()
@@ -33,9 +33,9 @@ fn test_record_serialization() {
 
         for _ in 0..ITERATIONS {
             let dummy_account = Account::new(
-                &circuit_parameters.account_signature,
-                &circuit_parameters.account_commitment,
-                &circuit_parameters.account_encryption,
+                &system_parameters.account_signature,
+                &system_parameters.account_commitment,
+                &system_parameters.account_encryption,
                 &mut rng,
             )
             .unwrap();
@@ -45,8 +45,8 @@ fn test_record_serialization() {
             let payload: [u8; 32] = rng.gen();
 
             let given_record = DPC::generate_record(
-                &circuit_parameters,
-                &SerialNumberNonce::hash(&circuit_parameters.serial_number_nonce, &sn_nonce_input).unwrap(),
+                &system_parameters,
+                &SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &sn_nonce_input).unwrap(),
                 &dummy_account.address,
                 true,
                 value,

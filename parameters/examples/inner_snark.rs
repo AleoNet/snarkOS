@@ -2,7 +2,7 @@ use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
-    parameters::CircuitParameters,
+    parameters::SystemParameters,
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
@@ -30,9 +30,9 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
         From::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
-    let circuit_parameters = CircuitParameters::<C>::load()?;
+    let system_parameters = SystemParameters::<C>::load()?;
     let inner_snark_parameters = C::InnerSNARK::setup(
-        InnerCircuit::blank(&circuit_parameters, &ledger_merkle_tree_parameters),
+        InnerCircuit::blank(&system_parameters, &ledger_merkle_tree_parameters),
         rng,
     )?;
     let inner_snark_pk = to_bytes![inner_snark_parameters.0]?;
