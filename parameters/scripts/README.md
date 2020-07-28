@@ -7,9 +7,9 @@ To perform a full parameter generation, run:
 
 ## Subroutines
 
-To perform the predicate SNARK parameter generation only, run:
+To perform the program SNARK parameter generation only, run:
 ```$xslt
-./predicate_snark.sh
+./program_snark.sh
 ```
 
 To perform the inner SNARK parameter generation only, run:

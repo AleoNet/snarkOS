@@ -4,7 +4,7 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, InstantiatedDPC, Predicate},
+    instantiated::{Components, InstantiatedDPC, Program},
     record::DPCRecord,
     record_payload::RecordPayload,
 };
@@ -164,17 +164,17 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert!(transaction_input.recipients.len() > 0);
         assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
 
-        // Fetch birth/death predicates
-        let predicate_vk_hash = self
+        // Fetch birth/death programs
+        let program_vk_hash = self
             .parameters
             .system_parameters
-            .predicate_verification_key_hash
-            .hash(&to_bytes![self.parameters.predicate_snark_parameters.verification_key]?)?;
-        let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
+            .program_verification_key_hash
+            .hash(&to_bytes![self.parameters.program_snark_parameters.verification_key]?)?;
+        let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
-        let predicate = Predicate::new(predicate_vk_hash_bytes.clone());
-        let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
+        let program = Program::new(program_vk_hash_bytes.clone());
+        let new_birth_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode old records
         let mut old_records = vec![];
@@ -212,8 +212,8 @@ impl ProtectedRpcFunctions for RpcImpl {
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
-                &predicate,
-                &predicate,
+                &program,
+                &program,
                 rng,
             )?;
 
@@ -267,8 +267,8 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_records,
             old_account_private_keys,
             new_record_owners,
-            new_birth_predicates,
-            new_death_predicates,
+            new_birth_programs,
+            new_death_programs,
             new_is_dummy_flags,
             new_values,
             new_payloads,

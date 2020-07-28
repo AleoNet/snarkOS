@@ -198,7 +198,7 @@ impl RpcFunctions for RpcImpl {
             memo,
             digest: hex::encode(to_bytes![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
-            predicate_commitment: hex::encode(to_bytes![transaction.predicate_commitment]?),
+            program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
@@ -325,8 +325,8 @@ impl RpcFunctions for RpcImpl {
         let payload = RPCRecordPayload {
             payload: hex::encode(to_bytes![record.payload()]?),
         };
-        let birth_predicate_id = hex::encode(record.birth_predicate_id());
-        let death_predicate_id = hex::encode(record.death_predicate_id());
+        let birth_program_id = hex::encode(record.birth_program_id());
+        let death_program_id = hex::encode(record.death_program_id());
         let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
         let commitment = hex::encode(to_bytes![record.commitment()]?);
         let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
@@ -336,8 +336,8 @@ impl RpcFunctions for RpcImpl {
             is_dummy: record.is_dummy(),
             value: record.value(),
             payload,
-            birth_predicate_id,
-            death_predicate_id,
+            birth_program_id,
+            death_program_id,
             serial_number_nonce,
             commitment,
             commitment_randomness,

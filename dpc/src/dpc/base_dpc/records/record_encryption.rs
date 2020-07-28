@@ -146,8 +146,8 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         let DeserializedRecord {
             serial_number_nonce,
             commitment_randomness,
-            birth_predicate_id,
-            death_predicate_id,
+            birth_program_id,
+            death_program_id,
             payload,
             value,
         } = record_components;
@@ -158,13 +158,13 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
 
         // Determine if the record is a dummy
 
-        // TODO (raychu86) Establish `is_dummy` flag properly by checking that the value is 0 and the predicates are equivalent to a global dummy
-        let dummy_predicate = birth_predicate_id.clone();
+        // TODO (raychu86) Establish `is_dummy` flag properly by checking that the value is 0 and the programs are equivalent to a global dummy
+        let dummy_program = birth_program_id.clone();
 
         let is_dummy = (value == 0)
             && (payload == RecordPayload::default())
-            && (death_predicate_id == dummy_predicate)
-            && (birth_predicate_id == dummy_predicate);
+            && (death_program_id == dummy_program)
+            && (birth_program_id == dummy_program);
 
         // Calculate record commitment
 
@@ -173,8 +173,8 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             is_dummy,
             value,
             payload,
-            birth_predicate_id,
-            death_predicate_id,
+            birth_program_id,
+            death_program_id,
             serial_number_nonce
         ]?;
 
@@ -189,8 +189,8 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             is_dummy,
             value,
             payload,
-            birth_predicate_id,
-            death_predicate_id,
+            birth_program_id,
+            death_program_id,
             serial_number_nonce,
             commitment_randomness,
             commitment,

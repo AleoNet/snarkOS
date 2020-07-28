@@ -7,7 +7,7 @@ pub trait Record: Default + FromBytes + ToBytes {
     type Commitment: FromBytes + ToBytes;
     type CommitmentRandomness;
     type Payload;
-    type Predicate;
+    type Program;
     type SerialNumberNonce;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type Value: FromBytes + ToBytes;
@@ -21,11 +21,11 @@ pub trait Record: Default + FromBytes + ToBytes {
     /// Returns the record payload.
     fn payload(&self) -> &Self::Payload;
 
-    /// Returns the birth predicate id of this record.
-    fn birth_predicate_id(&self) -> &[u8];
+    /// Returns the birth program id of this record.
+    fn birth_program_id(&self) -> &[u8];
 
-    /// Returns the death predicate id of this record.
-    fn death_predicate_id(&self) -> &[u8];
+    /// Returns the death program id of this record.
+    fn death_program_id(&self) -> &[u8];
 
     /// Returns the randomness used for the serial number.
     fn serial_number_nonce(&self) -> &Self::SerialNumberNonce;

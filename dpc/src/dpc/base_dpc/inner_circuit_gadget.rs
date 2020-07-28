@@ -76,8 +76,8 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
 
     // Rest
-    predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
+    program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
     local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     memo: &[u8; 32],
@@ -130,8 +130,8 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records_encryption_gadget_components,
         new_encrypted_record_hashes,
         //
-        predicate_commitment,
-        predicate_randomness,
+        program_commitment,
+        program_randomness,
         local_data_commitment,
         local_data_commitment_randomizers,
         memo,
@@ -192,8 +192,8 @@ fn base_dpc_execute_gadget_helper<
     new_encrypted_record_hashes: &[EncryptedRecordCRH::Output],
 
     //
-    predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
+    program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
     local_data_comm: &LocalDataCRH::Output,
     local_data_commitment_randomizers: &[LocalDataCommitment::Randomness],
     memo: &[u8; 32],
@@ -253,16 +253,16 @@ where
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
     let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_birth_predicate_ids_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_death_predicate_ids_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_birth_program_ids_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
     let mut new_record_owner_gadgets = Vec::with_capacity(new_records.len());
     let mut new_is_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
     let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_birth_predicate_ids_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_death_predicate_ids_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_death_program_ids_gadgets = Vec::with_capacity(new_records.len());
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
@@ -270,7 +270,7 @@ where
     // 3. account_signature_parameters
     // 4. record_commitment_parameters
     // 5. encrypted_record_crh_parameters
-    // 6. predicate_vk_commitment_parameters
+    // 6. program_vk_commitment_parameters
     // 7. local_data_crh_parameters
     // 8. local_data_commitment_parameters
     // 9. serial_number_nonce_crh_parameters
@@ -279,7 +279,7 @@ where
     // 12. ledger_digest
     // 13. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
     // 14. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i], new_encrypted_record_hashes[i]
-    // 15. predicate_commitment
+    // 15. program_commitment
     // 16. local_data_commitment
     // 17. binding_signature
     let (
@@ -288,7 +288,7 @@ where
         account_signature_parameters,
         record_commitment_parameters,
         encrypted_record_crh_parameters,
-        predicate_vk_commitment_parameters,
+        program_vk_commitment_parameters,
         local_data_crh_parameters,
         local_data_commitment_parameters,
         serial_number_nonce_crh_parameters,
@@ -322,12 +322,12 @@ where
             || Ok(system_parameters.encrypted_record_crh.parameters()),
         )?;
 
-        let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+        let program_vk_commitment_parameters = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<
             _,
             C::InnerField,
         >>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare predicate vk commitment parameters"),
-            || Ok(system_parameters.predicate_verification_key_commitment.parameters()),
+            &mut cs.ns(|| "Declare program vk commitment parameters"),
+            || Ok(system_parameters.program_verification_key_commitment.parameters()),
         )?;
 
         let local_data_crh_parameters = LocalDataCRHGadget::ParametersGadget::alloc_input(
@@ -362,7 +362,7 @@ where
             account_signature_parameters,
             record_commitment_parameters,
             encrypted_record_crh_parameters,
-            predicate_vk_commitment_parameters,
+            program_vk_commitment_parameters,
             local_data_crh_parameters,
             local_data_commitment_parameters,
             serial_number_nonce_crh_parameters,
@@ -394,8 +394,8 @@ where
             given_is_dummy,
             given_value,
             given_payload,
-            given_birth_predicate_id,
-            given_death_predicate_id,
+            given_birth_program_id,
+            given_death_program_id,
             given_commitment_randomness,
             serial_number_nonce,
         ) = {
@@ -427,17 +427,17 @@ where
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             old_payloads_gadgets.push(given_payload.clone());
 
-            let given_birth_predicate_id = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_birth_predicate_id"),
-                &record.birth_predicate_id(),
+            let given_birth_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_program_id"),
+                &record.birth_program_id(),
             )?;
-            old_birth_predicate_ids_gadgets.push(given_birth_predicate_id.clone());
+            old_birth_program_ids_gadgets.push(given_birth_program_id.clone());
 
-            let given_death_predicate_id = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_death_predicate_id"),
-                &record.death_predicate_id(),
+            let given_death_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_program_id"),
+                &record.death_program_id(),
             )?;
-            old_death_predicate_ids_gadgets.push(given_death_predicate_id.clone());
+            old_death_program_ids_gadgets.push(given_death_program_id.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -454,8 +454,8 @@ where
                 given_is_dummy,
                 given_value,
                 given_payload,
-                given_birth_predicate_id,
-                given_death_predicate_id,
+                given_birth_program_id,
+                given_death_program_id,
                 given_commitment_randomness,
                 serial_number_nonce,
             )
@@ -684,8 +684,8 @@ where
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
-            commitment_input.extend_from_slice(&given_birth_predicate_id);
-            commitment_input.extend_from_slice(&given_death_predicate_id);
+            commitment_input.extend_from_slice(&given_birth_program_id);
+            commitment_input.extend_from_slice(&given_death_program_id);
             commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
@@ -734,8 +734,8 @@ where
             given_is_dummy,
             given_value,
             given_payload,
-            given_birth_predicate_id,
-            given_death_predicate_id,
+            given_birth_program_id,
+            given_death_program_id,
             given_commitment_randomness,
             serial_number_nonce,
             serial_number_nonce_bytes,
@@ -768,17 +768,17 @@ where
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             new_payloads_gadgets.push(given_payload.clone());
 
-            let given_birth_predicate_id = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_birth_predicate_id"),
-                &record.birth_predicate_id(),
+            let given_birth_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_program_id"),
+                &record.birth_program_id(),
             )?;
-            new_birth_predicate_ids_gadgets.push(given_birth_predicate_id.clone());
+            new_birth_program_ids_gadgets.push(given_birth_program_id.clone());
 
-            let given_death_predicate_id = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_death_predicate_id"),
-                &record.death_predicate_id(),
+            let given_death_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_program_id"),
+                &record.death_program_id(),
             )?;
-            new_death_predicate_ids_gadgets.push(given_death_predicate_id.clone());
+            new_death_program_ids_gadgets.push(given_death_program_id.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -800,8 +800,8 @@ where
                 given_is_dummy,
                 given_value,
                 given_payload,
-                given_birth_predicate_id,
-                given_death_predicate_id,
+                given_birth_program_id,
+                given_death_program_id,
                 given_commitment_randomness,
                 serial_number_nonce,
                 serial_number_nonce_bytes,
@@ -894,8 +894,8 @@ where
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
-            commitment_input.extend_from_slice(&given_birth_predicate_id);
-            commitment_input.extend_from_slice(&given_death_predicate_id);
+            commitment_input.extend_from_slice(&given_birth_program_id);
+            commitment_input.extend_from_slice(&given_death_program_id);
             commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
@@ -925,7 +925,7 @@ where
             // Check serialization
 
             // *******************************************************************
-            // Convert serial number nonce, commitment_randomness, birth predicate id, death predicate id, payload, and value into bits
+            // Convert serial number nonce, commitment_randomness, birth program id, death program id, payload, and value into bits
 
             let serial_number_nonce_bits = serial_number_nonce_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert serial_number_nonce_bytes to bits"))?;
@@ -937,10 +937,10 @@ where
 
             let commitment_randomness_bits = commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert commitment_randomness_bytes to bits"))?;
-            let full_birth_predicate_id_bits = given_birth_predicate_id
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_id to bits"))?;
-            let full_death_predicate_id_bits = given_death_predicate_id
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_id to bits"))?;
+            let full_birth_program_id_bits =
+                given_birth_program_id.to_bits(&mut encryption_cs.ns(|| "Convert given_birth_program_id to bits"))?;
+            let full_death_program_id_bits =
+                given_death_program_id.to_bits(&mut encryption_cs.ns(|| "Convert given_death_program_id to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
             let mut fq_high_bits = vec![];
@@ -980,24 +980,24 @@ where
             // reserve the MSB of the data field element's valid bitsize and set the bit to 1.
             let payload_field_bitsize = data_field_bitsize - 1;
 
-            // Birth and death predicates
+            // Birth and death programs
 
-            let mut birth_predicate_id_bits = Vec::with_capacity(base_field_bitsize);
-            let mut death_predicate_id_bits = Vec::with_capacity(base_field_bitsize);
-            let mut birth_predicate_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
-            let mut death_predicate_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut birth_program_id_bits = Vec::with_capacity(base_field_bitsize);
+            let mut death_program_id_bits = Vec::with_capacity(base_field_bitsize);
+            let mut birth_program_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut death_program_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
 
             for i in 0..data_field_bitsize {
-                birth_predicate_id_bits.push(full_birth_predicate_id_bits[i]);
-                death_predicate_id_bits.push(full_death_predicate_id_bits[i]);
+                birth_program_id_bits.push(full_birth_program_id_bits[i]);
+                death_program_id_bits.push(full_death_program_id_bits[i]);
             }
 
             // (Assumption 2 applies)
             for i in data_field_bitsize..outer_field_bitsize {
-                birth_predicate_id_remainder_bits.push(full_birth_predicate_id_bits[i]);
-                death_predicate_id_remainder_bits.push(full_death_predicate_id_bits[i]);
+                birth_program_id_remainder_bits.push(full_birth_program_id_bits[i]);
+                death_program_id_remainder_bits.push(full_death_program_id_bits[i]);
             }
-            birth_predicate_id_remainder_bits.extend_from_slice(&death_predicate_id_remainder_bits);
+            birth_program_id_remainder_bits.extend_from_slice(&death_program_id_remainder_bits);
 
             // Payload
 
@@ -1084,20 +1084,20 @@ where
             let given_commitment_randomness_bits = given_commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_commitment_randomness_bytes to bits"))?;
 
-            let given_birth_predicate_id_bytes = &record_field_elements_gadgets[2]
-                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_id_bytes"))?;
-            let given_birth_predicate_id_bits = given_birth_predicate_id_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_id_bytes to bits"))?;
+            let given_birth_program_id_bytes =
+                &record_field_elements_gadgets[2].to_bytes(&mut encryption_cs.ns(|| "given_birth_program_id_bytes"))?;
+            let given_birth_program_id_bits = given_birth_program_id_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_program_id_bytes to bits"))?;
 
-            let given_death_predicate_id_bytes = &record_field_elements_gadgets[3]
-                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_id_bytes"))?;
-            let given_death_predicate_id_bits = given_death_predicate_id_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_id_bytes to bits"))?;
+            let given_death_program_id_bytes =
+                &record_field_elements_gadgets[3].to_bytes(&mut encryption_cs.ns(|| "given_death_program_id_bytes"))?;
+            let given_death_program_id_bits = given_death_program_id_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_program_id_bytes to bits"))?;
 
-            let given_predicate_repr_remainder_bytes = &record_field_elements_gadgets[4]
-                .to_bytes(&mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"))?;
-            let given_predicate_repr_remainder_bits = given_predicate_repr_remainder_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_predicate_repr_remainder_bytes to bits"))?;
+            let given_program_id_remainder_bytes = &record_field_elements_gadgets[4]
+                .to_bytes(&mut encryption_cs.ns(|| "given_program_id_remainder_bytes"))?;
+            let given_program_id_remainder_bits = given_program_id_remainder_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_program_id_remainder_bytes to bits"))?;
 
             // *******************************************************************
             // Equate the gadget packed and provided bits
@@ -1112,19 +1112,19 @@ where
                 &given_commitment_randomness_bits,
             )?;
 
-            birth_predicate_id_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_id_bits match"),
-                &given_birth_predicate_id_bits,
+            birth_program_id_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_program_id_bits match"),
+                &given_birth_program_id_bits,
             )?;
 
-            death_predicate_id_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_id_bits match"),
-                &given_death_predicate_id_bits,
+            death_program_id_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared death_program_id_bits match"),
+                &given_death_program_id_bits,
             )?;
 
-            birth_predicate_id_remainder_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared predicate_repr_remainder_bits match"),
-                &given_predicate_repr_remainder_bits,
+            birth_program_id_remainder_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared program_id_remainder_bits match"),
+                &given_program_id_remainder_bits,
             )?;
 
             for (i, (payload_element, field_element)) in payload_elements
@@ -1305,42 +1305,38 @@ where
     // *******************************************************************
 
     // *******************************************************************
-    // Check that predicate commitment is well formed.
+    // Check that program commitment is well formed.
     // *******************************************************************
     {
-        let commitment_cs = &mut cs.ns(|| "Check that predicate commitment is well-formed");
+        let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_predicate_ids_gadgets[i]);
+            input.extend_from_slice(&old_death_program_ids_gadgets[i]);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_predicate_ids_gadgets[j]);
+            input.extend_from_slice(&new_birth_program_ids_gadgets[j]);
         }
 
-        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
-            _,
-            C::InnerField,
-        >>::RandomnessGadget::alloc(
-            &mut commitment_cs.ns(|| "given_commitment_randomness"),
-            || Ok(predicate_randomness),
-        )?;
+        let given_commitment_randomness =
+            <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::RandomnessGadget::alloc(
+                &mut commitment_cs.ns(|| "given_commitment_randomness"),
+                || Ok(program_randomness),
+            )?;
 
-        let given_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
+        let given_commitment = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
             &mut commitment_cs.ns(|| "given_commitment"),
-            || Ok(predicate_commitment),
+            || Ok(program_commitment),
         )?;
 
-        let candidate_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
-            _,
-            C::InnerField,
-        >>::check_commitment_gadget(
-            &mut commitment_cs.ns(|| "candidate_commitment"),
-            &predicate_vk_commitment_parameters,
-            &input,
-            &given_commitment_randomness,
-        )?;
+        let candidate_commitment =
+            <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::check_commitment_gadget(
+                &mut commitment_cs.ns(|| "candidate_commitment"),
+                &program_vk_commitment_parameters,
+                &input,
+                &given_commitment_randomness,
+            )?;
 
         candidate_commitment.enforce_equal(
             &mut commitment_cs.ns(|| "Check that declared and computed commitments are equal"),

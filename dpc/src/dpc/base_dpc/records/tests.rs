@@ -18,14 +18,15 @@ fn test_record_serialization() {
 
     for _ in 0..ITERATIONS {
         // Generate parameters for the ledger, commitment schemes, CRH, and the
-        // "always-accept" predicate.
+        // "always-accept" program.
         let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
-        let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&system_parameters, &mut rng).unwrap();
+        let program_snark_pp =
+            InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
-        let pred_nizk_vk_bytes = to_bytes![
-            PredicateVerificationKeyHash::hash(
-                &system_parameters.predicate_verification_key_hash,
-                &to_bytes![pred_nizk_pp.verification_key].unwrap()
+        let program_snark_vk_bytes = to_bytes![
+            ProgramVerificationKeyHash::hash(
+                &system_parameters.program_verification_key_hash,
+                &to_bytes![program_snark_pp.verification_key].unwrap()
             )
             .unwrap()
         ]
@@ -51,8 +52,8 @@ fn test_record_serialization() {
                 false,
                 value,
                 &RecordPayload::from_bytes(&payload),
-                &Predicate::new(pred_nizk_vk_bytes.clone()),
-                &Predicate::new(pred_nizk_vk_bytes.clone()),
+                &Program::new(program_snark_vk_bytes.clone()),
+                &Program::new(program_snark_vk_bytes.clone()),
                 &mut rng,
             )
             .unwrap();
@@ -70,8 +71,8 @@ fn test_record_serialization() {
                 given_record.commitment_randomness,
                 record_components.commitment_randomness
             );
-            assert_eq!(given_record.birth_predicate_id, record_components.birth_predicate_id);
-            assert_eq!(given_record.death_predicate_id, record_components.death_predicate_id);
+            assert_eq!(given_record.birth_program_id, record_components.birth_program_id);
+            assert_eq!(given_record.death_program_id, record_components.death_program_id);
             assert_eq!(given_record.value, record_components.value);
             assert_eq!(given_record.payload, record_components.payload);
         }
@@ -84,14 +85,15 @@ fn test_record_encryption() {
 
     for _ in 0..ITERATIONS {
         // Generate parameters for the ledger, commitment schemes, CRH, and the
-        // "always-accept" predicate.
+        // "always-accept" program.
         let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
-        let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&system_parameters, &mut rng).unwrap();
+        let program_snark_pp =
+            InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
-        let pred_nizk_vk_bytes = to_bytes![
-            PredicateVerificationKeyHash::hash(
-                &system_parameters.predicate_verification_key_hash,
-                &to_bytes![pred_nizk_pp.verification_key].unwrap()
+        let program_snark_vk_bytes = to_bytes![
+            ProgramVerificationKeyHash::hash(
+                &system_parameters.program_verification_key_hash,
+                &to_bytes![program_snark_pp.verification_key].unwrap()
             )
             .unwrap()
         ]
@@ -117,8 +119,8 @@ fn test_record_encryption() {
                 false,
                 value,
                 &RecordPayload::from_bytes(&payload),
-                &Predicate::new(pred_nizk_vk_bytes.clone()),
-                &Predicate::new(pred_nizk_vk_bytes.clone()),
+                &Program::new(program_snark_vk_bytes.clone()),
+                &Program::new(program_snark_vk_bytes.clone()),
                 &mut rng,
             )
             .unwrap();

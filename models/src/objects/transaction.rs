@@ -8,7 +8,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type Digest: Clone + Eq + Hash + FromBytes + ToBytes;
     type LocalDataCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
-    type PredicateCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
+    type ProgramCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type EncryptedRecord: Clone + Eq + FromBytes + ToBytes;
 
@@ -27,8 +27,8 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     /// Returns the new commitments.
     fn new_commitments(&self) -> &[Self::Commitment];
 
-    /// Returns the predicate commitment in the transaction.
-    fn predicate_commitment(&self) -> &Self::PredicateCommitment;
+    /// Returns the program commitment in the transaction.
+    fn program_commitment(&self) -> &Self::ProgramCommitment;
 
     /// Returns the local data commitment in the transaction.
     fn local_data_commitment(&self) -> &Self::LocalDataCommitment;

@@ -68,7 +68,7 @@ mod rpc_tests {
 
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
-        let predicate_commitment = hex::encode(to_bytes![transaction.predicate_commitment].unwrap());
+        let program_commitment = hex::encode(to_bytes![transaction.program_commitment()].unwrap());
         let local_data_commitment = hex::encode(to_bytes![transaction.local_data_commitment].unwrap());
         let value_balance = transaction.value_balance;
         let signatures: Vec<Value> = transaction
@@ -91,7 +91,7 @@ mod rpc_tests {
 
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
-        assert_eq!(predicate_commitment, transaction_info["predicate_commitment"]);
+        assert_eq!(program_commitment, transaction_info["program_commitment"]);
         assert_eq!(local_data_commitment, transaction_info["local_data_commitment"]);
         assert_eq!(value_balance, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
@@ -288,8 +288,8 @@ mod rpc_tests {
         let owner = hex::encode(to_bytes![record.owner()].unwrap());
         let is_dummy = record.is_dummy();
         let value = record.value();
-        let birth_predicate_id = hex::encode(to_bytes![record.birth_predicate_id()].unwrap());
-        let death_predicate_id = hex::encode(to_bytes![record.death_predicate_id()].unwrap());
+        let birth_program_id = hex::encode(to_bytes![record.birth_program_id()].unwrap());
+        let death_program_id = hex::encode(to_bytes![record.death_program_id()].unwrap());
         let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()].unwrap());
         let commitment = hex::encode(to_bytes![record.commitment()].unwrap());
         let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()].unwrap());
@@ -297,8 +297,8 @@ mod rpc_tests {
         assert_eq!(owner, record_info["owner"]);
         assert_eq!(is_dummy, record_info["is_dummy"]);
         assert_eq!(value, record_info["value"]);
-        assert_eq!(birth_predicate_id, record_info["birth_predicate_id"]);
-        assert_eq!(death_predicate_id, record_info["death_predicate_id"]);
+        assert_eq!(birth_program_id, record_info["birth_program_id"]);
+        assert_eq!(death_program_id, record_info["death_program_id"]);
         assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
         assert_eq!(commitment, record_info["commitment"]);
         assert_eq!(commitment_randomness, record_info["commitment_randomness"]);

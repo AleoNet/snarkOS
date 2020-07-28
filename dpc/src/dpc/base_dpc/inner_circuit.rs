@@ -42,9 +42,9 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     new_records_encryption_gadget_components: Option<Vec<RecordEncryptionGadgetComponents<C>>>,
     new_encrypted_record_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
 
-    // Commitment to Predicates and to local data.
-    predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
-    predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
+    // Commitment to Programs and to local data.
+    program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
+    program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
 
     local_data_commitment: Option<<C::LocalDataCRH as CRH>::Output>,
     local_data_commitment_randomizers: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
@@ -87,8 +87,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         let memo = [0u8; 32];
 
-        let predicate_commitment = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default();
-        let predicate_randomness = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
+        let program_commitment = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output::default();
+        let program_randomness = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
 
         let local_data_commitment = <C::LocalDataCRH as CRH>::Output::default();
         let local_data_commitment_randomizers = vec![
@@ -133,8 +133,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
 
             // Other stuff
-            predicate_commitment: Some(predicate_commitment),
-            predicate_randomness: Some(predicate_randomness),
+            program_commitment: Some(program_commitment),
+            program_randomness: Some(program_randomness),
             local_data_commitment: Some(local_data_commitment),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
             memo: Some(memo),
@@ -174,8 +174,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
 
         // Other stuff
-        predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-        predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
+        program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+        program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
         local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
         local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
@@ -249,8 +249,8 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             new_encrypted_record_hashes: Some(new_encrypted_record_hashes.to_vec()),
 
             // Other stuff
-            predicate_commitment: Some(predicate_commitment.clone()),
-            predicate_randomness: Some(predicate_randomness.clone()),
+            program_commitment: Some(program_commitment.clone()),
+            program_randomness: Some(program_randomness.clone()),
 
             local_data_commitment: Some(local_data_commitment.clone()),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers.to_vec()),
@@ -291,8 +291,8 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_records_encryption_gadget_components.get()?,
             self.new_encrypted_record_hashes.get()?,
             // Other stuff
-            self.predicate_commitment.get()?,
-            self.predicate_randomness.get()?,
+            self.program_commitment.get()?,
+            self.program_randomness.get()?,
             self.local_data_commitment.get()?,
             self.local_data_commitment_randomizers.get()?,
             self.memo.get()?,

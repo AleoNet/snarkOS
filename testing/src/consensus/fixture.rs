@@ -25,7 +25,7 @@ pub struct Fixture {
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
     pub genesis_block: Block<Tx>,
-    pub predicate: Predicate,
+    pub program: Program,
     pub rng: XorShiftRng,
 }
 
@@ -46,23 +46,23 @@ fn setup(verify_only: bool) -> Fixture {
 
     let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
-    let predicate_vk_hash = to_bytes![
-        PredicateVerificationKeyHash::hash(
-            &parameters.system_parameters.predicate_verification_key_hash,
-            &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
+    let program_vk_hash = to_bytes![
+        ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()
     ]
     .unwrap();
 
-    let predicate = Predicate::new(predicate_vk_hash);
+    let program = Program::new(program_vk_hash);
 
     Fixture {
         parameters,
         test_accounts,
         ledger_parameters,
         genesis_block,
-        predicate,
+        program,
         rng,
     }
 }

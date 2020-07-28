@@ -35,7 +35,7 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
     #[derivative(PartialEq = "ignore")]
-    pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    pub program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
 
     #[derivative(PartialEq = "ignore")]
     pub local_data_commitment: <C::LocalDataCRH as CRH>::Output,
@@ -64,7 +64,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         memorandum: <Self as Transaction>::Memorandum,
         ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
         transaction_proof: <C::OuterSNARK as SNARK>::Proof,
-        predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+        program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_commitment: <C::LocalDataCRH as CRH>::Output,
         value_balance: i64,
         network_id: u8,
@@ -77,7 +77,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             memorandum,
             ledger_digest,
             transaction_proof,
-            predicate_commitment,
+            program_commitment,
             local_data_commitment,
             value_balance,
             network_id,
@@ -93,7 +93,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type EncryptedRecord = EncryptedRecord<C>;
     type LocalDataCommitment = <C::LocalDataCRH as CRH>::Output;
     type Memorandum = [u8; 32];
-    type PredicateCommitment = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output;
+    type ProgramCommitment = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
 
     /// Transaction id = Hash of (serial numbers || commitments || memo)
@@ -134,8 +134,8 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         self.new_commitments.as_slice()
     }
 
-    fn predicate_commitment(&self) -> &Self::PredicateCommitment {
-        &self.predicate_commitment
+    fn program_commitment(&self) -> &Self::ProgramCommitment {
+        &self.program_commitment
     }
 
     fn local_data_commitment(&self) -> &Self::LocalDataCommitment {
@@ -175,7 +175,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
 
         self.ledger_digest.write(&mut writer)?;
         self.transaction_proof.write(&mut writer)?;
-        self.predicate_commitment.write(&mut writer)?;
+        self.program_commitment.write(&mut writer)?;
         self.local_data_commitment.write(&mut writer)?;
 
         self.value_balance.write(&mut writer)?;
@@ -218,7 +218,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
 
         let ledger_digest: MerkleTreeDigest<C::MerkleParameters> = FromBytes::read(&mut reader)?;
         let transaction_proof: <C::OuterSNARK as SNARK>::Proof = FromBytes::read(&mut reader)?;
-        let predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output =
+        let program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output =
             FromBytes::read(&mut reader)?;
         let local_data_commitment: <C::LocalDataCRH as CRH>::Output = FromBytes::read(&mut reader)?;
 
@@ -247,7 +247,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             ledger_digest,
             old_serial_numbers,
             new_commitments,
-            predicate_commitment,
+            program_commitment,
             local_data_commitment,
             value_balance,
             signatures,
@@ -263,12 +263,12 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DPCTransaction {{ network_id: {:?}, digest: {:?}, old_serial_numbers: {:?}, new_commitments: {:?}, predicate_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?}, transaction_proof: {:?}, memorandum: {:?} }}",
+            "DPCTransaction {{ network_id: {:?}, digest: {:?}, old_serial_numbers: {:?}, new_commitments: {:?}, program_commitment: {:?}, local_data_commitment: {:?}, value_balance: {:?}, signatures: {:?}, transaction_proof: {:?}, memorandum: {:?} }}",
             self.network_id,
             self.ledger_digest,
             self.old_serial_numbers,
             self.new_commitments,
-            self.predicate_commitment,
+            self.program_commitment,
             self.local_data_commitment,
             self.value_balance,
             self.signatures,

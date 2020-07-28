@@ -4,8 +4,8 @@ use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    predicate::{DPCPredicate, PrivatePredicateInput},
-    predicate_circuit::{PredicateCircuit, PredicateLocalData},
+    program::{DPCProgram, PrivateProgramInput},
+    program_circuit::{ProgramCircuit, ProgramLocalData},
     record::DPCRecord,
     record_payload::RecordPayload,
     LocalData,
@@ -334,9 +334,9 @@ impl ConsensusParameters {
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
-        predicate_vk_hash: &Vec<u8>,
-        new_birth_predicates: Vec<DPCPredicate<Components>>,
-        new_death_predicates: Vec<DPCPredicate<Components>>,
+        program_vk_hash: &Vec<u8>,
+        new_birth_programs: Vec<DPCProgram<Components>>,
+        new_death_programs: Vec<DPCProgram<Components>>,
         recipient: AccountAddress<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -378,9 +378,9 @@ impl ConsensusParameters {
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
-                // Filler predicate input
-                &Predicate::new(predicate_vk_hash.clone()),
-                &Predicate::new(predicate_vk_hash.clone()),
+                // Filler program input
+                &Program::new(program_vk_hash.clone()),
+                &Program::new(program_vk_hash.clone()),
                 rng,
             )?;
 
@@ -399,8 +399,8 @@ impl ConsensusParameters {
             old_records,
             old_account_private_keys,
             new_record_owners,
-            new_birth_predicates,
-            new_death_predicates,
+            new_birth_programs,
+            new_death_programs,
             new_is_dummy_flags,
             new_values,
             new_payloads,
@@ -417,8 +417,8 @@ impl ConsensusParameters {
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
-        new_birth_predicates: Vec<DPCPredicate<Components>>,
-        new_death_predicates: Vec<DPCPredicate<Components>>,
+        new_birth_programs: Vec<DPCProgram<Components>>,
+        new_death_programs: Vec<DPCProgram<Components>>,
         new_is_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
@@ -426,29 +426,29 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
-        let pred_nizk_pvk: PreparedVerifyingKey<_> =
-            parameters.predicate_snark_parameters.verification_key.clone().into();
+        let program_snark_pvk: PreparedVerifyingKey<_> =
+            parameters.program_snark_parameters.verification_key.clone().into();
 
         let old_death_vk_and_proof_generator = |local_data: &LocalData<Components>| {
             let mut rng = thread_rng();
             let mut old_proof_and_vk = vec![];
             for i in 0..Components::NUM_INPUT_RECORDS {
-                // Instantiate death predicate circuit
-                let death_predicate_circuit = PredicateCircuit::new(
+                // Instantiate death program circuit
+                let death_program_circuit = ProgramCircuit::new(
                     &local_data.system_parameters,
                     &local_data.local_data_commitment,
                     i as u8,
                 );
 
-                // Generate the predicate proof
-                let proof = PredicateSNARK::prove(
-                    &parameters.predicate_snark_parameters.proving_key,
-                    death_predicate_circuit,
+                // Generate the program proof
+                let proof = ProgramSNARK::prove(
+                    &parameters.program_snark_parameters.proving_key,
+                    death_program_circuit,
                     &mut rng,
                 )
                 .expect("Proving should work");
                 {
-                    let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
+                    let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                         local_data_commitment_parameters: local_data
                             .system_parameters
                             .local_data_commitment
@@ -458,12 +458,13 @@ impl ConsensusParameters {
                         position: i as u8,
                     };
                     assert!(
-                        PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify")
+                        ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
+                            .expect("Proof should verify")
                     );
                 }
 
-                let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
-                    verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
+                let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+                    verification_key: parameters.program_snark_parameters.verification_key.clone(),
                     proof,
                 };
                 old_proof_and_vk.push(private_input);
@@ -476,22 +477,22 @@ impl ConsensusParameters {
             let mut rng = thread_rng();
             let mut new_proof_and_vk = vec![];
             for j in 0..NUM_OUTPUT_RECORDS {
-                // Instantiate birth predicate circuit
-                let birth_predicate_circuit = PredicateCircuit::new(
+                // Instantiate birth program circuit
+                let birth_program_circuit = ProgramCircuit::new(
                     &local_data.system_parameters,
                     &local_data.local_data_commitment,
                     j as u8,
                 );
 
-                // Generate the predicate proof
-                let proof = PredicateSNARK::prove(
-                    &parameters.predicate_snark_parameters.proving_key,
-                    birth_predicate_circuit,
+                // Generate the program proof
+                let proof = ProgramSNARK::prove(
+                    &parameters.program_snark_parameters.proving_key,
+                    birth_program_circuit,
                     &mut rng,
                 )
                 .expect("Proving should work");
                 {
-                    let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
+                    let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                         local_data_commitment_parameters: local_data
                             .system_parameters
                             .local_data_commitment
@@ -501,11 +502,12 @@ impl ConsensusParameters {
                         position: j as u8,
                     };
                     assert!(
-                        PredicateSNARK::verify(&pred_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify")
+                        ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
+                            .expect("Proof should verify")
                     );
                 }
-                let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
-                    verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
+                let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+                    verification_key: parameters.program_snark_parameters.verification_key.clone(),
                     proof,
                 };
                 new_proof_and_vk.push(private_input);
@@ -523,8 +525,8 @@ impl ConsensusParameters {
             &new_is_dummy_flags,
             &new_values,
             &new_payloads,
-            &new_birth_predicates,
-            &new_death_predicates,
+            &new_birth_programs,
+            &new_death_programs,
             &new_birth_vk_and_proof_generator,
             &memo,
             self.network_id,

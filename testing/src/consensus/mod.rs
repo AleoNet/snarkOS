@@ -30,7 +30,7 @@ impl Transaction for TestTx {
     type EncryptedRecord = [u8; 32];
     type LocalDataCommitment = [u8; 32];
     type Memorandum = [u8; 32];
-    type PredicateCommitment = [u8; 32];
+    type ProgramCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
 
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -53,7 +53,7 @@ impl Transaction for TestTx {
         &[[0u8; 32]]
     }
 
-    fn predicate_commitment(&self) -> &Self::PredicateCommitment {
+    fn program_commitment(&self) -> &Self::ProgramCommitment {
         &[0u8; 32]
     }
 

@@ -113,8 +113,8 @@ fn send<R: Rng>(
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let in_predicates = vec![FIXTURE.predicate.clone(); NUM_INPUT_RECORDS];
-    let out_predicates = vec![FIXTURE.predicate.clone(); NUM_OUTPUT_RECORDS];
+    let input_programs = vec![FIXTURE.program.clone(); NUM_INPUT_RECORDS];
+    let output_programs = vec![FIXTURE.program.clone(); NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
@@ -127,8 +127,8 @@ fn send<R: Rng>(
         inputs,
         from,
         to,
-        in_predicates,
-        out_predicates,
+        input_programs,
+        output_programs,
         dummy_flags,
         values,
         output,

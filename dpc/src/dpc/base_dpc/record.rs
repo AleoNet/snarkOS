@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{predicate::DPCPredicate, record_payload::RecordPayload, BaseDPCComponents};
+use crate::dpc::base_dpc::{program::DPCProgram, record_payload::RecordPayload, BaseDPCComponents};
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::Record,
@@ -30,10 +30,10 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) value: u64,
     pub(super) payload: RecordPayload,
 
-    #[derivative(Default(value = "default_predicate_id::<C::PredicateVerificationKeyHash>()"))]
-    pub(super) birth_predicate_id: Vec<u8>,
-    #[derivative(Default(value = "default_predicate_id::<C::PredicateVerificationKeyHash>()"))]
-    pub(super) death_predicate_id: Vec<u8>,
+    #[derivative(Default(value = "default_program_id::<C::ProgramVerificationKeyHash>()"))]
+    pub(super) birth_program_id: Vec<u8>,
+    #[derivative(Default(value = "default_program_id::<C::ProgramVerificationKeyHash>()"))]
+    pub(super) death_program_id: Vec<u8>,
 
     pub(super) serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,
 
@@ -43,7 +43,7 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) _components: PhantomData<C>,
 }
 
-fn default_predicate_id<C: CRH>() -> Vec<u8> {
+fn default_program_id<C: CRH>() -> Vec<u8> {
     to_bytes![C::Output::default()].unwrap()
 }
 
@@ -52,7 +52,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Owner = AccountAddress<C>;
     type Payload = RecordPayload;
-    type Predicate = DPCPredicate<C>;
+    type Program = DPCProgram<C>;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
     type Value = u64;
@@ -69,12 +69,12 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
         &self.payload
     }
 
-    fn birth_predicate_id(&self) -> &[u8] {
-        &self.birth_predicate_id
+    fn birth_program_id(&self) -> &[u8] {
+        &self.birth_program_id
     }
 
-    fn death_predicate_id(&self) -> &[u8] {
-        &self.death_predicate_id
+    fn death_program_id(&self) -> &[u8] {
+        &self.death_program_id
     }
 
     fn serial_number_nonce(&self) -> &Self::SerialNumberNonce {
@@ -103,11 +103,11 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
         self.value.write(&mut writer)?;
         self.payload.write(&mut writer)?;
 
-        variable_length_integer(self.birth_predicate_id.len() as u64).write(&mut writer)?;
-        self.birth_predicate_id.write(&mut writer)?;
+        variable_length_integer(self.birth_program_id.len() as u64).write(&mut writer)?;
+        self.birth_program_id.write(&mut writer)?;
 
-        variable_length_integer(self.death_predicate_id.len() as u64).write(&mut writer)?;
-        self.death_predicate_id.write(&mut writer)?;
+        variable_length_integer(self.death_program_id.len() as u64).write(&mut writer)?;
+        self.death_program_id.write(&mut writer)?;
 
         self.serial_number_nonce.write(&mut writer)?;
         self.commitment.write(&mut writer)?;
@@ -123,20 +123,20 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
         let value: u64 = FromBytes::read(&mut reader)?;
         let payload: RecordPayload = FromBytes::read(&mut reader)?;
 
-        let birth_pred_repr_size: usize = read_variable_length_integer(&mut reader)?;
+        let birth_program_id_size: usize = read_variable_length_integer(&mut reader)?;
 
-        let mut birth_pred_repr = vec![];
-        for _ in 0..birth_pred_repr_size {
+        let mut birth_program_id = vec![];
+        for _ in 0..birth_program_id_size {
             let byte: u8 = FromBytes::read(&mut reader)?;
-            birth_pred_repr.push(byte);
+            birth_program_id.push(byte);
         }
 
-        let death_pred_repr_size: usize = read_variable_length_integer(&mut reader)?;
+        let death_program_id_size: usize = read_variable_length_integer(&mut reader)?;
 
-        let mut death_pred_repr = vec![];
-        for _ in 0..death_pred_repr_size {
+        let mut death_program_id = vec![];
+        for _ in 0..death_program_id_size {
             let byte: u8 = FromBytes::read(&mut reader)?;
-            death_pred_repr.push(byte);
+            death_program_id.push(byte);
         }
 
         let serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output = FromBytes::read(&mut reader)?;
@@ -150,8 +150,8 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             is_dummy,
             value,
             payload,
-            birth_predicate_id: birth_pred_repr.to_vec(),
-            death_predicate_id: death_pred_repr.to_vec(),
+            birth_program_id: birth_program_id.to_vec(),
+            death_program_id: death_program_id.to_vec(),
             serial_number_nonce,
             commitment,
             commitment_randomness,

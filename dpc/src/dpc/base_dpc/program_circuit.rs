@@ -13,14 +13,14 @@ use snarkos_models::{
     },
 };
 
-pub struct PredicateLocalData<C: BaseDPCComponents> {
+pub struct ProgramLocalData<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
     pub local_data_commitment: <C::LocalDataCommitment as CommitmentScheme>::Output,
     pub position: u8,
 }
 
 /// Convert each component to bytes and pack into field elements.
-impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for PredicateLocalData<C>
+impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for ProgramLocalData<C>
 where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -34,16 +34,18 @@ where
     }
 }
 
-pub struct PredicateCircuit<C: BaseDPCComponents> {
-    // Parameters
+pub struct ProgramCircuit<C: BaseDPCComponents> {
+    /// System parameters
     pub system_parameters: Option<SystemParameters<C>>,
 
-    // Commitment to Predicate input.
+    /// Commitment to the program input.
     pub local_data_commitment: Option<<C::LocalDataCommitment as CommitmentScheme>::Output>,
+
+    /// Record position
     pub position: u8,
 }
 
-impl<C: BaseDPCComponents> PredicateCircuit<C> {
+impl<C: BaseDPCComponents> ProgramCircuit<C> {
     pub fn blank(system_parameters: &SystemParameters<C>) -> Self {
         let local_data_commitment = <C::LocalDataCommitment as CommitmentScheme>::Output::default();
 
@@ -67,7 +69,7 @@ impl<C: BaseDPCComponents> PredicateCircuit<C> {
     }
 }
 
-impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for PredicateCircuit<C> {
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for ProgramCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_payment_check_gadget(
             cs,

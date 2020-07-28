@@ -29,8 +29,8 @@ pub trait DPCComponents: 'static + Sized {
     type AccountSignature: SignatureScheme;
     type AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Self::AccountSignature, Self::InnerField>;
 
-    /// CRH and commitment scheme for committing to predicate input. Invoked inside
-    /// `Self::MainN` and every predicate SNARK.
+    /// CRH and commitment scheme for committing to program input. Invoked inside
+    /// `Self::MainN` and every program SNARK.
     type LocalDataCRH: CRH;
     type LocalDataCRHGadget: CRHGadget<Self::LocalDataCRH, Self::InnerField>;
     type LocalDataCommitment: CommitmentScheme;
@@ -38,15 +38,15 @@ pub trait DPCComponents: 'static + Sized {
 
     /// CRH for hashes of birth and death verification keys.
     /// This is invoked only on the larger curve.
-    type PredicateVerificationKeyHash: CRH;
-    type PredicateVerificationKeyHashGadget: CRHGadget<Self::PredicateVerificationKeyHash, Self::OuterField>;
+    type ProgramVerificationKeyHash: CRH;
+    type ProgramVerificationKeyHashGadget: CRHGadget<Self::ProgramVerificationKeyHash, Self::OuterField>;
 
     /// Commitment scheme for committing to hashes of birth and death verification keys
-    type PredicateVerificationKeyCommitment: CommitmentScheme;
+    type ProgramVerificationKeyCommitment: CommitmentScheme;
     /// Used to commit to hashes of verification keys on the smaller curve and to decommit hashes
     /// of verification keys on the larger curve
-    type PredicateVerificationKeyCommitmentGadget: CommitmentGadget<Self::PredicateVerificationKeyCommitment, Self::InnerField>
-        + CommitmentGadget<Self::PredicateVerificationKeyCommitment, Self::OuterField>;
+    type ProgramVerificationKeyCommitmentGadget: CommitmentGadget<Self::ProgramVerificationKeyCommitment, Self::InnerField>
+        + CommitmentGadget<Self::ProgramVerificationKeyCommitment, Self::OuterField>;
 
     /// PRF for computing serial numbers. Invoked only over `Self::InnerField`.
     type PRF: PRF;

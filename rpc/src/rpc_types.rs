@@ -110,8 +110,8 @@ pub struct TransactionInfo {
     /// Transaction (outer snark) proof
     pub transaction_proof: String,
 
-    /// Predicate verification key commitment
-    pub predicate_commitment: String,
+    /// Program verification key commitment
+    pub program_commitment: String,
 
     /// Local data commitment
     pub local_data_commitment: String,
@@ -151,11 +151,11 @@ pub struct RecordInfo {
     /// Record payload
     pub payload: RPCRecordPayload,
 
-    /// Record birth predicate id
-    pub birth_predicate_id: String,
+    /// Record birth program id
+    pub birth_program_id: String,
 
-    /// Record death predicate id
-    pub death_predicate_id: String,
+    /// Record death program id
+    pub death_program_id: String,
 
     /// Record serial number nonce
     pub serial_number_nonce: String,
@@ -206,9 +206,9 @@ pub struct TransactionInputs {
 
     /// Network id of the transaction
     pub network_id: u8,
-    // Attributes that will be relevant for custom predicates
-    //    pub new_birth_predicates: Vec<String>,
-    //    pub new_death_predicates: Vec<String>,
+    // Attributes that will be relevant for custom programs
+    //    pub new_birth_programs: Vec<String>,
+    //    pub new_death_programs: Vec<String>,
     //    pub new_payloads: Vec<String>,
 }
 

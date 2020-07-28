@@ -3,9 +3,9 @@ use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
     outer_circuit::OuterCircuit,
-    parameters::{PredicateSNARKParameters, SystemParameters},
-    predicate::PrivatePredicateInput,
-    predicate_circuit::PredicateCircuit,
+    parameters::{ProgramSNARKParameters, SystemParameters},
+    program::PrivateProgramInput,
+    program_circuit::ProgramCircuit,
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
@@ -48,17 +48,17 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
         rng,
     )?;
 
-    // TODO (howardwu): Check why is the PrivatePredicateInput necessary for running the setup? Blank should take option?
-    let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
+    // TODO (howardwu): Check why is the PrivateProgramInput necessary for running the setup? Blank should take option?
+    let program_snark_parameters = ProgramSNARKParameters::<C>::load()?;
 
-    let predicate_snark_proof = C::PredicateSNARK::prove(
-        &predicate_snark_parameters.proving_key,
-        PredicateCircuit::blank(&system_parameters),
+    let program_snark_proof = C::ProgramSNARK::prove(
+        &program_snark_parameters.proving_key,
+        ProgramCircuit::blank(&system_parameters),
         rng,
     )?;
-    let private_predicate_input = PrivatePredicateInput {
-        verification_key: predicate_snark_parameters.verification_key,
-        proof: predicate_snark_proof,
+    let private_program_input = PrivateProgramInput {
+        verification_key: program_snark_parameters.verification_key,
+        proof: program_snark_proof,
     };
 
     let outer_snark_parameters = C::OuterSNARK::setup(
@@ -67,7 +67,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
             &ledger_merkle_tree_parameters,
             &inner_snark_vk,
             &inner_snark_proof,
-            &private_predicate_input,
+            &private_program_input,
         ),
         rng,
     )?;

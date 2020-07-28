@@ -93,8 +93,8 @@ pub enum StorageError {
     #[error("missing genesis memo")]
     MissingGenesisMemo,
 
-    #[error("missing genesis predicate vk bytes")]
-    MissingGenesisPredVkBytes,
+    #[error("missing genesis program vk bytes")]
+    MissingGenesisProgramVkBytes,
 
     #[error("missing genesis serial number")]
     MissingGenesisSn,

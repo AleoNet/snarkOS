@@ -16,17 +16,17 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub ledger_parameters: C::MerkleParameters,
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
-    // Input record serial numbers and death predicate commitments
+    // Input record serial numbers
     pub old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
 
-    // Output record commitments and birth predicate commitments
+    // Output record commitments
     pub new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
     // New encrypted record hashes
     pub new_encrypted_record_hashes: Vec<<C::EncryptedRecordCRH as CRH>::Output>,
 
-    // Predicate input commitment and memo
-    pub predicate_commitment: <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
+    // Program input commitment and memo
+    pub program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     pub local_data_commitment: <C::LocalDataCRH as CRH>::Output,
     pub memo: [u8; 32],
 
@@ -53,8 +53,8 @@ where
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
@@ -105,7 +105,7 @@ where
         v.extend_from_slice(
             &self
                 .system_parameters
-                .predicate_verification_key_commitment
+                .program_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
         );
@@ -137,7 +137,7 @@ where
             v.extend_from_slice(&encrypted_record_hash.to_field_elements()?);
         }
 
-        v.extend_from_slice(&self.predicate_commitment.to_field_elements()?);
+        v.extend_from_slice(&self.program_commitment.to_field_elements()?);
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(&self.memo)?);
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
             &[self.network_id][..],

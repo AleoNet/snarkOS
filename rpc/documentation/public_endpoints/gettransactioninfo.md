@@ -8,20 +8,20 @@ Returns information about a transaction from a transaction id.
 
 ### Response
 
-|        Parameter        |  Type  |                Description                |
-|:-----------------------:|:------:|:----------------------------------------- |
-| `txid`                  | string | The transaction id                        |
-| `size`                  | number | The size of the transaction in bytes      |
-| `old_serial_numbers`    | array  | The list of old record serial numbers     |
-| `new_commitments`       | array  | The list of new record commitments        |
-| `memo`                  | string | The transaction memo                      |
-| `digest`                | string | The merkle tree digest                    |
-| `transaction_proof`     | string | The transaction zero knowledge proof      |
-| `predicate_commitment`  | string | The predicate verification key commitment |
-| `local_data_commitment` | string | The local data commitment                 |
-| `value balance`         | number | The transaction value balance             |
-| `signatures`            | array  | The list of transaction signatures        |
-| `transaction_metadata`  | object | The transaction metadata                  |
+|        Parameter        |  Type  |                Description               |
+|:-----------------------:|:------:|:---------------------------------------- |
+| `txid`                  | string | The transaction id                       |
+| `size`                  | number | The size of the transaction in bytes     |
+| `old_serial_numbers`    | array  | The list of old record serial numbers    |
+| `new_commitments`       | array  | The list of new record commitments       |
+| `memo`                  | string | The transaction memo                     |
+| `digest`                | string | The merkle tree digest                   |
+| `transaction_proof`     | string | The transaction zero knowledge proof     |
+| `program_commitment`    | string | The program verification key commitment  |
+| `local_data_commitment` | string | The local data commitment                |
+| `value balance`         | number | The transaction value balance            |
+| `signatures`            | array  | The list of transaction signatures       |
+| `transaction_metadata`  | object | The transaction metadata                 |
 
 ### Example
 ```ignore

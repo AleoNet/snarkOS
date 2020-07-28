@@ -26,7 +26,7 @@ impl<C: BaseDPCComponents> ToBytes for EncryptedRecord<C> {
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let mut ciphertext_selectors = vec![];
 
-        // Write the ciphertext
+        // Write the encrypted record
         variable_length_integer(self.encrypted_record.len() as u64).write(&mut writer)?;
         for ciphertext_element in &self.encrypted_record {
             // Compress the ciphertext representation to the affine x-coordinate and the selector bit
