@@ -78,8 +78,8 @@ Returns information about a record from serialized record hex.
 ### Response
 
 |        Parameter        |  Type  |             Description            |
-|:----------------------- |:------:|:---------------------------------- |
-| `account_public_key`    | string | The hash of current highest block  |
+|:-----------------------:|:------:|:----------------------------------:|
+| `owner`                 | string | The owner of the record            |
 | `is_dummy`              | number | The height of the next block       |
 | `value`                 | number | The current timestamp              |
 | `payload`               | object | The record payload                 |
