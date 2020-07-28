@@ -11,6 +11,6 @@ None
 | `result`  | number | The number of connected nodes |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectioncount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```

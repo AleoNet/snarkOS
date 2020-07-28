@@ -29,7 +29,7 @@ Transaction Recipient Object
 | `encoded_records`     | array  | The hex encodings of the generated records    |
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
     "id": "1",

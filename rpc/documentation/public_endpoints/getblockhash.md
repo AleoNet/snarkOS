@@ -13,6 +13,6 @@ Returns the block hash of a block at the given block height in the best valid ch
 | `result`  | string | The block hash of the block at the given block height |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```

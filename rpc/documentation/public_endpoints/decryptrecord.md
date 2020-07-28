@@ -15,7 +15,7 @@ Decrypts the record ciphertext and returns the hex encoded bytes of the record.
 
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
     "id": "1",

@@ -16,6 +16,6 @@ Yes
 | `address`     | string | An Aleo account address     |
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "createaccount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```

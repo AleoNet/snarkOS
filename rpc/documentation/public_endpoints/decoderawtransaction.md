@@ -24,6 +24,6 @@ Returns information about a transaction from serialized transaction bytes.
 | `transaction_metadata`  | object | The transaction metadata                  |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
