@@ -134,8 +134,8 @@ fn test_execute_base_dpc_constraints() {
     // Set the new record's predicate to be the "always-accept" predicate.
     let new_predicate = Predicate::new(pred_nizk_vk_bytes.clone());
 
-    let new_account_address = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
-    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
@@ -146,8 +146,8 @@ fn test_execute_base_dpc_constraints() {
         &circuit_parameters,
         &old_records,
         &old_account_private_keys,
-        &new_account_address,
-        &new_dummy_flags,
+        &new_record_owners,
+        &new_is_dummy_flags,
         &new_values,
         &new_payloads,
         &new_birth_predicates,
@@ -375,7 +375,7 @@ fn test_execute_base_dpc_constraints() {
         new_records_group_encoding.push(record_group_encoding);
         new_records_field_elements.push(record_field_elements);
 
-        let record_public_key = record.account_address().into_repr();
+        let record_public_key = record.owner().into_repr();
         let encryption_randomness = circuit_parameters
             .account_encryption
             .generate_randomness(record_public_key, &mut rng)

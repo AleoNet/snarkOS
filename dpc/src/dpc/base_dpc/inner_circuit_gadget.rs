@@ -262,7 +262,7 @@ where
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
     let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_account_address_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_record_owner_gadgets = Vec::with_capacity(old_records.len());
     let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
     let mut old_value_gadgets = Vec::with_capacity(old_records.len());
     let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
@@ -270,8 +270,8 @@ where
     let mut old_death_predicate_ids_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_account_address_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_record_owner_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_is_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
     let mut new_value_gadgets = Vec::with_capacity(new_records.len());
     let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
     let mut new_birth_predicate_ids_gadgets = Vec::with_capacity(new_records.len());
@@ -402,13 +402,13 @@ where
 
         // Declare record contents
         let (
-            given_account_address,
+            given_record_owner,
             given_commitment,
             given_is_dummy,
             given_value,
             given_payload,
-            given_birth_predicate_crh,
-            given_death_predicate_crh,
+            given_birth_predicate_id,
+            given_death_predicate_id,
             given_commitment_randomness,
             serial_number_nonce,
         ) = {
@@ -419,11 +419,11 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_address"),
-                || Ok(record.account_address().into_repr()),
-            )?;
-            old_account_address_gadgets.push(given_account_address.clone());
+            let given_record_owner =
+                AccountEncryptionGadget::PublicKeyGadget::alloc(&mut declare_cs.ns(|| "given_record_owner"), || {
+                    Ok(record.owner().into_repr())
+                })?;
+            old_record_owner_gadgets.push(given_record_owner.clone());
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
@@ -440,17 +440,17 @@ where
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
             old_payloads_gadgets.push(given_payload.clone());
 
-            let given_birth_predicate_crh = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_birth_predicate_crh"),
+            let given_birth_predicate_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_predicate_id"),
                 &record.birth_predicate_id(),
             )?;
-            old_birth_predicate_ids_gadgets.push(given_birth_predicate_crh.clone());
+            old_birth_predicate_ids_gadgets.push(given_birth_predicate_id.clone());
 
-            let given_death_predicate_crh = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_death_predicate_crh"),
+            let given_death_predicate_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_predicate_id"),
                 &record.death_predicate_id(),
             )?;
-            old_death_predicate_ids_gadgets.push(given_death_predicate_crh.clone());
+            old_death_predicate_ids_gadgets.push(given_death_predicate_id.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -462,13 +462,13 @@ where
                     Ok(record.serial_number_nonce())
                 })?;
             (
-                given_account_address,
+                given_record_owner,
                 given_commitment,
                 given_is_dummy,
                 given_value,
                 given_payload,
-                given_birth_predicate_crh,
-                given_death_predicate_crh,
+                given_birth_predicate_id,
+                given_death_predicate_id,
                 given_commitment_randomness,
                 serial_number_nonce,
             )
@@ -578,17 +578,17 @@ where
                 given_account_view_key
             };
 
-            // Construct and verify the account address.
+            // Construct and verify the record owner - account address.
             {
-                let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
-                    &mut account_cs.ns(|| "Compute the candidate account address"),
+                let candidate_record_owner = AccountEncryptionGadget::check_public_key_gadget(
+                    &mut account_cs.ns(|| "Compute the candidate record owner - account address"),
                     &account_encryption_parameters,
                     &candidate_account_view_key,
                 )?;
 
-                candidate_account_address.enforce_equal(
+                candidate_record_owner.enforce_equal(
                     &mut account_cs.ns(|| "Check that declared and computed addresses are equal"),
-                    &given_account_address,
+                    &given_record_owner,
                 )?;
             }
 
@@ -688,17 +688,17 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_address_bytes =
-                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
+            let record_owner_bytes =
+                given_record_owner.to_bytes(&mut commitment_cs.ns(|| "Convert record_owner to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_address_bytes);
+            commitment_input.extend_from_slice(&record_owner_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
-            commitment_input.extend_from_slice(&given_birth_predicate_crh);
-            commitment_input.extend_from_slice(&given_death_predicate_crh);
+            commitment_input.extend_from_slice(&given_birth_predicate_id);
+            commitment_input.extend_from_slice(&given_death_predicate_id);
             commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
@@ -745,7 +745,7 @@ where
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
         let (
-            given_account_address,
+            given_record_owner,
             given_record_commitment,
             given_commitment,
             given_is_dummy,
@@ -759,11 +759,11 @@ where
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
-            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_address"),
-                || Ok(record.account_address().into_repr()),
-            )?;
-            new_account_address_gadgets.push(given_account_address.clone());
+            let given_record_owner =
+                AccountEncryptionGadget::PublicKeyGadget::alloc(&mut declare_cs.ns(|| "given_record_owner"), || {
+                    Ok(record.owner().into_repr())
+                })?;
+            new_record_owner_gadgets.push(given_record_owner.clone());
 
             let given_record_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_record_commitment"), || {
@@ -777,7 +777,7 @@ where
                 })?;
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
-            new_dummy_flags_gadgets.push(given_is_dummy.clone());
+            new_is_dummy_flags_gadgets.push(given_is_dummy.clone());
 
             let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
             new_value_gadgets.push(given_value.clone());
@@ -811,7 +811,7 @@ where
                 serial_number_nonce.to_bytes(&mut declare_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             (
-                given_account_address,
+                given_record_owner,
                 given_record_commitment,
                 given_commitment,
                 given_is_dummy,
@@ -902,12 +902,12 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_address_bytes =
-                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
+            let record_owner_bytes =
+                given_record_owner.to_bytes(&mut commitment_cs.ns(|| "Convert record_owner to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_address_bytes);
+            commitment_input.extend_from_slice(&record_owner_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
@@ -1281,7 +1281,7 @@ where
                 &mut encryption_cs.ns(|| format!("output record {} check_encryption_gadget", j)),
                 &account_encryption_parameters,
                 &encryption_randomness_gadget,
-                &given_account_address,
+                &given_record_owner,
                 &encryption_plaintext_gadget,
                 &encryption_blinding_exponents_gadget,
             )?;

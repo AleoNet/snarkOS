@@ -277,7 +277,7 @@ mod rpc_tests {
         let response = rpc.request("decoderecord", &[hex::encode(to_bytes![record].unwrap())]);
         let record_info: Value = serde_json::from_str(&response).unwrap();
 
-        let account_address = hex::encode(to_bytes![record.account_address()].unwrap());
+        let owner = hex::encode(to_bytes![record.owner()].unwrap());
         let is_dummy = record.is_dummy();
         let value = record.value();
         let birth_predicate_id = hex::encode(to_bytes![record.birth_predicate_id()].unwrap());
@@ -286,7 +286,7 @@ mod rpc_tests {
         let commitment = hex::encode(to_bytes![record.commitment()].unwrap());
         let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()].unwrap());
 
-        assert_eq!(account_address, record_info["account_address"]);
+        assert_eq!(owner, record_info["owner"]);
         assert_eq!(is_dummy, record_info["is_dummy"]);
         assert_eq!(value, record_info["value"]);
         assert_eq!(birth_predicate_id, record_info["birth_predicate_id"]);

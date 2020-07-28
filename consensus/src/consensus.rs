@@ -385,8 +385,8 @@ impl ConsensusParameters {
             old_records.push(old_record);
         }
 
-        let new_account_address = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
+        let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
@@ -396,10 +396,10 @@ impl ConsensusParameters {
             parameters,
             old_records,
             old_account_private_keys,
-            new_account_address,
+            new_record_owners,
             new_birth_predicates,
             new_death_predicates,
-            new_dummy_flags,
+            new_is_dummy_flags,
             new_values,
             new_payloads,
             memo,
@@ -414,10 +414,10 @@ impl ConsensusParameters {
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
-        new_account_address: Vec<AccountAddress<Components>>,
+        new_record_owners: Vec<AccountAddress<Components>>,
         new_birth_predicates: Vec<DPCPredicate<Components>>,
         new_death_predicates: Vec<DPCPredicate<Components>>,
-        new_dummy_flags: Vec<bool>,
+        new_is_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
         memo: [u8; 32],
@@ -517,8 +517,8 @@ impl ConsensusParameters {
             &old_records,
             &old_account_private_keys,
             &old_death_vk_and_proof_generator,
-            &new_account_address,
-            &new_dummy_flags,
+            &new_record_owners,
+            &new_is_dummy_flags,
             &new_values,
             &new_payloads,
             &new_birth_predicates,

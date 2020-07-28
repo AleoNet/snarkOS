@@ -55,9 +55,9 @@ mod consensus_dpc {
 
         // OUTPUTS
 
-        let new_account_address = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
+        let new_record_owners = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
         let new_death_predicates = vec![predicate; NUM_OUTPUT_RECORDS];
-        let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+        let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
         let new_values = vec![10; NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
@@ -72,10 +72,10 @@ mod consensus_dpc {
                 &parameters,
                 old_records,
                 old_account_private_keys,
-                new_account_address,
+                new_record_owners,
                 new_birth_predicates.clone(),
                 new_death_predicates.clone(),
-                new_dummy_flags,
+                new_is_dummy_flags,
                 new_values,
                 new_payloads,
                 memo,

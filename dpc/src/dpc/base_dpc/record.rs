@@ -22,7 +22,7 @@ use std::{
     Clone(bound = "C: BaseDPCComponents")
 )]
 pub struct DPCRecord<C: BaseDPCComponents> {
-    pub(super) account_address: AccountAddress<C>,
+    pub(super) owner: AccountAddress<C>,
 
     pub(super) is_dummy: bool,
     pub(super) value: u64,
@@ -46,17 +46,17 @@ fn default_predicate_id<C: CRH>() -> Vec<u8> {
 }
 
 impl<C: BaseDPCComponents> Record for DPCRecord<C> {
-    type AccountAddress = AccountAddress<C>;
     type Commitment = <C::RecordCommitment as CommitmentScheme>::Output;
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
+    type Owner = AccountAddress<C>;
     type Payload = RecordPayload;
     type Predicate = DPCPredicate<C>;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
     type Value = u64;
 
-    fn account_address(&self) -> &Self::AccountAddress {
-        &self.account_address
+    fn owner(&self) -> &Self::Owner {
+        &self.owner
     }
 
     fn is_dummy(&self) -> bool {
@@ -95,7 +95,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
 impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.account_address.write(&mut writer)?;
+        self.owner.write(&mut writer)?;
 
         self.is_dummy.write(&mut writer)?;
         self.value.write(&mut writer)?;
@@ -116,7 +116,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCRecord<C> {
 impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let account_address: AccountAddress<C> = FromBytes::read(&mut reader)?;
+        let owner: AccountAddress<C> = FromBytes::read(&mut reader)?;
         let is_dummy: bool = FromBytes::read(&mut reader)?;
         let value: u64 = FromBytes::read(&mut reader)?;
         let payload: RecordPayload = FromBytes::read(&mut reader)?;
@@ -144,7 +144,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             FromBytes::read(&mut reader)?;
 
         Ok(Self {
-            account_address,
+            owner,
             is_dummy,
             value,
             payload,

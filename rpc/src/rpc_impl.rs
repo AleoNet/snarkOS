@@ -294,7 +294,7 @@ impl RpcFunctions for RpcImpl {
         let record_bytes = hex::decode(record_bytes)?;
         let record = DPCRecord::<Components>::read(&record_bytes[..])?;
 
-        let account_address = hex::encode(to_bytes![record.account_address()]?);
+        let owner = hex::encode(to_bytes![record.owner()]?);
         let payload = RPCRecordPayload {
             payload: hex::encode(to_bytes![record.payload()]?),
         };
@@ -305,7 +305,7 @@ impl RpcFunctions for RpcImpl {
         let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
 
         Ok(RecordInfo {
-            account_address,
+            owner,
             is_dummy: record.is_dummy(),
             value: record.value(),
             payload,

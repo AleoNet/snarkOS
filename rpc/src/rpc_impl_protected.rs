@@ -218,24 +218,24 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_account_address = vec![];
-        let mut new_dummy_flags = vec![];
+        let mut new_record_owners = vec![];
+        let mut new_is_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            new_account_address.push(AccountAddress::<Components>::from_str(&recipient.address)?);
-            new_dummy_flags.push(false);
+            new_record_owners.push(AccountAddress::<Components>::from_str(&recipient.address)?);
+            new_is_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_account_address.len() < Components::NUM_OUTPUT_RECORDS {
-            new_account_address.push(new_account_address[0].clone());
-            new_dummy_flags.push(true);
+        while new_record_owners.len() < Components::NUM_OUTPUT_RECORDS {
+            new_record_owners.push(new_record_owners[0].clone());
+            new_is_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_account_address.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_record_owners.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_is_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
         // Default record payload
@@ -254,10 +254,10 @@ impl ProtectedRpcFunctions for RpcImpl {
             &self.parameters,
             old_records,
             old_account_private_keys,
-            new_account_address,
+            new_record_owners,
             new_birth_predicates,
             new_death_predicates,
-            new_dummy_flags,
+            new_is_dummy_flags,
             new_values,
             new_payloads,
             memo,

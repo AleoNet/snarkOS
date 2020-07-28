@@ -123,13 +123,13 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     // Construct new records
 
-    let new_account_address = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
     let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
 
-    let mut new_dummy_flags = vec![false];
-    new_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
+    let mut new_is_dummy_flags = vec![false];
+    new_is_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
 
     let mut new_values = vec![value];
     new_values.extend(vec![0; Components::NUM_OUTPUT_RECORDS - 1]);
@@ -152,10 +152,10 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
             &parameters,
             old_records,
             old_account_private_keys,
-            new_account_address,
+            new_record_owners,
             new_birth_predicates,
             new_death_predicates,
-            new_dummy_flags,
+            new_is_dummy_flags,
             new_values,
             new_payloads,
             memo,

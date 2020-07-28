@@ -3,7 +3,7 @@ use snarkos_utilities::bytes::{FromBytes, ToBytes};
 use std::hash::Hash;
 
 pub trait Record: Default + FromBytes + ToBytes {
-    type AccountAddress;
+    type Owner;
     type Commitment: FromBytes + ToBytes;
     type CommitmentRandomness;
     type Payload;
@@ -12,8 +12,8 @@ pub trait Record: Default + FromBytes + ToBytes {
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type Value: FromBytes + ToBytes;
 
-    /// Returns the account address.
-    fn account_address(&self) -> &Self::AccountAddress;
+    /// Returns the record owner.
+    fn owner(&self) -> &Self::Owner;
 
     /// Returns whether or not the record is dummy.
     fn is_dummy(&self) -> bool;
