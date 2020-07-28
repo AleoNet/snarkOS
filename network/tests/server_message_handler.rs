@@ -383,7 +383,7 @@ mod server_message_handler {
 
             // 2. Send Transaction message to server from peer
 
-            let transaction_bytes = TRANSACTION_1.to_vec();
+            let transaction_bytes = TRANSACTION_2.to_vec();
             let transaction_bytes_clone = transaction_bytes.clone();
 
             let (tx, rx) = oneshot::channel();
@@ -490,7 +490,7 @@ mod server_message_handler {
 
             // 1. Insert transaction into server memory pool
 
-            let transaction_bytes = TRANSACTION_1.to_vec();
+            let transaction_bytes = TRANSACTION_2.to_vec();
             let entry = Entry {
                 size: transaction_bytes.len(),
                 transaction: Tx::read(&transaction_bytes[..]).unwrap(),
@@ -529,7 +529,7 @@ mod server_message_handler {
 
             assert_eq!(MemoryPool::name(), name);
             assert_eq!(
-                MemoryPool::new(vec![TRANSACTION_1.to_vec()]).serialize().unwrap(),
+                MemoryPool::new(vec![TRANSACTION_2.to_vec()]).serialize().unwrap(),
                 bytes
             )
         });
@@ -574,7 +574,7 @@ mod server_message_handler {
                     .send((
                         tx,
                         MemoryPool::name(),
-                        MemoryPool::new(vec![TRANSACTION_1.to_vec()]).serialize().unwrap(),
+                        MemoryPool::new(vec![TRANSACTION_2.to_vec()]).serialize().unwrap(),
                         Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
                     ))
                     .await
@@ -584,7 +584,7 @@ mod server_message_handler {
 
             // 3. Check that server correctly added transaction to memory pool
 
-            let transaction_bytes = TRANSACTION_1.to_vec();
+            let transaction_bytes = TRANSACTION_2.to_vec();
             let memory_pool = memory_pool_lock.lock().await;
 
             assert!(memory_pool.contains(&Entry {

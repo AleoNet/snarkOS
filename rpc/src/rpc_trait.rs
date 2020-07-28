@@ -62,6 +62,10 @@ pub trait RpcFunctions {
     #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/decoderecord.md"))]
     #[rpc(name = "decoderecord")]
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
+
+    #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/decryptrecord.md"))]
+    #[rpc(name = "decryptrecord")]
+    fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
 }
 
 /// Definition of private RPC endpoints that require authentication.

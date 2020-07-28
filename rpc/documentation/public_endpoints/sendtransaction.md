@@ -13,6 +13,6 @@ Send raw transaction bytes to this node to be added into the mempool. If valid, 
 | `result`  | string | The transaction id of the sent transaction |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
