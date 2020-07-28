@@ -95,13 +95,13 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decodere
 ```
 
 ## decryptrecord
-Decrypts the record ciphertext and returns the hex encoded bytes of the record.
+Decrypts the encrypted record and returns the hex encoded bytes of the record.
 
 ### Arguments
 
 |      Parameter      |  Type  | Required |                     Description                     |
 |:-------------------:|:------:|:--------:|:---------------------------------------------------:|
-| `record_ciphertext` | string |    Yes   |                 The encrypted record                |
+|  `encrypted_record` | string |    Yes   |                 The encrypted record                |
 |  `account_view_key` | string |    Yes   | The account view key used to decrypt the ciphertext |
 
 ### Response
