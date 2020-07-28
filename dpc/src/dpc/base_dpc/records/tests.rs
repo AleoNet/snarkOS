@@ -1,22 +1,22 @@
-use super::record_serializer::*;
+use super::{record_encryption::*, record_serializer::*};
 use crate::dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, DPC};
 use snarkos_curves::edwards_bls12::{EdwardsParameters, EdwardsProjective as EdwardsBls};
 use snarkos_models::{algorithms::CRH, dpc::RecordSerializerScheme, objects::AccountScheme};
 
-use snarkos_objects::Account;
+use snarkos_objects::{Account, AccountViewKey};
 
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-pub(crate) const ITERATIONS: usize = 10;
+pub(crate) const ITERATIONS: usize = 5;
 
 #[test]
 fn test_record_serialization() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
-    for _ in 0..5 {
+    for _ in 0..ITERATIONS {
         // Generate parameters for the ledger, commitment schemes, CRH, and the
         // "always-accept" predicate.
         let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
@@ -48,7 +48,7 @@ fn test_record_serialization() {
                 &system_parameters,
                 &SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &sn_nonce_input).unwrap(),
                 &dummy_account.address,
-                true,
+                false,
                 value,
                 &RecordPayload::from_bytes(&payload),
                 &Predicate::new(pred_nizk_vk_bytes.clone()),
@@ -74,6 +74,70 @@ fn test_record_serialization() {
             assert_eq!(given_record.death_predicate_id, record_components.death_predicate_id);
             assert_eq!(given_record.value, record_components.value);
             assert_eq!(given_record.payload, record_components.payload);
+        }
+    }
+}
+
+#[test]
+fn test_record_encryption() {
+    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+    for _ in 0..ITERATIONS {
+        // Generate parameters for the ledger, commitment schemes, CRH, and the
+        // "always-accept" predicate.
+        let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
+        let pred_nizk_pp = InstantiatedDPC::generate_predicate_snark_parameters(&system_parameters, &mut rng).unwrap();
+
+        let pred_nizk_vk_bytes = to_bytes![
+            PredicateVerificationKeyHash::hash(
+                &system_parameters.predicate_verification_key_hash,
+                &to_bytes![pred_nizk_pp.verification_key].unwrap()
+            )
+            .unwrap()
+        ]
+        .unwrap();
+
+        for _ in 0..ITERATIONS {
+            let dummy_account = Account::new(
+                &system_parameters.account_signature,
+                &system_parameters.account_commitment,
+                &system_parameters.account_encryption,
+                &mut rng,
+            )
+            .unwrap();
+
+            let sn_nonce_input: [u8; 32] = rng.gen();
+            let value = rng.gen();
+            let payload: [u8; 32] = rng.gen();
+
+            let given_record = DPC::generate_record(
+                &system_parameters,
+                &SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &sn_nonce_input).unwrap(),
+                &dummy_account.address,
+                false,
+                value,
+                &RecordPayload::from_bytes(&payload),
+                &Predicate::new(pred_nizk_vk_bytes.clone()),
+                &Predicate::new(pred_nizk_vk_bytes.clone()),
+                &mut rng,
+            )
+            .unwrap();
+
+            // Encrypt the record
+            let (_, encryped_record) =
+                RecordEncryption::encrypt_record(&system_parameters, &given_record, &mut rng).unwrap();
+            let account_view_key = AccountViewKey::from_private_key(
+                &system_parameters.account_signature,
+                &system_parameters.account_commitment,
+                &dummy_account.private_key,
+            )
+            .unwrap();
+
+            // Decrypt the record
+            let decrypted_record =
+                RecordEncryption::decrypt_record(&system_parameters, &account_view_key, &encryped_record).unwrap();
+
+            assert_eq!(given_record, decrypted_record);
         }
     }
 }

@@ -3,6 +3,7 @@ mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
     use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
     use snarkos_models::objects::Transaction;
+    use snarkos_objects::AccountViewKey;
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
@@ -65,12 +66,6 @@ mod rpc_tests {
             .collect();
         let memo = hex::encode(transaction.memorandum());
 
-        assert_eq!(transaction_id, transaction_info["txid"]);
-        assert_eq!(transaction_size, transaction_info["size"]);
-        assert_eq!(Value::Array(old_serial_numbers), transaction_info["old_serial_numbers"]);
-        assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
-        assert_eq!(memo, transaction_info["memo"]);
-
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
         let predicate_commitment = hex::encode(to_bytes![transaction.predicate_commitment].unwrap());
@@ -82,12 +77,25 @@ mod rpc_tests {
             .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
             .collect();
 
+        let ciphertexts: Vec<Value> = transaction
+            .record_ciphertexts
+            .iter()
+            .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
+            .collect();
+
+        assert_eq!(transaction_id, transaction_info["txid"]);
+        assert_eq!(transaction_size, transaction_info["size"]);
+        assert_eq!(Value::Array(old_serial_numbers), transaction_info["old_serial_numbers"]);
+        assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
+        assert_eq!(memo, transaction_info["memo"]);
+
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(predicate_commitment, transaction_info["predicate_commitment"]);
         assert_eq!(local_data_commitment, transaction_info["local_data_commitment"]);
         assert_eq!(value_balance, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
+        assert_eq!(Value::Array(ciphertexts), transaction_info["record_ciphertexts"]);
     }
 
     fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
@@ -294,6 +302,45 @@ mod rpc_tests {
         assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
         assert_eq!(commitment, record_info["commitment"]);
         assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_rpc_decrypt_record() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let system_parameters = &FIXTURE_VK.parameters.system_parameters;
+        let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
+
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let ciphertexts = transaction.record_ciphertexts;
+
+        let records = &DATA.records_1;
+
+        let view_key = AccountViewKey::from_private_key(
+            &system_parameters.account_signature,
+            &system_parameters.account_commitment,
+            &miner_acc.private_key,
+        )
+        .unwrap();
+
+        for (ciphertext, record) in ciphertexts.iter().zip(records) {
+            let ciphertext_string = hex::encode(to_bytes![ciphertext].unwrap());
+            let account_view_key = hex::encode(to_bytes![view_key].unwrap());
+
+            let params = DecryptRecordInput {
+                record_ciphertext: ciphertext_string,
+                account_view_key,
+            };
+            let params = serde_json::to_value(params).unwrap();
+
+            let response = rpc.request("decryptrecord", &[params]);
+
+            assert_eq!(response, format![r#""{}""#, hex::encode(to_bytes![record].unwrap())]);
+        }
 
         drop(rpc);
         kill_storage_sync(storage);

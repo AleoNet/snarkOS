@@ -21,6 +21,6 @@ Returns information about a record from serialized record hex.
 | `commitment_randomness` | string | The record commitment randomness   |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```

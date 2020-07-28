@@ -72,9 +72,8 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;
 
-    let crh_parameters =
-        <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
-            .expect("read bytes as hash for MerkleParameters in ledger");
+    let crh_parameters = <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes()?[..])
+        .expect("read bytes as hash for MerkleParameters in ledger");
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_parameters = From::from(merkle_tree_hash_parameters);
 
@@ -93,8 +92,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         &parameters.system_parameters.account_commitment,
         &parameters.system_parameters.account_encryption,
         rng,
-    )
-    .unwrap();
+    )?;
 
     // Generate dummy input records
 
@@ -104,8 +102,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         let old_sn_nonce = &parameters
             .system_parameters
             .serial_number_nonce
-            .hash(&[64u8 + (i as u8); 1])
-            .unwrap();
+            .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
             &parameters.system_parameters,
             &old_sn_nonce,
@@ -116,8 +113,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
             &predicate,
             &predicate,
             rng,
-        )
-        .unwrap();
+        )?;
         old_records.push(old_record);
     }
 

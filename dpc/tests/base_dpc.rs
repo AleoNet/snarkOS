@@ -1,20 +1,17 @@
 #[cfg(debug_assertions)]
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
-use snarkos_dpc::{
-    base_dpc::{
-        instantiated::*,
-        predicate::PrivatePredicateInput,
-        predicate_circuit::*,
-        record_payload::RecordPayload,
-        records::record_serializer::*,
-        LocalData,
-        DPC,
-    },
-    dpc::base_dpc::BaseDPCComponents,
+use snarkos_dpc::base_dpc::{
+    instantiated::*,
+    predicate::PrivatePredicateInput,
+    predicate_circuit::*,
+    record_payload::RecordPayload,
+    records::record_encryption::RecordEncryption,
+    LocalData,
+    DPC,
 };
 use snarkos_models::{
-    algorithms::{CommitmentScheme, EncryptionScheme, CRH, SNARK},
-    dpc::{DPCScheme, Record, RecordSerializerScheme},
+    algorithms::{CommitmentScheme, CRH, SNARK},
+    dpc::DPCScheme,
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
@@ -222,8 +219,11 @@ fn base_dpc_integration_test() {
     )
     .unwrap();
 
+    // Check that the transaction is serialized and deserialized correctly
     let transaction_bytes = to_bytes![transaction].unwrap();
-    let _recovered_transaction = Tx::read(&transaction_bytes[..]).unwrap();
+    let recovered_transaction = Tx::read(&transaction_bytes[..]).unwrap();
+
+    assert_eq!(transaction, recovered_transaction);
 
     {
         // Check that new_records can be decrypted from the transaction
@@ -231,49 +231,21 @@ fn base_dpc_integration_test() {
         let record_ciphertexts = transaction.ciphertexts();
         let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
 
-        for (((ciphertext, private_key), new_record), selector_bits) in record_ciphertexts
-            .iter()
-            .zip(new_account_private_keys)
-            .zip(new_records)
-            .zip(&transaction.new_records_ciphertext_and_fq_high_selectors)
+        for ((record_ciphertext, private_key), new_record) in
+            record_ciphertexts.iter().zip(new_account_private_keys).zip(new_records)
         {
-            let final_fq_high_bit = selector_bits.1.clone();
-
-            let view_key = AccountViewKey::from_private_key(
+            let account_view_key = AccountViewKey::from_private_key(
                 &parameters.system_parameters.account_signature,
                 &parameters.system_parameters.account_commitment,
                 &private_key,
             )
             .unwrap();
 
-            let plaintext = parameters
-                .system_parameters
-                .account_encryption
-                .decrypt(&view_key.decryption_key, &ciphertext)
-                .unwrap();
+            let decrypted_record =
+                RecordEncryption::decrypt_record(&parameters.system_parameters, &account_view_key, record_ciphertext)
+                    .unwrap();
 
-            let record_components = RecordSerializer::<
-                Components,
-                <Components as BaseDPCComponents>::EncryptionModelParameters,
-                <Components as BaseDPCComponents>::EncryptionGroup,
-            >::deserialize(plaintext, final_fq_high_bit)
-            .unwrap();
-
-            assert_eq!(record_components.value, new_record.value());
-            assert_eq!(record_components.payload, *new_record.payload());
-            assert_eq!(
-                record_components.birth_predicate_id,
-                new_record.birth_predicate_id().to_vec()
-            );
-            assert_eq!(
-                record_components.death_predicate_id,
-                new_record.death_predicate_id().to_vec()
-            );
-            assert_eq!(&record_components.serial_number_nonce, new_record.serial_number_nonce());
-            assert_eq!(
-                record_components.commitment_randomness,
-                new_record.commitment_randomness()
-            );
+            assert_eq!(decrypted_record, new_record);
         }
     }
 

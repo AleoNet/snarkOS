@@ -16,6 +16,6 @@ None
 | `coinbase_value`      | number | The amount spendable by the coinbase transaction      |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocktemplate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```

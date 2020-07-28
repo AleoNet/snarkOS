@@ -8,11 +8,13 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
     record::DPCRecord,
+    record_ciphertext::RecordCiphertext,
+    record_encryption::RecordEncryption,
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{dpc::Record, objects::Transaction};
 use snarkos_network::{context::Context, process_transaction_internal};
-use snarkos_objects::BlockHeaderHash;
+use snarkos_objects::{AccountViewKey, BlockHeaderHash};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -132,7 +134,7 @@ impl RpcFunctions for RpcImpl {
         Ok(hex::encode(&block_hash.0))
     }
 
-    /// Returns hex encoded bytes of a transaction from its transaction id.
+    /// Returns the hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         Ok(hex::encode(
             &self.storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
@@ -171,6 +173,12 @@ impl RpcFunctions for RpcImpl {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
 
+        let mut record_ciphertexts = vec![];
+
+        for ciphertext in &transaction.record_ciphertexts {
+            record_ciphertexts.push(hex::encode(to_bytes![ciphertext]?));
+        }
+
         let transaction_id = transaction.transaction_id()?;
         let block_number = match self.storage.get_transaction_location(&transaction_id.to_vec())? {
             Some(block_location) => Some(
@@ -194,6 +202,7 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
+            record_ciphertexts,
             transaction_metadata,
         })
     }
@@ -288,6 +297,27 @@ impl RpcFunctions for RpcImpl {
     }
 
     // Record handling
+
+    /// Decrypts the record ciphertext and returns the hex encoded bytes of the record.
+    fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
+        // Read the record ciphertext
+        let ciphertext_bytes = hex::decode(decryption_input.record_ciphertext)?;
+        let record_ciphertext = RecordCiphertext::<Components>::read(&ciphertext_bytes[..])?;
+
+        // Read the view key
+        let view_key_bytes = hex::decode(decryption_input.account_view_key)?;
+        let account_view_key = AccountViewKey::<Components>::read(&view_key_bytes[..])?;
+
+        // Decrypt the record ciphertext
+        let record = RecordEncryption::decrypt_record(
+            &self.parameters.system_parameters,
+            &account_view_key,
+            &record_ciphertext,
+        )?;
+        let record_bytes = to_bytes![record]?;
+
+        Ok(hex::encode(record_bytes))
+    }
 
     /// Returns information about a record from serialized record bytes.
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {

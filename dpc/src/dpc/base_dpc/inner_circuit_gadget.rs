@@ -2,18 +2,18 @@ use crate::dpc::base_dpc::{
     binding_signature::{gadget_verification_setup, BindingSignature},
     parameters::SystemParameters,
     record::DPCRecord,
+    record_encryption::RecordEncryptionGadgetComponents,
     BaseDPCComponents,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
+use snarkos_gadgets::algorithms::{encoding::Elligator2FieldGadget, merkle_tree::merkle_path::MerklePathGadget};
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, PRF},
     curves::{
         AffineCurve,
         Field,
         Group,
-        ModelParameters,
         MontgomeryModelParameters,
         One,
         PrimeField,
@@ -70,14 +70,9 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
-    new_records_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
-    new_records_group_encoding: &[Vec<(
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-    )>],
+
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-    new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
-    new_records_ciphertext_and_fq_high_selectors: &[(Vec<bool>, Vec<bool>)],
+    new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
     new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
 
     // Rest
@@ -131,11 +126,8 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_records,
         new_sn_nonce_randomness,
         new_commitments,
-        new_records_field_elements,
-        new_records_group_encoding,
         new_records_encryption_randomness,
-        new_records_encryption_blinding_exponents,
-        new_records_ciphertext_and_fq_high_selectors,
+        new_records_encryption_gadget_components,
         new_records_ciphertext_hashes,
         //
         predicate_commitment,
@@ -194,14 +186,9 @@ fn base_dpc_execute_gadget_helper<
     new_records: &[DPCRecord<C>],
     new_sn_nonce_randomness: &[[u8; 32]],
     new_commitments: &[RecordCommitment::Output],
-    new_records_field_elements: &[Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>],
-    new_records_group_encoding: &[Vec<(
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-    )>],
+
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-    new_records_encryption_blinding_exponents: &[Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>],
-    new_records_ciphertext_and_fq_high_selectors: &[(Vec<bool>, Vec<bool>)],
+    new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
     new_records_ciphertext_hashes: &[RecordCiphertextCRH::Output],
 
     //
@@ -718,30 +705,26 @@ where
     for (
         j,
         (
-            (
-                (
-                    (
-                        ((((record, sn_nonce_randomness), commitment), record_field_elements), record_group_encoding),
-                        encryption_randomness,
-                    ),
-                    encryption_blinding_exponents,
-                ),
-                record_ciphertext_hash,
-            ),
-            ciphertext_and_fq_high_selectors,
+            ((((record, sn_nonce_randomness), commitment), encryption_randomness), encryption_gadget_components),
+            record_ciphertext_hash,
         ),
     ) in new_records
         .iter()
         .zip(new_sn_nonce_randomness)
         .zip(new_commitments)
-        .zip(new_records_field_elements)
-        .zip(new_records_group_encoding)
         .zip(new_records_encryption_randomness)
-        .zip(new_records_encryption_blinding_exponents)
+        .zip(new_records_encryption_gadget_components)
         .zip(new_records_ciphertext_hashes)
-        .zip(new_records_ciphertext_and_fq_high_selectors)
         .enumerate()
     {
+        let RecordEncryptionGadgetComponents {
+            record_field_elements,
+            record_group_encoding,
+            ciphertext_selectors,
+            fq_high_selectors,
+            encryption_blinding_exponents,
+        } = encryption_gadget_components;
+
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
         let (
@@ -961,10 +944,8 @@ where
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
             let mut fq_high_bits = vec![];
-            for (i, fq_high_bit) in ciphertext_and_fq_high_selectors.1[0..ciphertext_and_fq_high_selectors.1.len() - 1]
-                .iter()
-                .enumerate()
-            {
+
+            for (i, fq_high_bit) in fq_high_selectors[0..(fq_high_selectors.len() - 1)].iter().enumerate() {
                 let boolean = Boolean::alloc(
                     encryption_cs.ns(|| format!("Allocate fq_high_bit {} - {}", i, j)),
                     || Ok(fq_high_bit),
@@ -1077,8 +1058,6 @@ where
 
             // *******************************************************************
             // Alloc each of the record field elements as gadgets.
-
-            use snarkos_gadgets::algorithms::encoding::Elligator2FieldGadget;
 
             let mut record_field_elements_gadgets = Vec::with_capacity(record_field_elements.len());
 
@@ -1300,8 +1279,8 @@ where
             let ciphertext_and_fq_high_selectors_bytes = UInt8::alloc_vec(
                 &mut encryption_cs.ns(|| format!("ciphertext and fq_high selector bits to bytes {}", j)),
                 &bits_to_bytes(
-                    &[&ciphertext_and_fq_high_selectors.0[..], &[
-                        ciphertext_and_fq_high_selectors.1[ciphertext_and_fq_high_selectors.1.len() - 1],
+                    &[&ciphertext_selectors[..], &[
+                        fq_high_selectors[fq_high_selectors.len() - 1]
                     ]]
                     .concat(),
                 ),

@@ -35,7 +35,7 @@ pub struct MemoryPool<T: Transaction> {
 }
 
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
-const COINBASE_TRANSACTION_SIZE: usize = 975; // TODO Find the value for actual coinbase transaction size
+const COINBASE_TRANSACTION_SIZE: usize = 1490; // TODO Find the value for actual coinbase transaction size
 
 impl<T: Transaction> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
@@ -224,13 +224,15 @@ mod tests {
 
     use std::sync::Arc;
 
+    // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
+
     #[test]
     fn push() {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let size = TRANSACTION_1.len();
+        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let size = TRANSACTION_2.len();
 
         mem_pool
             .insert(&blockchain, Entry {
@@ -257,8 +259,8 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let size = TRANSACTION_1.len();
+        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let size = TRANSACTION_2.len();
 
         let entry = Entry::<Tx> {
             size,
@@ -283,8 +285,8 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let size = TRANSACTION_1.len();
+        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let size = TRANSACTION_2.len();
 
         mem_pool
             .insert(&blockchain, Entry {
@@ -311,7 +313,7 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
 
         let size = to_bytes![transaction].unwrap().len();
 
@@ -332,10 +334,10 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
-                size: TRANSACTION_1.len(),
+                size: TRANSACTION_2.len(),
                 transaction: transaction.clone(),
             })
             .unwrap();
@@ -356,10 +358,10 @@ mod tests {
         let blockchain = Arc::new(FIXTURE_VK.ledger());
 
         let mut mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
-                size: TRANSACTION_1.len(),
+                size: TRANSACTION_2.len(),
                 transaction: transaction.clone(),
             })
             .unwrap();
@@ -368,9 +370,11 @@ mod tests {
 
         mem_pool.store(&blockchain).unwrap();
 
-        let block = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
+        let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
+        let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
 
-        blockchain.insert_and_commit(&block).unwrap();
+        blockchain.insert_and_commit(&block_1).unwrap();
+        blockchain.insert_and_commit(&block_2).unwrap();
 
         mem_pool.cleanse(&blockchain).unwrap();
 
