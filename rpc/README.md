@@ -14,7 +14,7 @@ to enable API calls for fetching data and interacting with peers connected to th
 
 ## RPC Port
 
-```
+```ignore
 -rpc-port 3030
 ```
 
@@ -22,7 +22,7 @@ The default RPC port is 3030. This can be specified with the `-rpc-port` flag wh
 
 ## Authentication for Private RPC Endpoints
 
-```
+```ignore
 -rpc-username {USERNAME} -rpc-password {PASSWORD}
 ```
 
@@ -62,7 +62,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `transaction_metadata`  | object | The transaction metadata                  |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -90,7 +90,7 @@ Returns information about a record from serialized record hex.
 | `commitment_randomness` | string | The record commitment randomness   |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -112,7 +112,7 @@ Decrypts the record ciphertext and returns the hex encoded bytes of the record.
 
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
     "id": "1",
@@ -139,7 +139,7 @@ None
 | `result`  | string | The block hash of the most recent valid block |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getbestblockhash", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -168,7 +168,7 @@ Returns information about a block from a block hash.
 | `transactions`      | array  | The list of transaction ids included in the block |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": ["caf49293d36f0215cfb3296dbc871a0ef5e5dcfc61f91cd0c9ac2c730f84d853"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -186,7 +186,7 @@ None
 | `result`  | string | The number of blocks in the best valid chain |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockcount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -206,7 +206,7 @@ Returns the block hash of a block at the given block height in the best valid ch
 | `result`  | string | The block hash of the block at the given block height |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -229,7 +229,7 @@ None
 | `coinbase_value`      | number | The amount spendable by the coinbase transaction      |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocktemplate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -247,7 +247,7 @@ None
 | `result`  | number | The number of connected nodes |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectioncount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -265,7 +265,7 @@ None
 | `peers`   | array | The list of connected peer IPs |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getpeerinfo", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -285,7 +285,7 @@ Returns hex encoded bytes of a transaction from its transaction id.
 | `result`  | string | The hex-encoded transaction bytes |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawtransaction", "params": ["83fc73b8a104d7cdabe514ec4ddfeb7fd6284ff8e0a757d25d8479ed0ffe608b"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -316,7 +316,7 @@ Returns information about a transaction from a transaction id.
 | `transaction_metadata`  | object | The transaction metadata                  |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettransactioninfo", "params": ["83fc73b8a104d7cdabe514ec4ddfeb7fd6284ff8e0a757d25d8479ed0ffe608b"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -336,7 +336,7 @@ Send raw transaction bytes to this node to be added into the mempool. If valid, 
 | `result`  | string | The transaction id of the sent transaction |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -356,7 +356,7 @@ Validate and return if the transaction is valid.
 | `result`  | boolean | Check that the transaction is valid |
 
 ### Example
-```
+```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "validaterawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
@@ -381,7 +381,7 @@ Yes
 | `address`     | string | An Aleo account address     |
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "createaccount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
@@ -417,7 +417,7 @@ Transaction Recipient Object
 | `encoded_records`     | array  | The hex encodings of the generated records    |
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
     "id": "1",
@@ -455,7 +455,7 @@ Yes
 | `result`  | array | The list stored record commitments |
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "fetchrecordcommitments", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
@@ -479,7 +479,7 @@ Yes
 | `result`  | string | The hex-encoded record bytes |
 
 ### Example
-```
+```ignore
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawrecord", "params": ["86be61d5f3bd795e31615d6834efefca01ad023d57c0383e2231e094bcabfc05"] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
