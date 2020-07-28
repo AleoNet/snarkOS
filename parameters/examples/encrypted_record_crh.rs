@@ -14,13 +14,13 @@ use std::{
 
 pub fn setup<C: DPCComponents>() -> Result<Vec<u8>, CRHError> {
     let rng = &mut thread_rng();
-    let record_ciphertext_crh = <C::RecordCiphertextCRH as CRH>::setup(rng);
-    let record_ciphertext_crh_parameters = record_ciphertext_crh.parameters();
-    let record_ciphertext_crh_parameters_bytes = to_bytes![record_ciphertext_crh_parameters]?;
+    let encrypted_record_crh = <C::EncryptedRecordCRH as CRH>::setup(rng);
+    let encrypted_record_crh_parameters = encrypted_record_crh.parameters();
+    let encrypted_record_crh_parameters_bytes = to_bytes![encrypted_record_crh_parameters]?;
 
-    let size = record_ciphertext_crh_parameters_bytes.len();
-    println!("record_ciphertext_crh.params\n\tsize - {}", size);
-    Ok(record_ciphertext_crh_parameters_bytes)
+    let size = encrypted_record_crh_parameters_bytes.len();
+    println!("encrypted_record_crh.params\n\tsize - {}", size);
+    Ok(encrypted_record_crh_parameters_bytes)
 }
 
 pub fn store(file_path: &PathBuf, checksum_path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
@@ -36,7 +36,7 @@ pub fn store(file_path: &PathBuf, checksum_path: &PathBuf, bytes: &Vec<u8>) -> I
 
 pub fn main() {
     let bytes = setup::<Components>().unwrap();
-    let filename = PathBuf::from("record_ciphertext_crh.params");
-    let sumname = PathBuf::from("record_ciphertext_crh.checksum");
+    let filename = PathBuf::from("encrypted_record_crh.params");
+    let sumname = PathBuf::from("encrypted_record_crh.checksum");
     store(&filename, &sumname, &bytes).unwrap();
 }

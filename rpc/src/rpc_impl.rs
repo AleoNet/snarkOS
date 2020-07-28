@@ -5,10 +5,10 @@
 use crate::{rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
+    encrypted_record::EncryptedRecord,
     instantiated::{Components, Tx},
     parameters::PublicParameters,
     record::DPCRecord,
-    record_ciphertext::RecordCiphertext,
     record_encryption::RecordEncryption,
 };
 use snarkos_errors::rpc::RpcError;
@@ -173,10 +173,10 @@ impl RpcFunctions for RpcImpl {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
 
-        let mut record_ciphertexts = vec![];
+        let mut encrypted_records = vec![];
 
-        for ciphertext in &transaction.record_ciphertexts {
-            record_ciphertexts.push(hex::encode(to_bytes![ciphertext]?));
+        for encrypted_record in &transaction.encrypted_records {
+            encrypted_records.push(hex::encode(to_bytes![encrypted_record]?));
         }
 
         let transaction_id = transaction.transaction_id()?;
@@ -202,7 +202,7 @@ impl RpcFunctions for RpcImpl {
             local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
             value_balance: transaction.value_balance,
             signatures,
-            record_ciphertexts,
+            encrypted_records,
             transaction_metadata,
         })
     }
@@ -300,20 +300,17 @@ impl RpcFunctions for RpcImpl {
 
     /// Decrypts the record ciphertext and returns the hex encoded bytes of the record.
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
-        // Read the record ciphertext
-        let ciphertext_bytes = hex::decode(decryption_input.record_ciphertext)?;
-        let record_ciphertext = RecordCiphertext::<Components>::read(&ciphertext_bytes[..])?;
+        // Read the encrypted_record
+        let encrypted_record_bytes = hex::decode(decryption_input.encrypted_record)?;
+        let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
 
         // Read the view key
         let view_key_bytes = hex::decode(decryption_input.account_view_key)?;
         let account_view_key = AccountViewKey::<Components>::read(&view_key_bytes[..])?;
 
         // Decrypt the record ciphertext
-        let record = RecordEncryption::decrypt_record(
-            &self.parameters.system_parameters,
-            &account_view_key,
-            &record_ciphertext,
-        )?;
+        let record =
+            RecordEncryption::decrypt_record(&self.parameters.system_parameters, &account_view_key, &encrypted_record)?;
         let record_bytes = to_bytes![record]?;
 
         Ok(hex::encode(record_bytes))

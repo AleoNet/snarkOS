@@ -51,7 +51,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
     old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    new_records_ciphertext_hashes: &Vec<<C::RecordCiphertextCRH as CRH>::Output>,
+    new_encrypted_record_hashes: &Vec<<C::EncryptedRecordCRH as CRH>::Output>,
     memo: &[u8; 32],
     value_balance: i64,
     network_id: u8,
@@ -83,8 +83,8 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
-    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
@@ -142,8 +142,8 @@ where
         ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.record_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let record_ciphertext_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.record_ciphertext_crh.parameters())
+    let encrypted_record_crh_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.encrypted_record_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let predicate_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
@@ -185,12 +185,12 @@ where
         commitments_fe.push(commitment_fe);
     }
 
-    let mut record_ciphertext_hashes_fe = vec![];
-    for ciphertext_hash in new_records_ciphertext_hashes {
-        let ciphertext_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(ciphertext_hash)
+    let mut encrypted_record_hashes_fe = vec![];
+    for encrypted_record_hash in new_encrypted_record_hashes {
+        let encrypted_record_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(encrypted_record_hash)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        record_ciphertext_hashes_fe.push(ciphertext_hash_fe);
+        encrypted_record_hashes_fe.push(encrypted_record_hash_fe);
     }
 
     let predicate_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(predicate_commitment)
@@ -226,8 +226,8 @@ where
     let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, &account_signature_fe, "account signature pp")?;
     let record_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &record_commitment_parameters_fe, "record commitment pp")?;
-    let record_ciphertext_crh_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &record_ciphertext_crh_parameters_fe, "record ciphertext crh pp")?;
+    let encrypted_record_crh_parameters_fe_bytes =
+        field_element_to_bytes::<C, _>(cs, &encrypted_record_crh_parameters_fe, "encrypted record crh pp")?;
     let predicate_vk_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &predicate_vk_commitment_parameters_fe, "predicate vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
@@ -248,20 +248,20 @@ where
         )?);
     }
 
-    let mut commitment_and_ciphertext_hash_fe_bytes = vec![];
-    for (index, (cm_fe, record_ciphertext_hash_fe)) in
-        commitments_fe.iter().zip_eq(&record_ciphertext_hashes_fe).enumerate()
+    let mut commitment_and_encrypted_record_hash_fe_bytes = vec![];
+    for (index, (cm_fe, encrypted_record_hash_fe)) in
+        commitments_fe.iter().zip_eq(&encrypted_record_hashes_fe).enumerate()
     {
-        commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
+        commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
             cm_fe,
             &format!("Allocate record commitment {:?}", index),
         )?);
 
-        commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
+        commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            record_ciphertext_hash_fe,
-            &format!("Allocate record ciphertext hash {:?}", index),
+            encrypted_record_hash_fe,
+            &format!("Allocate encrypted record hash {:?}", index),
         )?);
     }
 
@@ -281,7 +281,7 @@ where
     inner_snark_input_bytes.extend(account_encryption_fe_bytes);
     inner_snark_input_bytes.extend(account_signature_fe_bytes);
     inner_snark_input_bytes.extend(record_commitment_parameters_fe_bytes);
-    inner_snark_input_bytes.extend(record_ciphertext_crh_parameters_fe_bytes);
+    inner_snark_input_bytes.extend(encrypted_record_crh_parameters_fe_bytes);
     inner_snark_input_bytes.extend(predicate_vk_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(local_data_commitment_parameters_fe_bytes.clone());
     inner_snark_input_bytes.extend(serial_number_nonce_crh_parameters_fe_bytes);
@@ -289,7 +289,7 @@ where
     inner_snark_input_bytes.extend(ledger_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_digest_fe_bytes);
     inner_snark_input_bytes.extend(serial_number_fe_bytes);
-    inner_snark_input_bytes.extend(commitment_and_ciphertext_hash_fe_bytes);
+    inner_snark_input_bytes.extend(commitment_and_encrypted_record_hash_fe_bytes);
     inner_snark_input_bytes.extend(predicate_commitment_fe_bytes);
     inner_snark_input_bytes.extend(memo_fe_bytes);
     inner_snark_input_bytes.extend(network_id_fe_bytes);

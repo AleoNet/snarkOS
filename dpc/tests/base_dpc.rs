@@ -228,11 +228,11 @@ fn base_dpc_integration_test() {
     {
         // Check that new_records can be decrypted from the transaction
 
-        let record_ciphertexts = transaction.ciphertexts();
+        let encrypted_records = transaction.encrypted_records();
         let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
 
-        for ((record_ciphertext, private_key), new_record) in
-            record_ciphertexts.iter().zip(new_account_private_keys).zip(new_records)
+        for ((encrypted_record, private_key), new_record) in
+            encrypted_records.iter().zip(new_account_private_keys).zip(new_records)
         {
             let account_view_key = AccountViewKey::from_private_key(
                 &parameters.system_parameters.account_signature,
@@ -242,7 +242,7 @@ fn base_dpc_integration_test() {
             .unwrap();
 
             let decrypted_record =
-                RecordEncryption::decrypt_record(&parameters.system_parameters, &account_view_key, record_ciphertext)
+                RecordEncryption::decrypt_record(&parameters.system_parameters, &account_view_key, encrypted_record)
                     .unwrap();
 
             assert_eq!(decrypted_record, new_record);

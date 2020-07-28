@@ -10,7 +10,7 @@ cargo run --release --example local_data_crh
 cargo run --release --example local_data_commitment
 cargo run --release --example predicate_vk_crh
 cargo run --release --example record_commitment
-cargo run --release --example record_ciphertext_crh
+cargo run --release --example encrypted_record_crh
 cargo run --release --example serial_number_nonce_crh
 cargo run --release --example value_commitment
 
@@ -38,8 +38,8 @@ mv predicate_vk_crh.checksum ../src/params
 mv record_commitment.params ../src/params
 mv record_commitment.checksum ../src/params
 
-mv record_ciphertext_crh.params ../src/params
-mv record_ciphertext_crh.checksum ../src/params
+mv encrypted_record_crh.params ../src/params
+mv encrypted_record_crh.checksum ../src/params
 
 mv serial_number_nonce_crh.params ../src/params
 mv serial_number_nonce_crh.checksum ../src/params

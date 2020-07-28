@@ -301,23 +301,24 @@ fn test_execute_base_dpc_constraints() {
     // Encrypt the new records
 
     let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-    let mut new_records_encryption_ciphertexts = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_encrypted_records = Vec::with_capacity(NUM_OUTPUT_RECORDS);
 
     for record in &new_records {
-        let (record_encryption_randomness, record_encryption_ciphertext) =
+        let (record_encryption_randomness, encrypted_record) =
             RecordEncryption::encrypt_record(&system_parameters, record, &mut rng).unwrap();
 
         new_records_encryption_randomness.push(record_encryption_randomness);
-        new_records_encryption_ciphertexts.push(record_encryption_ciphertext);
+        new_encrypted_records.push(encrypted_record);
     }
 
     // Construct the ciphertext hashes
 
-    let mut new_records_ciphertext_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
+    let mut new_encrypted_record_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
 
-    for record_ciphertext in &new_records_encryption_ciphertexts {
-        let ciphertext_hash = RecordEncryption::record_ciphertext_hash(&system_parameters, &record_ciphertext).unwrap();
-        new_records_ciphertext_hashes.push(ciphertext_hash);
+    for encrypted_record in &new_encrypted_records {
+        let encrypted_record_hash =
+            RecordEncryption::encrypted_record_hash(&system_parameters, &encrypted_record).unwrap();
+        new_encrypted_record_hashes.push(encrypted_record_hash);
     }
 
     // Prepare record encryption components used in the inner SNARK
@@ -349,7 +350,7 @@ fn test_execute_base_dpc_constraints() {
         &new_commitments,
         &new_records_encryption_randomness,
         &new_records_encryption_gadget_components,
-        &new_records_ciphertext_hashes,
+        &new_encrypted_record_hashes,
         &predicate_comm,
         &predicate_rand,
         &local_data_comm,
@@ -406,7 +407,7 @@ fn test_execute_base_dpc_constraints() {
             &new_commitments,
             &new_records_encryption_randomness,
             &new_records_encryption_gadget_components,
-            &new_records_ciphertext_hashes,
+            &new_encrypted_record_hashes,
             &predicate_comm,
             &predicate_rand,
             &local_data_comm,
@@ -437,7 +438,7 @@ fn test_execute_base_dpc_constraints() {
         &ledger_digest,
         &old_serial_numbers,
         &new_commitments,
-        &new_records_ciphertext_hashes,
+        &new_encrypted_record_hashes,
         &memo,
         value_balance,
         network_id,

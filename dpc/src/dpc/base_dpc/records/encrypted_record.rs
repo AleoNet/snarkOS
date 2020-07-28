@@ -16,19 +16,19 @@ use std::io::{Error, ErrorKind, Read, Result as IoResult, Write};
     PartialEq(bound = "C: BaseDPCComponents"),
     Eq(bound = "C: BaseDPCComponents")
 )]
-pub struct RecordCiphertext<C: BaseDPCComponents> {
-    pub ciphertext: Vec<<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Text>,
+pub struct EncryptedRecord<C: BaseDPCComponents> {
+    pub encrypted_record: Vec<<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Text>,
     pub final_fq_high_selector: bool,
 }
 
-impl<C: BaseDPCComponents> ToBytes for RecordCiphertext<C> {
+impl<C: BaseDPCComponents> ToBytes for EncryptedRecord<C> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         let mut ciphertext_selectors = vec![];
 
         // Write the ciphertext
-        variable_length_integer(self.ciphertext.len() as u64).write(&mut writer)?;
-        for ciphertext_element in &self.ciphertext {
+        variable_length_integer(self.encrypted_record.len() as u64).write(&mut writer)?;
+        for ciphertext_element in &self.encrypted_record {
             // Compress the ciphertext representation to the affine x-coordinate and the selector bit
             let ciphertext_element_affine =
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
@@ -58,7 +58,7 @@ impl<C: BaseDPCComponents> ToBytes for RecordCiphertext<C> {
     }
 }
 
-impl<C: BaseDPCComponents> FromBytes for RecordCiphertext<C> {
+impl<C: BaseDPCComponents> FromBytes for EncryptedRecord<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the ciphertext x coordinates
@@ -99,7 +99,7 @@ impl<C: BaseDPCComponents> FromBytes for RecordCiphertext<C> {
         }
 
         Ok(Self {
-            ciphertext,
+            encrypted_record: ciphertext,
             final_fq_high_selector,
         })
     }

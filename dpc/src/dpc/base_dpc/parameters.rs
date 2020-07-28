@@ -12,7 +12,7 @@ pub struct SystemParameters<C: BaseDPCComponents> {
     pub account_encryption: C::AccountEncryption,
     pub account_signature: C::AccountSignature,
     pub record_commitment: C::RecordCommitment,
-    pub record_ciphertext_crh: C::RecordCiphertextCRH,
+    pub encrypted_record_crh: C::EncryptedRecordCRH,
     pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
     pub predicate_verification_key_hash: C::PredicateVerificationKeyHash,
     pub local_data_crh: C::LocalDataCRH,
@@ -32,9 +32,8 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             From::from(FromBytes::read(AccountSignatureParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =
             From::from(FromBytes::read(RecordCommitmentParameters::load_bytes()?.as_slice())?);
-        let record_ciphertext_crh: C::RecordCiphertextCRH = From::from(FromBytes::read(
-            RecordCiphertextCRHParameters::load_bytes()?.as_slice(),
-        )?);
+        let encrypted_record_crh: C::EncryptedRecordCRH =
+            From::from(FromBytes::read(EncryptedRecordCRHParameters::load_bytes()?.as_slice())?);
         let predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment =
             From::from(FromBytes::read(vec![].as_slice())?);
         let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
@@ -55,7 +54,7 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             account_encryption,
             account_signature,
             record_commitment,
-            record_ciphertext_crh,
+            encrypted_record_crh,
             predicate_verification_key_commitment,
             predicate_verification_key_hash,
             local_data_crh,
@@ -159,8 +158,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.system_parameters.record_commitment
     }
 
-    pub fn record_ciphertext_crh_parameters(&self) -> &C::RecordCiphertextCRH {
-        &self.system_parameters.record_ciphertext_crh
+    pub fn encrypted_record_crh_parameters(&self) -> &C::EncryptedRecordCRH {
+        &self.system_parameters.encrypted_record_crh
     }
 
     pub fn value_commitment_parameters(&self) -> &C::ValueCommitment {

@@ -40,7 +40,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     // Inputs for encryption of new records.
     new_records_encryption_randomness: Option<Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>>,
     new_records_encryption_gadget_components: Option<Vec<RecordEncryptionGadgetComponents<C>>>,
-    new_records_ciphertext_hashes: Option<Vec<<C::RecordCiphertextCRH as CRH>::Output>>,
+    new_encrypted_record_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
 
     // Commitment to Predicates and to local data.
     predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
@@ -83,8 +83,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let new_records_encryption_gadget_components =
             vec![RecordEncryptionGadgetComponents::<C>::default(); num_output_records];
 
-        let new_records_ciphertext_hashes =
-            vec![<C::RecordCiphertextCRH as CRH>::Output::default(); num_output_records];
+        let new_encrypted_record_hashes = vec![<C::EncryptedRecordCRH as CRH>::Output::default(); num_output_records];
 
         let memo = [0u8; 32];
 
@@ -131,7 +130,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
             new_records_encryption_randomness: Some(new_records_encryption_randomness),
             new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components),
-            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes),
+            new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
 
             // Other stuff
             predicate_commitment: Some(predicate_commitment),
@@ -172,7 +171,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
         new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
-        new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
+        new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
 
         // Other stuff
         predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -210,7 +209,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         assert_eq!(num_output_records, new_records_encryption_randomness.len());
         assert_eq!(num_output_records, new_records_encryption_gadget_components.len());
-        assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
+        assert_eq!(num_output_records, new_encrypted_record_hashes.len());
 
         // TODO (raychu86) Fix the lengths to be generic
         let record_encoding_length = 7;
@@ -247,7 +246,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
             new_records_encryption_randomness: Some(new_records_encryption_randomness.to_vec()),
             new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components.to_vec()),
-            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes.to_vec()),
+            new_encrypted_record_hashes: Some(new_encrypted_record_hashes.to_vec()),
 
             // Other stuff
             predicate_commitment: Some(predicate_commitment.clone()),
@@ -290,7 +289,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_commitments.get()?,
             self.new_records_encryption_randomness.get()?,
             self.new_records_encryption_gadget_components.get()?,
-            self.new_records_ciphertext_hashes.get()?,
+            self.new_encrypted_record_hashes.get()?,
             // Other stuff
             self.predicate_commitment.get()?,
             self.predicate_randomness.get()?,

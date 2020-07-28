@@ -66,7 +66,7 @@ pub struct BlockInfo {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DecryptRecordInput {
     /// The encrypted record
-    pub record_ciphertext: String,
+    pub encrypted_record: String,
 
     /// The account view key used to decrypt the record
     pub account_view_key: String,
@@ -122,8 +122,8 @@ pub struct TransactionInfo {
     /// Transaction signatures (Delegated DPC)
     pub signatures: Vec<String>,
 
-    /// Record ciphertexts
-    pub record_ciphertexts: Vec<String>,
+    /// Encrypted records
+    pub encrypted_records: Vec<String>,
 
     /// Block the transaction lives in
     pub transaction_metadata: TransactionMetadata,

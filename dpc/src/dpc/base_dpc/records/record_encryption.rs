@@ -2,7 +2,7 @@ use crate::base_dpc::{
     parameters::SystemParameters,
     record::DPCRecord,
     record_payload::RecordPayload,
-    records::{record_ciphertext::*, record_serializer::*},
+    records::{encrypted_record::*, record_serializer::*},
     BaseDPCComponents,
 };
 use snarkos_algorithms::encoding::Elligator2;
@@ -71,9 +71,7 @@ pub struct RecordEncryption<C: BaseDPCComponents>(PhantomData<C>);
 impl<C: BaseDPCComponents> RecordEncryption<C> {
     /// Encrypt the given vector of records and returns
     /// 1. Encryption Randomness
-    /// 2. Encrypted record ciphertext
-    /// 3. Ciphertext Selector bits - used to compress/decompress
-    /// 4. Final fq high selector bit - Used to decode the plaintext
+    /// 2. Encrypted record
     pub fn encrypt_record<R: Rng>(
         system_parameters: &SystemParameters<C>,
         record: &DPCRecord<C>,
@@ -81,7 +79,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
     ) -> Result<
         (
             <<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Randomness,
-            RecordCiphertext<C>,
+            EncryptedRecord<C>,
         ),
         DPCError,
     > {
@@ -103,32 +101,32 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         let encryption_randomness = system_parameters
             .account_encryption
             .generate_randomness(record_public_key, rng)?;
-        let ciphertext = C::AccountEncryption::encrypt(
+        let encrypted_record = C::AccountEncryption::encrypt(
             &system_parameters.account_encryption,
             record_public_key,
             &encryption_randomness,
             &record_plaintexts,
         )?;
 
-        let record_ciphertext = RecordCiphertext {
-            ciphertext,
+        let encrypted_record = EncryptedRecord {
+            encrypted_record,
             final_fq_high_selector,
         };
 
-        Ok((encryption_randomness, record_ciphertext))
+        Ok((encryption_randomness, encrypted_record))
     }
 
     /// Decrypt and reconstruct the encrypted record
     pub fn decrypt_record(
         system_parameters: &SystemParameters<C>,
         account_view_key: &AccountViewKey<C>,
-        record_ciphertext: &RecordCiphertext<C>,
+        encrypted_record: &EncryptedRecord<C>,
     ) -> Result<DPCRecord<C>, DPCError> {
-        // Decrypt the record ciphertext
+        // Decrypt the encrypted record
         let plaintext_elements = C::AccountEncryption::decrypt(
             &system_parameters.account_encryption,
             &account_view_key.decryption_key,
-            &record_ciphertext.ciphertext,
+            &encrypted_record.encrypted_record,
         )?;
 
         let mut plaintext = vec![];
@@ -143,7 +141,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             C,
             <C as BaseDPCComponents>::EncryptionModelParameters,
             <C as BaseDPCComponents>::EncryptionGroup,
-        >::deserialize(plaintext, record_ciphertext.final_fq_high_selector)?;
+        >::deserialize(plaintext, encrypted_record.final_fq_high_selector)?;
 
         let DeserializedRecord {
             serial_number_nonce,
@@ -200,15 +198,15 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         })
     }
 
-    /// Returns the ciphertext hash
+    /// Returns the encrypted record hash
     /// The hash input is the ciphertext x-coordinates appended with the selector bits
-    pub fn record_ciphertext_hash(
+    pub fn encrypted_record_hash(
         system_parameters: &SystemParameters<C>,
-        record_ciphertext: &RecordCiphertext<C>,
-    ) -> Result<<<C as DPCComponents>::RecordCiphertextCRH as CRH>::Output, DPCError> {
+        encrypted_record: &EncryptedRecord<C>,
+    ) -> Result<<<C as DPCComponents>::EncryptedRecordCRH as CRH>::Output, DPCError> {
         let mut ciphertext_affine_x = vec![];
         let mut selector_bits = vec![];
-        for ciphertext_element in &record_ciphertext.ciphertext {
+        for ciphertext_element in &encrypted_record.encrypted_record {
             // Compress the ciphertext element to the affine x coordinate
             let ciphertext_element_affine =
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
@@ -229,11 +227,11 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         }
 
         // Concatenate the ciphertext selector bits and the final fq_high selector bit
-        selector_bits.push(record_ciphertext.final_fq_high_selector);
+        selector_bits.push(encrypted_record.final_fq_high_selector);
         let selector_bytes = bits_to_bytes(&selector_bits);
 
         Ok(system_parameters
-            .record_ciphertext_crh
+            .encrypted_record_crh
             .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?)
     }
 
@@ -319,7 +317,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             record_plaintexts.len(),
         )?;
 
-        let ciphertext = C::AccountEncryption::encrypt(
+        let encrypted_record = C::AccountEncryption::encrypt(
             &system_parameters.account_encryption,
             record_public_key,
             &encryption_randomness,
@@ -328,7 +326,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
 
         // Compute the compressed ciphertext selector bits
         let mut ciphertext_selectors = vec![];
-        for ciphertext_element in ciphertext.iter() {
+        for ciphertext_element in encrypted_record.iter() {
             // Compress the ciphertext element to the affine x coordinate
             let ciphertext_element_affine =
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();

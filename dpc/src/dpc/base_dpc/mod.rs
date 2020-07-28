@@ -235,8 +235,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let record_commitment = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Record ciphertext CRH setup");
-        let record_ciphertext_crh = Components::RecordCiphertextCRH::setup(rng);
+        let time = start_timer!(|| "Record encrypted record CRH setup");
+        let encrypted_record_crh = Components::EncryptedRecordCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification key commitment setup");
@@ -268,7 +268,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             account_encryption,
             account_signature,
             record_commitment,
-            record_ciphertext_crh,
+            encrypted_record_crh,
             predicate_verification_key_commitment,
             predicate_verification_key_hash,
             local_data_crh,
@@ -839,23 +839,23 @@ where
         // Encrypt the new records
 
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_encrypted_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
         for record in &new_records {
-            let (record_encryption_randomness, record_encryption_ciphertext) =
+            let (record_encryption_randomness, encrypted_record) =
                 RecordEncryption::encrypt_record(&system_parameters, record, rng)?;
 
             new_records_encryption_randomness.push(record_encryption_randomness);
-            new_records_encryption_ciphertexts.push(record_encryption_ciphertext);
+            new_encrypted_records.push(encrypted_record);
         }
 
         // Construct the ciphertext hashes
 
-        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for record_ciphertext in &new_records_encryption_ciphertexts {
-            let ciphertext_hash = RecordEncryption::record_ciphertext_hash(&system_parameters, &record_ciphertext)?;
+        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for encrypted_record in &new_encrypted_records {
+            let encrypted_record_hash = RecordEncryption::encrypted_record_hash(&system_parameters, &encrypted_record)?;
 
-            new_records_ciphertext_hashes.push(ciphertext_hash);
+            new_encrypted_record_hashes.push(encrypted_record_hash);
         }
 
         // Prepare record encryption components used in the inner SNARK
@@ -886,7 +886,7 @@ where
                 &new_commitments,
                 &new_records_encryption_randomness,
                 &new_records_encryption_gadget_components,
-                &new_records_ciphertext_hashes,
+                &new_encrypted_record_hashes,
                 &predicate_commitment,
                 &predicate_randomness,
                 &local_data_commitment,
@@ -917,7 +917,7 @@ where
                 ledger_digest: ledger_digest.clone(),
                 old_serial_numbers: old_serial_numbers.clone(),
                 new_commitments: new_commitments.clone(),
-                new_records_ciphertext_hashes: new_records_ciphertext_hashes.clone(),
+                new_encrypted_record_hashes: new_encrypted_record_hashes.clone(),
                 memo: memorandum.clone(),
                 predicate_commitment: predicate_commitment.clone(),
                 local_data_commitment: local_data_commitment.clone(),
@@ -941,7 +941,7 @@ where
                 &ledger_digest,
                 &old_serial_numbers,
                 &new_commitments,
-                &new_records_ciphertext_hashes,
+                &new_encrypted_record_hashes,
                 &memorandum,
                 value_balance,
                 network_id,
@@ -973,7 +973,7 @@ where
             value_balance,
             network_id,
             signatures,
-            new_records_encryption_ciphertexts,
+            new_encrypted_records,
         );
 
         end_timer!(exec_time);
@@ -1054,11 +1054,11 @@ where
         // Construct the ciphertext hashes
 
         let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for record_ciphertext in &transaction.record_ciphertexts {
-            let ciphertext_hash =
-                RecordEncryption::record_ciphertext_hash(&parameters.system_parameters, record_ciphertext)?;
+        for encrypted_record in &transaction.encrypted_records {
+            let encrypted_record_hash =
+                RecordEncryption::encrypted_record_hash(&parameters.system_parameters, encrypted_record)?;
 
-            new_records_ciphertext_hashes.push(ciphertext_hash);
+            new_records_ciphertext_hashes.push(encrypted_record_hash);
         }
 
         let inner_snark_input = InnerCircuitVerifierInput {
@@ -1067,7 +1067,7 @@ where
             ledger_digest: transaction.ledger_digest().clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
-            new_records_ciphertext_hashes,
+            new_encrypted_record_hashes: new_records_ciphertext_hashes,
             memo: transaction.memorandum().clone(),
             predicate_commitment: transaction.predicate_commitment().clone(),
             local_data_commitment: transaction.local_data_commitment().clone(),

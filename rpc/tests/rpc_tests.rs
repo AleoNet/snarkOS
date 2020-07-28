@@ -77,8 +77,8 @@ mod rpc_tests {
             .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
             .collect();
 
-        let ciphertexts: Vec<Value> = transaction
-            .record_ciphertexts
+        let encrypted_records: Vec<Value> = transaction
+            .encrypted_records
             .iter()
             .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
             .collect();
@@ -95,7 +95,7 @@ mod rpc_tests {
         assert_eq!(local_data_commitment, transaction_info["local_data_commitment"]);
         assert_eq!(value_balance, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
-        assert_eq!(Value::Array(ciphertexts), transaction_info["record_ciphertexts"]);
+        assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
 
     fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
@@ -316,7 +316,7 @@ mod rpc_tests {
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
 
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let ciphertexts = transaction.record_ciphertexts;
+        let ciphertexts = transaction.encrypted_records;
 
         let records = &DATA.records_1;
 
@@ -332,7 +332,7 @@ mod rpc_tests {
             let account_view_key = hex::encode(to_bytes![view_key].unwrap());
 
             let params = DecryptRecordInput {
-                record_ciphertext: ciphertext_string,
+                encrypted_record: ciphertext_string,
                 account_view_key,
             };
             let params = serde_json::to_value(params).unwrap();

@@ -25,7 +25,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
     old_serial_numbers: Option<Vec<<C::AccountSignature as SignatureScheme>::PublicKey>>,
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
-    new_records_ciphertext_hashes: Option<Vec<<C::RecordCiphertextCRH as CRH>::Output>>,
+    new_records_ciphertext_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
     memo: Option<[u8; 32]>,
     value_balance: Option<i64>,
     network_id: Option<u8>,
@@ -63,7 +63,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             num_output_records
         ]);
         let new_records_ciphertext_hashes = Some(vec![
-            <C::RecordCiphertextCRH as CRH>::Output::default();
+            <C::EncryptedRecordCRH as CRH>::Output::default();
             num_output_records
         ]);
         let memo = Some([0u8; 32]);
@@ -110,7 +110,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
         old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
         new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-        new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
+        new_records_ciphertext_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
         memo: &[u8; 32],
         value_balance: i64,
         network_id: u8,
@@ -177,8 +177,8 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
-    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 

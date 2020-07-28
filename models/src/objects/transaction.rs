@@ -10,7 +10,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
     type PredicateCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
-    type Ciphertext: Clone + Eq;
+    type EncryptedRecord: Clone + Eq + FromBytes + ToBytes;
 
     /// Returns the transaction identifier.
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError>;
@@ -36,8 +36,8 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     /// Returns the value balance in the transaction.
     fn value_balance(&self) -> i64;
 
-    /// Returns the stored record ciphertexts
-    fn ciphertexts(&self) -> &[Self::Ciphertext];
+    /// Returns the encrypted records
+    fn encrypted_records(&self) -> &[Self::EncryptedRecord];
 
     /// Returns the memorandum.
     fn memorandum(&self) -> &Self::Memorandum;

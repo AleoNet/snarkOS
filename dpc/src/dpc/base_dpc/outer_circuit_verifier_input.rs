@@ -30,8 +30,8 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
-    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 

@@ -52,9 +52,9 @@ pub trait DPCComponents: 'static + Sized {
     type PRF: PRF;
     type PRFGadget: PRFGadget<Self::PRF, Self::InnerField>;
 
-    /// CRH for the record ciphertext.
-    type RecordCiphertextCRH: CRH;
-    type RecordCiphertextCRHGadget: CRHGadget<Self::RecordCiphertextCRH, Self::InnerField>;
+    /// CRH for the encrypted record.
+    type EncryptedRecordCRH: CRH;
+    type EncryptedRecordCRHGadget: CRHGadget<Self::EncryptedRecordCRH, Self::InnerField>;
 
     /// Commitment scheme for record contents. Invoked only over `Self::InnerField`.
     type RecordCommitment: CommitmentScheme;

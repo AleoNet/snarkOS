@@ -226,9 +226,9 @@ impl_params!(
     1742404
 );
 impl_params!(
-    RecordCiphertextCRHParameters,
-    record_ciphertext_crh_test,
-    "record_ciphertext_crh",
+    EncryptedRecordCRHParameters,
+    encrypted_record_crh_test,
+    "encrypted_record_crh",
     270532
 );
 impl_params!(

@@ -91,9 +91,9 @@ impl PedersenSize for RecordWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RecordCiphertextWindow;
+pub struct EncryptedRecordWindow;
 
-impl PedersenSize for RecordCiphertextWindow {
+impl PedersenSize for EncryptedRecordWindow {
     const NUM_WINDOWS: usize = 48;
     const WINDOW_SIZE: usize = 44;
 }
@@ -124,6 +124,8 @@ impl DPCComponents for Components {
     type AccountEncryptionGadget = AccountEncryptionGadget;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
+    type EncryptedRecordCRH = EncryptedRecordCRH;
+    type EncryptedRecordCRHGadget = EncryptedRecordCRHGadget;
     type InnerField = InnerField;
     type LocalDataCRH = LocalDataCRH;
     type LocalDataCRHGadget = LocalDataCRHGadget;
@@ -136,8 +138,6 @@ impl DPCComponents for Components {
     type PredicateVerificationKeyCommitmentGadget = PredicateVerificationKeyCommitmentGadget;
     type PredicateVerificationKeyHash = PredicateVerificationKeyHash;
     type PredicateVerificationKeyHashGadget = PredicateVerificationKeyHashGadget;
-    type RecordCiphertextCRH = RecordCiphertextCRH;
-    type RecordCiphertextCRHGadget = RecordCiphertextCRHGadget;
     type RecordCommitment = RecordCommitment;
     type RecordCommitmentGadget = RecordCommitmentGadget;
     type SerialNumberNonceCRH = SerialNumberNonce;
@@ -181,7 +181,7 @@ pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
-pub type RecordCiphertextCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, RecordCiphertextWindow>;
+pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, EncryptedRecordWindow>;
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type PredicateVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
 
@@ -210,7 +210,7 @@ pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls,
 pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type RecordCiphertextCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type EncryptedRecordCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type PredicateVerificationKeyHashGadget =
     BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;

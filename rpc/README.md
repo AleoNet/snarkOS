@@ -119,7 +119,7 @@ curl --user username:password --data-binary '{
     "method": "decryptrecord",
     "params": [
        {
-        "record_ciphertext": "record_ciphertext_string",
+        "encrypted_record": "encrypted_record_string",
         "account_view_key": "account_view_key_string"
        }
     ]
