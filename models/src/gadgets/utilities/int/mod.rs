@@ -11,3 +11,6 @@ pub use self::relational::*;
 
 pub mod utilities;
 pub use self::utilities::*;
+
+#[cfg(test)]
+mod tests;
