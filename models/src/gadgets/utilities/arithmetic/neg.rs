@@ -1,8 +1,9 @@
-use crate::gadgets::utilities::bits::RippleCarryAdder;
-
 use crate::{
     curves::Field,
-    gadgets::{r1cs::ConstraintSystem, utilities::boolean::Boolean},
+    gadgets::{
+        r1cs::ConstraintSystem,
+        utilities::{bits::RippleCarryAdder, boolean::Boolean},
+    },
 };
 use snarkos_errors::gadgets::SynthesisError;
 

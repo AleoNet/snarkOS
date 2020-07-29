@@ -1,23 +1,19 @@
-use crate::gadgets::utilities::{
-    arithmetic::{Add, Div, Neg, Sub},
-    bits::ComparatorGadget,
-    int::{Int, Int128, Int16, Int32, Int64, Int8},
-};
-
-use snarkos_errors::gadgets::SignedIntegerError;
-
 use crate::{
     curves::PrimeField,
     gadgets::{
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
+            arithmetic::{Add, Div, Neg, Sub},
+            bits::ComparatorGadget,
             boolean::{AllocatedBit, Boolean},
             eq::EvaluateEqGadget,
+            int::{Int, Int128, Int16, Int32, Int64, Int8},
             select::CondSelectGadget,
         },
     },
 };
+use snarkos_errors::gadgets::SignedIntegerError;
 
 macro_rules! div_int_impl {
     ($($gadget:ident)*) => ($(

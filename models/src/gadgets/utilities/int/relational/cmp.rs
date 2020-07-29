@@ -1,16 +1,17 @@
-use crate::gadgets::utilities::{
-    bits::{ComparatorGadget, EvaluateLtGadget},
-    int::{Int128, Int16, Int32, Int64, Int8},
-};
-
 use crate::{
     curves::PrimeField,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{boolean::Boolean, select::CondSelectGadget},
+        utilities::{
+            bits::{ComparatorGadget, EvaluateLtGadget},
+            boolean::Boolean,
+            int::{Int128, Int16, Int32, Int64, Int8},
+            select::CondSelectGadget,
+        },
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
+
 use std::cmp::Ordering;
 
 macro_rules! cmp_gadget_impl {

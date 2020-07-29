@@ -1,10 +1,8 @@
-use crate::gadgets::utilities::int::*;
-
 use crate::{
     curves::PrimeField,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{boolean::Boolean, eq::ConditionalEqGadget},
+        utilities::{boolean::Boolean, eq::ConditionalEqGadget, int::*},
     },
 };
 use snarkos_errors::gadgets::SynthesisError;

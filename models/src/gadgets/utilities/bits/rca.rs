@@ -1,8 +1,9 @@
-use crate::gadgets::utilities::{bits::FullAdder, int::*};
-
 use crate::{
     curves::{Field, PrimeField},
-    gadgets::{r1cs::ConstraintSystem, utilities::boolean::Boolean},
+    gadgets::{
+        r1cs::ConstraintSystem,
+        utilities::{bits::FullAdder, boolean::Boolean, int::*},
+    },
 };
 use snarkos_errors::gadgets::SynthesisError;
 

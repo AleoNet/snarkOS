@@ -1,9 +1,13 @@
-use crate::gadgets::utilities::{
-    arithmetic::{Add, Neg, Sub},
-    int::{Int128, Int16, Int32, Int64, Int8},
+use crate::{
+    curves::PrimeField,
+    gadgets::{
+        r1cs::ConstraintSystem,
+        utilities::{
+            arithmetic::{Add, Neg, Sub},
+            int::{Int128, Int16, Int32, Int64, Int8},
+        },
+    },
 };
-
-use crate::{curves::PrimeField, gadgets::r1cs::ConstraintSystem};
 use snarkos_errors::gadgets::SignedIntegerError;
 
 macro_rules! sub_int_impl {

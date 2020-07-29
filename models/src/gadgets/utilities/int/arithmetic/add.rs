@@ -1,21 +1,17 @@
-use crate::gadgets::utilities::{
-    arithmetic::Add,
-    bits::RippleCarryAdder,
-    int::{Int, Int128, Int16, Int32, Int64, Int8},
-};
-
-use snarkos_errors::gadgets::SignedIntegerError;
-
 use crate::{
     curves::{fp_parameters::FpParameters, PrimeField},
     gadgets::{
         r1cs::{Assignment, ConstraintSystem, LinearCombination},
         utilities::{
             alloc::AllocGadget,
+            arithmetic::Add,
+            bits::RippleCarryAdder,
             boolean::{AllocatedBit, Boolean},
+            int::{Int, Int128, Int16, Int32, Int64, Int8},
         },
     },
 };
+use snarkos_errors::gadgets::SignedIntegerError;
 
 macro_rules! add_int_impl {
     ($($gadget: ident)*) => ($(

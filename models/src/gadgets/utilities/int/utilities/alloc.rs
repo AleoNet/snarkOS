@@ -1,5 +1,3 @@
-use crate::gadgets::utilities::int::{Int, Int128, Int16, Int32, Int64, Int8};
-
 use crate::{
     curves::Field,
     gadgets::{
@@ -7,11 +5,13 @@ use crate::{
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
+            int::{Int, Int128, Int16, Int32, Int64, Int8},
         },
     },
 };
-use core::borrow::Borrow;
 use snarkos_errors::gadgets::SynthesisError;
+
+use core::borrow::Borrow;
 
 macro_rules! alloc_int_impl {
     ($($gadget: ident)*) => ($(

@@ -1,8 +1,11 @@
+use crate::{
+    curves::PrimeField,
+    gadgets::{
+        r1cs::ConstraintSystem,
+        utilities::{arithmetic::Neg, int::*},
+    },
+};
 use snarkos_errors::gadgets::SignedIntegerError;
-
-use crate::gadgets::utilities::{arithmetic::Neg, int::*};
-
-use crate::{curves::PrimeField, gadgets::r1cs::ConstraintSystem};
 
 macro_rules! neg_int_impl {
     ($($gadget: ident)*) => ($(

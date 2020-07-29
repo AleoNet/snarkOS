@@ -1,17 +1,17 @@
-use crate::gadgets::utilities::{
-    arithmetic::{Mul, Pow},
-    int::{Int, Int128, Int16, Int32, Int64, Int8},
-};
-
-use snarkos_errors::gadgets::SignedIntegerError;
-
 use crate::{
     curves::PrimeField,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, select::CondSelectGadget},
+        utilities::{
+            alloc::AllocGadget,
+            arithmetic::{Mul, Pow},
+            boolean::Boolean,
+            int::{Int, Int128, Int16, Int32, Int64, Int8},
+            select::CondSelectGadget,
+        },
     },
 };
+use snarkos_errors::gadgets::SignedIntegerError;
 
 macro_rules! pow_int_impl {
     ($($gadget:ty)*) => ($(
