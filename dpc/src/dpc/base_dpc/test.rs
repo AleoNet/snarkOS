@@ -169,7 +169,7 @@ fn test_execute_base_dpc_constraints() {
         new_commitments,
         program_commitment,
         program_randomness,
-        local_data_commitment,
+        local_data_root: local_data_commitment,
         local_data_commitment_randomizers,
         value_balance,
     } = context;
@@ -188,7 +188,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                 local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_commitment: local_data_commitment.clone(),
+                local_data_root: local_data_commitment.clone(),
                 position: i as u8,
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
@@ -213,7 +213,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                 local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_commitment: local_data_commitment.clone(),
+                local_data_root: local_data_commitment.clone(),
                 position: j as u8,
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));

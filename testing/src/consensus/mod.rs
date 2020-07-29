@@ -28,7 +28,7 @@ impl Transaction for TestTx {
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
-    type LocalDataCommitment = [u8; 32];
+    type LocalDataRoot = [u8; 32];
     type Memorandum = [u8; 32];
     type ProgramCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
@@ -57,7 +57,7 @@ impl Transaction for TestTx {
         &[0u8; 32]
     }
 
-    fn local_data_commitment(&self) -> &Self::LocalDataCommitment {
+    fn local_data_root(&self) -> &Self::LocalDataRoot {
         &[0u8; 32]
     }
 

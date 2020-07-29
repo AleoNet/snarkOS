@@ -199,7 +199,7 @@ impl RpcFunctions for RpcImpl {
             digest: hex::encode(to_bytes![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
             program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
-            local_data_commitment: hex::encode(to_bytes![transaction.local_data_commitment]?),
+            local_data_root: hex::encode(to_bytes![transaction.local_data_root]?),
             value_balance: transaction.value_balance,
             signatures,
             encrypted_records,

@@ -78,7 +78,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+    local_data_root: &<C::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -132,7 +132,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         //
         program_commitment,
         program_randomness,
-        local_data_commitment,
+        local_data_root,
         local_data_commitment_randomizers,
         memo,
         input_value_commitments,
@@ -194,7 +194,7 @@ fn base_dpc_execute_gadget_helper<
     //
     program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_comm: &LocalDataCRH::Output,
+    local_data_root: &LocalDataCRH::Output,
     local_data_commitment_randomizers: &[LocalDataCommitment::Randomness],
     memo: &[u8; 32],
     input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
@@ -280,7 +280,7 @@ where
     // 13. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
     // 14. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i], new_encrypted_record_hashes[i]
     // 15. program_commitment
-    // 16. local_data_commitment
+    // 16. local_data_root
     // 17. binding_signature
     let (
         account_commitment_parameters,
@@ -1426,20 +1426,20 @@ where
         inner_commitment_hash_bytes
             .extend_from_slice(&inner2_commitment_hash.to_bytes(&mut cs.ns(|| "inner2_commitment_hash"))?);
 
-        let local_data_commitment = LocalDataCRHGadget::check_evaluation_gadget(
+        let candidate_local_data_root = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment root"),
             &local_data_crh_parameters,
             &inner_commitment_hash_bytes,
         )?;
 
-        let declared_local_data_commitment =
-            LocalDataCRHGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
-                Ok(local_data_comm)
+        let declared_local_data_root =
+            LocalDataCRHGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data root"), || {
+                Ok(local_data_root)
             })?;
 
-        local_data_commitment.enforce_equal(
-            &mut cs.ns(|| "Check that local data commitment is valid"),
-            &declared_local_data_commitment,
+        candidate_local_data_root.enforce_equal(
+            &mut cs.ns(|| "Check that local data root is valid"),
+            &declared_local_data_root,
         )?;
     }
     // *******************************************************************
@@ -1455,7 +1455,7 @@ where
                 &system_parameters.value_commitment,
                 &input_value_commitments,
                 &output_value_commitments,
-                &to_bytes![local_data_comm]?,
+                &to_bytes![local_data_root]?,
                 &binding_signature,
             )
             .unwrap();

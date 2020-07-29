@@ -18,7 +18,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `digest`                | string | The merkle tree digest                    |
 | `transaction_proof`     | string | The transaction zero knowledge proof      |
 | `program_commitment`    | string | The program verification key commitment   |
-| `local_data_commitment` | string | The local data commitment                 |
+| `local_data_root`       | string | The local data root                       |
 | `value balance`         | number | The transaction value balance             |
 | `signatures`            | array  | The list of transaction signatures        |
 | `transaction_metadata`  | object | The transaction metadata                  |

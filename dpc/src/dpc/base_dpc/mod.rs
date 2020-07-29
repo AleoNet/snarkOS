@@ -163,11 +163,11 @@ where
     new_sn_nonce_randomness: Vec<[u8; 32]>,
     new_commitments: Vec<<Components::RecordCommitment as CommitmentScheme>::Output>,
 
-    // Program and local data commitment and randomness
+    // Program and local data root and randomness
     program_commitment: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_commitment: <Components::LocalDataCRH as CRH>::Output,
+    local_data_root: <Components::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
     // Value Balance
@@ -193,7 +193,7 @@ where
 
             new_records: self.new_records.to_vec(),
 
-            local_data_commitment: self.local_data_commitment.clone(),
+            local_data_root: self.local_data_root.clone(),
             local_data_commitment_randomizers: self.local_data_commitment_randomizers.clone(),
         }
     }
@@ -211,7 +211,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_commitment: <Components::LocalDataCRH as CRH>::Output,
+    pub local_data_root: <Components::LocalDataCRH as CRH>::Output,
     pub local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 }
 
@@ -559,7 +559,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             program_commitment,
             program_randomness,
-            local_data_commitment,
+            local_data_root: local_data_commitment,
             local_data_commitment_randomizers,
 
             value_balance,
@@ -725,7 +725,7 @@ where
             new_commitments,
             program_commitment,
             program_randomness,
-            local_data_commitment,
+            local_data_root: local_data_commitment,
             local_data_commitment_randomizers,
             value_balance,
         } = context;
@@ -924,7 +924,7 @@ where
                 new_encrypted_record_hashes: new_encrypted_record_hashes.clone(),
                 memo: memorandum.clone(),
                 program_commitment: program_commitment.clone(),
-                local_data_commitment: local_data_commitment.clone(),
+                local_data_root: local_data_commitment.clone(),
                 value_balance,
                 network_id,
             };
@@ -1040,7 +1040,7 @@ where
             transaction.old_serial_numbers(),
             transaction.new_commitments(),
             transaction.program_commitment(),
-            transaction.local_data_commitment(),
+            transaction.local_data_root(),
             transaction.value_balance(),
             transaction.memorandum()
         ]?;
@@ -1074,7 +1074,7 @@ where
             new_encrypted_record_hashes,
             memo: transaction.memorandum().clone(),
             program_commitment: transaction.program_commitment().clone(),
-            local_data_commitment: transaction.local_data_commitment().clone(),
+            local_data_root: transaction.local_data_root().clone(),
             value_balance: transaction.value_balance(),
             network_id: transaction.network_id(),
         };

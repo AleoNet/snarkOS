@@ -69,7 +69,7 @@ mod rpc_tests {
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
         let program_commitment = hex::encode(to_bytes![transaction.program_commitment()].unwrap());
-        let local_data_commitment = hex::encode(to_bytes![transaction.local_data_commitment].unwrap());
+        let local_data_root = hex::encode(to_bytes![transaction.local_data_root].unwrap());
         let value_balance = transaction.value_balance;
         let signatures: Vec<Value> = transaction
             .signatures
@@ -92,7 +92,7 @@ mod rpc_tests {
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(program_commitment, transaction_info["program_commitment"]);
-        assert_eq!(local_data_commitment, transaction_info["local_data_commitment"]);
+        assert_eq!(local_data_root, transaction_info["local_data_root"]);
         assert_eq!(value_balance, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);

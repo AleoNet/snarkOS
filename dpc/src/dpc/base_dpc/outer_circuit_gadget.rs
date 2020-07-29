@@ -69,7 +69,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Rest
     program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+    local_data_root: &<C::LocalDataCRH as CRH>::Output,
 ) -> Result<(), SynthesisError>
 where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -199,7 +199,7 @@ where
     let memo_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(memo).map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
+    let local_data_root_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_root)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let value_balance_as_u64 = value_balance.abs() as u64;
@@ -268,8 +268,7 @@ where
     let program_commitment_fe_bytes = field_element_to_bytes::<C, _>(cs, &program_commitment_fe, "program commitment")?;
     let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, &memo_fe, "memo")?;
     let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
-    let local_data_commitment_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_commitment_fe, "local data commitment")?;
+    let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, &local_data_root_fe, "local data root")?;
     let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
     let is_negative_fe_bytes = field_element_to_bytes::<C, _>(cs, &is_negative_fe, "is_negative flag")?;
 
@@ -292,7 +291,7 @@ where
     inner_snark_input_bytes.extend(program_commitment_fe_bytes);
     inner_snark_input_bytes.extend(memo_fe_bytes);
     inner_snark_input_bytes.extend(network_id_fe_bytes);
-    inner_snark_input_bytes.extend(local_data_commitment_fe_bytes.clone());
+    inner_snark_input_bytes.extend(local_data_root_fe_bytes.clone());
     inner_snark_input_bytes.extend(value_balance_fe_bytes);
     inner_snark_input_bytes.extend(is_negative_fe_bytes);
 
@@ -337,7 +336,7 @@ where
     let mut program_input_bytes = vec![];
 
     program_input_bytes.extend(local_data_commitment_parameters_fe_bytes);
-    program_input_bytes.extend(local_data_commitment_fe_bytes);
+    program_input_bytes.extend(local_data_root_fe_bytes);
 
     let mut program_input_bits = vec![];
 

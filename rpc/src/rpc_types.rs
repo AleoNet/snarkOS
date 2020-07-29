@@ -113,8 +113,8 @@ pub struct TransactionInfo {
     /// Program verification key commitment
     pub program_commitment: String,
 
-    /// Local data commitment
-    pub local_data_commitment: String,
+    /// Local data root
+    pub local_data_root: String,
 
     /// Transaction value balance
     pub value_balance: i64,

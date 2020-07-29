@@ -434,11 +434,8 @@ impl ConsensusParameters {
             let mut old_proof_and_vk = vec![];
             for i in 0..Components::NUM_INPUT_RECORDS {
                 // Instantiate death program circuit
-                let death_program_circuit = ProgramCircuit::new(
-                    &local_data.system_parameters,
-                    &local_data.local_data_commitment,
-                    i as u8,
-                );
+                let death_program_circuit =
+                    ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
 
                 // Generate the program proof
                 let proof = ProgramSNARK::prove(
@@ -454,7 +451,7 @@ impl ConsensusParameters {
                             .local_data_commitment
                             .parameters()
                             .clone(),
-                        local_data_commitment: local_data.local_data_commitment.clone(),
+                        local_data_root: local_data.local_data_root.clone(),
                         position: i as u8,
                     };
                     assert!(
@@ -478,11 +475,8 @@ impl ConsensusParameters {
             let mut new_proof_and_vk = vec![];
             for j in 0..NUM_OUTPUT_RECORDS {
                 // Instantiate birth program circuit
-                let birth_program_circuit = ProgramCircuit::new(
-                    &local_data.system_parameters,
-                    &local_data.local_data_commitment,
-                    j as u8,
-                );
+                let birth_program_circuit =
+                    ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
 
                 // Generate the program proof
                 let proof = ProgramSNARK::prove(
@@ -498,7 +492,7 @@ impl ConsensusParameters {
                             .local_data_commitment
                             .parameters()
                             .clone(),
-                        local_data_commitment: local_data.local_data_commitment.clone(),
+                        local_data_root: local_data.local_data_root.clone(),
                         position: j as u8,
                     };
                     assert!(

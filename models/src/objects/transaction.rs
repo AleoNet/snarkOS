@@ -6,7 +6,7 @@ use std::hash::Hash;
 pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type Commitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type Digest: Clone + Eq + Hash + FromBytes + ToBytes;
-    type LocalDataCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
+    type LocalDataRoot: Clone + Eq + Hash + FromBytes + ToBytes;
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
     type ProgramCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
@@ -31,7 +31,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     fn program_commitment(&self) -> &Self::ProgramCommitment;
 
     /// Returns the local data commitment in the transaction.
-    fn local_data_commitment(&self) -> &Self::LocalDataCommitment;
+    fn local_data_root(&self) -> &Self::LocalDataRoot;
 
     /// Returns the value balance in the transaction.
     fn value_balance(&self) -> i64;

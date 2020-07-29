@@ -39,7 +39,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
     program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
     program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
-    local_data_commitment: Option<<C::LocalDataCRH as CRH>::Output>,
+    local_data_root: Option<<C::LocalDataCRH as CRH>::Output>,
 }
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
@@ -75,7 +75,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         let program_commitment = Some(<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output::default());
         let program_randomness = Some(<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
-        let local_data_commitment = Some(<C::LocalDataCRH as CRH>::Output::default());
+        let local_data_root = Some(<C::LocalDataCRH as CRH>::Output::default());
 
         Self {
             system_parameters: Some(system_parameters.clone()),
@@ -97,7 +97,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
             program_commitment,
             program_randomness,
-            local_data_commitment,
+            local_data_root,
         }
     }
 
@@ -128,7 +128,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
-        local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+        local_data_root: &<C::LocalDataCRH as CRH>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -158,7 +158,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
             program_commitment: Some(program_commitment.clone()),
             program_randomness: Some(program_randomness.clone()),
-            local_data_commitment: Some(local_data_commitment.clone()),
+            local_data_root: Some(local_data_root.clone()),
         }
     }
 }
@@ -210,7 +210,7 @@ where
             self.new_private_program_inputs.get()?.as_slice(),
             self.program_commitment.get()?,
             self.program_randomness.get()?,
-            self.local_data_commitment.get()?,
+            self.local_data_root.get()?,
         )?;
         Ok(())
     }

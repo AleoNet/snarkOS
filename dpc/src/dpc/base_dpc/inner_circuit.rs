@@ -46,7 +46,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
     program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
 
-    local_data_commitment: Option<<C::LocalDataCRH as CRH>::Output>,
+    local_data_root: Option<<C::LocalDataCRH as CRH>::Output>,
     local_data_commitment_randomizers: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
 
     memo: Option<[u8; 32]>,
@@ -90,7 +90,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let program_commitment = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output::default();
         let program_randomness = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
 
-        let local_data_commitment = <C::LocalDataCRH as CRH>::Output::default();
+        let local_data_root = <C::LocalDataCRH as CRH>::Output::default();
         let local_data_commitment_randomizers = vec![
             <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
             num_input_records + num_output_records
@@ -135,7 +135,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             // Other stuff
             program_commitment: Some(program_commitment),
             program_randomness: Some(program_randomness),
-            local_data_commitment: Some(local_data_commitment),
+            local_data_root: Some(local_data_root),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
             memo: Some(memo),
 
@@ -177,7 +177,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-        local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+        local_data_root: &<C::LocalDataCRH as CRH>::Output,
         local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
 
         memo: &[u8; 32],
@@ -252,7 +252,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             program_commitment: Some(program_commitment.clone()),
             program_randomness: Some(program_randomness.clone()),
 
-            local_data_commitment: Some(local_data_commitment.clone()),
+            local_data_root: Some(local_data_root.clone()),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers.to_vec()),
 
             memo: Some(memo.clone()),
@@ -293,7 +293,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             // Other stuff
             self.program_commitment.get()?,
             self.program_randomness.get()?,
-            self.local_data_commitment.get()?,
+            self.local_data_root.get()?,
             self.local_data_commitment_randomizers.get()?,
             self.memo.get()?,
             self.input_value_commitments.get()?,

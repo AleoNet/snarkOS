@@ -25,13 +25,12 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     // New encrypted record hashes
     pub new_encrypted_record_hashes: Vec<<C::EncryptedRecordCRH as CRH>::Output>,
 
-    // Program input commitment and memo
+    // Program input commitment and local data root
     pub program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
-    pub local_data_commitment: <C::LocalDataCRH as CRH>::Output,
+    pub local_data_root: <C::LocalDataCRH as CRH>::Output,
+
     pub memo: [u8; 32],
-
     pub value_balance: i64,
-
     pub network_id: u8,
 }
 
@@ -142,7 +141,7 @@ where
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
             &[self.network_id][..],
         )?);
-        v.extend_from_slice(&self.local_data_commitment.to_field_elements()?);
+        v.extend_from_slice(&self.local_data_root.to_field_elements()?);
 
         let value_balance_as_u64 = self.value_balance.abs() as u64;
 
