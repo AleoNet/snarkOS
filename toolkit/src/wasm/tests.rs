@@ -4,8 +4,8 @@ use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 pub fn account_from_private_key_test() {
-    let given_private_key = "AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn";
-    let given_address = "aleo1fuge6ah8c9custvmlju5t30gk8p8lar5x36jlfa2glhgy9n0fuxsreeh2c";
+    let given_private_key = "AKEY1kcAwj8V7VZwQAUKsdDmCxvfyTSXbZXDWwSJrSH818Jyt";
+    let given_address = "aleo18q9acgakkg2fhyv66rjs77n553cl9nwkyu5h8f3fqxsyty98gc9s2s9tc0";
 
     let account = Account::from_private_key(given_private_key);
 
