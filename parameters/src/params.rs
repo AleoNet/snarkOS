@@ -210,12 +210,6 @@ impl_params!(
     "record_commitment",
     507084
 );
-impl_params!(
-    ValueCommitmentParameters,
-    value_commitment_test,
-    "value_commitment",
-    403244
-);
 
 // CRH
 impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);

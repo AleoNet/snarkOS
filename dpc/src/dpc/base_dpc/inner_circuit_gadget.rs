@@ -249,7 +249,6 @@ where
     // 13. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
     // 14. predicate_commitment
     // 15. local_data_commitment
-    // 16. binding_signature
     let (
         account_commitment_parameters,
         account_encryption_parameters,
@@ -840,7 +839,7 @@ where
             // *******************************************************************
             // Pack the record bits into serialization format
 
-            let scalar_field_bitsize = <C::BindingSignatureGroup as Group>::ScalarField::size_in_bits();
+            let scalar_field_bitsize = <C::EncryptionGroup as Group>::ScalarField::size_in_bits();
             let base_field_bitsize = <C::InnerField as PrimeField>::size_in_bits();
             let outer_field_bitsize = <C::OuterField as PrimeField>::size_in_bits();
 

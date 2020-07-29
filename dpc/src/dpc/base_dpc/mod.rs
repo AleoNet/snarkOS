@@ -14,7 +14,7 @@ use snarkos_models::{
     },
     curves::{Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, DPCScheme, Predicate, Record},
-    gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
+    gadgets::algorithms::{CRHGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
@@ -28,8 +28,6 @@ use snarkos_utilities::{
 use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod binding_signature;
 
 pub mod predicate;
 use self::predicate::*;
@@ -83,18 +81,6 @@ pub trait BaseDPCComponents: DPCComponents {
     /// Ledger digest type.
     type MerkleParameters: LoadableMerkleParameters;
     type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
-
-    /// Commitment scheme for committing to a record value
-    type ValueCommitment: CommitmentScheme;
-    type ValueCommitmentGadget: CommitmentGadget<Self::ValueCommitment, Self::InnerField>;
-
-    /// Gadget for verifying the binding signature
-    type BindingSignatureGroup: Group + ProjectiveCurve;
-    type BindingSignatureGadget: BindingSignatureGadget<
-        Self::ValueCommitment,
-        Self::InnerField,
-        Self::BindingSignatureGroup,
-    >;
 
     /// Group and Model Parameters for record encryption
     type EncryptionGroup: Group + ProjectiveCurve;
@@ -251,10 +237,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let local_data_commitment = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Value commitment setup");
-        let value_commitment = Components::ValueCommitment::setup(rng);
-        end_timer!(time);
-
         let time = start_timer!(|| "Serial nonce CRH setup");
         let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
@@ -273,7 +255,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             predicate_verification_key_hash,
             local_data_crh,
             local_data_commitment,
-            value_commitment,
             serial_number_nonce,
         };
 
