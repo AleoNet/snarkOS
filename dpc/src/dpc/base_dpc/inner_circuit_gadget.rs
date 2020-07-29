@@ -34,8 +34,10 @@ use snarkos_models::{
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
+            arithmetic::{add::Add, sub::Sub},
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
+            int::{Int, Int64},
             uint::UInt8,
             ToBitsGadget,
             ToBytesGadget,
@@ -1525,6 +1527,42 @@ where
             &c_gadget,
             &affine_r_gadget,
             &recommit_gadget,
+        )?;
+    }
+    // *******************************************************************
+
+    // *******************************************************************
+    // Check that the value balance is valid
+    // *******************************************************************
+    {
+        let mut cs = cs.ns(|| "Check that the value balance is valid.");
+
+        let given_value_balance = Int64::alloc(cs.ns(|| "given_value_balance"), || Ok(value_balance))?;
+
+        let mut candidate_value_balance = Int64::zero();
+
+        for (i, old_record) in old_records.iter().enumerate() {
+            let value = old_record.value as i64;
+            let record_value = Int64::alloc(cs.ns(|| format!("old record {} value", i)), || Ok(value))?;
+
+            candidate_value_balance = candidate_value_balance
+                .add(cs.ns(|| format!("add old record {} value", i)), &record_value)
+                .unwrap();
+        }
+
+        for (j, new_record) in new_records.iter().enumerate() {
+            let value = new_record.value as i64;
+            let record_value = Int64::alloc(cs.ns(|| format!("new record {} value", j)), || Ok(value))?;
+
+            candidate_value_balance = candidate_value_balance
+                .sub(cs.ns(|| format!("sub new record {} value", j)), &record_value)
+                .unwrap();
+        }
+
+        // Enforce that given_value_balance is equivalent to candidate_value_balance
+        given_value_balance.enforce_equal(
+            cs.ns(|| "given_value_balance == candidate_value_balance"),
+            &given_value_balance,
         )?;
     }
 

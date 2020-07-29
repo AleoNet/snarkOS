@@ -27,6 +27,7 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(super) account_address: AccountAddress<C>,
 
     pub(super) is_dummy: bool,
+    // TODO (raychu86) use AleoAmount which will guard the value range
     pub(super) value: u64,
     pub(super) payload: RecordPayload,
 

@@ -2,13 +2,20 @@ use crate::{
     curves::PrimeField,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{boolean::Boolean, eq::ConditionalEqGadget, int::*},
+        utilities::{
+            boolean::Boolean,
+            eq::{ConditionalEqGadget, EqGadget},
+            int::*,
+        },
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
 
 macro_rules! cond_eq_int_impl {
     ($($gadget: ident),*) => ($(
+
+        impl<F: PrimeField> EqGadget<F> for $gadget {}
+
         impl<F: PrimeField> ConditionalEqGadget<F> for $gadget {
             fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
                 &self,

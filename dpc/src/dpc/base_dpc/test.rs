@@ -430,6 +430,31 @@ fn test_execute_base_dpc_constraints() {
     let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
         inner_snark_parameters.1.clone().into();
 
+    use crate::dpc::base_dpc::inner_circuit_verifier_input::InnerCircuitVerifierInput;
+    let inner_snark_input = InnerCircuitVerifierInput {
+        circuit_parameters: circuit_parameters.clone(),
+        ledger_parameters: ledger.parameters().clone(),
+        ledger_digest: ledger_digest.clone(),
+        old_serial_numbers: old_serial_numbers.to_vec(),
+        new_commitments: new_commitments.to_vec(),
+        new_records_ciphertext_hashes: new_records_ciphertext_hashes.clone(),
+        memo: memo.clone(),
+        predicate_commitment: predicate_comm.clone(),
+        local_data_commitment: local_data_comm.clone(),
+        value_balance,
+        network_id,
+    };
+
+    if !<<Components as BaseDPCComponents>::InnerSNARK as SNARK>::verify(
+        &inner_snark_parameters.1,
+        &inner_snark_input,
+        &inner_snark_proof,
+    )
+    .unwrap()
+    {
+        println!("Inner snark proof failed to verify.");
+    }
+
     // Check that the proof check constraint system was satisfied.
     let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
 
