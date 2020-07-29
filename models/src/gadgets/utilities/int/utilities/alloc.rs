@@ -1,11 +1,13 @@
 use crate::{
-    curves::Field,
+    curves::{to_field_vec::ToConstraintField, Field, FpParameters, PrimeField},
     gadgets::{
+        curves::FpGadget,
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
             int::{Int, Int128, Int16, Int32, Int64, Int8},
+            ToBitsGadget,
         },
     },
 };
@@ -83,7 +85,7 @@ macro_rules! alloc_int_impl {
                     .into_iter()
                     .enumerate()
                     .map(|(i, v)| {
-                        Ok(Boolean::from(AllocatedBit::alloc(
+                        Ok(Boolean::from(AllocatedBit::alloc_input(
                             &mut cs.ns(|| format!("allocated bit_gadget {}", i)),
                             || v.ok_or(SynthesisError::AssignmentMissing),
                         )?))
@@ -100,3 +102,41 @@ macro_rules! alloc_int_impl {
 }
 
 alloc_int_impl!(Int8 Int16 Int32 Int64 Int128);
+
+// This method is used exclusively by Int64
+impl Int64 {
+    /// Allocates an `i64` by first converting the little-endian byte representation to
+    /// `F` elements, (thus reducing the number of input allocations),
+    /// and then converts this list of `F` gadgets into the `i64` gadget
+    pub fn alloc_input_bytes<F, CS>(mut cs: CS, values: &[u8]) -> Result<Self, SynthesisError>
+    where
+        F: PrimeField,
+        CS: ConstraintSystem<F>,
+    {
+        let field_elements: Vec<F> = ToConstraintField::<F>::to_field_elements(values).unwrap();
+
+        let max_size = 8 * (F::Parameters::CAPACITY / 8) as usize;
+        let mut allocated_bits = Vec::new();
+        for (i, field_element) in field_elements.into_iter().enumerate() {
+            let fe = FpGadget::alloc_input(&mut cs.ns(|| format!("Field element {}", i)), || Ok(field_element))?;
+            let mut fe_bits = fe.to_bits(cs.ns(|| format!("Convert fe to bits {}", i)))?;
+            // FpGadget::to_bits outputs a big-endian binary representation of
+            // fe_gadget's value, so we have to reverse it to get the little-endian
+            // form.
+            fe_bits.reverse();
+
+            // Remove the most significant bit, because we know it should be zero
+            // because `values.to_field_elements()` only
+            // packs field elements up to the penultimate bit.
+            // That is, the most significant bit (`F::NUM_BITS`-th bit) is
+            // unset, so we can just pop it off.
+            allocated_bits.extend_from_slice(&fe_bits[0..max_size]);
+        }
+
+        //TODO (raychu86) Add a from_bits_le impl for the signed integer gadgets to derive value
+        Ok(Self {
+            bits: allocated_bits,
+            value: None,
+        })
+    }
+}

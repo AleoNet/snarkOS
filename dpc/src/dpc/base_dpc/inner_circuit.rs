@@ -1,6 +1,5 @@
 use crate::{
     dpc::base_dpc::{
-        binding_signature::BindingSignature,
         inner_circuit_gadget::execute_inner_proof_gadget,
         parameters::CircuitParameters,
         record::DPCRecord,
@@ -51,12 +50,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 
     memo: Option<[u8; 32]>,
 
-    input_value_commitments: Option<Vec<<C::ValueCommitment as CommitmentScheme>::Output>>,
-    input_value_commitment_randomness: Option<Vec<<C::ValueCommitment as CommitmentScheme>::Randomness>>,
-    output_value_commitments: Option<Vec<<C::ValueCommitment as CommitmentScheme>::Output>>,
-    output_value_commitment_randomness: Option<Vec<<C::ValueCommitment as CommitmentScheme>::Randomness>>,
     value_balance: Option<i64>,
-    binding_signature: Option<BindingSignature>,
 
     network_id: Option<u8>,
 }
@@ -97,16 +91,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             num_input_records + num_output_records
         ];
 
-        let input_value_commitments =
-            vec![<C::ValueCommitment as CommitmentScheme>::Output::default(); num_input_records];
-        let input_value_commitment_randomness =
-            vec![<C::ValueCommitment as CommitmentScheme>::Randomness::default(); num_input_records];
-        let output_value_commitments =
-            vec![<C::ValueCommitment as CommitmentScheme>::Output::default(); num_output_records];
-        let output_value_commitment_randomness =
-            vec![<C::ValueCommitment as CommitmentScheme>::Randomness::default(); num_output_records];
         let value_balance: i64 = 0;
-        let binding_signature = BindingSignature::default();
 
         let network_id: u8 = 0;
 
@@ -140,12 +125,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
             memo: Some(memo),
 
-            input_value_commitments: Some(input_value_commitments),
-            input_value_commitment_randomness: Some(input_value_commitment_randomness),
-            output_value_commitments: Some(output_value_commitments),
-            output_value_commitment_randomness: Some(output_value_commitment_randomness),
             value_balance: Some(value_balance),
-            binding_signature: Some(binding_signature),
 
             network_id: Some(network_id),
         }
@@ -183,12 +163,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         memo: &[u8; 32],
 
-        input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
-        input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
-        output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
-        output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
         value_balance: i64,
-        binding_signature: &BindingSignature,
 
         network_id: u8,
     ) -> Self {
@@ -199,14 +174,10 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         assert_eq!(num_input_records, old_witnesses.len());
         assert_eq!(num_input_records, old_account_private_keys.len());
         assert_eq!(num_input_records, old_serial_numbers.len());
-        assert_eq!(num_input_records, input_value_commitments.len());
-        assert_eq!(num_input_records, input_value_commitment_randomness.len());
 
         assert_eq!(num_output_records, new_records.len());
         assert_eq!(num_output_records, new_serial_number_nonce_randomness.len());
         assert_eq!(num_output_records, new_commitments.len());
-        assert_eq!(num_output_records, output_value_commitments.len());
-        assert_eq!(num_output_records, output_value_commitment_randomness.len());
 
         assert_eq!(num_output_records, new_records_encryption_randomness.len());
         assert_eq!(num_output_records, new_records_encryption_gadget_components.len());
@@ -258,12 +229,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
             memo: Some(memo.clone()),
 
-            input_value_commitments: Some(input_value_commitments.to_vec()),
-            input_value_commitment_randomness: Some(input_value_commitment_randomness.to_vec()),
-            output_value_commitments: Some(output_value_commitments.to_vec()),
-            output_value_commitment_randomness: Some(output_value_commitment_randomness.to_vec()),
             value_balance: Some(value_balance),
-            binding_signature: Some(binding_signature.clone()),
 
             network_id: Some(network_id),
         }
@@ -297,12 +263,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.local_data_commitment.get()?,
             self.local_data_commitment_randomizers.get()?,
             self.memo.get()?,
-            self.input_value_commitments.get()?,
-            self.input_value_commitment_randomness.get()?,
-            self.output_value_commitments.get()?,
-            self.output_value_commitment_randomness.get()?,
             *self.value_balance.get()?,
-            self.binding_signature.get()?,
             *self.network_id.get()?,
         )?;
         Ok(())

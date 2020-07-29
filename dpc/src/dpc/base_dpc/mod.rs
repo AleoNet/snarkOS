@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
+use crate::dpc::base_dpc::record_payload::RecordPayload;
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -766,76 +766,6 @@ where
 
         end_timer!(signature_time);
 
-        // Generate binding signature
-
-        // Generate value commitments for input records
-
-        let mut old_value_commits = vec![];
-        let mut old_value_commit_randomness = vec![];
-
-        for old_record in old_records {
-            // If the record is a dummy, then the value should be 0
-            let input_value = match old_record.is_dummy() {
-                true => 0,
-                false => old_record.value(),
-            };
-
-            // Generate value commitment randomness
-            let value_commitment_randomness =
-                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-            // Generate the value commitment
-            let value_commitment = parameters
-                .circuit_parameters
-                .value_commitment
-                .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
-                .unwrap();
-
-            old_value_commits.push(value_commitment);
-            old_value_commit_randomness.push(value_commitment_randomness);
-        }
-
-        // Generate value commitments for output records
-
-        let mut new_value_commits = vec![];
-        let mut new_value_commit_randomness = vec![];
-
-        for new_record in &new_records {
-            // If the record is a dummy, then the value should be 0
-            let output_value = match new_record.is_dummy() {
-                true => 0,
-                false => new_record.value(),
-            };
-
-            // Generate value commitment randomness
-            let value_commitment_randomness =
-                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-            // Generate the value commitment
-            let value_commitment = parameters
-                .circuit_parameters
-                .value_commitment
-                .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
-                .unwrap();
-
-            new_value_commits.push(value_commitment);
-            new_value_commit_randomness.push(value_commitment_randomness);
-        }
-
-        let sighash = to_bytes![local_data_commitment]?;
-
-        let binding_signature =
-            create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
-                &circuit_parameters.value_commitment,
-                &old_value_commits,
-                &new_value_commits,
-                &old_value_commit_randomness,
-                &new_value_commit_randomness,
-                value_balance,
-                &sighash,
-                rng,
-            )?;
-
         // Encrypt the new records
 
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
@@ -893,12 +823,7 @@ where
                 &local_data_commitment,
                 &local_data_commitment_randomizers,
                 memorandum,
-                &old_value_commits,
-                &old_value_commit_randomness,
-                &new_value_commits,
-                &new_value_commit_randomness,
                 value_balance,
-                &binding_signature,
                 network_id,
             );
 
