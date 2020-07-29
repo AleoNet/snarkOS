@@ -1337,8 +1337,7 @@ where
     {
         let mut cs = cs.ns(|| "Check that the value balance is valid.");
 
-        let given_value_balance =
-            Int64::alloc_input_bytes(cs.ns(|| "given_value_balance"), &value_balance.to_le_bytes()[..])?;
+        let given_value_balance = Int64::alloc_input_fe(cs.ns(|| "given_value_balance"), value_balance)?;
 
         let mut candidate_value_balance = Int64::zero();
 
