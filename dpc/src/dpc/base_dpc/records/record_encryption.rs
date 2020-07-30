@@ -1,8 +1,8 @@
 use crate::base_dpc::{
-    parameters::CircuitParameters,
+    parameters::SystemParameters,
     record::DPCRecord,
     record_payload::RecordPayload,
-    records::{record_ciphertext::*, record_serializer::*},
+    records::{encrypted_record::*, record_serializer::*},
     BaseDPCComponents,
 };
 use snarkos_algorithms::encoding::Elligator2;
@@ -71,17 +71,15 @@ pub struct RecordEncryption<C: BaseDPCComponents>(PhantomData<C>);
 impl<C: BaseDPCComponents> RecordEncryption<C> {
     /// Encrypt the given vector of records and returns
     /// 1. Encryption Randomness
-    /// 2. Encrypted record ciphertext
-    /// 3. Ciphertext Selector bits - used to compress/decompress
-    /// 4. Final fq high selector bit - Used to decode the plaintext
+    /// 2. Encrypted record
     pub fn encrypt_record<R: Rng>(
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         record: &DPCRecord<C>,
         rng: &mut R,
     ) -> Result<
         (
             <<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Randomness,
-            RecordCiphertext<C>,
+            EncryptedRecord<C>,
         ),
         DPCError,
     > {
@@ -99,36 +97,36 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         }
 
         // Encrypt the record plaintext
-        let record_public_key = record.account_address().into_repr();
-        let encryption_randomness = circuit_parameters
+        let record_public_key = record.owner().into_repr();
+        let encryption_randomness = system_parameters
             .account_encryption
             .generate_randomness(record_public_key, rng)?;
-        let ciphertext = C::AccountEncryption::encrypt(
-            &circuit_parameters.account_encryption,
+        let encrypted_record = C::AccountEncryption::encrypt(
+            &system_parameters.account_encryption,
             record_public_key,
             &encryption_randomness,
             &record_plaintexts,
         )?;
 
-        let record_ciphertext = RecordCiphertext {
-            ciphertext,
+        let encrypted_record = EncryptedRecord {
+            encrypted_record,
             final_fq_high_selector,
         };
 
-        Ok((encryption_randomness, record_ciphertext))
+        Ok((encryption_randomness, encrypted_record))
     }
 
     /// Decrypt and reconstruct the encrypted record
     pub fn decrypt_record(
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         account_view_key: &AccountViewKey<C>,
-        record_ciphertext: &RecordCiphertext<C>,
+        encrypted_record: &EncryptedRecord<C>,
     ) -> Result<DPCRecord<C>, DPCError> {
-        // Decrypt the record ciphertext
+        // Decrypt the encrypted record
         let plaintext_elements = C::AccountEncryption::decrypt(
-            &circuit_parameters.account_encryption,
+            &system_parameters.account_encryption,
             &account_view_key.decryption_key,
-            &record_ciphertext.ciphertext,
+            &encrypted_record.encrypted_record,
         )?;
 
         let mut plaintext = vec![];
@@ -143,56 +141,56 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             C,
             <C as BaseDPCComponents>::EncryptionModelParameters,
             <C as BaseDPCComponents>::EncryptionGroup,
-        >::deserialize(plaintext, record_ciphertext.final_fq_high_selector)?;
+        >::deserialize(plaintext, encrypted_record.final_fq_high_selector)?;
 
         let DeserializedRecord {
             serial_number_nonce,
             commitment_randomness,
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_program_id,
+            death_program_id,
             payload,
             value,
         } = record_components;
 
         // Construct the record account address
 
-        let account_address = AccountAddress::from_view_key(&circuit_parameters.account_encryption, &account_view_key)?;
+        let owner = AccountAddress::from_view_key(&system_parameters.account_encryption, &account_view_key)?;
 
         // Determine if the record is a dummy
 
-        // TODO (raychu86) Establish `is_dummy` flag properly by checking that the value is 0 and the predicates are equivalent to a global dummy
-        let dummy_predicate = birth_predicate_hash.clone();
+        // TODO (raychu86) Establish `is_dummy` flag properly by checking that the value is 0 and the programs are equivalent to a global dummy
+        let dummy_program = birth_program_id.clone();
 
         let is_dummy = (value == 0)
             && (payload == RecordPayload::default())
-            && (death_predicate_hash == dummy_predicate)
-            && (birth_predicate_hash == dummy_predicate);
+            && (death_program_id == dummy_program)
+            && (birth_program_id == dummy_program);
 
         // Calculate record commitment
 
         let commitment_input = to_bytes![
-            account_address,
+            owner,
             is_dummy,
             value,
             payload,
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_program_id,
+            death_program_id,
             serial_number_nonce
         ]?;
 
         let commitment = C::RecordCommitment::commit(
-            &circuit_parameters.record_commitment,
+            &system_parameters.record_commitment,
             &commitment_input,
             &commitment_randomness,
         )?;
 
         Ok(DPCRecord {
-            account_address,
+            owner,
             is_dummy,
             value,
             payload,
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_program_id,
+            death_program_id,
             serial_number_nonce,
             commitment_randomness,
             commitment,
@@ -200,15 +198,15 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         })
     }
 
-    /// Returns the ciphertext hash
+    /// Returns the encrypted record hash
     /// The hash input is the ciphertext x-coordinates appended with the selector bits
-    pub fn record_ciphertext_hash(
-        circuit_parameters: &CircuitParameters<C>,
-        record_ciphertext: &RecordCiphertext<C>,
-    ) -> Result<<<C as DPCComponents>::RecordCiphertextCRH as CRH>::Output, DPCError> {
+    pub fn encrypted_record_hash(
+        system_parameters: &SystemParameters<C>,
+        encrypted_record: &EncryptedRecord<C>,
+    ) -> Result<<<C as DPCComponents>::EncryptedRecordCRH as CRH>::Output, DPCError> {
         let mut ciphertext_affine_x = vec![];
         let mut selector_bits = vec![];
-        for ciphertext_element in &record_ciphertext.ciphertext {
+        for ciphertext_element in &encrypted_record.encrypted_record {
             // Compress the ciphertext element to the affine x coordinate
             let ciphertext_element_affine =
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();
@@ -229,11 +227,11 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         }
 
         // Concatenate the ciphertext selector bits and the final fq_high selector bit
-        selector_bits.push(record_ciphertext.final_fq_high_selector);
+        selector_bits.push(encrypted_record.final_fq_high_selector);
         let selector_bytes = bits_to_bytes(&selector_bits);
 
-        Ok(circuit_parameters
-            .record_ciphertext_crh
+        Ok(system_parameters
+            .encrypted_record_crh
             .hash(&to_bytes![ciphertext_affine_x, selector_bytes]?)?)
     }
 
@@ -245,7 +243,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
     /// 4. Record fq high selectors - Used for plaintext serialization/deserialization
     /// 5. Record ciphertext blinding exponents used to encrypt the record
     pub fn prepare_encryption_gadget_components(
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         record: &DPCRecord<C>,
         encryption_randomness: &<<C as DPCComponents>::AccountEncryption as EncryptionScheme>::Randomness,
     ) -> Result<RecordEncryptionGadgetComponents<C>, DPCError> {
@@ -312,15 +310,15 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         }
 
         // Encrypt the record plaintext
-        let record_public_key = record.account_address().into_repr();
-        let encryption_blinding_exponents = circuit_parameters.account_encryption.generate_blinding_exponents(
+        let record_public_key = record.owner().into_repr();
+        let encryption_blinding_exponents = system_parameters.account_encryption.generate_blinding_exponents(
             record_public_key,
             encryption_randomness,
             record_plaintexts.len(),
         )?;
 
-        let ciphertext = C::AccountEncryption::encrypt(
-            &circuit_parameters.account_encryption,
+        let encrypted_record = C::AccountEncryption::encrypt(
+            &system_parameters.account_encryption,
             record_public_key,
             &encryption_randomness,
             &record_plaintexts,
@@ -328,7 +326,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
 
         // Compute the compressed ciphertext selector bits
         let mut ciphertext_selectors = vec![];
-        for ciphertext_element in ciphertext.iter() {
+        for ciphertext_element in encrypted_record.iter() {
             // Compress the ciphertext element to the affine x coordinate
             let ciphertext_element_affine =
                 <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![ciphertext_element]?[..])?.into_affine();

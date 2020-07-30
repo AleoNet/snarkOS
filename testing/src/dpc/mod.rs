@@ -46,9 +46,9 @@ pub fn generate_test_accounts<R: Rng>(
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
-    let signature_parameters = &parameters.circuit_parameters.account_signature;
-    let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-    let encryption_parameters = &parameters.circuit_parameters.account_encryption;
+    let signature_parameters = &parameters.system_parameters.account_signature;
+    let commitment_parameters = &parameters.system_parameters.account_commitment;
+    let encryption_parameters = &parameters.system_parameters.account_encryption;
 
     let genesis_account =
         Account::new(signature_parameters, commitment_parameters, encryption_parameters, rng).unwrap();

@@ -8,9 +8,9 @@ cargo run --release --example account_signature
 cargo run --release --example ledger_merkle_tree
 cargo run --release --example local_data_crh
 cargo run --release --example local_data_commitment
-cargo run --release --example predicate_vk_crh
+cargo run --release --example program_vk_crh
 cargo run --release --example record_commitment
-cargo run --release --example record_ciphertext_crh
+cargo run --release --example encrypted_record_crh
 cargo run --release --example serial_number_nonce_crh
 cargo run --release --example value_commitment
 
@@ -32,14 +32,14 @@ mv local_data_crh.checksum ../src/params
 mv local_data_commitment.params ../src/params
 mv local_data_commitment.checksum ../src/params
 
-mv predicate_vk_crh.params ../src/params
-mv predicate_vk_crh.checksum ../src/params
+mv program_vk_crh.params ../src/params
+mv program_vk_crh.checksum ../src/params
 
 mv record_commitment.params ../src/params
 mv record_commitment.checksum ../src/params
 
-mv record_ciphertext_crh.params ../src/params
-mv record_ciphertext_crh.checksum ../src/params
+mv encrypted_record_crh.params ../src/params
+mv encrypted_record_crh.checksum ../src/params
 
 mv serial_number_nonce_crh.params ../src/params
 mv serial_number_nonce_crh.checksum ../src/params
@@ -47,7 +47,7 @@ mv serial_number_nonce_crh.checksum ../src/params
 mv value_commitment.params ../src/params
 mv value_commitment.checksum ../src/params
 
-./predicate_snark.sh
+./program_snark.sh
 
 ./inner_snark.sh
 

@@ -25,12 +25,12 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusPar
 pub struct TestTx;
 
 impl Transaction for TestTx {
-    type Ciphertext = [u8; 32];
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
-    type LocalDataCommitment = [u8; 32];
+    type EncryptedRecord = [u8; 32];
+    type LocalDataRoot = [u8; 32];
     type Memorandum = [u8; 32];
-    type PredicateCommitment = [u8; 32];
+    type ProgramCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
 
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -53,11 +53,11 @@ impl Transaction for TestTx {
         &[[0u8; 32]]
     }
 
-    fn predicate_commitment(&self) -> &Self::PredicateCommitment {
+    fn program_commitment(&self) -> &Self::ProgramCommitment {
         &[0u8; 32]
     }
 
-    fn local_data_commitment(&self) -> &Self::LocalDataCommitment {
+    fn local_data_root(&self) -> &Self::LocalDataRoot {
         &[0u8; 32]
     }
 
@@ -69,7 +69,7 @@ impl Transaction for TestTx {
         &[0u8; 32]
     }
 
-    fn ciphertexts(&self) -> &[Self::Ciphertext] {
+    fn encrypted_records(&self) -> &[Self::EncryptedRecord] {
         &[[0u8; 32]]
     }
 

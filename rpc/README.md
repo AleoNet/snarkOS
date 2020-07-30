@@ -55,8 +55,8 @@ Returns information about a transaction from serialized transaction bytes.
 | `memo`                  | string | The transaction memo                      |
 | `digest`                | string | The merkle tree digest                    |
 | `transaction_proof`     | string | The transaction zero knowledge proof      |
-| `predicate_commitment`  | string | The predicate verification key commitment |
-| `local_data_commitment` | string | The local data commitment                 |
+| `program_commitment`    | string | The program verification key commitment   |
+| `local_data_root`       | string | The local data root                       |
 | `value balance`         | number | The transaction value balance             |
 | `signatures`            | array  | The list of transaction signatures        |
 | `transaction_metadata`  | object | The transaction metadata                  |
@@ -77,17 +77,17 @@ Returns information about a record from serialized record hex.
 
 ### Response
 
-|        Parameter        |  Type  |             Description            |
-|:----------------------- |:------:|:---------------------------------- |
-| `account_public_key`    | string | The hash of current highest block  |
-| `is_dummy`              | number | The height of the next block       |
-| `value`                 | number | The current timestamp              |
-| `payload`               | object | The record payload                 |
-| `birth_predicate_repr`  | string | The birth predicate representation |
-| `death_predicate_repr`  | string | The death predicate representation |
-| `serial_number_nonce`   | string | The serial number nonce            |
-| `commitment`            | string | The record commitment              |
-| `commitment_randomness` | string | The record commitment randomness   |
+|        Parameter        |  Type  |            Description            |
+|:-----------------------:|:------:|:---------------------------------:|
+| `owner`                 | string | The owner of the record           |
+| `is_dummy`              | number | The height of the next block      |
+| `value`                 | number | The current timestamp             |
+| `payload`               | object | The record payload                |
+| `birth_program_id`      | string | The birth program representation  |
+| `death_program_id`      | string | The death program representation  |
+| `serial_number_nonce`   | string | The serial number nonce           |
+| `commitment`            | string | The record commitment             |
+| `commitment_randomness` | string | The record commitment randomness  |
 
 ### Example
 ```ignore
@@ -95,13 +95,13 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decodere
 ```
 
 ## decryptrecord
-Decrypts the record ciphertext and returns the hex encoded bytes of the record.
+Decrypts the encrypted record and returns the hex encoded bytes of the record.
 
 ### Arguments
 
 |      Parameter      |  Type  | Required |                     Description                     |
 |:-------------------:|:------:|:--------:|:---------------------------------------------------:|
-| `record_ciphertext` | string |    Yes   |                 The encrypted record                |
+|  `encrypted_record` | string |    Yes   |                 The encrypted record                |
 |  `account_view_key` | string |    Yes   | The account view key used to decrypt the ciphertext |
 
 ### Response
@@ -119,7 +119,7 @@ curl --user username:password --data-binary '{
     "method": "decryptrecord",
     "params": [
        {
-        "record_ciphertext": "record_ciphertext_string",
+        "encrypted_record": "encrypted_record_string",
         "account_view_key": "account_view_key_string"
        }
     ]
@@ -300,20 +300,20 @@ Returns information about a transaction from a transaction id.
 
 ### Response
 
-|        Parameter        |  Type  |                Description                |
-|:-----------------------:|:------:|:----------------------------------------- |
-| `txid`                  | string | The transaction id                        |
-| `size`                  | number | The size of the transaction in bytes      |
-| `old_serial_numbers`    | array  | The list of old record serial numbers     |
-| `new_commitments`       | array  | The list of new record commitments        |
-| `memo`                  | string | The transaction memo                      |
-| `digest`                | string | The merkle tree digest                    |
-| `transaction_proof`     | string | The transaction zero knowledge proof      |
-| `predicate_commitment`  | string | The predicate verification key commitment |
-| `local_data_commitment` | string | The local data commitment                 |
-| `value balance`         | number | The transaction value balance             |
-| `signatures`            | array  | The list of transaction signatures        |
-| `transaction_metadata`  | object | The transaction metadata                  |
+|        Parameter        |  Type  |                Description               |
+|:-----------------------:|:------:|:---------------------------------------- |
+| `txid`                  | string | The transaction id                       |
+| `size`                  | number | The size of the transaction in bytes     |
+| `old_serial_numbers`    | array  | The list of old record serial numbers    |
+| `new_commitments`       | array  | The list of new record commitments       |
+| `memo`                  | string | The transaction memo                     |
+| `digest`                | string | The merkle tree digest                   |
+| `transaction_proof`     | string | The transaction zero knowledge proof     |
+| `program_commitment`    | string | The program verification key commitment  |
+| `local_data_root`       | string | The local data root                      |
+| `value balance`         | number | The transaction value balance            |
+| `signatures`            | array  | The list of transaction signatures       |
+| `transaction_metadata`  | object | The transaction metadata                 |
 
 ### Example
 ```ignore

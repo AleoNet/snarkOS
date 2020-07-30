@@ -8,17 +8,17 @@ Returns information about a record from serialized record hex.
 
 ### Response
 
-|        Parameter        |  Type  |             Description            |
-|:----------------------- |:------:|:---------------------------------- |
-| `account_public_key`    | string | The hash of current highest block  |
-| `is_dummy`              | number | The height of the next block       |
-| `value`                 | number | The current timestamp              |
-| `payload`               | object | The record payload                 |
-| `birth_predicate_repr`  | string | The birth predicate representation |
-| `death_predicate_repr`  | string | The death predicate representation |
-| `serial_number_nonce`   | string | The serial number nonce            |
-| `commitment`            | string | The record commitment              |
-| `commitment_randomness` | string | The record commitment randomness   |
+|        Parameter        |  Type  |            Description            |
+|:-----------------------:|:------:|:---------------------------------:|
+| `owner`                 | string | The owner of the record           |
+| `is_dummy`              | number | The height of the next block      |
+| `value`                 | number | The current timestamp             |
+| `payload`               | object | The record payload                |
+| `birth_program_id`      | string | The birth program representation  |
+| `death_program_id`      | string | The death program representation  |
+| `serial_number_nonce`   | string | The serial number nonce           |
+| `commitment`            | string | The record commitment             |
+| `commitment_randomness` | string | The record commitment randomness  |
 
 ### Example
 ```ignore

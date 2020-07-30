@@ -13,7 +13,7 @@ mod consensus_dpc {
     fn base_dpc_multiple_transactions() {
         let parameters = &FIXTURE.parameters;
         let ledger = FIXTURE.ledger();
-        let predicate = FIXTURE.predicate.clone();
+        let program = FIXTURE.program.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
         let mut rng = FIXTURE.rng.clone();
 
@@ -51,13 +51,13 @@ mod consensus_dpc {
 
         let old_account_private_keys = vec![miner_acc.private_key; NUM_INPUT_RECORDS];
         let old_records = coinbase_records;
-        let new_birth_predicates = vec![predicate.clone(); NUM_INPUT_RECORDS];
+        let new_birth_programs = vec![program.clone(); NUM_INPUT_RECORDS];
 
         // OUTPUTS
 
-        let new_account_address = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
-        let new_death_predicates = vec![predicate; NUM_OUTPUT_RECORDS];
-        let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+        let new_record_owners = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![program; NUM_OUTPUT_RECORDS];
+        let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
         let new_values = vec![10; NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
@@ -72,10 +72,10 @@ mod consensus_dpc {
                 &parameters,
                 old_records,
                 old_account_private_keys,
-                new_account_address,
-                new_birth_predicates.clone(),
-                new_death_predicates.clone(),
-                new_dummy_flags,
+                new_record_owners,
+                new_birth_programs.clone(),
+                new_death_programs.clone(),
+                new_is_dummy_flags,
                 new_values,
                 new_payloads,
                 memo,

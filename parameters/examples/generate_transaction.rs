@@ -2,7 +2,7 @@ use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::*,
-    predicate::DPCPredicate,
+    program::DPCProgram,
     record_payload::RecordPayload,
     BaseDPCComponents,
     DPC,
@@ -79,18 +79,18 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
 
-    let predicate_vk_hash = parameters
-        .circuit_parameters
-        .predicate_verification_key_hash
-        .hash(&to_bytes![parameters.predicate_snark_parameters.verification_key]?)?;
-    let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
-    let predicate = DPCPredicate::<Components>::new(predicate_vk_hash_bytes.clone());
+    let program_vk_hash = parameters
+        .system_parameters
+        .program_verification_key_hash
+        .hash(&to_bytes![parameters.program_snark_parameters.verification_key]?)?;
+    let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
+    let program = DPCProgram::<Components>::new(program_vk_hash_bytes.clone());
 
     // Generate a new account that owns the dummy input records
     let dummy_account = Account::new(
-        &parameters.circuit_parameters.account_signature,
-        &parameters.circuit_parameters.account_commitment,
-        &parameters.circuit_parameters.account_encryption,
+        &parameters.system_parameters.account_signature,
+        &parameters.system_parameters.account_commitment,
+        &parameters.system_parameters.account_encryption,
         rng,
     )?;
 
@@ -100,18 +100,18 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     let mut old_records = vec![];
     for i in 0..Components::NUM_INPUT_RECORDS {
         let old_sn_nonce = &parameters
-            .circuit_parameters
+            .system_parameters
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
-            &parameters.circuit_parameters,
+            &parameters.system_parameters,
             &old_sn_nonce,
             &dummy_account.address,
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
-            &predicate,
-            &predicate,
+            &program,
+            &program,
             rng,
         )?;
         old_records.push(old_record);
@@ -119,13 +119,13 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     // Construct new records
 
-    let new_account_address = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
-    let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_birth_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_death_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
 
-    let mut new_dummy_flags = vec![false];
-    new_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
+    let mut new_is_dummy_flags = vec![false];
+    new_is_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
 
     let mut new_values = vec![value];
     new_values.extend(vec![0; Components::NUM_OUTPUT_RECORDS - 1]);
@@ -148,10 +148,10 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
             &parameters,
             old_records,
             old_account_private_keys,
-            new_account_address,
-            new_birth_predicates,
-            new_death_predicates,
-            new_dummy_flags,
+            new_record_owners,
+            new_birth_programs,
+            new_death_programs,
+            new_is_dummy_flags,
             new_values,
             new_payloads,
             memo,

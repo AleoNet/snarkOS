@@ -62,14 +62,14 @@ impl Miner {
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
-        let predicate_vk_hash = to_bytes![PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash,
-            &to_bytes![parameters.predicate_snark_parameters.verification_key]?
+        let program_vk_hash = to_bytes![ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.program_snark_parameters.verification_key]?
         )?]?;
 
-        let new_predicate = Predicate::new(predicate_vk_hash.clone());
-        let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-        let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+        let new_program = Program::new(program_vk_hash.clone());
+        let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
             if self.consensus.network_id != transaction.network_id {
@@ -84,9 +84,9 @@ impl Miner {
             storage.get_latest_block_height() + 1,
             transactions,
             parameters,
-            &predicate_vk_hash,
-            new_birth_predicates,
-            new_death_predicates,
+            &program_vk_hash,
+            new_birth_programs,
+            new_death_programs,
             self.address.clone(),
             &storage,
             rng,

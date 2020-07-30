@@ -1,6 +1,6 @@
 use crate::errors::PrivateKeyError;
 
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::CircuitParameters};
+use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_objects::AccountPrivateKey;
 
 use rand::{CryptoRng, Rng};
@@ -13,7 +13,7 @@ pub struct PrivateKey {
 
 impl PrivateKey {
     pub fn new<R: Rng + CryptoRng>(rng: &mut R) -> Result<Self, PrivateKeyError> {
-        let parameters = CircuitParameters::<Components>::load()?;
+        let parameters = SystemParameters::<Components>::load()?;
         let private_key =
             AccountPrivateKey::<Components>::new(&parameters.account_signature, &parameters.account_commitment, rng)?;
         Ok(Self { private_key })

@@ -2,7 +2,7 @@ use crate::{
     dpc::base_dpc::{
         binding_signature::BindingSignature,
         inner_circuit_gadget::execute_inner_proof_gadget,
-        parameters::CircuitParameters,
+        parameters::SystemParameters,
         record::DPCRecord,
         record_encryption::RecordEncryptionGadgetComponents,
         BaseDPCComponents,
@@ -21,7 +21,7 @@ use snarkos_objects::AccountPrivateKey;
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct InnerCircuit<C: BaseDPCComponents> {
     // Parameters
-    circuit_parameters: Option<CircuitParameters<C>>,
+    system_parameters: Option<SystemParameters<C>>,
     ledger_parameters: Option<C::MerkleParameters>,
 
     ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
@@ -40,13 +40,13 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
     // Inputs for encryption of new records.
     new_records_encryption_randomness: Option<Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>>,
     new_records_encryption_gadget_components: Option<Vec<RecordEncryptionGadgetComponents<C>>>,
-    new_records_ciphertext_hashes: Option<Vec<<C::RecordCiphertextCRH as CRH>::Output>>,
+    new_encrypted_record_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
 
-    // Commitment to Predicates and to local data.
-    predicate_commitment: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output>,
-    predicate_randomness: Option<<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness>,
+    // Commitment to Programs and to local data.
+    program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
+    program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
 
-    local_data_commitment: Option<<C::LocalDataCRH as CRH>::Output>,
+    local_data_root: Option<<C::LocalDataCRH as CRH>::Output>,
     local_data_commitment_randomizers: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
 
     memo: Option<[u8; 32]>,
@@ -62,7 +62,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
-    pub fn blank(circuit_parameters: &CircuitParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
+    pub fn blank(system_parameters: &SystemParameters<C>, ledger_parameters: &C::MerkleParameters) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
         let digest = MerkleTreeDigest::<C::MerkleParameters>::default();
@@ -83,15 +83,14 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         let new_records_encryption_gadget_components =
             vec![RecordEncryptionGadgetComponents::<C>::default(); num_output_records];
 
-        let new_records_ciphertext_hashes =
-            vec![<C::RecordCiphertextCRH as CRH>::Output::default(); num_output_records];
+        let new_encrypted_record_hashes = vec![<C::EncryptedRecordCRH as CRH>::Output::default(); num_output_records];
 
         let memo = [0u8; 32];
 
-        let predicate_commitment = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output::default();
-        let predicate_randomness = <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
+        let program_commitment = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output::default();
+        let program_randomness = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::default();
 
-        let local_data_commitment = <C::LocalDataCRH as CRH>::Output::default();
+        let local_data_root = <C::LocalDataCRH as CRH>::Output::default();
         let local_data_commitment_randomizers = vec![
             <C::LocalDataCommitment as CommitmentScheme>::Randomness::default();
             num_input_records + num_output_records
@@ -112,7 +111,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest
@@ -131,12 +130,12 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
             new_records_encryption_randomness: Some(new_records_encryption_randomness),
             new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components),
-            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes),
+            new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
 
             // Other stuff
-            predicate_commitment: Some(predicate_commitment),
-            predicate_randomness: Some(predicate_randomness),
-            local_data_commitment: Some(local_data_commitment),
+            program_commitment: Some(program_commitment),
+            program_randomness: Some(program_randomness),
+            local_data_root: Some(local_data_root),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
             memo: Some(memo),
 
@@ -153,7 +152,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
     pub fn new(
         // Parameters
-        circuit_parameters: &CircuitParameters<C>,
+        system_parameters: &SystemParameters<C>,
         ledger_parameters: &C::MerkleParameters,
 
         // Digest
@@ -172,13 +171,13 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
         new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
-        new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
+        new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
 
         // Other stuff
-        predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-        predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
+        program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+        program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-        local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+        local_data_root: &<C::LocalDataCRH as CRH>::Output,
         local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
 
         memo: &[u8; 32],
@@ -210,7 +209,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         assert_eq!(num_output_records, new_records_encryption_randomness.len());
         assert_eq!(num_output_records, new_records_encryption_gadget_components.len());
-        assert_eq!(num_output_records, new_records_ciphertext_hashes.len());
+        assert_eq!(num_output_records, new_encrypted_record_hashes.len());
 
         // TODO (raychu86) Fix the lengths to be generic
         let record_encoding_length = 7;
@@ -228,7 +227,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            circuit_parameters: Some(circuit_parameters.clone()),
+            system_parameters: Some(system_parameters.clone()),
             ledger_parameters: Some(ledger_parameters.clone()),
 
             // Digest
@@ -247,13 +246,13 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
             new_records_encryption_randomness: Some(new_records_encryption_randomness.to_vec()),
             new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components.to_vec()),
-            new_records_ciphertext_hashes: Some(new_records_ciphertext_hashes.to_vec()),
+            new_encrypted_record_hashes: Some(new_encrypted_record_hashes.to_vec()),
 
             // Other stuff
-            predicate_commitment: Some(predicate_commitment.clone()),
-            predicate_randomness: Some(predicate_randomness.clone()),
+            program_commitment: Some(program_commitment.clone()),
+            program_randomness: Some(program_randomness.clone()),
 
-            local_data_commitment: Some(local_data_commitment.clone()),
+            local_data_root: Some(local_data_root.clone()),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers.to_vec()),
 
             memo: Some(memo.clone()),
@@ -275,7 +274,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
         execute_inner_proof_gadget::<C, CS>(
             cs,
             // Parameters
-            self.circuit_parameters.get()?,
+            self.system_parameters.get()?,
             self.ledger_parameters.get()?,
             // Digest
             self.ledger_digest.get()?,
@@ -290,11 +289,11 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
             self.new_commitments.get()?,
             self.new_records_encryption_randomness.get()?,
             self.new_records_encryption_gadget_components.get()?,
-            self.new_records_ciphertext_hashes.get()?,
+            self.new_encrypted_record_hashes.get()?,
             // Other stuff
-            self.predicate_commitment.get()?,
-            self.predicate_randomness.get()?,
-            self.local_data_commitment.get()?,
+            self.program_commitment.get()?,
+            self.program_randomness.get()?,
+            self.local_data_root.get()?,
             self.local_data_commitment_randomizers.get()?,
             self.memo.get()?,
             self.input_value_commitments.get()?,

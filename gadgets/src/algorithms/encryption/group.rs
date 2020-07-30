@@ -499,7 +499,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
         mut cs: CS,
         parameters: &Self::ParametersGadget,               // g
         randomness: &Self::RandomnessGadget,               // y
-        public_key: &Self::PublicKeyGadget,                // account_address
+        public_key: &Self::PublicKeyGadget,                // record_owner
         input: &Self::PlaintextGadget,                     // m
         blinding_exponents: &Self::BlindingExponentGadget, // 1 [/] (z [+] j)
     ) -> Result<Self::CiphertextGadget, SynthesisError> {

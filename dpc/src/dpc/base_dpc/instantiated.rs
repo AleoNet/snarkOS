@@ -3,8 +3,8 @@ use crate::dpc::base_dpc::{
     inner_circuit_verifier_input::InnerCircuitVerifierInput,
     outer_circuit::OuterCircuit,
     outer_circuit_verifier_input::OuterCircuitVerifierInput,
-    predicate::DPCPredicate,
-    predicate_circuit::{PredicateCircuit, PredicateLocalData},
+    program::DPCProgram,
+    program_circuit::{ProgramCircuit, ProgramLocalData},
     transaction::DPCTransaction,
     BaseDPCComponents,
     LocalData as DPCLocalData,
@@ -53,9 +53,9 @@ impl PedersenSize for SnNonceWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PredVkHashWindow;
+pub struct ProgramVkHashWindow;
 
-impl PedersenSize for PredVkHashWindow {
+impl PedersenSize for ProgramVkHashWindow {
     const NUM_WINDOWS: usize = 144;
     const WINDOW_SIZE: usize = 63;
 }
@@ -91,9 +91,9 @@ impl PedersenSize for RecordWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RecordCiphertextWindow;
+pub struct EncryptedRecordWindow;
 
-impl PedersenSize for RecordCiphertextWindow {
+impl PedersenSize for EncryptedRecordWindow {
     const NUM_WINDOWS: usize = 48;
     const WINDOW_SIZE: usize = 44;
 }
@@ -124,6 +124,8 @@ impl DPCComponents for Components {
     type AccountEncryptionGadget = AccountEncryptionGadget;
     type AccountSignature = AccountSignature;
     type AccountSignatureGadget = AccountSignatureGadget;
+    type EncryptedRecordCRH = EncryptedRecordCRH;
+    type EncryptedRecordCRHGadget = EncryptedRecordCRHGadget;
     type InnerField = InnerField;
     type LocalDataCRH = LocalDataCRH;
     type LocalDataCRHGadget = LocalDataCRHGadget;
@@ -132,12 +134,10 @@ impl DPCComponents for Components {
     type OuterField = OuterField;
     type PRF = PRF;
     type PRFGadget = PRFGadget;
-    type PredicateVerificationKeyCommitment = PredicateVerificationKeyCommitment;
-    type PredicateVerificationKeyCommitmentGadget = PredicateVerificationKeyCommitmentGadget;
-    type PredicateVerificationKeyHash = PredicateVerificationKeyHash;
-    type PredicateVerificationKeyHashGadget = PredicateVerificationKeyHashGadget;
-    type RecordCiphertextCRH = RecordCiphertextCRH;
-    type RecordCiphertextCRHGadget = RecordCiphertextCRHGadget;
+    type ProgramVerificationKeyCommitment = ProgramVerificationKeyCommitment;
+    type ProgramVerificationKeyCommitmentGadget = ProgramVerificationKeyCommitmentGadget;
+    type ProgramVerificationKeyHash = ProgramVerificationKeyHash;
+    type ProgramVerificationKeyHashGadget = ProgramVerificationKeyHashGadget;
     type RecordCommitment = RecordCommitment;
     type RecordCommitmentGadget = RecordCommitmentGadget;
     type SerialNumberNonceCRH = SerialNumberNonce;
@@ -157,8 +157,8 @@ impl BaseDPCComponents for Components {
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
     type OuterSNARK = ProofCheckNIZK;
-    type PredicateSNARK = PredicateSNARK<Self>;
-    type PredicateSNARKGadget = PredicateSNARKGadget;
+    type ProgramSNARK = ProgramSNARK<Self>;
+    type ProgramSNARKGadget = ProgramSNARKGadget;
     type ValueCommitment = ValueCommitment;
     type ValueCommitmentGadget = ValueCommitmentGadget;
 }
@@ -173,7 +173,7 @@ pub type OuterField = Bls12_377Fq;
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
 pub type AccountEncryption = GroupEncryption<EdwardsBls>;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
-pub type PredicateVerificationKeyCommitment = Blake2sCommitment;
+pub type ProgramVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataCommitmentWindow>;
 pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
@@ -181,14 +181,14 @@ pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
-pub type RecordCiphertextCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, RecordCiphertextWindow>;
+pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, EncryptedRecordWindow>;
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
-pub type PredicateVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, PredVkHashWindow>;
+pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
 
-pub type Predicate = DPCPredicate<Components>;
+pub type Program = DPCProgram<Components>;
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
-pub type PredicateSNARK<C> = GM17<InnerPairing, PredicateCircuit<C>, PredicateLocalData<C>>;
+pub type ProgramSNARK<C> = GM17<InnerPairing, ProgramCircuit<C>, ProgramLocalData<C>>;
 pub type PRF = Blake2s;
 
 pub type Tx = DPCTransaction<Components>;
@@ -201,7 +201,7 @@ pub type LocalData = DPCLocalData<Components>;
 pub type AccountCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type AccountEncryptionGadget = GroupEncryptionGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type PredicateVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
+pub type ProgramVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
@@ -210,11 +210,11 @@ pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls,
 pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type RecordCiphertextCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type EncryptedRecordCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type PredicateVerificationKeyHashGadget =
+pub type ProgramVerificationKeyHashGadget =
     BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
 
 pub type PRFGadget = Blake2sGadget;
-pub type PredicateSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
+pub type ProgramSNARKGadget = GM17VerifierGadget<InnerPairing, OuterField, PairingGadget>;
 pub type InnerSNARKGadget = Groth16VerifierGadget<InnerPairing, OuterField, PairingGadget>;

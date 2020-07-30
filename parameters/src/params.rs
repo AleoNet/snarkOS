@@ -219,16 +219,11 @@ impl_params!(
 
 // CRH
 impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
+impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
 impl_params!(
-    PredicateVKCRHParameters,
-    predicate_vk_crh_test,
-    "predicate_vk_crh",
-    1742404
-);
-impl_params!(
-    RecordCiphertextCRHParameters,
-    record_ciphertext_crh_test,
-    "record_ciphertext_crh",
+    EncryptedRecordCRHParameters,
+    encrypted_record_crh_test,
+    "encrypted_record_crh",
     270532
 );
 impl_params!(
@@ -250,17 +245,17 @@ impl_params!(
 impl_params_remote!(PoswSNARKPKParameters, "posw_snark_pk", 171163800);
 impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 40807);
 
-// Predicate SNARK
+// Program SNARK
 impl_params!(
-    PredicateSNARKPKParameters,
-    predicate_snark_pk_test,
-    "predicate_snark_pk",
+    ProgramSNARKPKParameters,
+    program_snark_pk_test,
+    "program_snark_pk",
     348514
 );
 impl_params!(
-    PredicateSNARKVKParameters,
-    predicate_snark_vk_test,
-    "predicate_snark_vk",
+    ProgramSNARKVKParameters,
+    program_snark_vk_test,
+    "program_snark_vk",
     1068
 );
 

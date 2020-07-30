@@ -1,5 +1,5 @@
 use crate::{
-    dpc::{Predicate, Record},
+    dpc::{Program, Record},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_errors::dpc::DPCError;
@@ -11,9 +11,9 @@ pub trait DPCScheme<L: LedgerScheme> {
     type Metadata: ?Sized;
     type Payload;
     type Parameters;
-    type Predicate: Predicate<PrivateWitness = Self::PrivatePredInput>;
-    type PrivatePredInput;
-    type Record: Record<AccountAddress = <Self::Account as AccountScheme>::AccountAddress, Predicate = Self::Predicate>;
+    type Program: Program<PrivateWitness = Self::PrivateProgramInput>;
+    type PrivateProgramInput;
+    type Record: Record<Owner = <Self::Account as AccountScheme>::AccountAddress, Program = Self::Program>;
     type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
     type LocalData;
 
@@ -30,15 +30,15 @@ pub trait DPCScheme<L: LedgerScheme> {
 
         old_records: &[Self::Record],
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        old_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
+        old_private_program_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivateProgramInput>, DPCError>,
 
-        new_account_address: &[<Self::Account as AccountScheme>::AccountAddress],
+        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[<Self::Record as Record>::Value],
         new_payloads: &[Self::Payload],
-        new_birth_predicates: &[Self::Predicate],
-        new_death_predicates: &[Self::Predicate],
-        new_private_pred_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
+        new_birth_programs: &[Self::Program],
+        new_death_programs: &[Self::Program],
+        new_private_program_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivateProgramInput>, DPCError>,
 
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,

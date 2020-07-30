@@ -4,7 +4,7 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, InstantiatedDPC, Predicate},
+    instantiated::{Components, InstantiatedDPC, Program},
     record::DPCRecord,
     record_payload::RecordPayload,
 };
@@ -164,17 +164,17 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert!(transaction_input.recipients.len() > 0);
         assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
 
-        // Fetch birth/death predicates
-        let predicate_vk_hash = self
+        // Fetch birth/death programs
+        let program_vk_hash = self
             .parameters
-            .circuit_parameters
-            .predicate_verification_key_hash
-            .hash(&to_bytes![self.parameters.predicate_snark_parameters.verification_key]?)?;
-        let predicate_vk_hash_bytes = to_bytes![predicate_vk_hash]?;
+            .system_parameters
+            .program_verification_key_hash
+            .hash(&to_bytes![self.parameters.program_snark_parameters.verification_key]?)?;
+        let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
-        let predicate = Predicate::new(predicate_vk_hash_bytes.clone());
-        let new_birth_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_predicates = vec![predicate.clone(); Components::NUM_OUTPUT_RECORDS];
+        let program = Program::new(program_vk_hash_bytes.clone());
+        let new_birth_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode old records
         let mut old_records = vec![];
@@ -193,7 +193,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
                 .parameters
-                .circuit_parameters
+                .system_parameters
                 .serial_number_nonce
                 .hash(&sn_randomness)?;
 
@@ -206,14 +206,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters.circuit_parameters,
+                &self.parameters.system_parameters,
                 &old_sn_nonce,
                 &address,
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
-                &predicate,
-                &predicate,
+                &program,
+                &program,
                 rng,
             )?;
 
@@ -225,24 +225,24 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_account_address = vec![];
-        let mut new_dummy_flags = vec![];
+        let mut new_record_owners = vec![];
+        let mut new_is_dummy_flags = vec![];
         let mut new_values = vec![];
         for recipient in transaction_input.recipients {
-            new_account_address.push(AccountAddress::<Components>::from_str(&recipient.address)?);
-            new_dummy_flags.push(false);
+            new_record_owners.push(AccountAddress::<Components>::from_str(&recipient.address)?);
+            new_is_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_account_address.len() < Components::NUM_OUTPUT_RECORDS {
-            new_account_address.push(new_account_address[0].clone());
-            new_dummy_flags.push(true);
+        while new_record_owners.len() < Components::NUM_OUTPUT_RECORDS {
+            new_record_owners.push(new_record_owners[0].clone());
+            new_is_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_account_address.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_record_owners.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_is_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
         // Default record payload
@@ -266,10 +266,10 @@ impl ProtectedRpcFunctions for RpcImpl {
             &self.parameters,
             old_records,
             old_account_private_keys,
-            new_account_address,
-            new_birth_predicates,
-            new_death_predicates,
-            new_dummy_flags,
+            new_record_owners,
+            new_birth_programs,
+            new_death_programs,
+            new_is_dummy_flags,
             new_values,
             new_payloads,
             memo,
