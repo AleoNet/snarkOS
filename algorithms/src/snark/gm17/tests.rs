@@ -60,28 +60,28 @@ mod bls12_377 {
     }
 }
 
-mod sw6 {
+mod bw6 {
     use super::*;
     use crate::snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof};
-    use snarkos_curves::sw6::{Fr as SW6Fr, SW6};
+    use snarkos_curves::bw6_761::{Fr as BW6Fr, BW6_761};
     use snarkos_utilities::rand::{test_rng, UniformRand};
 
     #[test]
     fn prove_and_verify() {
         let rng = &mut test_rng();
 
-        let params = generate_random_parameters::<SW6, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        let params = generate_random_parameters::<BW6_761, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
 
-        let pvk = prepare_verifying_key::<SW6>(&params.vk);
+        let pvk = prepare_verifying_key::<BW6_761>(&params.vk);
 
-        let a = SW6Fr::rand(rng);
-        let b = SW6Fr::rand(rng);
+        let a = BW6Fr::rand(rng);
+        let b = BW6Fr::rand(rng);
         let c = a * &b;
 
         let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
 
         assert!(verify_proof(&pvk, &proof, &[c]).unwrap());
-        assert!(!verify_proof(&pvk, &proof, &[SW6Fr::zero()]).unwrap());
+        assert!(!verify_proof(&pvk, &proof, &[BW6Fr::zero()]).unwrap());
     }
 }
 

@@ -2,7 +2,7 @@
 pub mod macros;
 
 pub mod gm17;
-pub use self::gm17::*;
+pub use gm17::*;
 
 pub mod groth16;
-pub use self::groth16::*;
+pub use groth16::*;

@@ -16,7 +16,7 @@ mod r1cs_to_qap;
 
 /// Groth16 zkSNARK construction.
 pub mod snark;
-pub use self::snark::*;
+pub use snark::*;
 
 /// Generate public parameters for the Groth16 zkSNARK construction.
 mod generator;
@@ -30,7 +30,9 @@ mod verifier;
 #[cfg(test)]
 mod test;
 
-pub use self::{generator::*, prover::*, verifier::*};
+pub use generator::*;
+pub use prover::*;
+pub use verifier::*;
 
 /// A proof in the Groth16 SNARK.
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]

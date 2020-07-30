@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-pub use self::inner::*;
+pub use inner::*;
 
 #[cfg(feature = "print-trace")]
 #[macro_use]

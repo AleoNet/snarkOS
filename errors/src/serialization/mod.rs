@@ -1,2 +1,2 @@
 pub mod serialization;
-pub use self::serialization::*;
+pub use serialization::*;
