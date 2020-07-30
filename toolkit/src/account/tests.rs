@@ -10,7 +10,7 @@ pub fn private_key_test() {
     let private_key = PrivateKey::new(rng);
     assert!(private_key.is_ok());
 
-    let expected_private_key = "AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn";
+    let expected_private_key = "APrivateKey1b5U31G1VUt6G9mAh6tm364eWgLUabK1qTBdRJKUEFEwcz";
     let candidate_private_key = private_key.unwrap().to_string();
 
     println!("{} == {}", expected_private_key, candidate_private_key);
@@ -19,7 +19,7 @@ pub fn private_key_test() {
 
 #[test]
 pub fn view_key_test() {
-    let private_key = PrivateKey::from_str("AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn").unwrap();
+    let private_key = PrivateKey::from_str("APrivateKey1b5U31G1VUt6G9mAh6tm364eWgLUabK1qTBdRJKUEFEwcz").unwrap();
     let view_key = ViewKey::from(&private_key);
     assert!(view_key.is_ok());
 
@@ -32,7 +32,7 @@ pub fn view_key_test() {
 
 #[test]
 pub fn address_test() {
-    let private_key = PrivateKey::from_str("AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn").unwrap();
+    let private_key = PrivateKey::from_str("APrivateKey1b5U31G1VUt6G9mAh6tm364eWgLUabK1qTBdRJKUEFEwcz").unwrap();
     let address = Address::from(&private_key);
     assert!(address.is_ok());
 
