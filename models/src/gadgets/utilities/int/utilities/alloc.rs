@@ -6,6 +6,7 @@ use crate::{
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
+            eq::EqGadget,
             int::{Int, Int128, Int16, Int32, Int64, Int8},
             ToBitsGadget,
         },
@@ -138,8 +139,15 @@ macro_rules! alloc_input_fe {
                     allocated_bits.extend_from_slice(&fe_bits[0..max_size]);
                 }
 
+                // Assert that the extra bits are false
+                for (i, bit) in allocated_bits.iter().skip(<$gadget as Int>::SIZE).enumerate() {
+                    bit.enforce_equal(&mut cs.ns(|| format!("bit {} is false", i + <$gadget as Int>::SIZE)), &Boolean::constant(false))?;
+                }
+
+                let bits = allocated_bits[0..<$gadget as Int>::SIZE].to_vec();
+
                 Ok(Self {
-                    bits: allocated_bits,
+                    bits,
                     value: Some(value),
                 })
             }
