@@ -28,7 +28,7 @@ mod prover;
 mod verifier;
 
 #[cfg(test)]
-mod test;
+mod tests;
 
 pub use generator::*;
 pub use prover::*;
