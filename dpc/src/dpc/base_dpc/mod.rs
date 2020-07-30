@@ -13,7 +13,7 @@ use snarkos_models::{
         SNARK,
     },
     curves::{Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
-    dpc::{DPCComponents, DPCScheme, Predicate, Record},
+    dpc::{DPCComponents, DPCScheme, Program, Record},
     gadgets::algorithms::{CRHGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
@@ -28,9 +28,6 @@ use snarkos_utilities::{
 use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod predicate;
-use self::predicate::*;
 
 pub mod record;
 use self::record::*;
@@ -47,9 +44,6 @@ pub use self::inner_circuit_gadget::*;
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
 
-pub mod predicate_circuit;
-use self::predicate_circuit::*;
-
 pub mod outer_circuit;
 use self::outer_circuit::*;
 
@@ -61,6 +55,12 @@ use self::outer_circuit_verifier_input::*;
 
 pub mod parameters;
 use self::parameters::*;
+
+pub mod program;
+use self::program::*;
+
+pub mod program_circuit;
+use self::program_circuit::*;
 
 pub mod records;
 pub use self::records::*;
@@ -103,15 +103,15 @@ pub trait BaseDPCComponents: DPCComponents {
         VerifierInput = OuterCircuitVerifierInput<Self>,
     >;
 
-    /// SNARK for a "dummy predicate" that does nothing with its input.
-    type PredicateSNARK: SNARK<
-        Circuit = PredicateCircuit<Self>,
-        AssignedCircuit = PredicateCircuit<Self>,
-        VerifierInput = PredicateLocalData<Self>,
+    /// SNARK for a "dummy program" that does nothing with its input.
+    type ProgramSNARK: SNARK<
+        Circuit = ProgramCircuit<Self>,
+        AssignedCircuit = ProgramCircuit<Self>,
+        VerifierInput = ProgramLocalData<Self>,
     >;
 
-    /// SNARK Verifier gadget for the "dummy predicate" that does nothing with its input.
-    type PredicateSNARKGadget: SNARKVerifierGadget<Self::PredicateSNARK, Self::OuterField>;
+    /// SNARK Verifier gadget for the "dummy program" that does nothing with its input.
+    type ProgramSNARKGadget: SNARKVerifierGadget<Self::ProgramSNARK, Self::OuterField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -134,7 +134,7 @@ where
         SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
     >,
 {
-    circuit_parameters: &'a CircuitParameters<Components>,
+    system_parameters: &'a SystemParameters<Components>,
     ledger_digest: L::MerkleTreeDigest,
 
     // Old record stuff
@@ -149,11 +149,11 @@ where
     new_sn_nonce_randomness: Vec<[u8; 32]>,
     new_commitments: Vec<<Components::RecordCommitment as CommitmentScheme>::Output>,
 
-    // Predicate and local data commitment and randomness
-    predicate_commitment: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    predicate_randomness: <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
+    // Program and local data root and randomness
+    program_commitment: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_commitment: <Components::LocalDataCRH as CRH>::Output,
+    local_data_root: <Components::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
     // Value Balance
@@ -172,22 +172,22 @@ where
 {
     fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
-            circuit_parameters: self.circuit_parameters.clone(),
+            system_parameters: self.system_parameters.clone(),
 
             old_records: self.old_records.to_vec(),
             old_serial_numbers: self.old_serial_numbers.to_vec(),
 
             new_records: self.new_records.to_vec(),
 
-            local_data_commitment: self.local_data_commitment.clone(),
+            local_data_root: self.local_data_root.clone(),
             local_data_commitment_randomizers: self.local_data_commitment_randomizers.clone(),
         }
     }
 }
 
-/// Stores local data required to produce predicate proofs.
+/// Stores local data required to produce program proofs.
 pub struct LocalData<Components: BaseDPCComponents> {
-    pub circuit_parameters: CircuitParameters<Components>,
+    pub system_parameters: SystemParameters<Components>,
 
     // Old records and serial numbers
     pub old_records: Vec<DPCRecord<Components>>,
@@ -197,14 +197,14 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_commitment: <Components::LocalDataCRH as CRH>::Output,
+    pub local_data_root: <Components::LocalDataCRH as CRH>::Output,
     pub local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl<Components: BaseDPCComponents> DPC<Components> {
-    pub fn generate_circuit_parameters<R: Rng>(rng: &mut R) -> Result<CircuitParameters<Components>, DPCError> {
+    pub fn generate_system_parameters<R: Rng>(rng: &mut R) -> Result<SystemParameters<Components>, DPCError> {
         let time = start_timer!(|| "Account commitment scheme setup");
         let account_commitment = Components::AccountCommitment::setup(rng);
         end_timer!(time);
@@ -221,12 +221,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let record_commitment = Components::RecordCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Record ciphertext CRH setup");
-        let record_ciphertext_crh = Components::RecordCiphertextCRH::setup(rng);
+        let time = start_timer!(|| "Record encrypted record CRH setup");
+        let encrypted_record_crh = Components::EncryptedRecordCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Verification key commitment setup");
-        let predicate_verification_key_commitment = Components::PredicateVerificationKeyCommitment::setup(rng);
+        let program_verification_key_commitment = Components::ProgramVerificationKeyCommitment::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local data CRH setup");
@@ -242,17 +242,17 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Verification key CRH setup");
-        let predicate_verification_key_hash = Components::PredicateVerificationKeyHash::setup(rng);
+        let program_verification_key_hash = Components::ProgramVerificationKeyHash::setup(rng);
         end_timer!(time);
 
-        let comm_crh_sig_pp = CircuitParameters {
+        let comm_crh_sig_pp = SystemParameters {
             account_commitment,
             account_encryption,
             account_signature,
             record_commitment,
-            record_ciphertext_crh,
-            predicate_verification_key_commitment,
-            predicate_verification_key_hash,
+            encrypted_record_crh,
+            program_verification_key_commitment,
+            program_verification_key_hash,
             local_data_crh,
             local_data_commitment,
             serial_number_nonce,
@@ -261,20 +261,20 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok(comm_crh_sig_pp)
     }
 
-    pub fn generate_predicate_snark_parameters<R: Rng>(
-        circuit_parameters: &CircuitParameters<Components>,
+    pub fn generate_program_snark_parameters<R: Rng>(
+        system_parameters: &SystemParameters<Components>,
         rng: &mut R,
-    ) -> Result<PredicateSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::PredicateSNARK::setup(PredicateCircuit::blank(circuit_parameters), rng)?;
+    ) -> Result<ProgramSNARKParameters<Components>, DPCError> {
+        let (pk, pvk) = Components::ProgramSNARK::setup(ProgramCircuit::blank(system_parameters), rng)?;
 
-        Ok(PredicateSNARKParameters {
+        Ok(ProgramSNARKParameters {
             proving_key: pk,
             verification_key: pvk.into(),
         })
     }
 
     pub fn generate_sn(
-        params: &CircuitParameters<Components>,
+        system_parameters: &SystemParameters<Components>,
         record: &DPCRecord<Components>,
         account_private_key: &AccountPrivateKey<Components>,
     ) -> Result<(<Components::AccountSignature as SignatureScheme>::PublicKey, Vec<u8>), DPCError> {
@@ -287,8 +287,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let sig_and_pk_randomizer = to_bytes![Components::PRF::evaluate(&prf_seed, &prf_input)?]?;
 
         let sn = Components::AccountSignature::randomize_public_key(
-            &params.account_signature,
-            &account_private_key.pk_sig(&params.account_signature)?,
+            &system_parameters.account_signature,
+            &account_private_key.pk_sig(&system_parameters.account_signature)?,
             &sig_and_pk_randomizer,
         )?;
         end_timer!(sn_time);
@@ -296,14 +296,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     }
 
     pub fn generate_record<R: Rng>(
-        parameters: &CircuitParameters<Components>,
+        system_parameters: &SystemParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        account_address: &AccountAddress<Components>,
+        owner: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
-        birth_predicate: &DPCPredicate<Components>,
-        death_predicate: &DPCPredicate<Components>,
+        birth_program: &DPCProgram<Components>,
+        death_program: &DPCProgram<Components>,
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
@@ -311,32 +311,32 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
         // Construct a record commitment.
-        let birth_predicate_hash = birth_predicate.into_compact_repr();
-        let death_predicate_hash = death_predicate.into_compact_repr();
+        let birth_program_id = birth_program.into_compact_repr();
+        let death_program_id = death_program.into_compact_repr();
         // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
         let commitment_input = to_bytes![
-            account_address,      // 256 bits = 32 bytes
-            is_dummy,             // 1 bit = 1 byte
-            value,                // 64 bits = 8 bytes
-            payload,              // 256 bits = 32 bytes
-            birth_predicate_hash, // 256 bits = 32 bytes
-            death_predicate_hash, // 256 bits = 32 bytes
-            sn_nonce              // 256 bits = 32 bytes
+            owner,            // 256 bits = 32 bytes
+            is_dummy,         // 1 bit = 1 byte
+            value,            // 64 bits = 8 bytes
+            payload,          // 256 bits = 32 bytes
+            birth_program_id, // 256 bits = 32 bytes
+            death_program_id, // 256 bits = 32 bytes
+            sn_nonce          // 256 bits = 32 bytes
         ]?;
 
         let commitment = Components::RecordCommitment::commit(
-            &parameters.record_commitment,
+            &system_parameters.record_commitment,
             &commitment_input,
             &commitment_randomness,
         )?;
 
         let record = DPCRecord {
-            account_address: account_address.clone(),
+            owner: owner.clone(),
             is_dummy,
             value,
             payload: payload.clone(),
-            birth_predicate_hash,
-            death_predicate_hash,
+            birth_program_id,
+            death_program_id,
             serial_number_nonce: sn_nonce.clone(),
             commitment,
             commitment_randomness,
@@ -347,17 +347,17 @@ impl<Components: BaseDPCComponents> DPC<Components> {
     }
 
     pub(crate) fn execute_helper<'a, L, R: Rng>(
-        parameters: &'a CircuitParameters<Components>,
+        parameters: &'a SystemParameters<Components>,
 
         old_records: &'a [<Self as DPCScheme<L>>::Record],
         old_account_private_keys: &'a [AccountPrivateKey<Components>],
 
-        new_account_address: &[AccountAddress<Components>],
+        new_record_owners: &[AccountAddress<Components>],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[<Self as DPCScheme<L>>::Payload],
-        new_birth_predicates: &[<Self as DPCScheme<L>>::Predicate],
-        new_death_predicates: &[<Self as DPCScheme<L>>::Predicate],
+        new_birth_programs: &[<Self as DPCScheme<L>>::Program],
+        new_death_programs: &[<Self as DPCScheme<L>>::Program],
 
         memo: &[u8; 32],
         network_id: u8,
@@ -378,17 +378,17 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_account_address.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_record_owners.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_predicates.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_death_predicates.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_programs.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_death_programs.len());
 
         let mut old_witnesses = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut joint_serial_numbers = Vec::new();
-        let mut old_death_pred_hashes = Vec::new();
+        let mut old_death_program_ids = Vec::new();
 
         let mut value_balance: i64 = 0;
 
@@ -409,7 +409,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
             old_serial_numbers.push(sn);
             old_randomizers.push(randomizer);
-            old_death_pred_hashes.push(record.death_predicate_hash().to_vec());
+            old_death_program_ids.push(record.death_program_id().to_vec());
 
             end_timer!(input_record_time);
         }
@@ -417,7 +417,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let mut new_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_birth_pred_hashes = Vec::new();
+        let mut new_birth_program_ids = Vec::new();
 
         // Generate new records and commitments for them.
         for j in 0..Components::NUM_OUTPUT_RECORDS {
@@ -435,12 +435,12 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             let record = Self::generate_record(
                 parameters,
                 &sn_nonce,
-                &new_account_address[j],
+                &new_record_owners[j],
                 new_is_dummy_flags[j],
                 new_values[j],
                 &new_payloads[j],
-                &new_birth_predicates[j],
-                &new_death_predicates[j],
+                &new_birth_programs[j],
+                &new_death_programs[j],
                 rng,
             )?;
 
@@ -450,13 +450,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             new_commitments.push(record.commitment.clone());
             new_sn_nonce_randomness.push(sn_randomness);
-            new_birth_pred_hashes.push(record.birth_predicate_hash().to_vec());
+            new_birth_program_ids.push(record.birth_program_id().to_vec());
             new_records.push(record);
 
             end_timer!(output_record_time);
         }
 
-        let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
+        let local_data_root_timer = start_timer!(|| "Compute local data root");
 
         let mut local_data_commitment_randomizers = vec![];
 
@@ -496,36 +496,36 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
 
-        let local_data_comm =
+        let local_data_root =
             Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
 
-        end_timer!(local_data_comm_timer);
+        end_timer!(local_data_root_timer);
 
-        let pred_hash_comm_timer = start_timer!(|| "Compute predicate commitment");
-        let (predicate_comm, predicate_rand) = {
+        let program_comm_timer = start_timer!(|| "Compute program commitment");
+        let (program_commitment, program_randomness) = {
             let mut input = Vec::new();
-            for hash in old_death_pred_hashes {
-                input.extend_from_slice(&hash);
+            for id in old_death_program_ids {
+                input.extend_from_slice(&id);
             }
 
-            for hash in new_birth_pred_hashes {
-                input.extend_from_slice(&hash);
+            for id in new_birth_program_ids {
+                input.extend_from_slice(&id);
             }
-            let predicate_rand =
-                <Components::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
-            let predicate_comm = Components::PredicateVerificationKeyCommitment::commit(
-                &parameters.predicate_verification_key_commitment,
+            let program_randomness =
+                <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let program_commitment = Components::ProgramVerificationKeyCommitment::commit(
+                &parameters.program_verification_key_commitment,
                 &input,
-                &predicate_rand,
+                &program_randomness,
             )?;
-            (predicate_comm, predicate_rand)
+            (program_commitment, program_randomness)
         };
-        end_timer!(pred_hash_comm_timer);
+        end_timer!(program_comm_timer);
 
         let ledger_digest = ledger.digest().expect("could not get digest");
 
         let context = ExecuteContext {
-            circuit_parameters: parameters,
+            system_parameters: parameters,
             ledger_digest,
 
             old_records,
@@ -538,9 +538,9 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             new_sn_nonce_randomness,
             new_commitments,
 
-            predicate_commitment: predicate_comm,
-            predicate_randomness: predicate_rand,
-            local_data_commitment: local_data_comm,
+            program_commitment,
+            program_randomness,
+            local_data_root,
             local_data_commitment_randomizers,
 
             value_balance,
@@ -565,8 +565,8 @@ where
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
     type Payload = <Self::Record as Record>::Payload;
-    type Predicate = DPCPredicate<Components>;
-    type PrivatePredInput = PrivatePredicateInput<Components>;
+    type PrivateProgramInput = PrivateProgramInput<Components>;
+    type Program = DPCProgram<Components>;
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
 
@@ -575,25 +575,25 @@ where
         rng: &mut R,
     ) -> Result<Self::Parameters, DPCError> {
         let setup_time = start_timer!(|| "BaseDPC::setup");
-        let circuit_parameters = Self::generate_circuit_parameters(rng)?;
+        let system_parameters = Self::generate_system_parameters(rng)?;
 
-        let predicate_snark_setup_time = start_timer!(|| "Dummy predicate SNARK setup");
-        let predicate_snark_parameters = Self::generate_predicate_snark_parameters(&circuit_parameters, rng)?;
-        let predicate_snark_proof = Components::PredicateSNARK::prove(
-            &predicate_snark_parameters.proving_key,
-            PredicateCircuit::blank(&circuit_parameters),
+        let program_snark_setup_time = start_timer!(|| "Dummy program SNARK setup");
+        let program_snark_parameters = Self::generate_program_snark_parameters(&system_parameters, rng)?;
+        let program_snark_proof = Components::ProgramSNARK::prove(
+            &program_snark_parameters.proving_key,
+            ProgramCircuit::blank(&system_parameters),
             rng,
         )?;
-        end_timer!(predicate_snark_setup_time);
+        end_timer!(program_snark_setup_time);
 
-        let private_pred_input = PrivatePredicateInput {
-            verification_key: predicate_snark_parameters.verification_key.clone(),
-            proof: predicate_snark_proof,
+        let program_snark_vk_and_proof = PrivateProgramInput {
+            verification_key: program_snark_parameters.verification_key.clone(),
+            proof: program_snark_proof,
         };
 
         let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
         let inner_snark_parameters =
-            Components::InnerSNARK::setup(InnerCircuit::blank(&circuit_parameters, ledger_parameters), rng)?;
+            Components::InnerSNARK::setup(InnerCircuit::blank(&system_parameters, ledger_parameters), rng)?;
         end_timer!(snark_setup_time);
 
         let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
@@ -601,17 +601,17 @@ where
             inner_snark_parameters.1.clone().into();
         let inner_snark_proof = Components::InnerSNARK::prove(
             &inner_snark_parameters.0,
-            InnerCircuit::blank(&circuit_parameters, ledger_parameters),
+            InnerCircuit::blank(&system_parameters, ledger_parameters),
             rng,
         )?;
 
         let outer_snark_parameters = Components::OuterSNARK::setup(
             OuterCircuit::blank(
-                &circuit_parameters,
+                &system_parameters,
                 ledger_parameters,
                 &inner_snark_vk,
                 &inner_snark_proof,
-                &private_pred_input,
+                &program_snark_vk_and_proof,
             ),
             rng,
         )?;
@@ -622,8 +622,8 @@ where
         let outer_snark_parameters = (Some(outer_snark_parameters.0), outer_snark_parameters.1);
 
         Ok(PublicParameters {
-            circuit_parameters,
-            predicate_snark_parameters,
+            system_parameters,
+            program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
         })
@@ -632,9 +632,9 @@ where
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError> {
         let time = start_timer!(|| "BaseDPC::create_account");
 
-        let account_signature_parameters = &parameters.circuit_parameters.account_signature;
-        let commitment_parameters = &parameters.circuit_parameters.account_commitment;
-        let encryption_parameters = &parameters.circuit_parameters.account_encryption;
+        let account_signature_parameters = &parameters.system_parameters.account_signature;
+        let commitment_parameters = &parameters.system_parameters.account_commitment;
+        let encryption_parameters = &parameters.system_parameters.account_encryption;
         let account = Account::new(
             account_signature_parameters,
             commitment_parameters,
@@ -651,15 +651,19 @@ where
         parameters: &Self::Parameters,
         old_records: &[Self::Record],
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        mut old_death_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
+        mut old_death_program_proof_generator: impl FnMut(
+            &Self::LocalData,
+        ) -> Result<Vec<Self::PrivateProgramInput>, DPCError>,
 
-        new_account_address: &[<Self::Account as AccountScheme>::AccountAddress],
+        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
-        new_birth_predicates: &[Self::Predicate],
-        new_death_predicates: &[Self::Predicate],
-        mut new_birth_pred_proof_generator: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivatePredInput>, DPCError>,
+        new_birth_programs: &[Self::Program],
+        new_death_programs: &[Self::Program],
+        mut new_birth_program_proof_generator: impl FnMut(
+            &Self::LocalData,
+        ) -> Result<Vec<Self::PrivateProgramInput>, DPCError>,
 
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
@@ -668,15 +672,15 @@ where
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
         let exec_time = start_timer!(|| "BaseDPC::execute");
         let context = Self::execute_helper(
-            &parameters.circuit_parameters,
+            &parameters.system_parameters,
             old_records,
             old_account_private_keys,
-            new_account_address,
+            new_record_owners,
             new_is_dummy_flags,
             new_values,
             new_payloads,
-            new_birth_predicates,
-            new_death_predicates,
+            new_birth_programs,
+            new_death_programs,
             memorandum,
             network_id,
             ledger,
@@ -684,11 +688,11 @@ where
         )?;
 
         let local_data = context.into_local_data();
-        let old_death_pred_attributes = old_death_pred_proof_generator(&local_data)?;
-        let new_birth_pred_attributes = new_birth_pred_proof_generator(&local_data)?;
+        let old_death_program_attributes = old_death_program_proof_generator(&local_data)?;
+        let new_birth_program_attributes = new_birth_program_proof_generator(&local_data)?;
 
         let ExecuteContext {
-            circuit_parameters,
+            system_parameters,
             ledger_digest,
 
             old_records,
@@ -700,9 +704,9 @@ where
             new_records,
             new_sn_nonce_randomness,
             new_commitments,
-            predicate_commitment,
-            predicate_randomness,
-            local_data_commitment,
+            program_commitment,
+            program_randomness,
+            local_data_root,
             local_data_commitment_randomizers,
             value_balance,
         } = context;
@@ -716,8 +720,8 @@ where
             ledger_digest,
             old_serial_numbers,
             new_commitments,
-            predicate_commitment,
-            local_data_commitment,
+            program_commitment,
+            local_data_root,
             value_balance,
             memorandum
         ]?;
@@ -729,7 +733,7 @@ where
 
             // Sign the transaction data
             let account_signature = Components::AccountSignature::sign(
-                &circuit_parameters.account_signature,
+                &system_parameters.account_signature,
                 sk_sig,
                 &signature_message,
                 rng,
@@ -737,7 +741,7 @@ where
 
             // Randomize the signature
             let randomized_signature = Components::AccountSignature::randomize_signature(
-                &circuit_parameters.account_signature,
+                &system_parameters.account_signature,
                 &account_signature,
                 randomizer,
             )?;
@@ -750,24 +754,23 @@ where
         // Encrypt the new records
 
         let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_records_encryption_ciphertexts = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_encrypted_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
         for record in &new_records {
-            let (record_encryption_randomness, record_encryption_ciphertext) =
-                RecordEncryption::encrypt_record(&circuit_parameters, record, rng)?;
+            let (record_encryption_randomness, encrypted_record) =
+                RecordEncryption::encrypt_record(&system_parameters, record, rng)?;
 
             new_records_encryption_randomness.push(record_encryption_randomness);
-            new_records_encryption_ciphertexts.push(record_encryption_ciphertext);
+            new_encrypted_records.push(encrypted_record);
         }
 
         // Construct the ciphertext hashes
 
-        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for encrypted_record in &new_encrypted_records {
+            let encrypted_record_hash = RecordEncryption::encrypted_record_hash(&system_parameters, &encrypted_record)?;
 
-        for record_ciphertext in &new_records_encryption_ciphertexts {
-            let ciphertext_hash = RecordEncryption::record_ciphertext_hash(&circuit_parameters, &record_ciphertext)?;
-
-            new_records_ciphertext_hashes.push(ciphertext_hash);
+            new_encrypted_record_hashes.push(encrypted_record_hash);
         }
 
         // Prepare record encryption components used in the inner SNARK
@@ -776,7 +779,7 @@ where
 
         for (record, ciphertext_randomness) in new_records.iter().zip_eq(&new_records_encryption_randomness) {
             let record_encryption_gadget_components = RecordEncryption::prepare_encryption_gadget_components(
-                &circuit_parameters,
+                &system_parameters,
                 &record,
                 ciphertext_randomness,
             )?;
@@ -786,7 +789,7 @@ where
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
-                &parameters.circuit_parameters,
+                &parameters.system_parameters,
                 ledger.parameters(),
                 &ledger_digest,
                 old_records,
@@ -798,10 +801,10 @@ where
                 &new_commitments,
                 &new_records_encryption_randomness,
                 &new_records_encryption_gadget_components,
-                &new_records_ciphertext_hashes,
-                &predicate_commitment,
-                &predicate_randomness,
-                &local_data_commitment,
+                &new_encrypted_record_hashes,
+                &program_commitment,
+                &program_randomness,
+                &local_data_root,
                 &local_data_commitment_randomizers,
                 memorandum,
                 value_balance,
@@ -819,15 +822,15 @@ where
         // Verify that the inner proof passes
         {
             let input = InnerCircuitVerifierInput {
-                circuit_parameters: parameters.circuit_parameters.clone(),
+                system_parameters: parameters.system_parameters.clone(),
                 ledger_parameters: ledger.parameters().clone(),
                 ledger_digest: ledger_digest.clone(),
                 old_serial_numbers: old_serial_numbers.clone(),
                 new_commitments: new_commitments.clone(),
-                new_records_ciphertext_hashes: new_records_ciphertext_hashes.clone(),
+                new_encrypted_record_hashes: new_encrypted_record_hashes.clone(),
                 memo: memorandum.clone(),
-                predicate_commitment: predicate_commitment.clone(),
-                local_data_commitment: local_data_commitment.clone(),
+                program_commitment: program_commitment.clone(),
+                local_data_root: local_data_root.clone(),
                 value_balance,
                 network_id,
             };
@@ -843,22 +846,22 @@ where
                 parameters.inner_snark_parameters.1.clone().into();
 
             let circuit = OuterCircuit::new(
-                &parameters.circuit_parameters,
+                &parameters.system_parameters,
                 ledger_parameters,
                 &ledger_digest,
                 &old_serial_numbers,
                 &new_commitments,
-                &new_records_ciphertext_hashes,
+                &new_encrypted_record_hashes,
                 &memorandum,
                 value_balance,
                 network_id,
                 &inner_snark_vk,
                 &inner_proof,
-                old_death_pred_attributes.as_slice(),
-                new_birth_pred_attributes.as_slice(),
-                &predicate_commitment,
-                &predicate_randomness,
-                &local_data_commitment,
+                old_death_program_attributes.as_slice(),
+                new_birth_program_attributes.as_slice(),
+                &program_commitment,
+                &program_randomness,
+                &local_data_root,
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
@@ -875,12 +878,12 @@ where
             memorandum.clone(),
             ledger_digest,
             transaction_proof,
-            predicate_commitment,
-            local_data_commitment,
+            program_commitment,
+            local_data_root,
             value_balance,
             network_id,
             signatures,
-            new_records_encryption_ciphertexts,
+            new_encrypted_records,
         );
 
         end_timer!(exec_time);
@@ -942,13 +945,13 @@ where
             transaction.ledger_digest(),
             transaction.old_serial_numbers(),
             transaction.new_commitments(),
-            transaction.predicate_commitment(),
-            transaction.local_data_commitment(),
+            transaction.program_commitment(),
+            transaction.local_data_root(),
             transaction.value_balance(),
             transaction.memorandum()
         ]?;
 
-        let account_signature = &parameters.circuit_parameters.account_signature;
+        let account_signature = &parameters.system_parameters.account_signature;
         for (pk, sig) in transaction.old_serial_numbers().iter().zip(&transaction.signatures) {
             if !Components::AccountSignature::verify(account_signature, pk, signature_message, sig)? {
                 eprintln!("Signature didn't verify.");
@@ -960,25 +963,24 @@ where
 
         // Construct the ciphertext hashes
 
-        let mut new_records_ciphertext_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for encrypted_record in &transaction.encrypted_records {
+            let encrypted_record_hash =
+                RecordEncryption::encrypted_record_hash(&parameters.system_parameters, encrypted_record)?;
 
-        for record_ciphertext in &transaction.record_ciphertexts {
-            let ciphertext_hash =
-                RecordEncryption::record_ciphertext_hash(&parameters.circuit_parameters, record_ciphertext)?;
-
-            new_records_ciphertext_hashes.push(ciphertext_hash);
+            new_encrypted_record_hashes.push(encrypted_record_hash);
         }
 
         let inner_snark_input = InnerCircuitVerifierInput {
-            circuit_parameters: parameters.circuit_parameters.clone(),
+            system_parameters: parameters.system_parameters.clone(),
             ledger_parameters: ledger.parameters().clone(),
             ledger_digest: transaction.ledger_digest().clone(),
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
-            new_records_ciphertext_hashes,
+            new_encrypted_record_hashes,
             memo: transaction.memorandum().clone(),
-            predicate_commitment: transaction.predicate_commitment().clone(),
-            local_data_commitment: transaction.local_data_commitment().clone(),
+            program_commitment: transaction.program_commitment().clone(),
+            local_data_root: transaction.local_data_root().clone(),
             value_balance: transaction.value_balance(),
             network_id: transaction.network_id(),
         };

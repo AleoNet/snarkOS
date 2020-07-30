@@ -1,10 +1,10 @@
-Decrypts the record ciphertext and returns the hex encoded bytes of the record.
+Decrypts the encrypted record and returns the hex encoded bytes of the record.
 
 ### Arguments
 
 |      Parameter      |  Type  | Required |                     Description                     |
 |:-------------------:|:------:|:--------:|:---------------------------------------------------:|
-| `record_ciphertext` | string |    Yes   |                 The encrypted record                |
+|  `encrypted_record` | string |    Yes   |                 The encrypted record                |
 |  `account_view_key` | string |    Yes   | The account view key used to decrypt the ciphertext |
 
 ### Response
@@ -22,7 +22,7 @@ curl --user username:password --data-binary '{
     "method": "decryptrecord",
     "params": [
        {
-        "record_ciphertext": "record_ciphertext_string",
+        "encrypted_record": "encrypted_record_string",
         "account_view_key": "account_view_key_string"
        }
     ]

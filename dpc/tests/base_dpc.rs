@@ -2,8 +2,8 @@
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
-    predicate::PrivatePredicateInput,
-    predicate_circuit::*,
+    program::PrivateProgramInput,
+    program_circuit::*,
     record_payload::RecordPayload,
     records::record_encryption::RecordEncryption,
     LocalData,
@@ -65,37 +65,37 @@ fn base_dpc_integration_test() {
 
     let ledger = initialize_test_blockchain::<Tx, CommitmentMerkleParameters>(ledger_parameters, genesis_block);
 
-    let predicate_vk_hash = to_bytes![
-        PredicateVerificationKeyHash::hash(
-            &parameters.circuit_parameters.predicate_verification_key_hash,
-            &to_bytes![parameters.predicate_snark_parameters().verification_key].unwrap()
+    let program_vk_hash = to_bytes![
+        ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()
     ]
     .unwrap();
 
     #[cfg(debug_assertions)]
-    let predicate_nizk_pvk: PreparedVerifyingKey<_> =
-        parameters.predicate_snark_parameters.verification_key.clone().into();
+    let program_snark_pvk: PreparedVerifyingKey<_> =
+        parameters.program_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
     let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
     let mut old_records = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let old_sn_nonce = SerialNumberNonce::hash(
-            &parameters.circuit_parameters.serial_number_nonce,
+            &parameters.system_parameters.serial_number_nonce,
             &[64u8 + (i as u8); 1],
         )
         .unwrap();
         let old_record = DPC::generate_record(
-            &parameters.circuit_parameters,
+            &parameters.system_parameters,
             &old_sn_nonce,
             &genesis_account.address,
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
-            &Predicate::new(predicate_vk_hash.clone()),
-            &Predicate::new(predicate_vk_hash.clone()),
+            &Program::new(program_vk_hash.clone()),
+            &Program::new(program_vk_hash.clone()),
             &mut rng,
         )
         .unwrap();
@@ -104,15 +104,15 @@ fn base_dpc_integration_test() {
 
     // Construct new records.
 
-    // Set the new records' predicate to be the "always-accept" predicate.
-    let new_predicate = Predicate::new(predicate_vk_hash.clone());
+    // Set the new records' program to be the "always-accept" program.
+    let new_program = Program::new(program_vk_hash.clone());
 
-    let new_account_address = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
-    let new_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let new_birth_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
-    let new_death_predicates = vec![new_predicate.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
 
     let memo = [4u8; 32];
 
@@ -120,38 +120,35 @@ fn base_dpc_integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut old_proof_and_vk = vec![];
         for i in 0..NUM_INPUT_RECORDS {
-            // Instantiate death predicate circuit
-            let death_predicate_circuit = PredicateCircuit::new(
-                &local_data.circuit_parameters,
-                &local_data.local_data_commitment,
-                i as u8,
-            );
+            // Instantiate death program circuit
+            let death_program_circuit =
+                ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
 
-            // Generate the predicate proof
-            let proof = PredicateSNARK::prove(
-                &parameters.predicate_snark_parameters.proving_key,
-                death_predicate_circuit,
+            // Generate the program proof
+            let proof = ProgramSNARK::prove(
+                &parameters.program_snark_parameters.proving_key,
+                death_program_circuit,
                 &mut rng,
             )
             .expect("Proving should work");
             #[cfg(debug_assertions)]
             {
-                let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
+                let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                     local_data_commitment_parameters: local_data
-                        .circuit_parameters
+                        .system_parameters
                         .local_data_commitment
                         .parameters()
                         .clone(),
-                    local_data_commitment: local_data.local_data_commitment.clone(),
+                    local_data_root: local_data.local_data_root.clone(),
                     position: i as u8,
                 };
                 assert!(
-                    PredicateSNARK::verify(&predicate_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify")
+                    ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify")
                 );
             }
 
-            let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
-                verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
+            let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+                verification_key: parameters.program_snark_parameters.verification_key.clone(),
                 proof,
             };
             old_proof_and_vk.push(private_input);
@@ -162,37 +159,34 @@ fn base_dpc_integration_test() {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut new_proof_and_vk = vec![];
         for j in 0..NUM_OUTPUT_RECORDS {
-            // Instantiate birth predicate circuit
-            let birth_predicate_circuit = PredicateCircuit::new(
-                &local_data.circuit_parameters,
-                &local_data.local_data_commitment,
-                j as u8,
-            );
+            // Instantiate birth program circuit
+            let birth_program_circuit =
+                ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
 
-            // Generate the predicate proof
-            let proof = PredicateSNARK::prove(
-                &parameters.predicate_snark_parameters.proving_key,
-                birth_predicate_circuit,
+            // Generate the program proof
+            let proof = ProgramSNARK::prove(
+                &parameters.program_snark_parameters.proving_key,
+                birth_program_circuit,
                 &mut rng,
             )
             .expect("Proving should work");
             #[cfg(debug_assertions)]
             {
-                let pred_pub_input: PredicateLocalData<Components> = PredicateLocalData {
+                let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                     local_data_commitment_parameters: local_data
-                        .circuit_parameters
+                        .system_parameters
                         .local_data_commitment
                         .parameters()
                         .clone(),
-                    local_data_commitment: local_data.local_data_commitment.clone(),
+                    local_data_root: local_data.local_data_root.clone(),
                     position: j as u8,
                 };
                 assert!(
-                    PredicateSNARK::verify(&predicate_nizk_pvk, &pred_pub_input, &proof).expect("Proof should verify")
+                    ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify")
                 );
             }
-            let private_input: PrivatePredicateInput<Components> = PrivatePredicateInput {
-                verification_key: parameters.predicate_snark_parameters.verification_key.clone(),
+            let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+                verification_key: parameters.program_snark_parameters.verification_key.clone(),
                 proof,
             };
             new_proof_and_vk.push(private_input);
@@ -205,12 +199,12 @@ fn base_dpc_integration_test() {
         &old_records,
         &old_account_private_keys,
         &old_death_vk_and_proof_generator,
-        &new_account_address,
-        &new_dummy_flags,
+        &new_record_owners,
+        &new_is_dummy_flags,
         &new_values,
         &new_payloads,
-        &new_birth_predicates,
-        &new_death_predicates,
+        &new_birth_programs,
+        &new_death_programs,
         &new_birth_vk_and_proof_generator,
         &memo,
         network_id,
@@ -228,21 +222,21 @@ fn base_dpc_integration_test() {
     {
         // Check that new_records can be decrypted from the transaction
 
-        let record_ciphertexts = transaction.ciphertexts();
+        let encrypted_records = transaction.encrypted_records();
         let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
 
-        for ((record_ciphertext, private_key), new_record) in
-            record_ciphertexts.iter().zip(new_account_private_keys).zip(new_records)
+        for ((encrypted_record, private_key), new_record) in
+            encrypted_records.iter().zip(new_account_private_keys).zip(new_records)
         {
             let account_view_key = AccountViewKey::from_private_key(
-                &parameters.circuit_parameters.account_signature,
-                &parameters.circuit_parameters.account_commitment,
+                &parameters.system_parameters.account_signature,
+                &parameters.system_parameters.account_commitment,
                 &private_key,
             )
             .unwrap();
 
             let decrypted_record =
-                RecordEncryption::decrypt_record(&parameters.circuit_parameters, &account_view_key, record_ciphertext)
+                RecordEncryption::decrypt_record(&parameters.system_parameters, &account_view_key, encrypted_record)
                     .unwrap();
 
             assert_eq!(decrypted_record, new_record);

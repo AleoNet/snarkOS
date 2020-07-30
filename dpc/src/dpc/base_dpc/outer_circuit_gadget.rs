@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{parameters::CircuitParameters, predicate::PrivatePredicateInput, BaseDPCComponents};
+use crate::dpc::base_dpc::{parameters::SystemParameters, program::PrivateProgramInput, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -44,14 +44,14 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
 
     // Inner snark verifier public inputs
     ledger_parameters: &C::MerkleParameters,
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
     old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
     new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    new_records_ciphertext_hashes: &Vec<<C::RecordCiphertextCRH as CRH>::Output>,
+    new_encrypted_record_hashes: &Vec<<C::EncryptedRecordCRH as CRH>::Output>,
     memo: &[u8; 32],
     value_balance: i64,
     network_id: u8,
@@ -60,16 +60,16 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
     inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
 
-    // Old record death predicate verification keys and proofs
-    old_death_predicate_verification_inputs: &[PrivatePredicateInput<C>],
+    // Old record death program verification keys and proofs
+    old_death_program_verification_inputs: &[PrivateProgramInput<C>],
 
-    // New record birth predicate verification keys and proofs
-    new_birth_predicate_verification_inputs: &[PrivatePredicateInput<C>],
+    // New record birth program verification keys and proofs
+    new_birth_program_verification_inputs: &[PrivateProgramInput<C>],
 
     // Rest
-    predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+    program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
+    local_data_root: &<C::LocalDataCRH as CRH>::Output,
 ) -> Result<(), SynthesisError>
 where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -83,13 +83,13 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
-    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
@@ -98,24 +98,24 @@ where
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
-    let (predicate_vk_commitment_parameters, predicate_vk_crh_parameters) = {
+    let (program_vk_commitment_parameters, program_vk_crh_parameters) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
 
-        let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+        let program_vk_commitment_parameters = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<
             _,
             C::OuterField,
         >>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare predicate_vk_commitment_parameters"),
-            || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
+            &mut cs.ns(|| "Declare program_vk_commitment_parameters"),
+            || Ok(system_parameters.program_verification_key_commitment.parameters()),
         )?;
 
-        let predicate_vk_crh_parameters =
-            <C::PredicateVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare predicate_vk_crh_parameters"),
-                || Ok(circuit_parameters.predicate_verification_key_hash.parameters()),
+        let program_vk_crh_parameters =
+            <C::ProgramVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare program_vk_crh_parameters"),
+                || Ok(system_parameters.program_verification_key_hash.parameters()),
             )?;
 
-        (predicate_vk_commitment_parameters, predicate_vk_crh_parameters)
+        (program_vk_commitment_parameters, program_vk_crh_parameters)
     };
 
     // ************************************************************************
@@ -125,36 +125,36 @@ where
     // Declare inner snark verifier inputs as `CoreCheckF` field elements
 
     let account_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_commitment.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let account_encryption_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_encryption.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_encryption.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let account_signature_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.account_signature.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_signature.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let record_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_commitment.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.record_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let record_ciphertext_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.record_ciphertext_crh.parameters())
+    let encrypted_record_crh_parameters_fe =
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.encrypted_record_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let predicate_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
-        circuit_parameters.predicate_verification_key_commitment.parameters(),
+    let program_vk_commitment_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+        system_parameters.program_verification_key_commitment.parameters(),
     )
     .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let local_data_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.local_data_crh.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.local_data_crh.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let serial_number_nonce_crh_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(circuit_parameters.serial_number_nonce.parameters())
+        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.serial_number_nonce.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let ledger_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_parameters.parameters())
@@ -179,21 +179,21 @@ where
         commitments_fe.push(commitment_fe);
     }
 
-    let mut record_ciphertext_hashes_fe = vec![];
-    for ciphertext_hash in new_records_ciphertext_hashes {
-        let ciphertext_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(ciphertext_hash)
+    let mut encrypted_record_hashes_fe = vec![];
+    for encrypted_record_hash in new_encrypted_record_hashes {
+        let encrypted_record_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(encrypted_record_hash)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        record_ciphertext_hashes_fe.push(ciphertext_hash_fe);
+        encrypted_record_hashes_fe.push(encrypted_record_hash_fe);
     }
 
-    let predicate_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(predicate_commitment)
+    let program_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(program_commitment)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let memo_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(memo).map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let local_data_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_commitment)
+    let local_data_root_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_root)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let value_balance_fe = ToConstraintField::<C::InnerField>::to_field_elements(&value_balance.to_le_bytes()[..])
@@ -213,10 +213,10 @@ where
     let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, &account_signature_fe, "account signature pp")?;
     let record_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &record_commitment_parameters_fe, "record commitment pp")?;
-    let record_ciphertext_crh_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &record_ciphertext_crh_parameters_fe, "record ciphertext crh pp")?;
-    let predicate_vk_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &predicate_vk_commitment_parameters_fe, "predicate vk commitment pp")?;
+    let encrypted_record_crh_parameters_fe_bytes =
+        field_element_to_bytes::<C, _>(cs, &encrypted_record_crh_parameters_fe, "encrypted record crh pp")?;
+    let program_vk_commitment_parameters_fe_bytes =
+        field_element_to_bytes::<C, _>(cs, &program_vk_commitment_parameters_fe, "program vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &local_data_crh_parameters_fe, "local data commitment pp")?;
     let serial_number_nonce_crh_parameters_fe_bytes =
@@ -233,29 +233,27 @@ where
         )?);
     }
 
-    let mut commitment_and_ciphertext_hash_fe_bytes = vec![];
-    for (index, (cm_fe, record_ciphertext_hash_fe)) in
-        commitments_fe.iter().zip_eq(&record_ciphertext_hashes_fe).enumerate()
+    let mut commitment_and_encrypted_record_hash_fe_bytes = vec![];
+    for (index, (cm_fe, encrypted_record_hash_fe)) in
+        commitments_fe.iter().zip_eq(&encrypted_record_hashes_fe).enumerate()
     {
-        commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
+        commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
             cm_fe,
             &format!("Allocate record commitment {:?}", index),
         )?);
 
-        commitment_and_ciphertext_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
+        commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            record_ciphertext_hash_fe,
-            &format!("Allocate record ciphertext hash {:?}", index),
+            encrypted_record_hash_fe,
+            &format!("Allocate encrypted record hash {:?}", index),
         )?);
     }
 
-    let predicate_commitment_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &predicate_commitment_fe, "predicate commitment")?;
+    let program_commitment_fe_bytes = field_element_to_bytes::<C, _>(cs, &program_commitment_fe, "program commitment")?;
     let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, &memo_fe, "memo")?;
     let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
-    let local_data_commitment_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_commitment_fe, "local data commitment")?;
+    let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, &local_data_root_fe, "local data root")?;
     let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
 
     // Construct inner snark input as bytes
@@ -265,18 +263,18 @@ where
     inner_snark_input_bytes.extend(account_encryption_fe_bytes);
     inner_snark_input_bytes.extend(account_signature_fe_bytes);
     inner_snark_input_bytes.extend(record_commitment_parameters_fe_bytes);
-    inner_snark_input_bytes.extend(record_ciphertext_crh_parameters_fe_bytes);
-    inner_snark_input_bytes.extend(predicate_vk_commitment_parameters_fe_bytes);
+    inner_snark_input_bytes.extend(encrypted_record_crh_parameters_fe_bytes);
+    inner_snark_input_bytes.extend(program_vk_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(local_data_commitment_parameters_fe_bytes.clone());
     inner_snark_input_bytes.extend(serial_number_nonce_crh_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_digest_fe_bytes);
     inner_snark_input_bytes.extend(serial_number_fe_bytes);
-    inner_snark_input_bytes.extend(commitment_and_ciphertext_hash_fe_bytes);
-    inner_snark_input_bytes.extend(predicate_commitment_fe_bytes);
+    inner_snark_input_bytes.extend(commitment_and_encrypted_record_hash_fe_bytes);
+    inner_snark_input_bytes.extend(program_commitment_fe_bytes);
     inner_snark_input_bytes.extend(memo_fe_bytes);
     inner_snark_input_bytes.extend(network_id_fe_bytes);
-    inner_snark_input_bytes.extend(local_data_commitment_fe_bytes.clone());
+    inner_snark_input_bytes.extend(local_data_root_fe_bytes.clone());
     inner_snark_input_bytes.extend(value_balance_fe_bytes);
 
     // Convert inner snark input bytes to bits
@@ -312,140 +310,136 @@ where
     )?;
 
     // ************************************************************************
-    // Construct predicate input
+    // Construct program input
     // ************************************************************************
 
     // Reuse inner snark verifier inputs
 
-    let mut predicate_input_bytes = vec![];
+    let mut program_input_bytes = vec![];
 
-    predicate_input_bytes.extend(local_data_commitment_parameters_fe_bytes);
-    predicate_input_bytes.extend(local_data_commitment_fe_bytes);
+    program_input_bytes.extend(local_data_commitment_parameters_fe_bytes);
+    program_input_bytes.extend(local_data_root_fe_bytes);
 
-    let mut predicate_input_bits = vec![];
+    let mut program_input_bits = vec![];
 
-    for input_bytes in predicate_input_bytes {
+    for input_bytes in program_input_bytes {
         let input_bits = input_bytes
             .iter()
             .flat_map(|byte| byte.to_bits_le())
             .collect::<Vec<_>>();
-        predicate_input_bits.push(input_bits);
+        program_input_bits.push(input_bits);
     }
 
     // ************************************************************************
     // ************************************************************************
 
-    let mut old_death_predicate_hashes = Vec::new();
-    let mut new_birth_predicate_hashes = Vec::new();
+    let mut old_death_program_ids = Vec::new();
+    let mut new_birth_program_ids = Vec::new();
     for i in 0..C::NUM_INPUT_RECORDS {
-        let cs = &mut cs.ns(|| format!("Check death predicate for input record {}", i));
+        let cs = &mut cs.ns(|| format!("Check death program for input record {}", i));
 
-        let death_predicate_proof = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        let death_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
             &mut cs.ns(|| "Allocate proof"),
-            || Ok(&old_death_predicate_verification_inputs[i].proof),
+            || Ok(&old_death_program_verification_inputs[i].proof),
         )?;
 
-        let death_predicate_vk = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+        let death_program_vk = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
             &mut cs.ns(|| "Allocate verification key"),
-            || Ok(&old_death_predicate_verification_inputs[i].verification_key),
+            || Ok(&old_death_program_verification_inputs[i].verification_key),
         )?;
 
-        let death_predicate_vk_bytes = death_predicate_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
+        let death_program_vk_bytes = death_program_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
-        let claimed_death_predicate_hash = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute death predicate vk hash"),
-            &predicate_vk_crh_parameters,
-            &death_predicate_vk_bytes,
+        let claimed_death_program_id = C::ProgramVerificationKeyHashGadget::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute death program vk hash"),
+            &program_vk_crh_parameters,
+            &death_program_vk_bytes,
         )?;
 
-        let claimed_death_predicate_hash_bytes =
-            claimed_death_predicate_hash.to_bytes(&mut cs.ns(|| "Convert death_pred vk hash to bytes"))?;
+        let claimed_death_program_id_bytes =
+            claimed_death_program_id.to_bytes(&mut cs.ns(|| "Convert death_pred vk hash to bytes"))?;
 
-        old_death_predicate_hashes.push(claimed_death_predicate_hash_bytes);
+        old_death_program_ids.push(claimed_death_program_id_bytes);
 
         let position = UInt8::constant(i as u8).to_bits_le();
 
-        C::PredicateSNARKGadget::check_verify(
+        C::ProgramSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
-            &death_predicate_vk,
+            &death_program_vk,
             ([position].iter())
-                .chain(predicate_input_bits.iter())
+                .chain(program_input_bits.iter())
                 .filter(|inp| !inp.is_empty()),
-            &death_predicate_proof,
+            &death_program_proof,
         )?;
     }
 
     for j in 0..C::NUM_OUTPUT_RECORDS {
-        let cs = &mut cs.ns(|| format!("Check birth predicate for output record {}", j));
+        let cs = &mut cs.ns(|| format!("Check birth program for output record {}", j));
 
-        let birth_predicate_proof = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        let birth_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
             &mut cs.ns(|| "Allocate proof"),
-            || Ok(&new_birth_predicate_verification_inputs[j].proof),
+            || Ok(&new_birth_program_verification_inputs[j].proof),
         )?;
 
-        let birth_predicate_vk = <C::PredicateSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
+        let birth_program_vk = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
             &mut cs.ns(|| "Allocate verification key"),
-            || Ok(&new_birth_predicate_verification_inputs[j].verification_key),
+            || Ok(&new_birth_program_verification_inputs[j].verification_key),
         )?;
 
-        let birth_predicate_vk_bytes = birth_predicate_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
+        let birth_program_vk_bytes = birth_program_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
 
-        let claimed_birth_predicate_hash = C::PredicateVerificationKeyHashGadget::check_evaluation_gadget(
-            &mut cs.ns(|| "Compute birth predicate vk hash"),
-            &predicate_vk_crh_parameters,
-            &birth_predicate_vk_bytes,
+        let claimed_birth_program_id = C::ProgramVerificationKeyHashGadget::check_evaluation_gadget(
+            &mut cs.ns(|| "Compute birth program vk hash"),
+            &program_vk_crh_parameters,
+            &birth_program_vk_bytes,
         )?;
 
-        let claimed_birth_predicate_hash_bytes =
-            claimed_birth_predicate_hash.to_bytes(&mut cs.ns(|| "Convert birth_pred vk hash to bytes"))?;
+        let claimed_birth_program_id_bytes =
+            claimed_birth_program_id.to_bytes(&mut cs.ns(|| "Convert birth_pred vk hash to bytes"))?;
 
-        new_birth_predicate_hashes.push(claimed_birth_predicate_hash_bytes);
+        new_birth_program_ids.push(claimed_birth_program_id_bytes);
 
         let position = UInt8::constant(j as u8).to_bits_le();
 
-        C::PredicateSNARKGadget::check_verify(
+        C::ProgramSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
-            &birth_predicate_vk,
+            &birth_program_vk,
             ([position].iter())
-                .chain(predicate_input_bits.iter())
+                .chain(program_input_bits.iter())
                 .filter(|inp| !inp.is_empty()),
-            &birth_predicate_proof,
+            &birth_program_proof,
         )?;
     }
     {
-        let commitment_cs = &mut cs.ns(|| "Check that predicate commitment is well-formed");
+        let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_predicate_hashes[i]);
+            input.extend_from_slice(&old_death_program_ids[i]);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_predicate_hashes[j]);
+            input.extend_from_slice(&new_birth_program_ids[j]);
         }
 
-        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
-            _,
-            C::OuterField,
-        >>::RandomnessGadget::alloc(
-            &mut commitment_cs.ns(|| "Commitment randomness"),
-            || Ok(predicate_randomness),
-        )?;
+        let given_commitment_randomness =
+            <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::RandomnessGadget::alloc(
+                &mut commitment_cs.ns(|| "Commitment randomness"),
+                || Ok(program_randomness),
+            )?;
 
-        let given_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::OutputGadget::alloc_input(
+        let given_commitment = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::OutputGadget::alloc_input(
             &mut commitment_cs.ns(|| "Commitment output"),
-            || Ok(predicate_commitment),
+            || Ok(program_commitment),
         )?;
 
-        let candidate_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
-            _,
-            C::OuterField,
-        >>::check_commitment_gadget(
-            &mut commitment_cs.ns(|| "Compute commitment"),
-            &predicate_vk_commitment_parameters,
-            &input,
-            &given_commitment_randomness,
-        )?;
+        let candidate_commitment =
+            <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::OuterField>>::check_commitment_gadget(
+                &mut commitment_cs.ns(|| "Compute commitment"),
+                &program_vk_commitment_parameters,
+                &input,
+                &given_commitment_randomness,
+            )?;
 
         candidate_commitment.enforce_equal(
             &mut commitment_cs.ns(|| "Check that declared and computed commitments are equal"),

@@ -7,21 +7,21 @@ use std::io::Result as IoResult;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
-pub struct CircuitParameters<C: BaseDPCComponents> {
+pub struct SystemParameters<C: BaseDPCComponents> {
     pub account_commitment: C::AccountCommitment,
     pub account_encryption: C::AccountEncryption,
     pub account_signature: C::AccountSignature,
     pub record_commitment: C::RecordCommitment,
-    pub record_ciphertext_crh: C::RecordCiphertextCRH,
-    pub predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment,
-    pub predicate_verification_key_hash: C::PredicateVerificationKeyHash,
+    pub encrypted_record_crh: C::EncryptedRecordCRH,
+    pub program_verification_key_commitment: C::ProgramVerificationKeyCommitment,
+    pub program_verification_key_hash: C::ProgramVerificationKeyHash,
     pub local_data_crh: C::LocalDataCRH,
     pub local_data_commitment: C::LocalDataCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
 }
 
-impl<C: BaseDPCComponents> CircuitParameters<C> {
-    // TODO (howardwu): Inspect what is going on with predicate_verification_key_commitment.
+impl<C: BaseDPCComponents> SystemParameters<C> {
+    // TODO (howardwu): Inspect what is going on with program_verification_key_commitment.
     pub fn load() -> IoResult<Self> {
         let account_commitment: C::AccountCommitment =
             From::from(FromBytes::read(AccountCommitmentParameters::load_bytes()?.as_slice())?);
@@ -31,13 +31,12 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
             From::from(FromBytes::read(AccountSignatureParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =
             From::from(FromBytes::read(RecordCommitmentParameters::load_bytes()?.as_slice())?);
-        let record_ciphertext_crh: C::RecordCiphertextCRH = From::from(FromBytes::read(
-            RecordCiphertextCRHParameters::load_bytes()?.as_slice(),
-        )?);
-        let predicate_verification_key_commitment: C::PredicateVerificationKeyCommitment =
+        let encrypted_record_crh: C::EncryptedRecordCRH =
+            From::from(FromBytes::read(EncryptedRecordCRHParameters::load_bytes()?.as_slice())?);
+        let program_verification_key_commitment: C::ProgramVerificationKeyCommitment =
             From::from(FromBytes::read(vec![].as_slice())?);
-        let predicate_verification_key_hash: C::PredicateVerificationKeyHash =
-            From::from(FromBytes::read(PredicateVKCRHParameters::load_bytes()?.as_slice())?);
+        let program_verification_key_hash: C::ProgramVerificationKeyHash =
+            From::from(FromBytes::read(ProgramVKCRHParameters::load_bytes()?.as_slice())?);
         let local_data_crh: C::LocalDataCRH =
             From::from(FromBytes::read(LocalDataCRHParameters::load_bytes()?.as_slice())?);
         let local_data_commitment: C::LocalDataCommitment = From::from(FromBytes::read(
@@ -52,9 +51,9 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
             account_encryption,
             account_signature,
             record_commitment,
-            record_ciphertext_crh,
-            predicate_verification_key_commitment,
-            predicate_verification_key_hash,
+            encrypted_record_crh,
+            program_verification_key_commitment,
+            program_verification_key_hash,
             local_data_crh,
             local_data_commitment,
             serial_number_nonce,
@@ -64,18 +63,18 @@ impl<C: BaseDPCComponents> CircuitParameters<C> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
-pub struct PredicateSNARKParameters<C: BaseDPCComponents> {
-    pub proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters,
-    pub verification_key: <C::PredicateSNARK as SNARK>::VerificationParameters,
+pub struct ProgramSNARKParameters<C: BaseDPCComponents> {
+    pub proving_key: <C::ProgramSNARK as SNARK>::ProvingParameters,
+    pub verification_key: <C::ProgramSNARK as SNARK>::VerificationParameters,
 }
 
-impl<C: BaseDPCComponents> PredicateSNARKParameters<C> {
+impl<C: BaseDPCComponents> ProgramSNARKParameters<C> {
     // TODO (howardwu): Why are we not preparing the VK here?
     pub fn load() -> IoResult<Self> {
-        let proving_key: <C::PredicateSNARK as SNARK>::ProvingParameters =
-            From::from(FromBytes::read(PredicateSNARKPKParameters::load_bytes()?.as_slice())?);
-        let verification_key = From::from(<C::PredicateSNARK as SNARK>::VerificationParameters::read(
-            PredicateSNARKVKParameters::load_bytes()?.as_slice(),
+        let proving_key: <C::ProgramSNARK as SNARK>::ProvingParameters =
+            From::from(FromBytes::read(ProgramSNARKPKParameters::load_bytes()?.as_slice())?);
+        let verification_key = From::from(<C::ProgramSNARK as SNARK>::VerificationParameters::read(
+            ProgramSNARKVKParameters::load_bytes()?.as_slice(),
         )?);
 
         Ok(Self {
@@ -88,8 +87,8 @@ impl<C: BaseDPCComponents> PredicateSNARKParameters<C> {
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct PublicParameters<C: BaseDPCComponents> {
-    pub circuit_parameters: CircuitParameters<C>,
-    pub predicate_snark_parameters: PredicateSNARKParameters<C>,
+    pub system_parameters: SystemParameters<C>,
+    pub program_snark_parameters: ProgramSNARKParameters<C>,
     pub inner_snark_parameters: (
         Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
         <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
@@ -102,15 +101,15 @@ pub struct PublicParameters<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn account_commitment_parameters(&self) -> &C::AccountCommitment {
-        &self.circuit_parameters.account_commitment
+        &self.system_parameters.account_commitment
     }
 
     pub fn account_encryption_parameters(&self) -> &C::AccountEncryption {
-        &self.circuit_parameters.account_encryption
+        &self.system_parameters.account_encryption
     }
 
     pub fn account_signature_parameters(&self) -> &C::AccountSignature {
-        &self.circuit_parameters.account_signature
+        &self.system_parameters.account_signature
     }
 
     pub fn inner_snark_parameters(
@@ -123,11 +122,11 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     }
 
     pub fn local_data_crh_parameters(&self) -> &C::LocalDataCRH {
-        &self.circuit_parameters.local_data_crh
+        &self.system_parameters.local_data_crh
     }
 
     pub fn local_data_commitment_parameters(&self) -> &C::LocalDataCommitment {
-        &self.circuit_parameters.local_data_commitment
+        &self.system_parameters.local_data_commitment
     }
 
     pub fn outer_snark_parameters(
@@ -139,33 +138,33 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.outer_snark_parameters
     }
 
-    pub fn predicate_snark_parameters(&self) -> &PredicateSNARKParameters<C> {
-        &self.predicate_snark_parameters
+    pub fn program_snark_parameters(&self) -> &ProgramSNARKParameters<C> {
+        &self.program_snark_parameters
     }
 
-    pub fn predicate_verification_key_commitment_parameters(&self) -> &C::PredicateVerificationKeyCommitment {
-        &self.circuit_parameters.predicate_verification_key_commitment
+    pub fn program_verification_key_commitment_parameters(&self) -> &C::ProgramVerificationKeyCommitment {
+        &self.system_parameters.program_verification_key_commitment
     }
 
-    pub fn predicate_verification_key_hash_parameters(&self) -> &C::PredicateVerificationKeyHash {
-        &self.circuit_parameters.predicate_verification_key_hash
+    pub fn program_verification_key_hash_parameters(&self) -> &C::ProgramVerificationKeyHash {
+        &self.system_parameters.program_verification_key_hash
     }
 
     pub fn record_commitment_parameters(&self) -> &C::RecordCommitment {
-        &self.circuit_parameters.record_commitment
+        &self.system_parameters.record_commitment
     }
 
-    pub fn record_ciphertext_crh_parameters(&self) -> &C::RecordCiphertextCRH {
-        &self.circuit_parameters.record_ciphertext_crh
+    pub fn encrypted_record_crh_parameters(&self) -> &C::EncryptedRecordCRH {
+        &self.system_parameters.encrypted_record_crh
     }
 
     pub fn serial_number_nonce_parameters(&self) -> &C::SerialNumberNonceCRH {
-        &self.circuit_parameters.serial_number_nonce
+        &self.system_parameters.serial_number_nonce
     }
 
     pub fn load(verify_only: bool) -> IoResult<Self> {
-        let circuit_parameters = CircuitParameters::<C>::load()?;
-        let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
+        let system_parameters = SystemParameters::<C>::load()?;
+        let program_snark_parameters = ProgramSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
             let inner_snark_pk = match verify_only {
@@ -200,16 +199,16 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         };
 
         Ok(Self {
-            circuit_parameters,
-            predicate_snark_parameters,
+            system_parameters,
+            program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
         })
     }
 
     pub fn load_vk_direct() -> IoResult<Self> {
-        let circuit_parameters = CircuitParameters::<C>::load()?;
-        let predicate_snark_parameters = PredicateSNARKParameters::<C>::load()?;
+        let system_parameters = SystemParameters::<C>::load()?;
+        let program_snark_parameters = ProgramSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
             let inner_snark_pk = None;
@@ -230,8 +229,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         };
 
         Ok(Self {
-            circuit_parameters,
-            predicate_snark_parameters,
+            system_parameters,
+            program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
         })

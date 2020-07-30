@@ -1,5 +1,5 @@
 use crate::dpc::base_dpc::{
-    parameters::CircuitParameters,
+    parameters::SystemParameters,
     record::DPCRecord,
     record_encryption::RecordEncryptionGadgetComponents,
     BaseDPCComponents,
@@ -48,7 +48,7 @@ use std::ops::Mul;
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
     ledger_parameters: &C::MerkleParameters,
 
     // Digest
@@ -67,12 +67,12 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
 
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
-    new_records_ciphertext_hashes: &[<C::RecordCiphertextCRH as CRH>::Output],
+    new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
 
     // Rest
-    predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_commitment: &<C::LocalDataCRH as CRH>::Output,
+    program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
+    local_data_root: &<C::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     memo: &[u8; 32],
     value_balance: i64,
@@ -85,7 +85,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::AccountEncryption,
         C::AccountSignature,
         C::RecordCommitment,
-        C::RecordCiphertextCRH,
+        C::EncryptedRecordCRH,
         C::LocalDataCRH,
         C::LocalDataCommitment,
         C::SerialNumberNonceCRH,
@@ -94,7 +94,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         C::AccountEncryptionGadget,
         C::AccountSignatureGadget,
         C::RecordCommitmentGadget,
-        C::RecordCiphertextCRHGadget,
+        C::EncryptedRecordCRHGadget,
         C::LocalDataCRHGadget,
         C::LocalDataCommitmentGadget,
         C::SerialNumberNonceCRHGadget,
@@ -102,7 +102,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     >(
         cs,
         //
-        circuit_parameters,
+        system_parameters,
         ledger_parameters,
         //
         ledger_digest,
@@ -117,11 +117,11 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         new_commitments,
         new_records_encryption_randomness,
         new_records_encryption_gadget_components,
-        new_records_ciphertext_hashes,
+        new_encrypted_record_hashes,
         //
-        predicate_commitment,
-        predicate_randomness,
-        local_data_commitment,
+        program_commitment,
+        program_randomness,
+        local_data_root,
         local_data_commitment_randomizers,
         memo,
         value_balance,
@@ -136,7 +136,7 @@ fn base_dpc_execute_gadget_helper<
     AccountEncryption,
     AccountSignature,
     RecordCommitment,
-    RecordCiphertextCRH,
+    EncryptedRecordCRH,
     LocalDataCRH,
     LocalDataCommitment,
     SerialNumberNonceCRH,
@@ -145,7 +145,7 @@ fn base_dpc_execute_gadget_helper<
     AccountEncryptionGadget,
     AccountSignatureGadget,
     RecordCommitmentGadget,
-    RecordCiphertextCRHGadget,
+    EncryptedRecordCRHGadget,
     LocalDataCRHGadget,
     LocalDataCommitmentGadget,
     SerialNumberNonceCRHGadget,
@@ -154,7 +154,7 @@ fn base_dpc_execute_gadget_helper<
     cs: &mut CS,
 
     //
-    circuit_parameters: &CircuitParameters<C>,
+    system_parameters: &SystemParameters<C>,
     ledger_parameters: &C::MerkleParameters,
 
     //
@@ -173,12 +173,12 @@ fn base_dpc_execute_gadget_helper<
 
     new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
     new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
-    new_records_ciphertext_hashes: &[RecordCiphertextCRH::Output],
+    new_encrypted_record_hashes: &[EncryptedRecordCRH::Output],
 
     //
-    predicate_commitment: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output,
-    predicate_randomness: &<C::PredicateVerificationKeyCommitment as CommitmentScheme>::Randomness,
-    local_data_comm: &LocalDataCRH::Output,
+    program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
+    local_data_root: &LocalDataCRH::Output,
     local_data_commitment_randomizers: &[LocalDataCommitment::Randomness],
     memo: &[u8; 32],
     value_balance: i64,
@@ -190,7 +190,7 @@ where
         AccountEncryption = AccountEncryption,
         AccountSignature = AccountSignature,
         RecordCommitment = RecordCommitment,
-        RecordCiphertextCRH = RecordCiphertextCRH,
+        EncryptedRecordCRH = EncryptedRecordCRH,
         LocalDataCRH = LocalDataCRH,
         LocalDataCommitment = LocalDataCommitment,
         SerialNumberNonceCRH = SerialNumberNonceCRH,
@@ -199,7 +199,7 @@ where
         AccountEncryptionGadget = AccountEncryptionGadget,
         AccountSignatureGadget = AccountSignatureGadget,
         RecordCommitmentGadget = RecordCommitmentGadget,
-        RecordCiphertextCRHGadget = RecordCiphertextCRHGadget,
+        EncryptedRecordCRHGadget = EncryptedRecordCRHGadget,
         LocalDataCRHGadget = LocalDataCRHGadget,
         LocalDataCommitmentGadget = LocalDataCommitmentGadget,
         SerialNumberNonceCRHGadget = SerialNumberNonceCRHGadget,
@@ -209,7 +209,7 @@ where
     AccountEncryption: EncryptionScheme,
     AccountSignature: SignatureScheme,
     RecordCommitment: CommitmentScheme,
-    RecordCiphertextCRH: CRH,
+    EncryptedRecordCRH: CRH,
     LocalDataCRH: CRH,
     LocalDataCommitment: CommitmentScheme,
     SerialNumberNonceCRH: CRH,
@@ -219,7 +219,7 @@ where
     AccountEncryptionGadget: EncryptionGadget<AccountEncryption, C::InnerField>,
     AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<AccountSignature, C::InnerField>,
     RecordCommitmentGadget: CommitmentGadget<RecordCommitment, C::InnerField>,
-    RecordCiphertextCRHGadget: CRHGadget<RecordCiphertextCRH, C::InnerField>,
+    EncryptedRecordCRHGadget: CRHGadget<EncryptedRecordCRH, C::InnerField>,
     LocalDataCRHGadget: CRHGadget<LocalDataCRH, C::InnerField>,
     LocalDataCommitmentGadget: CommitmentGadget<LocalDataCommitment, C::InnerField>,
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
@@ -228,34 +228,34 @@ where
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
     let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_death_predicate_hashes_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_birth_predicate_hashes_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
     // 2. account_encryption_parameters
     // 3. account_signature_parameters
     // 4. record_commitment_parameters
-    // 5. record_ciphertext_crh_parameters
-    // 6. predicate_vk_commitment_parameters
+    // 5. encrypted_record_crh_parameters
+    // 6. program_vk_commitment_parameters
     // 7. local_data_crh_parameters
     // 8. local_data_commitment_parameters
     // 9. serial_number_nonce_crh_parameters
     // 10. ledger_parameters
     // 11. ledger_digest
     // 12. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
-    // 13. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i]
-    // 14. predicate_commitment
-    // 15. local_data_commitment
+    // 13. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i], new_encrypted_record_hashes[i]
+    // 14. program_commitment
+    // 15. local_data_root
     let (
         account_commitment_parameters,
         account_encryption_parameters,
         account_signature_parameters,
         record_commitment_parameters,
-        record_ciphertext_crh_parameters,
-        predicate_vk_commitment_parameters,
+        encrypted_record_crh_parameters,
+        program_vk_commitment_parameters,
         local_data_crh_parameters,
         local_data_commitment_parameters,
         serial_number_nonce_crh_parameters,
@@ -265,50 +265,50 @@ where
 
         let account_commitment_parameters = AccountCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account commit parameters"),
-            || Ok(circuit_parameters.account_commitment.parameters()),
+            || Ok(system_parameters.account_commitment.parameters()),
         )?;
 
         let account_encryption_parameters = AccountEncryptionGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account encryption parameters"),
-            || Ok(circuit_parameters.account_encryption.parameters()),
+            || Ok(system_parameters.account_encryption.parameters()),
         )?;
 
         let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account signature parameters"),
-            || Ok(circuit_parameters.account_signature.parameters()),
+            || Ok(system_parameters.account_signature.parameters()),
         )?;
 
         let record_commitment_parameters = RecordCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record commitment parameters"),
-            || Ok(circuit_parameters.record_commitment.parameters()),
+            || Ok(system_parameters.record_commitment.parameters()),
         )?;
 
-        let record_ciphertext_crh_parameters = RecordCiphertextCRHGadget::ParametersGadget::alloc_input(
+        let encrypted_record_crh_parameters = EncryptedRecordCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare record ciphertext CRH parameters"),
-            || Ok(circuit_parameters.record_ciphertext_crh.parameters()),
+            || Ok(system_parameters.encrypted_record_crh.parameters()),
         )?;
 
-        let predicate_vk_commitment_parameters = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
+        let program_vk_commitment_parameters = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<
             _,
             C::InnerField,
         >>::ParametersGadget::alloc_input(
-            &mut cs.ns(|| "Declare predicate vk commitment parameters"),
-            || Ok(circuit_parameters.predicate_verification_key_commitment.parameters()),
+            &mut cs.ns(|| "Declare program vk commitment parameters"),
+            || Ok(system_parameters.program_verification_key_commitment.parameters()),
         )?;
 
         let local_data_crh_parameters = LocalDataCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare local data CRH parameters"),
-            || Ok(circuit_parameters.local_data_crh.parameters()),
+            || Ok(system_parameters.local_data_crh.parameters()),
         )?;
 
         let local_data_commitment_parameters = LocalDataCommitmentGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare local data commitment parameters"),
-            || Ok(circuit_parameters.local_data_commitment.parameters()),
+            || Ok(system_parameters.local_data_commitment.parameters()),
         )?;
 
         let serial_number_nonce_crh_parameters = SerialNumberNonceCRHGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare serial number nonce CRH parameters"),
-            || Ok(circuit_parameters.serial_number_nonce.parameters()),
+            || Ok(system_parameters.serial_number_nonce.parameters()),
         )?;
 
         let ledger_parameters = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
@@ -321,8 +321,8 @@ where
             account_encryption_parameters,
             account_signature_parameters,
             record_commitment_parameters,
-            record_ciphertext_crh_parameters,
-            predicate_vk_commitment_parameters,
+            encrypted_record_crh_parameters,
+            program_vk_commitment_parameters,
             local_data_crh_parameters,
             local_data_commitment_parameters,
             serial_number_nonce_crh_parameters,
@@ -348,13 +348,13 @@ where
 
         // Declare record contents
         let (
-            given_account_address,
+            given_record_owner,
             given_commitment,
             given_is_dummy,
             given_value,
             given_payload,
-            given_birth_predicate_crh,
-            given_death_predicate_crh,
+            given_birth_program_id,
+            given_death_program_id,
             given_commitment_randomness,
             serial_number_nonce,
         ) = {
@@ -365,10 +365,10 @@ where
             // are trusted, and so when we recompute these, the newly computed
             // values will always be in correct subgroup. If the input cm, pk
             // or hash is incorrect, then it will not match the computed equivalent.
-            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_address"),
-                || Ok(record.account_address().into_repr()),
-            )?;
+            let given_record_owner =
+                AccountEncryptionGadget::PublicKeyGadget::alloc(&mut declare_cs.ns(|| "given_record_owner"), || {
+                    Ok(record.owner().into_repr())
+                })?;
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
@@ -382,16 +382,16 @@ where
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
 
-            let given_birth_predicate_crh = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_birth_predicate_crh"),
-                &record.birth_predicate_hash(),
+            let given_birth_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_program_id"),
+                &record.birth_program_id(),
             )?;
 
-            let given_death_predicate_crh = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_death_predicate_crh"),
-                &record.death_predicate_hash(),
+            let given_death_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_program_id"),
+                &record.death_program_id(),
             )?;
-            old_death_predicate_hashes_gadgets.push(given_death_predicate_crh.clone());
+            old_death_program_ids_gadgets.push(given_death_program_id.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -403,13 +403,13 @@ where
                     Ok(record.serial_number_nonce())
                 })?;
             (
-                given_account_address,
+                given_record_owner,
                 given_commitment,
                 given_is_dummy,
                 given_value,
                 given_payload,
-                given_birth_predicate_crh,
-                given_death_predicate_crh,
+                given_birth_program_id,
+                given_death_program_id,
                 given_commitment_randomness,
                 serial_number_nonce,
             )
@@ -450,7 +450,7 @@ where
             // Allocate the account private key.
             let (pk_sig, sk_prf, r_pk) = {
                 let pk_sig_native = account_private_key
-                    .pk_sig(&circuit_parameters.account_signature)
+                    .pk_sig(&system_parameters.account_signature)
                     .map_err(|_| SynthesisError::AssignmentMissing)?;
                 let pk_sig =
                     AccountSignatureGadget::PublicKeyGadget::alloc(&mut account_cs.ns(|| "Declare pk_sig"), || {
@@ -495,8 +495,8 @@ where
                         || {
                             Ok(account_private_key
                                 .to_decryption_key(
-                                    &circuit_parameters.account_signature,
-                                    &circuit_parameters.account_commitment,
+                                    &system_parameters.account_signature,
+                                    &system_parameters.account_commitment,
                                 )
                                 .map_err(|_| SynthesisError::AssignmentMissing)?)
                         },
@@ -519,17 +519,17 @@ where
                 given_account_view_key
             };
 
-            // Construct and verify the account address.
+            // Construct and verify the record owner - account address.
             {
-                let candidate_account_address = AccountEncryptionGadget::check_public_key_gadget(
-                    &mut account_cs.ns(|| "Compute the candidate account address"),
+                let candidate_record_owner = AccountEncryptionGadget::check_public_key_gadget(
+                    &mut account_cs.ns(|| "Compute the candidate record owner - account address"),
                     &account_encryption_parameters,
                     &candidate_account_view_key,
                 )?;
 
-                candidate_account_address.enforce_equal(
+                candidate_record_owner.enforce_equal(
                     &mut account_cs.ns(|| "Check that declared and computed addresses are equal"),
-                    &given_account_address,
+                    &given_record_owner,
                 )?;
             }
 
@@ -596,17 +596,17 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_address_bytes =
-                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
+            let record_owner_bytes =
+                given_record_owner.to_bytes(&mut commitment_cs.ns(|| "Convert record_owner to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_address_bytes);
+            commitment_input.extend_from_slice(&record_owner_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
-            commitment_input.extend_from_slice(&given_birth_predicate_crh);
-            commitment_input.extend_from_slice(&given_death_predicate_crh);
+            commitment_input.extend_from_slice(&given_birth_program_id);
+            commitment_input.extend_from_slice(&given_death_program_id);
             commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
@@ -627,7 +627,7 @@ where
         j,
         (
             ((((record, sn_nonce_randomness), commitment), encryption_randomness), encryption_gadget_components),
-            record_ciphertext_hash,
+            encrypted_record_hash,
         ),
     ) in new_records
         .iter()
@@ -635,7 +635,7 @@ where
         .zip(new_commitments)
         .zip(new_records_encryption_randomness)
         .zip(new_records_encryption_gadget_components)
-        .zip(new_records_ciphertext_hashes)
+        .zip(new_encrypted_record_hashes)
         .enumerate()
     {
         let RecordEncryptionGadgetComponents {
@@ -649,24 +649,24 @@ where
         let cs = &mut cs.ns(|| format!("Process output record {}", j));
 
         let (
-            given_account_address,
+            given_record_owner,
             given_record_commitment,
             given_commitment,
             given_is_dummy,
             given_value,
             given_payload,
-            given_birth_predicate_hash,
-            given_death_predicate_hash,
+            given_birth_program_id,
+            given_death_program_id,
             given_commitment_randomness,
             serial_number_nonce,
             serial_number_nonce_bytes,
         ) = {
             let declare_cs = &mut cs.ns(|| "Declare output record");
 
-            let given_account_address = AccountEncryptionGadget::PublicKeyGadget::alloc(
-                &mut declare_cs.ns(|| "given_account_address"),
-                || Ok(record.account_address().into_repr()),
-            )?;
+            let given_record_owner =
+                AccountEncryptionGadget::PublicKeyGadget::alloc(&mut declare_cs.ns(|| "given_record_owner"), || {
+                    Ok(record.owner().into_repr())
+                })?;
 
             let given_record_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_record_commitment"), || {
@@ -685,15 +685,15 @@ where
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
 
-            let given_birth_predicate_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_birth_predicate_hash"),
-                &record.birth_predicate_hash(),
+            let given_birth_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_birth_program_id"),
+                &record.birth_program_id(),
             )?;
-            new_birth_predicate_hashes_gadgets.push(given_birth_predicate_hash.clone());
+            new_birth_program_ids_gadgets.push(given_birth_program_id.clone());
 
-            let given_death_predicate_hash = UInt8::alloc_vec(
-                &mut declare_cs.ns(|| "given_death_predicate_hash"),
-                &record.death_predicate_hash(),
+            let given_death_program_id = UInt8::alloc_vec(
+                &mut declare_cs.ns(|| "given_death_program_id"),
+                &record.death_program_id(),
             )?;
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
@@ -710,14 +710,14 @@ where
                 serial_number_nonce.to_bytes(&mut declare_cs.ns(|| "Convert sn nonce to bytes"))?;
 
             (
-                given_account_address,
+                given_record_owner,
                 given_record_commitment,
                 given_commitment,
                 given_is_dummy,
                 given_value,
                 given_payload,
-                given_birth_predicate_hash,
-                given_death_predicate_hash,
+                given_birth_program_id,
+                given_death_program_id,
                 given_commitment_randomness,
                 serial_number_nonce,
                 serial_number_nonce_bytes,
@@ -768,17 +768,17 @@ where
                 &given_is_dummy,
             )?;
 
-            let account_address_bytes =
-                given_account_address.to_bytes(&mut commitment_cs.ns(|| "Convert account_address to bytes"))?;
+            let record_owner_bytes =
+                given_record_owner.to_bytes(&mut commitment_cs.ns(|| "Convert record_owner to bytes"))?;
             let is_dummy_bytes = given_is_dummy.to_bytes(&mut commitment_cs.ns(|| "Convert is_dummy to bytes"))?;
 
             let mut commitment_input = Vec::new();
-            commitment_input.extend_from_slice(&account_address_bytes);
+            commitment_input.extend_from_slice(&record_owner_bytes);
             commitment_input.extend_from_slice(&is_dummy_bytes);
             commitment_input.extend_from_slice(&given_value);
             commitment_input.extend_from_slice(&given_payload);
-            commitment_input.extend_from_slice(&given_birth_predicate_hash);
-            commitment_input.extend_from_slice(&given_death_predicate_hash);
+            commitment_input.extend_from_slice(&given_birth_program_id);
+            commitment_input.extend_from_slice(&given_death_program_id);
             commitment_input.extend_from_slice(&serial_number_nonce_bytes);
 
             let candidate_commitment = RecordCommitmentGadget::check_commitment_gadget(
@@ -808,7 +808,7 @@ where
             // Check serialization
 
             // *******************************************************************
-            // Convert serial number nonce, commitment_randomness, birth predicate hash, death predicate hash, payload, and value into bits
+            // Convert serial number nonce, commitment_randomness, birth program id, death program id, payload, and value into bits
 
             let serial_number_nonce_bits = serial_number_nonce_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert serial_number_nonce_bytes to bits"))?;
@@ -820,10 +820,10 @@ where
 
             let commitment_randomness_bits = commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert commitment_randomness_bytes to bits"))?;
-            let full_birth_predicate_hash_bits = given_birth_predicate_hash
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash to bits"))?;
-            let full_death_predicate_hash_bits = given_death_predicate_hash
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash to bits"))?;
+            let full_birth_program_id_bits =
+                given_birth_program_id.to_bits(&mut encryption_cs.ns(|| "Convert given_birth_program_id to bits"))?;
+            let full_death_program_id_bits =
+                given_death_program_id.to_bits(&mut encryption_cs.ns(|| "Convert given_death_program_id to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
             let mut fq_high_bits = vec![];
@@ -863,24 +863,24 @@ where
             // reserve the MSB of the data field element's valid bitsize and set the bit to 1.
             let payload_field_bitsize = data_field_bitsize - 1;
 
-            // Birth and death predicates
+            // Birth and death programs
 
-            let mut birth_predicate_hash_bits = Vec::with_capacity(base_field_bitsize);
-            let mut death_predicate_hash_bits = Vec::with_capacity(base_field_bitsize);
-            let mut birth_predicate_hash_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
-            let mut death_predicate_hash_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut birth_program_id_bits = Vec::with_capacity(base_field_bitsize);
+            let mut death_program_id_bits = Vec::with_capacity(base_field_bitsize);
+            let mut birth_program_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
+            let mut death_program_id_remainder_bits = Vec::with_capacity(outer_field_bitsize - data_field_bitsize);
 
             for i in 0..data_field_bitsize {
-                birth_predicate_hash_bits.push(full_birth_predicate_hash_bits[i]);
-                death_predicate_hash_bits.push(full_death_predicate_hash_bits[i]);
+                birth_program_id_bits.push(full_birth_program_id_bits[i]);
+                death_program_id_bits.push(full_death_program_id_bits[i]);
             }
 
             // (Assumption 2 applies)
             for i in data_field_bitsize..outer_field_bitsize {
-                birth_predicate_hash_remainder_bits.push(full_birth_predicate_hash_bits[i]);
-                death_predicate_hash_remainder_bits.push(full_death_predicate_hash_bits[i]);
+                birth_program_id_remainder_bits.push(full_birth_program_id_bits[i]);
+                death_program_id_remainder_bits.push(full_death_program_id_bits[i]);
             }
-            birth_predicate_hash_remainder_bits.extend_from_slice(&death_predicate_hash_remainder_bits);
+            birth_program_id_remainder_bits.extend_from_slice(&death_program_id_remainder_bits);
 
             // Payload
 
@@ -967,20 +967,20 @@ where
             let given_commitment_randomness_bits = given_commitment_randomness_bytes
                 .to_bits(&mut encryption_cs.ns(|| "Convert given_commitment_randomness_bytes to bits"))?;
 
-            let given_birth_predicate_hash_bytes = &record_field_elements_gadgets[2]
-                .to_bytes(&mut encryption_cs.ns(|| "given_birth_predicate_hash_bytes"))?;
-            let given_birth_predicate_hash_bits = given_birth_predicate_hash_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_predicate_hash_bytes to bits"))?;
+            let given_birth_program_id_bytes =
+                &record_field_elements_gadgets[2].to_bytes(&mut encryption_cs.ns(|| "given_birth_program_id_bytes"))?;
+            let given_birth_program_id_bits = given_birth_program_id_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_birth_program_id_bytes to bits"))?;
 
-            let given_death_predicate_hash_bytes = &record_field_elements_gadgets[3]
-                .to_bytes(&mut encryption_cs.ns(|| "given_death_predicate_hash_bytes"))?;
-            let given_death_predicate_hash_bits = given_death_predicate_hash_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_predicate_hash_bytes to bits"))?;
+            let given_death_program_id_bytes =
+                &record_field_elements_gadgets[3].to_bytes(&mut encryption_cs.ns(|| "given_death_program_id_bytes"))?;
+            let given_death_program_id_bits = given_death_program_id_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_death_program_id_bytes to bits"))?;
 
-            let given_predicate_repr_remainder_bytes = &record_field_elements_gadgets[4]
-                .to_bytes(&mut encryption_cs.ns(|| "given_predicate_repr_remainder_bytes"))?;
-            let given_predicate_repr_remainder_bits = given_predicate_repr_remainder_bytes
-                .to_bits(&mut encryption_cs.ns(|| "Convert given_predicate_repr_remainder_bytes to bits"))?;
+            let given_program_id_remainder_bytes = &record_field_elements_gadgets[4]
+                .to_bytes(&mut encryption_cs.ns(|| "given_program_id_remainder_bytes"))?;
+            let given_program_id_remainder_bits = given_program_id_remainder_bytes
+                .to_bits(&mut encryption_cs.ns(|| "Convert given_program_id_remainder_bytes to bits"))?;
 
             // *******************************************************************
             // Equate the gadget packed and provided bits
@@ -995,19 +995,19 @@ where
                 &given_commitment_randomness_bits,
             )?;
 
-            birth_predicate_hash_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_predicate_hash_bits match"),
-                &given_birth_predicate_hash_bits,
+            birth_program_id_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared given_birth_program_id_bits match"),
+                &given_birth_program_id_bits,
             )?;
 
-            death_predicate_hash_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared death_predicate_hash_bits match"),
-                &given_death_predicate_hash_bits,
+            death_program_id_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared death_program_id_bits match"),
+                &given_death_program_id_bits,
             )?;
 
-            birth_predicate_hash_remainder_bits.enforce_equal(
-                &mut encryption_cs.ns(|| "Check that computed and declared predicate_repr_remainder_bits match"),
-                &given_predicate_repr_remainder_bits,
+            birth_program_id_remainder_bits.enforce_equal(
+                &mut encryption_cs.ns(|| "Check that computed and declared program_id_remainder_bits match"),
+                &given_program_id_remainder_bits,
             )?;
 
             for (i, (payload_element, field_element)) in payload_elements
@@ -1139,25 +1139,25 @@ where
                 || Ok(encryption_plaintext),
             )?;
 
-            let candidate_ciphertext_gadget = AccountEncryptionGadget::check_encryption_gadget(
+            let candidate_encrypted_record_gadget = AccountEncryptionGadget::check_encryption_gadget(
                 &mut encryption_cs.ns(|| format!("output record {} check_encryption_gadget", j)),
                 &account_encryption_parameters,
                 &encryption_randomness_gadget,
-                &given_account_address,
+                &given_record_owner,
                 &encryption_plaintext_gadget,
                 &encryption_blinding_exponents_gadget,
             )?;
 
             // *******************************************************************
-            // Check that the record ciphertext hash is correct
+            // Check that the encrypted record hash is correct
 
-            let record_ciphertext_hash_gadget = RecordCiphertextCRHGadget::OutputGadget::alloc_input(
-                &mut encryption_cs.ns(|| format!("output record {} ciphertext hash", j)),
-                || Ok(record_ciphertext_hash),
+            let encrypted_record_hash_gadget = EncryptedRecordCRHGadget::OutputGadget::alloc_input(
+                &mut encryption_cs.ns(|| format!("output record {} encrypted record hash", j)),
+                || Ok(encrypted_record_hash),
             )?;
 
-            let encryption_ciphertext_bytes = candidate_ciphertext_gadget
-                .to_bytes(encryption_cs.ns(|| format!("output record {} ciphertext bytes", j)))?;
+            let candidate_encrypted_record_bytes = candidate_encrypted_record_gadget
+                .to_bytes(encryption_cs.ns(|| format!("output record {} encrypted record bytes", j)))?;
 
             let ciphertext_and_fq_high_selectors_bytes = UInt8::alloc_vec(
                 &mut encryption_cs.ns(|| format!("ciphertext and fq_high selector bits to bytes {}", j)),
@@ -1169,61 +1169,57 @@ where
                 ),
             )?;
 
-            let mut ciphertext_hash_input = Vec::new();
-            ciphertext_hash_input.extend_from_slice(&encryption_ciphertext_bytes);
-            ciphertext_hash_input.extend_from_slice(&ciphertext_and_fq_high_selectors_bytes);
+            let mut encrypted_record_hash_input = Vec::new();
+            encrypted_record_hash_input.extend_from_slice(&candidate_encrypted_record_bytes);
+            encrypted_record_hash_input.extend_from_slice(&ciphertext_and_fq_high_selectors_bytes);
 
-            let candidate_ciphertext_hash = RecordCiphertextCRHGadget::check_evaluation_gadget(
-                &mut encryption_cs.ns(|| format!("Compute ciphertext hash {}", j)),
-                &record_ciphertext_crh_parameters,
-                &ciphertext_hash_input,
+            let candidate_encrypted_record_hash = EncryptedRecordCRHGadget::check_evaluation_gadget(
+                &mut encryption_cs.ns(|| format!("Compute encrypted record hash {}", j)),
+                &encrypted_record_crh_parameters,
+                &encrypted_record_hash_input,
             )?;
 
-            record_ciphertext_hash_gadget.enforce_equal(
-                encryption_cs.ns(|| format!("output record {} ciphertext hash is valid", j)),
-                &candidate_ciphertext_hash,
+            encrypted_record_hash_gadget.enforce_equal(
+                encryption_cs.ns(|| format!("output record {} encrypted record hash is valid", j)),
+                &candidate_encrypted_record_hash,
             )?;
         }
     }
     // *******************************************************************
 
     // *******************************************************************
-    // Check that predicate commitment is well formed.
+    // Check that program commitment is well formed.
     // *******************************************************************
     {
-        let commitment_cs = &mut cs.ns(|| "Check that predicate commitment is well-formed");
+        let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
         for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_predicate_hashes_gadgets[i]);
+            input.extend_from_slice(&old_death_program_ids_gadgets[i]);
         }
 
         for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_predicate_hashes_gadgets[j]);
+            input.extend_from_slice(&new_birth_program_ids_gadgets[j]);
         }
 
-        let given_commitment_randomness = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
-            _,
-            C::InnerField,
-        >>::RandomnessGadget::alloc(
-            &mut commitment_cs.ns(|| "given_commitment_randomness"),
-            || Ok(predicate_randomness),
-        )?;
+        let given_commitment_randomness =
+            <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::RandomnessGadget::alloc(
+                &mut commitment_cs.ns(|| "given_commitment_randomness"),
+                || Ok(program_randomness),
+            )?;
 
-        let given_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
+        let given_commitment = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::OutputGadget::alloc_input(
             &mut commitment_cs.ns(|| "given_commitment"),
-            || Ok(predicate_commitment),
+            || Ok(program_commitment),
         )?;
 
-        let candidate_commitment = <C::PredicateVerificationKeyCommitmentGadget as CommitmentGadget<
-            _,
-            C::InnerField,
-        >>::check_commitment_gadget(
-            &mut commitment_cs.ns(|| "candidate_commitment"),
-            &predicate_vk_commitment_parameters,
-            &input,
-            &given_commitment_randomness,
-        )?;
+        let candidate_commitment =
+            <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<_, C::InnerField>>::check_commitment_gadget(
+                &mut commitment_cs.ns(|| "candidate_commitment"),
+                &program_vk_commitment_parameters,
+                &input,
+                &given_commitment_randomness,
+            )?;
 
         candidate_commitment.enforce_equal(
             &mut commitment_cs.ns(|| "Check that declared and computed commitments are equal"),
@@ -1233,10 +1229,10 @@ where
     // ********************************************************************
 
     // ********************************************************************
-    // Check that the local data commitment is valid
+    // Check that the local data root is valid
     // ********************************************************************
     {
-        let mut cs = cs.ns(|| "Check that local data commitment is valid.");
+        let mut cs = cs.ns(|| "Check that local data root is valid.");
 
         let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
@@ -1313,20 +1309,20 @@ where
         inner_commitment_hash_bytes
             .extend_from_slice(&inner2_commitment_hash.to_bytes(&mut cs.ns(|| "inner2_commitment_hash"))?);
 
-        let local_data_commitment = LocalDataCRHGadget::check_evaluation_gadget(
+        let candidate_local_data_root = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment root"),
             &local_data_crh_parameters,
             &inner_commitment_hash_bytes,
         )?;
 
-        let declared_local_data_commitment =
-            LocalDataCRHGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data commitment"), || {
-                Ok(local_data_comm)
+        let declared_local_data_root =
+            LocalDataCRHGadget::OutputGadget::alloc_input(cs.ns(|| "Allocate local data root"), || {
+                Ok(local_data_root)
             })?;
 
-        local_data_commitment.enforce_equal(
-            &mut cs.ns(|| "Check that local data commitment is valid"),
-            &declared_local_data_commitment,
+        candidate_local_data_root.enforce_equal(
+            &mut cs.ns(|| "Check that local data root is valid"),
+            &declared_local_data_root,
         )?;
     }
     // *******************************************************************

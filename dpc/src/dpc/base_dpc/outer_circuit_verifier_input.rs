@@ -15,9 +15,9 @@ pub struct OuterCircuitVerifierInput<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVerifierInput<C>
 where
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
-    <C::PredicateVerificationKeyHash as CRH>::Parameters: ToConstraintField<C::OuterField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
+    <C::ProgramVerificationKeyHash as CRH>::Parameters: ToConstraintField<C::OuterField>,
 
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -30,13 +30,13 @@ where
     <C::RecordCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::RecordCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
-    <C::RecordCiphertextCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
-    <C::RecordCiphertextCRH as CRH>::Output: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
+    <C::EncryptedRecordCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
     <C::SerialNumberNonceCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
 
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::PredicateVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
 
     <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
@@ -50,16 +50,16 @@ where
         v.extend_from_slice(
             &self
                 .inner_snark_verifier_input
-                .circuit_parameters
-                .predicate_verification_key_commitment
+                .system_parameters
+                .program_verification_key_commitment
                 .parameters()
                 .to_field_elements()?,
         );
         v.extend_from_slice(
             &self
                 .inner_snark_verifier_input
-                .circuit_parameters
-                .predicate_verification_key_hash
+                .system_parameters
+                .program_verification_key_hash
                 .parameters()
                 .to_field_elements()?,
         );
@@ -75,12 +75,7 @@ where
             )?);
         }
 
-        v.extend_from_slice(
-            &self
-                .inner_snark_verifier_input
-                .predicate_commitment
-                .to_field_elements()?,
-        );
+        v.extend_from_slice(&self.inner_snark_verifier_input.program_commitment.to_field_elements()?);
         Ok(v)
     }
 }

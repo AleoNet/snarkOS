@@ -6,11 +6,11 @@ use std::hash::Hash;
 pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type Commitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type Digest: Clone + Eq + Hash + FromBytes + ToBytes;
-    type LocalDataCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
+    type LocalDataRoot: Clone + Eq + Hash + FromBytes + ToBytes;
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
-    type PredicateCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
+    type ProgramCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
-    type Ciphertext: Clone + Eq;
+    type EncryptedRecord: Clone + Eq + FromBytes + ToBytes;
 
     /// Returns the transaction identifier.
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError>;
@@ -27,17 +27,17 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     /// Returns the new commitments.
     fn new_commitments(&self) -> &[Self::Commitment];
 
-    /// Returns the predicate commitment in the transaction.
-    fn predicate_commitment(&self) -> &Self::PredicateCommitment;
+    /// Returns the program commitment in the transaction.
+    fn program_commitment(&self) -> &Self::ProgramCommitment;
 
-    /// Returns the local data commitment in the transaction.
-    fn local_data_commitment(&self) -> &Self::LocalDataCommitment;
+    /// Returns the local data root in the transaction.
+    fn local_data_root(&self) -> &Self::LocalDataRoot;
 
     /// Returns the value balance in the transaction.
     fn value_balance(&self) -> i64;
 
-    /// Returns the stored record ciphertexts
-    fn ciphertexts(&self) -> &[Self::Ciphertext];
+    /// Returns the encrypted records
+    fn encrypted_records(&self) -> &[Self::EncryptedRecord];
 
     /// Returns the memorandum.
     fn memorandum(&self) -> &Self::Memorandum;
