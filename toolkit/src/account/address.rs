@@ -4,7 +4,7 @@ use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParamete
 use snarkos_objects::AccountAddress;
 use snarkos_utilities::bytes::ToBytes;
 
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
 pub struct Address {
@@ -27,6 +27,16 @@ impl Address {
         let mut output = vec![];
         self.address.write(&mut output).expect("serialization to bytes failed");
         output
+    }
+}
+
+impl FromStr for Address {
+    type Err = AddressError;
+
+    fn from_str(address: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            address: AccountAddress::<Components>::from_str(address)?,
+        })
     }
 }
 

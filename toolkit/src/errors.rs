@@ -17,6 +17,24 @@ impl From<std::io::Error> for PrivateKeyError {
 }
 
 #[derive(Debug, Error)]
+pub enum ViewKeyError {
+    #[error("{}: {}", _0, _1)]
+    Crate(&'static str, String),
+}
+
+impl From<snarkos_errors::objects::account::AccountError> for ViewKeyError {
+    fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
+        ViewKeyError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for ViewKeyError {
+    fn from(error: std::io::Error) -> Self {
+        ViewKeyError::Crate("std::io", format!("{:?}", error))
+    }
+}
+
+#[derive(Debug, Error)]
 pub enum AddressError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
