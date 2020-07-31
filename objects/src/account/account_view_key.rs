@@ -70,7 +70,7 @@ impl<C: DPCComponents> FromStr for AccountViewKey<C> {
             return Err(AccountError::InvalidPrefixBytes(data[0..7].to_vec()));
         }
 
-        let mut reader = &data[4..];
+        let mut reader = &data[7..];
         let decryption_key: <C::AccountEncryption as EncryptionScheme>::PrivateKey = FromBytes::read(&mut reader)?;
 
         Ok(Self { decryption_key })
