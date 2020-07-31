@@ -114,6 +114,18 @@ impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
     }
 }
 
+impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        other.vk
+    }
+}
+
+impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
+    fn from(other: PreparedVerifyingKey<E>) -> Self {
+        other.vk
+    }
+}
+
 impl<E: PairingEngine> Default for VerifyingKey<E> {
     fn default() -> Self {
         Self {
@@ -306,18 +318,6 @@ impl<E: PairingEngine> Parameters<E> {
     }
 }
 
-impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
-    fn from(other: Parameters<E>) -> Self {
-        other.vk
-    }
-}
-
-impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
-    fn from(other: Parameters<E>) -> Self {
-        prepare_verifying_key(&other.vk)
-    }
-}
-
 /// Preprocessed verification key parameters that enable faster verification
 /// at the expense of larger size in memory.
 #[derive(Clone, Debug)]
@@ -329,9 +329,9 @@ pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub gamma_abc_g1: Vec<E::G1Affine>,
 }
 
-impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
-    fn from(other: PreparedVerifyingKey<E>) -> Self {
-        other.vk
+impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        prepare_verifying_key(&other.vk)
     }
 }
 

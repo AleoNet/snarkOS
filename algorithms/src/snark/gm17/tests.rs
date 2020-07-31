@@ -94,7 +94,7 @@ mod gm17 {
 
     #[test]
     fn test_gm17() {
-        use crate::snark::GM17;
+        use crate::snark::gm17::GM17;
         use snarkos_curves::bls12_377::{Bls12_377, Fr};
         use snarkos_models::algorithms::SNARK;
 
