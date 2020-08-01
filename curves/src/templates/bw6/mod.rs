@@ -1,8 +1,8 @@
 pub mod bw6;
-pub use self::bw6::*;
+pub use bw6::*;
 
 pub mod g1;
-pub use self::g1::*;
+pub use g1::*;
 
 pub mod g2;
-pub use self::g2::*;
+pub use g2::*;

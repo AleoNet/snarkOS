@@ -2,15 +2,15 @@
 
 pub mod fq;
 #[doc(inline)]
-pub use self::fq::*;
+pub use fq::*;
 
 pub mod fr;
 #[doc(inline)]
-pub use self::fr::*;
+pub use fr::*;
 
 pub mod parameters;
 #[doc(inline)]
-pub use self::parameters::*;
+pub use parameters::*;
 
 #[cfg(test)]
 mod tests;

@@ -15,32 +15,32 @@ pub use alloc::{boxed::Box, format, vec, vec::Vec};
 pub use std::{boxed::Box, format, vec, vec::Vec};
 
 pub mod biginteger;
-pub use self::biginteger::*;
+pub use biginteger::*;
 
 pub mod bititerator;
-pub use self::bititerator::*;
+pub use bititerator::*;
 
 #[macro_use]
 pub mod bytes;
-pub use self::bytes::*;
+pub use bytes::*;
 
 pub mod error;
-pub use self::error::*;
+pub use error::*;
 
 pub mod iterator;
-pub use self::iterator::*;
+pub use iterator::*;
 
 pub mod math;
-pub use self::math::*;
+pub use math::*;
 
 pub mod rand;
 pub use self::rand::*;
 
 pub mod serialize;
-pub use self::serialize::*;
+pub use serialize::*;
 
 pub mod variable_length_integer;
-pub use self::variable_length_integer::*;
+pub use variable_length_integer::*;
 
 #[cfg(not(feature = "std"))]
 pub mod io;

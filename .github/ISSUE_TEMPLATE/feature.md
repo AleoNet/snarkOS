@@ -1,6 +1,6 @@
 ---
 name:  🚀 Feature
-about: Submit a new snarkOS feature request
+about: Submit a new feature request
 title: "[Feature]"
 labels: feature
 ---

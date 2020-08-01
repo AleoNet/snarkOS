@@ -1,5 +1,5 @@
 pub mod schnorr;
-pub use self::schnorr::*;
+pub use schnorr::*;
 
 #[cfg(test)]
 pub mod tests;
