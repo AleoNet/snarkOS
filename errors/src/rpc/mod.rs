@@ -1,2 +1,2 @@
 pub mod rpc;
-pub use self::rpc::*;
+pub use rpc::*;

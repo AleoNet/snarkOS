@@ -9,7 +9,7 @@ use std::io::{self, Read, Result as IoResult, Write};
 
 /// GM17 zkSNARK construction.
 pub mod snark;
-pub use self::snark::*;
+pub use snark::*;
 
 /// Reduce an R1CS instance to a *Square Arithmetic Program* instance.
 mod r1cs_to_sap;
@@ -26,7 +26,9 @@ mod verifier;
 #[cfg(test)]
 mod tests;
 
-pub use self::{generator::*, prover::*, verifier::*};
+pub use generator::*;
+pub use prover::*;
+pub use verifier::*;
 
 /// A proof in the GM17 SNARK.
 #[derive(Clone, Debug, Eq)]

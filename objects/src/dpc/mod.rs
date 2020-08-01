@@ -1,2 +1,2 @@
 pub mod transactions;
-pub use self::transactions::*;
+pub use transactions::*;

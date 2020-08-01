@@ -1,5 +1,5 @@
 pub mod dpc;
-pub use self::dpc::*;
+pub use dpc::*;
 
 pub mod ledger;
-pub use self::ledger::*;
+pub use ledger::*;

@@ -19,10 +19,10 @@
 #![forbid(unsafe_code)]
 
 pub mod consensus;
-pub use self::consensus::*;
+pub use consensus::*;
 
 pub mod difficulty;
-pub use self::difficulty::*;
+pub use difficulty::*;
 
 pub mod miner;
 pub use miner::Miner;

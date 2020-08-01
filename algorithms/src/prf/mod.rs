@@ -1,2 +1,2 @@
 pub mod blake2s;
-pub use self::blake2s::*;
+pub use blake2s::*;

@@ -2,13 +2,13 @@
 extern crate log;
 
 pub mod context;
-pub use self::context::*;
+pub use context::*;
 
 pub mod message;
-pub use self::message::*;
+pub use message::*;
 
 pub mod protocol;
-pub use self::protocol::*;
+pub use protocol::*;
 
 pub mod server;
-pub use self::server::*;
+pub use server::*;

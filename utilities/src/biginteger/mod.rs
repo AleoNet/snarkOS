@@ -2,7 +2,7 @@
 mod macros;
 
 pub mod biginteger;
-pub use self::biginteger::*;
+pub use biginteger::*;
 
 #[cfg(test)]
 mod tests;

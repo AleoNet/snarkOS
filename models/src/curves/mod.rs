@@ -16,49 +16,49 @@ use std::fmt::Debug;
 mod macros;
 
 pub mod field;
-pub use self::field::*;
+pub use field::*;
 
 pub mod fp_256;
-pub use self::fp_256::*;
+pub use fp_256::*;
 
 pub mod fp_320;
-pub use self::fp_320::*;
+pub use fp_320::*;
 
 pub mod fp_384;
-pub use self::fp_384::*;
+pub use fp_384::*;
 
 pub mod fp_768;
-pub use self::fp_768::*;
+pub use fp_768::*;
 
 pub mod fp_832;
-pub use self::fp_832::*;
+pub use fp_832::*;
 
 pub mod fp2;
-pub use self::fp2::*;
+pub use fp2::*;
 
 pub mod fp3;
-pub use self::fp3::*;
+pub use fp3::*;
 
 pub mod fp6_2over3;
-pub use self::fp6_2over3::*;
+pub use fp6_2over3::*;
 
 pub mod fp6_3over2;
-pub use self::fp6_3over2::*;
+pub use fp6_3over2::*;
 
 pub mod fp12_2over3over2;
-pub use self::fp12_2over3over2::*;
+pub use fp12_2over3over2::*;
 
 pub mod fp_parameters;
-pub use self::fp_parameters::*;
+pub use fp_parameters::*;
 
 pub mod group;
-pub use self::group::*;
+pub use group::*;
 
 pub mod pairing_engine;
-pub use self::pairing_engine::*;
+pub use pairing_engine::*;
 
 pub mod primefield;
-pub use self::primefield::*;
+pub use primefield::*;
 
 pub mod tests_field;
 

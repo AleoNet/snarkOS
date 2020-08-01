@@ -1,17 +1,17 @@
 pub mod commitment;
-pub use self::commitment::*;
+pub use commitment::*;
 
 pub mod crh;
-pub use self::crh::*;
+pub use crh::*;
 
 pub mod encryption;
-pub use self::encryption::*;
+pub use encryption::*;
 
 pub mod prf;
-pub use self::prf::*;
+pub use prf::*;
 
 pub mod signature;
-pub use self::signature::*;
+pub use signature::*;
 
 pub mod snark;
-pub use self::snark::*;
+pub use snark::*;

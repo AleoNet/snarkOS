@@ -23,7 +23,7 @@ pub type PoswMarlin = GenericPosw<Marlin<Bls12_377>, Bls12_377>;
 type GenericPosw<S, E> = consensus::Posw<S, <E as PairingEngine>::Fr, M, HG, params::PoSWParams>;
 
 /// GM17 type alias for the PoSW circuit
-pub type GM17<E> = snark::GM17<E, Circuit<<E as PairingEngine>::Fr>, Vec<<E as PairingEngine>::Fr>>;
+pub type GM17<E> = snark::gm17::GM17<E, Circuit<<E as PairingEngine>::Fr>, Vec<<E as PairingEngine>::Fr>>;
 
 pub type Marlin<E> =
     snarkos_marlin::snark::MarlinSnark<'static, E, Circuit<<E as PairingEngine>::Fr>, Vec<<E as PairingEngine>::Fr>>;

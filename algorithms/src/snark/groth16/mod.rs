@@ -16,7 +16,7 @@ mod r1cs_to_qap;
 
 /// Groth16 zkSNARK construction.
 pub mod snark;
-pub use self::snark::*;
+pub use snark::*;
 
 /// Generate public parameters for the Groth16 zkSNARK construction.
 mod generator;
@@ -28,9 +28,11 @@ mod prover;
 mod verifier;
 
 #[cfg(test)]
-mod test;
+mod tests;
 
-pub use self::{generator::*, prover::*, verifier::*};
+pub use generator::*;
+pub use prover::*;
+pub use verifier::*;
 
 /// A proof in the Groth16 SNARK.
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -109,6 +111,18 @@ impl<E: PairingEngine> FromBytes for VerifyingKey<E> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         Self::read(&mut reader)
+    }
+}
+
+impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        other.vk
+    }
+}
+
+impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
+    fn from(other: PreparedVerifyingKey<E>) -> Self {
+        other.vk
     }
 }
 
@@ -304,18 +318,6 @@ impl<E: PairingEngine> Parameters<E> {
     }
 }
 
-impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
-    fn from(other: Parameters<E>) -> Self {
-        other.vk
-    }
-}
-
-impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
-    fn from(other: Parameters<E>) -> Self {
-        prepare_verifying_key(&other.vk)
-    }
-}
-
 /// Preprocessed verification key parameters that enable faster verification
 /// at the expense of larger size in memory.
 #[derive(Clone, Debug)]
@@ -327,9 +329,9 @@ pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub gamma_abc_g1: Vec<E::G1Affine>,
 }
 
-impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
-    fn from(other: PreparedVerifyingKey<E>) -> Self {
-        other.vk
+impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
+    fn from(other: Parameters<E>) -> Self {
+        prepare_verifying_key(&other.vk)
     }
 }
 

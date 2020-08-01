@@ -1,11 +1,11 @@
 pub mod account;
-pub use self::account::*;
+pub use account::*;
 
 pub mod amount;
-pub use self::amount::*;
+pub use amount::*;
 
 pub mod block;
-pub use self::block::*;
+pub use block::*;
 
 pub mod transaction;
-pub use self::transaction::*;
+pub use transaction::*;
