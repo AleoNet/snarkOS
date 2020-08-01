@@ -2,8 +2,7 @@
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
-    program::PrivateProgramInput,
-    program_circuit::*,
+    program::{program_circuit::*, PrivateProgramInput, ProgramLocalData},
     record_payload::RecordPayload,
     records::record_encryption::RecordEncryption,
     LocalData,

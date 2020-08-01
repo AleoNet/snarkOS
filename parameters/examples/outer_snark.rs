@@ -4,8 +4,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::Components,
     outer_circuit::OuterCircuit,
     parameters::{ProgramSNARKParameters, SystemParameters},
-    program::PrivateProgramInput,
-    program_circuit::ProgramCircuit,
+    program::{PrivateProgramInput, ProgramCircuit},
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;

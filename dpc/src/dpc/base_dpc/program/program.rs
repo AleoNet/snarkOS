@@ -1,6 +1,10 @@
 use crate::dpc::base_dpc::BaseDPCComponents;
-
-use snarkos_models::{algorithms::SNARK, dpc::Program};
+use snarkos_errors::curves::ConstraintFieldError;
+use snarkos_models::{
+    algorithms::{CommitmentScheme, SNARK},
+    curves::to_field_vec::ToConstraintField,
+    dpc::Program,
+};
 
 use std::marker::PhantomData;
 
@@ -45,5 +49,27 @@ impl<C: BaseDPCComponents> Program for DPCProgram<C> {
 
     fn into_compact_repr(&self) -> Vec<u8> {
         self.identity.clone()
+    }
+}
+
+pub struct ProgramLocalData<C: BaseDPCComponents> {
+    pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
+    // TODO (raychu86) add local_data_crh_parameters
+    pub local_data_root: <C::LocalDataCommitment as CommitmentScheme>::Output,
+    pub position: u8,
+}
+
+/// Convert each component to bytes and pack into field elements.
+impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for ProgramLocalData<C>
+where
+    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
+    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+{
+    fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
+        let mut v = ToConstraintField::<C::InnerField>::to_field_elements(&[self.position][..])?;
+
+        v.extend_from_slice(&self.local_data_commitment_parameters.to_field_elements()?);
+        v.extend_from_slice(&self.local_data_root.to_field_elements()?);
+        Ok(v)
     }
 }

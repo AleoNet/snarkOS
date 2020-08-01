@@ -4,8 +4,7 @@ use crate::dpc::base_dpc::{
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
-    program::PrivateProgramInput,
-    program_circuit::ProgramCircuit,
+    program::{PrivateProgramInput, ProgramCircuit},
     record_payload::RecordPayload,
     records::record_encryption::*,
     BaseDPCComponents,
@@ -41,7 +40,7 @@ use rand_xorshift::XorShiftRng;
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 
 #[cfg(debug_assertions)]
-use crate::dpc::base_dpc::program_circuit::ProgramLocalData;
+use crate::dpc::base_dpc::program::ProgramLocalData;
 
 #[test]
 fn test_execute_base_dpc_constraints() {

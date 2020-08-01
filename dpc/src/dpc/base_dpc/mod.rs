@@ -32,7 +32,7 @@ use std::marker::PhantomData;
 pub mod binding_signature;
 
 pub mod program;
-use self::program::*;
+use program::*;
 
 pub mod record;
 use self::record::*;
@@ -48,9 +48,6 @@ pub use self::inner_circuit_gadget::*;
 
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
-
-pub mod program_circuit;
-use self::program_circuit::*;
 
 pub mod outer_circuit;
 use self::outer_circuit::*;

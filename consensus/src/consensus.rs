@@ -4,8 +4,7 @@ use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    program::{DPCProgram, PrivateProgramInput},
-    program_circuit::{ProgramCircuit, ProgramLocalData},
+    program::{DPCProgram, PrivateProgramInput, ProgramCircuit, ProgramLocalData},
     record::DPCRecord,
     record_payload::RecordPayload,
     LocalData,
