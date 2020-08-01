@@ -28,7 +28,7 @@ hex = { version="0.4.2" }
 log = { version = "0.4.11" }
 rand = { version = "0.7.3" }
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "0.2.13", features = ["full"] }
+tokio = { version = "0.2.22", features = ["full"] }
 
 [dev-dependencies]
 snarkos-testing = { path = "../testing", version = "0.8.0" }
