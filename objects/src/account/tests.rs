@@ -1,4 +1,4 @@
-use crate::account::{Account, AccountAddress, AccountPrivateKey};
+use crate::account::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::objects::account::AccountScheme;
 
@@ -25,12 +25,22 @@ fn test_account_new() {
 
 #[test]
 pub fn test_private_key_from_str() {
-    let private_key_string = "AKEY1dgmbjBrMQjqSSes54BBiUSTuRr9jn4eWwxhzmXFBDNpn";
+    let private_key_string = "APrivateKey1b5U31G1VUt6G9mAh6tm364eWgLUabK1qTBdRJKUEFEwcz";
     let private_key = AccountPrivateKey::<Components>::from_str(private_key_string);
     println!("{:?}", private_key);
 
     assert!(private_key.is_ok());
     assert_eq!(private_key_string, private_key.unwrap().to_string());
+}
+
+#[test]
+pub fn test_view_key_from_str() {
+    let view_key_string = "AViewKey1m8TjBbmN9rmorg8GEyqv4pBZ7WMnDBnTj8v8KQdUYwf6";
+    let view_key = AccountViewKey::<Components>::from_str(view_key_string);
+    println!("{:?}", view_key);
+
+    assert!(view_key.is_ok());
+    assert_eq!(view_key_string, view_key.unwrap().to_string());
 }
 
 #[test]
