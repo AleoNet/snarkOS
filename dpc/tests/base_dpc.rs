@@ -5,7 +5,6 @@ use snarkos_dpc::base_dpc::{
     program::{program_circuit::*, PrivateProgramInput, ProgramLocalData},
     record_payload::RecordPayload,
     records::record_encryption::RecordEncryption,
-    LocalData,
     DPC,
 };
 use snarkos_models::{
@@ -33,6 +32,8 @@ use snarkos_utilities::{
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+type L = Ledger<Tx, CommitmentMerkleParameters>;
 
 #[test]
 fn base_dpc_integration_test() {
@@ -115,7 +116,26 @@ fn base_dpc_integration_test() {
 
     let memo = [4u8; 32];
 
-    let old_death_vk_and_proof_generator = |local_data: &LocalData<Components>| {
+    // Offline execution to generate a DPC transaction
+    let execution_context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
+        &parameters.system_parameters,
+        &old_records,
+        &old_account_private_keys,
+        &new_record_owners,
+        &new_is_dummy_flags,
+        &new_values,
+        &new_payloads,
+        &new_birth_programs,
+        &new_death_programs,
+        &memo,
+        network_id,
+        &mut rng,
+    )
+    .unwrap();
+
+    let local_data = execution_context.into_local_data();
+
+    let old_death_program_proofs = {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut old_proof_and_vk = vec![];
         for i in 0..NUM_INPUT_RECORDS {
@@ -152,9 +172,9 @@ fn base_dpc_integration_test() {
             };
             old_proof_and_vk.push(private_input);
         }
-        Ok(old_proof_and_vk)
+        old_proof_and_vk
     };
-    let new_birth_vk_and_proof_generator = |local_data: &LocalData<Components>| {
+    let new_birth_program_proofs = {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
         let mut new_proof_and_vk = vec![];
         for j in 0..NUM_OUTPUT_RECORDS {
@@ -190,23 +210,14 @@ fn base_dpc_integration_test() {
             };
             new_proof_and_vk.push(private_input);
         }
-        Ok(new_proof_and_vk)
+        new_proof_and_vk
     };
 
-    let (new_records, transaction) = InstantiatedDPC::execute(
+    let (new_records, transaction) = InstantiatedDPC::execute_online(
         &parameters,
-        &old_records,
-        &old_account_private_keys,
-        &old_death_vk_and_proof_generator,
-        &new_record_owners,
-        &new_is_dummy_flags,
-        &new_values,
-        &new_payloads,
-        &new_birth_programs,
-        &new_death_programs,
-        &new_birth_vk_and_proof_generator,
-        &memo,
-        network_id,
+        execution_context,
+        &old_death_program_proofs,
+        &new_birth_program_proofs,
         &ledger,
         &mut rng,
     )

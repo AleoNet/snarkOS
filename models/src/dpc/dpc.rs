@@ -25,6 +25,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     /// Returns an account, given the public parameters, metadata, and an rng.
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
+    /// Returns the execution context required for program snark and DPC transaction generation.
     fn execute_offline<R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],
@@ -40,34 +41,13 @@ pub trait DPCScheme<L: LedgerScheme> {
         rng: &mut R,
     ) -> Result<Self::ExecuteContext, DPCError>;
 
+    /// Returns new records and a transaction based on the authorized
+    /// consumption of old records.
     fn execute_online<R: Rng>(
         parameters: &Self::Parameters,
         execute_context: Self::ExecuteContext,
         old_death_program_proofs: &[Self::PrivateProgramInput],
         new_birth_program_proofs: &[Self::PrivateProgramInput],
-        ledger: &L,
-        rng: &mut R,
-    ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;
-
-    /// Returns new records and a transaction based on the authorized
-    /// consumption of old records.
-    fn execute<R: Rng>(
-        parameters: &Self::Parameters,
-
-        old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        old_private_program_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivateProgramInput>, DPCError>,
-
-        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
-        new_is_dummy_flags: &[bool],
-        new_values: &[<Self::Record as Record>::Value],
-        new_payloads: &[Self::Payload],
-        new_birth_programs: &[Self::Program],
-        new_death_programs: &[Self::Program],
-        new_private_program_input: impl FnMut(&Self::LocalData) -> Result<Vec<Self::PrivateProgramInput>, DPCError>,
-
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
-        network_id: u8,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;

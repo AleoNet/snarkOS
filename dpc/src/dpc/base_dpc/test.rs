@@ -43,6 +43,8 @@ use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 #[cfg(debug_assertions)]
 use crate::dpc::base_dpc::program::ProgramLocalData;
 
+type L = Ledger<Tx, CommitmentMerkleParameters>;
+
 #[test]
 fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -137,7 +139,6 @@ fn test_execute_base_dpc_constraints() {
     let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
     let memo = [0u8; 32];
 
-    type L = Ledger<Tx, CommitmentMerkleParameters>;
     let context = InstantiatedDPC::execute_helper::<L, _>(
         &system_parameters,
         &old_records,
@@ -175,6 +176,8 @@ fn test_execute_base_dpc_constraints() {
         local_data_root: local_data_commitment,
         local_data_commitment_randomizers,
         value_balance,
+        memorandum,
+        network_id,
     } = context;
 
     // Generate the program proofs
@@ -352,7 +355,7 @@ fn test_execute_base_dpc_constraints() {
         &program_randomness,
         &local_data_commitment,
         &local_data_commitment_randomizers,
-        &memo,
+        &memorandum,
         &old_value_commits,
         &old_value_commit_randomness,
         &new_value_commits,
@@ -409,7 +412,7 @@ fn test_execute_base_dpc_constraints() {
             &program_randomness,
             &local_data_commitment,
             &local_data_commitment_randomizers,
-            &memo,
+            &memorandum,
             &old_value_commits,
             &old_value_commit_randomness,
             &new_value_commits,
@@ -436,7 +439,7 @@ fn test_execute_base_dpc_constraints() {
         &old_serial_numbers,
         &new_commitments,
         &new_encrypted_record_hashes,
-        &memo,
+        &memorandum,
         value_balance,
         network_id,
         &inner_snark_vk,
