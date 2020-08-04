@@ -52,7 +52,7 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Owner = AccountAddress<C>;
     type Payload = RecordPayload;
-    type Program = DPCProgram<C>;
+    type Program = DPCProgram<C::ProgramSNARK>;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
     type Value = u64;

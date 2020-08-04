@@ -7,6 +7,7 @@ use snarkos_dpc::base_dpc::{
     program::{DPCProgram, PrivateProgramInput, ProgramCircuit, ProgramLocalData},
     record::DPCRecord,
     record_payload::RecordPayload,
+    BaseDPCComponents,
     LocalData,
 };
 use snarkos_errors::consensus::ConsensusError;
@@ -334,8 +335,8 @@ impl ConsensusParameters {
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
         program_vk_hash: &Vec<u8>,
-        new_birth_programs: Vec<DPCProgram<Components>>,
-        new_death_programs: Vec<DPCProgram<Components>>,
+        new_birth_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
+        new_death_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
         recipient: AccountAddress<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -416,8 +417,8 @@ impl ConsensusParameters {
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
-        new_birth_programs: Vec<DPCProgram<Components>>,
-        new_death_programs: Vec<DPCProgram<Components>>,
+        new_birth_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
+        new_death_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
         new_is_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
@@ -459,7 +460,7 @@ impl ConsensusParameters {
                     );
                 }
 
-                let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+                let private_input: PrivateProgramInput<_> = PrivateProgramInput {
                     verification_key: parameters.program_snark_parameters.verification_key.clone(),
                     proof,
                 };
@@ -499,7 +500,7 @@ impl ConsensusParameters {
                             .expect("Proof should verify")
                     );
                 }
-                let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+                let private_input: PrivateProgramInput<_> = PrivateProgramInput {
                     verification_key: parameters.program_snark_parameters.verification_key.clone(),
                     proof,
                 };

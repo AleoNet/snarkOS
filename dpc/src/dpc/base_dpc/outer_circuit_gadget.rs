@@ -61,10 +61,10 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
 
     // Old record death program verification keys and proofs
-    old_death_program_verification_inputs: &[PrivateProgramInput<C>],
+    old_death_program_verification_inputs: &[PrivateProgramInput<C::ProgramSNARK>],
 
     // New record birth program verification keys and proofs
-    new_birth_program_verification_inputs: &[PrivateProgramInput<C>],
+    new_birth_program_verification_inputs: &[PrivateProgramInput<C::ProgramSNARK>],
 
     // Rest
     program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,

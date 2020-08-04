@@ -318,8 +318,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
-        birth_program: &DPCProgram<Components>,
-        death_program: &DPCProgram<Components>,
+        birth_program: &DPCProgram<Components::ProgramSNARK>,
+        death_program: &DPCProgram<Components::ProgramSNARK>,
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
@@ -581,8 +581,8 @@ where
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
     type Payload = <Self::Record as Record>::Payload;
-    type PrivateProgramInput = PrivateProgramInput<Components>;
-    type Program = DPCProgram<Components>;
+    type PrivateProgramInput = PrivateProgramInput<Components::ProgramSNARK>;
+    type Program = DPCProgram<Components::ProgramSNARK>;
     type Record = DPCRecord<Components>;
     type Transaction = DPCTransaction<Components>;
 

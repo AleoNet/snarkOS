@@ -146,7 +146,7 @@ fn base_dpc_integration_test() {
                 );
             }
 
-            let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+            let private_input: PrivateProgramInput<_> = PrivateProgramInput {
                 verification_key: parameters.program_snark_parameters.verification_key.clone(),
                 proof,
             };
@@ -184,7 +184,7 @@ fn base_dpc_integration_test() {
                     ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify")
                 );
             }
-            let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+            let private_input: PrivateProgramInput<_> = PrivateProgramInput {
                 verification_key: parameters.program_snark_parameters.verification_key.clone(),
                 proof,
             };

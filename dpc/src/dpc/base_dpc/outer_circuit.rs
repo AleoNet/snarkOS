@@ -34,8 +34,8 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     inner_snark_vk: Option<<C::InnerSNARK as SNARK>::VerificationParameters>,
     inner_snark_proof: Option<<C::InnerSNARK as SNARK>::Proof>,
 
-    old_private_program_inputs: Option<Vec<PrivateProgramInput<C>>>,
-    new_private_program_inputs: Option<Vec<PrivateProgramInput<C>>>,
+    old_private_program_inputs: Option<Vec<PrivateProgramInput<C::ProgramSNARK>>>,
+    new_private_program_inputs: Option<Vec<PrivateProgramInput<C::ProgramSNARK>>>,
 
     program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
     program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
@@ -48,7 +48,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         ledger_parameters: &C::MerkleParameters,
         inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
         inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
-        program_snark_vk_and_proof: &PrivateProgramInput<C>,
+        program_snark_vk_and_proof: &PrivateProgramInput<C::ProgramSNARK>,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -120,11 +120,11 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         // Private program input = Verification key and input
         // Commitment contains commitment to hash of death program vk.
-        old_private_program_inputs: &[PrivateProgramInput<C>],
+        old_private_program_inputs: &[PrivateProgramInput<C::ProgramSNARK>],
 
         // Private program input = Verification key and input
         // Commitment contains commitment to hash of birth program vk.
-        new_private_program_inputs: &[PrivateProgramInput<C>],
+        new_private_program_inputs: &[PrivateProgramInput<C::ProgramSNARK>],
 
         program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,

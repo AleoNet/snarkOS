@@ -8,12 +8,12 @@ use snarkos_models::{
 
 use std::marker::PhantomData;
 
-pub struct PrivateProgramInput<C: BaseDPCComponents> {
-    pub verification_key: <C::ProgramSNARK as SNARK>::VerificationParameters,
-    pub proof: <C::ProgramSNARK as SNARK>::Proof,
+pub struct PrivateProgramInput<S: SNARK> {
+    pub verification_key: S::VerificationParameters,
+    pub proof: S::Proof,
 }
 
-impl<C: BaseDPCComponents> Clone for PrivateProgramInput<C> {
+impl<S: SNARK> Clone for PrivateProgramInput<S> {
     fn clone(&self) -> Self {
         Self {
             verification_key: self.verification_key.clone(),
@@ -23,14 +23,14 @@ impl<C: BaseDPCComponents> Clone for PrivateProgramInput<C> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "C: BaseDPCComponents"), Default(bound = "C: BaseDPCComponents"))]
-pub struct DPCProgram<C: BaseDPCComponents> {
-    #[derivative(Default(value = "vec![0u8; 32]"))]
+#[derivative(Clone(bound = "S: SNARK"), Default(bound = "S: SNARK"))]
+pub struct DPCProgram<S: SNARK> {
+    #[derivative(Default(value = "vec![0u8; 48]"))]
     identity: Vec<u8>,
-    _components: PhantomData<C>,
+    _components: PhantomData<S>,
 }
 
-impl<C: BaseDPCComponents> DPCProgram<C> {
+impl<S: SNARK> DPCProgram<S> {
     pub fn new(identity: Vec<u8>) -> Self {
         Self {
             identity,
@@ -39,8 +39,8 @@ impl<C: BaseDPCComponents> DPCProgram<C> {
     }
 }
 
-impl<C: BaseDPCComponents> Program for DPCProgram<C> {
-    type PrivateWitness = PrivateProgramInput<C>;
+impl<S: SNARK> Program for DPCProgram<S> {
+    type PrivateWitness = PrivateProgramInput<S>;
     type PublicInput = ();
 
     fn evaluate(&self, _p: &Self::PublicInput, _w: &Self::PrivateWitness) -> bool {

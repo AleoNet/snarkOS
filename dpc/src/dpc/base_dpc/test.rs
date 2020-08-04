@@ -192,7 +192,7 @@ fn test_execute_base_dpc_constraints() {
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
         }
-        let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+        let private_input: PrivateProgramInput<_> = PrivateProgramInput {
             verification_key: program_snark_pp.verification_key.clone(),
             proof,
         };
@@ -218,7 +218,7 @@ fn test_execute_base_dpc_constraints() {
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
         }
 
-        let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
+        let private_input: PrivateProgramInput<_> = PrivateProgramInput {
             verification_key: program_snark_pp.verification_key.clone(),
             proof,
         };
