@@ -184,7 +184,7 @@ pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, Encry
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
 
-pub type Program = DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>;
+pub type Program = DPCProgram<Components, <Components as BaseDPCComponents>::ProgramSNARK>;
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
 pub type ProgramSNARK<C> = GM17<InnerPairing, ProgramCircuit<C>, ProgramLocalData<C>>;

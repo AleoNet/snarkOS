@@ -302,15 +302,15 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok((sn, sig_and_pk_randomizer))
     }
 
-    pub fn generate_record<R: Rng>(
+    pub fn generate_record<P: Program, R: Rng>(
         system_parameters: &SystemParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
         owner: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
-        birth_program: &DPCProgram<Components::ProgramSNARK>,
-        death_program: &DPCProgram<Components::ProgramSNARK>,
+        birth_program: &P,
+        death_program: &P,
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
@@ -372,7 +372,6 @@ where
     type Parameters = PublicParameters<Components>;
     type Payload = <Self::Record as Record>::Payload;
     type PrivateProgramInput = PrivateProgramInput<Components::ProgramSNARK>;
-    type Program = DPCProgram<Components::ProgramSNARK>;
     type Record = DPCRecord<Components>;
     type SystemParameters = SystemParameters<Components>;
     type Transaction = DPCTransaction<Components>;
@@ -454,7 +453,7 @@ where
         Ok(account)
     }
 
-    fn execute_offline<R: Rng>(
+    fn execute_offline<P: Program, R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
@@ -462,8 +461,8 @@ where
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
-        new_birth_programs: &[Self::Program],
-        new_death_programs: &[Self::Program],
+        new_birth_programs: &[P],
+        new_death_programs: &[P],
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,

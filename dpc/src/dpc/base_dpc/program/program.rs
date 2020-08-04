@@ -1,11 +1,12 @@
-use crate::dpc::base_dpc::BaseDPCComponents;
-use snarkos_errors::curves::ConstraintFieldError;
+use crate::dpc::base_dpc::{program::ProgramCircuit, BaseDPCComponents, LocalData};
+use snarkos_errors::{curves::ConstraintFieldError, dpc::DPCError};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, SNARK},
+    algorithms::{CommitmentScheme, CRH, SNARK},
     curves::to_field_vec::ToConstraintField,
-    dpc::Program,
+    dpc::{Program, Record},
 };
 
+use rand::Rng;
 use std::marker::PhantomData;
 
 pub struct PrivateProgramInput<S: SNARK> {
@@ -23,25 +24,82 @@ impl<S: SNARK> Clone for PrivateProgramInput<S> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "S: SNARK"), Default(bound = "S: SNARK"))]
-pub struct DPCProgram<S: SNARK> {
+#[derivative(
+    Clone(bound = "C: BaseDPCComponents, S: SNARK"),
+    Debug(bound = "C: BaseDPCComponents, S: SNARK"),
+    PartialEq(bound = "C: BaseDPCComponents, S: SNARK"),
+    Eq(bound = "C: BaseDPCComponents, S: SNARK")
+)]
+pub struct DPCProgram<C: BaseDPCComponents, S: SNARK> {
     #[derivative(Default(value = "vec![0u8; 48]"))]
     identity: Vec<u8>,
-    _components: PhantomData<S>,
+    _components: PhantomData<C>,
+    _snark: PhantomData<S>,
 }
 
-impl<S: SNARK> DPCProgram<S> {
+impl<C: BaseDPCComponents, S: SNARK> DPCProgram<C, S> {
     pub fn new(identity: Vec<u8>) -> Self {
         Self {
             identity,
             _components: PhantomData,
+            _snark: PhantomData,
         }
     }
 }
 
-impl<S: SNARK> Program for DPCProgram<S> {
+impl<C: BaseDPCComponents, S: SNARK> Program for DPCProgram<C, S>
+where
+    S: SNARK<AssignedCircuit = ProgramCircuit<C>, VerifierInput = ProgramLocalData<C>>,
+{
+    type LocalData = LocalData<C>;
     type PrivateWitness = PrivateProgramInput<S>;
+    type ProvingParameters = S::ProvingParameters;
     type PublicInput = ();
+    type VerificationParameters = S::VerificationParameters;
+
+    fn execute<R: Rng>(
+        &self,
+        proving_key: Self::ProvingParameters,
+        verification_key: Self::VerificationParameters,
+        local_data: Self::LocalData,
+        position: u8,
+        rng: &mut R,
+    ) -> Result<Self::PrivateWitness, DPCError> {
+        let records = [local_data.old_records, local_data.new_records].concat();
+        assert_eq!(position as usize, records.len());
+
+        let record = &records[position as usize];
+
+        if (position as usize) < C::NUM_OUTPUT_RECORDS {
+            assert_eq!(self.identity, record.death_program_id())
+        } else {
+            assert_eq!(self.identity, record.birth_program_id())
+        }
+
+        let circuit = ProgramCircuit::<C>::new(&local_data.system_parameters, &local_data.local_data_root, position);
+
+        let proof = S::prove(&proving_key, circuit, rng)?;
+
+        {
+            let program_snark_pvk: <S as SNARK>::PreparedVerificationParameters = verification_key.clone().into();
+
+            let program_pub_input: ProgramLocalData<C> = ProgramLocalData {
+                local_data_commitment_parameters: local_data
+                    .system_parameters
+                    .local_data_commitment
+                    .parameters()
+                    .clone(),
+                local_data_root: local_data.local_data_root.clone(),
+                position,
+            };
+            assert!(S::verify(&program_snark_pvk, &program_pub_input, &proof)?);
+        }
+
+        Ok(Self::PrivateWitness {
+            proof,
+            verification_key,
+        })
+    }
 
     fn evaluate(&self, _p: &Self::PublicInput, _w: &Self::PrivateWitness) -> bool {
         unimplemented!()
@@ -55,7 +113,7 @@ impl<S: SNARK> Program for DPCProgram<S> {
 pub struct ProgramLocalData<C: BaseDPCComponents> {
     pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
     // TODO (raychu86) add local_data_crh_parameters
-    pub local_data_root: <C::LocalDataCommitment as CommitmentScheme>::Output,
+    pub local_data_root: <C::LocalDataCRH as CRH>::Output,
     pub position: u8,
 }
 
@@ -63,7 +121,7 @@ pub struct ProgramLocalData<C: BaseDPCComponents> {
 impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for ProgramLocalData<C>
 where
     <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
+    <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 {
     fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
         let mut v = ToConstraintField::<C::InnerField>::to_field_elements(&[self.position][..])?;

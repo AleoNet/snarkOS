@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{program::DPCProgram, record_payload::RecordPayload, BaseDPCComponents};
+use crate::dpc::base_dpc::{record_payload::RecordPayload, BaseDPCComponents};
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::Record,
@@ -52,7 +52,6 @@ impl<C: BaseDPCComponents> Record for DPCRecord<C> {
     type CommitmentRandomness = <C::RecordCommitment as CommitmentScheme>::Randomness;
     type Owner = AccountAddress<C>;
     type Payload = RecordPayload;
-    type Program = DPCProgram<C::ProgramSNARK>;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
     type SerialNumberNonce = <C::SerialNumberNonceCRH as CRH>::Output;
     type Value = u64;

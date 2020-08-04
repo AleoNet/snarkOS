@@ -173,12 +173,14 @@ fn test_execute_base_dpc_constraints() {
 
         program_commitment,
         program_randomness,
-        local_data_root: local_data_commitment,
+        local_data_root,
         local_data_commitment_randomizers,
         value_balance,
         memorandum,
         network_id,
     } = context;
+
+    let local_data = context.into_local_data();
 
     // Generate the program proofs
 
@@ -186,7 +188,7 @@ fn test_execute_base_dpc_constraints() {
     for i in 0..NUM_INPUT_RECORDS {
         let proof = ProgramSNARK::prove(
             &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_commitment, i as u8),
+            ProgramCircuit::new(&system_parameters, &local_data_root, i as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -194,7 +196,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                 local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_commitment.clone(),
+                local_data_root: local_data_root.clone(),
                 position: i as u8,
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
@@ -227,7 +229,7 @@ fn test_execute_base_dpc_constraints() {
     for j in 0..NUM_OUTPUT_RECORDS {
         let proof = ProgramSNARK::prove(
             &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_commitment, j as u8),
+            ProgramCircuit::new(&system_parameters, &local_data_root, j as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -236,7 +238,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                 local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_commitment.clone(),
+                local_data_root: local_data_root.clone(),
                 position: j as u8,
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
@@ -303,7 +305,7 @@ fn test_execute_base_dpc_constraints() {
         new_value_commit_randomness.push(value_commitment_randomness);
     }
 
-    let sighash = to_bytes![local_data_commitment].unwrap();
+    let sighash = to_bytes![local_data_root].unwrap();
 
     let binding_signature = create_binding_signature::<
         <Components as BaseDPCComponents>::ValueCommitment,
@@ -353,7 +355,7 @@ fn test_execute_base_dpc_constraints() {
         &new_encrypted_record_hashes,
         &program_commitment,
         &program_randomness,
-        &local_data_commitment,
+        &local_data_root,
         &local_data_commitment_randomizers,
         &memorandum,
         &old_value_commits,
@@ -410,7 +412,7 @@ fn test_execute_base_dpc_constraints() {
             &new_encrypted_record_hashes,
             &program_commitment,
             &program_randomness,
-            &local_data_commitment,
+            &local_data_root,
             &local_data_commitment_randomizers,
             &memorandum,
             &old_value_commits,
@@ -448,7 +450,7 @@ fn test_execute_base_dpc_constraints() {
         &new_proof_and_vk,
         &program_commitment,
         &program_randomness,
-        &local_data_commitment,
+        &local_data_root,
     )
     .unwrap();
 

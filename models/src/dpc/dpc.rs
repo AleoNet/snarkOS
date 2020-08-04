@@ -11,9 +11,8 @@ pub trait DPCScheme<L: LedgerScheme> {
     type Metadata: ?Sized;
     type Payload;
     type Parameters;
-    type Program: Program<PrivateWitness = Self::PrivateProgramInput>;
     type PrivateProgramInput;
-    type Record: Record<Owner = <Self::Account as AccountScheme>::AccountAddress, Program = Self::Program>;
+    type Record: Record<Owner = <Self::Account as AccountScheme>::AccountAddress>;
     type SystemParameters;
     type Transaction: Transaction<SerialNumber = <Self::Record as Record>::SerialNumber>;
     type LocalData;
@@ -26,7 +25,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
     /// Returns the execution context required for program snark and DPC transaction generation.
-    fn execute_offline<R: Rng>(
+    fn execute_offline<P: Program, R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
@@ -34,8 +33,8 @@ pub trait DPCScheme<L: LedgerScheme> {
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
-        new_birth_programs: &[Self::Program],
-        new_death_programs: &[Self::Program],
+        new_birth_programs: &[P],
+        new_death_programs: &[P],
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
