@@ -11,6 +11,7 @@ use crate::dpc::base_dpc::{
     ExecuteContext,
     DPC,
 };
+use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
@@ -136,7 +137,8 @@ fn test_execute_base_dpc_constraints() {
     let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
     let memo = [0u8; 32];
 
-    let context = DPC::execute_helper(
+    type L = Ledger<Tx, CommitmentMerkleParameters>;
+    let context = InstantiatedDPC::execute_helper::<L, _>(
         &system_parameters,
         &old_records,
         &old_account_private_keys,
@@ -148,17 +150,14 @@ fn test_execute_base_dpc_constraints() {
         &new_death_programs,
         &memo,
         network_id,
-        &ledger,
         &mut rng,
     )
     .unwrap();
 
     let ExecuteContext {
-        system_parameters: _comm_crh_sig_pp,
-        ledger_digest,
+        system_parameters: _system_parameters,
 
         old_records,
-        old_witnesses,
         old_account_private_keys,
         old_serial_numbers,
         old_randomizers: _,
@@ -168,7 +167,7 @@ fn test_execute_base_dpc_constraints() {
         new_commitments,
 
         new_records_encryption_randomness,
-        new_encrypted_records,
+        new_encrypted_records: _new_encrypted_records,
         new_encrypted_record_hashes,
 
         program_commitment,
@@ -204,6 +203,23 @@ fn test_execute_base_dpc_constraints() {
         old_proof_and_vk.push(private_input);
     }
 
+    // Construct the ledger witnesses
+
+    let ledger_digest = ledger.digest().expect("could not get digest");
+
+    // Generate the ledger membership witnesses
+    let mut old_witnesses = Vec::with_capacity(NUM_INPUT_RECORDS);
+
+    // Compute the ledger membership witness and serial number from the old records.
+    for record in old_records.iter() {
+        if record.is_dummy() {
+            old_witnesses.push(MerklePath::default());
+        } else {
+            let witness = ledger.prove_cm(&record.commitment()).unwrap();
+            old_witnesses.push(witness);
+        }
+    }
+
     let mut new_proof_and_vk = vec![];
     for j in 0..NUM_OUTPUT_RECORDS {
         let proof = ProgramSNARK::prove(
@@ -237,7 +253,7 @@ fn test_execute_base_dpc_constraints() {
     let mut old_value_commits = vec![];
     let mut old_value_commit_randomness = vec![];
 
-    for old_record in old_records {
+    for old_record in &old_records {
         // If the record is a dummy, then the value should be 0
         let input_value = match old_record.is_dummy() {
             true => 0,
@@ -301,19 +317,6 @@ fn test_execute_base_dpc_constraints() {
         &mut rng,
     )
     .unwrap();
-
-    // Encrypt the new records
-
-    let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-    let mut new_encrypted_records = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-
-    for record in &new_records {
-        let (record_encryption_randomness, encrypted_record) =
-            RecordEncryption::encrypt_record(&system_parameters, record, &mut rng).unwrap();
-
-        new_records_encryption_randomness.push(record_encryption_randomness);
-        new_encrypted_records.push(encrypted_record);
-    }
 
     // Prepare record encryption components used in the inner SNARK
 
@@ -392,9 +395,9 @@ fn test_execute_base_dpc_constraints() {
             &system_parameters,
             ledger.parameters(),
             &ledger_digest,
-            old_records,
+            &old_records,
             &old_witnesses,
-            old_account_private_keys,
+            &old_account_private_keys,
             &old_serial_numbers,
             &new_records,
             &new_sn_nonce_randomness,
