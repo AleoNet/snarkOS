@@ -13,7 +13,7 @@ use snarkos_models::{
         SNARK,
     },
     curves::{Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
-    dpc::{DPCComponents, DPCScheme, Program, Record},
+    dpc::{DPCComponents, DPCScheme, Record},
     gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
@@ -302,32 +302,29 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok((sn, sig_and_pk_randomizer))
     }
 
-    pub fn generate_record<P: Program, R: Rng>(
+    pub fn generate_record<R: Rng>(
         system_parameters: &SystemParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
         owner: &AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
-        birth_program: &P,
-        death_program: &P,
+        birth_program_id: &Vec<u8>,
+        death_program_id: &Vec<u8>,
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
         // Sample new commitment randomness.
         let commitment_randomness = <Components::RecordCommitment as CommitmentScheme>::Randomness::rand(rng);
 
-        // Construct a record commitment.
-        let birth_program_id = birth_program.into_compact_repr();
-        let death_program_id = death_program.into_compact_repr();
-        // Total = 32 + 1 + 8 + 32 + 32 + 32 + 32 = 169 bytes
+        // Total = 32 + 1 + 8 + 32 + 48 + 48 + 32 = 201 bytes
         let commitment_input = to_bytes![
             owner,            // 256 bits = 32 bytes
             is_dummy,         // 1 bit = 1 byte
             value,            // 64 bits = 8 bytes
             payload,          // 256 bits = 32 bytes
-            birth_program_id, // 256 bits = 32 bytes
-            death_program_id, // 256 bits = 32 bytes
+            birth_program_id, // 384 bits = 48 bytes
+            death_program_id, // 384 bits = 48 bytes
             sn_nonce          // 256 bits = 32 bytes
         ]?;
 
@@ -342,8 +339,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             is_dummy,
             value,
             payload: payload.clone(),
-            birth_program_id,
-            death_program_id,
+            birth_program_id: birth_program_id.to_vec(),
+            death_program_id: death_program_id.to_vec(),
             serial_number_nonce: sn_nonce.clone(),
             commitment,
             commitment_randomness,
@@ -453,7 +450,7 @@ where
         Ok(account)
     }
 
-    fn execute_offline<P: Program, R: Rng>(
+    fn execute_offline<R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
@@ -461,8 +458,8 @@ where
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
-        new_birth_programs: &[P],
-        new_death_programs: &[P],
+        new_birth_program_ids: &[Vec<u8>],
+        new_death_program_ids: &[Vec<u8>],
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
@@ -473,8 +470,8 @@ where
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_record_owners.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
         assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_programs.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_death_programs.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_program_ids.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_death_program_ids.len());
 
         let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
@@ -503,7 +500,6 @@ where
         let mut new_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_birth_program_ids = Vec::new();
 
         // Generate new records and commitments for them.
         for j in 0..Components::NUM_OUTPUT_RECORDS {
@@ -525,8 +521,8 @@ where
                 new_is_dummy_flags[j],
                 new_values[j],
                 &new_payloads[j],
-                &new_birth_programs[j],
-                &new_death_programs[j],
+                &new_birth_program_ids[j],
+                &new_death_program_ids[j],
                 rng,
             )?;
 
@@ -536,13 +532,12 @@ where
 
             new_commitments.push(record.commitment.clone());
             new_sn_nonce_randomness.push(sn_randomness);
-            new_birth_program_ids.push(record.birth_program_id().to_vec());
             new_records.push(record);
 
             end_timer!(output_record_time);
         }
 
-        // TODO (raychu86) Add Leo program inputs + outputs to local data commitments
+        // TODO (raychu86) Add Leo program inputs + outputs and index to local data commitments
         let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
 
         let mut local_data_commitment_randomizers = vec![];

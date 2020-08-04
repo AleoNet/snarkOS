@@ -417,6 +417,7 @@ where
 
         new_birth_program_ids.push(claimed_birth_program_id_bytes);
 
+        // TODO (raychu86) update this position to be (C::NUM_INPUT_RECORDS + j)
         let position = UInt8::constant(j as u8).to_bits_le();
 
         C::ProgramSNARKGadget::check_verify(

@@ -94,8 +94,8 @@ fn base_dpc_integration_test() {
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
-            &Program::new(program_vk_hash.clone()),
-            &Program::new(program_vk_hash.clone()),
+            &program_vk_hash,
+            &program_vk_hash,
             &mut rng,
         )
         .unwrap();
@@ -105,14 +105,12 @@ fn base_dpc_integration_test() {
     // Construct new records.
 
     // Set the new records' program to be the "always-accept" program.
-    let new_program = Program::new(program_vk_hash.clone());
-
     let new_record_owners = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
-    let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
 
     let memo = [4u8; 32];
 
@@ -125,8 +123,8 @@ fn base_dpc_integration_test() {
         &new_is_dummy_flags,
         &new_values,
         &new_payloads,
-        &new_birth_programs,
-        &new_death_programs,
+        &new_birth_program_ids,
+        &new_death_program_ids,
         &memo,
         network_id,
         &mut rng,

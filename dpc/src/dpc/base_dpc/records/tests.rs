@@ -52,8 +52,8 @@ fn test_record_serialization() {
                 false,
                 value,
                 &RecordPayload::from_bytes(&payload),
-                &Program::new(program_snark_vk_bytes.clone()),
-                &Program::new(program_snark_vk_bytes.clone()),
+                &program_snark_vk_bytes,
+                &program_snark_vk_bytes,
                 &mut rng,
             )
             .unwrap();
@@ -119,8 +119,8 @@ fn test_record_encryption() {
                 false,
                 value,
                 &RecordPayload::from_bytes(&payload),
-                &Program::new(program_snark_vk_bytes.clone()),
-                &Program::new(program_snark_vk_bytes.clone()),
+                &program_snark_vk_bytes,
+                &program_snark_vk_bytes,
                 &mut rng,
             )
             .unwrap();

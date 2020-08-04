@@ -12,9 +12,9 @@ pub trait Program: Clone {
     /// Executes and returns the program proof
     fn execute<R: Rng>(
         &self,
-        proving_key: Self::ProvingParameters,
-        verification_key: Self::VerificationParameters,
-        local_data: Self::LocalData,
+        proving_key: &Self::ProvingParameters,
+        verification_key: &Self::VerificationParameters,
+        local_data: &Self::LocalData,
         position: u8,
         rng: &mut R,
     ) -> Result<Self::PrivateWitness, DPCError>;

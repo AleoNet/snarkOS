@@ -4,10 +4,9 @@ use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    program::{DPCProgram, PrivateProgramInput, ProgramCircuit, ProgramLocalData},
+    program::{PrivateProgramInput, ProgramCircuit, ProgramLocalData},
     record::DPCRecord,
     record_payload::RecordPayload,
-    BaseDPCComponents,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
@@ -334,8 +333,8 @@ impl ConsensusParameters {
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
         program_vk_hash: &Vec<u8>,
-        new_birth_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
-        new_death_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -378,8 +377,8 @@ impl ConsensusParameters {
                 0,
                 &RecordPayload::default(),
                 // Filler program input
-                &Program::new(program_vk_hash.clone()),
-                &Program::new(program_vk_hash.clone()),
+                &program_vk_hash,
+                &program_vk_hash,
                 rng,
             )?;
 
@@ -398,8 +397,8 @@ impl ConsensusParameters {
             old_records,
             old_account_private_keys,
             new_record_owners,
-            new_birth_programs,
-            new_death_programs,
+            new_birth_program_ids,
+            new_death_program_ids,
             new_is_dummy_flags,
             new_values,
             new_payloads,
@@ -416,8 +415,8 @@ impl ConsensusParameters {
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
-        new_birth_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
-        new_death_programs: Vec<DPCProgram<<Components as BaseDPCComponents>::ProgramSNARK>>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
         new_is_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
@@ -437,8 +436,8 @@ impl ConsensusParameters {
             &new_is_dummy_flags,
             &new_values,
             &new_payloads,
-            &new_birth_programs,
-            &new_death_programs,
+            &new_birth_program_ids,
+            &new_death_program_ids,
             &memo,
             self.network_id,
             rng,

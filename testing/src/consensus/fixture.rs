@@ -25,7 +25,7 @@ pub struct Fixture {
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
     pub genesis_block: Block<Tx>,
-    pub program: Program,
+    pub program: AlwaysAcceptProgram,
     pub rng: XorShiftRng,
 }
 
@@ -55,7 +55,7 @@ fn setup(verify_only: bool) -> Fixture {
     ]
     .unwrap();
 
-    let program = Program::new(program_vk_hash);
+    let program = AlwaysAcceptProgram::new(program_vk_hash);
 
     Fixture {
         parameters,

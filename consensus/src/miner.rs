@@ -67,9 +67,8 @@ impl Miner {
             &to_bytes![parameters.program_snark_parameters.verification_key]?
         )?]?;
 
-        let new_program = Program::new(program_vk_hash.clone());
-        let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
-        let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+        let new_birth_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
             if self.consensus.network_id != transaction.network_id {

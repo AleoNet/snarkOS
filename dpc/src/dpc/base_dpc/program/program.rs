@@ -59,26 +59,30 @@ where
 
     fn execute<R: Rng>(
         &self,
-        proving_key: Self::ProvingParameters,
-        verification_key: Self::VerificationParameters,
-        local_data: Self::LocalData,
+        proving_key: &Self::ProvingParameters,
+        verification_key: &Self::VerificationParameters,
+        local_data: &Self::LocalData,
         position: u8,
         rng: &mut R,
     ) -> Result<Self::PrivateWitness, DPCError> {
-        let records = [local_data.old_records, local_data.new_records].concat();
-        assert_eq!(position as usize, records.len());
+        let mut position = position;
+        let records = [&local_data.old_records[..], &local_data.new_records[..]].concat();
+        assert!((position as usize) < records.len());
 
         let record = &records[position as usize];
 
-        if (position as usize) < C::NUM_OUTPUT_RECORDS {
-            assert_eq!(self.identity, record.death_program_id())
+        if (position as usize) < C::NUM_INPUT_RECORDS {
+            assert_eq!(self.identity, record.death_program_id());
         } else {
-            assert_eq!(self.identity, record.birth_program_id())
+            assert_eq!(self.identity, record.birth_program_id());
+
+            // TODO (raychu86) Make this position absolute (remove this line)
+            position -= C::NUM_INPUT_RECORDS as u8;
         }
 
         let circuit = ProgramCircuit::<C>::new(&local_data.system_parameters, &local_data.local_data_root, position);
 
-        let proof = S::prove(&proving_key, circuit, rng)?;
+        let proof = S::prove(proving_key, circuit, rng)?;
 
         {
             let program_snark_pvk: <S as SNARK>::PreparedVerificationParameters = verification_key.clone().into();
@@ -97,7 +101,7 @@ where
 
         Ok(Self::PrivateWitness {
             proof,
-            verification_key,
+            verification_key: verification_key.clone(),
         })
     }
 

@@ -4,7 +4,7 @@ use crate::dpc::base_dpc::{
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
-    program::{PrivateProgramInput, ProgramCircuit},
+    program::DPCProgram,
     record_payload::RecordPayload,
     records::record_encryption::*,
     BaseDPCComponents,
@@ -15,7 +15,7 @@ use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
-    dpc::{DPCScheme, Record},
+    dpc::{DPCScheme, Program, Record},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
@@ -37,12 +37,6 @@ use itertools::Itertools;
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
-#[cfg(debug_assertions)]
-use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
-
-#[cfg(debug_assertions)]
-use crate::dpc::base_dpc::program::ProgramLocalData;
-
 type L = Ledger<Tx, CommitmentMerkleParameters>;
 
 #[test]
@@ -57,8 +51,6 @@ fn test_execute_base_dpc_constraints() {
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
     let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
     let program_snark_pp = InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
-    #[cfg(debug_assertions)]
-    let program_snark_pvk: PreparedVerifyingKey<_> = program_snark_pp.verification_key.clone().into();
 
     let program_snark_vk_bytes = to_bytes![
         ProgramVerificationKeyHash::hash(
@@ -106,8 +98,8 @@ fn test_execute_base_dpc_constraints() {
         true,
         0,
         &RecordPayload::default(),
-        &Program::new(program_snark_vk_bytes.clone()),
-        &Program::new(program_snark_vk_bytes.clone()),
+        &program_snark_vk_bytes,
+        &program_snark_vk_bytes,
         &mut rng,
     )
     .unwrap();
@@ -129,14 +121,13 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     // Set the new record's program to be the "always-accept" program.
-    let new_program = Program::new(program_snark_vk_bytes.clone());
 
     let new_record_owners = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
-    let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![program_snark_vk_bytes.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![program_snark_vk_bytes.clone(); NUM_OUTPUT_RECORDS];
     let memo = [0u8; 32];
 
     let context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
@@ -147,13 +138,49 @@ fn test_execute_base_dpc_constraints() {
         &new_is_dummy_flags,
         &new_values,
         &new_payloads,
-        &new_birth_programs,
-        &new_death_programs,
+        &new_birth_program_ids,
+        &new_death_program_ids,
         &memo,
         network_id,
         &mut rng,
     )
     .unwrap();
+
+    let local_data = context.into_local_data();
+
+    // Generate the program proofs
+
+    let dpc_program = DPCProgram::new(program_snark_vk_bytes);
+
+    let mut old_proof_and_vk = vec![];
+    for i in 0..NUM_INPUT_RECORDS {
+        let private_input = dpc_program
+            .execute(
+                &program_snark_pp.proving_key,
+                &program_snark_pp.verification_key,
+                &local_data,
+                i as u8,
+                &mut rng,
+            )
+            .unwrap();
+
+        old_proof_and_vk.push(private_input);
+    }
+
+    let mut new_proof_and_vk = vec![];
+    for j in 0..NUM_OUTPUT_RECORDS {
+        let private_input = dpc_program
+            .execute(
+                &program_snark_pp.proving_key,
+                &program_snark_pp.verification_key,
+                &local_data,
+                (NUM_INPUT_RECORDS + j) as u8,
+                &mut rng,
+            )
+            .unwrap();
+
+        new_proof_and_vk.push(private_input);
+    }
 
     let ExecuteContext {
         system_parameters: _system_parameters,
@@ -180,34 +207,6 @@ fn test_execute_base_dpc_constraints() {
         network_id,
     } = context;
 
-    let local_data = context.into_local_data();
-
-    // Generate the program proofs
-
-    let mut old_proof_and_vk = vec![];
-    for i in 0..NUM_INPUT_RECORDS {
-        let proof = ProgramSNARK::prove(
-            &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_root, i as u8),
-            &mut rng,
-        )
-        .expect("Proof should work");
-        #[cfg(debug_assertions)]
-        {
-            let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_root.clone(),
-                position: i as u8,
-            };
-            assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
-        }
-        let private_input: PrivateProgramInput<_> = PrivateProgramInput {
-            verification_key: program_snark_pp.verification_key.clone(),
-            proof,
-        };
-        old_proof_and_vk.push(private_input);
-    }
-
     // Construct the ledger witnesses
 
     let ledger_digest = ledger.digest().expect("could not get digest");
@@ -223,32 +222,6 @@ fn test_execute_base_dpc_constraints() {
             let witness = ledger.prove_cm(&record.commitment()).unwrap();
             old_witnesses.push(witness);
         }
-    }
-
-    let mut new_proof_and_vk = vec![];
-    for j in 0..NUM_OUTPUT_RECORDS {
-        let proof = ProgramSNARK::prove(
-            &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_root, j as u8),
-            &mut rng,
-        )
-        .expect("Proof should work");
-
-        #[cfg(debug_assertions)]
-        {
-            let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_root.clone(),
-                position: j as u8,
-            };
-            assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
-        }
-
-        let private_input: PrivateProgramInput<_> = PrivateProgramInput {
-            verification_key: program_snark_pp.verification_key.clone(),
-            proof,
-        };
-        new_proof_and_vk.push(private_input);
     }
 
     // Generate binding signature

@@ -1,5 +1,5 @@
 use crate::{
-    dpc::{Program, Record},
+    dpc::Record,
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_errors::dpc::DPCError;
@@ -25,7 +25,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
     /// Returns the execution context required for program snark and DPC transaction generation.
-    fn execute_offline<P: Program, R: Rng>(
+    fn execute_offline<R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],
         old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
@@ -33,8 +33,8 @@ pub trait DPCScheme<L: LedgerScheme> {
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
         new_payloads: &[Self::Payload],
-        new_birth_programs: &[P],
-        new_death_programs: &[P],
+        new_birth_program_ids: &[Vec<u8>],
+        new_death_program_ids: &[Vec<u8>],
         memorandum: &<Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,

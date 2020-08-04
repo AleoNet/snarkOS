@@ -4,7 +4,7 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, InstantiatedDPC, Program},
+    instantiated::{AlwaysAcceptProgram, Components, InstantiatedDPC},
     record::DPCRecord,
     record_payload::RecordPayload,
 };
@@ -172,7 +172,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             .hash(&to_bytes![self.parameters.program_snark_parameters.verification_key]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
-        let program = Program::new(program_vk_hash_bytes.clone());
+        let program = AlwaysAcceptProgram::new(program_vk_hash_bytes.clone());
         let new_birth_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_death_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
 
