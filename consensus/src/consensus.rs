@@ -429,7 +429,7 @@ impl ConsensusParameters {
             parameters.program_snark_parameters.verification_key.clone().into();
 
         // Offline execution to generate a DPC transaction
-        let execution_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+        let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
             &parameters.system_parameters,
             &old_records,
             &old_account_private_keys,
@@ -444,7 +444,7 @@ impl ConsensusParameters {
             rng,
         )?;
 
-        let local_data = execution_context.into_local_data();
+        let local_data = execute_context.into_local_data();
 
         let old_death_program_proofs = {
             let mut rng = thread_rng();
@@ -529,7 +529,7 @@ impl ConsensusParameters {
 
         let (new_records, transaction) = InstantiatedDPC::execute_online(
             &parameters,
-            execution_context,
+            execute_context,
             &old_death_program_proofs,
             &new_birth_program_proofs,
             ledger,

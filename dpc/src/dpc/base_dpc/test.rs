@@ -15,7 +15,7 @@ use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
-    dpc::Record,
+    dpc::{DPCScheme, Record},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
@@ -139,7 +139,7 @@ fn test_execute_base_dpc_constraints() {
     let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
     let memo = [0u8; 32];
 
-    let context = InstantiatedDPC::execute_helper::<L, _>(
+    let context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
         &system_parameters,
         &old_records,
         &old_account_private_keys,

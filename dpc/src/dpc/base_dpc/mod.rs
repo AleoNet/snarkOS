@@ -131,8 +131,8 @@ pub struct DPC<Components: BaseDPCComponents> {
     _components: PhantomData<Components>,
 }
 
-/// Returned by `PlainDPC::execute_helper`. Stores data required to produce the
-/// final transaction after `execute_helper` has created old serial numbers,
+/// Returned by `BaseDPC::execute_offline`. Stores data required to produce the
+/// final transaction after `execute_offline` has created old serial numbers,
 /// new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
 pub struct ExecuteContext<Components: BaseDPCComponents> {
@@ -352,226 +352,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(record_time);
         Ok(record)
     }
-
-    pub(crate) fn execute_helper<'a, L, R: Rng>(
-        parameters: &'a SystemParameters<Components>,
-
-        old_records: &'a [<Self as DPCScheme<L>>::Record],
-        old_account_private_keys: &'a [AccountPrivateKey<Components>],
-
-        new_record_owners: &[AccountAddress<Components>],
-        new_is_dummy_flags: &[bool],
-        new_values: &[u64],
-        new_payloads: &[<Self as DPCScheme<L>>::Payload],
-        new_birth_programs: &[<Self as DPCScheme<L>>::Program],
-        new_death_programs: &[<Self as DPCScheme<L>>::Program],
-
-        memo: &[u8; 32],
-        network_id: u8,
-
-        rng: &mut R,
-    ) -> Result<ExecuteContext<Components>, DPCError>
-    where
-        L: LedgerScheme<
-            Commitment = <Components::RecordCommitment as CommitmentScheme>::Output,
-            MerkleParameters = Components::MerkleParameters,
-            MerklePath = MerklePath<Components::MerkleParameters>,
-            MerkleTreeDigest = MerkleTreeDigest<Components::MerkleParameters>,
-            SerialNumber = <Components::AccountSignature as SignatureScheme>::PublicKey,
-            Transaction = DPCTransaction<Components>,
-        >,
-    {
-        assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
-        assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
-
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_record_owners.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_programs.len());
-        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_death_programs.len());
-
-        let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
-        let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
-        let mut joint_serial_numbers = Vec::new();
-        let mut old_death_program_ids = Vec::new();
-
-        let mut value_balance: i64 = 0;
-
-        // Compute the ledger membership witness and serial number from the old records.
-        for (i, record) in old_records.iter().enumerate() {
-            let input_record_time = start_timer!(|| format!("Process input record {}", i));
-
-            if !record.is_dummy() {
-                value_balance += record.value() as i64;
-            }
-
-            let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
-            joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
-            old_serial_numbers.push(sn);
-            old_randomizers.push(randomizer);
-            old_death_program_ids.push(record.death_program_id().to_vec());
-
-            end_timer!(input_record_time);
-        }
-
-        let mut new_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_birth_program_ids = Vec::new();
-
-        // Generate new records and commitments for them.
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
-            let output_record_time = start_timer!(|| format!("Process output record {}", j));
-            let sn_nonce_time = start_timer!(|| "Generate serial number nonce");
-
-            // Sample randomness sn_randomness for the CRH input.
-            let sn_randomness: [u8; 32] = rng.gen();
-
-            let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
-            let sn_nonce = Components::SerialNumberNonceCRH::hash(&parameters.serial_number_nonce, &crh_input)?;
-
-            end_timer!(sn_nonce_time);
-
-            let record = Self::generate_record(
-                parameters,
-                &sn_nonce,
-                &new_record_owners[j],
-                new_is_dummy_flags[j],
-                new_values[j],
-                &new_payloads[j],
-                &new_birth_programs[j],
-                &new_death_programs[j],
-                rng,
-            )?;
-
-            if !record.is_dummy {
-                value_balance -= record.value() as i64;
-            }
-
-            new_commitments.push(record.commitment.clone());
-            new_sn_nonce_randomness.push(sn_randomness);
-            new_birth_program_ids.push(record.birth_program_id().to_vec());
-            new_records.push(record);
-
-            end_timer!(output_record_time);
-        }
-
-        // TODO (raychu86) Add Leo program inputs + outputs to local data commitments
-        let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
-
-        let mut local_data_commitment_randomizers = vec![];
-
-        let mut old_record_commitments = Vec::new();
-        for i in 0..Components::NUM_INPUT_RECORDS {
-            let record = &old_records[i];
-            let input_bytes = to_bytes![old_serial_numbers[i], record.commitment(), memo, network_id]?;
-
-            let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
-            let commitment = Components::LocalDataCommitment::commit(
-                &parameters.local_data_commitment,
-                &input_bytes,
-                &commitment_randomness,
-            )?;
-
-            old_record_commitments.extend_from_slice(&to_bytes![commitment]?);
-            local_data_commitment_randomizers.push(commitment_randomness);
-        }
-
-        let mut new_record_commitments = Vec::new();
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
-            let record = &new_records[j];
-            let input_bytes = to_bytes![record.commitment(), memo, network_id]?;
-
-            let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
-            let commitment = Components::LocalDataCommitment::commit(
-                &parameters.local_data_commitment,
-                &input_bytes,
-                &commitment_randomness,
-            )?;
-
-            new_record_commitments.extend_from_slice(&to_bytes![commitment]?);
-            local_data_commitment_randomizers.push(commitment_randomness);
-        }
-
-        let inner1_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &old_record_commitments)?;
-
-        let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
-
-        let local_data_root =
-            Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
-
-        end_timer!(local_data_comm_timer);
-
-        let program_comm_timer = start_timer!(|| "Compute program commitment");
-        let (program_commitment, program_randomness) = {
-            let mut input = Vec::new();
-            for id in old_death_program_ids {
-                input.extend_from_slice(&id);
-            }
-
-            for id in new_birth_program_ids {
-                input.extend_from_slice(&id);
-            }
-            let program_randomness =
-                <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
-            let program_commitment = Components::ProgramVerificationKeyCommitment::commit(
-                &parameters.program_verification_key_commitment,
-                &input,
-                &program_randomness,
-            )?;
-            (program_commitment, program_randomness)
-        };
-        end_timer!(program_comm_timer);
-
-        // Encrypt the new records
-
-        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_encrypted_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-
-        for record in &new_records {
-            let (record_encryption_randomness, encrypted_record) =
-                RecordEncryption::encrypt_record(&parameters, record, rng)?;
-
-            new_records_encryption_randomness.push(record_encryption_randomness);
-            new_encrypted_records.push(encrypted_record);
-        }
-
-        // Construct the ciphertext hashes
-
-        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for encrypted_record in &new_encrypted_records {
-            let encrypted_record_hash = RecordEncryption::encrypted_record_hash(&parameters, &encrypted_record)?;
-
-            new_encrypted_record_hashes.push(encrypted_record_hash);
-        }
-
-        let context = ExecuteContext {
-            system_parameters: parameters.clone(),
-
-            old_records: old_records.to_vec(),
-            old_account_private_keys: old_account_private_keys.to_vec(),
-            old_serial_numbers,
-            old_randomizers,
-
-            new_records,
-            new_sn_nonce_randomness,
-            new_commitments,
-
-            new_records_encryption_randomness,
-            new_encrypted_records,
-            new_encrypted_record_hashes,
-
-            program_commitment,
-            program_randomness,
-            local_data_root,
-            local_data_commitment_randomizers,
-
-            value_balance,
-            memorandum: memo.clone(),
-            network_id,
-        };
-        Ok(context)
-    }
 }
 
 impl<Components: BaseDPCComponents, L: LedgerScheme> DPCScheme<L> for DPC<Components>
@@ -688,20 +468,196 @@ where
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self::ExecuteContext, DPCError> {
-        Self::execute_helper::<L, _>(
-            &parameters,
-            &old_records,
-            &old_account_private_keys,
-            &new_record_owners,
-            &new_is_dummy_flags,
-            &new_values,
-            &new_payloads,
-            &new_birth_programs,
-            &new_death_programs,
-            &memorandum,
+        assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
+        assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
+
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_record_owners.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_is_dummy_flags.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_payloads.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_birth_programs.len());
+        assert_eq!(Components::NUM_OUTPUT_RECORDS, new_death_programs.len());
+
+        let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        let mut joint_serial_numbers = Vec::new();
+        let mut old_death_program_ids = Vec::new();
+
+        let mut value_balance: i64 = 0;
+
+        // Compute the ledger membership witness and serial number from the old records.
+        for (i, record) in old_records.iter().enumerate() {
+            let input_record_time = start_timer!(|| format!("Process input record {}", i));
+
+            if !record.is_dummy() {
+                value_balance += record.value() as i64;
+            }
+
+            let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
+            joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
+            old_serial_numbers.push(sn);
+            old_randomizers.push(randomizer);
+            old_death_program_ids.push(record.death_program_id().to_vec());
+
+            end_timer!(input_record_time);
+        }
+
+        let mut new_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_birth_program_ids = Vec::new();
+
+        // Generate new records and commitments for them.
+        for j in 0..Components::NUM_OUTPUT_RECORDS {
+            let output_record_time = start_timer!(|| format!("Process output record {}", j));
+            let sn_nonce_time = start_timer!(|| "Generate serial number nonce");
+
+            // Sample randomness sn_randomness for the CRH input.
+            let sn_randomness: [u8; 32] = rng.gen();
+
+            let crh_input = to_bytes![j as u8, sn_randomness, joint_serial_numbers]?;
+            let sn_nonce = Components::SerialNumberNonceCRH::hash(&parameters.serial_number_nonce, &crh_input)?;
+
+            end_timer!(sn_nonce_time);
+
+            let record = Self::generate_record(
+                parameters,
+                &sn_nonce,
+                &new_record_owners[j],
+                new_is_dummy_flags[j],
+                new_values[j],
+                &new_payloads[j],
+                &new_birth_programs[j],
+                &new_death_programs[j],
+                rng,
+            )?;
+
+            if !record.is_dummy {
+                value_balance -= record.value() as i64;
+            }
+
+            new_commitments.push(record.commitment.clone());
+            new_sn_nonce_randomness.push(sn_randomness);
+            new_birth_program_ids.push(record.birth_program_id().to_vec());
+            new_records.push(record);
+
+            end_timer!(output_record_time);
+        }
+
+        // TODO (raychu86) Add Leo program inputs + outputs to local data commitments
+        let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
+
+        let mut local_data_commitment_randomizers = vec![];
+
+        let mut old_record_commitments = Vec::new();
+        for i in 0..Components::NUM_INPUT_RECORDS {
+            let record = &old_records[i];
+            let input_bytes = to_bytes![old_serial_numbers[i], record.commitment(), memorandum, network_id]?;
+
+            let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let commitment = Components::LocalDataCommitment::commit(
+                &parameters.local_data_commitment,
+                &input_bytes,
+                &commitment_randomness,
+            )?;
+
+            old_record_commitments.extend_from_slice(&to_bytes![commitment]?);
+            local_data_commitment_randomizers.push(commitment_randomness);
+        }
+
+        let mut new_record_commitments = Vec::new();
+        for j in 0..Components::NUM_OUTPUT_RECORDS {
+            let record = &new_records[j];
+            let input_bytes = to_bytes![record.commitment(), memorandum, network_id]?;
+
+            let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let commitment = Components::LocalDataCommitment::commit(
+                &parameters.local_data_commitment,
+                &input_bytes,
+                &commitment_randomness,
+            )?;
+
+            new_record_commitments.extend_from_slice(&to_bytes![commitment]?);
+            local_data_commitment_randomizers.push(commitment_randomness);
+        }
+
+        let inner1_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &old_record_commitments)?;
+
+        let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
+
+        let local_data_root =
+            Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
+
+        end_timer!(local_data_comm_timer);
+
+        let program_comm_timer = start_timer!(|| "Compute program commitment");
+        let (program_commitment, program_randomness) = {
+            let mut input = Vec::new();
+            for id in old_death_program_ids {
+                input.extend_from_slice(&id);
+            }
+
+            for id in new_birth_program_ids {
+                input.extend_from_slice(&id);
+            }
+            let program_randomness =
+                <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::rand(rng);
+            let program_commitment = Components::ProgramVerificationKeyCommitment::commit(
+                &parameters.program_verification_key_commitment,
+                &input,
+                &program_randomness,
+            )?;
+            (program_commitment, program_randomness)
+        };
+        end_timer!(program_comm_timer);
+
+        // Encrypt the new records
+
+        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_encrypted_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+
+        for record in &new_records {
+            let (record_encryption_randomness, encrypted_record) =
+                RecordEncryption::encrypt_record(&parameters, record, rng)?;
+
+            new_records_encryption_randomness.push(record_encryption_randomness);
+            new_encrypted_records.push(encrypted_record);
+        }
+
+        // Construct the ciphertext hashes
+
+        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for encrypted_record in &new_encrypted_records {
+            let encrypted_record_hash = RecordEncryption::encrypted_record_hash(&parameters, &encrypted_record)?;
+
+            new_encrypted_record_hashes.push(encrypted_record_hash);
+        }
+
+        let context = ExecuteContext {
+            system_parameters: parameters.clone(),
+
+            old_records: old_records.to_vec(),
+            old_account_private_keys: old_account_private_keys.to_vec(),
+            old_serial_numbers,
+            old_randomizers,
+
+            new_records,
+            new_sn_nonce_randomness,
+            new_commitments,
+
+            new_records_encryption_randomness,
+            new_encrypted_records,
+            new_encrypted_record_hashes,
+
+            program_commitment,
+            program_randomness,
+            local_data_root,
+            local_data_commitment_randomizers,
+
+            value_balance,
+            memorandum: memorandum.clone(),
             network_id,
-            rng,
-        )
+        };
+        Ok(context)
     }
 
     fn execute_online<R: Rng>(
@@ -763,7 +719,7 @@ where
         }
 
         // Generate Schnorr signature on transaction data
-        // TODO (raychu86) Remove ledger_digest from signature and move the schorr signing into `execute_helper`
+        // TODO (raychu86) Remove ledger_digest from signature and move the schorr signing into `execute_offline`
         let signature_time = start_timer!(|| "Sign and randomize transaction contents");
 
         let signature_message = to_bytes![

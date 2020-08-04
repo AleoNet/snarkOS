@@ -117,7 +117,7 @@ fn base_dpc_integration_test() {
     let memo = [4u8; 32];
 
     // Offline execution to generate a DPC transaction
-    let execution_context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
+    let execute_context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
         &parameters.system_parameters,
         &old_records,
         &old_account_private_keys,
@@ -133,7 +133,7 @@ fn base_dpc_integration_test() {
     )
     .unwrap();
 
-    let local_data = execution_context.into_local_data();
+    let local_data = execute_context.into_local_data();
 
     let old_death_program_proofs = {
         let mut rng = XorShiftRng::seed_from_u64(23472342u64);
@@ -215,7 +215,7 @@ fn base_dpc_integration_test() {
 
     let (new_records, transaction) = InstantiatedDPC::execute_online(
         &parameters,
-        execution_context,
+        execute_context,
         &old_death_program_proofs,
         &new_birth_program_proofs,
         &ledger,
