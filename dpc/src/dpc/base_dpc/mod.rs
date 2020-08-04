@@ -160,6 +160,10 @@ where
     new_sn_nonce_randomness: Vec<[u8; 32]>,
     new_commitments: Vec<<Components::RecordCommitment as CommitmentScheme>::Output>,
 
+    new_records_encryption_randomness: Vec<<Components::AccountEncryption as EncryptionScheme>::Randomness>,
+    new_encrypted_records: Vec<EncryptedRecord<Components>>,
+    new_encrypted_record_hashes: Vec<<Components::EncryptedRecordCRH as CRH>::Output>,
+
     // Program and local data root and randomness
     program_commitment: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
@@ -512,7 +516,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
 
-        let local_data_commitment =
+        let local_data_root =
             Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
 
         end_timer!(local_data_comm_timer);
@@ -538,6 +542,28 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         };
         end_timer!(program_comm_timer);
 
+        // Encrypt the new records
+
+        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_encrypted_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+
+        for record in &new_records {
+            let (record_encryption_randomness, encrypted_record) =
+                RecordEncryption::encrypt_record(&parameters, record, rng)?;
+
+            new_records_encryption_randomness.push(record_encryption_randomness);
+            new_encrypted_records.push(encrypted_record);
+        }
+
+        // Construct the ciphertext hashes
+
+        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for encrypted_record in &new_encrypted_records {
+            let encrypted_record_hash = RecordEncryption::encrypted_record_hash(&parameters, &encrypted_record)?;
+
+            new_encrypted_record_hashes.push(encrypted_record_hash);
+        }
+
         let ledger_digest = ledger.digest().expect("could not get digest");
 
         let context = ExecuteContext {
@@ -554,9 +580,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             new_sn_nonce_randomness,
             new_commitments,
 
+            new_records_encryption_randomness,
+            new_encrypted_records,
+            new_encrypted_record_hashes,
+
             program_commitment,
             program_randomness,
-            local_data_root: local_data_commitment,
+            local_data_root,
             local_data_commitment_randomizers,
 
             value_balance,
@@ -720,6 +750,11 @@ where
             new_records,
             new_sn_nonce_randomness,
             new_commitments,
+
+            new_records_encryption_randomness,
+            new_encrypted_records,
+            new_encrypted_record_hashes,
+
             program_commitment,
             program_randomness,
             local_data_root: local_data_commitment,
@@ -836,28 +871,6 @@ where
                 &sighash,
                 rng,
             )?;
-
-        // Encrypt the new records
-
-        let mut new_records_encryption_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_encrypted_records = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-
-        for record in &new_records {
-            let (record_encryption_randomness, encrypted_record) =
-                RecordEncryption::encrypt_record(&system_parameters, record, rng)?;
-
-            new_records_encryption_randomness.push(record_encryption_randomness);
-            new_encrypted_records.push(encrypted_record);
-        }
-
-        // Construct the ciphertext hashes
-
-        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for encrypted_record in &new_encrypted_records {
-            let encrypted_record_hash = RecordEncryption::encrypted_record_hash(&system_parameters, &encrypted_record)?;
-
-            new_encrypted_record_hashes.push(encrypted_record_hash);
-        }
 
         // Prepare record encryption components used in the inner SNARK
 

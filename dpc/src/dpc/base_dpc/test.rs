@@ -166,6 +166,11 @@ fn test_execute_base_dpc_constraints() {
         new_records,
         new_sn_nonce_randomness,
         new_commitments,
+
+        new_records_encryption_randomness,
+        new_encrypted_records,
+        new_encrypted_record_hashes,
+
         program_commitment,
         program_randomness,
         local_data_root: local_data_commitment,
@@ -308,16 +313,6 @@ fn test_execute_base_dpc_constraints() {
 
         new_records_encryption_randomness.push(record_encryption_randomness);
         new_encrypted_records.push(encrypted_record);
-    }
-
-    // Construct the ciphertext hashes
-
-    let mut new_encrypted_record_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-
-    for encrypted_record in &new_encrypted_records {
-        let encrypted_record_hash =
-            RecordEncryption::encrypted_record_hash(&system_parameters, &encrypted_record).unwrap();
-        new_encrypted_record_hashes.push(encrypted_record_hash);
     }
 
     // Prepare record encryption components used in the inner SNARK
