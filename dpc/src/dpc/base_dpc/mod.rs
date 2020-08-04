@@ -44,7 +44,7 @@ pub mod inner_circuit;
 use self::inner_circuit::*;
 
 pub mod inner_circuit_gadget;
-pub use self::inner_circuit_gadget::*;
+pub use inner_circuit_gadget::*;
 
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
@@ -53,7 +53,7 @@ pub mod outer_circuit;
 use self::outer_circuit::*;
 
 pub mod outer_circuit_gadget;
-pub use self::outer_circuit_gadget::*;
+pub use outer_circuit_gadget::*;
 
 pub mod outer_circuit_verifier_input;
 use self::outer_circuit_verifier_input::*;
@@ -62,7 +62,7 @@ pub mod parameters;
 use self::parameters::*;
 
 pub mod records;
-pub use self::records::*;
+pub use records::*;
 
 pub mod record_payload;
 

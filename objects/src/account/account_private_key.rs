@@ -184,15 +184,15 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
     /// Reads in an account private key string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = s.from_base58()?;
-        if data.len() != 36 {
+        if data.len() != 42 {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..4] != account_format::PRIVATE_KEY_PREFIX {
+        if &data[0..10] != account_format::PRIVATE_KEY_PREFIX {
             return Err(AccountError::InvalidPrefixBytes(data[0..4].to_vec()));
         }
 
-        let mut reader = &data[4..];
+        let mut reader = &data[10..];
         let seed: [u8; 32] = FromBytes::read(&mut reader)?;
 
         Self::from_seed_unchecked(&seed)
@@ -201,13 +201,13 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
 
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut private_key = [0u8; 36];
+        let mut private_key = [0u8; 42];
         let prefix = account_format::PRIVATE_KEY_PREFIX;
 
-        private_key[0..4].copy_from_slice(&prefix);
+        private_key[0..10].copy_from_slice(&prefix);
 
         self.seed
-            .write(&mut private_key[4..36])
+            .write(&mut private_key[10..42])
             .expect("seed formatting failed");
 
         write!(f, "{}", private_key.to_base58())

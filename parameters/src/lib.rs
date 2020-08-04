@@ -1,5 +1,5 @@
 pub mod genesis;
-pub use self::genesis::*;
+pub use genesis::*;
 
 pub mod params;
-pub use self::params::*;
+pub use params::*;

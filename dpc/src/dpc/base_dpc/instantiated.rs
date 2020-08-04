@@ -16,7 +16,7 @@ use snarkos_algorithms::{
     encryption::GroupEncryption,
     prf::Blake2s,
     signature::SchnorrSignature,
-    snark::{Groth16, GM17},
+    snark::{gm17::GM17, groth16::Groth16},
 };
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},

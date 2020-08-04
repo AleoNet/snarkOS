@@ -1,5 +1,5 @@
 pub mod block;
-pub use self::block::*;
+pub use block::*;
 
 #[cfg(test)]
 pub mod tests;

@@ -538,9 +538,6 @@ mod tests {
     use snarkos_objects::PedersenMerkleRootHash;
     use snarkos_testing::consensus::DATA;
 
-    use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
-
     #[test]
     fn verify_header() {
         // mine a PoSW proof

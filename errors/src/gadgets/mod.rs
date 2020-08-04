@@ -1,2 +1,2 @@
 pub mod synthesis;
-pub use self::synthesis::*;
+pub use synthesis::*;

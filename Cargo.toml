@@ -16,7 +16,6 @@ members = [
     "algorithms",
     "benchmarks",
     "consensus",
-    "console",
     "curves",
     "dpc",
     "errors",

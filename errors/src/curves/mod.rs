@@ -1,8 +1,8 @@
 pub mod constraint_field;
-pub use self::constraint_field::*;
+pub use constraint_field::*;
 
 pub mod field;
-pub use self::field::*;
+pub use field::*;
 
 pub mod group;
-pub use self::group::*;
+pub use group::*;
