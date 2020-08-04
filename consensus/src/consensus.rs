@@ -1,17 +1,16 @@
 use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    program::{PrivateProgramInput, ProgramCircuit, ProgramLocalData},
+    program::DPCProgram,
     record::DPCRecord,
     record_payload::RecordPayload,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::{DPCComponents, DPCScheme},
+    algorithms::{CRH, SNARK},
+    dpc::{DPCComponents, DPCScheme, Program},
     objects::{AccountScheme, LedgerScheme},
 };
 use snarkos_objects::{
@@ -28,10 +27,10 @@ use snarkos_objects::{
 use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
-use snarkos_utilities::bytes::FromBytes;
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -424,9 +423,6 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
-        let program_snark_pvk: PreparedVerifyingKey<_> =
-            parameters.program_snark_parameters.verification_key.clone().into();
-
         // Offline execution to generate a DPC transaction
         let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
             &parameters.system_parameters,
@@ -443,89 +439,44 @@ impl ConsensusParameters {
             rng,
         )?;
 
+        // Construct the program proofs
+
         let local_data = execute_context.into_local_data();
 
-        let old_death_program_proofs = {
-            let mut rng = thread_rng();
-            let mut old_proof_and_vk = vec![];
-            for i in 0..Components::NUM_INPUT_RECORDS {
-                // Instantiate death program circuit
-                let death_program_circuit =
-                    ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
+        let program_snark_vk_bytes = to_bytes![ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.program_snark_parameters.verification_key]?
+        )?]?;
 
-                // Generate the program proof
-                let proof = ProgramSNARK::prove(
-                    &parameters.program_snark_parameters.proving_key,
-                    death_program_circuit,
-                    &mut rng,
-                )
-                .expect("Proving should work");
-                {
-                    let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                        local_data_commitment_parameters: local_data
-                            .system_parameters
-                            .local_data_commitment
-                            .parameters()
-                            .clone(),
-                        local_data_root: local_data.local_data_root.clone(),
-                        position: i as u8,
-                    };
-                    assert!(
-                        ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
-                            .expect("Proof should verify")
-                    );
-                }
+        let dpc_program = DPCProgram::new(program_snark_vk_bytes);
 
-                let private_input: PrivateProgramInput<_> = PrivateProgramInput {
-                    verification_key: parameters.program_snark_parameters.verification_key.clone(),
-                    proof,
-                };
-                old_proof_and_vk.push(private_input);
-            }
+        let mut old_death_program_proofs = vec![];
+        for i in 0..NUM_INPUT_RECORDS {
+            let private_input = dpc_program.execute(
+                &parameters.program_snark_parameters.proving_key,
+                &parameters.program_snark_parameters.verification_key,
+                &local_data,
+                i as u8,
+                rng,
+            )?;
 
-            old_proof_and_vk
-        };
+            old_death_program_proofs.push(private_input);
+        }
 
-        let new_birth_program_proofs = {
-            let mut rng = thread_rng();
-            let mut new_proof_and_vk = vec![];
-            for j in 0..NUM_OUTPUT_RECORDS {
-                // Instantiate birth program circuit
-                let birth_program_circuit =
-                    ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
+        let mut new_birth_program_proofs = vec![];
+        for j in 0..NUM_OUTPUT_RECORDS {
+            let private_input = dpc_program.execute(
+                &parameters.program_snark_parameters.proving_key,
+                &parameters.program_snark_parameters.verification_key,
+                &local_data,
+                (NUM_INPUT_RECORDS + j) as u8,
+                rng,
+            )?;
 
-                // Generate the program proof
-                let proof = ProgramSNARK::prove(
-                    &parameters.program_snark_parameters.proving_key,
-                    birth_program_circuit,
-                    &mut rng,
-                )
-                .expect("Proving should work");
-                {
-                    let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                        local_data_commitment_parameters: local_data
-                            .system_parameters
-                            .local_data_commitment
-                            .parameters()
-                            .clone(),
-                        local_data_root: local_data.local_data_root.clone(),
-                        position: j as u8,
-                    };
-                    assert!(
-                        ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
-                            .expect("Proof should verify")
-                    );
-                }
-                let private_input: PrivateProgramInput<_> = PrivateProgramInput {
-                    verification_key: parameters.program_snark_parameters.verification_key.clone(),
-                    proof,
-                };
-                new_proof_and_vk.push(private_input);
-            }
+            new_birth_program_proofs.push(private_input);
+        }
 
-            new_proof_and_vk
-        };
-
+        // Online execution to generate a DPC transaction
         let (new_records, transaction) = InstantiatedDPC::execute_online(
             &parameters,
             execute_context,
