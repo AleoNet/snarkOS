@@ -26,7 +26,6 @@ use snarkos_curves::{
 };
 use snarkos_gadgets::{
     algorithms::{
-        binding_signature::BindingSignatureVerificationGadget,
         commitment::{Blake2sCommitmentGadget, PedersenCompressedCommitmentGadget},
         crh::BoweHopwoodPedersenCompressedCRHGadget,
         encryption::GroupEncryptionGadget,
@@ -147,8 +146,6 @@ impl DPCComponents for Components {
 }
 
 impl BaseDPCComponents for Components {
-    type BindingSignatureGadget = BindingSignatureGadget;
-    type BindingSignatureGroup = EdwardsBls;
     type DummyProgramSNARK = DummyProgramSNARK<Self>;
     type EncryptionGroup = EdwardsBls;
     type EncryptionModelParameters = EdwardsParameters;
@@ -159,8 +156,6 @@ impl BaseDPCComponents for Components {
     type OuterSNARK = ProofCheckNIZK;
     type ProgramSNARK = ProgramSNARK<Self>;
     type ProgramSNARKGadget = ProgramSNARKGadget;
-    type ValueCommitment = ValueCommitment;
-    type ValueCommitmentGadget = ValueCommitmentGadget;
 }
 
 // Native primitives
@@ -176,7 +171,6 @@ pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindo
 pub type ProgramVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
 pub type LocalDataCommitment = PedersenCompressedCommitment<EdwardsBls, LocalDataCommitmentWindow>;
-pub type ValueCommitment = PedersenCompressedCommitment<EdwardsBls, ValueWindow>;
 
 pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
@@ -206,9 +200,7 @@ pub type RecordCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls,
 pub type ProgramVerificationKeyCommitmentGadget = Blake2sCommitmentGadget;
 pub type LocalDataCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type LocalDataCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type ValueCommitmentGadget = PedersenCompressedCommitmentGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 
-pub type BindingSignatureGadget = BindingSignatureVerificationGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAffine, InnerField, EdwardsBlsGadget>;
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;

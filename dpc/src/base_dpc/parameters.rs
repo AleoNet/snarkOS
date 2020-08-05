@@ -17,7 +17,6 @@ pub struct SystemParameters<C: BaseDPCComponents> {
     pub program_verification_key_hash: C::ProgramVerificationKeyHash,
     pub local_data_crh: C::LocalDataCRH,
     pub local_data_commitment: C::LocalDataCommitment,
-    pub value_commitment: C::ValueCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
 }
 
@@ -43,8 +42,6 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
         let local_data_commitment: C::LocalDataCommitment = From::from(FromBytes::read(
             LocalDataCommitmentParameters::load_bytes()?.as_slice(),
         )?);
-        let value_commitment: C::ValueCommitment =
-            From::from(FromBytes::read(ValueCommitmentParameters::load_bytes()?.as_slice())?);
         let serial_number_nonce: C::SerialNumberNonceCRH = From::from(FromBytes::read(
             SerialNumberNonceCRHParameters::load_bytes()?.as_slice(),
         )?);
@@ -59,7 +56,6 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             program_verification_key_hash,
             local_data_crh,
             local_data_commitment,
-            value_commitment,
             serial_number_nonce,
         })
     }
@@ -189,10 +185,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn encrypted_record_crh_parameters(&self) -> &C::EncryptedRecordCRH {
         &self.system_parameters.encrypted_record_crh
-    }
-
-    pub fn value_commitment_parameters(&self) -> &C::ValueCommitment {
-        &self.system_parameters.value_commitment
     }
 
     pub fn serial_number_nonce_parameters(&self) -> &C::SerialNumberNonceCRH {

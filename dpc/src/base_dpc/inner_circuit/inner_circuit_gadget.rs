@@ -1,5 +1,4 @@
 use crate::base_dpc::{
-    binding_signature::{gadget_verification_setup, BindingSignature},
     parameters::SystemParameters,
     record_encryption::RecordEncryptionGadgetComponents,
     records::DPCRecord,
@@ -22,20 +21,15 @@ use snarkos_models::{
     },
     dpc::Record,
     gadgets::{
-        algorithms::{
-            BindingSignatureGadget,
-            CRHGadget,
-            CommitmentGadget,
-            EncryptionGadget,
-            PRFGadget,
-            SignaturePublicKeyRandomizationGadget,
-        },
+        algorithms::{CRHGadget, CommitmentGadget, EncryptionGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
         curves::FieldGadget,
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
+            arithmetic::{add::Add, sub::Sub},
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
+            int::{Int, Int64},
             uint::UInt8,
             ToBitsGadget,
             ToBytesGadget,
@@ -81,12 +75,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_root: &<C::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     memo: &[u8; 32],
-    input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
-    input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
-    output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
-    output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
-    binding_signature: &BindingSignature,
     network_id: u8,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
@@ -135,12 +124,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         local_data_root,
         local_data_commitment_randomizers,
         memo,
-        input_value_commitments,
-        input_value_commitment_randomness,
-        output_value_commitments,
-        output_value_commitment_randomness,
         value_balance,
-        binding_signature,
         network_id,
     )
 }
@@ -197,12 +181,7 @@ fn base_dpc_execute_gadget_helper<
     local_data_root: &LocalDataCRH::Output,
     local_data_commitment_randomizers: &[LocalDataCommitment::Randomness],
     memo: &[u8; 32],
-    input_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
-    input_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
-    output_value_commitments: &[<C::ValueCommitment as CommitmentScheme>::Output],
-    output_value_commitment_randomness: &[<C::ValueCommitment as CommitmentScheme>::Randomness],
     value_balance: i64,
-    binding_signature: &BindingSignature,
     network_id: u8,
 ) -> Result<(), SynthesisError>
 where
@@ -249,20 +228,10 @@ where
     let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
     let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
     let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_record_owner_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_dummy_flags_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_value_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_payloads_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_birth_program_ids_gadgets = Vec::with_capacity(old_records.len());
     let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
 
     let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_record_owner_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_is_dummy_flags_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_value_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_payloads_gadgets = Vec::with_capacity(new_records.len());
     let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_death_program_ids_gadgets = Vec::with_capacity(new_records.len());
 
     // Order for allocation of input:
     // 1. account_commitment_parameters
@@ -274,14 +243,12 @@ where
     // 7. local_data_crh_parameters
     // 8. local_data_commitment_parameters
     // 9. serial_number_nonce_crh_parameters
-    // 10. value_commitment_parameters
-    // 11. ledger_parameters
-    // 12. ledger_digest
-    // 13. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
-    // 14. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i], new_encrypted_record_hashes[i]
-    // 15. program_commitment
-    // 16. local_data_root
-    // 17. binding_signature
+    // 10. ledger_parameters
+    // 11. ledger_digest
+    // 12. for i in 0..NUM_INPUT_RECORDS: old_serial_numbers[i]
+    // 13. for j in 0..NUM_OUTPUT_RECORDS: new_commitments[i], new_encrypted_record_hashes[i]
+    // 14. program_commitment
+    // 15. local_data_root
     let (
         account_commitment_parameters,
         account_encryption_parameters,
@@ -292,7 +259,6 @@ where
         local_data_crh_parameters,
         local_data_commitment_parameters,
         serial_number_nonce_crh_parameters,
-        value_commitment_parameters,
         ledger_parameters,
     ) = {
         let cs = &mut cs.ns(|| "Declare commitment and CRH parameters");
@@ -345,12 +311,6 @@ where
             || Ok(system_parameters.serial_number_nonce.parameters()),
         )?;
 
-        let value_commitment_parameters =
-            <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::ParametersGadget::alloc_input(
-                &mut cs.ns(|| "Declare value commitment parameters"),
-                || Ok(system_parameters.value_commitment.parameters()),
-            )?;
-
         let ledger_parameters = <C::MerkleHashGadget as CRHGadget<_, _>>::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare ledger parameters"),
             || Ok(ledger_parameters.parameters()),
@@ -366,7 +326,6 @@ where
             local_data_crh_parameters,
             local_data_commitment_parameters,
             serial_number_nonce_crh_parameters,
-            value_commitment_parameters,
             ledger_parameters,
         )
     };
@@ -410,7 +369,6 @@ where
                 AccountEncryptionGadget::PublicKeyGadget::alloc(&mut declare_cs.ns(|| "given_record_owner"), || {
                     Ok(record.owner().into_repr())
                 })?;
-            old_record_owner_gadgets.push(given_record_owner.clone());
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
@@ -419,19 +377,15 @@ where
             old_record_commitments_gadgets.push(given_commitment.clone());
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
-            old_dummy_flags_gadgets.push(given_is_dummy.clone());
 
             let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
-            old_value_gadgets.push(given_value.clone());
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
-            old_payloads_gadgets.push(given_payload.clone());
 
             let given_birth_program_id = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_birth_program_id"),
                 &record.birth_program_id(),
             )?;
-            old_birth_program_ids_gadgets.push(given_birth_program_id.clone());
 
             let given_death_program_id = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_death_program_id"),
@@ -629,39 +583,6 @@ where
         };
         // ********************************************************************
 
-        // ********************************************************************
-        // Check that the value commitment is correct
-        // ********************************************************************
-        {
-            let vc_cs = &mut cs.ns(|| "Check that the value commitment is correct");
-
-            let value_commitment_randomness_gadget =
-                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-                    vc_cs.ns(|| "Allocate value commitment randomness"),
-                    || Ok(&input_value_commitment_randomness[i]),
-                )?;
-
-            let declared_value_commitment_gadget =
-                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc(
-                    vc_cs.ns(|| "Allocate declared value commitment"),
-                    || Ok(&input_value_commitments[i]),
-                )?;
-
-            let computed_value_commitment_gadget = C::ValueCommitmentGadget::check_commitment_gadget(
-                vc_cs.ns(|| "Generate value commitment"),
-                &value_commitment_parameters,
-                &given_value,
-                &value_commitment_randomness_gadget,
-            )?;
-
-            // Check that the value commitments are equivalent
-            computed_value_commitment_gadget.enforce_equal(
-                &mut vc_cs.ns(|| "Check that declared and computed value commitments are equal"),
-                &declared_value_commitment_gadget,
-            )?;
-        };
-        // ********************************************************************
-
         // *******************************************************************
         // Check that the record is well-formed.
         // *******************************************************************
@@ -746,7 +667,6 @@ where
                 AccountEncryptionGadget::PublicKeyGadget::alloc(&mut declare_cs.ns(|| "given_record_owner"), || {
                     Ok(record.owner().into_repr())
                 })?;
-            new_record_owner_gadgets.push(given_record_owner.clone());
 
             let given_record_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_record_commitment"), || {
@@ -760,13 +680,10 @@ where
                 })?;
 
             let given_is_dummy = Boolean::alloc(&mut declare_cs.ns(|| "given_is_dummy"), || Ok(record.is_dummy()))?;
-            new_is_dummy_flags_gadgets.push(given_is_dummy.clone());
 
             let given_value = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_value"), &to_bytes![record.value()]?)?;
-            new_value_gadgets.push(given_value.clone());
 
             let given_payload = UInt8::alloc_vec(&mut declare_cs.ns(|| "given_payload"), &record.payload().to_bytes())?;
-            new_payloads_gadgets.push(given_payload.clone());
 
             let given_birth_program_id = UInt8::alloc_vec(
                 &mut declare_cs.ns(|| "given_birth_program_id"),
@@ -778,7 +695,6 @@ where
                 &mut declare_cs.ns(|| "given_death_program_id"),
                 &record.death_program_id(),
             )?;
-            new_death_program_ids_gadgets.push(given_death_program_id.clone());
 
             let given_commitment_randomness = RecordCommitmentGadget::RandomnessGadget::alloc(
                 &mut declare_cs.ns(|| "given_commitment_randomness"),
@@ -837,39 +753,6 @@ where
                 &serial_number_nonce,
             )?;
         }
-        // ********************************************************************
-
-        // ********************************************************************
-        // Check that the value commitment is correct
-        // ********************************************************************
-        {
-            let vc_cs = &mut cs.ns(|| "Check that the value commitment is correct");
-
-            let value_commitment_randomness_gadget =
-                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-                    vc_cs.ns(|| "Allocate value commitment randomness"),
-                    || Ok(&output_value_commitment_randomness[j]),
-                )?;
-
-            let declared_value_commitment_gadget =
-                <C::ValueCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::alloc(
-                    vc_cs.ns(|| "Allocate declared value commitment"),
-                    || Ok(&output_value_commitments[j]),
-                )?;
-
-            let computed_value_commitment_gadget = C::ValueCommitmentGadget::check_commitment_gadget(
-                vc_cs.ns(|| "Generate value commitment"),
-                &value_commitment_parameters,
-                &given_value,
-                &value_commitment_randomness_gadget,
-            )?;
-
-            // Check that the value commitments are equivalent
-            computed_value_commitment_gadget.enforce_equal(
-                &mut vc_cs.ns(|| "Check that declared and computed value commitments are equal"),
-                &declared_value_commitment_gadget,
-            )?;
-        };
         // *******************************************************************
 
         // *******************************************************************
@@ -956,7 +839,7 @@ where
             // *******************************************************************
             // Pack the record bits into serialization format
 
-            let scalar_field_bitsize = <C::BindingSignatureGroup as Group>::ScalarField::size_in_bits();
+            let scalar_field_bitsize = <C::EncryptionGroup as Group>::ScalarField::size_in_bits();
             let base_field_bitsize = <C::InnerField as PrimeField>::size_in_bits();
             let outer_field_bitsize = <C::OuterField as PrimeField>::size_in_bits();
 
@@ -1346,10 +1229,10 @@ where
     // ********************************************************************
 
     // ********************************************************************
-    // Check that the local data commitment is valid
+    // Check that the local data root is valid
     // ********************************************************************
     {
-        let mut cs = cs.ns(|| "Check that local data commitment is valid.");
+        let mut cs = cs.ns(|| "Check that local data root is valid.");
 
         let memo = UInt8::alloc_input_vec(cs.ns(|| "Allocate memorandum"), memo)?;
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
@@ -1445,82 +1328,37 @@ where
     // *******************************************************************
 
     // *******************************************************************
-    // Check that the binding signature is valid
+    // Check that the value balance is valid
     // *******************************************************************
     {
-        let mut cs = cs.ns(|| "Check that the binding signature is valid.");
+        let mut cs = cs.ns(|| "Check that the value balance is valid.");
 
-        let (c, partial_bvk, affine_r, recommit) =
-            gadget_verification_setup::<C::ValueCommitment, C::BindingSignatureGroup>(
-                &system_parameters.value_commitment,
-                &input_value_commitments,
-                &output_value_commitments,
-                &to_bytes![local_data_root]?,
-                &binding_signature,
-            )
-            .unwrap();
+        let given_value_balance = Int64::alloc_input_fe(cs.ns(|| "given_value_balance"), value_balance)?;
 
-        let binding_signature_parameters = <C::BindingSignatureGadget as BindingSignatureGadget<
-            _,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::ParametersGadget::alloc(
-            &mut cs.ns(|| "Declare value commitment parameters as binding signature parameters"),
-            || Ok(system_parameters.value_commitment.parameters()),
-        )?;
+        let mut candidate_value_balance = Int64::zero();
 
-        let c_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
-            _,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::RandomnessGadget::alloc(&mut cs.ns(|| "c_gadget"), || Ok(c))?;
+        for (i, old_record) in old_records.iter().enumerate() {
+            let value = old_record.value as i64;
+            let record_value = Int64::alloc(cs.ns(|| format!("old record {} value", i)), || Ok(value))?;
 
-        let partial_bvk_gadget =
-            <C::BindingSignatureGadget as BindingSignatureGadget<
-                C::ValueCommitment,
-                C::InnerField,
-                C::BindingSignatureGroup,
-            >>::OutputGadget::alloc(&mut cs.ns(|| "partial_bvk_gadget"), || Ok(partial_bvk))?;
+            candidate_value_balance = candidate_value_balance
+                .add(cs.ns(|| format!("add old record {} value", i)), &record_value)
+                .unwrap();
+        }
 
-        let affine_r_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
-            C::ValueCommitment,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::OutputGadget::alloc(&mut cs.ns(|| "affine_r_gadget"), || Ok(affine_r))?;
+        for (j, new_record) in new_records.iter().enumerate() {
+            let value = new_record.value as i64;
+            let record_value = Int64::alloc(cs.ns(|| format!("new record {} value", j)), || Ok(value))?;
 
-        let recommit_gadget = <C::BindingSignatureGadget as BindingSignatureGadget<
-            C::ValueCommitment,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::OutputGadget::alloc(&mut cs.ns(|| "recommit_gadget"), || Ok(recommit))?;
+            candidate_value_balance = candidate_value_balance
+                .sub(cs.ns(|| format!("sub new record {} value", j)), &record_value)
+                .unwrap();
+        }
 
-        let value_balance_bytes = UInt8::alloc_input_vec(
-            cs.ns(|| "value_balance_bytes"),
-            &(value_balance.abs() as u64).to_le_bytes(),
-        )?;
-
-        let is_negative = Boolean::alloc_input(&mut cs.ns(|| "value_balance_is_negative"), || {
-            Ok(value_balance.is_negative())
-        })?;
-
-        let value_balance_commitment = <C::BindingSignatureGadget as BindingSignatureGadget<
-            _,
-            C::InnerField,
-            C::BindingSignatureGroup,
-        >>::check_value_balance_commitment_gadget(
-            &mut cs.ns(|| "value_balance_commitment"),
-            &binding_signature_parameters,
-            &value_balance_bytes,
-        )?;
-
-        <C::BindingSignatureGadget as BindingSignatureGadget<_, C::InnerField, C::BindingSignatureGroup>>::check_binding_signature_gadget(
-            &mut cs.ns(|| "verify_binding_signature"),
-            &partial_bvk_gadget,
-            &value_balance_commitment,
-            &is_negative,
-            &c_gadget,
-            &affine_r_gadget,
-            &recommit_gadget,
+        // Enforce that given_value_balance is equivalent to candidate_value_balance
+        given_value_balance.enforce_equal(
+            cs.ns(|| "given_value_balance == candidate_value_balance"),
+            &given_value_balance,
         )?;
     }
 

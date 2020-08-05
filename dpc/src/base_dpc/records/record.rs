@@ -25,8 +25,8 @@ use std::{
 )]
 pub struct DPCRecord<C: BaseDPCComponents> {
     pub(crate) owner: AccountAddress<C>,
-
     pub(crate) is_dummy: bool,
+    // TODO (raychu86) use AleoAmount which will guard the value range
     pub(crate) value: u64,
     pub(crate) payload: RecordPayload,
 

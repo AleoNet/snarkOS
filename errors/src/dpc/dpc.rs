@@ -1,6 +1,6 @@
 use crate::{
     algorithms::{CRHError, CommitmentError, EncodingError, EncryptionError, PRFError, SNARKError, SignatureError},
-    dpc::{BindingSignatureError, LedgerError},
+    dpc::LedgerError,
     objects::AccountError,
     parameters::ParametersError,
 };
@@ -9,9 +9,6 @@ use crate::{
 pub enum DPCError {
     #[error("{}", _0)]
     AccountError(AccountError),
-
-    #[error("{}", _0)]
-    BindingSignatureError(BindingSignatureError),
 
     #[error("{}", _0)]
     CommitmentError(CommitmentError),
@@ -56,12 +53,6 @@ pub enum DPCError {
 impl From<AccountError> for DPCError {
     fn from(error: AccountError) -> Self {
         DPCError::AccountError(error)
-    }
-}
-
-impl From<BindingSignatureError> for DPCError {
-    fn from(error: BindingSignatureError) -> Self {
-        DPCError::BindingSignatureError(error)
     }
 }
 

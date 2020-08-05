@@ -12,7 +12,6 @@ cargo run --release --example program_vk_crh
 cargo run --release --example record_commitment
 cargo run --release --example encrypted_record_crh
 cargo run --release --example serial_number_nonce_crh
-cargo run --release --example value_commitment
 
 mv account_commitment.params ../src/params
 mv account_commitment.checksum ../src/params
@@ -43,9 +42,6 @@ mv encrypted_record_crh.checksum ../src/params
 
 mv serial_number_nonce_crh.params ../src/params
 mv serial_number_nonce_crh.checksum ../src/params
-
-mv value_commitment.params ../src/params
-mv value_commitment.checksum ../src/params
 
 ./program_snark.sh
 
