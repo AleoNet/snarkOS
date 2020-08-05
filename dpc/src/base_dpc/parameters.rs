@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::BaseDPCComponents;
+use crate::base_dpc::BaseDPCComponents;
 use snarkos_models::{algorithms::SNARK, parameters::Parameters};
 use snarkos_parameters::*;
 use snarkos_utilities::bytes::FromBytes;

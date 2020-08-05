@@ -1,6 +1,6 @@
 mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, MemoryPool, Miner};
-    use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
+    use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, records::DPCRecord};
     use snarkos_models::{
         dpc::{DPCScheme, Program, Record},
         objects::LedgerScheme,

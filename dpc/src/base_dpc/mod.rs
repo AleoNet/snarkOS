@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
+use crate::base_dpc::{binding_signature::*, record_payload::RecordPayload};
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -31,40 +31,23 @@ use std::marker::PhantomData;
 
 pub mod binding_signature;
 
-pub mod program;
-use program::*;
-
-pub mod record;
-use self::record::*;
-
-pub mod transaction;
-use self::transaction::*;
-
 pub mod inner_circuit;
-use self::inner_circuit::*;
-
-pub mod inner_circuit_gadget;
-pub use inner_circuit_gadget::*;
-
-pub mod inner_circuit_verifier_input;
-use self::inner_circuit_verifier_input::*;
+pub use inner_circuit::*;
 
 pub mod outer_circuit;
-use self::outer_circuit::*;
-
-pub mod outer_circuit_gadget;
-pub use outer_circuit_gadget::*;
-
-pub mod outer_circuit_verifier_input;
-use self::outer_circuit_verifier_input::*;
+pub use outer_circuit::*;
 
 pub mod parameters;
-use self::parameters::*;
+pub use parameters::*;
+
+pub mod program;
+pub use program::*;
 
 pub mod records;
 pub use records::*;
 
-pub mod record_payload;
+pub mod transaction;
+pub use transaction::*;
 
 pub mod instantiated;
 
@@ -526,11 +509,11 @@ where
                 rng,
             )?;
 
-            if !record.is_dummy {
+            if !record.is_dummy() {
                 value_balance -= record.value() as i64;
             }
 
-            new_commitments.push(record.commitment.clone());
+            new_commitments.push(record.commitment().clone());
             new_sn_nonce_randomness.push(sn_randomness);
             new_records.push(record);
 

@@ -1,10 +1,10 @@
 use crate::{
-    dpc::base_dpc::{
+    base_dpc::{
         binding_signature::BindingSignature,
         inner_circuit_gadget::execute_inner_proof_gadget,
         parameters::SystemParameters,
-        record::DPCRecord,
         record_encryption::RecordEncryptionGadgetComponents,
+        records::DPCRecord,
         BaseDPCComponents,
     },
     Assignment,

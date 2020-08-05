@@ -5,8 +5,8 @@
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
     instantiated::{AlwaysAcceptProgram, Components, InstantiatedDPC},
-    record::DPCRecord,
     record_payload::RecordPayload,
+    records::DPCRecord,
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::AccountScheme};

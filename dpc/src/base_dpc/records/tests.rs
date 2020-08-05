@@ -1,5 +1,5 @@
 use super::{record_encryption::*, record_serializer::*};
-use crate::dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, DPC};
+use crate::base_dpc::{instantiated::*, record_payload::RecordPayload, DPC};
 use snarkos_curves::edwards_bls12::{EdwardsParameters, EdwardsProjective as EdwardsBls};
 use snarkos_models::{algorithms::CRH, dpc::RecordSerializerScheme, objects::AccountScheme};
 

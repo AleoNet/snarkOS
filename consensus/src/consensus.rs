@@ -4,8 +4,8 @@ use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
     program::DPCProgram,
-    record::DPCRecord,
     record_payload::RecordPayload,
+    records::DPCRecord,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{

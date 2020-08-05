@@ -1,4 +1,4 @@
-use crate::base_dpc::{record::DPCRecord, record_payload::RecordPayload, BaseDPCComponents};
+use crate::base_dpc::{record_payload::RecordPayload, records::DPCRecord, BaseDPCComponents};
 use snarkos_algorithms::encoding::Elligator2;
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{

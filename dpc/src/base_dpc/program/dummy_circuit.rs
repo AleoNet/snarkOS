@@ -1,5 +1,5 @@
 use crate::{
-    base_dpc::{parameters::SystemParameters, record::DPCRecord, record_payload::RecordPayload, *},
+    base_dpc::{parameters::SystemParameters, record_payload::RecordPayload, records::DPCRecord, *},
     Assignment,
 };
 use snarkos_errors::gadgets::SynthesisError;

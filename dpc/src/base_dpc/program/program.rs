@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{program::ProgramCircuit, BaseDPCComponents, LocalData};
+use crate::base_dpc::{program::ProgramCircuit, BaseDPCComponents, LocalData};
 use snarkos_errors::{curves::ConstraintFieldError, dpc::DPCError};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH, SNARK},

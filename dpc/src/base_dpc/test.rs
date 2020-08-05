@@ -1,5 +1,5 @@
 use super::instantiated::*;
-use crate::dpc::base_dpc::{
+use crate::base_dpc::{
     binding_signature::*,
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,

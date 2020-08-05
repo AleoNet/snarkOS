@@ -43,8 +43,8 @@ extern crate snarkos_profiler;
 #[macro_use]
 extern crate derivative;
 
-pub mod dpc;
-pub use crate::dpc::*;
+pub mod base_dpc;
+pub use crate::base_dpc::*;
 
 use snarkos_errors::gadgets::SynthesisError;
 

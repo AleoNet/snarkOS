@@ -26,7 +26,7 @@ use snarkos_utilities::{
 use hex;
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
-use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
+use snarkos_dpc::base_dpc::instantiated::Tx;
 use std::{
     fs::{self, File},
     io::{Result as IoResult, Write},
@@ -84,7 +84,8 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         .program_verification_key_hash
         .hash(&to_bytes![parameters.program_snark_parameters.verification_key]?)?;
     let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
-    let program = DPCProgram::<Components>::new(program_vk_hash_bytes.clone());
+    let program =
+        DPCProgram::<Components, <Components as BaseDPCComponents>::ProgramSNARK>::new(program_vk_hash_bytes.clone());
 
     // Generate a new account that owns the dummy input records
     let dummy_account = Account::new(

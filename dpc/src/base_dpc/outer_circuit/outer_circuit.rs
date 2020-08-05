@@ -1,5 +1,5 @@
 use crate::{
-    dpc::base_dpc::{
+    base_dpc::{
         outer_circuit_gadget::execute_outer_proof_gadget,
         parameters::SystemParameters,
         program::PrivateProgramInput,

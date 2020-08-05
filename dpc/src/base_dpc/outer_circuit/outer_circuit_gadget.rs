@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{parameters::SystemParameters, program::PrivateProgramInput, BaseDPCComponents};
+use crate::base_dpc::{parameters::SystemParameters, program::PrivateProgramInput, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{

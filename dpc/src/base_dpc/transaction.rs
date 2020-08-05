@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{records::encrypted_record::*, BaseDPCComponents};
+use crate::base_dpc::{records::encrypted_record::*, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{

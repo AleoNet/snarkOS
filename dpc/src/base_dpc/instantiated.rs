@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{
+use crate::base_dpc::{
     inner_circuit::InnerCircuit,
     inner_circuit_verifier_input::InnerCircuitVerifierInput,
     outer_circuit::OuterCircuit,

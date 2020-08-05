@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{parameters::SystemParameters, BaseDPCComponents};
+use crate::base_dpc::{parameters::SystemParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{

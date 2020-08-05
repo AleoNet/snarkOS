@@ -1,8 +1,8 @@
-use crate::dpc::base_dpc::{
+use crate::base_dpc::{
     binding_signature::{gadget_verification_setup, BindingSignature},
     parameters::SystemParameters,
-    record::DPCRecord,
     record_encryption::RecordEncryptionGadgetComponents,
+    records::DPCRecord,
     BaseDPCComponents,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
