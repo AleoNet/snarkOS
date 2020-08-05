@@ -8,7 +8,7 @@ use snarkos_models::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
         r1cs::ConstraintSystem,
         utilities::{
-            alloc::AllocGadget,
+            alloc::{AllocBytesGadget, AllocGadget},
             eq::EqGadget,
             uint::unsigned_integer::{UInt, UInt8},
             ToBytesGadget,
@@ -61,10 +61,10 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
 
     // Old record death program verification keys and proofs
-    old_death_program_verification_inputs: &[PrivateProgramInput<C::ProgramSNARK>],
+    old_death_program_verification_inputs: &[PrivateProgramInput],
 
     // New record birth program verification keys and proofs
-    new_birth_program_verification_inputs: &[PrivateProgramInput<C::ProgramSNARK>],
+    new_birth_program_verification_inputs: &[PrivateProgramInput],
 
     // Rest
     program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
@@ -338,15 +338,16 @@ where
     for i in 0..C::NUM_INPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check death program for input record {}", i));
 
-        let death_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        let death_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc_bytes(
             &mut cs.ns(|| "Allocate proof"),
             || Ok(&old_death_program_verification_inputs[i].proof),
         )?;
 
-        let death_program_vk = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
-            &mut cs.ns(|| "Allocate verification key"),
-            || Ok(&old_death_program_verification_inputs[i].verification_key),
-        )?;
+        let death_program_vk =
+            <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc_bytes(
+                &mut cs.ns(|| "Allocate verification key"),
+                || Ok(&old_death_program_verification_inputs[i].verification_key),
+            )?;
 
         let death_program_vk_bytes = death_program_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
@@ -376,15 +377,16 @@ where
     for j in 0..C::NUM_OUTPUT_RECORDS {
         let cs = &mut cs.ns(|| format!("Check birth program for output record {}", j));
 
-        let birth_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc(
+        let birth_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc_bytes(
             &mut cs.ns(|| "Allocate proof"),
             || Ok(&new_birth_program_verification_inputs[j].proof),
         )?;
 
-        let birth_program_vk = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc(
-            &mut cs.ns(|| "Allocate verification key"),
-            || Ok(&new_birth_program_verification_inputs[j].verification_key),
-        )?;
+        let birth_program_vk =
+            <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc_bytes(
+                &mut cs.ns(|| "Allocate verification key"),
+                || Ok(&new_birth_program_verification_inputs[j].verification_key),
+            )?;
 
         let birth_program_vk_bytes = birth_program_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
 

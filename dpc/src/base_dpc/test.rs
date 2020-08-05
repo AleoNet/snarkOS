@@ -148,7 +148,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate the program proofs
 
-    let dpc_program = DPCProgram::new(program_snark_vk_bytes);
+    let dpc_program = DPCProgram::<_, <Components as BaseDPCComponents>::ProgramSNARK>::new(program_snark_vk_bytes);
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {

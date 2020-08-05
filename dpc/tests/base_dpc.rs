@@ -164,9 +164,9 @@ fn base_dpc_integration_test() {
                 );
             }
 
-            let private_input: PrivateProgramInput<_> = PrivateProgramInput {
-                verification_key: parameters.program_snark_parameters.verification_key.clone(),
-                proof,
+            let private_input: PrivateProgramInput = PrivateProgramInput {
+                verification_key: to_bytes![parameters.program_snark_parameters.verification_key].unwrap(),
+                proof: to_bytes![proof].unwrap(),
             };
             old_proof_and_vk.push(private_input);
         }
@@ -202,9 +202,9 @@ fn base_dpc_integration_test() {
                     ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify")
                 );
             }
-            let private_input: PrivateProgramInput<_> = PrivateProgramInput {
-                verification_key: parameters.program_snark_parameters.verification_key.clone(),
-                proof,
+            let private_input: PrivateProgramInput = PrivateProgramInput {
+                verification_key: to_bytes![parameters.program_snark_parameters.verification_key].unwrap(),
+                proof: to_bytes![proof].unwrap(),
             };
             new_proof_and_vk.push(private_input);
         }

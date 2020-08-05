@@ -5,16 +5,19 @@ use snarkos_models::{
     curves::to_field_vec::ToConstraintField,
     dpc::{Program, Record},
 };
+use snarkos_utilities::{to_bytes, ToBytes};
 
 use rand::Rng;
 use std::marker::PhantomData;
 
-pub struct PrivateProgramInput<S: SNARK> {
-    pub verification_key: S::VerificationParameters,
-    pub proof: S::Proof,
+/// Program verification key and proof
+/// Represented as bytes to be generic for any Program SNARK
+pub struct PrivateProgramInput {
+    pub verification_key: Vec<u8>,
+    pub proof: Vec<u8>,
 }
 
-impl<S: SNARK> Clone for PrivateProgramInput<S> {
+impl Clone for PrivateProgramInput {
     fn clone(&self) -> Self {
         Self {
             verification_key: self.verification_key.clone(),
@@ -52,7 +55,7 @@ where
     S: SNARK<AssignedCircuit = ProgramCircuit<C>, VerifierInput = ProgramLocalData<C>>,
 {
     type LocalData = LocalData<C>;
-    type PrivateWitness = PrivateProgramInput<S>;
+    type PrivateWitness = PrivateProgramInput;
     type ProvingParameters = S::ProvingParameters;
     type PublicInput = ();
     type VerificationParameters = S::VerificationParameters;
@@ -100,8 +103,8 @@ where
         }
 
         Ok(Self::PrivateWitness {
-            proof,
-            verification_key: verification_key.clone(),
+            verification_key: to_bytes![verification_key]?,
+            proof: to_bytes![proof]?,
         })
     }
 

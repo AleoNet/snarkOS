@@ -351,7 +351,7 @@ where
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
     type Payload = <Self::Record as Record>::Payload;
-    type PrivateProgramInput = PrivateProgramInput<Components::ProgramSNARK>;
+    type PrivateProgramInput = PrivateProgramInput;
     type Record = DPCRecord<Components>;
     type SystemParameters = SystemParameters<Components>;
     type Transaction = DPCTransaction<Components>;
@@ -374,8 +374,8 @@ where
         end_timer!(program_snark_setup_time);
 
         let program_snark_vk_and_proof = PrivateProgramInput {
-            verification_key: program_snark_parameters.verification_key.clone(),
-            proof: program_snark_proof,
+            verification_key: to_bytes![program_snark_parameters.verification_key]?,
+            proof: to_bytes![program_snark_proof]?,
         };
 
         let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");

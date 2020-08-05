@@ -6,6 +6,7 @@ use snarkos_dpc::base_dpc::{
     program::DPCProgram,
     record_payload::RecordPayload,
     records::DPCRecord,
+    BaseDPCComponents,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
@@ -448,7 +449,7 @@ impl ConsensusParameters {
             &to_bytes![parameters.program_snark_parameters.verification_key]?
         )?]?;
 
-        let dpc_program = DPCProgram::new(program_snark_vk_bytes);
+        let dpc_program = DPCProgram::<_, <Components as BaseDPCComponents>::ProgramSNARK>::new(program_snark_vk_bytes);
 
         let mut old_death_program_proofs = vec![];
         for i in 0..NUM_INPUT_RECORDS {

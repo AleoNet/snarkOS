@@ -56,8 +56,8 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
         rng,
     )?;
     let private_program_input = PrivateProgramInput {
-        verification_key: program_snark_parameters.verification_key,
-        proof: program_snark_proof,
+        verification_key: to_bytes![program_snark_parameters.verification_key]?,
+        proof: to_bytes![program_snark_proof]?,
     };
 
     let outer_snark_parameters = C::OuterSNARK::setup(
