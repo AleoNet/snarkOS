@@ -4,7 +4,7 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
-    instantiated::{AlwaysAcceptProgram, Components, InstantiatedDPC},
+    instantiated::{Components, InstantiatedDPC},
     record_payload::RecordPayload,
     records::DPCRecord,
 };
