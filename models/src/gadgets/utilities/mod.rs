@@ -11,8 +11,11 @@ use crate::{
 use snarkos_errors::gadgets::SynthesisError;
 
 pub mod alloc;
+pub mod arithmetic;
+pub mod bits;
 pub mod boolean;
 pub mod eq;
+pub mod int;
 pub mod select;
 pub mod uint;
 

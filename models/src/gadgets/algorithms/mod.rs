@@ -1,6 +1,3 @@
-pub mod binding_signature;
-pub use binding_signature::*;
-
 pub mod commitment;
 pub use commitment::*;
 

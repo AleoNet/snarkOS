@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{binding_signature::*, record_payload::RecordPayload};
+use crate::dpc::base_dpc::record_payload::RecordPayload;
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -14,7 +14,7 @@ use snarkos_models::{
     },
     curves::{Group, MontgomeryModelParameters, ProjectiveCurve, TEModelParameters},
     dpc::{DPCComponents, DPCScheme, Program, Record},
-    gadgets::algorithms::{BindingSignatureGadget, CRHGadget, CommitmentGadget, SNARKVerifierGadget},
+    gadgets::algorithms::{CRHGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
@@ -28,11 +28,6 @@ use snarkos_utilities::{
 use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
-
-pub mod binding_signature;
-
-pub mod program;
-use self::program::*;
 
 pub mod record;
 use self::record::*;
@@ -49,9 +44,6 @@ pub use inner_circuit_gadget::*;
 pub mod inner_circuit_verifier_input;
 use self::inner_circuit_verifier_input::*;
 
-pub mod program_circuit;
-use self::program_circuit::*;
-
 pub mod outer_circuit;
 use self::outer_circuit::*;
 
@@ -63,6 +55,12 @@ use self::outer_circuit_verifier_input::*;
 
 pub mod parameters;
 use self::parameters::*;
+
+pub mod program;
+use self::program::*;
+
+pub mod program_circuit;
+use self::program_circuit::*;
 
 pub mod records;
 pub use records::*;
@@ -83,18 +81,6 @@ pub trait BaseDPCComponents: DPCComponents {
     /// Ledger digest type.
     type MerkleParameters: LoadableMerkleParameters;
     type MerkleHashGadget: CRHGadget<<Self::MerkleParameters as MerkleParameters>::H, Self::InnerField>;
-
-    /// Commitment scheme for committing to a record value
-    type ValueCommitment: CommitmentScheme;
-    type ValueCommitmentGadget: CommitmentGadget<Self::ValueCommitment, Self::InnerField>;
-
-    /// Gadget for verifying the binding signature
-    type BindingSignatureGroup: Group + ProjectiveCurve;
-    type BindingSignatureGadget: BindingSignatureGadget<
-        Self::ValueCommitment,
-        Self::InnerField,
-        Self::BindingSignatureGroup,
-    >;
 
     /// Group and Model Parameters for record encryption
     type EncryptionGroup: Group + ProjectiveCurve;
@@ -251,10 +237,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let local_data_commitment = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Value commitment setup");
-        let value_commitment = Components::ValueCommitment::setup(rng);
-        end_timer!(time);
-
         let time = start_timer!(|| "Serial nonce CRH setup");
         let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
@@ -273,7 +255,6 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             program_verification_key_hash,
             local_data_crh,
             local_data_commitment,
-            value_commitment,
             serial_number_nonce,
         };
 
@@ -475,7 +456,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             end_timer!(output_record_time);
         }
 
-        let local_data_comm_timer = start_timer!(|| "Compute local data commitment");
+        let local_data_root_timer = start_timer!(|| "Compute local data root");
 
         let mut local_data_commitment_randomizers = vec![];
 
@@ -515,10 +496,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
         let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
 
-        let local_data_commitment =
+        let local_data_root =
             Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
 
-        end_timer!(local_data_comm_timer);
+        end_timer!(local_data_root_timer);
 
         let program_comm_timer = start_timer!(|| "Compute program commitment");
         let (program_commitment, program_randomness) = {
@@ -559,7 +540,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
             program_commitment,
             program_randomness,
-            local_data_root: local_data_commitment,
+            local_data_root,
             local_data_commitment_randomizers,
 
             value_balance,
@@ -725,7 +706,7 @@ where
             new_commitments,
             program_commitment,
             program_randomness,
-            local_data_root: local_data_commitment,
+            local_data_root,
             local_data_commitment_randomizers,
             value_balance,
         } = context;
@@ -740,7 +721,7 @@ where
             old_serial_numbers,
             new_commitments,
             program_commitment,
-            local_data_commitment,
+            local_data_root,
             value_balance,
             memorandum
         ]?;
@@ -769,76 +750,6 @@ where
         }
 
         end_timer!(signature_time);
-
-        // Generate binding signature
-
-        // Generate value commitments for input records
-
-        let mut old_value_commits = vec![];
-        let mut old_value_commit_randomness = vec![];
-
-        for old_record in old_records {
-            // If the record is a dummy, then the value should be 0
-            let input_value = match old_record.is_dummy() {
-                true => 0,
-                false => old_record.value(),
-            };
-
-            // Generate value commitment randomness
-            let value_commitment_randomness =
-                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-            // Generate the value commitment
-            let value_commitment = parameters
-                .system_parameters
-                .value_commitment
-                .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
-                .unwrap();
-
-            old_value_commits.push(value_commitment);
-            old_value_commit_randomness.push(value_commitment_randomness);
-        }
-
-        // Generate value commitments for output records
-
-        let mut new_value_commits = vec![];
-        let mut new_value_commit_randomness = vec![];
-
-        for new_record in &new_records {
-            // If the record is a dummy, then the value should be 0
-            let output_value = match new_record.is_dummy() {
-                true => 0,
-                false => new_record.value(),
-            };
-
-            // Generate value commitment randomness
-            let value_commitment_randomness =
-                <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(rng);
-
-            // Generate the value commitment
-            let value_commitment = parameters
-                .system_parameters
-                .value_commitment
-                .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
-                .unwrap();
-
-            new_value_commits.push(value_commitment);
-            new_value_commit_randomness.push(value_commitment_randomness);
-        }
-
-        let sighash = to_bytes![local_data_commitment]?;
-
-        let binding_signature =
-            create_binding_signature::<Components::ValueCommitment, Components::BindingSignatureGroup, _>(
-                &system_parameters.value_commitment,
-                &old_value_commits,
-                &new_value_commits,
-                &old_value_commit_randomness,
-                &new_value_commit_randomness,
-                value_balance,
-                &sighash,
-                rng,
-            )?;
 
         // Encrypt the new records
 
@@ -893,15 +804,10 @@ where
                 &new_encrypted_record_hashes,
                 &program_commitment,
                 &program_randomness,
-                &local_data_commitment,
+                &local_data_root,
                 &local_data_commitment_randomizers,
                 memorandum,
-                &old_value_commits,
-                &old_value_commit_randomness,
-                &new_value_commits,
-                &new_value_commit_randomness,
                 value_balance,
-                &binding_signature,
                 network_id,
             );
 
@@ -924,7 +830,7 @@ where
                 new_encrypted_record_hashes: new_encrypted_record_hashes.clone(),
                 memo: memorandum.clone(),
                 program_commitment: program_commitment.clone(),
-                local_data_root: local_data_commitment.clone(),
+                local_data_root: local_data_root.clone(),
                 value_balance,
                 network_id,
             };
@@ -955,7 +861,7 @@ where
                 new_birth_program_attributes.as_slice(),
                 &program_commitment,
                 &program_randomness,
-                &local_data_commitment,
+                &local_data_root,
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
@@ -973,7 +879,7 @@ where
             ledger_digest,
             transaction_proof,
             program_commitment,
-            local_data_commitment,
+            local_data_root,
             value_balance,
             network_id,
             signatures,

@@ -25,7 +25,7 @@ fn test_account_new() {
 
 #[test]
 pub fn test_private_key_from_str() {
-    let private_key_string = "APrivateKey1b5U31G1VUt6G9mAh6tm364eWgLUabK1qTBdRJKUEFEwcz";
+    let private_key_string = "APrivateKey1b3ixncv6hxXBqhCmybZFJVp6xJQMHC8H9WbFFGM5MAxax";
     let private_key = AccountPrivateKey::<Components>::from_str(private_key_string);
     println!("{:?}", private_key);
 
@@ -35,7 +35,7 @@ pub fn test_private_key_from_str() {
 
 #[test]
 pub fn test_view_key_from_str() {
-    let view_key_string = "AViewKey1m8TjBbmN9rmorg8GEyqv4pBZ7WMnDBnTj8v8KQdUYwf6";
+    let view_key_string = "AViewKey1cVP45x3E1TxJFgiJqawy7w5WQDsUXWTbpWAXSXB1sDw8";
     let view_key = AccountViewKey::<Components>::from_str(view_key_string);
     println!("{:?}", view_key);
 
@@ -45,7 +45,7 @@ pub fn test_view_key_from_str() {
 
 #[test]
 pub fn test_address_from_str() {
-    let address_string = "aleo1fuge6ah8c9custvmlju5t30gk8p8lar5x36jlfa2glhgy9n0fuxsreeh2c";
+    let address_string = "aleo1azf0kyxw77mwz2eax7aruwe9atm2ujz7gcec2kp8wajmzn93zg8qraqpkl";
     let address = AccountAddress::<Components>::from_str(address_string);
     assert!(address.is_ok());
     assert_eq!(address_string, address.unwrap().to_string());

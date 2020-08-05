@@ -94,8 +94,6 @@ where
     <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
-    <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
@@ -159,10 +157,6 @@ where
         ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.serial_number_nonce.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let value_commitment_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.value_commitment.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
     let ledger_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_parameters.parameters())
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
@@ -202,15 +196,8 @@ where
     let local_data_root_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_root)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let value_balance_as_u64 = value_balance.abs() as u64;
-
-    let value_balance_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(&value_balance_as_u64.to_le_bytes()[..])
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-    let is_negative_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(&[value_balance.is_negative() as u8][..])
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let value_balance_fe = ToConstraintField::<C::InnerField>::to_field_elements(&value_balance.to_le_bytes()[..])
+        .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let network_id_fe = ToConstraintField::<C::InnerField>::to_field_elements(&[network_id][..])
         .map_err(|_| SynthesisError::AssignmentMissing)?;
@@ -234,8 +221,6 @@ where
         field_element_to_bytes::<C, _>(cs, &local_data_crh_parameters_fe, "local data commitment pp")?;
     let serial_number_nonce_crh_parameters_fe_bytes =
         field_element_to_bytes::<C, _>(cs, &serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
-    let value_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &value_commitment_parameters_fe, "value commitment pp")?;
     let ledger_parameters_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_parameters_fe, "ledger pp")?;
     let ledger_digest_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_digest_fe, "ledger digest")?;
 
@@ -270,7 +255,6 @@ where
     let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
     let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, &local_data_root_fe, "local data root")?;
     let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
-    let is_negative_fe_bytes = field_element_to_bytes::<C, _>(cs, &is_negative_fe, "is_negative flag")?;
 
     // Construct inner snark input as bytes
 
@@ -283,7 +267,6 @@ where
     inner_snark_input_bytes.extend(program_vk_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(local_data_commitment_parameters_fe_bytes.clone());
     inner_snark_input_bytes.extend(serial_number_nonce_crh_parameters_fe_bytes);
-    inner_snark_input_bytes.extend(value_commitment_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_parameters_fe_bytes);
     inner_snark_input_bytes.extend(ledger_digest_fe_bytes);
     inner_snark_input_bytes.extend(serial_number_fe_bytes);
@@ -293,7 +276,6 @@ where
     inner_snark_input_bytes.extend(network_id_fe_bytes);
     inner_snark_input_bytes.extend(local_data_root_fe_bytes.clone());
     inner_snark_input_bytes.extend(value_balance_fe_bytes);
-    inner_snark_input_bytes.extend(is_negative_fe_bytes);
 
     // Convert inner snark input bytes to bits
 

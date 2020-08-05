@@ -30,7 +30,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     /// Returns the program commitment in the transaction.
     fn program_commitment(&self) -> &Self::ProgramCommitment;
 
-    /// Returns the local data commitment in the transaction.
+    /// Returns the local data root in the transaction.
     fn local_data_root(&self) -> &Self::LocalDataRoot;
 
     /// Returns the value balance in the transaction.
