@@ -14,7 +14,7 @@ use snarkos_models::{
 };
 //use snarkos_gadgets::algorithms::merkle_tree::merkle_path::MerklePathGadget;
 
-pub struct DummyProgram<C: BaseDPCComponents> {
+pub struct DummyCircuit<C: BaseDPCComponents> {
     /// System parameters
     pub system_parameters: Option<SystemParameters<C>>,
 
@@ -31,7 +31,7 @@ pub struct DummyProgram<C: BaseDPCComponents> {
     pub position: u8,
 }
 
-impl<C: BaseDPCComponents> DummyProgram<C> {
+impl<C: BaseDPCComponents> DummyCircuit<C> {
     pub fn blank(system_parameters: &SystemParameters<C>) -> Self {
         let local_data_root = <C::LocalDataCRH as CRH>::Output::default();
         let record = DPCRecord::default();
@@ -61,7 +61,7 @@ impl<C: BaseDPCComponents> DummyProgram<C> {
     }
 }
 
-impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for DummyProgram<C> {
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for DummyCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_dummy_check_gadget(
             cs,

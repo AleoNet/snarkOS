@@ -259,6 +259,20 @@ impl_params!(
     1068
 );
 
+// Dummy Program SNARK
+impl_params!(
+    DummyProgramSNARKPKParameters,
+    dummy_program_snark_pk_test,
+    "dummy_program_snark_pk",
+    1358946
+);
+impl_params!(
+    DummyProgramSNARKVKParameters,
+    dummy_program_snark_vk_test,
+    "dummy_program_snark_vk",
+    1068
+);
+
 // Inner SNARK
 impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 212265409);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2426);

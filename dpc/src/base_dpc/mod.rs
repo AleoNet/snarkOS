@@ -97,7 +97,14 @@ pub trait BaseDPCComponents: DPCComponents {
         VerifierInput = OuterCircuitVerifierInput<Self>,
     >;
 
-    /// SNARK for a "dummy program" that does nothing with its input.
+    /// SNARK for a "dummy" program that ensures the record value is 0 and payload is empty
+    type DummyProgramSNARK: SNARK<
+        Circuit = DummyCircuit<Self>,
+        AssignedCircuit = DummyCircuit<Self>,
+        VerifierInput = ProgramLocalData<Self>,
+    >;
+
+    /// SNARK for the "always-accept" that does nothing with its input.
     type ProgramSNARK: SNARK<
         Circuit = ProgramCircuit<Self>,
         AssignedCircuit = ProgramCircuit<Self>,
@@ -263,6 +270,18 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         })
     }
 
+    pub fn generate_dummy_program_snark_parameters<R: Rng>(
+        system_parameters: &SystemParameters<Components>,
+        rng: &mut R,
+    ) -> Result<DummyProgramSNARKParameters<Components>, DPCError> {
+        let (pk, pvk) = Components::DummyProgramSNARK::setup(DummyCircuit::blank(system_parameters), rng)?;
+
+        Ok(DummyProgramSNARKParameters {
+            proving_key: pk,
+            verification_key: pvk.into(),
+        })
+    }
+
     pub fn generate_sn(
         system_parameters: &SystemParameters<Components>,
         record: &DPCRecord<Components>,
@@ -365,6 +384,7 @@ where
 
         let program_snark_setup_time = start_timer!(|| "Dummy program SNARK setup");
         let program_snark_parameters = Self::generate_program_snark_parameters(&system_parameters, rng)?;
+        let dummy_program_snark_parameters = Self::generate_dummy_program_snark_parameters(&system_parameters, rng)?;
         let program_snark_proof = Components::ProgramSNARK::prove(
             &program_snark_parameters.proving_key,
             ProgramCircuit::blank(&system_parameters),
@@ -410,6 +430,7 @@ where
         Ok(PublicParameters {
             system_parameters,
             program_snark_parameters,
+            dummy_program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
         })
