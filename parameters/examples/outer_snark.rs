@@ -4,7 +4,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::Components,
     outer_circuit::OuterCircuit,
     parameters::{ProgramSNARKParameters, SystemParameters},
-    program::{PrivateProgramInput, ProgramCircuit},
+    program::{NoopCircuit, PrivateProgramInput},
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
@@ -52,7 +52,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     let program_snark_proof = C::ProgramSNARK::prove(
         &program_snark_parameters.proving_key,
-        ProgramCircuit::blank(&system_parameters),
+        NoopCircuit::blank(&system_parameters),
         rng,
     )?;
     let private_program_input = PrivateProgramInput {

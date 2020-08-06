@@ -3,7 +3,7 @@ use crate::base_dpc::{
     inner_circuit_verifier_input::InnerCircuitVerifierInput,
     outer_circuit::OuterCircuit,
     outer_circuit_verifier_input::OuterCircuitVerifierInput,
-    program::{DPCProgram, DummyCircuit, ProgramCircuit, ProgramLocalData},
+    program::{DummyCircuit, NoopCircuit, ProgramLocalData},
     transaction::DPCTransaction,
     BaseDPCComponents,
     LocalData as DPCLocalData,
@@ -179,11 +179,9 @@ pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, Encry
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
 
-// TODO (raychu86) rename this
-pub type AlwaysAcceptProgram = DPCProgram<Components, <Components as BaseDPCComponents>::ProgramSNARK>;
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
-pub type ProgramSNARK<C> = GM17<InnerPairing, ProgramCircuit<C>, ProgramLocalData<C>>;
+pub type ProgramSNARK<C> = GM17<InnerPairing, NoopCircuit<C>, ProgramLocalData<C>>;
 pub type DummyProgramSNARK<C> = GM17<InnerPairing, DummyCircuit<C>, ProgramLocalData<C>>;
 pub type PRF = Blake2s;
 

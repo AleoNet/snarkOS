@@ -3,7 +3,7 @@ use crate::base_dpc::{
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
-    program::DPCProgram,
+    program::{DummyProgram, NoopProgram},
     record_payload::RecordPayload,
     records::record_encryption::*,
     BaseDPCComponents,
@@ -48,12 +48,24 @@ fn test_execute_base_dpc_constraints() {
     // "always-accept" program.
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
     let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
-    let program_snark_pp = InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+    let noop_program_snark_pp =
+        InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+    let dummy_program_snark_pp =
+        InstantiatedDPC::generate_dummy_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
-    let program_snark_vk_bytes = to_bytes![
+    let noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
             &system_parameters.program_verification_key_hash,
-            &to_bytes![program_snark_pp.verification_key].unwrap()
+            &to_bytes![noop_program_snark_pp.verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let dummy_program_id = to_bytes![
+        ProgramVerificationKeyHash::hash(
+            &system_parameters.program_verification_key_hash,
+            &to_bytes![dummy_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()
     ]
@@ -96,8 +108,8 @@ fn test_execute_base_dpc_constraints() {
         true,
         0,
         &RecordPayload::default(),
-        &program_snark_vk_bytes,
-        &program_snark_vk_bytes,
+        &dummy_program_id,
+        &dummy_program_id,
         &mut rng,
     )
     .unwrap();
@@ -124,8 +136,8 @@ fn test_execute_base_dpc_constraints() {
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let new_birth_program_ids = vec![program_snark_vk_bytes.clone(); NUM_OUTPUT_RECORDS];
-    let new_death_program_ids = vec![program_snark_vk_bytes.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![noop_program_id.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![noop_program_id.clone(); NUM_OUTPUT_RECORDS];
     let memo = [0u8; 32];
 
     let context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
@@ -148,35 +160,38 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate the program proofs
 
-    let dpc_program = DPCProgram::<_, <Components as BaseDPCComponents>::ProgramSNARK>::new(program_snark_vk_bytes);
+    let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::ProgramSNARK>::new(noop_program_id);
+    let dummy_program = DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {
-        let private_input = dpc_program
+        let private_input = dummy_program
             .execute(
-                &program_snark_pp.proving_key,
-                &program_snark_pp.verification_key,
+                &dummy_program_snark_pp.proving_key,
+                &dummy_program_snark_pp.verification_key,
                 &local_data,
                 i as u8,
                 &mut rng,
             )
             .unwrap();
+        println!("private_input proof size: {:?}", private_input.proof.len());
 
         old_proof_and_vk.push(private_input);
     }
 
     let mut new_proof_and_vk = vec![];
     for j in 0..NUM_OUTPUT_RECORDS {
-        let private_input = dpc_program
+        let private_input = noop_program
             .execute(
-                &program_snark_pp.proving_key,
-                &program_snark_pp.verification_key,
+                &noop_program_snark_pp.proving_key,
+                &noop_program_snark_pp.verification_key,
                 &local_data,
                 (NUM_INPUT_RECORDS + j) as u8,
                 &mut rng,
             )
             .unwrap();
 
+        println!("private_input proof size: {:?}", private_input.proof.len());
         new_proof_and_vk.push(private_input);
     }
 

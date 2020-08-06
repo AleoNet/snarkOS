@@ -3,7 +3,7 @@ use crate::{
     storage::*,
 };
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_dpc::base_dpc::instantiated::*;
+use snarkos_dpc::base_dpc::{instantiated::*, BaseDPCComponents, NoopProgram};
 use snarkos_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
 use snarkos_objects::{Account, Block};
 use snarkos_parameters::GenesisBlock;
@@ -25,7 +25,7 @@ pub struct Fixture {
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
     pub genesis_block: Block<Tx>,
-    pub program: AlwaysAcceptProgram,
+    pub program: NoopProgram<Components, <Components as BaseDPCComponents>::ProgramSNARK>,
     pub rng: XorShiftRng,
 }
 
@@ -55,7 +55,7 @@ fn setup(verify_only: bool) -> Fixture {
     ]
     .unwrap();
 
-    let program = AlwaysAcceptProgram::new(program_vk_hash);
+    let program = NoopProgram::new(program_vk_hash);
 
     Fixture {
         parameters,

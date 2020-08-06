@@ -83,6 +83,7 @@ pub trait BaseDPCComponents: DPCComponents {
         VerifierInput = OuterCircuitVerifierInput<Self>,
     >;
 
+    // TODO (raychu86) remove these from BaseDPCComponents
     /// SNARK for a "dummy" program that ensures the record value is 0 and payload is empty
     type DummyProgramSNARK: SNARK<
         Circuit = DummyCircuit<Self>,
@@ -92,8 +93,8 @@ pub trait BaseDPCComponents: DPCComponents {
 
     /// SNARK for the "always-accept" that does nothing with its input.
     type ProgramSNARK: SNARK<
-        Circuit = ProgramCircuit<Self>,
-        AssignedCircuit = ProgramCircuit<Self>,
+        Circuit = NoopCircuit<Self>,
+        AssignedCircuit = NoopCircuit<Self>,
         VerifierInput = ProgramLocalData<Self>,
     >;
 
@@ -243,7 +244,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         system_parameters: &SystemParameters<Components>,
         rng: &mut R,
     ) -> Result<ProgramSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::ProgramSNARK::setup(ProgramCircuit::blank(system_parameters), rng)?;
+        let (pk, pvk) = Components::ProgramSNARK::setup(NoopCircuit::blank(system_parameters), rng)?;
 
         Ok(ProgramSNARKParameters {
             proving_key: pk,
@@ -368,7 +369,7 @@ where
         let dummy_program_snark_parameters = Self::generate_dummy_program_snark_parameters(&system_parameters, rng)?;
         let program_snark_proof = Components::ProgramSNARK::prove(
             &program_snark_parameters.proving_key,
-            ProgramCircuit::blank(&system_parameters),
+            NoopCircuit::blank(&system_parameters),
             rng,
         )?;
         end_timer!(program_snark_setup_time);

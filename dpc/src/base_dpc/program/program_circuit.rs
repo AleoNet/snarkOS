@@ -13,7 +13,7 @@ use snarkos_models::{
 };
 
 /// Always-accept program
-pub struct ProgramCircuit<C: BaseDPCComponents> {
+pub struct NoopCircuit<C: BaseDPCComponents> {
     /// System parameters
     pub system_parameters: Option<SystemParameters<C>>,
 
@@ -24,7 +24,7 @@ pub struct ProgramCircuit<C: BaseDPCComponents> {
     pub position: u8,
 }
 
-impl<C: BaseDPCComponents> ProgramCircuit<C> {
+impl<C: BaseDPCComponents> NoopCircuit<C> {
     pub fn blank(system_parameters: &SystemParameters<C>) -> Self {
         let local_data_root = <C::LocalDataCRH as CRH>::Output::default();
 
@@ -48,9 +48,9 @@ impl<C: BaseDPCComponents> ProgramCircuit<C> {
     }
 }
 
-impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for ProgramCircuit<C> {
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for NoopCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        execute_payment_check_gadget(
+        execute_noop_gadget(
             cs,
             self.system_parameters.get()?,
             self.local_data_root.get()?,
@@ -59,7 +59,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for ProgramCircu
     }
 }
 
-fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
+fn execute_noop_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     system_parameters: &SystemParameters<C>,
     local_data_root: &<C::LocalDataCRH as CRH>::Output,

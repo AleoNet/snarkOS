@@ -139,7 +139,7 @@ fn base_dpc_integration_test() {
         for i in 0..NUM_INPUT_RECORDS {
             // Instantiate death program circuit
             let death_program_circuit =
-                ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
+                NoopCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
 
             // Generate the program proof
             let proof = ProgramSNARK::prove(
@@ -178,7 +178,7 @@ fn base_dpc_integration_test() {
         for j in 0..NUM_OUTPUT_RECORDS {
             // Instantiate birth program circuit
             let birth_program_circuit =
-                ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
+                NoopCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
 
             // Generate the program proof
             let proof = ProgramSNARK::prove(
