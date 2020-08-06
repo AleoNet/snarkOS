@@ -169,7 +169,9 @@ impl ProtectedRpcFunctions for RpcImpl {
             .parameters
             .system_parameters
             .program_verification_key_hash
-            .hash(&to_bytes![self.parameters.program_snark_parameters.verification_key]?)?;
+            .hash(&to_bytes![
+                self.parameters.noop_program_snark_parameters.verification_key
+            ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
         let program_id = program_vk_hash_bytes;

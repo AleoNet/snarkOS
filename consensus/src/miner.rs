@@ -61,7 +61,7 @@ impl Miner {
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let program_vk_hash = to_bytes![ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.program_snark_parameters.verification_key]?
+            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 
         let new_birth_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];

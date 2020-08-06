@@ -25,7 +25,7 @@ pub struct Fixture {
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
     pub genesis_block: Block<Tx>,
-    pub program: NoopProgram<Components, <Components as BaseDPCComponents>::ProgramSNARK>,
+    pub program: NoopProgram<Components, <Components as BaseDPCComponents>::NoopProgramSNARK>,
     pub rng: XorShiftRng,
 }
 
@@ -49,7 +49,7 @@ fn setup(verify_only: bool) -> Fixture {
     let program_vk_hash = to_bytes![
         ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.program_snark_parameters().verification_key].unwrap()
+            &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()
     ]

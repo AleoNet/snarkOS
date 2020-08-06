@@ -63,18 +63,18 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
-pub struct ProgramSNARKParameters<C: BaseDPCComponents> {
-    pub proving_key: <C::ProgramSNARK as SNARK>::ProvingParameters,
-    pub verification_key: <C::ProgramSNARK as SNARK>::VerificationParameters,
+pub struct NoopProgramSNARKParameters<C: BaseDPCComponents> {
+    pub proving_key: <C::NoopProgramSNARK as SNARK>::ProvingParameters,
+    pub verification_key: <C::NoopProgramSNARK as SNARK>::VerificationParameters,
 }
 
-impl<C: BaseDPCComponents> ProgramSNARKParameters<C> {
+impl<C: BaseDPCComponents> NoopProgramSNARKParameters<C> {
     // TODO (howardwu): Why are we not preparing the VK here?
     pub fn load() -> IoResult<Self> {
-        let proving_key: <C::ProgramSNARK as SNARK>::ProvingParameters =
-            From::from(FromBytes::read(ProgramSNARKPKParameters::load_bytes()?.as_slice())?);
-        let verification_key = From::from(<C::ProgramSNARK as SNARK>::VerificationParameters::read(
-            ProgramSNARKVKParameters::load_bytes()?.as_slice(),
+        let proving_key: <C::NoopProgramSNARK as SNARK>::ProvingParameters =
+            From::from(FromBytes::read(NoopProgramSNARKPKParameters::load_bytes()?.as_slice())?);
+        let verification_key = From::from(<C::NoopProgramSNARK as SNARK>::VerificationParameters::read(
+            NoopProgramSNARKVKParameters::load_bytes()?.as_slice(),
         )?);
 
         Ok(Self {
@@ -112,7 +112,7 @@ impl<C: BaseDPCComponents> DummyProgramSNARKParameters<C> {
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct PublicParameters<C: BaseDPCComponents> {
     pub system_parameters: SystemParameters<C>,
-    pub program_snark_parameters: ProgramSNARKParameters<C>,
+    pub noop_program_snark_parameters: NoopProgramSNARKParameters<C>,
     pub dummy_program_snark_parameters: DummyProgramSNARKParameters<C>,
     pub inner_snark_parameters: (
         Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
@@ -163,8 +163,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.outer_snark_parameters
     }
 
-    pub fn program_snark_parameters(&self) -> &ProgramSNARKParameters<C> {
-        &self.program_snark_parameters
+    pub fn noop_program_snark_parameters(&self) -> &NoopProgramSNARKParameters<C> {
+        &self.noop_program_snark_parameters
     }
 
     pub fn dummy_program_snark_parameters(&self) -> &DummyProgramSNARKParameters<C> {
@@ -193,7 +193,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn load(verify_only: bool) -> IoResult<Self> {
         let system_parameters = SystemParameters::<C>::load()?;
-        let program_snark_parameters = ProgramSNARKParameters::<C>::load()?;
+        let noop_program_snark_parameters = NoopProgramSNARKParameters::<C>::load()?;
         let dummy_program_snark_parameters = DummyProgramSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
@@ -230,7 +230,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         Ok(Self {
             system_parameters,
-            program_snark_parameters,
+            noop_program_snark_parameters,
             dummy_program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
@@ -239,7 +239,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
     pub fn load_vk_direct() -> IoResult<Self> {
         let system_parameters = SystemParameters::<C>::load()?;
-        let program_snark_parameters = ProgramSNARKParameters::<C>::load()?;
+        let noop_program_snark_parameters = NoopProgramSNARKParameters::<C>::load()?;
         let dummy_program_snark_parameters = DummyProgramSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
@@ -262,7 +262,7 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
 
         Ok(Self {
             system_parameters,
-            program_snark_parameters,
+            noop_program_snark_parameters,
             dummy_program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,

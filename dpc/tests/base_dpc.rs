@@ -2,7 +2,7 @@
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
-    program::{program_circuit::*, PrivateProgramInput, ProgramLocalData},
+    program::{noop_program_circuit::*, PrivateProgramInput, ProgramLocalData},
     record_payload::RecordPayload,
     records::record_encryption::RecordEncryption,
     DPC,
@@ -68,7 +68,7 @@ fn base_dpc_integration_test() {
     let program_vk_hash = to_bytes![
         ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.program_snark_parameters().verification_key].unwrap()
+            &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()
     ]
@@ -76,7 +76,7 @@ fn base_dpc_integration_test() {
 
     #[cfg(debug_assertions)]
     let program_snark_pvk: PreparedVerifyingKey<_> =
-        parameters.program_snark_parameters.verification_key.clone().into();
+        parameters.noop_program_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
     let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
@@ -142,8 +142,8 @@ fn base_dpc_integration_test() {
                 NoopCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
 
             // Generate the program proof
-            let proof = ProgramSNARK::prove(
-                &parameters.program_snark_parameters.proving_key,
+            let proof = NoopProgramSNARK::prove(
+                &parameters.noop_program_snark_parameters.proving_key,
                 death_program_circuit,
                 &mut rng,
             )
@@ -160,12 +160,13 @@ fn base_dpc_integration_test() {
                     position: i as u8,
                 };
                 assert!(
-                    ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify")
+                    NoopProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
+                        .expect("Proof should verify")
                 );
             }
 
             let private_input: PrivateProgramInput = PrivateProgramInput {
-                verification_key: to_bytes![parameters.program_snark_parameters.verification_key].unwrap(),
+                verification_key: to_bytes![parameters.noop_program_snark_parameters.verification_key].unwrap(),
                 proof: to_bytes![proof].unwrap(),
             };
             old_proof_and_vk.push(private_input);
@@ -181,8 +182,8 @@ fn base_dpc_integration_test() {
                 NoopCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
 
             // Generate the program proof
-            let proof = ProgramSNARK::prove(
-                &parameters.program_snark_parameters.proving_key,
+            let proof = NoopProgramSNARK::prove(
+                &parameters.noop_program_snark_parameters.proving_key,
                 birth_program_circuit,
                 &mut rng,
             )
@@ -199,11 +200,12 @@ fn base_dpc_integration_test() {
                     position: j as u8,
                 };
                 assert!(
-                    ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify")
+                    NoopProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
+                        .expect("Proof should verify")
                 );
             }
             let private_input: PrivateProgramInput = PrivateProgramInput {
-                verification_key: to_bytes![parameters.program_snark_parameters.verification_key].unwrap(),
+                verification_key: to_bytes![parameters.noop_program_snark_parameters.verification_key].unwrap(),
                 proof: to_bytes![proof].unwrap(),
             };
             new_proof_and_vk.push(private_input);

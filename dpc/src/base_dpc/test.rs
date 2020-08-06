@@ -49,7 +49,7 @@ fn test_execute_base_dpc_constraints() {
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
     let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
     let noop_program_snark_pp =
-        InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+        InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
     let dummy_program_snark_pp =
         InstantiatedDPC::generate_dummy_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
@@ -160,7 +160,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate the program proofs
 
-    let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::ProgramSNARK>::new(noop_program_id);
+    let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
     let dummy_program = DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
 
     let mut old_proof_and_vk = vec![];

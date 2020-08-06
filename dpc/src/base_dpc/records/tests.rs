@@ -20,13 +20,13 @@ fn test_record_serialization() {
         // Generate parameters for the ledger, commitment schemes, CRH, and the
         // "always-accept" program.
         let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
-        let program_snark_pp =
-            InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+        let noop_program_snark_pp =
+            InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
         let program_snark_vk_bytes = to_bytes![
             ProgramVerificationKeyHash::hash(
                 &system_parameters.program_verification_key_hash,
-                &to_bytes![program_snark_pp.verification_key].unwrap()
+                &to_bytes![noop_program_snark_pp.verification_key].unwrap()
             )
             .unwrap()
         ]
@@ -88,7 +88,7 @@ fn test_record_encryption() {
         // "always-accept" program.
         let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
         let program_snark_pp =
-            InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+            InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
         let program_snark_vk_bytes = to_bytes![
             ProgramVerificationKeyHash::hash(

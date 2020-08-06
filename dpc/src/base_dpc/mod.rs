@@ -91,15 +91,15 @@ pub trait BaseDPCComponents: DPCComponents {
         VerifierInput = ProgramLocalData<Self>,
     >;
 
-    /// SNARK for the "always-accept" that does nothing with its input.
-    type ProgramSNARK: SNARK<
+    /// SNARK for the Noop "always-accept" that does nothing with its input.
+    type NoopProgramSNARK: SNARK<
         Circuit = NoopCircuit<Self>,
         AssignedCircuit = NoopCircuit<Self>,
         VerifierInput = ProgramLocalData<Self>,
     >;
 
     /// SNARK Verifier gadget for the "dummy program" that does nothing with its input.
-    type ProgramSNARKGadget: SNARKVerifierGadget<Self::ProgramSNARK, Self::OuterField>;
+    type ProgramSNARKGadget: SNARKVerifierGadget<Self::NoopProgramSNARK, Self::OuterField>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -240,13 +240,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok(comm_crh_sig_pp)
     }
 
-    pub fn generate_program_snark_parameters<R: Rng>(
+    pub fn generate_noop_program_snark_parameters<R: Rng>(
         system_parameters: &SystemParameters<Components>,
         rng: &mut R,
-    ) -> Result<ProgramSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::ProgramSNARK::setup(NoopCircuit::blank(system_parameters), rng)?;
+    ) -> Result<NoopProgramSNARKParameters<Components>, DPCError> {
+        let (pk, pvk) = Components::NoopProgramSNARK::setup(NoopCircuit::blank(system_parameters), rng)?;
 
-        Ok(ProgramSNARKParameters {
+        Ok(NoopProgramSNARKParameters {
             proving_key: pk,
             verification_key: pvk.into(),
         })
@@ -365,17 +365,17 @@ where
         let system_parameters = Self::generate_system_parameters(rng)?;
 
         let program_snark_setup_time = start_timer!(|| "Dummy program SNARK setup");
-        let program_snark_parameters = Self::generate_program_snark_parameters(&system_parameters, rng)?;
+        let noop_program_snark_parameters = Self::generate_noop_program_snark_parameters(&system_parameters, rng)?;
         let dummy_program_snark_parameters = Self::generate_dummy_program_snark_parameters(&system_parameters, rng)?;
-        let program_snark_proof = Components::ProgramSNARK::prove(
-            &program_snark_parameters.proving_key,
+        let program_snark_proof = Components::NoopProgramSNARK::prove(
+            &noop_program_snark_parameters.proving_key,
             NoopCircuit::blank(&system_parameters),
             rng,
         )?;
         end_timer!(program_snark_setup_time);
 
         let program_snark_vk_and_proof = PrivateProgramInput {
-            verification_key: to_bytes![program_snark_parameters.verification_key]?,
+            verification_key: to_bytes![noop_program_snark_parameters.verification_key]?,
             proof: to_bytes![program_snark_proof]?,
         };
 
@@ -411,7 +411,7 @@ where
 
         Ok(PublicParameters {
             system_parameters,
-            program_snark_parameters,
+            noop_program_snark_parameters,
             dummy_program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,

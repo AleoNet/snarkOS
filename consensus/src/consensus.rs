@@ -444,19 +444,19 @@ impl ConsensusParameters {
 
         let local_data = execute_context.into_local_data();
 
-        let program_snark_vk_bytes = to_bytes![ProgramVerificationKeyHash::hash(
+        let noop_program_snark_id = to_bytes![ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.program_snark_parameters.verification_key]?
+            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 
         let dpc_program =
-            NoopProgram::<_, <Components as BaseDPCComponents>::ProgramSNARK>::new(program_snark_vk_bytes);
+            NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
 
         let mut old_death_program_proofs = vec![];
         for i in 0..NUM_INPUT_RECORDS {
             let private_input = dpc_program.execute(
-                &parameters.program_snark_parameters.proving_key,
-                &parameters.program_snark_parameters.verification_key,
+                &parameters.noop_program_snark_parameters.proving_key,
+                &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,
                 i as u8,
                 rng,
@@ -468,8 +468,8 @@ impl ConsensusParameters {
         let mut new_birth_program_proofs = vec![];
         for j in 0..NUM_OUTPUT_RECORDS {
             let private_input = dpc_program.execute(
-                &parameters.program_snark_parameters.proving_key,
-                &parameters.program_snark_parameters.verification_key,
+                &parameters.noop_program_snark_parameters.proving_key,
+                &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,
                 (NUM_INPUT_RECORDS + j) as u8,
                 rng,

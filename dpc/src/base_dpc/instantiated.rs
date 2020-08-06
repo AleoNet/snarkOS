@@ -153,8 +153,8 @@ impl BaseDPCComponents for Components {
     type InnerSNARKGadget = InnerSNARKGadget;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
+    type NoopProgramSNARK = NoopProgramSNARK<Self>;
     type OuterSNARK = ProofCheckNIZK;
-    type ProgramSNARK = ProgramSNARK<Self>;
     type ProgramSNARKGadget = ProgramSNARKGadget;
 }
 
@@ -181,7 +181,7 @@ pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW
 
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
-pub type ProgramSNARK<C> = GM17<InnerPairing, NoopCircuit<C>, ProgramLocalData<C>>;
+pub type NoopProgramSNARK<C> = GM17<InnerPairing, NoopCircuit<C>, ProgramLocalData<C>>;
 pub type DummyProgramSNARK<C> = GM17<InnerPairing, DummyCircuit<C>, ProgramLocalData<C>>;
 pub type PRF = Blake2s;
 
