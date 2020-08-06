@@ -24,16 +24,14 @@ pub struct AccountPrivateKey<C: DPCComponents> {
     pub sk_sig: <C::AccountSignature as SignatureScheme>::PrivateKey,
     pub sk_prf: <C::PRF as PRF>::Seed,
     pub r_pk: <C::AccountCommitment as CommitmentScheme>::Randomness,
+    pub r_pk_counter: u16,
     // This dummy flag is set to true for use in the `inner_snark` setup.
     #[derivative(Default(value = "true"))]
     pub is_dummy: bool,
 }
 
 impl<C: DPCComponents> AccountPrivateKey<C> {
-    const INPUT_R_PK: [u8; 32] = [
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    ];
+    const INITIAL_R_PK_COUNTER: u16 = 2;
     const INPUT_SK_PRF: [u8; 32] = [
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -66,17 +64,28 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         seed: &[u8; 32],
     ) -> Result<Self, AccountError> {
         // Derive the private key attributes and construct the account private key.
-        let private_key = Self::from_seed_unchecked(seed)?;
+        let mut private_key = Self::from_seed_and_counter_unchecked(seed, Self::INITIAL_R_PK_COUNTER)?;
 
-        // Returns the private key if it is valid.
-        match private_key.is_valid(signature_parameters, commitment_parameters) {
-            true => return Ok(private_key),
-            false => Err(AccountError::InvalidPrivateKeySeed),
+        loop {
+            // Returns the private key if it is valid.
+            match private_key.is_valid(signature_parameters, commitment_parameters) {
+                true => return Ok(private_key),
+                false => {
+                    if private_key.r_pk_counter == u16::MAX {
+                        return Err(AccountError::InvalidPrivateKeySeed);
+                    } else {
+                        // Samples a new r_pk by iterating the counter
+                        private_key = private_key.iterate_counter()?;
+
+                        continue;
+                    }
+                }
+            }
         }
     }
 
-    /// Derives the account private key from a given seed without verifying if it is well-formed.
-    pub fn from_seed_unchecked(seed: &[u8; 32]) -> Result<Self, AccountError> {
+    /// Derives the account private key from a given seed and counter without verifying if it is well-formed.
+    pub fn from_seed_and_counter_unchecked(seed: &[u8; 32], r_pk_counter: u16) -> Result<Self, AccountError> {
         // Generate the SIG key pair.
         let sk_sig_bytes = Blake2s::evaluate(&seed, &Self::INPUT_SK_SIG)?;
         let sk_sig = <C::AccountSignature as SignatureScheme>::PrivateKey::read(&sk_sig_bytes[..])?;
@@ -85,17 +94,55 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         let sk_prf_bytes = Blake2s::evaluate(&seed, &Self::INPUT_SK_PRF)?;
         let sk_prf = <C::PRF as PRF>::Seed::read(&sk_prf_bytes[..])?;
 
-        // Generate the randomness rpk for the commitment scheme.
-        let r_pk_bytes = Blake2s::evaluate(&seed, &Self::INPUT_R_PK)?;
-        let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::read(&r_pk_bytes[..])?;
+        let (r_pk, r_pk_counter) = Self::derive_r_pk(seed, r_pk_counter)?;
 
         Ok(Self {
             seed: *seed,
             sk_sig,
             sk_prf,
             r_pk,
+            r_pk_counter,
             is_dummy: false,
         })
+    }
+
+    fn derive_r_pk(
+        seed: &[u8; 32],
+        counter: u16,
+    ) -> Result<(<C::AccountCommitment as CommitmentScheme>::Randomness, u16), AccountError> {
+        let mut r_pk_counter = counter;
+        loop {
+            let mut r_pk_input = [0u8; 32];
+            r_pk_input[0..2].copy_from_slice(&r_pk_counter.to_le_bytes());
+
+            // Generate the randomness rpk for the commitment scheme.
+            let r_pk_bytes = Blake2s::evaluate(seed, &r_pk_input)?;
+
+            // This will fail if `r_pk_bytes` does not fit within the scalar field
+            match <C::AccountCommitment as CommitmentScheme>::Randomness::read(&r_pk_bytes[..]) {
+                Ok(r_pk) => return Ok((r_pk, r_pk_counter)),
+                _ => {
+                    if r_pk_counter == u16::MAX {
+                        return Err(AccountError::InvalidPrivateKeySeed);
+                    } else {
+                        r_pk_counter += 1;
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Derives a new account private key without verifying if it is well-formed by iterating the r_pk counter
+    fn iterate_counter(self) -> Result<Self, AccountError> {
+        let mut private_key = self;
+
+        let (r_pk, r_pk_counter) = Self::derive_r_pk(&private_key.seed, private_key.r_pk_counter + 1)?;
+
+        private_key.r_pk_counter = r_pk_counter;
+        private_key.r_pk = r_pk;
+
+        Ok(private_key)
     }
 
     /// Returns `true` if the private key is well-formed. Otherwise, returns `false`.
@@ -184,30 +231,32 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
     /// Reads in an account private key string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = s.from_base58()?;
-        if data.len() != 42 {
+        if data.len() != 43 {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..10] != account_format::PRIVATE_KEY_PREFIX {
-            return Err(AccountError::InvalidPrefixBytes(data[0..4].to_vec()));
+        if &data[0..9] != account_format::PRIVATE_KEY_PREFIX {
+            return Err(AccountError::InvalidPrefixBytes(data[0..9].to_vec()));
         }
 
-        let mut reader = &data[10..];
+        let mut reader = &data[9..];
+        let counter_bytes: [u8; 2] = FromBytes::read(&mut reader)?;
         let seed: [u8; 32] = FromBytes::read(&mut reader)?;
 
-        Self::from_seed_unchecked(&seed)
+        Self::from_seed_and_counter_unchecked(&seed, u16::from_le_bytes(counter_bytes))
     }
 }
 
 impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut private_key = [0u8; 42];
+        let mut private_key = [0u8; 43];
         let prefix = account_format::PRIVATE_KEY_PREFIX;
 
-        private_key[0..10].copy_from_slice(&prefix);
+        private_key[0..9].copy_from_slice(&prefix);
+        private_key[9..11].copy_from_slice(&self.r_pk_counter.to_le_bytes());
 
         self.seed
-            .write(&mut private_key[10..42])
+            .write(&mut private_key[11..43])
             .expect("seed formatting failed");
 
         write!(f, "{}", private_key.to_base58())
@@ -216,6 +265,10 @@ impl<C: DPCComponents> fmt::Display for AccountPrivateKey<C> {
 
 impl<C: DPCComponents> fmt::Debug for AccountPrivateKey<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "AccountPrivateKey {{ seed: {:?} }}", self.seed,)
+        write!(
+            f,
+            "AccountPrivateKey {{ seed: {:?}, r_pk_counter: {:?} }}",
+            self.seed, self.r_pk_counter
+        )
     }
 }
