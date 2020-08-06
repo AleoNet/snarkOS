@@ -329,7 +329,7 @@ mod rpc_tests {
 
         for (ciphertext, record) in ciphertexts.iter().zip(records) {
             let ciphertext_string = hex::encode(to_bytes![ciphertext].unwrap());
-            let account_view_key = hex::encode(to_bytes![view_key].unwrap());
+            let account_view_key = view_key.to_string();
 
             let params = DecryptRecordInput {
                 encrypted_record: ciphertext_string,
