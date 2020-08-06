@@ -2,14 +2,15 @@
 use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
-    program::{noop_program_circuit::*, PrivateProgramInput, ProgramLocalData},
+    program::{DummyProgram, NoopProgram},
     record::record_encryption::RecordEncryption,
     record_payload::RecordPayload,
+    BaseDPCComponents,
     DPC,
 };
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::DPCScheme,
+    algorithms::CRH,
+    dpc::{DPCScheme, Program},
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::{
@@ -65,7 +66,16 @@ fn base_dpc_integration_test() {
 
     let ledger = initialize_test_blockchain::<Tx, CommitmentMerkleParameters>(ledger_parameters, genesis_block);
 
-    let program_vk_hash = to_bytes![
+    let dummy_program_id = to_bytes![
+        ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.dummy_program_snark_parameters().verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
             &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
@@ -73,10 +83,6 @@ fn base_dpc_integration_test() {
         .unwrap()
     ]
     .unwrap();
-
-    #[cfg(debug_assertions)]
-    let program_snark_pvk: PreparedVerifyingKey<_> =
-        parameters.noop_program_snark_parameters.verification_key.clone().into();
 
     // Generate dummy input records having as address the genesis address.
     let old_account_private_keys = vec![genesis_account.private_key.clone(); NUM_INPUT_RECORDS];
@@ -94,8 +100,8 @@ fn base_dpc_integration_test() {
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
-            &program_vk_hash,
-            &program_vk_hash,
+            &dummy_program_id,
+            &dummy_program_id,
             &mut rng,
         )
         .unwrap();
@@ -109,8 +115,8 @@ fn base_dpc_integration_test() {
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let new_birth_program_ids = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
-    let new_death_program_ids = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![noop_program_id.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![noop_program_id.clone(); NUM_OUTPUT_RECORDS];
 
     let memo = [4u8; 32];
 
@@ -133,85 +139,40 @@ fn base_dpc_integration_test() {
 
     let local_data = execute_context.into_local_data();
 
-    let old_death_program_proofs = {
-        let mut rng = XorShiftRng::seed_from_u64(23472342u64);
-        let mut old_proof_and_vk = vec![];
-        for i in 0..NUM_INPUT_RECORDS {
-            // Instantiate death program circuit
-            let death_program_circuit =
-                NoopCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
+    // Generate the program proofs
 
-            // Generate the program proof
-            let proof = NoopProgramSNARK::prove(
-                &parameters.noop_program_snark_parameters.proving_key,
-                death_program_circuit,
+    let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
+    let dummy_program = DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
+
+    let mut old_death_program_proofs = vec![];
+    for i in 0..NUM_INPUT_RECORDS {
+        let private_input = dummy_program
+            .execute(
+                &parameters.dummy_program_snark_parameters.proving_key,
+                &parameters.dummy_program_snark_parameters.verification_key,
+                &local_data,
+                i as u8,
                 &mut rng,
             )
-            .expect("Proving should work");
-            #[cfg(debug_assertions)]
-            {
-                let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                    local_data_commitment_parameters: local_data
-                        .system_parameters
-                        .local_data_commitment
-                        .parameters()
-                        .clone(),
-                    local_data_root: local_data.local_data_root.clone(),
-                    position: i as u8,
-                };
-                assert!(
-                    NoopProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
-                        .expect("Proof should verify")
-                );
-            }
+            .unwrap();
 
-            let private_input: PrivateProgramInput = PrivateProgramInput {
-                verification_key: to_bytes![parameters.noop_program_snark_parameters.verification_key].unwrap(),
-                proof: to_bytes![proof].unwrap(),
-            };
-            old_proof_and_vk.push(private_input);
-        }
-        old_proof_and_vk
-    };
-    let new_birth_program_proofs = {
-        let mut rng = XorShiftRng::seed_from_u64(23472342u64);
-        let mut new_proof_and_vk = vec![];
-        for j in 0..NUM_OUTPUT_RECORDS {
-            // Instantiate birth program circuit
-            let birth_program_circuit =
-                NoopCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
+        old_death_program_proofs.push(private_input);
+    }
 
-            // Generate the program proof
-            let proof = NoopProgramSNARK::prove(
+    let mut new_birth_program_proofs = vec![];
+    for j in 0..NUM_OUTPUT_RECORDS {
+        let private_input = noop_program
+            .execute(
                 &parameters.noop_program_snark_parameters.proving_key,
-                birth_program_circuit,
+                &parameters.noop_program_snark_parameters.verification_key,
+                &local_data,
+                (NUM_INPUT_RECORDS + j) as u8,
                 &mut rng,
             )
-            .expect("Proving should work");
-            #[cfg(debug_assertions)]
-            {
-                let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                    local_data_commitment_parameters: local_data
-                        .system_parameters
-                        .local_data_commitment
-                        .parameters()
-                        .clone(),
-                    local_data_root: local_data.local_data_root.clone(),
-                    position: j as u8,
-                };
-                assert!(
-                    NoopProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
-                        .expect("Proof should verify")
-                );
-            }
-            let private_input: PrivateProgramInput = PrivateProgramInput {
-                verification_key: to_bytes![parameters.noop_program_snark_parameters.verification_key].unwrap(),
-                proof: to_bytes![proof].unwrap(),
-            };
-            new_proof_and_vk.push(private_input);
-        }
-        new_proof_and_vk
-    };
+            .unwrap();
+
+        new_birth_program_proofs.push(private_input);
+    }
 
     let (new_records, transaction) = InstantiatedDPC::execute_online(
         &parameters,

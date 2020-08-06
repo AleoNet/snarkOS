@@ -174,7 +174,6 @@ fn test_execute_base_dpc_constraints() {
                 &mut rng,
             )
             .unwrap();
-        println!("private_input proof size: {:?}", private_input.proof.len());
 
         old_proof_and_vk.push(private_input);
     }
@@ -191,7 +190,6 @@ fn test_execute_base_dpc_constraints() {
             )
             .unwrap();
 
-        println!("private_input proof size: {:?}", private_input.proof.len());
         new_proof_and_vk.push(private_input);
     }
 
