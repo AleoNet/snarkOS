@@ -1,7 +1,7 @@
 use crate::base_dpc::{
     parameters::SystemParameters,
+    record::{encrypted_record::*, record_serializer::*, DPCRecord},
     record_payload::RecordPayload,
-    records::{encrypted_record::*, record_serializer::*, DPCRecord},
     BaseDPCComponents,
 };
 use snarkos_algorithms::encoding::Elligator2;

@@ -1,5 +1,5 @@
 use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, records::DPCRecord};
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{LoadableMerkleParameters, CRH},

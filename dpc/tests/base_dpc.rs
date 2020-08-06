@@ -3,8 +3,8 @@ use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     program::{noop_program_circuit::*, PrivateProgramInput, ProgramLocalData},
+    record::record_encryption::RecordEncryption,
     record_payload::RecordPayload,
-    records::record_encryption::RecordEncryption,
     DPC,
 };
 use snarkos_models::{

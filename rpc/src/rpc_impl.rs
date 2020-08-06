@@ -8,8 +8,8 @@ use snarkos_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, Tx},
     parameters::PublicParameters,
+    record::DPCRecord,
     record_encryption::RecordEncryption,
-    records::DPCRecord,
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{dpc::Record, objects::Transaction};

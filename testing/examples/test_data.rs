@@ -1,5 +1,5 @@
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
-use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, records::DPCRecord};
+use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::dpc::{DPCScheme, Program, Record};
 use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};

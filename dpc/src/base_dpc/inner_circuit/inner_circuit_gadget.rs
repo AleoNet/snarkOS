@@ -1,7 +1,7 @@
 use crate::base_dpc::{
     parameters::SystemParameters,
+    record::DPCRecord,
     record_encryption::RecordEncryptionGadgetComponents,
-    records::DPCRecord,
     BaseDPCComponents,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};

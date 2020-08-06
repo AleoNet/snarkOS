@@ -41,8 +41,8 @@ pub use parameters::*;
 pub mod program;
 pub use program::*;
 
-pub mod records;
-pub use records::*;
+pub mod record;
+pub use record::*;
 
 pub mod transaction;
 pub use transaction::*;

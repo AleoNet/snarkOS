@@ -1,4 +1,4 @@
-use snarkos_dpc::base_dpc::{instantiated::*, records::DPCRecord};
+use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord};
 use snarkos_models::genesis::Genesis;
 use snarkos_objects::{Block, BlockHeader};
 use snarkos_parameters::GenesisBlock;

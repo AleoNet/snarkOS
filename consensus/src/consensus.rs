@@ -4,8 +4,8 @@ use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
     program::NoopProgram,
+    record::DPCRecord,
     record_payload::RecordPayload,
-    records::DPCRecord,
     BaseDPCComponents,
 };
 use snarkos_errors::consensus::ConsensusError;

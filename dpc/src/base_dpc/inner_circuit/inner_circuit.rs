@@ -2,8 +2,8 @@ use crate::{
     base_dpc::{
         inner_circuit_gadget::execute_inner_proof_gadget,
         parameters::SystemParameters,
+        record::DPCRecord,
         record_encryption::RecordEncryptionGadgetComponents,
-        records::DPCRecord,
         BaseDPCComponents,
     },
     Assignment,

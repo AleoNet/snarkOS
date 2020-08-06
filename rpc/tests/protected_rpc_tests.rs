@@ -4,7 +4,7 @@ mod protected_rpc_tests {
     use snarkos_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
-        records::DPCRecord,
+        record::DPCRecord,
     };
     use snarkos_models::dpc::Record;
     use snarkos_network::Context;
