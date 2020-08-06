@@ -63,22 +63,42 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         commitment_parameters: &C::AccountCommitment,
         seed: &[u8; 32],
     ) -> Result<Self, AccountError> {
-        // Derive the private key attributes and construct the account private key.
-        let mut private_key = Self::from_seed_and_counter_unchecked(seed, Self::INITIAL_R_PK_COUNTER)?;
+        // Generate the SIG key pair.
+        let sk_sig_bytes = Blake2s::evaluate(&seed, &Self::INPUT_SK_SIG)?;
+        let sk_sig = <C::AccountSignature as SignatureScheme>::PrivateKey::read(&sk_sig_bytes[..])?;
 
+        // Generate the PRF secret key.
+        let sk_prf_bytes = Blake2s::evaluate(&seed, &Self::INPUT_SK_PRF)?;
+        let sk_prf = <C::PRF as PRF>::Seed::read(&sk_prf_bytes[..])?;
+
+        let mut r_pk_counter = Self::INITIAL_R_PK_COUNTER;
         loop {
+            if r_pk_counter == u16::MAX {
+                return Err(AccountError::InvalidPrivateKeySeed);
+            }
+
+            // Derive the private key by iterating on the r_pk counter
+            let private_key = match Self::derive_r_pk(seed, r_pk_counter) {
+                Ok(r_pk) => Self {
+                    seed: *seed,
+                    sk_sig: sk_sig.clone(),
+                    sk_prf: sk_prf.clone(),
+                    r_pk,
+                    r_pk_counter,
+                    is_dummy: false,
+                },
+                _ => {
+                    r_pk_counter += 1;
+                    continue;
+                }
+            };
+
             // Returns the private key if it is valid.
             match private_key.is_valid(signature_parameters, commitment_parameters) {
                 true => return Ok(private_key),
                 false => {
-                    if private_key.r_pk_counter == u16::MAX {
-                        return Err(AccountError::InvalidPrivateKeySeed);
-                    } else {
-                        // Samples a new r_pk by iterating the counter
-                        private_key = private_key.iterate_counter()?;
-
-                        continue;
-                    }
+                    r_pk_counter += 1;
+                    continue;
                 }
             }
         }
@@ -94,7 +114,8 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         let sk_prf_bytes = Blake2s::evaluate(&seed, &Self::INPUT_SK_PRF)?;
         let sk_prf = <C::PRF as PRF>::Seed::read(&sk_prf_bytes[..])?;
 
-        let (r_pk, r_pk_counter) = Self::derive_r_pk(seed, r_pk_counter)?;
+        // Generate the randomness rpk for the commitment scheme.
+        let r_pk = Self::derive_r_pk(seed, r_pk_counter)?;
 
         Ok(Self {
             seed: *seed,
@@ -106,43 +127,19 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         })
     }
 
+    /// Generate the randomness rpk for the commitment scheme from a given seed and counter
     fn derive_r_pk(
         seed: &[u8; 32],
         counter: u16,
-    ) -> Result<(<C::AccountCommitment as CommitmentScheme>::Randomness, u16), AccountError> {
-        let mut r_pk_counter = counter;
-        loop {
-            let mut r_pk_input = [0u8; 32];
-            r_pk_input[0..2].copy_from_slice(&r_pk_counter.to_le_bytes());
+    ) -> Result<<C::AccountCommitment as CommitmentScheme>::Randomness, AccountError> {
+        let mut r_pk_input = [0u8; 32];
+        r_pk_input[0..2].copy_from_slice(&counter.to_le_bytes());
 
-            // Generate the randomness rpk for the commitment scheme.
-            let r_pk_bytes = Blake2s::evaluate(seed, &r_pk_input)?;
+        // Generate the randomness rpk for the commitment scheme.
+        let r_pk_bytes = Blake2s::evaluate(seed, &r_pk_input)?;
+        let r_pk = <C::AccountCommitment as CommitmentScheme>::Randomness::read(&r_pk_bytes[..])?;
 
-            // This will fail if `r_pk_bytes` does not fit within the scalar field
-            match <C::AccountCommitment as CommitmentScheme>::Randomness::read(&r_pk_bytes[..]) {
-                Ok(r_pk) => return Ok((r_pk, r_pk_counter)),
-                _ => {
-                    if r_pk_counter == u16::MAX {
-                        return Err(AccountError::InvalidPrivateKeySeed);
-                    } else {
-                        r_pk_counter += 1;
-                        continue;
-                    }
-                }
-            }
-        }
-    }
-
-    /// Derives a new account private key without verifying if it is well-formed by iterating the r_pk counter
-    fn iterate_counter(self) -> Result<Self, AccountError> {
-        let mut private_key = self;
-
-        let (r_pk, r_pk_counter) = Self::derive_r_pk(&private_key.seed, private_key.r_pk_counter + 1)?;
-
-        private_key.r_pk_counter = r_pk_counter;
-        private_key.r_pk = r_pk;
-
-        Ok(private_key)
+        Ok(r_pk)
     }
 
     /// Returns `true` if the private key is well-formed. Otherwise, returns `false`.
