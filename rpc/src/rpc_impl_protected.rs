@@ -145,7 +145,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
-            view_key: hex::encode(to_bytes![view_key]?),
+            view_key: view_key.to_string(),
             address: account.address.to_string(),
         })
     }
