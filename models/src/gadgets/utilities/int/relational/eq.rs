@@ -1,5 +1,4 @@
 use crate::gadgets::utilities::int::{Int128, Int16, Int32, Int64, Int8};
-use snarkos_errors::gadgets::SynthesisError;
 
 macro_rules! eq_gadget_impl {
     ($($gadget: ident)*) => ($(
