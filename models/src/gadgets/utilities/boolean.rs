@@ -4,7 +4,7 @@ use crate::{
         r1cs::{Assignment, ConstraintSystem, ConstraintVar, LinearCombination, Variable},
         utilities::{
             alloc::AllocGadget,
-            eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
+            eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
             uint::UInt8,
             ToBytesGadget,
@@ -623,14 +623,6 @@ impl Eq for Boolean {}
 impl From<AllocatedBit> for Boolean {
     fn from(b: AllocatedBit) -> Boolean {
         Boolean::Is(b)
-    }
-}
-
-/// a == b = !(a XOR b)
-impl<F: PrimeField> EvaluateEqGadget<F> for Boolean {
-    fn evaluate_equal<CS: ConstraintSystem<F>>(&self, cs: CS, other: &Self) -> Result<Boolean, SynthesisError> {
-        let xor = Boolean::xor(cs, self, other)?;
-        Ok(xor.not())
     }
 }
 

@@ -5,7 +5,7 @@ use crate::{
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
-            eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
+            eq::{ConditionalEqGadget, EqGadget},
             select::CondSelectGadget,
             uint::unsigned_integer::{UInt, UInt8},
             ToBytesGadget,
@@ -618,23 +618,6 @@ impl Eq for UInt128 {}
 impl PartialOrd for UInt128 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Option::from(self.value.cmp(&other.value))
-    }
-}
-
-impl<F: PrimeField> EvaluateEqGadget<F> for UInt128 {
-    fn evaluate_equal<CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Boolean, SynthesisError> {
-        let mut result = Boolean::constant(true);
-        for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-            let equal = a.evaluate_equal(&mut cs.ns(|| format!("u128 evaluate equality for {}-th bit", i)), b)?;
-
-            result = Boolean::and(
-                &mut cs.ns(|| format!("u128 and result for {}-th bit", i)),
-                &equal,
-                &result,
-            )?;
-        }
-
-        Ok(result)
     }
 }
 
