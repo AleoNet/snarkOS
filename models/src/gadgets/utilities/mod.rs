@@ -2,22 +2,19 @@ use crate::{
     curves::Field,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{
-            boolean::Boolean,
-            uint::unsigned_integer::{UInt, UInt8},
-        },
+        utilities::{boolean::Boolean, uint8::UInt8},
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
 
 pub mod alloc;
-pub mod arithmetic;
-pub mod bits;
+// pub mod arithmetic;
+// pub mod bits;
 pub mod boolean;
 pub mod eq;
-pub mod int;
+// pub mod int;
 pub mod select;
-pub mod uint;
+// pub mod uint;
 
 pub trait ToBitsGadget<F: Field> {
     fn to_bits<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Vec<Boolean>, SynthesisError>;

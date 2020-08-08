@@ -25,7 +25,7 @@ pub struct SchnorrParameters<G: Group, D: Digest> {
 impl<G: Group, D: Digest> SchnorrParameters<G, D> {
     pub fn setup<R: Rng>(rng: &mut R, private_key_size_in_bits: usize) -> Self {
         // Round to the closest multiple of 64 to factor bit and byte encoding differences.
-        assert!(private_key_size_in_bits < usize::MAX - 63);
+        assert!(private_key_size_in_bits < std::usize::MAX - 63);
         let num_powers = (private_key_size_in_bits + 63) & !63usize;
         Self {
             generator_powers: Self::generator(num_powers, rng),
