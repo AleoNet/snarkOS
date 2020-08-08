@@ -48,15 +48,6 @@ jobs:
           command: test
           args: --all --lib
 
-      - name: Slack notification
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: git-snarkos # Optional. (defaults to webhook)
-        uses: 8398a7/action-slack@v3.5.2
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow # selectable (default: repo,message)
-
 #  test-ga:
 #    name: Check Tests (Simple)
 #    runs-on: ubuntu-latest
@@ -117,12 +108,3 @@ jobs:
           cd toolkit
           wasm-pack test --node
 #          cargo test --target wasm32-unknown-unknown --features wasm
-
-      - name: Slack notification
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: git-snarkos # Optional. (defaults to webhook)
-        uses: 8398a7/action-slack@v3.5.2
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow # selectable (default: repo,message)
