@@ -6,11 +6,7 @@ use snarkos_models::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{
-            alloc::AllocGadget,
-            boolean::Boolean,
-            uint::unsigned_integer::{UInt, UInt8},
-        },
+        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8},
     },
 };
 

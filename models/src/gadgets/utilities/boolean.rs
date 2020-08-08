@@ -6,7 +6,7 @@ use crate::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
             select::CondSelectGadget,
-            uint::UInt8,
+            uint8::UInt8,
             ToBytesGadget,
         },
     },
@@ -708,11 +708,7 @@ impl<F: Field> ToBytesGadget<F> for Boolean {
         bits.push(*self);
         bits.reverse();
         let value = self.get_value().map(|val| val as u8);
-        let byte = UInt8 {
-            bits,
-            negated: false,
-            value,
-        };
+        let byte = UInt8 { bits, value };
         Ok(vec![byte])
     }
 

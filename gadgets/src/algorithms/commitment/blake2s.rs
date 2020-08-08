@@ -6,11 +6,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::CommitmentGadget,
         r1cs::ConstraintSystem,
-        utilities::{
-            alloc::AllocGadget,
-            uint::unsigned_integer::{UInt, UInt8},
-            ToBytesGadget,
-        },
+        utilities::{alloc::AllocGadget, uint8::UInt8, ToBytesGadget},
     },
 };
 

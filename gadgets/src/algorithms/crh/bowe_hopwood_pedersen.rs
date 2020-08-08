@@ -12,10 +12,7 @@ use snarkos_models::{
         algorithms::CRHGadget,
         curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{
-            boolean::Boolean,
-            uint::unsigned_integer::{UInt, UInt8},
-        },
+        utilities::{boolean::Boolean, uint8::UInt8},
     },
 };
 

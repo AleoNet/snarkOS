@@ -11,7 +11,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::CommitmentGadget,
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, uint::UInt8},
+        utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
 use snarkos_utilities::rand::UniformRand;

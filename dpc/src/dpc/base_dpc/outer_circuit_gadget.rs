@@ -7,12 +7,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SNARKVerifierGadget},
         r1cs::ConstraintSystem,
-        utilities::{
-            alloc::AllocGadget,
-            eq::EqGadget,
-            uint::unsigned_integer::{UInt, UInt8},
-            ToBytesGadget,
-        },
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};

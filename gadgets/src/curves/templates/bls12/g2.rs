@@ -6,7 +6,7 @@ use snarkos_models::{
     gadgets::{
         curves::{FieldGadget, Fp2Gadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{eq::NEqGadget, uint::UInt8, ToBytesGadget},
+        utilities::{eq::NEqGadget, uint8::UInt8, ToBytesGadget},
     },
 };
 use snarkos_utilities::bititerator::BitIterator;

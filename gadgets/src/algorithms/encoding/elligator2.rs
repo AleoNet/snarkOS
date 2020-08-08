@@ -4,7 +4,7 @@ use snarkos_models::{
     gadgets::{
         curves::FpGadget,
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, boolean::Boolean, uint::UInt8, ToBitsGadget, ToBytesGadget},
+        utilities::{alloc::AllocGadget, boolean::Boolean, uint8::UInt8, ToBitsGadget, ToBytesGadget},
     },
 };
 use snarkos_utilities::{to_bytes, ToBytes};

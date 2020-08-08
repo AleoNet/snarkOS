@@ -9,10 +9,7 @@ use snarkos_models::{
         algorithms::CommitmentGadget,
         curves::{CompressedGroupGadget, GroupGadget},
         r1cs::ConstraintSystem,
-        utilities::{
-            alloc::AllocGadget,
-            uint::unsigned_integer::{UInt, UInt8},
-        },
+        utilities::{alloc::AllocGadget, uint8::UInt8},
     },
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};

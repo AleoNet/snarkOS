@@ -10,7 +10,7 @@ use snarkos_models::{
             alloc::AllocGadget,
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
-            uint::{UInt, UInt8},
+            uint8::UInt8,
             ToBytesGadget,
         },
     },

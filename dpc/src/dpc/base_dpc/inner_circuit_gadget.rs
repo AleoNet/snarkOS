@@ -26,11 +26,9 @@ use snarkos_models::{
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
-            arithmetic::{add::Add, sub::Sub},
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
-            int::{Int, Int64},
-            uint::UInt8,
+            uint8::UInt8,
             ToBitsGadget,
             ToBytesGadget,
         },

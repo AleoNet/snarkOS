@@ -20,7 +20,7 @@ use snarkos_models::{
     gadgets::{
         algorithms::{CRHGadget, MaskedCRHGadget},
         r1cs::{ConstraintSystem, TestConstraintSystem},
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
+        utilities::{alloc::AllocGadget, eq::EqGadget, uint8::UInt8},
     },
 };
 use snarkos_utilities::ToBytes;

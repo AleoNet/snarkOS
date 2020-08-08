@@ -13,7 +13,7 @@ use crate::{
             boolean::{AllocatedBit, Boolean},
             eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
-            uint::unsigned_integer::{UInt, UInt8},
+            uint8::UInt8,
             ToBitsGadget,
             ToBytesGadget,
         },
