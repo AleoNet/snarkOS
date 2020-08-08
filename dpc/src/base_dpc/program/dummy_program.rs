@@ -56,8 +56,6 @@ where
 
         let record = &records[position as usize];
 
-        let birth_program = (position as usize) >= C::NUM_INPUT_RECORDS;
-
         if (position as usize) < C::NUM_INPUT_RECORDS {
             assert_eq!(self.identity, record.death_program_id());
         } else {

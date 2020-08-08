@@ -4,14 +4,21 @@ use crate::{
 };
 use snarkos_algorithms::commitment_tree::CommitmentMerklePath;
 use snarkos_errors::gadgets::SynthesisError;
-// use snarkos_gadgets::algorithms::commitment_tree::merkle_path::CommitmentMerklePathGadget;
+use snarkos_gadgets::algorithms::commitment_tree::merkle_path::CommitmentMerklePathGadget;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH},
     dpc::Record,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, SignaturePublicKeyRandomizationGadget},
         r1cs::{ConstraintSynthesizer, ConstraintSystem},
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8, ToBytesGadget},
+        utilities::{
+            alloc::AllocGadget,
+            boolean::Boolean,
+            eq::EqGadget,
+            select::CondSelectGadget,
+            uint::UInt8,
+            ToBytesGadget,
+        },
     },
 };
 
@@ -81,6 +88,7 @@ impl<C: BaseDPCComponents> DummyCircuit<C> {
     }
 
     pub fn new(local_data: &LocalData<C>, position: u8) -> Self {
+        assert!((position as usize) < (C::NUM_INPUT_RECORDS + C::NUM_OUTPUT_RECORDS));
         let records = [&local_data.old_records[..], &local_data.new_records[..]].concat();
         let record = &records[position as usize];
         let local_data_commitment_randomizer = &local_data.local_data_commitment_randomizers[position as usize];
@@ -132,7 +140,7 @@ pub fn execute_dummy_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     position: u8,
 ) -> Result<(), SynthesisError> {
     // Allocate the position
-    let _position = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[position])?;
+    let position_gadget = UInt8::alloc_input_vec(cs.ns(|| "Alloc position"), &[position])?;
 
     // Allocate the parameters and local data root
     let local_data_commitment_parameters_gadget =
@@ -173,7 +181,11 @@ pub fn execute_dummy_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
 
     // Create the record commitment gadget
 
-    let serial_number = &old_serial_numbers[position as usize];
+    let is_death_record = position < (C::NUM_INPUT_RECORDS as u8);
+    let is_death = Boolean::alloc(&mut cs.ns(|| "is_death_record"), || Ok(is_death_record))?;
+
+    let serial_number_position = position % 2;
+    let serial_number = &old_serial_numbers[serial_number_position as usize];
     let serial_number_gadget = <C::AccountSignatureGadget as SignaturePublicKeyRandomizationGadget<
         C::AccountSignature,
         _,
@@ -182,8 +194,6 @@ pub fn execute_dummy_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     })?;
     let serial_number_bytes = serial_number_gadget.to_bytes(&mut cs.ns(|| "serial_number_bytes"))?;
 
-    // TODO (raychu86) do we need to enforce the record commitment is valid here?
-
     let record_commitment_gadget =
         <C::RecordCommitmentGadget as CommitmentGadget<C::RecordCommitment, _>>::OutputGadget::alloc(
             &mut cs.ns(|| "given_commitment"),
@@ -191,44 +201,71 @@ pub fn execute_dummy_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
         )?;
     let record_commitment_bytes = record_commitment_gadget.to_bytes(&mut cs.ns(|| "record_commitment_bytes"))?;
 
-    // let mut input_bytes = vec![];
+    let mut death_input_bytes = position_gadget.clone();
 
-    //  // if !birth_program {
-    //  //     input_bytes.extend_from_slice(&serial_number_bytes);
-    //  // }
-    //  input_bytes.extend_from_slice(&record_commitment_bytes);
-    //  input_bytes.extend_from_slice(&memo);
-    //  input_bytes.extend_from_slice(&network_id);
-    //
-    //  // Create the local data commitment leaf
-    //
-    //  let commitment_randomness = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
-    //      cs.ns(|| "Allocate record local data commitment randomness"),
-    //      || Ok(local_data_commitment_randomizer),
-    //  )?;
-    //
-    //  let local_data_commtiment_leaf = <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::check_commitment_gadget(
-    //      cs.ns(|| "Commit to record local data"),
-    //      &local_data_commitment_parameters_gadget,
-    //      &input_bytes,
-    //      &commitment_randomness,
-    //  )?;
-    //
-    //  // Alloc the witness gadget. - Currently we do not have witnesses because the root is generated from scratch
-    //
-    // let witness_gadget = CommitmentMerklePathGadget::<_, _, C::LocalDataCommitmentGadget, C::LocalDataCRHGadget, _>::alloc(
-    //     &mut cs.ns(|| "Declare local data witness path"),
-    //     || Ok(local_data_merkle_path),
-    // )?;
-    //
-    //  // Enforce that record commitment and witness is correct given the root
-    //
-    //  witness_gadget.check_membership(
-    //     &mut cs.ns(|| "Perform local data commitment membership witness check"),
-    //     &local_data_crh_parameters,
-    //     &local_data_root_gadget,
-    //     &local_data_commtiment_leaf,
-    //  )?;
+    death_input_bytes.extend_from_slice(&serial_number_bytes);
+    death_input_bytes.extend_from_slice(&record_commitment_bytes);
+    death_input_bytes.extend_from_slice(&memo);
+    death_input_bytes.extend_from_slice(&network_id);
+
+    let mut birth_input_bytes = position_gadget.clone();
+
+    birth_input_bytes.extend_from_slice(&record_commitment_bytes);
+    birth_input_bytes.extend_from_slice(&memo);
+    birth_input_bytes.extend_from_slice(&network_id);
+
+    let local_data_commitment_randomness =
+        <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::RandomnessGadget::alloc(
+            cs.ns(|| "Allocate record local data commitment randomness"),
+            || Ok(local_data_commitment_randomizer),
+        )?;
+
+    // Create the local data commitment leaf for a death record
+
+    let death_local_data_commtiment_leaf =
+        <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::check_commitment_gadget(
+            cs.ns(|| "Commit to record local data - death"),
+            &local_data_commitment_parameters_gadget,
+            &death_input_bytes,
+            &local_data_commitment_randomness,
+        )?;
+
+    // Create the local data commitment leaf for a death record
+
+    let birth_local_data_commtiment_leaf =
+        <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::check_commitment_gadget(
+            cs.ns(|| "Commit to record local data - birth"),
+            &local_data_commitment_parameters_gadget,
+            &birth_input_bytes,
+            &local_data_commitment_randomness,
+        )?;
+
+    // Select the local data commitment leaf based on the given position
+
+    let local_data_commtiment_leaf =
+        <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::OutputGadget::conditionally_select(
+            cs.ns(|| "conditionally_select the local_data_commitment_leaf"),
+            &is_death,
+            &death_local_data_commtiment_leaf,
+            &birth_local_data_commtiment_leaf,
+        )?;
+
+    // Alloc the witness gadget. - Currently we do not have witnesses because the root is generated from scratch
+
+    let witness_gadget =
+        CommitmentMerklePathGadget::<_, _, C::LocalDataCommitmentGadget, C::LocalDataCRHGadget, _>::alloc(
+            &mut cs.ns(|| "Declare local data witness path"),
+            || Ok(local_data_merkle_path),
+        )?;
+
+    // Enforce that record commitment and witness is correct given the root
+
+    witness_gadget.check_membership(
+        &mut cs.ns(|| "Perform local data commitment membership witness check"),
+        &local_data_crh_parameters,
+        &local_data_root_gadget,
+        &local_data_commtiment_leaf,
+    )?;
 
     Ok(())
 }
