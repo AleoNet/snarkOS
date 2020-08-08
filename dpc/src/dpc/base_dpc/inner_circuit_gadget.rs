@@ -28,7 +28,7 @@ use snarkos_models::{
             alloc::AllocGadget,
             arithmetic::{add::Add, sub::Sub},
             boolean::Boolean,
-            eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget},
+            eq::{ConditionalEqGadget, EqGadget},
             int::{Int, Int64},
             uint::UInt8,
             ToBitsGadget,
@@ -1104,21 +1104,6 @@ where
                 let element_squared = element
                     .0
                     .mul(encryption_cs.ns(|| format!("element_{} ^ 2", i)), &element.0)?;
-
-                let a_i_is_correct =
-                    element_squared.evaluate_equal(encryption_cs.ns(|| format!("element_squared == a_{}", i)), &a_i)?;
-                let b_i_is_correct =
-                    element_squared.evaluate_equal(encryption_cs.ns(|| format!("element_squared == b_{}", i)), &b_i)?;
-
-                // Enforce that either a_i or b_i was valid
-                let single_valid_recovery = a_i_is_correct.evaluate_equal(
-                    encryption_cs.ns(|| format!("(element_squared == a_{}) == (element_squared == b_{})", i, i)),
-                    &b_i_is_correct,
-                )?;
-                single_valid_recovery.enforce_equal(
-                    encryption_cs.ns(|| format!("single_valid_recovery_{} == false", i)),
-                    &Boolean::Constant(false),
-                )?;
             }
 
             // *******************************************************************

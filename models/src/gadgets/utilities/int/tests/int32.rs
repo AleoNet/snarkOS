@@ -281,60 +281,6 @@ fn test_int32_mul() {
 }
 
 #[test]
-fn test_int32_div_constants() {
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-
-    for _ in 0..1000 {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-
-        let a: i32 = rng.gen_range(-i32::MAX, i32::MAX);
-        let b: i32 = rng.gen_range(-i32::MAX, i32::MAX);
-
-        let expected = match a.checked_div(b) {
-            Some(valid) => valid,
-            None => continue,
-        };
-
-        let a_bit = Int32::constant(a);
-        let b_bit = Int32::constant(b);
-
-        let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
-
-        assert!(r.value == Some(expected));
-
-        check_all_constant_bits(expected, r);
-    }
-}
-
-#[test]
-fn test_int32_div() {
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-
-    for _ in 0..100 {
-        let mut cs = TestConstraintSystem::<Fr>::new();
-
-        let a: i32 = rng.gen_range(-i32::MAX, i32::MAX);
-        let b: i32 = rng.gen_range(-i32::MAX, i32::MAX);
-
-        let expected = match a.checked_div(b) {
-            Some(valid) => valid,
-            None => continue,
-        };
-
-        let a_bit = Int32::alloc(cs.ns(|| "a_bit"), || Ok(a)).unwrap();
-        let b_bit = Int32::alloc(cs.ns(|| "b_bit"), || Ok(b)).unwrap();
-
-        let r = a_bit.div(cs.ns(|| "division"), &b_bit).unwrap();
-
-        assert!(cs.is_satisfied());
-
-        assert!(r.value == Some(expected));
-
-        check_all_allocated_bits(expected, r);
-    }
-}
-
-#[test]
 fn test_int32_pow_constants() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
