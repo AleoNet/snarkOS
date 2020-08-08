@@ -6,7 +6,7 @@
 
 # Inputs: recipient address, amount, network_id, file_path
 
-cargo run --release --example generate_transaction aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh 100 0 transaction_1.genesis
+cargo run --release --example generate_transaction aleo1zx95xxqlx7rgn2h6j0u6fj4l9j3lwrueggrq7yw9xr99ykw94v9sl5k2tv 100 0 transaction_1.genesis
 
 mv transaction_1.genesis ../src/genesis/transaction_1
 
