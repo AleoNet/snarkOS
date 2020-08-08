@@ -3,7 +3,7 @@ use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    program::NoopProgram,
+    program::{DummyProgram, NoopProgram},
     record::DPCRecord,
     record_payload::RecordPayload,
     BaseDPCComponents,
@@ -449,12 +449,18 @@ impl ConsensusParameters {
             &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 
-        let dpc_program =
-            NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
+        let dummy_program_snark_id = to_bytes![ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.dummy_program_snark_parameters.verification_key]?
+        )?]?;
+
+        let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
+        let _dummy_program =
+            DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
 
         let mut old_death_program_proofs = vec![];
         for i in 0..NUM_INPUT_RECORDS {
-            let private_input = dpc_program.execute(
+            let private_input = noop_program.execute(
                 &parameters.noop_program_snark_parameters.proving_key,
                 &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,
@@ -467,7 +473,7 @@ impl ConsensusParameters {
 
         let mut new_birth_program_proofs = vec![];
         for j in 0..NUM_OUTPUT_RECORDS {
-            let private_input = dpc_program.execute(
+            let private_input = noop_program.execute(
                 &parameters.noop_program_snark_parameters.proving_key,
                 &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,

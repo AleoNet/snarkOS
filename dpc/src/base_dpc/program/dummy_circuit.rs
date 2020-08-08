@@ -127,6 +127,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for DummyCircuit
     }
 }
 
+/// Enforce that if a record is a dummy, that the value is 0 and payload is 0.
 pub fn execute_dummy_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     system_parameters: &SystemParameters<C>,

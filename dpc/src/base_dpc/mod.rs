@@ -122,7 +122,6 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
     old_account_private_keys: Vec<AccountPrivateKey<Components>>,
     old_records: Vec<DPCRecord<Components>>,
     old_serial_numbers: Vec<<Components::AccountSignature as SignatureScheme>::PublicKey>,
-    old_randomizers: Vec<Vec<u8>>,
 
     // New record stuff
     new_records: Vec<DPCRecord<Components>>,
@@ -139,6 +138,8 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
 
     local_data_merkle_tree: CommitmentMerkleTree<Components::LocalDataCommitment, Components::LocalDataCRH>,
     local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
+
+    transaction_signatures: Vec<<Components::AccountSignature as SignatureScheme>::Output>,
 
     value_balance: i64,
     memorandum: <DPCTransaction<Components> as Transaction>::Memorandum,
@@ -627,13 +628,47 @@ where
             new_encrypted_record_hashes.push(encrypted_record_hash);
         }
 
+        // Generate Schnorr signature on transaction data
+        let signature_time = start_timer!(|| "Sign and randomize transaction contents");
+
+        let signature_message = to_bytes![
+            network_id,
+            old_serial_numbers,
+            new_commitments,
+            new_encrypted_record_hashes,
+            program_commitment,
+            local_data_merkle_tree.root(),
+            value_balance,
+            memorandum
+        ]?;
+
+        let mut transaction_signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        for i in 0..Components::NUM_INPUT_RECORDS {
+            let sk_sig = &old_account_private_keys[i].sk_sig;
+            let randomizer = &old_randomizers[i];
+
+            // Sign the transaction data
+            let account_signature =
+                Components::AccountSignature::sign(&parameters.account_signature, sk_sig, &signature_message, rng)?;
+
+            // Randomize the signature
+            let randomized_signature = Components::AccountSignature::randomize_signature(
+                &parameters.account_signature,
+                &account_signature,
+                randomizer,
+            )?;
+
+            transaction_signatures.push(randomized_signature);
+        }
+
+        end_timer!(signature_time);
+
         let context = ExecuteContext {
             system_parameters: parameters.clone(),
 
             old_records: old_records.to_vec(),
             old_account_private_keys: old_account_private_keys.to_vec(),
             old_serial_numbers,
-            old_randomizers,
 
             new_records,
             new_sn_nonce_randomness,
@@ -647,6 +682,8 @@ where
             program_randomness,
             local_data_merkle_tree,
             local_data_commitment_randomizers,
+
+            transaction_signatures,
 
             value_balance,
             memorandum: memorandum.clone(),
@@ -672,9 +709,9 @@ where
             system_parameters,
 
             old_records,
+            // TODO (raychu86) Online/delegated phase shouldn't have access to the AccountPrivateKey SK_SIG
             old_account_private_keys,
             old_serial_numbers,
-            old_randomizers,
 
             new_records,
             new_sn_nonce_randomness,
@@ -688,6 +725,7 @@ where
             program_randomness,
             local_data_merkle_tree,
             local_data_commitment_randomizers,
+            transaction_signatures,
             value_balance,
             memorandum,
             network_id,
@@ -714,46 +752,6 @@ where
                 old_witnesses.push(witness);
             }
         }
-
-        // Generate Schnorr signature on transaction data
-        // TODO (raychu86) Remove ledger_digest from signature and move the schorr signing into `execute_offline`
-        let signature_time = start_timer!(|| "Sign and randomize transaction contents");
-
-        let signature_message = to_bytes![
-            network_id,
-            ledger_digest,
-            old_serial_numbers,
-            new_commitments,
-            program_commitment,
-            local_data_root,
-            value_balance,
-            memorandum
-        ]?;
-
-        let mut signatures = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
-        for i in 0..Components::NUM_INPUT_RECORDS {
-            let sk_sig = &old_account_private_keys[i].sk_sig;
-            let randomizer = &old_randomizers[i];
-
-            // Sign the transaction data
-            let account_signature = Components::AccountSignature::sign(
-                &system_parameters.account_signature,
-                sk_sig,
-                &signature_message,
-                rng,
-            )?;
-
-            // Randomize the signature
-            let randomized_signature = Components::AccountSignature::randomize_signature(
-                &system_parameters.account_signature,
-                &account_signature,
-                randomizer,
-            )?;
-
-            signatures.push(randomized_signature);
-        }
-
-        end_timer!(signature_time);
 
         // Prepare record encryption components used in the inner SNARK
 
@@ -864,7 +862,7 @@ where
             local_data_root,
             value_balance,
             network_id,
-            signatures,
+            transaction_signatures,
             new_encrypted_records,
         );
 
@@ -920,13 +918,23 @@ where
 
         end_timer!(ledger_time);
 
+        // Construct the ciphertext hashes
+
+        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for encrypted_record in &transaction.encrypted_records {
+            let encrypted_record_hash =
+                RecordEncryption::encrypted_record_hash(&parameters.system_parameters, encrypted_record)?;
+
+            new_encrypted_record_hashes.push(encrypted_record_hash);
+        }
+
         let signature_time = start_timer!(|| "Signature checks");
 
         let signature_message = &to_bytes![
             transaction.network_id(),
-            transaction.ledger_digest(),
             transaction.old_serial_numbers(),
             transaction.new_commitments(),
+            new_encrypted_record_hashes,
             transaction.program_commitment(),
             transaction.local_data_root(),
             transaction.value_balance(),
@@ -942,16 +950,6 @@ where
         }
 
         end_timer!(signature_time);
-
-        // Construct the ciphertext hashes
-
-        let mut new_encrypted_record_hashes = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for encrypted_record in &transaction.encrypted_records {
-            let encrypted_record_hash =
-                RecordEncryption::encrypted_record_hash(&parameters.system_parameters, encrypted_record)?;
-
-            new_encrypted_record_hashes.push(encrypted_record_hash);
-        }
 
         let inner_snark_input = InnerCircuitVerifierInput {
             system_parameters: parameters.system_parameters.clone(),

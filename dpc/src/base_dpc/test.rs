@@ -199,7 +199,6 @@ fn test_execute_base_dpc_constraints() {
         old_records,
         old_account_private_keys,
         old_serial_numbers,
-        old_randomizers: _,
 
         new_records,
         new_sn_nonce_randomness,
@@ -213,6 +212,7 @@ fn test_execute_base_dpc_constraints() {
         program_randomness,
         local_data_merkle_tree,
         local_data_commitment_randomizers,
+        transaction_signatures: _,
         value_balance,
         memorandum,
         network_id,
