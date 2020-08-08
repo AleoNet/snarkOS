@@ -22,7 +22,7 @@ use snarkos_models::{
     dpc::Record,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget, EncryptionGadget, PRFGadget, SignaturePublicKeyRandomizationGadget},
-        curves::FieldGadget,
+        curves::{FieldGadget, FpGadget},
         r1cs::ConstraintSystem,
         utilities::{
             alloc::AllocGadget,
@@ -43,6 +43,7 @@ use snarkos_utilities::{
     to_bytes,
 };
 
+use snarkos_models::gadgets::utilities::eq::NEqGadget;
 use std::ops::Mul;
 
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
@@ -1060,6 +1061,8 @@ where
             let u = C::InnerField::read(&to_bytes![u]?[..])?;
             let ua = C::InnerField::read(&to_bytes![ua]?[..])?;
 
+            let fp_zero = FpGadget::zero(encryption_cs.ns(|| "fpg zero"))?;
+
             for (i, (element, y_gadget)) in record_field_elements_gadgets
                 .iter()
                 .skip(1)
@@ -1104,6 +1107,32 @@ where
                 let element_squared = element
                     .0
                     .mul(encryption_cs.ns(|| format!("element_{} ^ 2", i)), &element.0)?;
+
+                // Enforce that either a_i == element_squared or b_i == element_squared
+
+                let a_i_minus_element_squared = a_i.sub(
+                    encryption_cs.ns(|| format!("a_{} - element_{}^2", i, i)),
+                    &element_squared,
+                )?;
+                let b_i_minus_element_squared = b_i.sub(
+                    encryption_cs.ns(|| format!("b_{} - element_{}^2", i, i)),
+                    &element_squared,
+                )?;
+
+                let expected_zero = a_i_minus_element_squared.mul(
+                    encryption_cs.ns(|| format!("(-a_{} - element_{}^2) * (-b_{} - element_{}^2)", i, i, i, i)),
+                    &b_i_minus_element_squared,
+                )?;
+
+                expected_zero.enforce_equal(
+                    encryption_cs.ns(|| format!("(-a_{} - element_{}^2) * (-b_{} - element_{}^2) == 0", i, i, i, i)),
+                    &fp_zero,
+                )?;
+
+                a_i.enforce_not_equal(encryption_cs.ns(|| format!("a_{} != b_{}", i, i)), &b_i)?;
+
+                element_squared
+                    .enforce_not_equal(encryption_cs.ns(|| format!("element_squared_{} != 0", i)), &fp_zero)?;
             }
 
             // *******************************************************************
