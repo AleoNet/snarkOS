@@ -2,10 +2,16 @@ use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{CommitmentScheme, CRH};
 use snarkos_utilities::{to_bytes, ToBytes};
 
-#[derive(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "C: CommitmentScheme, H: CRH"),
+    PartialEq(bound = "C: CommitmentScheme, H: CRH"),
+    Eq(bound = "C: CommitmentScheme, H: CRH")
+)]
 pub struct CommitmentMerklePath<C: CommitmentScheme, H: CRH> {
     pub leaves: (<C as CommitmentScheme>::Output, <C as CommitmentScheme>::Output),
     pub inner_hashes: (<H as CRH>::Output, <H as CRH>::Output),
+    #[derivative(PartialEq = "ignore")]
     pub parameters: H,
 }
 
@@ -42,4 +48,21 @@ impl<C: CommitmentScheme, H: CRH> CommitmentMerklePath<C, H> {
 fn hash_inner_node<H: CRH, L: ToBytes>(crh: &H, left: &L, right: &L) -> Result<<H as CRH>::Output, MerkleError> {
     let input = to_bytes![left, right]?;
     Ok(crh.hash(&input)?)
+}
+
+impl<C: CommitmentScheme, H: CRH> Default for CommitmentMerklePath<C, H> {
+    fn default() -> Self {
+        let leaves = (
+            <C as CommitmentScheme>::Output::default(),
+            <C as CommitmentScheme>::Output::default(),
+        );
+        let inner_hashes = (<H as CRH>::Output::default(), <H as CRH>::Output::default());
+        let parameters = H::default();
+
+        Self {
+            leaves,
+            inner_hashes,
+            parameters,
+        }
+    }
 }

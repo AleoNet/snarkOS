@@ -1,5 +1,8 @@
 use crate::base_dpc::record_payload::RecordPayload;
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
+use snarkos_algorithms::{
+    commitment_tree::CommitmentMerkleTree,
+    merkle_tree::{MerklePath, MerkleTreeDigest},
+};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{
@@ -134,7 +137,7 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
     program_commitment: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_root: <Components::LocalDataCRH as CRH>::Output,
+    local_data_merkle_tree: CommitmentMerkleTree<Components::LocalDataCommitment, Components::LocalDataCRH>,
     local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
     value_balance: i64,
@@ -152,7 +155,7 @@ impl<Components: BaseDPCComponents> ExecuteContext<Components> {
 
             new_records: self.new_records.to_vec(),
 
-            local_data_root: self.local_data_root.clone(),
+            local_data_merkle_tree: self.local_data_merkle_tree.clone(),
             local_data_commitment_randomizers: self.local_data_commitment_randomizers.clone(),
 
             memorandum: self.memorandum.clone(),
@@ -173,7 +176,7 @@ pub struct LocalData<Components: BaseDPCComponents> {
     pub new_records: Vec<DPCRecord<Components>>,
 
     // Commitment to the above information.
-    pub local_data_root: <Components::LocalDataCRH as CRH>::Output,
+    pub local_data_merkle_tree: CommitmentMerkleTree<Components::LocalDataCommitment, Components::LocalDataCRH>,
     pub local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
     pub memorandum: <DPCTransaction<Components> as Transaction>::Memorandum,
@@ -524,11 +527,11 @@ where
         }
 
         // TODO (raychu86) Add Leo program inputs + outputs and index to local data commitments
-        let local_data_root_timer = start_timer!(|| "Compute local data root");
+        let local_data_merkle_tree_timer = start_timer!(|| "Compute local data merkle tree");
 
         let mut local_data_commitment_randomizers = vec![];
 
-        let mut old_record_commitments = Vec::new();
+        let mut old_record_commitments = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for i in 0..Components::NUM_INPUT_RECORDS {
             let record = &old_records[i];
             let input_bytes = to_bytes![old_serial_numbers[i], record.commitment(), memorandum, network_id]?;
@@ -540,11 +543,11 @@ where
                 &commitment_randomness,
             )?;
 
-            old_record_commitments.extend_from_slice(&to_bytes![commitment]?);
+            old_record_commitments.push(commitment);
             local_data_commitment_randomizers.push(commitment_randomness);
         }
 
-        let mut new_record_commitments = Vec::new();
+        let mut new_record_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for j in 0..Components::NUM_OUTPUT_RECORDS {
             let record = &new_records[j];
             let input_bytes = to_bytes![record.commitment(), memorandum, network_id]?;
@@ -556,18 +559,19 @@ where
                 &commitment_randomness,
             )?;
 
-            new_record_commitments.extend_from_slice(&to_bytes![commitment]?);
+            new_record_commitments.push(commitment);
             local_data_commitment_randomizers.push(commitment_randomness);
         }
 
-        let inner1_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &old_record_commitments)?;
+        let leaves = [
+            old_record_commitments[0].clone(),
+            old_record_commitments[1].clone(),
+            new_record_commitments[0].clone(),
+            new_record_commitments[1].clone(),
+        ];
+        let local_data_merkle_tree = CommitmentMerkleTree::new(parameters.local_data_crh.clone(), &leaves)?;
 
-        let inner2_hash = Components::LocalDataCRH::hash(&parameters.local_data_crh, &new_record_commitments)?;
-
-        let local_data_root =
-            Components::LocalDataCRH::hash(&parameters.local_data_crh, &to_bytes![inner1_hash, inner2_hash]?)?;
-
-        end_timer!(local_data_root_timer);
+        end_timer!(local_data_merkle_tree_timer);
 
         let program_comm_timer = start_timer!(|| "Compute program commitment");
         let (program_commitment, program_randomness) = {
@@ -630,7 +634,7 @@ where
 
             program_commitment,
             program_randomness,
-            local_data_root,
+            local_data_merkle_tree,
             local_data_commitment_randomizers,
 
             value_balance,
@@ -671,12 +675,14 @@ where
 
             program_commitment,
             program_randomness,
-            local_data_root,
+            local_data_merkle_tree,
             local_data_commitment_randomizers,
             value_balance,
             memorandum,
             network_id,
         } = context;
+
+        let local_data_root = local_data_merkle_tree.root();
 
         let old_death_program_attributes = old_death_program_proofs;
         let new_birth_program_attributes = new_birth_program_proofs;

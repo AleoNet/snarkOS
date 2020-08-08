@@ -53,7 +53,7 @@ impl<C: BaseDPCComponents> DummyCircuit<C> {
 
         Self {
             system_parameters: Some(local_data.system_parameters.clone()),
-            local_data_root: Some(local_data.local_data_root.clone()),
+            local_data_root: Some(local_data.local_data_merkle_tree.root()),
             record: Some(record.clone()),
             local_data_commitment_randomizer: Some(local_data_commitment_randomizer.clone()),
             position,

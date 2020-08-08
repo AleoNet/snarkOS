@@ -211,12 +211,14 @@ fn test_execute_base_dpc_constraints() {
 
         program_commitment,
         program_randomness,
-        local_data_root,
+        local_data_merkle_tree,
         local_data_commitment_randomizers,
         value_balance,
         memorandum,
         network_id,
     } = context;
+
+    let local_data_root = local_data_merkle_tree.root();
 
     // Construct the ledger witnesses
     let ledger_digest = ledger.digest().expect("could not get digest");
