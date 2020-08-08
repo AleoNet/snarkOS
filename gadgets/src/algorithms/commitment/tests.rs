@@ -54,7 +54,7 @@ fn blake2s_commitment_gadget_test() {
     .unwrap();
 
     for i in 0..32 {
-        assert_eq!(native_result[i], gadget_result.0[i].value.unwrap());
+        assert_eq!(native_result[i], gadget_result.0[i].get_value().unwrap());
     }
     assert!(cs.is_satisfied());
 }
