@@ -534,7 +534,13 @@ where
         let mut old_record_commitments = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for i in 0..Components::NUM_INPUT_RECORDS {
             let record = &old_records[i];
-            let input_bytes = to_bytes![old_serial_numbers[i], record.commitment(), memorandum, network_id]?;
+            let input_bytes = to_bytes![
+                (i as u8),
+                old_serial_numbers[i],
+                record.commitment(),
+                memorandum,
+                network_id
+            ]?;
 
             let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
             let commitment = Components::LocalDataCommitment::commit(
@@ -550,7 +556,12 @@ where
         let mut new_record_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for j in 0..Components::NUM_OUTPUT_RECORDS {
             let record = &new_records[j];
-            let input_bytes = to_bytes![record.commitment(), memorandum, network_id]?;
+            let input_bytes = to_bytes![
+                (Components::NUM_INPUT_RECORDS + j) as u8,
+                record.commitment(),
+                memorandum,
+                network_id
+            ]?;
 
             let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
             let commitment = Components::LocalDataCommitment::commit(

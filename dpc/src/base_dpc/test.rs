@@ -158,6 +158,47 @@ fn test_execute_base_dpc_constraints() {
 
     let local_data = context.into_local_data();
 
+    // //////
+    // use crate::program::dummy_circuit::execute_dummy_check_gadget;
+    // let mut dummy_check_cs = TestConstraintSystem::<Fr>::new();
+    //
+    // let leaf = &local_data.local_data_merkle_tree.leaves()[0];
+    // let local_data_merkle_path = local_data.local_data_merkle_tree.generate_proof(leaf).unwrap();
+    //
+    // execute_dummy_check_gadget::<_, _>(
+    //     &mut dummy_check_cs.ns(|| "dummy checks"),
+    //     &system_parameters,
+    //     &local_data_merkle_path,
+    //     &local_data.local_data_merkle_tree.root(),
+    //     &old_records[0],
+    //     &local_data.old_serial_numbers,
+    //     false,
+    //     &local_data.local_data_commitment_randomizers[0],
+    //     &memo,
+    //     network_id,
+    //     0
+    // )
+    // .unwrap();
+    //
+    // if !dummy_check_cs.is_satisfied() {
+    //     println!("=========================================================");
+    //     println!("num constraints: {:?}", dummy_check_cs.num_constraints());
+    //     println!("Unsatisfied constraints:");
+    //     println!("{}", dummy_check_cs.which_is_unsatisfied().unwrap());
+    //     println!("=========================================================");
+    // }
+    //
+    // if dummy_check_cs.is_satisfied() {
+    //     println!("\n\n\n\nAll Core check constraints:");
+    //     //        core_cs.print_named_objects();
+    //     println!("num constraints: {:?}", dummy_check_cs.num_constraints());
+    // }
+    // println!("=========================================================");
+    // println!("=========================================================");
+    // println!("=========================================================\n\n\n");
+    //
+    // //////
+
     // Generate the program proofs
 
     let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);

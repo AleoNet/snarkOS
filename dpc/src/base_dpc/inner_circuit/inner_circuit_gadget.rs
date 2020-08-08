@@ -1240,8 +1240,9 @@ where
         let mut old_record_commitment_bytes = vec![];
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
+            let position = UInt8::constant(i as u8);
 
-            let mut input_bytes = vec![];
+            let mut input_bytes = vec![position];
             input_bytes.extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
             input_bytes.extend_from_slice(
                 &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
@@ -1268,8 +1269,9 @@ where
         let mut new_record_commitment_bytes = Vec::new();
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
+            let position = UInt8::constant((C::NUM_INPUT_RECORDS + j) as u8);
 
-            let mut input_bytes = vec![];
+            let mut input_bytes = vec![position];
             input_bytes
                 .extend_from_slice(&new_record_commitments_gadgets[j].to_bytes(&mut cs.ns(|| "record_commitment"))?);
             input_bytes.extend_from_slice(&memo);

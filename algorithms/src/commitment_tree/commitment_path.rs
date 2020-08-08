@@ -49,20 +49,3 @@ fn hash_inner_node<H: CRH, L: ToBytes>(crh: &H, left: &L, right: &L) -> Result<<
     let input = to_bytes![left, right]?;
     Ok(crh.hash(&input)?)
 }
-
-impl<C: CommitmentScheme, H: CRH> Default for CommitmentMerklePath<C, H> {
-    fn default() -> Self {
-        let leaves = (
-            <C as CommitmentScheme>::Output::default(),
-            <C as CommitmentScheme>::Output::default(),
-        );
-        let inner_hashes = (<H as CRH>::Output::default(), <H as CRH>::Output::default());
-        let parameters = H::default();
-
-        Self {
-            leaves,
-            inner_hashes,
-            parameters,
-        }
-    }
-}

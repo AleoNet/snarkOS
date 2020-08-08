@@ -71,7 +71,7 @@ pub struct LocalDataCommitmentWindow;
 
 impl PedersenSize for LocalDataCommitmentWindow {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 129;
+    const WINDOW_SIZE: usize = 130;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
