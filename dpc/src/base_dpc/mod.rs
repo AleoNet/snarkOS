@@ -526,7 +526,7 @@ where
             end_timer!(output_record_time);
         }
 
-        // TODO (raychu86) Add Leo program inputs + outputs and index to local data commitments
+        // TODO (raychu86) Add index and program register inputs + outputs to local data commitment leaves
         let local_data_merkle_tree_timer = start_timer!(|| "Compute local data merkle tree");
 
         let mut local_data_commitment_randomizers = vec![];
@@ -705,7 +705,7 @@ where
         }
 
         // Generate Schnorr signature on transaction data
-        // TODO (raychu86) Remove ledger_digest from signature and move the schorr signing into `execute_offline`
+        // TODO (raychu86) Remove ledger_digest from signature and move the schnorr signing into `execute_offline`
         let signature_time = start_timer!(|| "Sign and randomize transaction contents");
 
         let signature_message = to_bytes![

@@ -6,6 +6,7 @@ use crate::{
         utilities::{
             alloc::AllocGadget,
             eq::{ConditionalEqGadget, EqGadget},
+            select::CondSelectGadget,
             uint::UInt8,
             ToBytesGadget,
         },
@@ -17,6 +18,7 @@ use std::fmt::Debug;
 
 pub trait CommitmentGadget<C: CommitmentScheme, F: Field> {
     type OutputGadget: ConditionalEqGadget<F>
+        + CondSelectGadget<F>
         + EqGadget<F>
         + ToBytesGadget<F>
         + AllocGadget<C::Output, F>
