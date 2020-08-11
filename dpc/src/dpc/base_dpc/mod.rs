@@ -880,7 +880,7 @@ where
             transaction_proof,
             program_commitment,
             local_data_root,
-            value_balance: AleoAmount::from_bytes(value_balance),
+            AleoAmount::from_bytes(value_balance),
             network_id,
             signatures,
             new_encrypted_records,
@@ -981,7 +981,7 @@ where
             memo: transaction.memorandum().clone(),
             program_commitment: transaction.program_commitment().clone(),
             local_data_root: transaction.local_data_root().clone(),
-            value_balance: transaction.value_balance().0,
+            value_balance: transaction.value_balance.0,
             network_id: transaction.network_id(),
         };
 

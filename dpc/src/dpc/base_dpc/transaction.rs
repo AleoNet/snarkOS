@@ -96,6 +96,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Memorandum = [u8; 32];
     type ProgramCommitment = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
+    type ValueBalance = AleoAmount;
 
     /// Transaction id = Hash of (serial numbers || commitments || memo)
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -143,7 +144,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         &self.local_data_root
     }
 
-    fn value_balance(&self) -> AleoAmount {
+    fn value_balance(&self) -> Self::ValueBalance {
         self.value_balance
     }
 
@@ -223,7 +224,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             FromBytes::read(&mut reader)?;
         let local_data_root: <C::LocalDataCRH as CRH>::Output = FromBytes::read(&mut reader)?;
 
-        let value_balance: i64 = FromBytes::read(&mut reader)?;
+        let value_balance: AleoAmount = FromBytes::read(&mut reader)?;
         let network_id: u8 = FromBytes::read(&mut reader)?;
 
         // Read the signatures
@@ -250,7 +251,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             new_commitments,
             program_commitment,
             local_data_root,
-            value_balance: AleoAmount::from_bytes(value_balance),
+            value_balance,
             signatures,
             encrypted_records,
             transaction_proof,
