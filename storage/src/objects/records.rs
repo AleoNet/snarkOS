@@ -10,12 +10,14 @@ use snarkos_utilities::{
 //  This is merely for local node / miner functionality.
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get all stored record commitments of the node
-    pub fn get_record_commitments(&self, limit: usize) -> Result<Vec<Vec<u8>>, StorageError> {
+    pub fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];
 
         for (commitment_key, _record) in self.storage.get_iter(COL_RECORDS)? {
-            if record_commitments.len() >= limit {
-                break;
+            if let Some(limit) = limit {
+                if record_commitments.len() >= limit {
+                    break;
+                }
             }
 
             record_commitments.push(commitment_key.to_vec());

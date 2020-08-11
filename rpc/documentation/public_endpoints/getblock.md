@@ -8,18 +8,20 @@ Returns information about a block from a block hash.
 
 ### Response
 
-|      Parameter      |  Type  |                    Description                    |
-|:------------------- |:------:|:------------------------------------------------- |
-| `block_hash`        | string | The number of blocks in the best valid chain      |
-| `difficulty_target` | number | The difficulty of the block                       |
-| `hash`              | string | The block hash (same as provided)                 |
-| `height`            | number | The block height                                  |
-| `merkle_root`       | number | The merkle root of the transactions in the block  |
-| `nonce`             | number | The nonce for solving the PoSW puzzle             |
-| `proof`             | string | The Proof of Succinct Work                        |
-| `size`              | number | The size of the block in bytes                    |
-| `time`              | number | The block time                                    |
-| `transactions`      | array  | The list of transaction ids included in the block |
+|        Parameter       |  Type  |                               Description                              |
+|:----------------------:|:------:|:----------------------------------------------------------------------:|
+| `confirmations`        | number | The number of confirmations for this block                             |
+| `difficulty_target`    | number | The difficulty of the block                                            |
+| `hash`                 | string | The block hash (same as provided)                                      |
+| `height`               | number | The block height                                                       |
+| `merkle_root`          | number | The Merkle root of the transactions in the block                       |
+| `nonce`                | number | The nonce for solving the PoSW puzzle                                  |
+| `pedersen_merkle_root` | number | The Merkle root of the transactions in the block using a Pedersen hash |
+| `previous_block_hash`  | string | The block hash of the parent block                                     |
+| `proof`                | string | The Proof of Succinct Work                                             |
+| `size`                 | number | The size of the block in bytes                                         |
+| `time`                 | number | The block time                                                         |
+| `transactions`         | array  | The list of transaction ids included in the block                      |
 
 ### Example
 ```ignore
