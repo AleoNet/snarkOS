@@ -1,7 +1,7 @@
 /// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
-    use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_models::objects::Transaction;
     use snarkos_objects::AccountViewKey;
     use snarkos_rpc::*;

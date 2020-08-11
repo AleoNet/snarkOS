@@ -1,4 +1,5 @@
 pub mod commitment;
+pub mod commitment_tree;
 pub mod crh;
 pub mod encoding;
 pub mod encryption;

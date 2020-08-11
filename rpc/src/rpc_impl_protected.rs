@@ -4,7 +4,7 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, InstantiatedDPC, Program},
+    instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
     record_payload::RecordPayload,
 };
@@ -169,12 +169,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             .parameters
             .system_parameters
             .program_verification_key_hash
-            .hash(&to_bytes![self.parameters.program_snark_parameters.verification_key]?)?;
+            .hash(&to_bytes![
+                self.parameters.noop_program_snark_parameters.verification_key
+            ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
-        let program = Program::new(program_vk_hash_bytes.clone());
-        let new_birth_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
+        let program_id = program_vk_hash_bytes;
+        let new_birth_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode old records
         let mut old_records = vec![];
@@ -212,8 +214,8 @@ impl ProtectedRpcFunctions for RpcImpl {
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
-                &program,
-                &program,
+                &program_id,
+                &program_id,
                 rng,
             )?;
 
@@ -267,8 +269,8 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_records,
             old_account_private_keys,
             new_record_owners,
-            new_birth_programs,
-            new_death_programs,
+            new_birth_program_ids,
+            new_death_program_ids,
             new_is_dummy_flags,
             new_values,
             new_payloads,

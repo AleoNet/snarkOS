@@ -3,7 +3,12 @@ use crate::{
     curves::Field,
     gadgets::{
         r1cs::ConstraintSystem,
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8, ToBytesGadget},
+        utilities::{
+            alloc::AllocGadget,
+            eq::{ConditionalEqGadget, EqGadget},
+            uint::UInt8,
+            ToBytesGadget,
+        },
     },
 };
 use snarkos_errors::gadgets::SynthesisError;
@@ -11,7 +16,13 @@ use snarkos_errors::gadgets::SynthesisError;
 use std::fmt::Debug;
 
 pub trait CommitmentGadget<C: CommitmentScheme, F: Field> {
-    type OutputGadget: EqGadget<F> + ToBytesGadget<F> + AllocGadget<C::Output, F> + Clone + Sized + Debug;
+    type OutputGadget: ConditionalEqGadget<F>
+        + EqGadget<F>
+        + ToBytesGadget<F>
+        + AllocGadget<C::Output, F>
+        + Clone
+        + Sized
+        + Debug;
     type ParametersGadget: AllocGadget<C::Parameters, F> + Clone;
     type RandomnessGadget: AllocGadget<C::Randomness, F> + Clone;
 

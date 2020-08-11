@@ -1,7 +1,7 @@
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
-    use snarkos_dpc::dpc::base_dpc::{
+    use snarkos_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
         record::DPCRecord,

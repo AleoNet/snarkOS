@@ -1,6 +1,6 @@
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
-    use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
     use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;

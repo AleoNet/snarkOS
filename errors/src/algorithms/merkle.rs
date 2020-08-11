@@ -14,6 +14,9 @@ pub enum MerkleError {
     #[error("Incorrect path length: {}", _0)]
     IncorrectPathLength(usize),
 
+    #[error("Invalid leaf")]
+    InvalidLeaf,
+
     #[error("Invalid path length: {}. Must be less than or equal to: {}", _0, _1)]
     InvalidPathLength(usize, usize),
 

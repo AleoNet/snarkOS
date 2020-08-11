@@ -13,6 +13,7 @@ extern crate derivative;
 extern crate snarkos_profiler;
 
 pub mod commitment;
+pub mod commitment_tree;
 pub mod crh;
 pub mod encoding;
 pub mod encryption;
