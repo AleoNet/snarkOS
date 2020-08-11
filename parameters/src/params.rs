@@ -258,7 +258,7 @@ impl_params!(
     DummyProgramSNARKPKParameters,
     dummy_program_snark_pk_test,
     "dummy_program_snark_pk",
-    1358946
+    16858198
 );
 impl_params!(
     DummyProgramSNARKVKParameters,
