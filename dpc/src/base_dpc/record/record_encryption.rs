@@ -25,18 +25,18 @@ use std::marker::PhantomData;
     Eq(bound = "C: BaseDPCComponents")
 )]
 pub struct RecordEncryptionGadgetComponents<C: BaseDPCComponents> {
-    // Record field element reprentations
+    /// Record field element representations
     pub record_field_elements: Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>,
-    // Record group element encodings - Represented in (x,y) affine coordinates
+    /// Record group element encodings - Represented in (x,y) affine coordinates
     pub record_group_encoding: Vec<(
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
         <C::EncryptionModelParameters as ModelParameters>::BaseField,
     )>,
-    // Record ciphertext selectors - Used for ciphertext compression/decompression
+    /// Record ciphertext selectors - Used for ciphertext compression/decompression
     pub ciphertext_selectors: Vec<bool>,
-    // Record fq high selectors - Used for plaintext serialization/deserialization
+    /// Record fq high selectors - Used for plaintext serialization/deserialization
     pub fq_high_selectors: Vec<bool>,
-    // Record ciphertext blinding exponents used to encrypt the record
+    /// Record ciphertext blinding exponents used to encrypt the record
     pub encryption_blinding_exponents: Vec<<C::AccountEncryption as EncryptionScheme>::BlindingExponent>,
 }
 
