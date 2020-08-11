@@ -27,14 +27,9 @@ pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
     let transaction_1 = DPCTransaction::<C>::read(Transaction1::load_bytes().as_slice())?;
     transactions.push(transaction_1);
 
-    // Establish the merkle root hash of the transactions
-
-    let mut merkle_root_bytes = [0u8; 32];
-    merkle_root_bytes[..].copy_from_slice(&merkle_root(&transactions.to_transaction_ids()?));
-
     let genesis_header = BlockHeader {
         previous_block_hash: BlockHeaderHash([0u8; 32]),
-        merkle_root_hash: MerkleRootHash(merkle_root_bytes),
+        merkle_root_hash: MerkleRootHash([0u8; 32]),
         time: Utc::now().timestamp(),
         difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
         nonce: 0,

@@ -176,7 +176,7 @@ impl Miner {
 
         let header = self.find_block(&transactions, &previous_block_header)?;
 
-        println!("Miner found block block");
+        println!("Miner found block");
 
         let block = Block { header, transactions };
 
