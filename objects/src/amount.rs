@@ -44,7 +44,7 @@ impl AleoAmount {
     /// Number of AB (base unit) per ALEO
     pub const COIN: i64 = 1_000_000;
     /// Exactly one ALEO.
-    pub const ONE_ALEO: AleoAmount = AleoAmount(COIN);
+    pub const ONE_ALEO: AleoAmount = AleoAmount(Self::COIN);
     /// Exactly one byte.
     pub const ONE_BYTE: AleoAmount = AleoAmount(1);
     /// The zero amount.
