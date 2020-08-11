@@ -5,6 +5,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
     objects::Transaction,
 };
+use snarkos_objects::amount::AleoAmount;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     serialize::{CanonicalDeserialize, CanonicalSerialize},
@@ -43,7 +44,7 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
     /// A transaction value balance is the difference between input and output record balances.
     /// This value effectively becomes the transaction fee for the miner. Only coinbase transactions
     /// can have a negative value balance representing tokens being minted.
-    pub value_balance: i64,
+    pub value_balance: AleoAmount,
 
     #[derivative(PartialEq = "ignore")]
     pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
@@ -66,7 +67,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         transaction_proof: <C::OuterSNARK as SNARK>::Proof,
         program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_root: <C::LocalDataCRH as CRH>::Output,
-        value_balance: i64,
+        value_balance: AleoAmount,
         network_id: u8,
         signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
         encrypted_records: Vec<EncryptedRecord<C>>,
@@ -142,7 +143,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         &self.local_data_root
     }
 
-    fn value_balance(&self) -> i64 {
+    fn value_balance(&self) -> AleoAmount {
         self.value_balance
     }
 
@@ -249,7 +250,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             new_commitments,
             program_commitment,
             local_data_root,
-            value_balance,
+            value_balance: AleoAmount::from_bytes(value_balance),
             signatures,
             encrypted_records,
             transaction_proof,
