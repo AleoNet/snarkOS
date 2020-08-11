@@ -238,8 +238,8 @@ impl ConsensusParameters {
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = get_block_reward(ledger.len() as u32) as i64;
-        if total_value_balance + expected_block_reward != 0 {
+        let expected_block_reward = get_block_reward(ledger.len() as u32).0;
+        if total_value_balance.0 + expected_block_reward != 0 {
             println!("total_value_balance: {:?}", total_value_balance);
             println!("expected_block_reward: {:?}", expected_block_reward);
 
@@ -400,7 +400,12 @@ impl ConsensusParameters {
 
         let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Components::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
+        .concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
         let memo: [u8; 32] = rng.gen();

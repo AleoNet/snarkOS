@@ -1,5 +1,10 @@
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
+
 use serde::Serialize;
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Result as IoResult, Write},
+};
 
 // Number of UNITS (base unit) per ALEO
 const COIN: i64 = 1_000_000;
@@ -85,6 +90,21 @@ impl AleoAmount {
     /// positive.
     pub const fn is_negative(self) -> bool {
         self.0.is_negative()
+    }
+}
+
+impl ToBytes for AleoAmount {
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.0.write(&mut writer)
+    }
+}
+
+impl FromBytes for AleoAmount {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let amount: i64 = FromBytes::read(&mut reader)?;
+
+        Ok(Self(amount))
     }
 }
 
