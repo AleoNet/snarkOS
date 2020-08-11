@@ -56,9 +56,19 @@ pub struct ConsensusParameters {
     pub verifier: PoswMarlin,
 }
 
-/// Calculate a block reward that halves every 1000 blocks.
+// TODO (raychu86) integrate this with AleoAmount and clean up impl
+/// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> u64 {
-    100_000_000u64 / (2_u64.pow(block_num / 1000))
+    let expected_blocks_per_hour: u32 = 100;
+    let num_years = 4;
+    let block_segments = num_years * 365 * 24 * expected_blocks_per_hour;
+
+    let aleo_denonimation = 1_000_000u64;
+    let initial_reward = 150u64 * aleo_denonimation;
+
+    let num_halves = u32::min(block_num / block_segments, 2);
+
+    initial_reward / (2_u64.pow(num_halves))
 }
 
 /// Bitcoin difficulty retarget algorithm.
@@ -535,8 +545,50 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::{thread_rng, Rng};
     use snarkos_objects::PedersenMerkleRootHash;
     use snarkos_testing::consensus::DATA;
+
+    #[test]
+    fn test_block_rewards() {
+        let rng = &mut thread_rng();
+
+        let first_halfing: u32 = 4 * 365 * 24 * 100;
+        let second_halfing: u32 = first_halfing * 2;
+
+        let mut block_reward: u64 = 150 * 1_000_000;
+
+        // Before block halving
+        assert_eq!(get_block_reward(0), block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(0, first_halfing);
+            assert_eq!(get_block_reward(block_num), block_reward);
+        }
+
+        // First block halving
+
+        block_reward /= 2;
+
+        assert_eq!(get_block_reward(first_halfing), block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(first_halfing + 1, second_halfing);
+            assert_eq!(get_block_reward(block_num), block_reward);
+        }
+
+        // Second and final block halving
+
+        block_reward /= 2;
+
+        assert_eq!(get_block_reward(second_halfing), block_reward);
+        assert_eq!(get_block_reward(u32::MAX), block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(second_halfing, u32::MAX);
+            assert_eq!(get_block_reward(block_num), block_reward);
+        }
+    }
 
     #[test]
     fn verify_header() {
