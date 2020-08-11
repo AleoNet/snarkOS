@@ -93,7 +93,7 @@ mod rpc_tests {
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(program_commitment, transaction_info["program_commitment"]);
         assert_eq!(local_data_root, transaction_info["local_data_root"]);
-        assert_eq!(value_balance, transaction_info["value_balance"]);
+        assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
