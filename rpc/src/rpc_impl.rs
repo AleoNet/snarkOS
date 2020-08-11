@@ -22,7 +22,7 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
@@ -305,8 +305,7 @@ impl RpcFunctions for RpcImpl {
         let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
 
         // Read the view key
-        let view_key_bytes = hex::decode(decryption_input.account_view_key)?;
-        let account_view_key = AccountViewKey::<Components>::read(&view_key_bytes[..])?;
+        let account_view_key = AccountViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
 
         // Decrypt the record ciphertext
         let record =

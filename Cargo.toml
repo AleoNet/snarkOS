@@ -52,7 +52,7 @@ snarkos-rpc = { path = "./rpc", version = "0.8.0" }
 snarkos-storage = { path = "storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
-clap = { version = "2.33.1" }
+clap = { version = "2.33.2" }
 colored = { version = "2.0" }
 dirs = { version = "3.0.1" }
 env_logger = { version = "0.7.1" }
