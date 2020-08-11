@@ -284,7 +284,8 @@ impl RpcFunctions for RpcImpl {
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 
-        let coinbase_value = get_block_reward(block_height + 1) + full_transactions.calculate_transaction_fees();
+        let coinbase_value =
+            get_block_reward(block_height + 1).0 as u64 + full_transactions.calculate_transaction_fees();
 
         Ok(BlockTemplate {
             previous_block_hash: hex::encode(&block.header.get_hash().0),

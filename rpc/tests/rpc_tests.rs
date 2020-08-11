@@ -400,7 +400,7 @@ mod rpc_tests {
         assert_eq!(template.previous_block_hash, latest_block_hash);
         assert_eq!(template.block_height, new_height);
         assert_eq!(template.transactions, expected_transactions);
-        assert!(template.coinbase_value >= block_reward);
+        assert!(template.coinbase_value >= block_reward.0 as u64);
 
         drop(rpc);
         kill_storage_sync(storage);

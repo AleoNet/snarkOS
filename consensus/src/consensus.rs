@@ -21,6 +21,7 @@ use snarkos_objects::{
     Account,
     AccountAddress,
     AccountPrivateKey,
+    AleoAmount,
     Block,
     BlockHeader,
     BlockHeaderHash,
@@ -58,7 +59,7 @@ pub struct ConsensusParameters {
 
 // TODO (raychu86) integrate this with AleoAmount and clean up impl
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
-pub fn get_block_reward(block_num: u32) -> u64 {
+pub fn get_block_reward(block_num: u32) -> AleoAmount {
     let expected_blocks_per_hour: u32 = 100;
     let num_years = 4;
     let block_segments = num_years * 365 * 24 * expected_blocks_per_hour;
@@ -68,7 +69,7 @@ pub fn get_block_reward(block_num: u32) -> u64 {
 
     let num_halves = u32::min(block_num / block_segments, 2);
 
-    initial_reward / (2_u64.pow(num_halves))
+    AleoAmount::from_bytes((initial_reward / (2_u64.pow(num_halves))) as i64)
 }
 
 /// Bitcoin difficulty retarget algorithm.
@@ -218,7 +219,7 @@ impl ConsensusParameters {
         // Verify block amounts and check that there is a single coinbase transaction
 
         let mut coinbase_transaction_count = 0;
-        let mut total_value_balance = 0;
+        let mut total_value_balance = AleoAmount::ZERO;
 
         for transaction in block.transactions.iter() {
             let value_balance = transaction.value_balance;
@@ -227,7 +228,7 @@ impl ConsensusParameters {
                 coinbase_transaction_count += 1;
             }
 
-            total_value_balance += value_balance;
+            total_value_balance = total_value_balance.add(value_balance);
         }
 
         // Check that there is only 1 coinbase transaction
@@ -360,7 +361,7 @@ impl ConsensusParameters {
                 return Err(ConsensusError::CoinbaseTransactionAlreadyExists());
             }
 
-            total_value_balance += transaction.value_balance.abs() as u64;
+            total_value_balance = total_value_balance.add(transaction.value_balance);
         }
 
         // Generate a new account that owns the dummy input records
@@ -556,37 +557,37 @@ mod tests {
         let first_halfing: u32 = 4 * 365 * 24 * 100;
         let second_halfing: u32 = first_halfing * 2;
 
-        let mut block_reward: u64 = 150 * 1_000_000;
+        let mut block_reward: i64 = 150 * 1_000_000;
 
         // Before block halving
-        assert_eq!(get_block_reward(0), block_reward);
+        assert_eq!(get_block_reward(0).0, block_reward);
 
         for _ in 0..100 {
             let block_num: u32 = rng.gen_range(0, first_halfing);
-            assert_eq!(get_block_reward(block_num), block_reward);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
         }
 
         // First block halving
 
         block_reward /= 2;
 
-        assert_eq!(get_block_reward(first_halfing), block_reward);
+        assert_eq!(get_block_reward(first_halfing).0, block_reward);
 
         for _ in 0..100 {
             let block_num: u32 = rng.gen_range(first_halfing + 1, second_halfing);
-            assert_eq!(get_block_reward(block_num), block_reward);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
         }
 
         // Second and final block halving
 
         block_reward /= 2;
 
-        assert_eq!(get_block_reward(second_halfing), block_reward);
-        assert_eq!(get_block_reward(u32::MAX), block_reward);
+        assert_eq!(get_block_reward(second_halfing).0, block_reward);
+        assert_eq!(get_block_reward(u32::MAX).0, block_reward);
 
         for _ in 0..100 {
             let block_num: u32 = rng.gen_range(second_halfing, u32::MAX);
-            assert_eq!(get_block_reward(block_num), block_reward);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
         }
     }
 

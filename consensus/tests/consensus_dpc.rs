@@ -35,7 +35,7 @@ mod consensus_dpc {
         assert_eq!(coinbase_records.len(), 2);
         assert!(!coinbase_records[0].is_dummy());
         assert!(coinbase_records[1].is_dummy());
-        assert_eq!(coinbase_records[0].value(), block_reward);
+        assert_eq!(coinbase_records[0].value(), block_reward.0 as u64);
         assert_eq!(coinbase_records[1].value(), 0);
 
         println!("Verifying and receiving the block");

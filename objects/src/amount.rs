@@ -46,28 +46,45 @@ impl AleoAmount {
     /// The zero amount.
     pub const ZERO: AleoAmount = AleoAmount(0);
 
+    /// Create an `AleoAmount` given a number of bytes
     pub fn from_bytes(bytes: i64) -> Self {
         Self(bytes)
     }
 
+    /// Create an `AleoAmount` given a number of gates
     pub fn from_gates(gate_value: i64) -> Self {
         let bytes = gate_value * 10_i64.pow(Denomination::GATE.precision());
 
         Self::from_bytes(bytes)
     }
 
+    /// Create an `AleoAmount` given a number of ALEOs
     pub fn from_aleo(aleo_value: i64) -> Self {
         let bytes = aleo_value * 10_i64.pow(Denomination::ALEO.precision());
 
         Self::from_bytes(bytes)
     }
 
+    /// Add the values of two `AleoAmount`s
     pub fn add(self, b: Self) -> Self {
         Self::from_bytes(self.0 + b.0)
     }
 
+    /// Subtract the value of two `AleoAmounts`
     pub fn sub(self, b: AleoAmount) -> Self {
         Self::from_bytes(self.0 - b.0)
+    }
+
+    /// Returns `true` the amount is positive and `false` if the amount is zero or
+    /// negative.
+    pub const fn is_positive(self) -> bool {
+        self.0.is_positive()
+    }
+
+    /// Returns `true` if the amount is negative and `false` if the amount is zero or
+    /// positive.
+    pub const fn is_negative(self) -> bool {
+        self.0.is_negative()
     }
 }
 
