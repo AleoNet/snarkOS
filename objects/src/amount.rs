@@ -6,9 +6,6 @@ use std::{
     io::{Read, Result as IoResult, Write},
 };
 
-// Number of UNITS (base unit) per ALEO
-const COIN: i64 = 1_000_000;
-
 /// Represents the amount of ALEOs in UNITS
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct AleoAmount(pub i64);
@@ -44,6 +41,8 @@ impl fmt::Display for Denomination {
 }
 
 impl AleoAmount {
+    /// Number of AB (base unit) per ALEO
+    pub const COIN: i64 = 1_000_000;
     /// Exactly one ALEO.
     pub const ONE_ALEO: AleoAmount = AleoAmount(COIN);
     /// Exactly one byte.
