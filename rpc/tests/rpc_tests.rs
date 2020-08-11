@@ -65,6 +65,7 @@ mod rpc_tests {
             .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
+        let network_id = transaction.network_id;
 
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
@@ -89,6 +90,7 @@ mod rpc_tests {
         assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
         assert_eq!(memo, transaction_info["memo"]);
 
+        assert_eq!(network_id, transaction_info["network_id"]);
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(program_commitment, transaction_info["program_commitment"]);

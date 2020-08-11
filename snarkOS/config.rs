@@ -10,7 +10,7 @@ use serde::Serialize;
 /// Hardcoded bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:14130"
+pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize)]
@@ -75,20 +75,20 @@ impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
-            "network" => self.network(clap::value_t!(arguments.value_of(*option), u8).ok()),
-            "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
+            "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "quiet" => self.quiet(arguments.is_present(option)),
             // Options
-            "ip" => self.ip(arguments.value_of(option)),
-            "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
-            "path" => self.path(arguments.value_of(option)),
-            "miner-address" => self.miner_address(arguments.value_of(option)),
             "connect" => self.connect(arguments.value_of(option)),
+            "ip" => self.ip(arguments.value_of(option)),
+            "miner-address" => self.miner_address(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
-            "min-peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "max-peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "min-peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "network" => self.network(clap::value_t!(arguments.value_of(*option), u8).ok()),
+            "path" => self.path(arguments.value_of(option)),
+            "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
