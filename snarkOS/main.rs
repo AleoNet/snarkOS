@@ -41,11 +41,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
-    let network_id = match config.network.as_str() {
-        "mainnet" => 0,
-        "testnet" => 1,
-        _ => 0,
-    };
+    let network_id = config.network;
 
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,

@@ -16,7 +16,7 @@ pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:14130"
 #[derive(Clone, Debug, Serialize)]
 pub struct Config {
     // Flags
-    pub network: String,
+    pub network: u8,
     pub jsonrpc: bool,
     pub is_bootnode: bool,
     pub is_miner: bool,
@@ -44,7 +44,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             // Flags
-            network: "mainnet".into(),
+            network: 0,
             jsonrpc: true,
             is_bootnode: false,
             is_miner: true,
@@ -75,7 +75,7 @@ impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
-            "network" => self.network(arguments.is_present(option)),
+            "network" => self.network(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
@@ -97,19 +97,21 @@ impl Config {
     }
 
     /// Sets `network` to the specified network, overriding its previous state.
-    fn network(&mut self, argument: bool) {
-        match argument {
-            true => {
-                self.path = "snarkos_testnet_db".into();
-                self.port = 18080;
-                self.bootnodes = TESTNET_BOOTNODES
-                    .iter()
-                    .map(|node| (*node).to_string())
-                    .collect::<Vec<String>>();
-                self.network = "testnet".into();
+    fn network(&mut self, argument: Option<u8>) {
+        if let Some(network_id) = argument {
+            match network_id {
+                0 => {}
+                _ => {
+                    self.path = format!("snarkos_db_network_{}", network_id);
+                    self.port = 4130 + (network_id as u16);
+                    self.bootnodes = TESTNET_BOOTNODES
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+                    self.network = network_id;
+                }
             }
-            false => self.network = "mainnet".into(),
-        };
+        }
     }
 
     fn no_jsonrpc(&mut self, argument: bool) {
@@ -209,13 +211,7 @@ impl CLI for ConfigCli {
     type Config = Config;
 
     const ABOUT: AboutType = "Start a skeleton blockchain miner (include -h for more options)";
-    const FLAGS: &'static [FlagType] = &[
-        flag::NETWORK,
-        flag::NO_JSONRPC,
-        flag::IS_BOOTNODE,
-        flag::IS_MINER,
-        flag::QUIET,
-    ];
+    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER, flag::QUIET];
     const NAME: NameType = "snarkos-node";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
@@ -226,6 +222,7 @@ impl CLI for ConfigCli {
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
         option::MAX_PEERS,
+        option::NETWORK,
         option::RPC_PORT,
         option::RPC_USERNAME,
         option::RPC_PASSWORD,

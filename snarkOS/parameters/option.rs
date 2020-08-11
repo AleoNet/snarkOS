@@ -56,6 +56,13 @@ pub const MAX_PEERS: OptionType = (
     &[],
 );
 
+pub const NETWORK: OptionType = (
+    "[network] --network=[network-id] 'Run the node on a specified network id (default = 0)'",
+    &[],
+    &[],
+    &[],
+);
+
 pub const RPC_PORT: OptionType = (
     "[rpc-port] --rpc-port=[rpc-port] 'Run the rpc server on a specified port'",
     &["no_jsonrpc"],
