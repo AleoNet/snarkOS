@@ -1,4 +1,4 @@
-use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
+use crate::{difficulty::bitcoin_retarget, memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
@@ -66,36 +66,9 @@ pub fn get_block_reward(block_num: u32) -> AleoAmount {
 
     // The block reward halves at most 2 times - minimum is 37.5 ALEO after 8 years.
     let num_halves = u32::min(block_num / block_segments, 2);
-    let reward = (initial_reward / (2_u64.pow(num_halves)));
+    let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
     AleoAmount::from_bytes(reward)
-}
-
-/// Bitcoin difficulty retarget algorithm.
-pub fn bitcoin_retarget(
-    block_timestamp: i64,
-    parent_timestamp: i64,
-    target_block_time: i64,
-    parent_difficulty: u64,
-) -> u64 {
-    let mut time_elapsed = block_timestamp - parent_timestamp;
-
-    // Limit difficulty adjustment by factor of 2
-    if time_elapsed < target_block_time / 2 {
-        time_elapsed = target_block_time / 2
-    } else if time_elapsed > target_block_time * 2 {
-        time_elapsed = target_block_time * 2
-    }
-
-    let mut x: u64;
-    x = match parent_difficulty.checked_mul(time_elapsed as u64) {
-        Some(x) => x,
-        None => u64::max_value(),
-    };
-
-    x /= target_block_time as u64;
-
-    x
 }
 
 impl ConsensusParameters {
@@ -169,33 +142,28 @@ impl ConsensusParameters {
         Ok(())
     }
 
-    /// Check if the transaction is valid
+    /// Check if the transaction is valid.
     pub fn verify_transaction(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        // TODO (raychu86) add network_id check
-
-        // Check that all the transaction proofs verify
         Ok(InstantiatedDPC::verify(parameters, transaction, ledger)?)
     }
 
-    /// Check if the block transactions are valid
-    /// Check all outpoints, verify signatures, and calculate transaction fees.
+    /// Check if the transactions are valid.
     pub fn verify_transactions(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transactions: &Vec<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        // Check that all the transaction proofs verify
         Ok(InstantiatedDPC::verify_transactions(parameters, transactions, ledger)?)
     }
 
-    /// Check if the block is valid
-    /// Verify signatures, and calculate transaction fees.
+    /// Check if the block is valid.
+    /// Verify transactions and transaction fees.
     pub fn verify_block(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
