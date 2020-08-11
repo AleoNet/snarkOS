@@ -89,7 +89,7 @@ mod consensus_dpc {
         assert!(!spend_records[1].is_dummy());
         assert_eq!(spend_records[0].value(), 10);
         assert_eq!(spend_records[1].value(), 10);
-        assert_eq!(transaction.value_balance, (block_reward - 20) as i64);
+        assert_eq!(transaction.value_balance.0, (block_reward.0 - 20) as i64);
 
         assert!(InstantiatedDPC::verify(&parameters, &transaction, &ledger).unwrap());
 
@@ -108,7 +108,10 @@ mod consensus_dpc {
         assert_eq!(new_coinbase_records.len(), 2);
         assert!(!new_coinbase_records[0].is_dummy());
         assert!(new_coinbase_records[1].is_dummy());
-        assert_eq!(new_coinbase_records[0].value(), new_block_reward + block_reward - 20);
+        assert_eq!(
+            new_coinbase_records[0].value(),
+            (new_block_reward.0 + block_reward.0 - 20) as u64
+        );
         assert_eq!(new_coinbase_records[1].value(), 0);
 
         println!("Verify and receive the block with the new payment transaction");
