@@ -51,9 +51,9 @@ impl Default for Config {
             quiet: false,
             // Options
             ip: "0.0.0.0".into(),
-            port: 4130,
-            path: "snarkos_db".into(),
-            bootnodes: MAINNET_BOOTNODES
+            port: 4131,
+            path: "snarkos_testnet_1".into(),
+            bootnodes: TESTNET_BOOTNODES
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
@@ -100,7 +100,15 @@ impl Config {
     fn network(&mut self, argument: Option<u8>) {
         if let Some(network_id) = argument {
             match network_id {
-                0 => {}
+                0 => {
+                    self.path = "snarkos_db".into();
+                    self.port = 4130 + (network_id as u16);
+                    self.bootnodes = MAINNET_BOOTNODES
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+                    self.network = network_id;
+                }
                 _ => {
                     self.path = format!("snarkos_testnet_{}", network_id);
                     self.port = 4130 + (network_id as u16);
