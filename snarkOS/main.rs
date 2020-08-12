@@ -14,7 +14,7 @@ use snarkos_network::{
     protocol::SyncHandler,
     server::{MinerInstance, Server},
 };
-use snarkos_objects::AccountAddress;
+use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 
@@ -41,13 +41,13 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let address = format! {"{}:{}", config.ip, config.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
-    let network_id = config.network;
+    let network_id = Network::from_network_id(config.network);
 
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network_id,
+        network: network_id,
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
     };
 

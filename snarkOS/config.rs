@@ -102,7 +102,7 @@ impl Config {
             match network_id {
                 0 => {}
                 _ => {
-                    self.path = format!("snarkos_db_network_{}", network_id);
+                    self.path = format!("snarkos_testnet_{}", network_id);
                     self.port = 4130 + (network_id as u16);
                     self.bootnodes = TESTNET_BOOTNODES
                         .iter()
@@ -210,9 +210,9 @@ pub struct ConfigCli;
 impl CLI for ConfigCli {
     type Config = Config;
 
-    const ABOUT: AboutType = "Start a skeleton blockchain miner (include -h for more options)";
+    const ABOUT: AboutType = "Start an Aleo Node (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER, flag::QUIET];
-    const NAME: NameType = "snarkos-node";
+    const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
         option::PORT,

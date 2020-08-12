@@ -66,7 +66,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network_id,
+        network: network_id,
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
