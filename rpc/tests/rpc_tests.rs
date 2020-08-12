@@ -93,7 +93,7 @@ mod rpc_tests {
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(program_commitment, transaction_info["program_commitment"]);
         assert_eq!(local_data_root, transaction_info["local_data_root"]);
-        assert_eq!(value_balance, transaction_info["value_balance"]);
+        assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
@@ -400,7 +400,7 @@ mod rpc_tests {
         assert_eq!(template.previous_block_hash, latest_block_hash);
         assert_eq!(template.block_height, new_height);
         assert_eq!(template.transactions, expected_transactions);
-        assert!(template.coinbase_value >= block_reward);
+        assert!(template.coinbase_value >= block_reward.0 as u64);
 
         drop(rpc);
         kill_storage_sync(storage);

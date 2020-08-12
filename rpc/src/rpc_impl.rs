@@ -200,7 +200,7 @@ impl RpcFunctions for RpcImpl {
             transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
             program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
             local_data_root: hex::encode(to_bytes![transaction.local_data_root]?),
-            value_balance: transaction.value_balance,
+            value_balance: transaction.value_balance.0,
             signatures,
             encrypted_records,
             transaction_metadata,
@@ -284,7 +284,10 @@ impl RpcFunctions for RpcImpl {
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 
-        let coinbase_value = get_block_reward(block_height + 1) + full_transactions.calculate_transaction_fees();
+        let mut coinbase_value = get_block_reward(block_height + 1);
+        for transaction in full_transactions.iter() {
+            coinbase_value = coinbase_value.add(transaction.value_balance())
+        }
 
         Ok(BlockTemplate {
             previous_block_hash: hex::encode(&block.header.get_hash().0),
@@ -292,7 +295,7 @@ impl RpcFunctions for RpcImpl {
             time,
             difficulty_target: self.consensus.get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
-            coinbase_value,
+            coinbase_value: coinbase_value.0 as u64,
         })
     }
 

@@ -32,6 +32,7 @@ impl Transaction for TestTx {
     type Memorandum = [u8; 32];
     type ProgramCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
+    type ValueBalance = i64;
 
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
         Ok([0u8; 32])

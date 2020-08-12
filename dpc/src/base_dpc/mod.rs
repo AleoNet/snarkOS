@@ -20,7 +20,7 @@ use snarkos_models::{
     gadgets::algorithms::{CRHGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
-use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AleoAmount};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -140,7 +140,7 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
     local_data_merkle_tree: CommitmentMerkleTree<Components::LocalDataCommitment, Components::LocalDataCRH>,
     local_data_commitment_randomizers: Vec<<Components::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
-    value_balance: i64,
+    value_balance: AleoAmount,
     memorandum: <DPCTransaction<Components> as Transaction>::Memorandum,
     network_id: u8,
 }
@@ -467,14 +467,14 @@ where
         let mut joint_serial_numbers = Vec::new();
         let mut old_death_program_ids = Vec::new();
 
-        let mut value_balance: i64 = 0;
+        let mut value_balance = AleoAmount::ZERO;
 
         // Compute the ledger membership witness and serial number from the old records.
         for (i, record) in old_records.iter().enumerate() {
             let input_record_time = start_timer!(|| format!("Process input record {}", i));
 
             if !record.is_dummy() {
-                value_balance += record.value() as i64;
+                value_balance = value_balance.add(AleoAmount::from_bytes(record.value() as i64));
             }
 
             let (sn, randomizer) = Self::generate_sn(&parameters, record, &old_account_private_keys[i])?;
@@ -516,7 +516,7 @@ where
             )?;
 
             if !record.is_dummy() {
-                value_balance -= record.value() as i64;
+                value_balance = value_balance.sub(AleoAmount::from_bytes(record.value() as i64));
             }
 
             new_commitments.push(record.commitment().clone());

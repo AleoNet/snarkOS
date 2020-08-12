@@ -1,4 +1,4 @@
-use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
+use crate::{difficulty::bitcoin_retarget, memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
@@ -19,6 +19,7 @@ use snarkos_objects::{
     Account,
     AccountAddress,
     AccountPrivateKey,
+    AleoAmount,
     Block,
     BlockHeader,
     BlockHeaderHash,
@@ -54,36 +55,20 @@ pub struct ConsensusParameters {
     pub verifier: PoswMarlin,
 }
 
-/// Calculate a block reward that halves every 1000 blocks.
-pub fn get_block_reward(block_num: u32) -> u64 {
-    100_000_000u64 / (2_u64.pow(block_num / 1000))
-}
+/// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
+pub fn get_block_reward(block_num: u32) -> AleoAmount {
+    let expected_blocks_per_hour: u32 = 100;
+    let num_years = 4;
+    let block_segments = num_years * 365 * 24 * expected_blocks_per_hour;
 
-/// Bitcoin difficulty retarget algorithm.
-pub fn bitcoin_retarget(
-    block_timestamp: i64,
-    parent_timestamp: i64,
-    target_block_time: i64,
-    parent_difficulty: u64,
-) -> u64 {
-    let mut time_elapsed = block_timestamp - parent_timestamp;
+    let aleo_denonimation = AleoAmount::COIN;
+    let initial_reward = 150i64 * aleo_denonimation;
 
-    // Limit difficulty adjustment by factor of 2
-    if time_elapsed < target_block_time / 2 {
-        time_elapsed = target_block_time / 2
-    } else if time_elapsed > target_block_time * 2 {
-        time_elapsed = target_block_time * 2
-    }
+    // The block reward halves at most 2 times - minimum is 37.5 ALEO after 8 years.
+    let num_halves = u32::min(block_num / block_segments, 2);
+    let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
-    let mut x: u64;
-    x = match parent_difficulty.checked_mul(time_elapsed as u64) {
-        Some(x) => x,
-        None => u64::max_value(),
-    };
-
-    x /= target_block_time as u64;
-
-    x
+    AleoAmount::from_bytes(reward)
 }
 
 impl ConsensusParameters {
@@ -157,33 +142,28 @@ impl ConsensusParameters {
         Ok(())
     }
 
-    /// Check if the transaction is valid
+    /// Check if the transaction is valid.
     pub fn verify_transaction(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        // TODO (raychu86) add network_id check
-
-        // Check that all the transaction proofs verify
         Ok(InstantiatedDPC::verify(parameters, transaction, ledger)?)
     }
 
-    /// Check if the block transactions are valid
-    /// Check all outpoints, verify signatures, and calculate transaction fees.
+    /// Check if the transactions are valid.
     pub fn verify_transactions(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transactions: &Vec<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        // Check that all the transaction proofs verify
         Ok(InstantiatedDPC::verify_transactions(parameters, transactions, ledger)?)
     }
 
-    /// Check if the block is valid
-    /// Verify signatures, and calculate transaction fees.
+    /// Check if the block is valid.
+    /// Verify transactions and transaction fees.
     pub fn verify_block(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
@@ -206,7 +186,7 @@ impl ConsensusParameters {
         // Verify block amounts and check that there is a single coinbase transaction
 
         let mut coinbase_transaction_count = 0;
-        let mut total_value_balance = 0;
+        let mut total_value_balance = AleoAmount::ZERO;
 
         for transaction in block.transactions.iter() {
             let value_balance = transaction.value_balance;
@@ -215,7 +195,7 @@ impl ConsensusParameters {
                 coinbase_transaction_count += 1;
             }
 
-            total_value_balance += value_balance;
+            total_value_balance = total_value_balance.add(value_balance);
         }
 
         // Check that there is only 1 coinbase transaction
@@ -225,8 +205,8 @@ impl ConsensusParameters {
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = get_block_reward(ledger.len() as u32) as i64;
-        if total_value_balance + expected_block_reward != 0 {
+        let expected_block_reward = get_block_reward(ledger.len() as u32).0;
+        if total_value_balance.0 + expected_block_reward != 0 {
             println!("total_value_balance: {:?}", total_value_balance);
             println!("expected_block_reward: {:?}", expected_block_reward);
 
@@ -348,7 +328,7 @@ impl ConsensusParameters {
                 return Err(ConsensusError::CoinbaseTransactionAlreadyExists());
             }
 
-            total_value_balance += transaction.value_balance.abs() as u64;
+            total_value_balance = total_value_balance.add(transaction.value_balance);
         }
 
         // Generate a new account that owns the dummy input records
@@ -387,7 +367,12 @@ impl ConsensusParameters {
 
         let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Components::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
+        .concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
         let memo: [u8; 32] = rng.gen();
@@ -495,8 +480,50 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::{thread_rng, Rng};
     use snarkos_objects::PedersenMerkleRootHash;
     use snarkos_testing::consensus::DATA;
+
+    #[test]
+    fn test_block_rewards() {
+        let rng = &mut thread_rng();
+
+        let first_halfing: u32 = 4 * 365 * 24 * 100;
+        let second_halfing: u32 = first_halfing * 2;
+
+        let mut block_reward: i64 = 150 * 1_000_000;
+
+        // Before block halving
+        assert_eq!(get_block_reward(0).0, block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(0, first_halfing);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
+        }
+
+        // First block halving
+
+        block_reward /= 2;
+
+        assert_eq!(get_block_reward(first_halfing).0, block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(first_halfing + 1, second_halfing);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
+        }
+
+        // Second and final block halving
+
+        block_reward /= 2;
+
+        assert_eq!(get_block_reward(second_halfing).0, block_reward);
+        assert_eq!(get_block_reward(u32::MAX).0, block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(second_halfing, u32::MAX);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
+        }
+    }
 
     #[test]
     fn verify_header() {
