@@ -287,7 +287,7 @@ mod rpc_tests {
         let response = rpc.request("decoderecord", &[hex::encode(to_bytes![record].unwrap())]);
         let record_info: Value = serde_json::from_str(&response).unwrap();
 
-        let owner = hex::encode(to_bytes![record.owner()].unwrap());
+        let owner = record.owner().to_string();
         let is_dummy = record.is_dummy();
         let value = record.value();
         let birth_program_id = hex::encode(to_bytes![record.birth_program_id()].unwrap());
