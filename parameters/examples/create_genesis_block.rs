@@ -2,7 +2,6 @@ use snarkos_dpc::base_dpc::{instantiated::Components, transaction::DPCTransactio
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::genesis::Genesis;
 use snarkos_objects::{
-    merkle_root,
     BlockHeader,
     BlockHeaderHash,
     DPCTransactions,

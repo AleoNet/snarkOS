@@ -548,7 +548,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
-            network: 0,
+            network: Network::Mainnet,
             verifier: posw,
         };
 

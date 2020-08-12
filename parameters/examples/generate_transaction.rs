@@ -14,7 +14,7 @@ use snarkos_models::{
     objects::{account::AccountScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{Account, AccountAddress};
+use snarkos_objects::{Account, AccountAddress, Network};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_posw::PoswMarlin;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
@@ -66,7 +66,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network: network_id,
+        network: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
     };
 

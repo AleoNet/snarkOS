@@ -72,10 +72,10 @@ impl Miner {
         let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
-            if self.consensus.network.id() != transaction.network_id {
+            if self.consensus.network != transaction.network {
                 return Err(ConsensusError::ConflictingNetworkId(
                     self.consensus.network.id(),
-                    transaction.network_id,
+                    transaction.network.id(),
                 ));
             }
         }

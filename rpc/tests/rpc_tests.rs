@@ -65,7 +65,7 @@ mod rpc_tests {
             .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
-        let network_id = transaction.network_id;
+        let network_id = transaction.network.id();
 
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
