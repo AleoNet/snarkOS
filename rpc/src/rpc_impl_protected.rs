@@ -61,13 +61,25 @@ impl RpcImpl {
         }
     }
 
-    /// Wrap authentication around `fetch_record_commitments`
-    pub fn fetch_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    /// Wrap authentication around `get_record_commitment_count`
+    pub fn get_record_commitment_count_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
 
-        match self.fetch_record_commitments() {
+        match self.get_record_commitment_count() {
+            Ok(num_record_commitments) => Ok(Value::from(num_record_commitments)),
+            Err(_) => Err(JsonRPCError::invalid_request()),
+        }
+    }
+
+    /// Wrap authentication around `get_record_commitments`
+    pub fn get_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        params.expect_no_params()?;
+
+        match self.get_record_commitments() {
             Ok(record_commitments) => Ok(Value::from(record_commitments)),
             Err(_) => Err(JsonRPCError::invalid_request()),
         }
@@ -115,7 +127,8 @@ impl RpcImpl {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
-        d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
+        d.add_method_with_meta("getrecordcommitmentcount", Self::get_record_commitment_count_protected);
+        d.add_method_with_meta("getrecordcommitments", Self::get_record_commitments_protected);
         d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
         d.add_method_with_meta("createaccount", Self::create_account_protected);
 
@@ -289,9 +302,16 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
+    /// Returns the number of record commitments that are stored on the full node.
+    fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
+        let record_commitments = self.storage.get_record_commitments(None)?;
+
+        Ok(record_commitments.len())
+    }
+
     /// Returns a list of record commitments that are stored on the full node.
-    fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let record_commitments = self.storage.get_record_commitments(100)?;
+    fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
+        let record_commitments = self.storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
 
         Ok(record_commitment_strings)

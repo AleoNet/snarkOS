@@ -16,7 +16,7 @@ pub fn render_init(miner_address: &str) -> String {
 
 "#
     )
-    .cyan()
+    .white()
     .bold();
     let aleo_welcome =
         format!("Welcome to Aleo! We thank you for supporting privacy and running a network node.\n\n").bold();
