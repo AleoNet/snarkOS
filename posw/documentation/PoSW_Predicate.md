@@ -6,6 +6,8 @@ The predicate used as part of the PoSW circuit verifies the inclusion of transac
 
 The state of the system is given by a Merkle tree $\mathsf{Tree}_\mathcal{G}(h)$ of depth $h$ over a CRT function $\mathcal{G}: \{0,1\}^{k} \rightarrow \{0,1\}^{k/2}$, where $\mathcal{G}$ is taken to be SHA-256 with $k = 512$. We denote this as the "state tree". Each leaf is the unique id of a transaction to be processed, and the variable $\mathsf{state}$ is the root of the tree.
 
+<img align="left" src="Binary_tree.png" style="float:right"></img>
+
 The PoSW circuit takes the $q \leq d$ subtree of the state tree and computes a Merkle tree of depth $q$. The leaves of the tree are the depth $q$ elements of the state tree $\mathsf{Tree}_\mathcal{H}(h)$, instantiated over $k$-bit leaves with a different CRT function $\mathcal{H} : \{0,1\}^{k} \rightarrow \{0,1\}^{k/2}$ as a new PoSW tree $\mathsf{Tree}_{\mathcal{H}}(q)$. This layout is illustrated in the diagram above. For example, for $\mathbb{G} = \mathsf{BLS377}$ we set $\mathcal{H}$ as the $512$-bit Pedersen hash with output truncated to $256$ bits. 
 
 The circuit implementation for$\mathcal{H}$ masks the witness variables based on a pseudorandom seed, which is part of the predicate statement. This is required to achieve non-amortization guarantees. We set $q = 3$ throughout.
