@@ -1,6 +1,6 @@
 use snarkos_dpc::base_dpc::{
     instantiated::*,
-    program::{DummyProgram, NoopProgram},
+    program::NoopProgram,
     record::record_encryption::RecordEncryption,
     record_payload::RecordPayload,
     BaseDPCComponents,
