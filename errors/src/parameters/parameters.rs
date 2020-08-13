@@ -11,6 +11,9 @@ pub enum ParametersError {
     #[error("{}", _0)]
     Message(String),
 
+    #[error("Missing parameters")]
+    MissingParameters,
+
     #[error("Remote fetch is disabled, enable compiler flag for feature")]
     RemoteFetchDisabled,
 }
