@@ -79,11 +79,7 @@ impl<C: CommitmentScheme, H: CRH> CommitmentMerkleTree<C, H> {
 
         let inner_hashes = self.inner_hashes.clone();
 
-        Ok(CommitmentMerklePath {
-            leaves,
-            inner_hashes,
-            parameters: Some(self.parameters.clone()),
-        })
+        Ok(CommitmentMerklePath { leaves, inner_hashes })
     }
 }
 

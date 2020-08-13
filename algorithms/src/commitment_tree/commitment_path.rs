@@ -12,22 +12,15 @@ use std::io::{Read, Result as IoResult, Write};
 pub struct CommitmentMerklePath<C: CommitmentScheme, H: CRH> {
     pub leaves: (<C as CommitmentScheme>::Output, <C as CommitmentScheme>::Output),
     pub inner_hashes: (<H as CRH>::Output, <H as CRH>::Output),
-    #[derivative(PartialEq = "ignore")]
-    pub parameters: Option<H>,
 }
 
 impl<C: CommitmentScheme, H: CRH> CommitmentMerklePath<C, H> {
     pub fn verify(
         &self,
+        parameters: &H,
         root_hash: &<H as CRH>::Output,
         leaf: &<C as CommitmentScheme>::Output,
     ) -> Result<bool, MerkleError> {
-        // Check that CRH parameters exist
-        let parameters = match self.parameters {
-            Some(ref crh_parameters) => crh_parameters,
-            None => return Err(MerkleError::MissingParameters),
-        };
-
         // Check if the leaf is included in the path
         if leaf != &self.leaves.0 && leaf != &self.leaves.1 {
             return Ok(false);
@@ -73,10 +66,6 @@ impl<C: CommitmentScheme, H: CRH> FromBytes for CommitmentMerklePath<C, H> {
         let leaves = (C::Output::read(&mut reader)?, C::Output::read(&mut reader)?);
         let inner_hashes = (H::Output::read(&mut reader)?, H::Output::read(&mut reader)?);
 
-        Ok(Self {
-            leaves,
-            inner_hashes,
-            parameters: None,
-        })
+        Ok(Self { leaves, inner_hashes })
     }
 }

@@ -65,7 +65,7 @@ fn commitment_tree_good_root_test() {
 
     for leaf in merkle_tree.leaves().iter() {
         let proof = merkle_tree.generate_proof(&leaf).unwrap();
-        assert!(proof.verify(&merkle_tree.root(), &leaf).unwrap());
+        assert!(proof.verify(&crh, &merkle_tree.root(), &leaf).unwrap());
     }
 }
 
@@ -81,7 +81,7 @@ fn commitment_tree_bad_root_test() {
 
     for leaf in merkle_tree.leaves().iter() {
         let proof = merkle_tree.generate_proof(&leaf).unwrap();
-        assert!(proof.verify(&<H as CRH>::Output::default(), &leaf).unwrap());
+        assert!(proof.verify(&crh, &<H as CRH>::Output::default(), &leaf).unwrap());
     }
 }
 
@@ -98,12 +98,10 @@ fn test_serialize_commitment_path() {
         let proof = merkle_tree.generate_proof(&leaf).unwrap();
 
         let proof_bytes = to_bytes![proof].unwrap();
-        let mut recovered_proof = CM::read(&proof_bytes[..]).unwrap();
-
-        recovered_proof.parameters = Some(crh.clone());
+        let recovered_proof = CM::read(&proof_bytes[..]).unwrap();
 
         assert!(proof == recovered_proof);
 
-        assert!(recovered_proof.verify(&merkle_tree.root(), &leaf).unwrap());
+        assert!(recovered_proof.verify(&crh, &merkle_tree.root(), &leaf).unwrap());
     }
 }

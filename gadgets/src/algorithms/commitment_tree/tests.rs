@@ -87,7 +87,7 @@ fn commitment_tree_test<
     let mut satisfied = true;
     for (i, leaf) in merkle_tree.leaves().iter().enumerate() {
         let proof = merkle_tree.generate_proof(&leaf).unwrap();
-        assert!(proof.verify(&merkle_tree.root(), &leaf).unwrap());
+        assert!(proof.verify(&crh, &merkle_tree.root(), &leaf).unwrap());
 
         let mut num_constraints = 0;
 

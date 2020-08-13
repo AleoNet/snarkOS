@@ -65,11 +65,7 @@ impl<C: BaseDPCComponents> DummyCircuit<C> {
             <C::LocalDataCRH as CRH>::Output::default(),
             <C::LocalDataCRH as CRH>::Output::default(),
         );
-        let local_data_merkle_path = CommitmentMerklePath {
-            leaves,
-            inner_hashes,
-            parameters: Some(system_parameters.local_data_crh.clone()),
-        };
+        let local_data_merkle_path = CommitmentMerklePath { leaves, inner_hashes };
 
         let old_serial_numbers =
             vec![<C::AccountSignature as SignatureScheme>::PublicKey::default(); C::NUM_INPUT_RECORDS];
