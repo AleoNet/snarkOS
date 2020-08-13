@@ -2,3 +2,6 @@
 **/target
 **.DS_Store
 **storage_db
+**inner_snark_pk*.params
+**outer_snark_pk*.params
+**posw_snark_pk*.params
