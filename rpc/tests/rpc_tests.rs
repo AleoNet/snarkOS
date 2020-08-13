@@ -65,6 +65,7 @@ mod rpc_tests {
             .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
+        let network_id = transaction.network.id();
 
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
@@ -89,6 +90,7 @@ mod rpc_tests {
         assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
         assert_eq!(memo, transaction_info["memo"]);
 
+        assert_eq!(network_id, transaction_info["network_id"]);
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(program_commitment, transaction_info["program_commitment"]);
@@ -285,7 +287,7 @@ mod rpc_tests {
         let response = rpc.request("decoderecord", &[hex::encode(to_bytes![record].unwrap())]);
         let record_info: Value = serde_json::from_str(&response).unwrap();
 
-        let owner = hex::encode(to_bytes![record.owner()].unwrap());
+        let owner = record.owner().to_string();
         let is_dummy = record.is_dummy();
         let value = record.value();
         let birth_program_id = hex::encode(to_bytes![record.birth_program_id()].unwrap());
