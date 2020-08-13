@@ -43,49 +43,10 @@ pub const NUM_INPUT_RECORDS: usize = 2;
 pub const NUM_OUTPUT_RECORDS: usize = 2;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SnNonceWindow;
-
-impl PedersenSize for SnNonceWindow {
-    const NUM_WINDOWS: usize = 32;
-    const WINDOW_SIZE: usize = 63;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ProgramVkHashWindow;
-
-impl PedersenSize for ProgramVkHashWindow {
-    const NUM_WINDOWS: usize = 144;
-    const WINDOW_SIZE: usize = 63;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct LocalDataCRHWindow;
-
-impl PedersenSize for LocalDataCRHWindow {
-    const NUM_WINDOWS: usize = 16;
-    const WINDOW_SIZE: usize = 32;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct LocalDataCommitmentWindow;
-
-impl PedersenSize for LocalDataCommitmentWindow {
+pub struct AccountWindow;
+impl PedersenSize for AccountWindow {
     const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 129;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TwoToOneWindow;
-impl PedersenSize for TwoToOneWindow {
-    const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 32;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RecordWindow;
-impl PedersenSize for RecordWindow {
-    const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 233;
+    const WINDOW_SIZE: usize = 192;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -97,18 +58,57 @@ impl PedersenSize for EncryptedRecordWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct AccountWindow;
-impl PedersenSize for AccountWindow {
-    const NUM_WINDOWS: usize = 8;
-    const WINDOW_SIZE: usize = 192;
+pub struct InnerSNARKVkHashWindow;
+
+impl PedersenSize for InnerSNARKVkHashWindow {
+    const NUM_WINDOWS: usize = 296;
+    const WINDOW_SIZE: usize = 63;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ValueWindow;
+pub struct LocalDataCommitmentWindow;
 
-impl PedersenSize for ValueWindow {
-    const NUM_WINDOWS: usize = 4;
-    const WINDOW_SIZE: usize = 350;
+impl PedersenSize for LocalDataCommitmentWindow {
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 129;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LocalDataCRHWindow;
+
+impl PedersenSize for LocalDataCRHWindow {
+    const NUM_WINDOWS: usize = 16;
+    const WINDOW_SIZE: usize = 32;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProgramVkHashWindow;
+
+impl PedersenSize for ProgramVkHashWindow {
+    const NUM_WINDOWS: usize = 144;
+    const WINDOW_SIZE: usize = 63;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct RecordWindow;
+impl PedersenSize for RecordWindow {
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 233;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SnNonceWindow;
+
+impl PedersenSize for SnNonceWindow {
+    const NUM_WINDOWS: usize = 32;
+    const WINDOW_SIZE: usize = 63;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TwoToOneWindow;
+impl PedersenSize for TwoToOneWindow {
+    const NUM_WINDOWS: usize = 8;
+    const WINDOW_SIZE: usize = 32;
 }
 
 define_merkle_tree_parameters!(CommitmentMerkleParameters, MerkleTreeCRH, 32);
@@ -125,6 +125,8 @@ impl DPCComponents for Components {
     type EncryptedRecordCRH = EncryptedRecordCRH;
     type EncryptedRecordCRHGadget = EncryptedRecordCRHGadget;
     type InnerField = InnerField;
+    type InnerSNARKVerificationKeyCRH = InnerSNARKVerificationKeyCRH;
+    type InnerSNARKVerificationKeyCRHGadget = InnerSNARKVerificationKeyCRHGadget;
     type LocalDataCRH = LocalDataCRH;
     type LocalDataCRHGadget = LocalDataCRHGadget;
     type LocalDataCommitment = LocalDataCommitment;
@@ -148,12 +150,12 @@ impl DPCComponents for Components {
 impl BaseDPCComponents for Components {
     type EncryptionGroup = EdwardsBls;
     type EncryptionModelParameters = EdwardsParameters;
-    type InnerSNARK = CoreCheckNIZK;
+    type InnerSNARK = InnerSNARK;
     type InnerSNARKGadget = InnerSNARKGadget;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
     type NoopProgramSNARK = NoopProgramSNARK<Self>;
-    type OuterSNARK = ProofCheckNIZK;
+    type OuterSNARK = OuterSNARK;
     type ProgramSNARKGadget = ProgramSNARKGadget;
 }
 
@@ -175,11 +177,12 @@ pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, EncryptedRecordWindow>;
+pub type InnerSNARKVerificationKeyCRH = BoweHopwoodPedersenCompressedCRH<EdwardsSW, InnerSNARKVkHashWindow>;
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type ProgramVerificationKeyCRH = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
 
-pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
-pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
+pub type InnerSNARK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
+pub type OuterSNARK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
 pub type NoopProgramSNARK<C> = GM17<InnerPairing, NoopCircuit<C>, ProgramLocalData<C>>;
 pub type PRF = Blake2s;
 
@@ -201,6 +204,8 @@ pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAff
 
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type EncryptedRecordCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
+pub type InnerSNARKVerificationKeyCRHGadget =
+    BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
 pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type ProgramVerificationKeyCRHGadget =
     BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;

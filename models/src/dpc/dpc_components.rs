@@ -33,6 +33,11 @@ pub trait DPCComponents: 'static + Sized {
     type EncryptedRecordCRH: CRH;
     type EncryptedRecordCRHGadget: CRHGadget<Self::EncryptedRecordCRH, Self::InnerField>;
 
+    /// CRH for hash of the `Self::InnerSNARK` verification keys.
+    /// This is invoked only on the larger curve.
+    type InnerSNARKVerificationKeyCRH: CRH;
+    type InnerSNARKVerificationKeyCRHGadget: CRHGadget<Self::InnerSNARKVerificationKeyCRH, Self::OuterField>;
+
     /// CRH and commitment scheme for committing to program input. Invoked inside
     /// `Self::InnerSNARK` and every program SNARK.
     type LocalDataCRH: CRH;
