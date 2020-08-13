@@ -44,7 +44,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             // Flags
-            network: 0,
+            network: 1,
             jsonrpc: true,
             is_bootnode: false,
             is_miner: true,
