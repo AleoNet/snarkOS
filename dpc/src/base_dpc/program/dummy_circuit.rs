@@ -21,6 +21,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkos_utilities::{to_bytes, ToBytes};
 
 pub struct DummyCircuit<C: BaseDPCComponents> {
     /// System parameters
@@ -231,7 +232,7 @@ pub fn execute_dummy_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
             &local_data_commitment_randomness,
         )?;
 
-    // Create the local data commitment leaf for a death record
+    // Create the local data commitment leaf for a birth record
 
     let birth_local_data_commtiment_leaf =
         <C::LocalDataCommitmentGadget as CommitmentGadget<_, _>>::check_commitment_gadget(

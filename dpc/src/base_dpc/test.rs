@@ -3,14 +3,14 @@ use crate::base_dpc::{
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
-    program::{DummyProgram, NoopProgram},
+    program::*,
     record::record_encryption::*,
     record_payload::RecordPayload,
     BaseDPCComponents,
     ExecuteContext,
     DPC,
 };
-use snarkos_algorithms::merkle_tree::MerklePath;
+use snarkos_algorithms::{merkle_tree::MerklePath, snark::gm17::GM17};
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH, SNARK},
@@ -37,6 +37,8 @@ use rand_xorshift::XorShiftRng;
 
 type L = Ledger<Tx, CommitmentMerkleParameters>;
 
+type DummyProgramSNARK<C> = GM17<InnerPairing, DummyCircuit<C>, ProgramLocalData<C>>;
+
 #[test]
 fn test_execute_base_dpc_constraints() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -50,8 +52,13 @@ fn test_execute_base_dpc_constraints() {
     let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
     let noop_program_snark_pp =
         InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
-    let dummy_program_snark_pp =
-        InstantiatedDPC::generate_dummy_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+
+    let (dummy_program_snark_pk, dummy_program_snark_pvk) =
+        DummyProgramSNARK::setup(DummyCircuit::blank(&system_parameters), &mut rng).unwrap();
+    let dummy_program_snark_vk = dummy_program_snark_pvk.into();
+
+    // let dummy_program_snark_pp =
+    //     generate_dummy_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
     let noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
@@ -65,7 +72,7 @@ fn test_execute_base_dpc_constraints() {
     let dummy_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
             &system_parameters.program_verification_key_hash,
-            &to_bytes![dummy_program_snark_pp.verification_key].unwrap()
+            &to_bytes![dummy_program_snark_vk].unwrap()
         )
         .unwrap()
     ]
@@ -161,14 +168,14 @@ fn test_execute_base_dpc_constraints() {
     // Generate the program proofs
 
     let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
-    let dummy_program = DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
+    let dummy_program = DummyProgram::<_, DummyProgramSNARK<Components>>::new(dummy_program_id);
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {
         let private_input = dummy_program
             .execute(
-                &dummy_program_snark_pp.proving_key,
-                &dummy_program_snark_pp.verification_key,
+                &dummy_program_snark_pk,
+                &dummy_program_snark_vk,
                 &local_data,
                 i as u8,
                 &mut rng,

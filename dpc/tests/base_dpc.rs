@@ -64,15 +64,6 @@ fn base_dpc_integration_test() {
 
     let ledger = initialize_test_blockchain::<Tx, CommitmentMerkleParameters>(ledger_parameters, genesis_block);
 
-    let dummy_program_id = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.dummy_program_snark_parameters().verification_key].unwrap()
-        )
-        .unwrap()
-    ]
-    .unwrap();
-
     let noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
@@ -98,8 +89,8 @@ fn base_dpc_integration_test() {
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
-            &dummy_program_id,
-            &dummy_program_id,
+            &noop_program_id,
+            &noop_program_id,
             &mut rng,
         )
         .unwrap();
@@ -140,14 +131,13 @@ fn base_dpc_integration_test() {
     // Generate the program proofs
 
     let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
-    let dummy_program = DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
 
     let mut old_death_program_proofs = vec![];
     for i in 0..NUM_INPUT_RECORDS {
-        let private_input = dummy_program
+        let private_input = noop_program
             .execute(
-                &parameters.dummy_program_snark_parameters.proving_key,
-                &parameters.dummy_program_snark_parameters.verification_key,
+                &parameters.noop_program_snark_parameters.proving_key,
+                &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,
                 i as u8,
                 &mut rng,
