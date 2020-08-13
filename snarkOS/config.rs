@@ -52,7 +52,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             // Flags
-            network: 0,
+            network: 1,
             jsonrpc: true,
             is_bootnode: false,
             is_miner: true,
@@ -149,7 +149,7 @@ impl Config {
             match network_id {
                 0 => {
                     self.db_path = "snarkos_db".into();
-                    self.port = 4130 + (network_id as u16);
+                    self.port = 4130;
                     self.bootnodes = MAINNET_BOOTNODES
                         .iter()
                         .map(|node| (*node).to_string())
