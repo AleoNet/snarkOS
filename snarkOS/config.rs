@@ -102,7 +102,7 @@ impl Config {
             match network_id {
                 0 => {
                     self.path = "snarkos_db".into();
-                    self.port = 4130 + (network_id as u16);
+                    self.port = 4130;
                     self.bootnodes = MAINNET_BOOTNODES
                         .iter()
                         .map(|node| (*node).to_string())
