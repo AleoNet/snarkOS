@@ -29,8 +29,12 @@ pub trait DPCComponents: 'static + Sized {
     type AccountSignature: SignatureScheme;
     type AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Self::AccountSignature, Self::InnerField>;
 
+    /// CRH for the encrypted record.
+    type EncryptedRecordCRH: CRH;
+    type EncryptedRecordCRHGadget: CRHGadget<Self::EncryptedRecordCRH, Self::InnerField>;
+
     /// CRH and commitment scheme for committing to program input. Invoked inside
-    /// `Self::MainN` and every program SNARK.
+    /// `Self::InnerSNARK` and every program SNARK.
     type LocalDataCRH: CRH;
     type LocalDataCRHGadget: CRHGadget<Self::LocalDataCRH, Self::InnerField>;
     type LocalDataCommitment: CommitmentScheme;
@@ -38,8 +42,8 @@ pub trait DPCComponents: 'static + Sized {
 
     /// CRH for hashes of birth and death verification keys.
     /// This is invoked only on the larger curve.
-    type ProgramVerificationKeyHash: CRH;
-    type ProgramVerificationKeyHashGadget: CRHGadget<Self::ProgramVerificationKeyHash, Self::OuterField>;
+    type ProgramVerificationKeyCRH: CRH;
+    type ProgramVerificationKeyCRHGadget: CRHGadget<Self::ProgramVerificationKeyCRH, Self::OuterField>;
 
     /// Commitment scheme for committing to hashes of birth and death verification keys
     type ProgramVerificationKeyCommitment: CommitmentScheme;
@@ -51,10 +55,6 @@ pub trait DPCComponents: 'static + Sized {
     /// PRF for computing serial numbers. Invoked only over `Self::InnerField`.
     type PRF: PRF;
     type PRFGadget: PRFGadget<Self::PRF, Self::InnerField>;
-
-    /// CRH for the encrypted record.
-    type EncryptedRecordCRH: CRH;
-    type EncryptedRecordCRHGadget: CRHGadget<Self::EncryptedRecordCRH, Self::InnerField>;
 
     /// Commitment scheme for record contents. Invoked only over `Self::InnerField`.
     type RecordCommitment: CommitmentScheme;

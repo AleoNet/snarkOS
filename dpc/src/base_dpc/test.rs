@@ -54,8 +54,8 @@ fn test_execute_base_dpc_constraints() {
         InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
     let noop_program_id = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &system_parameters.program_verification_key_crh,
             &to_bytes![noop_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()
@@ -63,8 +63,8 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     let alternate_noop_program_id = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &system_parameters.program_verification_key_crh,
             &to_bytes![alternate_noop_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()

@@ -216,8 +216,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Verification key CRH setup");
-        let program_verification_key_hash = Components::ProgramVerificationKeyHash::setup(rng);
+        let time = start_timer!(|| "Program verification key CRH setup");
+        let program_verification_key_crh = Components::ProgramVerificationKeyCRH::setup(rng);
         end_timer!(time);
 
         let comm_crh_sig_pp = SystemParameters {
@@ -227,7 +227,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
             record_commitment,
             encrypted_record_crh,
             program_verification_key_commitment,
-            program_verification_key_hash,
+            program_verification_key_crh,
             local_data_crh,
             local_data_commitment,
             serial_number_nonce,

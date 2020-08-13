@@ -430,8 +430,8 @@ impl ConsensusParameters {
 
         let local_data = execute_context.into_local_data();
 
-        let noop_program_snark_id = to_bytes![ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
+        let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
+            &parameters.system_parameters.program_verification_key_crh,
             &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 

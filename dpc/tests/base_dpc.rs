@@ -65,8 +65,8 @@ fn base_dpc_integration_test() {
     let ledger = initialize_test_blockchain::<Tx, CommitmentMerkleParameters>(ledger_parameters, genesis_block);
 
     let noop_program_id = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &parameters.system_parameters.program_verification_key_crh,
             &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()

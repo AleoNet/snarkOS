@@ -111,9 +111,9 @@ where
         )?;
 
         let program_vk_crh_parameters =
-            <C::ProgramVerificationKeyHashGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
+            <C::ProgramVerificationKeyCRHGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
                 &mut cs.ns(|| "Declare program_vk_crh_parameters"),
-                || Ok(system_parameters.program_verification_key_hash.parameters()),
+                || Ok(system_parameters.program_verification_key_crh.parameters()),
             )?;
 
         (program_vk_commitment_parameters, program_vk_crh_parameters)
@@ -352,7 +352,7 @@ where
 
         let death_program_vk_bytes = death_program_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
-        let claimed_death_program_id = C::ProgramVerificationKeyHashGadget::check_evaluation_gadget(
+        let claimed_death_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death program vk hash"),
             &program_vk_crh_parameters,
             &death_program_vk_bytes,
@@ -391,7 +391,7 @@ where
 
         let birth_program_vk_bytes = birth_program_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
 
-        let claimed_birth_program_id = C::ProgramVerificationKeyHashGadget::check_evaluation_gadget(
+        let claimed_birth_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute birth program vk hash"),
             &program_vk_crh_parameters,
             &birth_program_vk_bytes,

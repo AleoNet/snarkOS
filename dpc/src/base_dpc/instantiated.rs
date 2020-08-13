@@ -132,10 +132,10 @@ impl DPCComponents for Components {
     type OuterField = OuterField;
     type PRF = PRF;
     type PRFGadget = PRFGadget;
+    type ProgramVerificationKeyCRH = ProgramVerificationKeyCRH;
+    type ProgramVerificationKeyCRHGadget = ProgramVerificationKeyCRHGadget;
     type ProgramVerificationKeyCommitment = ProgramVerificationKeyCommitment;
     type ProgramVerificationKeyCommitmentGadget = ProgramVerificationKeyCommitmentGadget;
-    type ProgramVerificationKeyHash = ProgramVerificationKeyHash;
-    type ProgramVerificationKeyHashGadget = ProgramVerificationKeyHashGadget;
     type RecordCommitment = RecordCommitment;
     type RecordCommitmentGadget = RecordCommitmentGadget;
     type SerialNumberNonceCRH = SerialNumberNonce;
@@ -176,7 +176,7 @@ pub type AccountSignature = SchnorrSignature<EdwardsAffine, Blake2sHash>;
 pub type MerkleTreeCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, TwoToOneWindow>;
 pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, EncryptedRecordWindow>;
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
-pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
+pub type ProgramVerificationKeyCRH = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
 
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
@@ -202,7 +202,7 @@ pub type AccountSignatureGadget = SchnorrPublicKeyRandomizationGadget<EdwardsAff
 pub type MerkleTreeCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type EncryptedRecordCRHGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
 pub type SerialNumberNonceGadget = BoweHopwoodPedersenCompressedCRHGadget<EdwardsBls, InnerField, EdwardsBlsGadget>;
-pub type ProgramVerificationKeyHashGadget =
+pub type ProgramVerificationKeyCRHGadget =
     BoweHopwoodPedersenCompressedCRHGadget<EdwardsSW, OuterField, EdwardsSWGadget>;
 
 pub type PRFGadget = Blake2sGadget;

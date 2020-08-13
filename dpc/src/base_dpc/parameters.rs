@@ -14,7 +14,7 @@ pub struct SystemParameters<C: BaseDPCComponents> {
     pub record_commitment: C::RecordCommitment,
     pub encrypted_record_crh: C::EncryptedRecordCRH,
     pub program_verification_key_commitment: C::ProgramVerificationKeyCommitment,
-    pub program_verification_key_hash: C::ProgramVerificationKeyHash,
+    pub program_verification_key_crh: C::ProgramVerificationKeyCRH,
     pub local_data_crh: C::LocalDataCRH,
     pub local_data_commitment: C::LocalDataCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
@@ -35,7 +35,7 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             From::from(FromBytes::read(EncryptedRecordCRHParameters::load_bytes()?.as_slice())?);
         let program_verification_key_commitment: C::ProgramVerificationKeyCommitment =
             From::from(FromBytes::read(vec![].as_slice())?);
-        let program_verification_key_hash: C::ProgramVerificationKeyHash =
+        let program_verification_key_crh: C::ProgramVerificationKeyCRH =
             From::from(FromBytes::read(ProgramVKCRHParameters::load_bytes()?.as_slice())?);
         let local_data_crh: C::LocalDataCRH =
             From::from(FromBytes::read(LocalDataCRHParameters::load_bytes()?.as_slice())?);
@@ -53,7 +53,7 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             record_commitment,
             encrypted_record_crh,
             program_verification_key_commitment,
-            program_verification_key_hash,
+            program_verification_key_crh,
             local_data_crh,
             local_data_commitment,
             serial_number_nonce,
@@ -146,8 +146,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.system_parameters.program_verification_key_commitment
     }
 
-    pub fn program_verification_key_hash_parameters(&self) -> &C::ProgramVerificationKeyHash {
-        &self.system_parameters.program_verification_key_hash
+    pub fn program_verification_key_crh_parameters(&self) -> &C::ProgramVerificationKeyCRH {
+        &self.system_parameters.program_verification_key_crh
     }
 
     pub fn record_commitment_parameters(&self) -> &C::RecordCommitment {

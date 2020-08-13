@@ -24,8 +24,8 @@ fn test_record_serialization() {
             InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
         let program_snark_vk_bytes = to_bytes![
-            ProgramVerificationKeyHash::hash(
-                &system_parameters.program_verification_key_hash,
+            ProgramVerificationKeyCRH::hash(
+                &system_parameters.program_verification_key_crh,
                 &to_bytes![noop_program_snark_pp.verification_key].unwrap()
             )
             .unwrap()
@@ -91,8 +91,8 @@ fn test_record_encryption() {
             InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
         let program_snark_vk_bytes = to_bytes![
-            ProgramVerificationKeyHash::hash(
-                &system_parameters.program_verification_key_hash,
+            ProgramVerificationKeyCRH::hash(
+                &system_parameters.program_verification_key_crh,
                 &to_bytes![program_snark_pp.verification_key].unwrap()
             )
             .unwrap()

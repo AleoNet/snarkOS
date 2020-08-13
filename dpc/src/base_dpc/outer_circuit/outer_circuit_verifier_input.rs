@@ -17,7 +17,7 @@ impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVeri
 where
     <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
     <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
-    <C::ProgramVerificationKeyHash as CRH>::Parameters: ToConstraintField<C::OuterField>,
+    <C::ProgramVerificationKeyCRH as CRH>::Parameters: ToConstraintField<C::OuterField>,
 
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -59,7 +59,7 @@ where
             &self
                 .inner_snark_verifier_input
                 .system_parameters
-                .program_verification_key_hash
+                .program_verification_key_crh
                 .parameters()
                 .to_field_elements()?,
         );

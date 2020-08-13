@@ -11,7 +11,7 @@ use utils::store;
 
 pub fn setup<C: DPCComponents>() -> Result<Vec<u8>, CRHError> {
     let rng = &mut thread_rng();
-    let program_vk_crh = <C::ProgramVerificationKeyHash as CRH>::setup(rng);
+    let program_vk_crh = <C::ProgramVerificationKeyCRH as CRH>::setup(rng);
     let program_vk_crh_parameters = program_vk_crh.parameters();
     let program_vk_crh_parameters_bytes = to_bytes![program_vk_crh_parameters]?;
 
