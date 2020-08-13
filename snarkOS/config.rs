@@ -7,7 +7,10 @@ use snarkos_errors::node::CliError;
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use toml;
 
 /// Hardcoded bootnodes maintained by Aleo.
@@ -93,29 +96,25 @@ impl Config {
         let mut config_path = snarkos_path.clone();
         config_path.push("snarkOS.toml");
 
+        if !Path::exists(&config_path) {
+            // Create a new default snarkOS.toml file if it doesn't already exist
+            fs::create_dir_all(&snarkos_path)?;
+
+            let default_config_string = toml::to_string(&Config::default())?;
+
+            fs::write(&config_path, default_config_string)?;
+        }
+
         let toml_string = match fs::read_to_string(&config_path) {
             Ok(toml) => toml,
             Err(_) => {
-                // Create a new snarkOS.toml file if it doesn't already exist
-                fs::create_dir_all(&snarkos_path).unwrap();
+                fs::create_dir_all(&snarkos_path)?;
                 String::new()
             }
         };
 
         // Parse the contents into the `Config` struct
-        let config: Config = match toml::from_str(&toml_string) {
-            Ok(config) => config,
-            Err(_) => {
-                // Initialize the default config
-                let config = Config::default();
-
-                let default_config_string = toml::to_string(&config).unwrap();
-
-                fs::write(&config_path, default_config_string).unwrap();
-
-                config
-            }
-        };
+        let config: Config = toml::from_str(&toml_string)?;
 
         Ok(config)
     }
