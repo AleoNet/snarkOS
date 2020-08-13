@@ -8,7 +8,7 @@ The state of the system is given by a Merkle tree $\mathsf{Tree}_\mathcal{G}(h)$
 
 <img align="left" src="Binary_tree.png" style="float:right"></img>
 
-The PoSW circuit takes the $q \leq d$ subtree of the state tree and computes a Merkle tree of depth $q$. The leaves of the tree are the depth $q$ elements of the state tree $\mathsf{Tree}_\mathcal{H}(h)$, instantiated over $k$-bit leaves with a different CRT function $\mathcal{H} : \{0,1\}^{k} \rightarrow \{0,1\}^{k/2}$ as a new PoSW tree $\mathsf{Tree}_{\mathcal{H}}(q)$. This layout is illustrated in the diagram above. For example, for $\mathbb{G} = \mathsf{BLS377}$ we set $\mathcal{H}$ as the $512$-bit Pedersen hash with output truncated to $256$ bits. 
+The PoSW circuit takes the $q \leq d$ subtree of the state tree and computes a Merkle tree of depth $q$. The leaves of the tree are the depth $q$ elements of the state tree $\mathsf{Tree}_\mathcal{H}(h)$, instantiated over $k$-bit leaves with a different CRT function $\mathcal{H} : \{0,1\}^{k} \rightarrow \{0,1\}^{k/2}$ as a new PoSW tree $\mathsf{Tree}_{\mathcal{H}}(q)$. This layout is illustrated in the diagram on the left. For example, for $\mathbb{G} = \mathsf{BLS377}$ we set $\mathcal{H}$ as the $512$-bit Pedersen hash with output truncated to $256$ bits. 
 
 The circuit implementation for$\mathcal{H}$ masks the witness variables based on a pseudorandom seed, which is part of the predicate statement. This is required to achieve non-amortization guarantees. We set $q = 3$ throughout.
 

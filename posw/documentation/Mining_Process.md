@@ -18,7 +18,7 @@ We investigate proof generation times for various values of $c \in \mathbb{N}_+$
 
 |  Size (GB) | Proof Generation Time (s) | Quantization Error | Collision Probability |                    
 | -----------|------------------------------|-------------| -----------|
-| 1              |                              |             |
+| 0.6              |   4.65                       | 3.82            | 3.87
 | 2              |                              |             |
 | 4              |                              |             |
 | 8              |                              |             |
