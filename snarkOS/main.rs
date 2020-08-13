@@ -18,8 +18,7 @@ use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 
-use dirs::home_dir;
-use std::{fs, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Builds a node from configuration parameters.
@@ -31,17 +30,17 @@ use tokio::sync::Mutex;
 /// 5. Starts miner thread.
 /// 6. Starts network server listener.
 async fn start_server(config: Config) -> Result<(), NodeError> {
-    if !config.quiet {
+    if !config.node.quiet {
         std::env::set_var("RUST_LOG", "info");
         env_logger::init();
 
-        println!("{}", render_init(&config.miner_address));
+        println!("{}", render_init(&config.miner.miner_address));
     }
 
-    let address = format! {"{}:{}", config.ip, config.port};
+    let address = format! {"{}:{}", config.node.ip, config.node.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
-    let network = Network::from_network_id(config.network);
+    let network = Network::from_network_id(config.aleo.network_id);
 
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
@@ -51,36 +50,34 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
-    let mut path = home_dir().unwrap_or(std::env::current_dir()?);
-    path.push(".snarkOS/");
-    fs::create_dir_all(&path).map_err(|err| NodeError::Message(err.to_string()))?;
-    path.push(&config.db_path);
+    let mut path = config.node.dir;
+    path.push(&config.node.db);
 
     let storage = Arc::new(MerkleTreeLedger::open_at_path(path)?);
 
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    let bootnode = match config.bootnodes.len() {
+    let bootnode = match config.p2p.bootnodes.len() {
         0 => socket_address,
-        _ => config.bootnodes[0].parse::<SocketAddr>()?,
+        _ => config.p2p.bootnodes[0].parse::<SocketAddr>()?,
     };
 
     let sync_handler = SyncHandler::new(bootnode);
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
     info!("Loading Aleo parameters...");
-    let parameters = PublicParameters::<Components>::load(!config.is_miner)?;
+    let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
     info!("Loading complete.");
 
     let server = Server::new(
         Context::new(
             socket_address,
-            config.mempool_interval,
-            config.min_peers,
-            config.max_peers,
-            config.is_bootnode,
-            config.bootnodes.clone(),
+            config.p2p.mempool_interval,
+            config.p2p.min_peers,
+            config.p2p.max_peers,
+            config.node.is_bootnode,
+            config.p2p.bootnodes.clone(),
         ),
         consensus.clone(),
         storage.clone(),
@@ -92,28 +89,28 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     // Start rpc thread
 
-    if config.jsonrpc {
+    if config.rpc.json_rpc {
         info!("Loading Aleo parameters for RPC...");
         let proving_parameters = PublicParameters::<Components>::load(false)?;
         info!("Loading complete.");
 
         start_rpc_server(
-            config.rpc_port,
+            config.rpc.port,
             storage.clone(),
             proving_parameters,
             server.context.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
-            config.rpc_username,
-            config.rpc_password,
+            config.rpc.username,
+            config.rpc.password,
         )
         .await?;
     }
 
     // Start miner thread
 
-    if config.is_miner {
-        let miner_address = AccountAddress::<Components>::from_str(&config.miner_address)?;
+    if config.miner.is_miner {
+        let miner_address = AccountAddress::<Components>::from_str(&config.miner.miner_address)?;
         MinerInstance::new(
             miner_address,
             consensus.clone(),
