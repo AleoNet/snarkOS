@@ -16,9 +16,9 @@ For a precomputation table of $S = k \cdot (n/c) \cdot (2^c - 1)$ group elements
 
 We investigate proof generation times for various values of $c \in \mathbb{N}_+$. At constant block frequency, these can be used to project what the minimal table size $S$ is for a predicate involving $k$ exponentiations to achieve sufficiently low quantization error and collision probability. We provide results below for $1$ minute blocks, $64$ byte group elements and a circuit with $k \approx 2^{13}$ exponentiations per proof. Miner size corresponds to the size of its precomputed exponentiation table.
 
-|  Size (GB) | Proof Generation Time (s) | Quantization Error | Collision Probability |                    
+|  Size (GB) | Proof Generation Time (s) | Quantization Error (\%) | Collision Probability |                    
 | -----------|------------------------------|-------------| -----------|
-| 0.6              |   4.65                       | 3.82            | 3.87
+| 0.6              |   4.65                       | 3.82            | 0.0387
 | 2              |                              |             |
 | 4              |                              |             |
 | 8              |                              |             |
