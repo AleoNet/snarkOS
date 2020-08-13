@@ -5,7 +5,10 @@ use crate::{
 use snarkos_errors::node::CliError;
 
 use clap::ArgMatches;
-use serde::Serialize;
+use dirs::home_dir;
+use serde::{Deserialize, Serialize};
+use std::{fs, path::PathBuf};
+use toml;
 
 /// Hardcoded bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
@@ -13,7 +16,7 @@ pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     // Flags
     pub network: u8,
@@ -23,8 +26,8 @@ pub struct Config {
     pub quiet: bool,
     // Options
     pub ip: String,
+    pub db_path: String,
     pub port: u16,
-    pub path: String,
     pub bootnodes: Vec<String>,
     pub miner_address: String,
     pub mempool_interval: u8,
@@ -34,6 +37,8 @@ pub struct Config {
     pub rpc_port: u16,
     pub rpc_username: Option<String>,
     pub rpc_password: Option<String>,
+
+    pub snarkos_dir: PathBuf,
 
     //Subcommand
     subcommand: Option<String>,
@@ -52,11 +57,12 @@ impl Default for Config {
             // Options
             ip: "0.0.0.0".into(),
             port: 4131,
-            path: "snarkos_testnet_1".into(),
+            db_path: "snarkos_testnet_1".into(),
             bootnodes: TESTNET_BOOTNODES
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
+            // TODO (raychu86) make this dynamic for the node operator
             miner_address: "aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh".into(),
             mempool_interval: 5,
             min_peers: 2,
@@ -66,12 +72,54 @@ impl Default for Config {
             rpc_username: None,
             rpc_password: None,
 
+            snarkos_dir: Self::snarkos_dir(),
             subcommand: None,
         }
     }
 }
 
 impl Config {
+    /// The directory that snarkOS system files will be stored
+    fn snarkos_dir() -> PathBuf {
+        let mut path = home_dir().unwrap_or(std::env::current_dir().unwrap());
+        path.push(".snarkOS/");
+
+        path
+    }
+
+    /// Read the config from the snarkOS.toml file
+    fn read_config() -> Result<Self, CliError> {
+        let snarkos_path = Self::snarkos_dir();
+        let mut config_path = snarkos_path.clone();
+        config_path.push("snarkOS.toml");
+
+        let toml_string = match fs::read_to_string(&config_path) {
+            Ok(toml) => toml,
+            Err(_) => {
+                // Create a new snarkOS.toml file if it doesn't already exist
+                fs::create_dir_all(&snarkos_path).unwrap();
+                String::new()
+            }
+        };
+
+        // Parse the contents into the `Config` struct
+        let config: Config = match toml::from_str(&toml_string) {
+            Ok(config) => config,
+            Err(_) => {
+                // Initialize the default config
+                let config = Config::default();
+
+                let default_config_string = toml::to_string(&config).unwrap();
+
+                fs::write(&config_path, default_config_string).unwrap();
+
+                config
+            }
+        };
+
+        Ok(config)
+    }
+
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
@@ -101,7 +149,7 @@ impl Config {
         if let Some(network_id) = argument {
             match network_id {
                 0 => {
-                    self.path = "snarkos_db".into();
+                    self.db_path = "snarkos_db".into();
                     self.port = 4130 + (network_id as u16);
                     self.bootnodes = MAINNET_BOOTNODES
                         .iter()
@@ -110,7 +158,7 @@ impl Config {
                     self.network = network_id;
                 }
                 _ => {
-                    self.path = format!("snarkos_testnet_{}", network_id);
+                    self.db_path = format!("snarkos_testnet_{}", network_id);
                     self.port = 4130 + (network_id as u16);
                     self.bootnodes = TESTNET_BOOTNODES
                         .iter()
@@ -158,7 +206,7 @@ impl Config {
 
     fn path(&mut self, argument: Option<&str>) {
         match argument {
-            Some(path) => self.path = path.into(),
+            Some(path) => self.db_path = path.into(),
             _ => (),
         };
     }
@@ -239,7 +287,7 @@ impl CLI for ConfigCli {
 
     /// Handle all CLI arguments and flags for skeleton node
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CliError> {
-        let mut config = Config::default();
+        let mut config = Config::read_config()?;
         config.parse(arguments, &[
             "network",
             "no-jsonrpc",

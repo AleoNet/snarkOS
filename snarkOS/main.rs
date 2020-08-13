@@ -54,7 +54,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     let mut path = home_dir().unwrap_or(std::env::current_dir()?);
     path.push(".snarkOS/");
     fs::create_dir_all(&path).map_err(|err| NodeError::Message(err.to_string()))?;
-    path.push(&config.path);
+    path.push(&config.db_path);
 
     let storage = Arc::new(MerkleTreeLedger::open_at_path(path)?);
 
