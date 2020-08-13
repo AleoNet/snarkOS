@@ -44,18 +44,11 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     Ok((inner_snark_pk, inner_snark_vk))
 }
 
-fn versioned_filename(checksum: &str) -> String {
-    match checksum.get(0..7) {
-        Some(sum) => format!("inner_snark_pk-{}.params", sum),
-        _ => format!("inner_snark_pk.params"),
-    }
-}
-
 pub fn main() {
     let (inner_snark_pk, inner_snark_vk) = setup::<Components>().unwrap();
     let inner_snark_pk_checksum = hex::encode(sha256(&inner_snark_pk));
     store(
-        &PathBuf::from(&versioned_filename(&inner_snark_pk_checksum)),
+        &PathBuf::from("inner_snark_pk.params"),
         &PathBuf::from("inner_snark_pk.checksum"),
         &inner_snark_pk,
     )

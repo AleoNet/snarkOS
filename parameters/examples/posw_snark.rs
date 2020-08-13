@@ -38,9 +38,8 @@ fn versioned_filename(checksum: &str) -> String {
 
 pub fn main() {
     let (posw_snark_pk, posw_snark_vk, _srs) = setup().unwrap();
-    let posw_snark_pk_checksum = hex::encode(sha256(&posw_snark_pk));
     store(
-        &PathBuf::from(&versioned_filename(&posw_snark_pk_checksum)),
+        &PathBuf::from("posw_snark_pk.params"),
         &PathBuf::from("posw_snark_pk.checksum"),
         &posw_snark_pk,
     )

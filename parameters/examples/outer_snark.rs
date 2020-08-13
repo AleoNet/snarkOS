@@ -81,18 +81,10 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     Ok((outer_snark_pk, outer_snark_vk))
 }
 
-fn versioned_filename(checksum: &str) -> String {
-    match checksum.get(0..7) {
-        Some(sum) => format!("outer_snark_pk-{}.params", sum),
-        _ => format!("outer_snark_pk.params"),
-    }
-}
-
 pub fn main() {
     let (outer_snark_pk, outer_snark_vk) = setup::<Components>().unwrap();
-    let outer_snark_pk_checksum = hex::encode(sha256(&outer_snark_pk));
     store(
-        &PathBuf::from(&versioned_filename(&outer_snark_pk_checksum)),
+        &PathBuf::from("outer_snark_pk.params"),
         &PathBuf::from("outer_snark_pk.checksum"),
         &outer_snark_pk,
     )
