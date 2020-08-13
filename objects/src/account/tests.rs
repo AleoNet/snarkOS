@@ -35,7 +35,7 @@ pub fn test_private_key_from_str() {
 
 #[test]
 pub fn test_view_key_from_str() {
-    let view_key_string = "AViewKey1m8cUmgK6bw4Y3YaNBTTCbShHC8PiFZackT8fwiAB6oQD";
+    let view_key_string = "AViewKey1m8gvywHKHKfUzZiLiLoHedcdHEjKwo5TWo6efz8gK7wF";
     let view_key = AccountViewKey::<Components>::from_str(view_key_string);
     println!("{:?}", view_key);
 

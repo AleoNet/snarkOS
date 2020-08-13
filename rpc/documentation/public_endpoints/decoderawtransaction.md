@@ -15,6 +15,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `old_serial_numbers`    | array  | The list of old record serial numbers     |
 | `new_commitments`       | array  | The list of new record commitments        |
 | `memo`                  | string | The transaction memo                      |
+| `network_id`            | number | The transaction network id                |
 | `digest`                | string | The merkle tree digest                    |
 | `transaction_proof`     | string | The transaction zero knowledge proof      |
 | `program_commitment`    | string | The program verification key commitment   |

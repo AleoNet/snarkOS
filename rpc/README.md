@@ -53,6 +53,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `old_serial_numbers`    | array  | The list of old record serial numbers     |
 | `new_commitments`       | array  | The list of new record commitments        |
 | `memo`                  | string | The transaction memo                      |
+| `network_id`            | number | The transaction network id                |
 | `digest`                | string | The merkle tree digest                    |
 | `transaction_proof`     | string | The transaction zero knowledge proof      |
 | `program_commitment`    | string | The program verification key commitment   |
@@ -154,18 +155,20 @@ Returns information about a block from a block hash.
 
 ### Response
 
-|      Parameter      |  Type  |                    Description                    |
-|:------------------- |:------:|:------------------------------------------------- |
-| `block_hash`        | string | The number of blocks in the best valid chain      |
-| `difficulty_target` | number | The difficulty of the block                       |
-| `hash`              | string | The block hash (same as provided)                 |
-| `height`            | number | The block height                                  |
-| `merkle_root`       | number | The merkle root of the transactions in the block  |
-| `nonce`             | number | The nonce for solving the PoSW puzzle             |
-| `proof`             | string | The Proof of Succinct Work                        |
-| `size`              | number | The size of the block in bytes                    |
-| `time`              | number | The block time                                    |
-| `transactions`      | array  | The list of transaction ids included in the block |
+|        Parameter       |  Type  |                               Description                              |
+|:----------------------:|:------:|:----------------------------------------------------------------------:|
+| `confirmations`        | number | The number of confirmations for this block                             |
+| `difficulty_target`    | number | The difficulty of the block                                            |
+| `hash`                 | string | The block hash (same as provided)                                      |
+| `height`               | number | The block height                                                       |
+| `merkle_root`          | number | The Merkle root of the transactions in the block                       |
+| `nonce`                | number | The nonce for solving the PoSW puzzle                                  |
+| `pedersen_merkle_root` | number | The Merkle root of the transactions in the block using a Pedersen hash |
+| `previous_block_hash`  | string | The block hash of the parent block                                     |
+| `proof`                | string | The Proof of Succinct Work                                             |
+| `size`                 | number | The size of the block in bytes                                         |
+| `time`                 | number | The block time                                                         |
+| `transactions`         | array  | The list of transaction ids included in the block                      |
 
 ### Example
 ```ignore
@@ -437,28 +440,6 @@ curl --user username:password --data-binary '{
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## fetchrecordcommitments
-Returns a list of record commitments that are stored on the full node.
-
-### Protected Endpoint
-
-Yes
-
-### Arguments
-
-`None`
-
-### Response
-
-| Parameter |  Type |             Description            |
-|:---------:|:-----:|:---------------------------------- |
-| `result`  | array | The list stored record commitments |
-
-### Example
-```ignore
-curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "fetchrecordcommitments", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
-```
-
 ## getrawrecord
 Returns the hex encoded bytes of a record from its record commitment.
 
@@ -481,6 +462,50 @@ Yes
 ### Example
 ```ignore
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawrecord", "params": ["86be61d5f3bd795e31615d6834efefca01ad023d57c0383e2231e094bcabfc05"] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
+```
+
+## getrecordcommitmentcount
+Returns the number of record commitments that are stored on the full node.
+
+### Protected Endpoint
+
+Yes
+
+### Arguments
+
+`None`
+
+### Response
+
+| Parameter |  Type  |               Description               |
+|:---------:|:------:|:--------------------------------------- |
+| `result`  | number | The number of stored record commitments |
+
+### Example
+```ignore
+curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrecordcommitmentcount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
+```
+
+## getrecordcommitments
+Returns a list of record commitments that are stored on the full node.
+
+### Protected Endpoint
+
+Yes
+
+### Arguments
+
+`None`
+
+### Response
+
+| Parameter |  Type |              Description              |
+|:---------:|:-----:|:------------------------------------- |
+| `result`  | array | The list of stored record commitments |
+
+### Example
+```ignore
+curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrecordcommitments", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
 
