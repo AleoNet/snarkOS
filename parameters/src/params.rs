@@ -42,6 +42,48 @@ macro_rules! impl_params {
     };
 }
 
+macro_rules! impl_lfs_params {
+    ($name: ident, $fname: tt, $size: tt) => {
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub struct $name;
+
+        impl Parameters for $name {
+            const CHECKSUM: &'static str = include_str!(concat!("params/", $fname, ".checksum"));
+            const SIZE: u64 = $size;
+
+            fn load_bytes() -> Result<Vec<u8>, ParametersError> {
+                let mut file_path = PathBuf::from(file!());
+                file_path.pop();
+                file_path.push("params/");
+                file_path.push($fname);
+
+                // Compute the relative path.
+                let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
+
+                // Compute the absolute path.
+                let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                absolute_path.push(&relative_path);
+
+                let buffer = if relative_path.exists() {
+                    // Attempts to load the parameter file locally with a relative path.
+                    fs::read(relative_path)?.to_vec()
+                } else if absolute_path.exists() {
+                    // Attempts to load the parameter file locally with an absolute path.
+                    fs::read(absolute_path)?.to_vec()
+                } else {
+                    return Err(ParametersError::MissingParameters);
+                };
+
+                let checksum = hex::encode(sha256(&buffer));
+                match Self::CHECKSUM == checksum {
+                    true => Ok(buffer.to_vec()),
+                    false => Err(ParametersError::ChecksumMismatch(Self::CHECKSUM.into(), checksum)),
+                }
+            }
+        }
+    };
+}
+
 macro_rules! impl_params_remote {
     ($name: ident, $fname: tt, $size: tt) => {
 
@@ -236,7 +278,7 @@ impl_params!(
 );
 
 // POSW SNARK
-impl_params_remote!(PoswSNARKPKParameters, "posw_snark_pk", 171163800);
+impl_lfs_params!(PoswSNARKPKParameters, "posw_snark_pk", 171163800);
 impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 40807);
 
 // Program SNARK
@@ -254,9 +296,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 250108401);
+impl_lfs_params!(InnerSNARKPKParameters, "inner_snark_pk", 250108401);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2329);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 464560481);
+impl_lfs_params!(OuterSNARKPKParameters, "outer_snark_pk", 464560481);
 impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4250);
