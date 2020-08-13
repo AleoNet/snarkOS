@@ -82,7 +82,7 @@ impl<C: CommitmentScheme, H: CRH> CommitmentMerkleTree<C, H> {
         Ok(CommitmentMerklePath {
             leaves,
             inner_hashes,
-            parameters: self.parameters.clone(),
+            parameters: Some(self.parameters.clone()),
         })
     }
 }

@@ -25,6 +25,9 @@ pub enum MerkleError {
 
     #[error("{}", _0)]
     Message(String),
+
+    #[error("Missing CRH parameters")]
+    MissingParameters,
 }
 
 impl From<CRHError> for MerkleError {

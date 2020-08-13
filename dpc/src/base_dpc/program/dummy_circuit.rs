@@ -68,7 +68,7 @@ impl<C: BaseDPCComponents> DummyCircuit<C> {
         let local_data_merkle_path = CommitmentMerklePath {
             leaves,
             inner_hashes,
-            parameters: system_parameters.local_data_crh.clone(),
+            parameters: Some(system_parameters.local_data_crh.clone()),
         };
 
         let old_serial_numbers =
