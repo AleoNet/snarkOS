@@ -79,7 +79,7 @@ where
                     .local_data_commitment
                     .parameters()
                     .clone(),
-                local_data_root: local_data.local_data_root.clone(),
+                local_data_root: local_data.local_data_merkle_tree.root(),
                 position,
             };
             assert!(S::verify(&program_snark_pvk, &program_pub_input, &proof)?);

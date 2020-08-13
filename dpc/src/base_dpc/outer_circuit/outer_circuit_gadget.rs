@@ -15,6 +15,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkos_objects::AleoAmount;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use itertools::Itertools;
@@ -53,7 +54,7 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
     new_encrypted_record_hashes: &Vec<<C::EncryptedRecordCRH as CRH>::Output>,
     memo: &[u8; 32],
-    value_balance: i64,
+    value_balance: AleoAmount,
     network_id: u8,
 
     // Inner snark verifier private inputs (verification key and proof)
@@ -196,7 +197,7 @@ where
     let local_data_root_fe = ToConstraintField::<C::InnerField>::to_field_elements(local_data_root)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let value_balance_fe = ToConstraintField::<C::InnerField>::to_field_elements(&value_balance.to_le_bytes()[..])
+    let value_balance_fe = ToConstraintField::<C::InnerField>::to_field_elements(&value_balance.0.to_le_bytes()[..])
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let network_id_fe = ToConstraintField::<C::InnerField>::to_field_elements(&[network_id][..])

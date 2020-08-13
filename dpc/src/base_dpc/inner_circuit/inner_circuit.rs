@@ -14,7 +14,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
-use snarkos_objects::AccountPrivateKey;
+use snarkos_objects::{AccountPrivateKey, AleoAmount};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -50,7 +50,7 @@ pub struct InnerCircuit<C: BaseDPCComponents> {
 
     memo: Option<[u8; 32]>,
 
-    value_balance: Option<i64>,
+    value_balance: Option<AleoAmount>,
 
     network_id: Option<u8>,
 }
@@ -90,7 +90,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             num_input_records + num_output_records
         ];
 
-        let value_balance: i64 = 0;
+        let value_balance = AleoAmount::ZERO;
 
         let network_id: u8 = 0;
 
@@ -162,7 +162,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         memo: &[u8; 32],
 
-        value_balance: i64,
+        value_balance: AleoAmount,
 
         network_id: u8,
     ) -> Self {

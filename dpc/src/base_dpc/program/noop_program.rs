@@ -66,7 +66,9 @@ where
             position -= C::NUM_INPUT_RECORDS as u8;
         }
 
-        let circuit = NoopCircuit::<C>::new(&local_data.system_parameters, &local_data.local_data_root, position);
+        let local_data_root = local_data.local_data_merkle_tree.root();
+
+        let circuit = NoopCircuit::<C>::new(&local_data.system_parameters, &local_data_root, position);
 
         let proof = S::prove(proving_key, circuit, rng)?;
 
@@ -79,7 +81,7 @@ where
                     .local_data_commitment
                     .parameters()
                     .clone(),
-                local_data_root: local_data.local_data_root.clone(),
+                local_data_root,
                 position,
             };
             assert!(S::verify(&program_snark_pvk, &program_pub_input, &proof)?);

@@ -14,6 +14,7 @@ use snarkos_models::{
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
+use snarkos_objects::AleoAmount;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -27,7 +28,7 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
     new_encrypted_record_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
     memo: Option<[u8; 32]>,
-    value_balance: Option<i64>,
+    value_balance: Option<AleoAmount>,
     network_id: Option<u8>,
 
     // Inner snark verifier private inputs
@@ -67,7 +68,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             num_output_records
         ]);
         let memo = Some([0u8; 32]);
-        let value_balance = Some(0);
+        let value_balance = Some(AleoAmount::ZERO);
         let network_id = Some(0);
 
         let old_private_program_inputs = Some(vec![program_snark_vk_and_proof.clone(); num_input_records]);
@@ -111,7 +112,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
         new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
         memo: &[u8; 32],
-        value_balance: i64,
+        value_balance: AleoAmount,
         network_id: u8,
 
         // Inner snark private inputs
