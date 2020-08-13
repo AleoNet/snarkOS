@@ -17,7 +17,7 @@ use snarkos_models::{
     gadgets::algorithms::{CRHGadget, SNARKVerifierGadget},
     objects::{AccountScheme, LedgerScheme, Transaction},
 };
-use snarkos_objects::{Account, AccountAddress, AccountPrivateKey};
+use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, Network};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -846,7 +846,7 @@ where
             program_commitment,
             local_data_root,
             value_balance,
-            network_id,
+            Network::from_network_id(network_id),
             signatures,
             new_encrypted_records,
         );

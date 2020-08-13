@@ -196,6 +196,7 @@ impl RpcFunctions for RpcImpl {
             old_serial_numbers,
             new_commitments,
             memo,
+            network_id: transaction.network.id(),
             digest: hex::encode(to_bytes![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
             program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
@@ -320,7 +321,7 @@ impl RpcFunctions for RpcImpl {
         let record_bytes = hex::decode(record_bytes)?;
         let record = DPCRecord::<Components>::read(&record_bytes[..])?;
 
-        let owner = hex::encode(to_bytes![record.owner()]?);
+        let owner = record.owner().to_string();
         let payload = RPCRecordPayload {
             payload: hex::encode(to_bytes![record.payload()]?),
         };

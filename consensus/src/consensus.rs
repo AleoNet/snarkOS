@@ -23,6 +23,7 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    Network,
     PedersenMerkleRootHash,
 };
 use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
@@ -47,8 +48,8 @@ pub struct ConsensusParameters {
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
 
-    /// Network identifier
-    pub network_id: u8,
+    /// Network
+    pub network: Network,
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
     pub verifier: PoswMarlin,
@@ -436,54 +437,7 @@ impl ConsensusParameters {
             &new_birth_program_ids,
             &new_death_program_ids,
             &memo,
-            self.network_id,
-            rng,
-        )?;
-
-        // Construct the program proofs
-
-        let local_data = execute_context.into_local_data();
-
-        let noop_program_snark_id = to_bytes![ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
-        )?]?;
-
-        let dpc_program =
-            NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
-
-        let mut old_death_program_proofs = vec![];
-        for i in 0..NUM_INPUT_RECORDS {
-            let private_input = dpc_program.execute(
-                &parameters.noop_program_snark_parameters.proving_key,
-                &parameters.noop_program_snark_parameters.verification_key,
-                &local_data,
-                i as u8,
-                rng,
-            )?;
-
-            old_death_program_proofs.push(private_input);
-        }
-
-        let mut new_birth_program_proofs = vec![];
-        for j in 0..NUM_OUTPUT_RECORDS {
-            let private_input = dpc_program.execute(
-                &parameters.noop_program_snark_parameters.proving_key,
-                &parameters.noop_program_snark_parameters.verification_key,
-                &local_data,
-                (NUM_INPUT_RECORDS + j) as u8,
-                rng,
-            )?;
-
-            new_birth_program_proofs.push(private_input);
-        }
-
-        // Online execution to generate a DPC transaction
-        let (new_records, transaction) = InstantiatedDPC::execute_online(
-            &parameters,
-            execute_context,
-            &old_death_program_proofs,
-            &new_birth_program_proofs,
+            self.network.id(),
             ledger,
             rng,
         )?;
@@ -507,7 +461,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
-            network_id: 0,
+            network: Network::Mainnet,
             verifier: posw,
         };
 

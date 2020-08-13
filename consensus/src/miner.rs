@@ -68,10 +68,10 @@ impl Miner {
         let new_death_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
-            if self.consensus.network_id != transaction.network_id {
+            if self.consensus.network != transaction.network {
                 return Err(ConsensusError::ConflictingNetworkId(
-                    self.consensus.network_id,
-                    transaction.network_id,
+                    self.consensus.network.id(),
+                    transaction.network.id(),
                 ));
             }
         }
@@ -172,7 +172,7 @@ impl Miner {
 
         let header = self.find_block(&transactions, &previous_block_header)?;
 
-        println!("Miner found block block");
+        println!("Miner found block");
 
         let block = Block { header, transactions };
 
