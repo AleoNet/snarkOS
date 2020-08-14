@@ -370,6 +370,10 @@ where
         bytes.extend_from_slice(&self.beta_g2.to_bytes(&mut cs.ns(|| "beta_g2 to bytes"))?);
         bytes.extend_from_slice(&self.gamma_g2.to_bytes(&mut cs.ns(|| "gamma_g2 to bytes"))?);
         bytes.extend_from_slice(&self.delta_g2.to_bytes(&mut cs.ns(|| "delta_g2 to bytes"))?);
+        bytes.extend_from_slice(&UInt8::alloc_vec(
+            &mut cs.ns(|| "gamma_abc_g1_length"),
+            &(self.gamma_abc_g1.len() as u32).to_le_bytes()[..],
+        )?);
         for (i, g) in self.gamma_abc_g1.iter().enumerate() {
             let mut cs = cs.ns(|| format!("Iteration {}", i));
             bytes.extend_from_slice(&g.to_bytes(&mut cs.ns(|| "g"))?);
@@ -384,6 +388,10 @@ where
         bytes.extend_from_slice(&self.beta_g2.to_bytes_strict(&mut cs.ns(|| "beta_g2 to bytes"))?);
         bytes.extend_from_slice(&self.gamma_g2.to_bytes_strict(&mut cs.ns(|| "gamma_g2 to bytes"))?);
         bytes.extend_from_slice(&self.delta_g2.to_bytes_strict(&mut cs.ns(|| "delta_g2 to bytes"))?);
+        bytes.extend_from_slice(&UInt8::alloc_vec(
+            &mut cs.ns(|| "gamma_abc_g1_length"),
+            &(self.gamma_abc_g1.len() as u32).to_le_bytes()[..],
+        )?);
         for (i, g) in self.gamma_abc_g1.iter().enumerate() {
             let mut cs = cs.ns(|| format!("Iteration {}", i));
             bytes.extend_from_slice(&g.to_bytes_strict(&mut cs.ns(|| "g"))?);
