@@ -11,7 +11,7 @@ use crate::{
         utilities::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
-            eq::{ConditionalEqGadget, EqGadget, EvaluateEqGadget, NEqGadget},
+            eq::{ConditionalEqGadget, EqGadget, NEqGadget},
             select::{CondSelectGadget, ThreeBitCondNegLookupGadget, TwoBitLookupGadget},
             uint::unsigned_integer::{UInt, UInt8},
             ToBitsGadget,
@@ -259,16 +259,6 @@ impl<F: PrimeField> PartialEq for FpGadget<F> {
 }
 
 impl<F: PrimeField> Eq for FpGadget<F> {}
-
-impl<F: PrimeField> EvaluateEqGadget<F> for FpGadget<F> {
-    fn evaluate_equal<CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Boolean, SynthesisError> {
-        let bool_option = self.value.and_then(|a| other.value.map(|b| a.eq(&b)));
-
-        Boolean::alloc(&mut cs.ns(|| "evaluate_equal"), || {
-            bool_option.ok_or(SynthesisError::AssignmentMissing)
-        })
-    }
-}
 
 impl<F: PrimeField> EqGadget<F> for FpGadget<F> {}
 
