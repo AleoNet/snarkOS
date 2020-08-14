@@ -196,6 +196,10 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let encrypted_record_crh = Components::EncryptedRecordCRH::setup(rng);
         end_timer!(time);
 
+        let time = start_timer!(|| "Inner SNARK verification key CRH setup");
+        let inner_snark_verification_key_crh = Components::InnerSNARKVerificationKeyCRH::setup(rng);
+        end_timer!(time);
+
         let time = start_timer!(|| "Local data commitment setup");
         let local_data_commitment = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
@@ -220,20 +224,19 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
-        let comm_crh_sig_pp = SystemParameters {
+        Ok(SystemParameters {
             account_commitment,
             account_encryption,
             account_signature,
             encrypted_record_crh,
+            inner_snark_verification_key_crh,
             local_data_crh,
             local_data_commitment,
             program_verification_key_commitment,
             program_verification_key_crh,
             record_commitment,
             serial_number_nonce,
-        };
-
-        Ok(comm_crh_sig_pp)
+        })
     }
 
     pub fn generate_noop_program_snark_parameters<R: Rng>(

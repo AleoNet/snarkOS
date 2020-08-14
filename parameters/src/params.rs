@@ -212,14 +212,21 @@ impl_params!(
 );
 
 // CRH
-impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
-impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
 impl_params!(
     EncryptedRecordCRHParameters,
     encrypted_record_crh_test,
     "encrypted_record_crh",
     270532
 );
+impl_params!(
+    InnerSNARKVKCRHParameters,
+    inner_snark_vk_crh_test,
+    "inner_snark_vk_crh",
+    1742404
+);
+impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
+impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
+
 impl_params!(
     SerialNumberNonceCRHParameters,
     serial_number_nonce_crh_test,
