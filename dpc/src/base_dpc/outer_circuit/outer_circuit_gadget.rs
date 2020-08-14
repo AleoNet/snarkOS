@@ -71,6 +71,8 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
     program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
     local_data_root: &<C::LocalDataCRH as CRH>::Output,
+
+    inner_snark_id: &<C::InnerSNARKVerificationKeyCRH as CRH>::Output,
 ) -> Result<(), SynthesisError>
 where
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
@@ -99,7 +101,7 @@ where
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
     // Declare public parameters.
-    let (program_vk_commitment_parameters, program_vk_crh_parameters) = {
+    let (program_vk_commitment_parameters, program_vk_crh_parameters, inner_snark_vk_crh_parameters) = {
         let cs = &mut cs.ns(|| "Declare Comm and CRH parameters");
 
         let program_vk_commitment_parameters = <C::ProgramVerificationKeyCommitmentGadget as CommitmentGadget<
@@ -116,7 +118,17 @@ where
                 || Ok(system_parameters.program_verification_key_crh.parameters()),
             )?;
 
-        (program_vk_commitment_parameters, program_vk_crh_parameters)
+        let inner_snark_vk_crh_parameters =
+            <C::InnerSNARKVerificationKeyCRHGadget as CRHGadget<_, C::OuterField>>::ParametersGadget::alloc_input(
+                &mut cs.ns(|| "Declare inner_snark_vk_crh_parameters"),
+                || Ok(system_parameters.inner_snark_verification_key_crh.parameters()),
+            )?;
+
+        (
+            program_vk_commitment_parameters,
+            program_vk_crh_parameters,
+            inner_snark_vk_crh_parameters,
+        )
     };
 
     // ************************************************************************
@@ -352,6 +364,11 @@ where
 
         let death_program_vk_bytes = death_program_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
 
+        println!(
+            "gadget - death_program_vk_bytes len: {:?}",
+            death_program_vk_bytes.len()
+        );
+
         let claimed_death_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death program vk hash"),
             &program_vk_crh_parameters,
@@ -414,6 +431,11 @@ where
             &birth_program_proof,
         )?;
     }
+    // ********************************************************************
+
+    // ********************************************************************
+    // Check that the program commitment is derived correctly.
+    // ********************************************************************
     {
         let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
@@ -450,5 +472,35 @@ where
             &given_commitment,
         )?;
     }
+
+    // ********************************************************************
+
+    // ********************************************************************
+    // Check that the inner snark id is derived correctly.
+    // ********************************************************************
+
+    let inner_snark_vk_bytes = inner_snark_vk.to_bytes(&mut cs.ns(|| "Convert inner snark vk to bytes"))?;
+
+    let given_inner_snark_id =
+        <C::InnerSNARKVerificationKeyCRHGadget as CRHGadget<_, C::OuterField>>::OutputGadget::alloc_input(
+            &mut cs.ns(|| "Inner snark id"),
+            || Ok(inner_snark_id),
+        )?;
+
+    let candidate_inner_snark_id = C::InnerSNARKVerificationKeyCRHGadget::check_evaluation_gadget(
+        &mut cs.ns(|| "Compute inner snark vk hash"),
+        &inner_snark_vk_crh_parameters,
+        &inner_snark_vk_bytes,
+    )?;
+
+    println!("gadget - inner_snark_vk_bytes len: {:?}", inner_snark_vk_bytes.len());
+    println!("gadget - candidate_inner_snark_id: {:?}", candidate_inner_snark_id);
+    println!("gadget - given_inner_snark_id: {:?}", given_inner_snark_id);
+
+    candidate_inner_snark_id.enforce_equal(
+        &mut cs.ns(|| "Check that declared and computed inner snark ids are equal"),
+        &given_inner_snark_id,
+    )?;
+
     Ok(())
 }
