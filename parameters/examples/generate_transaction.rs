@@ -61,6 +61,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         target_block_time: 10i64,
         network: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
+        authorized_inner_snark_ids: vec![],
     };
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;

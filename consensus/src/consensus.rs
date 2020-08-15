@@ -54,6 +54,9 @@ pub struct ConsensusParameters {
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
     pub verifier: PoswMarlin,
+
+    /// The authorized inner SNARK IDs
+    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
 }
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
@@ -150,6 +153,13 @@ impl ConsensusParameters {
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
+        if !self
+            .authorized_inner_snark_ids
+            .contains(&to_bytes![transaction.inner_snark_id]?)
+        {
+            return Ok(false);
+        }
+
         Ok(InstantiatedDPC::verify(parameters, transaction, ledger)?)
     }
 
@@ -160,6 +170,12 @@ impl ConsensusParameters {
         transactions: &Vec<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
+        for tx in transactions {
+            if !self.authorized_inner_snark_ids.contains(&to_bytes![tx.inner_snark_id]?) {
+                return Ok(false);
+            }
+        }
+
         Ok(InstantiatedDPC::verify_transactions(parameters, transactions, ledger)?)
     }
 
@@ -537,6 +553,7 @@ mod tests {
             target_block_time: 2i64, //unix seconds
             network: Network::Mainnet,
             verifier: posw,
+            authorized_inner_snark_ids: vec![],
         };
 
         let b1 = DATA.block_1.clone();

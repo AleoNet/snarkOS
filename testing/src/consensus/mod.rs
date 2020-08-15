@@ -1,9 +1,11 @@
 use snarkos_consensus::ConsensusParameters;
+use snarkos_dpc::instantiated::Components;
 use snarkos_errors::objects::TransactionError;
-use snarkos_models::objects::Transaction;
+use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameters};
 use snarkos_objects::Network;
+use snarkos_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters};
 use snarkos_posw::PoswMarlin;
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};
@@ -14,12 +16,27 @@ pub use e2e::*;
 mod fixture;
 pub use fixture::*;
 
-pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| ConsensusParameters {
-    max_block_size: 1_000_000usize,
-    max_nonce: u32::max_value(),
-    target_block_time: 2i64, //unix seconds
-    network: Network::Mainnet,
-    verifier: PoswMarlin::verify_only().unwrap(),
+pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| {
+    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerSNARKVerificationKeyCRH as CRH>::Parameters = FromBytes::read(InnerSNARKVKCRHParameters::load_bytes().unwrap().as_slice()).unwrap();
+
+    let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerSNARKVerificationKeyCRH =
+        From::from(inner_snark_verification_key_crh_parameters);
+
+    let inner_snark_id = to_bytes![
+        inner_snark_verification_key_crh
+            .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
+            .unwrap()
+    ]
+    .unwrap();
+
+    ConsensusParameters {
+        max_block_size: 1_000_000usize,
+        max_nonce: u32::max_value(),
+        target_block_time: 2i64, //unix seconds
+        network: Network::Mainnet,
+        verifier: PoswMarlin::verify_only().unwrap(),
+        authorized_inner_snark_ids: vec![inner_snark_id],
+    }
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +46,7 @@ impl Transaction for TestTx {
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
+    type InnerSNARKID = [u8; 32];
     type LocalDataRoot = [u8; 32];
     type Memorandum = [u8; 32];
     type ProgramCommitment = [u8; 32];
@@ -44,6 +62,10 @@ impl Transaction for TestTx {
     }
 
     fn ledger_digest(&self) -> &Self::Digest {
+        &[0u8; 32]
+    }
+
+    fn inner_snark_id(&self) -> &Self::InnerSNARKID {
         &[0u8; 32]
     }
 

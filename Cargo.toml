@@ -45,11 +45,12 @@ path = "snarkOS/main.rs"
 snarkos-consensus = { path = "./consensus", version = "0.8.0" }
 snarkos-dpc = { path = "./dpc", version = "0.8.0" }
 snarkos-errors = { path = "./errors", version = "0.8.0" }
-snarkos-network = { path = "network", version = "0.8.0" }
-snarkos-objects = { path = "objects", version = "0.8.0" }
+snarkos-models = { path = "./models", version = "0.8.0" }
+snarkos-network = { path = "./network", version = "0.8.0" }
+snarkos-objects = { path = "./objects", version = "0.8.0" }
 snarkos-posw = { path = "./posw", version = "0.8.0" }
 snarkos-rpc = { path = "./rpc", version = "0.8.0" }
-snarkos-storage = { path = "storage", version = "0.8.0" }
+snarkos-storage = { path = "./storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
 clap = { version = "2.33.2" }
