@@ -5,7 +5,7 @@ use crate::{
         utilities::{
             boolean::Boolean,
             eq::EvaluateEqGadget,
-            int::{Int, Int128, Int16, Int32, Int64, Int8},
+            int::{Int, Int64},
         },
     },
 };
@@ -47,4 +47,4 @@ macro_rules! eq_gadget_impl {
     )*)
 }
 
-eq_gadget_impl!(Int8 Int16 Int32 Int64 Int128);
+eq_gadget_impl!(Int64);
