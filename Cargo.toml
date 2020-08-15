@@ -96,7 +96,7 @@ debug = true
 opt-level = 0
 
 [profile.test.package.snarkos-consensus]
-opt-level = 1 # necessary for testing
+opt-level = 3 # necessary for testing
 
 [profile.test.package.snarkos-dpc]
 opt-level = 3 # necessary for DPC testing
