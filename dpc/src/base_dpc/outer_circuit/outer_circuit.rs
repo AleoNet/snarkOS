@@ -41,6 +41,8 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
     program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
     local_data_root: Option<<C::LocalDataCRH as CRH>::Output>,
+
+    inner_snark_id: Option<<C::InnerSNARKVerificationKeyCRH as CRH>::Output>,
 }
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
@@ -78,6 +80,8 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let program_randomness = Some(<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
         let local_data_root = Some(<C::LocalDataCRH as CRH>::Output::default());
 
+        let inner_snark_id = Some(<C::InnerSNARKVerificationKeyCRH as CRH>::Output::default());
+
         Self {
             system_parameters: Some(system_parameters.clone()),
 
@@ -99,13 +103,15 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             program_commitment,
             program_randomness,
             local_data_root,
+
+            inner_snark_id,
         }
     }
 
     pub fn new(
         system_parameters: &SystemParameters<C>,
 
-        // Inner snark public inputs
+        // Inner SNARK public inputs
         ledger_parameters: &C::MerkleParameters,
         ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
         old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
@@ -115,7 +121,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         value_balance: AleoAmount,
         network_id: u8,
 
-        // Inner snark private inputs
+        // Inner SNARK private inputs
         inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
         inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
 
@@ -130,6 +136,9 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
         local_data_root: &<C::LocalDataCRH as CRH>::Output,
+
+        // Inner SNARK ID
+        inner_snark_id: &<C::InnerSNARKVerificationKeyCRH as CRH>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -160,6 +169,8 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             program_commitment: Some(program_commitment.clone()),
             program_randomness: Some(program_randomness.clone()),
             local_data_root: Some(local_data_root.clone()),
+
+            inner_snark_id: Some(inner_snark_id.clone()),
         }
     }
 }
@@ -210,6 +221,7 @@ where
             self.program_commitment.get()?,
             self.program_randomness.get()?,
             self.local_data_root.get()?,
+            self.inner_snark_id.get()?,
         )?;
         Ok(())
     }
