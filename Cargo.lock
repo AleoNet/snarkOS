@@ -1939,6 +1939,7 @@ dependencies = [
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.2.22",
+ "toml",
 ]
 
 [[package]]
@@ -2071,6 +2072,7 @@ dependencies = [
  "jsonrpc-core",
  "rocksdb",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
