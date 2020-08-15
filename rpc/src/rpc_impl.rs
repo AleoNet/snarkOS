@@ -22,7 +22,7 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
@@ -196,6 +196,7 @@ impl RpcFunctions for RpcImpl {
             old_serial_numbers,
             new_commitments,
             memo,
+            network_id: transaction.network.id(),
             digest: hex::encode(to_bytes![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
             program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
@@ -305,8 +306,7 @@ impl RpcFunctions for RpcImpl {
         let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
 
         // Read the view key
-        let view_key_bytes = hex::decode(decryption_input.account_view_key)?;
-        let account_view_key = AccountViewKey::<Components>::read(&view_key_bytes[..])?;
+        let account_view_key = AccountViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
 
         // Decrypt the record ciphertext
         let record =
@@ -321,7 +321,7 @@ impl RpcFunctions for RpcImpl {
         let record_bytes = hex::decode(record_bytes)?;
         let record = DPCRecord::<Components>::read(&record_bytes[..])?;
 
-        let owner = hex::encode(to_bytes![record.owner()]?);
+        let owner = record.owner().to_string();
         let payload = RPCRecordPayload {
             payload: hex::encode(to_bytes![record.payload()]?),
         };

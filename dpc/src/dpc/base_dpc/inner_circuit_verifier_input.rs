@@ -58,8 +58,6 @@ where
     <C::LocalDataCRH as CRH>::Parameters: ToConstraintField<C::InnerField>,
     <C::LocalDataCRH as CRH>::Output: ToConstraintField<C::InnerField>,
 
-    <C::ValueCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
@@ -116,13 +114,6 @@ where
                 .parameters()
                 .to_field_elements()?,
         );
-        v.extend_from_slice(
-            &self
-                .system_parameters
-                .value_commitment
-                .parameters()
-                .to_field_elements()?,
-        );
 
         v.extend_from_slice(&self.ledger_parameters.parameters().to_field_elements()?);
         v.extend_from_slice(&self.ledger_digest.to_field_elements()?);
@@ -143,18 +134,9 @@ where
         )?);
         v.extend_from_slice(&self.local_data_root.to_field_elements()?);
 
-        let value_balance_as_u64 = self.value_balance.abs() as u64;
-
-        let is_negative: bool = self.value_balance.is_negative();
-
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &value_balance_as_u64.to_le_bytes()[..],
+            &self.value_balance.to_le_bytes()[..],
         )?);
-
-        v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &[is_negative as u8][..],
-        )?);
-
         Ok(v)
     }
 }

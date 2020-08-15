@@ -1,6 +1,5 @@
 use super::instantiated::*;
 use crate::dpc::base_dpc::{
-    binding_signature::*,
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
@@ -15,7 +14,6 @@ use crate::dpc::base_dpc::{
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
-    dpc::Record,
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
@@ -31,7 +29,7 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_testing::storage::*;
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use itertools::Itertools;
 use rand::SeedableRng;
@@ -169,7 +167,7 @@ fn test_execute_base_dpc_constraints() {
         new_commitments,
         program_commitment,
         program_randomness,
-        local_data_root: local_data_commitment,
+        local_data_root,
         local_data_commitment_randomizers,
         value_balance,
     } = context;
@@ -180,7 +178,7 @@ fn test_execute_base_dpc_constraints() {
     for i in 0..NUM_INPUT_RECORDS {
         let proof = ProgramSNARK::prove(
             &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_commitment, i as u8),
+            ProgramCircuit::new(&system_parameters, &local_data_root, i as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -188,7 +186,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                 local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_commitment.clone(),
+                local_data_root: local_data_root.clone(),
                 position: i as u8,
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
@@ -204,7 +202,7 @@ fn test_execute_base_dpc_constraints() {
     for j in 0..NUM_OUTPUT_RECORDS {
         let proof = ProgramSNARK::prove(
             &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_commitment, j as u8),
+            ProgramCircuit::new(&system_parameters, &local_data_root, j as u8),
             &mut rng,
         )
         .expect("Proof should work");
@@ -213,7 +211,7 @@ fn test_execute_base_dpc_constraints() {
         {
             let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
                 local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_commitment.clone(),
+                local_data_root: local_data_root.clone(),
                 position: j as u8,
             };
             assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
@@ -225,78 +223,6 @@ fn test_execute_base_dpc_constraints() {
         };
         new_proof_and_vk.push(private_input);
     }
-
-    // Generate binding signature
-
-    // Generate value commitments for input records
-
-    let mut old_value_commits = vec![];
-    let mut old_value_commit_randomness = vec![];
-
-    for old_record in old_records {
-        // If the record is a dummy, then the value should be 0
-        let input_value = match old_record.is_dummy() {
-            true => 0,
-            false => old_record.value(),
-        };
-
-        // Generate value commitment randomness
-        let value_commitment_randomness =
-            <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
-
-        // Generate the value commitment
-        let value_commitment = system_parameters
-            .value_commitment
-            .commit(&input_value.to_le_bytes(), &value_commitment_randomness)
-            .unwrap();
-
-        old_value_commits.push(value_commitment);
-        old_value_commit_randomness.push(value_commitment_randomness);
-    }
-
-    // Generate value commitments for output records
-
-    let mut new_value_commits = vec![];
-    let mut new_value_commit_randomness = vec![];
-
-    for new_record in &new_records {
-        // If the record is a dummy, then the value should be 0
-        let output_value = match new_record.is_dummy() {
-            true => 0,
-            false => new_record.value(),
-        };
-
-        // Generate value commitment randomness
-        let value_commitment_randomness =
-            <<Components as BaseDPCComponents>::ValueCommitment as CommitmentScheme>::Randomness::rand(&mut rng);
-
-        // Generate the value commitment
-        let value_commitment = system_parameters
-            .value_commitment
-            .commit(&output_value.to_le_bytes(), &value_commitment_randomness)
-            .unwrap();
-
-        new_value_commits.push(value_commitment);
-        new_value_commit_randomness.push(value_commitment_randomness);
-    }
-
-    let sighash = to_bytes![local_data_commitment].unwrap();
-
-    let binding_signature = create_binding_signature::<
-        <Components as BaseDPCComponents>::ValueCommitment,
-        <Components as BaseDPCComponents>::BindingSignatureGroup,
-        _,
-    >(
-        &system_parameters.value_commitment,
-        &old_value_commits,
-        &new_value_commits,
-        &old_value_commit_randomness,
-        &new_value_commit_randomness,
-        value_balance,
-        &sighash,
-        &mut rng,
-    )
-    .unwrap();
 
     // Encrypt the new records
 
@@ -353,15 +279,10 @@ fn test_execute_base_dpc_constraints() {
         &new_encrypted_record_hashes,
         &program_commitment,
         &program_randomness,
-        &local_data_commitment,
+        &local_data_root,
         &local_data_commitment_randomizers,
         &memo,
-        &old_value_commits,
-        &old_value_commit_randomness,
-        &new_value_commits,
-        &new_value_commit_randomness,
         value_balance,
-        &binding_signature,
         network_id,
     )
     .unwrap();
@@ -410,15 +331,10 @@ fn test_execute_base_dpc_constraints() {
             &new_encrypted_record_hashes,
             &program_commitment,
             &program_randomness,
-            &local_data_commitment,
+            &local_data_root,
             &local_data_commitment_randomizers,
             &memo,
-            &old_value_commits,
-            &old_value_commit_randomness,
-            &new_value_commits,
-            &new_value_commit_randomness,
             value_balance,
-            &binding_signature,
             network_id,
         ),
         &mut rng,
@@ -448,7 +364,7 @@ fn test_execute_base_dpc_constraints() {
         &new_proof_and_vk,
         &program_commitment,
         &program_randomness,
-        &local_data_commitment,
+        &local_data_root,
     )
     .unwrap();
 
@@ -469,21 +385,6 @@ fn test_execute_base_dpc_constraints() {
     println!("=========================================================");
 
     assert!(pf_check_cs.is_satisfied());
-
-    let verify_binding_signature = verify_binding_signature::<
-        <Components as BaseDPCComponents>::ValueCommitment,
-        <Components as BaseDPCComponents>::BindingSignatureGroup,
-    >(
-        &system_parameters.value_commitment,
-        &old_value_commits,
-        &new_value_commits,
-        value_balance,
-        &sighash,
-        &binding_signature,
-    )
-    .unwrap();
-
-    assert!(verify_binding_signature);
 
     kill_storage(ledger);
 }

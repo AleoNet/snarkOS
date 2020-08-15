@@ -25,6 +25,7 @@ use snarkos_objects::{
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    Network,
     PedersenMerkleRootHash,
 };
 use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
@@ -49,8 +50,8 @@ pub struct ConsensusParameters {
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
 
-    /// Network identifier
-    pub network_id: u8,
+    /// Network
+    pub network: Network,
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
     pub verifier: PoswMarlin,
@@ -523,7 +524,7 @@ impl ConsensusParameters {
             &new_death_programs,
             &new_birth_vk_and_proof_generator,
             &memo,
-            self.network_id,
+            self.network.id(),
             ledger,
             rng,
         )?;
@@ -547,7 +548,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
-            network_id: 0,
+            network: Network::Mainnet,
             verifier: posw,
         };
 

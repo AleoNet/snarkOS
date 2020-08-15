@@ -295,9 +295,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.33.1"
+version = "2.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdfa80d47f954d53a35a64987ca1422f495b8d6483c0fe9f7117b36c2a792129"
+checksum = "10040cdf04294b565d9e0319955430099ec3813a64c952b86a41200ad714ae48"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1938,7 +1938,7 @@ dependencies = [
  "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -2010,7 +2010,7 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkos-utilities",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -2146,7 +2146,7 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkos-utilities",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tokio-test",
 ]
 
@@ -2265,7 +2265,7 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkos-utilities",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -2308,7 +2308,7 @@ dependencies = [
  "snarkos-posw",
  "snarkos-storage",
  "snarkos-utilities",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -2493,9 +2493,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.21"
+version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d099fa27b9702bed751524694adbe393e18b36b204da91eb1cbbbbb4a5ee2d58"
+checksum = "5d34ca54d84bf2b5b4d7d31e901a8464f7b60ac145a284fba25ceb801f2ddccd"
 dependencies = [
  "bytes 0.5.5",
  "fnv",
@@ -2641,7 +2641,7 @@ checksum = "ed0049c119b6d505c4447f5c64873636c7af6c75ab0d45fd9f618d82acb8016d"
 dependencies = [
  "bytes 0.5.5",
  "futures-core",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
