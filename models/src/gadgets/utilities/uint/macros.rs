@@ -281,6 +281,7 @@ macro_rules! uint_impl {
                 Self::addmany(&mut cs.ns(|| "add_not"), &[self.clone(), other.negate()])
             }
 
+            /// Used for division. Evaluates a - b, and when a - b < 0, returns 0.
             fn sub_unsafe<F: PrimeField, CS: ConstraintSystem<F>>(
                 &self,
                 mut cs: CS,
@@ -367,7 +368,10 @@ macro_rules! uint_impl {
 
                 let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
                 let constant_result = Self::constant(0 as $_type);
-                let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u32"), || Ok(0 as $_type))?;
+                let allocated_result = Self::alloc(
+                    &mut cs.ns(|| format!("allocated_0u{}", $size)),
+                    || Ok(0 as $_type),
+                )?;
                 let zero_result = Self::conditionally_select(
                     &mut cs.ns(|| "constant_or_allocated"),
                     &is_constant,
@@ -524,17 +528,7 @@ macro_rules! uint_impl {
             ) -> Result<Self, SynthesisError> {
                 // let mut res = Self::one();
                 //
-                // let mut found_one = false;
-                //
                 // for i in BitIterator::new(exp) {
-                //     if !found_one {
-                //         if i {
-                //             found_one = true;
-                //         } else {
-                //             continue;
-                //         }
-                //     }
-                //
                 //     res.square_in_place();
                 //
                 //     if i {
@@ -545,7 +539,10 @@ macro_rules! uint_impl {
 
                 let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
                 let constant_result = Self::constant(1 as $_type);
-                let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u64"), || Ok(1 as $_type))?;
+                let allocated_result = Self::alloc(
+                    &mut cs.ns(|| format!("allocated_1u{}", $size)),
+                    || Ok(1 as $_type),
+                )?;
                 let mut result = Self::conditionally_select(
                     &mut cs.ns(|| "constant_or_allocated"),
                     &is_constant,
@@ -554,16 +551,7 @@ macro_rules! uint_impl {
                 )?;
 
                 for (i, bit) in other.bits.iter().rev().enumerate() {
-                    let found_one = Boolean::Constant(result.eq(&Self::constant(1 as $_type)));
-                    let cond1 = Boolean::and(cs.ns(|| format!("found_one_{}", i)), &bit.not(), &found_one)?;
-                    let square = result.mul(cs.ns(|| format!("square_{}", i)), &result).unwrap();
-
-                    result = Self::conditionally_select(
-                        &mut cs.ns(|| format!("result_or_sqaure_{}", i)),
-                        &cond1,
-                        &result,
-                        &square,
-                    )?;
+                    result = result.mul(cs.ns(|| format!("square_{}", i)), &result).unwrap();
 
                     let mul_by_self = result
                         .mul(cs.ns(|| format!("multiply_by_self_{}", i)), &self)

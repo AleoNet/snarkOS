@@ -7,7 +7,7 @@ use crate::{
             arithmetic::Add,
             bits::RippleCarryAdder,
             boolean::{AllocatedBit, Boolean},
-            int::{Int, Int128, Int16, Int32, Int64, Int8},
+            int::{Int, Int64},
         },
     },
 };
@@ -130,4 +130,4 @@ macro_rules! add_int_impl {
     )*)
 }
 
-add_int_impl!(Int8 Int16 Int32 Int64 Int128);
+add_int_impl!(Int64);
