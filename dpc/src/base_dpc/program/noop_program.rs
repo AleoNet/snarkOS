@@ -61,9 +61,6 @@ where
             assert_eq!(self.identity, record.death_program_id());
         } else {
             assert_eq!(self.identity, record.birth_program_id());
-
-            // TODO (raychu86) Make this position absolute (remove this line)
-            position -= C::NUM_INPUT_RECORDS as u8;
         }
 
         let local_data_root = local_data.local_data_merkle_tree.root();
