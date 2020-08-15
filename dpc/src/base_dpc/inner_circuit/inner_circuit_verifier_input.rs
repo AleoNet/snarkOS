@@ -1,10 +1,11 @@
-use crate::dpc::base_dpc::{parameters::SystemParameters, BaseDPCComponents};
+use crate::base_dpc::{parameters::SystemParameters, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::curves::ConstraintFieldError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH},
     curves::to_field_vec::ToConstraintField,
 };
+use snarkos_objects::AleoAmount;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -30,7 +31,7 @@ pub struct InnerCircuitVerifierInput<C: BaseDPCComponents> {
     pub local_data_root: <C::LocalDataCRH as CRH>::Output,
 
     pub memo: [u8; 32],
-    pub value_balance: i64,
+    pub value_balance: AleoAmount,
     pub network_id: u8,
 }
 
@@ -135,7 +136,7 @@ where
         v.extend_from_slice(&self.local_data_root.to_field_elements()?);
 
         v.extend_from_slice(&ToConstraintField::<C::InnerField>::to_field_elements(
-            &self.value_balance.to_le_bytes()[..],
+            &self.value_balance.0.to_le_bytes()[..],
         )?);
         Ok(v)
     }

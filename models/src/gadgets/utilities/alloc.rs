@@ -3,6 +3,35 @@ use snarkos_errors::gadgets::SynthesisError;
 
 use std::borrow::Borrow;
 
+pub trait AllocBytesGadget<V: ?Sized, F: Field>: Sized
+where
+    V: Into<Option<Vec<u8>>>,
+{
+    fn alloc_bytes<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<V>, CS: ConstraintSystem<F>>(
+        cs: CS,
+        f: Fn,
+    ) -> Result<Self, SynthesisError>;
+
+    fn alloc_bytes_checked<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<V>, CS: ConstraintSystem<F>>(
+        cs: CS,
+        f: Fn,
+    ) -> Result<Self, SynthesisError> {
+        Self::alloc_bytes(cs, f)
+    }
+
+    fn alloc_input_bytes<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<V>, CS: ConstraintSystem<F>>(
+        cs: CS,
+        f: Fn,
+    ) -> Result<Self, SynthesisError>;
+
+    fn alloc_input_bytes_checked<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<V>, CS: ConstraintSystem<F>>(
+        cs: CS,
+        f: Fn,
+    ) -> Result<Self, SynthesisError> {
+        Self::alloc_input_bytes(cs, f)
+    }
+}
+
 pub trait AllocGadget<V: ?Sized, F: Field>: Sized {
     fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<V>, CS: ConstraintSystem<F>>(
         cs: CS,

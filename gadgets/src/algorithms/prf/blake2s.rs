@@ -9,6 +9,7 @@ use snarkos_models::{
             alloc::AllocGadget,
             boolean::Boolean,
             eq::{ConditionalEqGadget, EqGadget},
+            select::CondSelectGadget,
             uint::unsigned_integer::{UInt, UInt32, UInt8},
             ToBytesGadget,
         },
@@ -382,6 +383,21 @@ impl<F: PrimeField> ConditionalEqGadget<F> for Blake2sOutputGadget {
 
     fn cost() -> usize {
         32 * <UInt8 as ConditionalEqGadget<F>>::cost()
+    }
+}
+
+impl<F: PrimeField> CondSelectGadget<F> for Blake2sOutputGadget {
+    fn conditionally_select<CS: ConstraintSystem<F>>(
+        _cs: CS,
+        _cond: &Boolean,
+        _first: &Self,
+        _second: &Self,
+    ) -> Result<Self, SynthesisError> {
+        unimplemented!()
+    }
+
+    fn cost() -> usize {
+        unimplemented!()
     }
 }
 

@@ -3,9 +3,8 @@ use snarkos_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
     outer_circuit::OuterCircuit,
-    parameters::{ProgramSNARKParameters, SystemParameters},
-    program::PrivateProgramInput,
-    program_circuit::ProgramCircuit,
+    parameters::{NoopProgramSNARKParameters, SystemParameters},
+    program::{NoopCircuit, PrivateProgramInput},
     BaseDPCComponents,
 };
 use snarkos_errors::dpc::DPCError;
@@ -49,16 +48,16 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     )?;
 
     // TODO (howardwu): Check why is the PrivateProgramInput necessary for running the setup? Blank should take option?
-    let program_snark_parameters = ProgramSNARKParameters::<C>::load()?;
+    let noop_program_snark_parameters = NoopProgramSNARKParameters::<C>::load()?;
 
-    let program_snark_proof = C::ProgramSNARK::prove(
-        &program_snark_parameters.proving_key,
-        ProgramCircuit::blank(&system_parameters),
+    let program_snark_proof = C::NoopProgramSNARK::prove(
+        &noop_program_snark_parameters.proving_key,
+        NoopCircuit::blank(&system_parameters),
         rng,
     )?;
     let private_program_input = PrivateProgramInput {
-        verification_key: program_snark_parameters.verification_key,
-        proof: program_snark_proof,
+        verification_key: to_bytes![noop_program_snark_parameters.verification_key]?,
+        proof: to_bytes![program_snark_proof]?,
     };
 
     let outer_snark_parameters = C::OuterSNARK::setup(

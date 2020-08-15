@@ -7,7 +7,6 @@ pub trait Record: Default + FromBytes + ToBytes {
     type Commitment: FromBytes + ToBytes;
     type CommitmentRandomness;
     type Payload;
-    type Program;
     type SerialNumberNonce;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type Value: FromBytes + ToBytes;

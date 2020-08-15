@@ -1,11 +1,11 @@
-use crate::dpc::base_dpc::{records::encrypted_record::*, BaseDPCComponents};
+use crate::base_dpc::{record::encrypted_record::*, BaseDPCComponents};
 use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
     objects::Transaction,
 };
-use snarkos_objects::Network;
+use snarkos_objects::{AleoAmount, Network};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     serialize::{CanonicalDeserialize, CanonicalSerialize},
@@ -44,7 +44,7 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
     /// A transaction value balance is the difference between input and output record balances.
     /// This value effectively becomes the transaction fee for the miner. Only coinbase transactions
     /// can have a negative value balance representing tokens being minted.
-    pub value_balance: i64,
+    pub value_balance: AleoAmount,
 
     #[derivative(PartialEq = "ignore")]
     pub signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
@@ -67,7 +67,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         transaction_proof: <C::OuterSNARK as SNARK>::Proof,
         program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_root: <C::LocalDataCRH as CRH>::Output,
-        value_balance: i64,
+        value_balance: AleoAmount,
         network: Network,
         signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
         encrypted_records: Vec<EncryptedRecord<C>>,
@@ -96,6 +96,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     type Memorandum = [u8; 32];
     type ProgramCommitment = <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output;
     type SerialNumber = <C::AccountSignature as SignatureScheme>::PublicKey;
+    type ValueBalance = AleoAmount;
 
     /// Transaction id = Hash of (serial numbers || commitments || memo)
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -143,7 +144,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
         &self.local_data_root
     }
 
-    fn value_balance(&self) -> i64 {
+    fn value_balance(&self) -> Self::ValueBalance {
         self.value_balance
     }
 
@@ -223,7 +224,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
             FromBytes::read(&mut reader)?;
         let local_data_root: <C::LocalDataCRH as CRH>::Output = FromBytes::read(&mut reader)?;
 
-        let value_balance: i64 = FromBytes::read(&mut reader)?;
+        let value_balance: AleoAmount = FromBytes::read(&mut reader)?;
         let network: Network = FromBytes::read(&mut reader)?;
 
         // Read the signatures

@@ -1,11 +1,10 @@
 use crate::{
-    base_dpc::{parameters::SystemParameters, *},
+    base_dpc::{parameters::SystemParameters, BaseDPCComponents},
     Assignment,
 };
-use snarkos_errors::{curves::ConstraintFieldError, gadgets::SynthesisError};
+use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
-    curves::to_field_vec::ToConstraintField,
     gadgets::{
         algorithms::{CRHGadget, CommitmentGadget},
         r1cs::{ConstraintSynthesizer, ConstraintSystem},
@@ -13,28 +12,8 @@ use snarkos_models::{
     },
 };
 
-pub struct ProgramLocalData<C: BaseDPCComponents> {
-    pub local_data_commitment_parameters: <C::LocalDataCommitment as CommitmentScheme>::Parameters,
-    pub local_data_root: <C::LocalDataCommitment as CommitmentScheme>::Output,
-    pub position: u8,
-}
-
-/// Convert each component to bytes and pack into field elements.
-impl<C: BaseDPCComponents> ToConstraintField<C::InnerField> for ProgramLocalData<C>
-where
-    <C::LocalDataCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
-    <C::LocalDataCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
-{
-    fn to_field_elements(&self) -> Result<Vec<C::InnerField>, ConstraintFieldError> {
-        let mut v = ToConstraintField::<C::InnerField>::to_field_elements(&[self.position][..])?;
-
-        v.extend_from_slice(&self.local_data_commitment_parameters.to_field_elements()?);
-        v.extend_from_slice(&self.local_data_root.to_field_elements()?);
-        Ok(v)
-    }
-}
-
-pub struct ProgramCircuit<C: BaseDPCComponents> {
+/// Always-accept program
+pub struct NoopCircuit<C: BaseDPCComponents> {
     /// System parameters
     pub system_parameters: Option<SystemParameters<C>>,
 
@@ -45,7 +24,7 @@ pub struct ProgramCircuit<C: BaseDPCComponents> {
     pub position: u8,
 }
 
-impl<C: BaseDPCComponents> ProgramCircuit<C> {
+impl<C: BaseDPCComponents> NoopCircuit<C> {
     pub fn blank(system_parameters: &SystemParameters<C>) -> Self {
         let local_data_root = <C::LocalDataCRH as CRH>::Output::default();
 
@@ -69,9 +48,9 @@ impl<C: BaseDPCComponents> ProgramCircuit<C> {
     }
 }
 
-impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for ProgramCircuit<C> {
+impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for NoopCircuit<C> {
     fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        execute_payment_check_gadget(
+        execute_noop_gadget(
             cs,
             self.system_parameters.get()?,
             self.local_data_root.get()?,
@@ -80,7 +59,7 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for ProgramCircu
     }
 }
 
-fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
+fn execute_noop_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     system_parameters: &SystemParameters<C>,
     local_data_root: &<C::LocalDataCRH as CRH>::Output,
@@ -94,7 +73,7 @@ fn execute_payment_check_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::In
             || Ok(system_parameters.local_data_commitment.parameters().clone()),
         )?;
 
-    let _local_data_commitment_gadget = <C::LocalDataCRHGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
+    let _local_data_root_gadget = <C::LocalDataCRHGadget as CRHGadget<_, _>>::OutputGadget::alloc_input(
         cs.ns(|| "Allocate local data root"),
         || Ok(local_data_root),
     )?;

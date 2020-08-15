@@ -1,5 +1,5 @@
 use crate::{
-    dpc::base_dpc::{
+    base_dpc::{
         outer_circuit_gadget::execute_outer_proof_gadget,
         parameters::SystemParameters,
         program::PrivateProgramInput,
@@ -14,6 +14,7 @@ use snarkos_models::{
     curves::to_field_vec::ToConstraintField,
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
+use snarkos_objects::AleoAmount;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
@@ -27,15 +28,15 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
     new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
     new_encrypted_record_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
     memo: Option<[u8; 32]>,
-    value_balance: Option<i64>,
+    value_balance: Option<AleoAmount>,
     network_id: Option<u8>,
 
     // Inner snark verifier private inputs
     inner_snark_vk: Option<<C::InnerSNARK as SNARK>::VerificationParameters>,
     inner_snark_proof: Option<<C::InnerSNARK as SNARK>::Proof>,
 
-    old_private_program_inputs: Option<Vec<PrivateProgramInput<C>>>,
-    new_private_program_inputs: Option<Vec<PrivateProgramInput<C>>>,
+    old_private_program_inputs: Option<Vec<PrivateProgramInput>>,
+    new_private_program_inputs: Option<Vec<PrivateProgramInput>>,
 
     program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
     program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
@@ -48,7 +49,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         ledger_parameters: &C::MerkleParameters,
         inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
         inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
-        program_snark_vk_and_proof: &PrivateProgramInput<C>,
+        program_snark_vk_and_proof: &PrivateProgramInput,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -67,7 +68,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             num_output_records
         ]);
         let memo = Some([0u8; 32]);
-        let value_balance = Some(0);
+        let value_balance = Some(AleoAmount::ZERO);
         let network_id = Some(0);
 
         let old_private_program_inputs = Some(vec![program_snark_vk_and_proof.clone(); num_input_records]);
@@ -111,7 +112,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
         new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
         memo: &[u8; 32],
-        value_balance: i64,
+        value_balance: AleoAmount,
         network_id: u8,
 
         // Inner snark private inputs
@@ -120,11 +121,11 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
         // Private program input = Verification key and input
         // Commitment contains commitment to hash of death program vk.
-        old_private_program_inputs: &[PrivateProgramInput<C>],
+        old_private_program_inputs: &[PrivateProgramInput],
 
         // Private program input = Verification key and input
         // Commitment contains commitment to hash of birth program vk.
-        new_private_program_inputs: &[PrivateProgramInput<C>],
+        new_private_program_inputs: &[PrivateProgramInput],
 
         program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,

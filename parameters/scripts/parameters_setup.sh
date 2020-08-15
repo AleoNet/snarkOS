@@ -43,7 +43,7 @@ mv encrypted_record_crh.checksum ../src/params
 mv serial_number_nonce_crh.params ../src/params
 mv serial_number_nonce_crh.checksum ../src/params
 
-./program_snark.sh
+./noop_program_snark.sh
 
 ./inner_snark.sh
 
