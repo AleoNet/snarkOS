@@ -5,7 +5,11 @@ use crate::{
 };
 use snarkos_curves::edwards_bls12::EdwardsProjective as EdwardsBls;
 use snarkos_models::algorithms::{CommitmentScheme, CRH};
-use snarkos_utilities::rand::UniformRand;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    rand::UniformRand,
+    to_bytes,
+};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -28,6 +32,7 @@ impl PedersenSize for CommitmentWindow {
 
 pub type H = BoweHopwoodPedersenCompressedCRH<EdwardsBls, CRHWindow>;
 pub type C = PedersenCompressedCommitment<EdwardsBls, CommitmentWindow>;
+pub type CM = CommitmentMerklePath<C, H>;
 
 /// Generates a valid Merkle tree and verifies the Merkle path witness for each leaf.
 fn generate_merkle_tree<C: CommitmentScheme, H: CRH, R: Rng>(
@@ -60,7 +65,7 @@ fn commitment_tree_good_root_test() {
 
     for leaf in merkle_tree.leaves().iter() {
         let proof = merkle_tree.generate_proof(&leaf).unwrap();
-        assert!(proof.verify(&merkle_tree.root(), &leaf).unwrap());
+        assert!(proof.verify(&crh, &merkle_tree.root(), &leaf).unwrap());
     }
 }
 
@@ -76,6 +81,27 @@ fn commitment_tree_bad_root_test() {
 
     for leaf in merkle_tree.leaves().iter() {
         let proof = merkle_tree.generate_proof(&leaf).unwrap();
-        assert!(proof.verify(&<H as CRH>::Output::default(), &leaf).unwrap());
+        assert!(proof.verify(&crh, &<H as CRH>::Output::default(), &leaf).unwrap());
+    }
+}
+
+#[test]
+fn test_serialize_commitment_path() {
+    let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
+
+    let commitment = C::setup(rng);
+    let crh = H::setup(rng);
+
+    let merkle_tree = generate_merkle_tree(&commitment, &crh, rng);
+
+    for leaf in merkle_tree.leaves().iter() {
+        let proof = merkle_tree.generate_proof(&leaf).unwrap();
+
+        let proof_bytes = to_bytes![proof].unwrap();
+        let recovered_proof = CM::read(&proof_bytes[..]).unwrap();
+
+        assert!(proof == recovered_proof);
+
+        assert!(recovered_proof.verify(&crh, &merkle_tree.root(), &leaf).unwrap());
     }
 }
