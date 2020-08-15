@@ -51,7 +51,6 @@ where
         position: u8,
         rng: &mut R,
     ) -> Result<Self::PrivateWitness, DPCError> {
-        let mut position = position;
         let records = [&local_data.old_records[..], &local_data.new_records[..]].concat();
         assert!((position as usize) < records.len());
 

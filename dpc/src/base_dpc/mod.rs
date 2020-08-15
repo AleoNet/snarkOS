@@ -793,15 +793,16 @@ where
             assert!(Components::InnerSNARK::verify(verification_key, &input, &inner_proof)?);
         }
 
+        let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
+            parameters.inner_snark_parameters.1.clone().into();
+
+        let inner_snark_id = <Components::InnerSNARKVerificationKeyCRH as CRH>::hash(
+            &parameters.system_parameters.inner_snark_verification_key_crh,
+            &to_bytes![inner_snark_vk]?,
+        )?;
+
         let transaction_proof = {
             let ledger_parameters = ledger.parameters();
-            let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
-                parameters.inner_snark_parameters.1.clone().into();
-
-            let inner_snark_id = <Components::InnerSNARKVerificationKeyCRH as CRH>::hash(
-                &parameters.system_parameters.inner_snark_verification_key_crh,
-                &to_bytes![inner_snark_vk]?,
-            )?;
 
             let circuit = OuterCircuit::new(
                 &parameters.system_parameters,
@@ -831,7 +832,6 @@ where
             Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
         };
 
-        // TODO (raychu86) Add inner snark id to the transaction
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
