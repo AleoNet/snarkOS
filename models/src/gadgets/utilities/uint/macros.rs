@@ -595,30 +595,6 @@ macro_rules! uint_impl {
             }
         }
 
-        impl<F: PrimeField> EvaluateEqGadget<F> for $name {
-            fn evaluate_equal<CS: ConstraintSystem<F>>(
-                &self,
-                mut cs: CS,
-                other: &Self,
-            ) -> Result<Boolean, SynthesisError> {
-                let mut result = Boolean::constant(true);
-                for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-                    let equal = a.evaluate_equal(
-                        &mut cs.ns(|| format!("{} evaluate equality for {}-th bit", $size, i)),
-                        b,
-                    )?;
-
-                    result = Boolean::and(
-                        &mut cs.ns(|| format!("{} and result for {}-th bit", $size, i)),
-                        &equal,
-                        &result,
-                    )?;
-                }
-
-                Ok(result)
-            }
-        }
-
         impl<F: Field> EqGadget<F> for $name {}
 
         impl<F: Field> ConditionalEqGadget<F> for $name {
