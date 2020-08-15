@@ -5,7 +5,7 @@ use snarkos_models::{
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::Block;
-use snarkos_storage::Ledger;
+pub use snarkos_storage::Ledger;
 
 use rand::{thread_rng, Rng};
 use std::{path::PathBuf, sync::Arc};

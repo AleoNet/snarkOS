@@ -45,7 +45,6 @@ pub fn bitcoin_retarget(
         time_elapsed = target_block_time * 2
     }
 
-    // new_difficulty = old_difficulty * (time_elapsed / target_block_time)
     let mut x: u64;
     x = match parent_difficulty.checked_mul(time_elapsed as u64) {
         Some(x) => x,
@@ -53,13 +52,6 @@ pub fn bitcoin_retarget(
     };
 
     x /= target_block_time as u64;
-
-    //        if x > self.pow_limit {
-    //            x = self.pow_limit
-    //        }
-
-    //        println!("old difficulty        {:#x}", parent_difficulty);
-    //        println!("new difficulty        {:#x}", x as u64);
 
     x
 }

@@ -6,9 +6,16 @@ use snarkos_models::{
         algorithms::SNARKVerifierGadget,
         curves::{FieldGadget, GroupGadget, PairingGadget},
         r1cs::{ConstraintSynthesizer, ConstraintSystem},
-        utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8, ToBitsGadget, ToBytesGadget},
+        utilities::{
+            alloc::{AllocBytesGadget, AllocGadget},
+            eq::EqGadget,
+            uint::UInt8,
+            ToBitsGadget,
+            ToBytesGadget,
+        },
     },
 };
+use snarkos_utilities::bytes::FromBytes;
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -247,6 +254,36 @@ impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> AllocGadget
     }
 }
 
+impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> AllocBytesGadget<Vec<u8>, F>
+    for GM17VerifyingKeyGadget<Pairing, F, P>
+{
+    #[inline]
+    fn alloc_bytes<FN, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: FN) -> Result<Self, SynthesisError>
+    where
+        FN: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<Vec<u8>>,
+    {
+        value_gen().and_then(|vk_bytes| {
+            let vk: VerifyingKey<Pairing> = FromBytes::read(&vk_bytes.borrow().clone()[..])?;
+
+            Self::alloc(cs.ns(|| "alloc_bytes"), || Ok(vk))
+        })
+    }
+
+    #[inline]
+    fn alloc_input_bytes<FN, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: FN) -> Result<Self, SynthesisError>
+    where
+        FN: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<Vec<u8>>,
+    {
+        value_gen().and_then(|vk_bytes| {
+            let vk: VerifyingKey<Pairing> = FromBytes::read(&vk_bytes.borrow().clone()[..])?;
+
+            Self::alloc_input(cs.ns(|| "alloc_input_bytes"), || Ok(vk))
+        })
+    }
+}
+
 impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> AllocGadget<Proof<Pairing>, F>
     for GM17ProofGadget<Pairing, F, P>
 {
@@ -277,6 +314,36 @@ impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> AllocGadget
             let b = P::G2Gadget::alloc_input(cs.ns(|| "b"), || Ok(b.into_projective()))?;
             let c = P::G1Gadget::alloc_input(cs.ns(|| "c"), || Ok(c.into_projective()))?;
             Ok(Self { a, b, c })
+        })
+    }
+}
+
+impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> AllocBytesGadget<Vec<u8>, F>
+    for GM17ProofGadget<Pairing, F, P>
+{
+    #[inline]
+    fn alloc_bytes<FN, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: FN) -> Result<Self, SynthesisError>
+    where
+        FN: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<Vec<u8>>,
+    {
+        value_gen().and_then(|proof_bytes| {
+            let proof: Proof<Pairing> = FromBytes::read(&proof_bytes.borrow().clone()[..])?;
+
+            Self::alloc(cs.ns(|| "alloc_bytes"), || Ok(proof))
+        })
+    }
+
+    #[inline]
+    fn alloc_input_bytes<FN, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: FN) -> Result<Self, SynthesisError>
+    where
+        FN: FnOnce() -> Result<T, SynthesisError>,
+        T: Borrow<Vec<u8>>,
+    {
+        value_gen().and_then(|proof_bytes| {
+            let proof: Proof<Pairing> = FromBytes::read(&proof_bytes.borrow().clone()[..])?;
+
+            Self::alloc_input(cs.ns(|| "alloc_input_bytes"), || Ok(proof))
         })
     }
 }

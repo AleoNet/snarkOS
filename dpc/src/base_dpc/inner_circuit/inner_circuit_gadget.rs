@@ -1,4 +1,4 @@
-use crate::dpc::base_dpc::{
+use crate::base_dpc::{
     parameters::SystemParameters,
     record::DPCRecord,
     record_encryption::RecordEncryptionGadgetComponents,
@@ -36,7 +36,7 @@ use snarkos_models::{
         },
     },
 };
-use snarkos_objects::AccountPrivateKey;
+use snarkos_objects::{AccountPrivateKey, AleoAmount};
 use snarkos_utilities::{
     bits_to_bytes,
     bytes::{FromBytes, ToBytes},
@@ -76,7 +76,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     local_data_root: &<C::LocalDataCRH as CRH>::Output,
     local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
     memo: &[u8; 32],
-    value_balance: i64,
+    value_balance: AleoAmount,
     network_id: u8,
 ) -> Result<(), SynthesisError> {
     base_dpc_execute_gadget_helper::<
@@ -182,7 +182,7 @@ fn base_dpc_execute_gadget_helper<
     local_data_root: &LocalDataCRH::Output,
     local_data_commitment_randomizers: &[LocalDataCommitment::Randomness],
     memo: &[u8; 32],
-    value_balance: i64,
+    value_balance: AleoAmount,
     network_id: u8,
 ) -> Result<(), SynthesisError>
 where
@@ -1347,7 +1347,7 @@ where
     {
         let mut cs = cs.ns(|| "Check that the value balance is valid.");
 
-        let given_value_balance = Int64::alloc_input_fe(cs.ns(|| "given_value_balance"), value_balance)?;
+        let given_value_balance = Int64::alloc_input_fe(cs.ns(|| "given_value_balance"), value_balance.0)?;
 
         let mut candidate_value_balance = Int64::zero();
 

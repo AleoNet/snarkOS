@@ -1,10 +1,9 @@
-use crate::dpc::base_dpc::{
+use crate::base_dpc::{
     inner_circuit::InnerCircuit,
     inner_circuit_verifier_input::InnerCircuitVerifierInput,
     outer_circuit::OuterCircuit,
     outer_circuit_verifier_input::OuterCircuitVerifierInput,
-    program::DPCProgram,
-    program_circuit::{ProgramCircuit, ProgramLocalData},
+    program::{NoopCircuit, ProgramLocalData},
     transaction::DPCTransaction,
     BaseDPCComponents,
     LocalData as DPCLocalData,
@@ -153,8 +152,8 @@ impl BaseDPCComponents for Components {
     type InnerSNARKGadget = InnerSNARKGadget;
     type MerkleHashGadget = MerkleTreeCRHGadget;
     type MerkleParameters = CommitmentMerkleParameters;
+    type NoopProgramSNARK = NoopProgramSNARK<Self>;
     type OuterSNARK = ProofCheckNIZK;
-    type ProgramSNARK = ProgramSNARK<Self>;
     type ProgramSNARKGadget = ProgramSNARKGadget;
 }
 
@@ -179,10 +178,9 @@ pub type EncryptedRecordCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, Encry
 pub type SerialNumberNonce = BoweHopwoodPedersenCompressedCRH<EdwardsBls, SnNonceWindow>;
 pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW, ProgramVkHashWindow>;
 
-pub type Program = DPCProgram<Components>;
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
-pub type ProgramSNARK<C> = GM17<InnerPairing, ProgramCircuit<C>, ProgramLocalData<C>>;
+pub type NoopProgramSNARK<C> = GM17<InnerPairing, NoopCircuit<C>, ProgramLocalData<C>>;
 pub type PRF = Blake2s;
 
 pub type Tx = DPCTransaction<Components>;

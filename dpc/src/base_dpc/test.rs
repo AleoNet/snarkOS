@@ -1,23 +1,23 @@
 use super::instantiated::*;
-use crate::dpc::base_dpc::{
+use crate::base_dpc::{
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
-    program::PrivateProgramInput,
-    program_circuit::ProgramCircuit,
+    program::*,
+    record::record_encryption::*,
     record_payload::RecordPayload,
-    records::record_encryption::*,
     BaseDPCComponents,
     ExecuteContext,
     DPC,
 };
+use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
-    algorithms::{CommitmentScheme, MerkleParameters, CRH, SNARK},
+    algorithms::{MerkleParameters, CRH, SNARK},
+    dpc::{DPCScheme, Program, Record},
     gadgets::r1cs::{ConstraintSystem, TestConstraintSystem},
     objects::{AccountScheme, LedgerScheme},
 };
-
 use snarkos_objects::{
     dpc::DPCTransactions,
     Account,
@@ -35,11 +35,7 @@ use itertools::Itertools;
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
-#[cfg(debug_assertions)]
-use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
-
-#[cfg(debug_assertions)]
-use crate::dpc::base_dpc::program_circuit::ProgramLocalData;
+type L = Ledger<Tx, CommitmentMerkleParameters>;
 
 #[test]
 fn test_execute_base_dpc_constraints() {
@@ -52,14 +48,24 @@ fn test_execute_base_dpc_constraints() {
     // "always-accept" program.
     let ledger_parameters = CommitmentMerkleParameters::setup(&mut rng);
     let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
-    let program_snark_pp = InstantiatedDPC::generate_program_snark_parameters(&system_parameters, &mut rng).unwrap();
-    #[cfg(debug_assertions)]
-    let program_snark_pvk: PreparedVerifyingKey<_> = program_snark_pp.verification_key.clone().into();
+    let noop_program_snark_pp =
+        InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+    let alternate_noop_program_snark_pp =
+        InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
-    let program_snark_vk_bytes = to_bytes![
+    let noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
             &system_parameters.program_verification_key_hash,
-            &to_bytes![program_snark_pp.verification_key].unwrap()
+            &to_bytes![noop_program_snark_pp.verification_key].unwrap()
+        )
+        .unwrap()
+    ]
+    .unwrap();
+
+    let alternate_noop_program_id = to_bytes![
+        ProgramVerificationKeyHash::hash(
+            &system_parameters.program_verification_key_hash,
+            &to_bytes![alternate_noop_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()
     ]
@@ -102,8 +108,8 @@ fn test_execute_base_dpc_constraints() {
         true,
         0,
         &RecordPayload::default(),
-        &Program::new(program_snark_vk_bytes.clone()),
-        &Program::new(program_snark_vk_bytes.clone()),
+        &alternate_noop_program_id,
+        &alternate_noop_program_id,
         &mut rng,
     )
     .unwrap();
@@ -125,17 +131,16 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     // Set the new record's program to be the "always-accept" program.
-    let new_program = Program::new(program_snark_vk_bytes.clone());
 
     let new_record_owners = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
-    let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![noop_program_id.clone(); NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![noop_program_id.clone(); NUM_OUTPUT_RECORDS];
     let memo = [0u8; 32];
 
-    let context = DPC::execute_helper(
+    let context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
         &system_parameters,
         &old_records,
         &old_account_private_keys,
@@ -143,21 +148,56 @@ fn test_execute_base_dpc_constraints() {
         &new_is_dummy_flags,
         &new_values,
         &new_payloads,
-        &new_birth_programs,
-        &new_death_programs,
+        &new_birth_program_ids,
+        &new_death_program_ids,
         &memo,
         network_id,
-        &ledger,
         &mut rng,
     )
     .unwrap();
 
+    let local_data = context.into_local_data();
+
+    // Generate the program proofs
+
+    let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
+    let alternate_noop_program =
+        NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(alternate_noop_program_id);
+
+    let mut old_proof_and_vk = vec![];
+    for i in 0..NUM_INPUT_RECORDS {
+        let private_input = alternate_noop_program
+            .execute(
+                &alternate_noop_program_snark_pp.proving_key,
+                &alternate_noop_program_snark_pp.verification_key,
+                &local_data,
+                i as u8,
+                &mut rng,
+            )
+            .unwrap();
+
+        old_proof_and_vk.push(private_input);
+    }
+
+    let mut new_proof_and_vk = vec![];
+    for j in 0..NUM_OUTPUT_RECORDS {
+        let private_input = noop_program
+            .execute(
+                &noop_program_snark_pp.proving_key,
+                &noop_program_snark_pp.verification_key,
+                &local_data,
+                (NUM_INPUT_RECORDS + j) as u8,
+                &mut rng,
+            )
+            .unwrap();
+
+        new_proof_and_vk.push(private_input);
+    }
+
     let ExecuteContext {
-        system_parameters: _comm_crh_sig_pp,
-        ledger_digest,
+        system_parameters: _,
 
         old_records,
-        old_witnesses,
         old_account_private_keys,
         old_serial_numbers,
         old_randomizers: _,
@@ -165,90 +205,39 @@ fn test_execute_base_dpc_constraints() {
         new_records,
         new_sn_nonce_randomness,
         new_commitments,
+
+        new_records_encryption_randomness,
+        new_encrypted_records: _,
+        new_encrypted_record_hashes,
+
         program_commitment,
         program_randomness,
-        local_data_root,
+        local_data_merkle_tree,
         local_data_commitment_randomizers,
         value_balance,
+        memorandum,
+        network_id,
     } = context;
 
-    // Generate the program proofs
+    let local_data_root = local_data_merkle_tree.root();
 
-    let mut old_proof_and_vk = vec![];
-    for i in 0..NUM_INPUT_RECORDS {
-        let proof = ProgramSNARK::prove(
-            &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_root, i as u8),
-            &mut rng,
-        )
-        .expect("Proof should work");
-        #[cfg(debug_assertions)]
-        {
-            let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_root.clone(),
-                position: i as u8,
-            };
-            assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
+    // Construct the ledger witnesses
+    let ledger_digest = ledger.digest().expect("could not get digest");
+
+    // Generate the ledger membership witnesses
+    let mut old_witnesses = Vec::with_capacity(NUM_INPUT_RECORDS);
+
+    // Compute the ledger membership witness and serial number from the old records.
+    for record in old_records.iter() {
+        if record.is_dummy() {
+            old_witnesses.push(MerklePath::default());
+        } else {
+            let witness = ledger.prove_cm(&record.commitment()).unwrap();
+            old_witnesses.push(witness);
         }
-        let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
-            verification_key: program_snark_pp.verification_key.clone(),
-            proof,
-        };
-        old_proof_and_vk.push(private_input);
-    }
-
-    let mut new_proof_and_vk = vec![];
-    for j in 0..NUM_OUTPUT_RECORDS {
-        let proof = ProgramSNARK::prove(
-            &program_snark_pp.proving_key,
-            ProgramCircuit::new(&system_parameters, &local_data_root, j as u8),
-            &mut rng,
-        )
-        .expect("Proof should work");
-
-        #[cfg(debug_assertions)]
-        {
-            let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                local_data_commitment_parameters: system_parameters.local_data_commitment.parameters().clone(),
-                local_data_root: local_data_root.clone(),
-                position: j as u8,
-            };
-            assert!(ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof).expect("Proof should verify"));
-        }
-
-        let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
-            verification_key: program_snark_pp.verification_key.clone(),
-            proof,
-        };
-        new_proof_and_vk.push(private_input);
-    }
-
-    // Encrypt the new records
-
-    let mut new_records_encryption_randomness = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-    let mut new_encrypted_records = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-
-    for record in &new_records {
-        let (record_encryption_randomness, encrypted_record) =
-            RecordEncryption::encrypt_record(&system_parameters, record, &mut rng).unwrap();
-
-        new_records_encryption_randomness.push(record_encryption_randomness);
-        new_encrypted_records.push(encrypted_record);
-    }
-
-    // Construct the ciphertext hashes
-
-    let mut new_encrypted_record_hashes = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-
-    for encrypted_record in &new_encrypted_records {
-        let encrypted_record_hash =
-            RecordEncryption::encrypted_record_hash(&system_parameters, &encrypted_record).unwrap();
-        new_encrypted_record_hashes.push(encrypted_record_hash);
     }
 
     // Prepare record encryption components used in the inner SNARK
-
     let mut new_records_encryption_gadget_components = Vec::with_capacity(NUM_OUTPUT_RECORDS);
     for (record, ciphertext_randomness) in new_records.iter().zip_eq(&new_records_encryption_randomness) {
         let record_encryption_gadget_components =
@@ -319,9 +308,9 @@ fn test_execute_base_dpc_constraints() {
             &system_parameters,
             ledger.parameters(),
             &ledger_digest,
-            old_records,
+            &old_records,
             &old_witnesses,
-            old_account_private_keys,
+            &old_account_private_keys,
             &old_serial_numbers,
             &new_records,
             &new_sn_nonce_randomness,
@@ -355,7 +344,7 @@ fn test_execute_base_dpc_constraints() {
         &old_serial_numbers,
         &new_commitments,
         &new_encrypted_record_hashes,
-        &memo,
+        &memorandum,
         value_balance,
         network_id,
         &inner_snark_vk,
