@@ -44,7 +44,7 @@ impl MinerInstance {
         task::spawn(async move {
             let context = self.server_context.clone();
             let local_address = *self.server_context.local_address.read().await;
-            info!("Initializing miner");
+            info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
 
             loop {

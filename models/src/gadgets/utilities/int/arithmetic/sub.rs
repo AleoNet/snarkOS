@@ -4,7 +4,7 @@ use crate::{
         r1cs::ConstraintSystem,
         utilities::{
             arithmetic::{Add, Neg, Sub},
-            int::{Int128, Int16, Int32, Int64, Int8},
+            int::Int64,
         },
     },
 };
@@ -26,4 +26,4 @@ macro_rules! sub_int_impl {
     )*)
 }
 
-sub_int_impl!(Int8 Int16 Int32 Int64 Int128);
+sub_int_impl!(Int64);

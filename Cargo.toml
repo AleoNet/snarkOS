@@ -53,7 +53,7 @@ snarkos-rpc = { path = "./rpc", version = "0.8.0" }
 snarkos-storage = { path = "./storage", version = "0.8.0" }
 snarkos-utilities = { path = "./utilities", version = "0.8.0" }
 
-clap = { version = "2.33.2" }
+clap = { version = "2.33.3" }
 colored = { version = "2.0" }
 dirs = { version = "3.0.1" }
 env_logger = { version = "0.7.1" }
@@ -61,7 +61,8 @@ hex = { version = "0.4.1" }
 log = { version = "0.4.11" }
 rand = { version = "0.7" }
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "0.2.13", features = ["full"] }
+tokio = { version = "0.2.22", features = ["full"] }
+toml = { version = "0.5.6" }
 
 [dev-dependencies]
 rusty-hook = { version = "0.11.2" }

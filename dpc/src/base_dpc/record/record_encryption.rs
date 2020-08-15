@@ -8,7 +8,7 @@ use snarkos_algorithms::encoding::Elligator2;
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, CRH},
-    curves::{AffineCurve, ModelParameters, ProjectiveCurve},
+    curves::{AffineCurve, ModelParameters, One, ProjectiveCurve},
     dpc::{DPCComponents, Record, RecordSerializerScheme},
 };
 use snarkos_objects::{AccountAddress, AccountViewKey};
@@ -44,9 +44,10 @@ impl<C: BaseDPCComponents> Default for RecordEncryptionGadgetComponents<C> {
     fn default() -> Self {
         // TODO (raychu86) Fix the lengths to be generic
         let record_encoding_length = 7;
+        let base_field_one = <C::EncryptionModelParameters as ModelParameters>::BaseField::one();
         let base_field_default = <C::EncryptionModelParameters as ModelParameters>::BaseField::default();
 
-        let record_field_elements = vec![base_field_default; record_encoding_length];
+        let record_field_elements = vec![base_field_one; record_encoding_length];
         let record_group_encoding = vec![(base_field_default, base_field_default); record_encoding_length];
 
         let ciphertext_selectors = vec![false; record_encoding_length + 1];

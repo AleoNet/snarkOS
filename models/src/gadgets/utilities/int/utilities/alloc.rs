@@ -7,7 +7,7 @@ use crate::{
             alloc::AllocGadget,
             boolean::{AllocatedBit, Boolean},
             eq::EqGadget,
-            int::{Int, Int128, Int16, Int32, Int64, Int8},
+            int::{Int, Int64},
             ToBitsGadget,
         },
     },
@@ -102,7 +102,7 @@ macro_rules! alloc_int_impl {
     )*)
 }
 
-alloc_int_impl!(Int8 Int16 Int32 Int64 Int128);
+alloc_int_impl!(Int64);
 
 /// Alloc the unsigned integer through field elements rather purely bits
 /// to reduce the number of input allocations.
@@ -155,4 +155,4 @@ macro_rules! alloc_input_fe {
     )*)
 }
 
-alloc_input_fe!(Int8 Int16 Int32 Int64 Int128);
+alloc_input_fe!(Int64);
