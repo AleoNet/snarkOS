@@ -241,15 +241,15 @@ impl_params!(PoswSNARKVKParameters, posw_snark_vk_test, "posw_snark_vk", 40807);
 
 // Program SNARK
 impl_params!(
-    ProgramSNARKPKParameters,
-    program_snark_pk_test,
-    "program_snark_pk",
+    NoopProgramSNARKPKParameters,
+    noop_program_snark_pk_test,
+    "noop_program_snark_pk",
     348514
 );
 impl_params!(
-    ProgramSNARKVKParameters,
-    program_snark_vk_test,
-    "program_snark_vk",
+    NoopProgramSNARKVKParameters,
+    noop_program_snark_vk_test,
+    "noop_program_snark_vk",
     1068
 );
 

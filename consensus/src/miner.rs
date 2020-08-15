@@ -1,8 +1,5 @@
 use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::{
-    base_dpc::{instantiated::*, parameters::PublicParameters},
-    dpc::base_dpc::record::DPCRecord,
-};
+use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{LoadableMerkleParameters, CRH},
@@ -64,12 +61,11 @@ impl Miner {
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let program_vk_hash = to_bytes![ProgramVerificationKeyHash::hash(
             &parameters.system_parameters.program_verification_key_hash,
-            &to_bytes![parameters.program_snark_parameters.verification_key]?
+            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 
-        let new_program = Program::new(program_vk_hash.clone());
-        let new_birth_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
-        let new_death_programs = vec![new_program.clone(); NUM_OUTPUT_RECORDS];
+        let new_birth_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
             if self.consensus.network != transaction.network {

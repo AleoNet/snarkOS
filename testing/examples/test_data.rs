@@ -1,7 +1,7 @@
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::dpc::{DPCScheme, Record};
+use snarkos_models::dpc::{DPCScheme, Program, Record};
 use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkos_testing::consensus::*;
 use snarkos_utilities::bytes::ToBytes;
@@ -113,8 +113,8 @@ fn send<R: Rng>(
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let input_programs = vec![FIXTURE.program.clone(); NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.clone(); NUM_OUTPUT_RECORDS];
+    let input_programs = vec![FIXTURE.program.into_compact_repr(); NUM_INPUT_RECORDS];
+    let output_programs = vec![FIXTURE.program.into_compact_repr(); NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
