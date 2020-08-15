@@ -84,9 +84,15 @@ debug-assertions = false
 [profile.dev]
 opt-level = 0
 
+[profile.test.package."*"]
+opt-level = 0
+
 [profile.test]
-opt-level = 3 # necessary for DPC testing
+opt-level = 0
 lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
+
+[profile.test.package.snarkos-dpc]
+opt-level = 3 # necessary for DPC testing
