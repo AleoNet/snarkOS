@@ -86,34 +86,9 @@ impl<C: BaseDPCComponents> NoopProgramSNARKParameters<C> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
-pub struct DummyProgramSNARKParameters<C: BaseDPCComponents> {
-    pub proving_key: <C::DummyProgramSNARK as SNARK>::ProvingParameters,
-    pub verification_key: <C::DummyProgramSNARK as SNARK>::VerificationParameters,
-}
-
-impl<C: BaseDPCComponents> DummyProgramSNARKParameters<C> {
-    // TODO (howardwu): Why are we not preparing the VK here?
-    pub fn load() -> IoResult<Self> {
-        let proving_key: <C::DummyProgramSNARK as SNARK>::ProvingParameters = From::from(FromBytes::read(
-            DummyProgramSNARKPKParameters::load_bytes()?.as_slice(),
-        )?);
-        let verification_key = From::from(<C::DummyProgramSNARK as SNARK>::VerificationParameters::read(
-            DummyProgramSNARKVKParameters::load_bytes()?.as_slice(),
-        )?);
-
-        Ok(Self {
-            proving_key,
-            verification_key,
-        })
-    }
-}
-
-#[derive(Derivative)]
-#[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct PublicParameters<C: BaseDPCComponents> {
     pub system_parameters: SystemParameters<C>,
     pub noop_program_snark_parameters: NoopProgramSNARKParameters<C>,
-    pub dummy_program_snark_parameters: DummyProgramSNARKParameters<C>,
     pub inner_snark_parameters: (
         Option<<C::InnerSNARK as SNARK>::ProvingParameters>,
         <C::InnerSNARK as SNARK>::PreparedVerificationParameters,
@@ -167,10 +142,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.noop_program_snark_parameters
     }
 
-    pub fn dummy_program_snark_parameters(&self) -> &DummyProgramSNARKParameters<C> {
-        &self.dummy_program_snark_parameters
-    }
-
     pub fn program_verification_key_commitment_parameters(&self) -> &C::ProgramVerificationKeyCommitment {
         &self.system_parameters.program_verification_key_commitment
     }
@@ -194,7 +165,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn load(verify_only: bool) -> IoResult<Self> {
         let system_parameters = SystemParameters::<C>::load()?;
         let noop_program_snark_parameters = NoopProgramSNARKParameters::<C>::load()?;
-        let dummy_program_snark_parameters = DummyProgramSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
             let inner_snark_pk = match verify_only {
@@ -231,7 +201,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         Ok(Self {
             system_parameters,
             noop_program_snark_parameters,
-            dummy_program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
         })
@@ -240,7 +209,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
     pub fn load_vk_direct() -> IoResult<Self> {
         let system_parameters = SystemParameters::<C>::load()?;
         let noop_program_snark_parameters = NoopProgramSNARKParameters::<C>::load()?;
-        let dummy_program_snark_parameters = DummyProgramSNARKParameters::<C>::load()?;
 
         let inner_snark_parameters = {
             let inner_snark_pk = None;
@@ -263,7 +231,6 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         Ok(Self {
             system_parameters,
             noop_program_snark_parameters,
-            dummy_program_snark_parameters,
             inner_snark_parameters,
             outer_snark_parameters,
         })

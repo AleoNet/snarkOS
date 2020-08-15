@@ -104,6 +104,9 @@ pub struct TransactionInfo {
     /// Transaction Memo
     pub memo: String,
 
+    /// Network id of the transaction
+    pub network_id: u8,
+
     /// Merkle tree digest
     pub digest: String,
 

@@ -53,6 +53,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `old_serial_numbers`    | array  | The list of old record serial numbers     |
 | `new_commitments`       | array  | The list of new record commitments        |
 | `memo`                  | string | The transaction memo                      |
+| `network_id`            | number | The transaction network id                |
 | `digest`                | string | The merkle tree digest                    |
 | `transaction_proof`     | string | The transaction zero knowledge proof      |
 | `program_commitment`    | string | The program verification key commitment   |
@@ -439,28 +440,6 @@ curl --user username:password --data-binary '{
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## fetchrecordcommitments
-Returns a list of record commitments that are stored on the full node.
-
-### Protected Endpoint
-
-Yes
-
-### Arguments
-
-`None`
-
-### Response
-
-| Parameter |  Type |             Description            |
-|:---------:|:-----:|:---------------------------------- |
-| `result`  | array | The list stored record commitments |
-
-### Example
-```ignore
-curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "fetchrecordcommitments", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
-```
-
 ## getrawrecord
 Returns the hex encoded bytes of a record from its record commitment.
 
@@ -483,6 +462,50 @@ Yes
 ### Example
 ```ignore
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawrecord", "params": ["86be61d5f3bd795e31615d6834efefca01ad023d57c0383e2231e094bcabfc05"] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
+```
+
+## getrecordcommitmentcount
+Returns the number of record commitments that are stored on the full node.
+
+### Protected Endpoint
+
+Yes
+
+### Arguments
+
+`None`
+
+### Response
+
+| Parameter |  Type  |               Description               |
+|:---------:|:------:|:--------------------------------------- |
+| `result`  | number | The number of stored record commitments |
+
+### Example
+```ignore
+curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrecordcommitmentcount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
+```
+
+## getrecordcommitments
+Returns a list of record commitments that are stored on the full node.
+
+### Protected Endpoint
+
+Yes
+
+### Arguments
+
+`None`
+
+### Response
+
+| Parameter |  Type |              Description              |
+|:---------:|:-----:|:------------------------------------- |
+| `result`  | array | The list of stored record commitments |
+
+### Example
+```ignore
+curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrecordcommitments", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
 

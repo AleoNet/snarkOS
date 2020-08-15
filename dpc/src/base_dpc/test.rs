@@ -3,7 +3,7 @@ use crate::base_dpc::{
     execute_inner_proof_gadget,
     execute_outer_proof_gadget,
     inner_circuit::InnerCircuit,
-    program::{DummyProgram, NoopProgram},
+    program::*,
     record::record_encryption::*,
     record_payload::RecordPayload,
     BaseDPCComponents,
@@ -50,8 +50,8 @@ fn test_execute_base_dpc_constraints() {
     let system_parameters = InstantiatedDPC::generate_system_parameters(&mut rng).unwrap();
     let noop_program_snark_pp =
         InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
-    let dummy_program_snark_pp =
-        InstantiatedDPC::generate_dummy_program_snark_parameters(&system_parameters, &mut rng).unwrap();
+    let alternate_noop_program_snark_pp =
+        InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
     let noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
@@ -62,10 +62,10 @@ fn test_execute_base_dpc_constraints() {
     ]
     .unwrap();
 
-    let dummy_program_id = to_bytes![
+    let alternate_noop_program_id = to_bytes![
         ProgramVerificationKeyHash::hash(
             &system_parameters.program_verification_key_hash,
-            &to_bytes![dummy_program_snark_pp.verification_key].unwrap()
+            &to_bytes![alternate_noop_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()
     ]
@@ -108,8 +108,8 @@ fn test_execute_base_dpc_constraints() {
         true,
         0,
         &RecordPayload::default(),
-        &dummy_program_id,
-        &dummy_program_id,
+        &alternate_noop_program_id,
+        &alternate_noop_program_id,
         &mut rng,
     )
     .unwrap();
@@ -161,14 +161,15 @@ fn test_execute_base_dpc_constraints() {
     // Generate the program proofs
 
     let noop_program = NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_id);
-    let dummy_program = DummyProgram::<_, <Components as BaseDPCComponents>::DummyProgramSNARK>::new(dummy_program_id);
+    let alternate_noop_program =
+        NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(alternate_noop_program_id);
 
     let mut old_proof_and_vk = vec![];
     for i in 0..NUM_INPUT_RECORDS {
-        let private_input = dummy_program
+        let private_input = alternate_noop_program
             .execute(
-                &dummy_program_snark_pp.proving_key,
-                &dummy_program_snark_pp.verification_key,
+                &alternate_noop_program_snark_pp.proving_key,
+                &alternate_noop_program_snark_pp.verification_key,
                 &local_data,
                 i as u8,
                 &mut rng,

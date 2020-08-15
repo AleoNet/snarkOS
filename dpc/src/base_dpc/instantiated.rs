@@ -3,7 +3,7 @@ use crate::base_dpc::{
     inner_circuit_verifier_input::InnerCircuitVerifierInput,
     outer_circuit::OuterCircuit,
     outer_circuit_verifier_input::OuterCircuitVerifierInput,
-    program::{DummyCircuit, NoopCircuit, ProgramLocalData},
+    program::{NoopCircuit, ProgramLocalData},
     transaction::DPCTransaction,
     BaseDPCComponents,
     LocalData as DPCLocalData,
@@ -146,7 +146,6 @@ impl DPCComponents for Components {
 }
 
 impl BaseDPCComponents for Components {
-    type DummyProgramSNARK = DummyProgramSNARK<Self>;
     type EncryptionGroup = EdwardsBls;
     type EncryptionModelParameters = EdwardsParameters;
     type InnerSNARK = CoreCheckNIZK;
@@ -182,7 +181,6 @@ pub type ProgramVerificationKeyHash = BoweHopwoodPedersenCompressedCRH<EdwardsSW
 pub type CoreCheckNIZK = Groth16<InnerPairing, InnerCircuit<Components>, InnerCircuitVerifierInput<Components>>;
 pub type ProofCheckNIZK = Groth16<OuterPairing, OuterCircuit<Components>, OuterCircuitVerifierInput<Components>>;
 pub type NoopProgramSNARK<C> = GM17<InnerPairing, NoopCircuit<C>, ProgramLocalData<C>>;
-pub type DummyProgramSNARK<C> = GM17<InnerPairing, DummyCircuit<C>, ProgramLocalData<C>>;
 pub type PRF = Blake2s;
 
 pub type Tx = DPCTransaction<Components>;

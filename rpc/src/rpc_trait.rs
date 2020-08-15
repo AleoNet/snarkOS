@@ -79,11 +79,14 @@ pub trait ProtectedRpcFunctions {
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError>;
 
+    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrecordcommitments.md"))]
+    fn get_record_commitments(&self) -> Result<Vec<String>, RpcError>;
+
     #[cfg_attr(
         nightly,
-        doc(include = "../documentation/private_endpoints/fetchrecordcommitments.md")
+        doc(include = "../documentation/private_endpoints/getrecordcommitmentcount.md")
     )]
-    fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError>;
+    fn get_record_commitment_count(&self) -> Result<usize, RpcError>;
 
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrawrecord.md"))]
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;

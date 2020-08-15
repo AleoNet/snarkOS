@@ -10,13 +10,13 @@ use serde::Serialize;
 /// Hardcoded bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:14130"
+pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize)]
 pub struct Config {
     // Flags
-    pub network: String,
+    pub network: u8,
     pub jsonrpc: bool,
     pub is_bootnode: bool,
     pub is_miner: bool,
@@ -44,16 +44,16 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             // Flags
-            network: "mainnet".into(),
+            network: 1,
             jsonrpc: true,
             is_bootnode: false,
             is_miner: true,
             quiet: false,
             // Options
             ip: "0.0.0.0".into(),
-            port: 4130,
-            path: "snarkos_db".into(),
-            bootnodes: MAINNET_BOOTNODES
+            port: 4131,
+            path: "snarkos_testnet_1".into(),
+            bootnodes: TESTNET_BOOTNODES
                 .iter()
                 .map(|node| (*node).to_string())
                 .collect::<Vec<String>>(),
@@ -75,20 +75,20 @@ impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
-            "network" => self.network(arguments.is_present(option)),
-            "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
+            "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "quiet" => self.quiet(arguments.is_present(option)),
             // Options
-            "ip" => self.ip(arguments.value_of(option)),
-            "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
-            "path" => self.path(arguments.value_of(option)),
-            "miner-address" => self.miner_address(arguments.value_of(option)),
             "connect" => self.connect(arguments.value_of(option)),
+            "ip" => self.ip(arguments.value_of(option)),
+            "miner-address" => self.miner_address(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
-            "min-peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "max-peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "min-peers" => self.min_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "network" => self.network(clap::value_t!(arguments.value_of(*option), u8).ok()),
+            "path" => self.path(arguments.value_of(option)),
+            "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
@@ -97,19 +97,29 @@ impl Config {
     }
 
     /// Sets `network` to the specified network, overriding its previous state.
-    fn network(&mut self, argument: bool) {
-        match argument {
-            true => {
-                self.path = "snarkos_testnet_db".into();
-                self.port = 18080;
-                self.bootnodes = TESTNET_BOOTNODES
-                    .iter()
-                    .map(|node| (*node).to_string())
-                    .collect::<Vec<String>>();
-                self.network = "testnet".into();
+    fn network(&mut self, argument: Option<u8>) {
+        if let Some(network_id) = argument {
+            match network_id {
+                0 => {
+                    self.path = "snarkos_db".into();
+                    self.port = 4130;
+                    self.bootnodes = MAINNET_BOOTNODES
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+                    self.network = network_id;
+                }
+                _ => {
+                    self.path = format!("snarkos_testnet_{}", network_id);
+                    self.port = 4130 + (network_id as u16);
+                    self.bootnodes = TESTNET_BOOTNODES
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+                    self.network = network_id;
+                }
             }
-            false => self.network = "mainnet".into(),
-        };
+        }
     }
 
     fn no_jsonrpc(&mut self, argument: bool) {
@@ -208,15 +218,9 @@ pub struct ConfigCli;
 impl CLI for ConfigCli {
     type Config = Config;
 
-    const ABOUT: AboutType = "Start a skeleton blockchain miner (include -h for more options)";
-    const FLAGS: &'static [FlagType] = &[
-        flag::NETWORK,
-        flag::NO_JSONRPC,
-        flag::IS_BOOTNODE,
-        flag::IS_MINER,
-        flag::QUIET,
-    ];
-    const NAME: NameType = "snarkos-node";
+    const ABOUT: AboutType = "Start an Aleo Node (include -h for more options)";
+    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER, flag::QUIET];
+    const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
         option::PORT,
@@ -226,6 +230,7 @@ impl CLI for ConfigCli {
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
         option::MAX_PEERS,
+        option::NETWORK,
         option::RPC_PORT,
         option::RPC_USERNAME,
         option::RPC_PASSWORD,

@@ -5,7 +5,7 @@ use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
     objects::Transaction,
 };
-use snarkos_objects::amount::AleoAmount;
+use snarkos_objects::{AleoAmount, Network};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     serialize::{CanonicalDeserialize, CanonicalSerialize},
@@ -27,7 +27,7 @@ use std::{
 // TODO (howardwu): Remove the public visibility here
 pub struct DPCTransaction<C: BaseDPCComponents> {
     /// The network this transaction is included in
-    pub network_id: u8,
+    pub network: Network,
 
     pub ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
@@ -68,7 +68,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
         program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
         local_data_root: <C::LocalDataCRH as CRH>::Output,
         value_balance: AleoAmount,
-        network_id: u8,
+        network: Network,
         signatures: Vec<<C::AccountSignature as SignatureScheme>::Output>,
         encrypted_records: Vec<EncryptedRecord<C>>,
     ) -> Self {
@@ -81,7 +81,7 @@ impl<C: BaseDPCComponents> DPCTransaction<C> {
             program_commitment,
             local_data_root,
             value_balance,
-            network_id,
+            network,
             signatures,
             encrypted_records,
         }
@@ -121,7 +121,7 @@ impl<C: BaseDPCComponents> Transaction for DPCTransaction<C> {
     }
 
     fn network_id(&self) -> u8 {
-        self.network_id
+        self.network.id()
     }
 
     fn ledger_digest(&self) -> &Self::Digest {
@@ -181,7 +181,7 @@ impl<C: BaseDPCComponents> ToBytes for DPCTransaction<C> {
         self.local_data_root.write(&mut writer)?;
 
         self.value_balance.write(&mut writer)?;
-        self.network_id.write(&mut writer)?;
+        self.network.write(&mut writer)?;
 
         for signature in &self.signatures {
             signature.write(&mut writer)?;
@@ -225,7 +225,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         let local_data_root: <C::LocalDataCRH as CRH>::Output = FromBytes::read(&mut reader)?;
 
         let value_balance: AleoAmount = FromBytes::read(&mut reader)?;
-        let network_id: u8 = FromBytes::read(&mut reader)?;
+        let network: Network = FromBytes::read(&mut reader)?;
 
         // Read the signatures
         let num_signatures = C::NUM_INPUT_RECORDS;
@@ -245,7 +245,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
         }
 
         Ok(Self {
-            network_id,
+            network,
             ledger_digest,
             old_serial_numbers,
             new_commitments,
@@ -266,7 +266,7 @@ impl<C: BaseDPCComponents> fmt::Debug for DPCTransaction<C> {
         write!(
             f,
             "DPCTransaction {{ network_id: {:?}, digest: {:?}, old_serial_numbers: {:?}, new_commitments: {:?}, program_commitment: {:?}, local_data_root: {:?}, value_balance: {:?}, signatures: {:?}, transaction_proof: {:?}, memorandum: {:?} }}",
-            self.network_id,
+            self.network,
             self.ledger_digest,
             self.old_serial_numbers,
             self.new_commitments,

@@ -8,7 +8,7 @@ use snarkos_models::{
     objects::{account::AccountScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{Account, AccountAddress};
+use snarkos_objects::{Account, AccountAddress, Network};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_posw::PoswMarlin;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
@@ -59,7 +59,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network_id,
+        network: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
     };
 
@@ -72,11 +72,11 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
 
-    let program_vk_hash = parameters
+    let noop_program_vk_hash = parameters
         .system_parameters
         .program_verification_key_hash
         .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?;
-    let program_snark_id = to_bytes![program_vk_hash]?;
+    let noop_program_id = to_bytes![noop_program_vk_hash]?;
 
     // Generate a new account that owns the dummy input records
     let dummy_account = Account::new(
@@ -102,8 +102,8 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
             true, // The input record is dummy
             0,
             &RecordPayload::default(),
-            &program_snark_id,
-            &program_snark_id,
+            &noop_program_id,
+            &noop_program_id,
             rng,
         )?;
         old_records.push(old_record);
@@ -113,8 +113,8 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let new_birth_program_ids = vec![program_snark_id.clone(); Components::NUM_OUTPUT_RECORDS];
-    let new_death_program_ids = vec![program_snark_id.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
 
     let mut new_is_dummy_flags = vec![false];
     new_is_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
