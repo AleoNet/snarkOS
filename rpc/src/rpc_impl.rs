@@ -5,16 +5,13 @@
 use crate::{rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
-    encrypted_record::EncryptedRecord,
     instantiated::{Components, Tx},
     parameters::PublicParameters,
-    record::DPCRecord,
-    record_encryption::RecordEncryption,
 };
 use snarkos_errors::rpc::RpcError;
-use snarkos_models::{dpc::Record, objects::Transaction};
+use snarkos_models::objects::Transaction;
 use snarkos_network::{context::Context, process_transaction_internal};
-use snarkos_objects::{AccountViewKey, BlockHeaderHash};
+use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -22,7 +19,7 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
@@ -297,53 +294,6 @@ impl RpcFunctions for RpcImpl {
             difficulty_target: self.consensus.get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
             coinbase_value: coinbase_value.0 as u64,
-        })
-    }
-
-    // Record handling
-
-    /// Decrypts the record ciphertext and returns the hex encoded bytes of the record.
-    fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
-        // Read the encrypted_record
-        let encrypted_record_bytes = hex::decode(decryption_input.encrypted_record)?;
-        let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
-
-        // Read the view key
-        let account_view_key = AccountViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
-
-        // Decrypt the record ciphertext
-        let record =
-            RecordEncryption::decrypt_record(&self.parameters.system_parameters, &account_view_key, &encrypted_record)?;
-        let record_bytes = to_bytes![record]?;
-
-        Ok(hex::encode(record_bytes))
-    }
-
-    /// Returns information about a record from serialized record bytes.
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
-        let record_bytes = hex::decode(record_bytes)?;
-        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
-
-        let owner = record.owner().to_string();
-        let payload = RPCRecordPayload {
-            payload: hex::encode(to_bytes![record.payload()]?),
-        };
-        let birth_program_id = hex::encode(record.birth_program_id());
-        let death_program_id = hex::encode(record.death_program_id());
-        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
-        let commitment = hex::encode(to_bytes![record.commitment()]?);
-        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
-
-        Ok(RecordInfo {
-            owner,
-            is_dummy: record.is_dummy(),
-            value: record.value(),
-            payload,
-            birth_program_id,
-            death_program_id,
-            serial_number_nonce,
-            commitment,
-            commitment_randomness,
         })
     }
 }

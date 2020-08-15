@@ -8,7 +8,7 @@ mod protected_rpc_tests {
     };
     use snarkos_models::dpc::Record;
     use snarkos_network::Context;
-    use snarkos_objects::{AccountAddress, AccountPrivateKey};
+    use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
@@ -172,6 +172,99 @@ mod protected_rpc_tests {
     }
 
     #[test]
+    fn test_rpc_decode_record() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let parameters = load_verifying_parameters();
+        let meta = authentication();
+        let rpc = initialize_test_rpc(&storage, parameters);
+
+        let record = &DATA.records_1[0];
+
+        let method = "decoderecord";
+        let params = hex::encode(to_bytes![record].unwrap());
+        let request = format!(
+            "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [\"{}\"] }}",
+            method, params
+        );
+
+        let response = rpc.handle_request_sync(&request, meta).unwrap();
+
+        let record_info: Value = serde_json::from_str(&response).unwrap();
+
+        let record_info = record_info["result"].clone();
+
+        let owner = record.owner().to_string();
+        let is_dummy = record.is_dummy();
+        let value = record.value();
+        let birth_program_id = hex::encode(to_bytes![record.birth_program_id()].unwrap());
+        let death_program_id = hex::encode(to_bytes![record.death_program_id()].unwrap());
+        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()].unwrap());
+        let commitment = hex::encode(to_bytes![record.commitment()].unwrap());
+        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()].unwrap());
+
+        assert_eq!(owner, record_info["owner"]);
+        assert_eq!(is_dummy, record_info["is_dummy"]);
+        assert_eq!(value, record_info["value"]);
+        assert_eq!(birth_program_id, record_info["birth_program_id"]);
+        assert_eq!(death_program_id, record_info["death_program_id"]);
+        assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
+        assert_eq!(commitment, record_info["commitment"]);
+        assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_rpc_decrypt_record() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let parameters = load_verifying_parameters();
+        let meta = authentication();
+        let rpc = initialize_test_rpc(&storage, parameters);
+
+        let system_parameters = &FIXTURE_VK.parameters.system_parameters;
+        let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
+
+        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let ciphertexts = transaction.encrypted_records;
+
+        let records = &DATA.records_1;
+
+        let view_key = AccountViewKey::from_private_key(
+            &system_parameters.account_signature,
+            &system_parameters.account_commitment,
+            &miner_acc.private_key,
+        )
+        .unwrap();
+
+        for (ciphertext, record) in ciphertexts.iter().zip(records) {
+            let ciphertext_string = hex::encode(to_bytes![ciphertext].unwrap());
+            let account_view_key = view_key.to_string();
+
+            let params = DecryptRecordInput {
+                encrypted_record: ciphertext_string,
+                account_view_key,
+            };
+            let params = serde_json::to_value(params).unwrap();
+
+            let method = "decryptrecord";
+            let request = format!(
+                "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
+                method, params
+            );
+            let response = rpc.handle_request_sync(&request, meta.clone()).unwrap();
+
+            let extracted: Value = serde_json::from_str(&response).unwrap();
+
+            let expected_result = Value::String(format!("{}", hex::encode(to_bytes![record].unwrap())));
+            assert_eq!(extracted["result"], expected_result);
+        }
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
     fn test_rpc_create_raw_transaction() {
         let storage = Arc::new(FIXTURE.ledger());
         let parameters = FIXTURE.parameters.clone();
@@ -240,11 +333,8 @@ mod protected_rpc_tests {
 
         let method = "createaccount".to_string();
 
-        // Request without specified metadata
-        let request_without_metadata = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc
-            .handle_request_sync(&request_without_metadata, meta.clone())
-            .unwrap();
+        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
+        let response = rpc.handle_request_sync(&request, meta.clone()).unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -253,9 +343,8 @@ mod protected_rpc_tests {
         let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
         let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
 
-        // Request without specified metadata
-        let request_without_metadata = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc.handle_request_sync(&request_without_metadata, meta).unwrap();
+        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
+        let response = rpc.handle_request_sync(&request, meta).unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 

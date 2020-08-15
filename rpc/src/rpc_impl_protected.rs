@@ -4,12 +4,18 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
+    encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
+    record_encryption::RecordEncryption,
     record_payload::RecordPayload,
 };
 use snarkos_errors::rpc::RpcError;
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::AccountScheme};
+use snarkos_models::{
+    algorithms::CRH,
+    dpc::{DPCComponents, Record},
+    objects::AccountScheme,
+};
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -110,6 +116,49 @@ impl RpcImpl {
         }
     }
 
+    /// Wrap authentication around `decode_record`
+    pub fn decode_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        if value.len() != 1 {
+            return Err(JsonRPCError::invalid_params(format!(
+                "invalid length {}, expected 1 element",
+                value.len()
+            )));
+        }
+
+        let record_bytes: String = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.decode_record(record_bytes) {
+            Ok(record) => Ok(serde_json::to_value(record).expect("record deserialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `decrypt_record`
+    pub fn decrypt_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let decrypt_record_input: DecryptRecordInput = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.decrypt_record(decrypt_record_input) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("record serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
     /// Wrap authentication around `create_account`
     pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
@@ -127,6 +176,8 @@ impl RpcImpl {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
+        d.add_method_with_meta("decoderecord", Self::decode_record_protected);
+        d.add_method_with_meta("decryptrecord", Self::decrypt_record_protected);
         d.add_method_with_meta("getrecordcommitmentcount", Self::get_record_commitment_count_protected);
         d.add_method_with_meta("getrecordcommitments", Self::get_record_commitments_protected);
         d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
@@ -331,5 +382,50 @@ impl ProtectedRpcFunctions for RpcImpl {
             }
             None => Ok("Record not found".to_string()),
         }
+    }
+
+    /// Decrypts the record ciphertext and returns the hex encoded bytes of the record.
+    fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
+        // Read the encrypted_record
+        let encrypted_record_bytes = hex::decode(decryption_input.encrypted_record)?;
+        let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
+
+        // Read the view key
+        let account_view_key = AccountViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
+
+        // Decrypt the record ciphertext
+        let record =
+            RecordEncryption::decrypt_record(&self.parameters.system_parameters, &account_view_key, &encrypted_record)?;
+        let record_bytes = to_bytes![record]?;
+
+        Ok(hex::encode(record_bytes))
+    }
+
+    /// Returns information about a record from serialized record bytes.
+    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
+        let record_bytes = hex::decode(record_bytes)?;
+        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
+
+        let owner = record.owner().to_string();
+        let payload = RPCRecordPayload {
+            payload: hex::encode(to_bytes![record.payload()]?),
+        };
+        let birth_program_id = hex::encode(record.birth_program_id());
+        let death_program_id = hex::encode(record.death_program_id());
+        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
+        let commitment = hex::encode(to_bytes![record.commitment()]?);
+        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
+
+        Ok(RecordInfo {
+            owner,
+            is_dummy: record.is_dummy(),
+            value: record.value(),
+            payload,
+            birth_program_id,
+            death_program_id,
+            serial_number_nonce,
+            commitment,
+            commitment_randomness,
+        })
     }
 }
