@@ -11,6 +11,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type ProgramCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type SerialNumber: Clone + Eq + Hash + FromBytes + ToBytes;
     type EncryptedRecord: Clone + Eq + FromBytes + ToBytes;
+    type ValueBalance: Clone + Eq + FromBytes + ToBytes;
 
     /// Returns the transaction identifier.
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError>;
@@ -34,7 +35,7 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     fn local_data_root(&self) -> &Self::LocalDataRoot;
 
     /// Returns the value balance in the transaction.
-    fn value_balance(&self) -> i64;
+    fn value_balance(&self) -> Self::ValueBalance;
 
     /// Returns the encrypted records
     fn encrypted_records(&self) -> &[Self::EncryptedRecord];

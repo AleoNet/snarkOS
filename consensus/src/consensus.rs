@@ -1,19 +1,17 @@
-use crate::{memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_algorithms::snark::gm17::PreparedVerifyingKey;
+use crate::{difficulty::bitcoin_retarget, memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
-    program::{DPCProgram, PrivateProgramInput},
-    program_circuit::{ProgramCircuit, ProgramLocalData},
+    program::NoopProgram,
     record::DPCRecord,
     record_payload::RecordPayload,
-    LocalData,
+    BaseDPCComponents,
 };
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
-    algorithms::{CommitmentScheme, CRH, SNARK},
-    dpc::{DPCComponents, DPCScheme},
+    algorithms::{CRH, SNARK},
+    dpc::{DPCComponents, DPCScheme, Program},
     objects::{AccountScheme, LedgerScheme},
 };
 use snarkos_objects::{
@@ -21,19 +19,21 @@ use snarkos_objects::{
     Account,
     AccountAddress,
     AccountPrivateKey,
+    AleoAmount,
     Block,
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
+    Network,
     PedersenMerkleRootHash,
 };
 use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
-use snarkos_utilities::bytes::FromBytes;
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -49,43 +49,27 @@ pub struct ConsensusParameters {
     /// The amount of time it should take to find a block
     pub target_block_time: i64,
 
-    /// Network identifier
-    pub network_id: u8,
+    /// Network
+    pub network: Network,
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
     pub verifier: PoswMarlin,
 }
 
-/// Calculate a block reward that halves every 1000 blocks.
-pub fn get_block_reward(block_num: u32) -> u64 {
-    100_000_000u64 / (2_u64.pow(block_num / 1000))
-}
+/// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
+pub fn get_block_reward(block_num: u32) -> AleoAmount {
+    let expected_blocks_per_hour: u32 = 100;
+    let num_years = 4;
+    let block_segments = num_years * 365 * 24 * expected_blocks_per_hour;
 
-/// Bitcoin difficulty retarget algorithm.
-pub fn bitcoin_retarget(
-    block_timestamp: i64,
-    parent_timestamp: i64,
-    target_block_time: i64,
-    parent_difficulty: u64,
-) -> u64 {
-    let mut time_elapsed = block_timestamp - parent_timestamp;
+    let aleo_denonimation = AleoAmount::COIN;
+    let initial_reward = 150i64 * aleo_denonimation;
 
-    // Limit difficulty adjustment by factor of 2
-    if time_elapsed < target_block_time / 2 {
-        time_elapsed = target_block_time / 2
-    } else if time_elapsed > target_block_time * 2 {
-        time_elapsed = target_block_time * 2
-    }
+    // The block reward halves at most 2 times - minimum is 37.5 ALEO after 8 years.
+    let num_halves = u32::min(block_num / block_segments, 2);
+    let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
-    let mut x: u64;
-    x = match parent_difficulty.checked_mul(time_elapsed as u64) {
-        Some(x) => x,
-        None => u64::max_value(),
-    };
-
-    x /= target_block_time as u64;
-
-    x
+    AleoAmount::from_bytes(reward)
 }
 
 impl ConsensusParameters {
@@ -159,33 +143,28 @@ impl ConsensusParameters {
         Ok(())
     }
 
-    /// Check if the transaction is valid
+    /// Check if the transaction is valid.
     pub fn verify_transaction(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        // TODO (raychu86) add network_id check
-
-        // Check that all the transaction proofs verify
         Ok(InstantiatedDPC::verify(parameters, transaction, ledger)?)
     }
 
-    /// Check if the block transactions are valid
-    /// Check all outpoints, verify signatures, and calculate transaction fees.
+    /// Check if the transactions are valid.
     pub fn verify_transactions(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transactions: &Vec<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        // Check that all the transaction proofs verify
         Ok(InstantiatedDPC::verify_transactions(parameters, transactions, ledger)?)
     }
 
-    /// Check if the block is valid
-    /// Verify signatures, and calculate transaction fees.
+    /// Check if the block is valid.
+    /// Verify transactions and transaction fees.
     pub fn verify_block(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
@@ -208,7 +187,7 @@ impl ConsensusParameters {
         // Verify block amounts and check that there is a single coinbase transaction
 
         let mut coinbase_transaction_count = 0;
-        let mut total_value_balance = 0;
+        let mut total_value_balance = AleoAmount::ZERO;
 
         for transaction in block.transactions.iter() {
             let value_balance = transaction.value_balance;
@@ -217,7 +196,7 @@ impl ConsensusParameters {
                 coinbase_transaction_count += 1;
             }
 
-            total_value_balance += value_balance;
+            total_value_balance = total_value_balance.add(value_balance);
         }
 
         // Check that there is only 1 coinbase transaction
@@ -227,8 +206,8 @@ impl ConsensusParameters {
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = get_block_reward(ledger.len() as u32) as i64;
-        if total_value_balance + expected_block_reward != 0 {
+        let expected_block_reward = get_block_reward(ledger.len() as u32).0;
+        if total_value_balance.0 + expected_block_reward != 0 {
             println!("total_value_balance: {:?}", total_value_balance);
             println!("expected_block_reward: {:?}", expected_block_reward);
 
@@ -335,8 +314,8 @@ impl ConsensusParameters {
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
         program_vk_hash: &Vec<u8>,
-        new_birth_programs: Vec<DPCProgram<Components>>,
-        new_death_programs: Vec<DPCProgram<Components>>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
         ledger: &MerkleTreeLedger,
         rng: &mut R,
@@ -350,7 +329,7 @@ impl ConsensusParameters {
                 return Err(ConsensusError::CoinbaseTransactionAlreadyExists());
             }
 
-            total_value_balance += transaction.value_balance.abs() as u64;
+            total_value_balance = total_value_balance.add(transaction.value_balance);
         }
 
         // Generate a new account that owns the dummy input records
@@ -379,8 +358,8 @@ impl ConsensusParameters {
                 0,
                 &RecordPayload::default(),
                 // Filler program input
-                &Program::new(program_vk_hash.clone()),
-                &Program::new(program_vk_hash.clone()),
+                &program_vk_hash,
+                &program_vk_hash,
                 rng,
             )?;
 
@@ -389,7 +368,12 @@ impl ConsensusParameters {
 
         let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance], vec![0; Components::NUM_OUTPUT_RECORDS - 1]].concat();
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Components::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
+        .concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
         let memo: [u8; 32] = rng.gen();
@@ -399,8 +383,8 @@ impl ConsensusParameters {
             old_records,
             old_account_private_keys,
             new_record_owners,
-            new_birth_programs,
-            new_death_programs,
+            new_birth_program_ids,
+            new_death_program_ids,
             new_is_dummy_flags,
             new_values,
             new_payloads,
@@ -417,8 +401,8 @@ impl ConsensusParameters {
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
-        new_birth_programs: Vec<DPCProgram<Components>>,
-        new_death_programs: Vec<DPCProgram<Components>>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
         new_is_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
@@ -426,104 +410,66 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
-        let program_snark_pvk: PreparedVerifyingKey<_> =
-            parameters.program_snark_parameters.verification_key.clone().into();
-
-        let old_death_vk_and_proof_generator = |local_data: &LocalData<Components>| {
-            let mut rng = thread_rng();
-            let mut old_proof_and_vk = vec![];
-            for i in 0..Components::NUM_INPUT_RECORDS {
-                // Instantiate death program circuit
-                let death_program_circuit =
-                    ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, i as u8);
-
-                // Generate the program proof
-                let proof = ProgramSNARK::prove(
-                    &parameters.program_snark_parameters.proving_key,
-                    death_program_circuit,
-                    &mut rng,
-                )
-                .expect("Proving should work");
-                {
-                    let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                        local_data_commitment_parameters: local_data
-                            .system_parameters
-                            .local_data_commitment
-                            .parameters()
-                            .clone(),
-                        local_data_root: local_data.local_data_root.clone(),
-                        position: i as u8,
-                    };
-                    assert!(
-                        ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
-                            .expect("Proof should verify")
-                    );
-                }
-
-                let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
-                    verification_key: parameters.program_snark_parameters.verification_key.clone(),
-                    proof,
-                };
-                old_proof_and_vk.push(private_input);
-            }
-
-            Ok(old_proof_and_vk)
-        };
-
-        let new_birth_vk_and_proof_generator = |local_data: &LocalData<Components>| {
-            let mut rng = thread_rng();
-            let mut new_proof_and_vk = vec![];
-            for j in 0..NUM_OUTPUT_RECORDS {
-                // Instantiate birth program circuit
-                let birth_program_circuit =
-                    ProgramCircuit::new(&local_data.system_parameters, &local_data.local_data_root, j as u8);
-
-                // Generate the program proof
-                let proof = ProgramSNARK::prove(
-                    &parameters.program_snark_parameters.proving_key,
-                    birth_program_circuit,
-                    &mut rng,
-                )
-                .expect("Proving should work");
-                {
-                    let program_pub_input: ProgramLocalData<Components> = ProgramLocalData {
-                        local_data_commitment_parameters: local_data
-                            .system_parameters
-                            .local_data_commitment
-                            .parameters()
-                            .clone(),
-                        local_data_root: local_data.local_data_root.clone(),
-                        position: j as u8,
-                    };
-                    assert!(
-                        ProgramSNARK::verify(&program_snark_pvk, &program_pub_input, &proof)
-                            .expect("Proof should verify")
-                    );
-                }
-                let private_input: PrivateProgramInput<Components> = PrivateProgramInput {
-                    verification_key: parameters.program_snark_parameters.verification_key.clone(),
-                    proof,
-                };
-                new_proof_and_vk.push(private_input);
-            }
-
-            Ok(new_proof_and_vk)
-        };
-
-        let (new_records, transaction) = InstantiatedDPC::execute(
-            &parameters,
+        // Offline execution to generate a DPC transaction
+        let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+            &parameters.system_parameters,
             &old_records,
             &old_account_private_keys,
-            &old_death_vk_and_proof_generator,
             &new_record_owners,
             &new_is_dummy_flags,
             &new_values,
             &new_payloads,
-            &new_birth_programs,
-            &new_death_programs,
-            &new_birth_vk_and_proof_generator,
+            &new_birth_program_ids,
+            &new_death_program_ids,
             &memo,
-            self.network_id,
+            self.network.id(),
+            rng,
+        )?;
+
+        // Construct the program proofs
+
+        let local_data = execute_context.into_local_data();
+
+        let noop_program_snark_id = to_bytes![ProgramVerificationKeyHash::hash(
+            &parameters.system_parameters.program_verification_key_hash,
+            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
+        )?]?;
+
+        let dpc_program =
+            NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
+
+        let mut old_death_program_proofs = vec![];
+        for i in 0..NUM_INPUT_RECORDS {
+            let private_input = dpc_program.execute(
+                &parameters.noop_program_snark_parameters.proving_key,
+                &parameters.noop_program_snark_parameters.verification_key,
+                &local_data,
+                i as u8,
+                rng,
+            )?;
+
+            old_death_program_proofs.push(private_input);
+        }
+
+        let mut new_birth_program_proofs = vec![];
+        for j in 0..NUM_OUTPUT_RECORDS {
+            let private_input = dpc_program.execute(
+                &parameters.noop_program_snark_parameters.proving_key,
+                &parameters.noop_program_snark_parameters.verification_key,
+                &local_data,
+                (NUM_INPUT_RECORDS + j) as u8,
+                rng,
+            )?;
+
+            new_birth_program_proofs.push(private_input);
+        }
+
+        // Online execution to generate a DPC transaction
+        let (new_records, transaction) = InstantiatedDPC::execute_online(
+            &parameters,
+            execute_context,
+            &old_death_program_proofs,
+            &new_birth_program_proofs,
             ledger,
             rng,
         )?;
@@ -535,8 +481,50 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::{thread_rng, Rng};
     use snarkos_objects::PedersenMerkleRootHash;
     use snarkos_testing::consensus::DATA;
+
+    #[test]
+    fn test_block_rewards() {
+        let rng = &mut thread_rng();
+
+        let first_halfing: u32 = 4 * 365 * 24 * 100;
+        let second_halfing: u32 = first_halfing * 2;
+
+        let mut block_reward: i64 = 150 * 1_000_000;
+
+        // Before block halving
+        assert_eq!(get_block_reward(0).0, block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(0, first_halfing);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
+        }
+
+        // First block halving
+
+        block_reward /= 2;
+
+        assert_eq!(get_block_reward(first_halfing).0, block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(first_halfing + 1, second_halfing);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
+        }
+
+        // Second and final block halving
+
+        block_reward /= 2;
+
+        assert_eq!(get_block_reward(second_halfing).0, block_reward);
+        assert_eq!(get_block_reward(u32::MAX).0, block_reward);
+
+        for _ in 0..100 {
+            let block_num: u32 = rng.gen_range(second_halfing, u32::MAX);
+            assert_eq!(get_block_reward(block_num).0, block_reward);
+        }
+    }
 
     #[test]
     fn verify_header() {
@@ -547,7 +535,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
-            network_id: 0,
+            network: Network::Mainnet,
             verifier: posw,
         };
 

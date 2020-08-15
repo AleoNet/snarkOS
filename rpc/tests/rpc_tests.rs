@@ -1,7 +1,7 @@
 /// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
-    use snarkos_dpc::dpc::base_dpc::instantiated::Tx;
+    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_models::objects::Transaction;
     use snarkos_objects::AccountViewKey;
     use snarkos_rpc::*;
@@ -65,6 +65,7 @@ mod rpc_tests {
             .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
+        let network_id = transaction.network.id();
 
         let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
@@ -89,11 +90,12 @@ mod rpc_tests {
         assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
         assert_eq!(memo, transaction_info["memo"]);
 
+        assert_eq!(network_id, transaction_info["network_id"]);
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
         assert_eq!(program_commitment, transaction_info["program_commitment"]);
         assert_eq!(local_data_root, transaction_info["local_data_root"]);
-        assert_eq!(value_balance, transaction_info["value_balance"]);
+        assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
@@ -285,7 +287,7 @@ mod rpc_tests {
         let response = rpc.request("decoderecord", &[hex::encode(to_bytes![record].unwrap())]);
         let record_info: Value = serde_json::from_str(&response).unwrap();
 
-        let owner = hex::encode(to_bytes![record.owner()].unwrap());
+        let owner = record.owner().to_string();
         let is_dummy = record.is_dummy();
         let value = record.value();
         let birth_program_id = hex::encode(to_bytes![record.birth_program_id()].unwrap());
@@ -400,7 +402,7 @@ mod rpc_tests {
         assert_eq!(template.previous_block_hash, latest_block_hash);
         assert_eq!(template.block_height, new_height);
         assert_eq!(template.transactions, expected_transactions);
-        assert!(template.coinbase_value >= block_reward);
+        assert!(template.coinbase_value >= block_reward.0 as u64);
 
         drop(rpc);
         kill_storage_sync(storage);

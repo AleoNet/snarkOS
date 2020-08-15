@@ -1,7 +1,5 @@
 // Global
 
-pub const NETWORK: &str = "[network] --testnet 'Run the node on the testnet'";
-
 pub const NO_JSONRPC: &str = "[no-jsonrpc] --no-jsonrpc 'Run the node without running the json rpc'";
 
 pub const IS_BOOTNODE: &str =

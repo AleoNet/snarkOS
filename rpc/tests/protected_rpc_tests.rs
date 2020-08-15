@@ -1,7 +1,7 @@
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
-    use snarkos_dpc::dpc::base_dpc::{
+    use snarkos_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
         record::DPCRecord,
@@ -85,7 +85,7 @@ mod protected_rpc_tests {
         let meta = invalid_authentication();
         let rpc = initialize_test_rpc(&storage, parameters);
 
-        let method = "fetchrecordcommitments".to_string();
+        let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
         let response = rpc.handle_request_sync(&request, meta).unwrap();
 
@@ -93,6 +93,27 @@ mod protected_rpc_tests {
 
         let expected_result = Value::String("Authentication Error".to_string());
         assert_eq!(extracted["error"]["message"], expected_result);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_rpc_fetch_record_commitment_count() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let parameters = load_verifying_parameters();
+        let meta = authentication();
+        let rpc = initialize_test_rpc(&storage, parameters);
+
+        storage.store_record(&DATA.records_1[0]).unwrap();
+
+        let method = "getrecordcommitmentcount".to_string();
+        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
+        let response = rpc.handle_request_sync(&request, meta).unwrap();
+
+        let extracted: Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(extracted["result"], 1);
 
         drop(rpc);
         kill_storage_sync(storage);
@@ -107,7 +128,7 @@ mod protected_rpc_tests {
 
         storage.store_record(&DATA.records_1[0]).unwrap();
 
-        let method = "fetchrecordcommitments".to_string();
+        let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
         let response = rpc.handle_request_sync(&request, meta).unwrap();
 

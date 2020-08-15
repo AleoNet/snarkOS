@@ -4,7 +4,7 @@
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_dpc::base_dpc::{
-    instantiated::{Components, InstantiatedDPC, Program},
+    instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
     record_payload::RecordPayload,
 };
@@ -61,13 +61,25 @@ impl RpcImpl {
         }
     }
 
-    /// Wrap authentication around `fetch_record_commitments`
-    pub fn fetch_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    /// Wrap authentication around `get_record_commitment_count`
+    pub fn get_record_commitment_count_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
 
-        match self.fetch_record_commitments() {
+        match self.get_record_commitment_count() {
+            Ok(num_record_commitments) => Ok(Value::from(num_record_commitments)),
+            Err(_) => Err(JsonRPCError::invalid_request()),
+        }
+    }
+
+    /// Wrap authentication around `get_record_commitments`
+    pub fn get_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        params.expect_no_params()?;
+
+        match self.get_record_commitments() {
             Ok(record_commitments) => Ok(Value::from(record_commitments)),
             Err(_) => Err(JsonRPCError::invalid_request()),
         }
@@ -115,7 +127,8 @@ impl RpcImpl {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
-        d.add_method_with_meta("fetchrecordcommitments", Self::fetch_record_commitments_protected);
+        d.add_method_with_meta("getrecordcommitmentcount", Self::get_record_commitment_count_protected);
+        d.add_method_with_meta("getrecordcommitments", Self::get_record_commitments_protected);
         d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
         d.add_method_with_meta("createaccount", Self::create_account_protected);
 
@@ -169,12 +182,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             .parameters
             .system_parameters
             .program_verification_key_hash
-            .hash(&to_bytes![self.parameters.program_snark_parameters.verification_key]?)?;
+            .hash(&to_bytes![
+                self.parameters.noop_program_snark_parameters.verification_key
+            ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
-        let program = Program::new(program_vk_hash_bytes.clone());
-        let new_birth_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_programs = vec![program.clone(); Components::NUM_OUTPUT_RECORDS];
+        let program_id = program_vk_hash_bytes;
+        let new_birth_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode old records
         let mut old_records = vec![];
@@ -212,8 +227,8 @@ impl ProtectedRpcFunctions for RpcImpl {
                 true, // The input record is dummy
                 0,
                 &RecordPayload::default(),
-                &program,
-                &program,
+                &program_id,
+                &program_id,
                 rng,
             )?;
 
@@ -267,8 +282,8 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_records,
             old_account_private_keys,
             new_record_owners,
-            new_birth_programs,
-            new_death_programs,
+            new_birth_program_ids,
+            new_death_program_ids,
             new_is_dummy_flags,
             new_values,
             new_payloads,
@@ -289,9 +304,16 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
+    /// Returns the number of record commitments that are stored on the full node.
+    fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
+        let record_commitments = self.storage.get_record_commitments(None)?;
+
+        Ok(record_commitments.len())
+    }
+
     /// Returns a list of record commitments that are stored on the full node.
-    fn fetch_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let record_commitments = self.storage.get_record_commitments(100)?;
+    fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
+        let record_commitments = self.storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
 
         Ok(record_commitment_strings)
