@@ -34,7 +34,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         std::env::set_var("RUST_LOG", "info");
         env_logger::init();
 
-        println!("{}", render_init(&config.miner.miner_address));
+        println!("{}", render_init());
     }
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
@@ -110,16 +110,22 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     // Start miner thread
 
     if config.miner.is_miner {
-        let miner_address = AccountAddress::<Components>::from_str(&config.miner.miner_address)?;
-        MinerInstance::new(
-            miner_address,
-            consensus.clone(),
-            parameters,
-            storage.clone(),
-            memory_pool_lock.clone(),
-            server.context.clone(),
-        )
-        .spawn();
+        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+            Ok(miner_address) => {
+                MinerInstance::new(
+                    miner_address,
+                    consensus.clone(),
+                    parameters,
+                    storage.clone(),
+                    memory_pool_lock.clone(),
+                    server.context.clone(),
+                )
+                .spawn();
+            }
+            Err(_) => info!(
+                "Miner not started. Please specify a valid miner address in your snarkOS.toml file or by using the --miner-address option in the CLI."
+            ),
+        }
     }
 
     // Start server thread

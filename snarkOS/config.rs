@@ -79,8 +79,7 @@ impl Default for Config {
             },
             miner: Miner {
                 is_miner: false,
-                // TODO (raychu86) make this dynamic for the node operator
-                miner_address: "aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh".into(),
+                miner_address: "".into(),
             },
             rpc: JsonRPC {
                 json_rpc: true,
