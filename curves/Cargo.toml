@@ -22,7 +22,8 @@ serde = { version = "1.0.114", default-features = false, features = ["derive"] }
 rand_xorshift = { version = "0.2", default-features = false }
 
 [features]
-default = [ "snarkos-errors/default", "snarkos-models/default", "snarkos-utilities/default", ]
+default = ["snarkos-errors/default", "snarkos-models/default", "snarkos-utilities/default"]
+sw6 = []
 
 [build-dependencies]
 rustc_version = "0.2"
