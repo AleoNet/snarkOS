@@ -6,6 +6,7 @@ use std::hash::Hash;
 pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type Commitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type Digest: Clone + Eq + Hash + FromBytes + ToBytes;
+    type InnerSNARKID: Clone + Eq + FromBytes + ToBytes;
     type LocalDataRoot: Clone + Eq + Hash + FromBytes + ToBytes;
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
     type ProgramCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
@@ -21,6 +22,9 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
 
     /// Returns the ledger digest.
     fn ledger_digest(&self) -> &Self::Digest;
+
+    /// Returns the inner snark id.
+    fn inner_snark_id(&self) -> &Self::InnerSNARKVersion;
 
     /// Returns the old serial numbers.
     fn old_serial_numbers(&self) -> &[Self::SerialNumber];

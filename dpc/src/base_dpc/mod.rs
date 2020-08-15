@@ -837,6 +837,7 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
+            inner_snark_id,
             transaction_proof,
             program_commitment,
             local_data_root,
