@@ -3,7 +3,6 @@ mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
     use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_models::objects::Transaction;
-    use snarkos_objects::AccountViewKey;
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
@@ -14,7 +13,6 @@ mod rpc_tests {
 
     use jsonrpc_test::Rpc;
     use serde_json::Value;
-    use snarkos_models::dpc::Record;
     use std::{net::SocketAddr, sync::Arc};
 
     fn initialize_test_rpc(storage: &Arc<MerkleTreeLedger>) -> Rpc {
@@ -272,77 +270,6 @@ mod rpc_tests {
             rpc.request("validaterawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),
             "true"
         );
-
-        drop(rpc);
-        kill_storage_sync(storage);
-    }
-
-    #[test]
-    fn test_rpc_decode_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
-
-        let record = &DATA.records_1[0];
-
-        let response = rpc.request("decoderecord", &[hex::encode(to_bytes![record].unwrap())]);
-        let record_info: Value = serde_json::from_str(&response).unwrap();
-
-        let owner = record.owner().to_string();
-        let is_dummy = record.is_dummy();
-        let value = record.value();
-        let birth_program_id = hex::encode(to_bytes![record.birth_program_id()].unwrap());
-        let death_program_id = hex::encode(to_bytes![record.death_program_id()].unwrap());
-        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()].unwrap());
-        let commitment = hex::encode(to_bytes![record.commitment()].unwrap());
-        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()].unwrap());
-
-        assert_eq!(owner, record_info["owner"]);
-        assert_eq!(is_dummy, record_info["is_dummy"]);
-        assert_eq!(value, record_info["value"]);
-        assert_eq!(birth_program_id, record_info["birth_program_id"]);
-        assert_eq!(death_program_id, record_info["death_program_id"]);
-        assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
-        assert_eq!(commitment, record_info["commitment"]);
-        assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
-
-        drop(rpc);
-        kill_storage_sync(storage);
-    }
-
-    #[test]
-    fn test_rpc_decrypt_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
-
-        let system_parameters = &FIXTURE_VK.parameters.system_parameters;
-        let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
-
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
-        let ciphertexts = transaction.encrypted_records;
-
-        let records = &DATA.records_1;
-
-        let view_key = AccountViewKey::from_private_key(
-            &system_parameters.account_signature,
-            &system_parameters.account_commitment,
-            &miner_acc.private_key,
-        )
-        .unwrap();
-
-        for (ciphertext, record) in ciphertexts.iter().zip(records) {
-            let ciphertext_string = hex::encode(to_bytes![ciphertext].unwrap());
-            let account_view_key = view_key.to_string();
-
-            let params = DecryptRecordInput {
-                encrypted_record: ciphertext_string,
-                account_view_key,
-            };
-            let params = serde_json::to_value(params).unwrap();
-
-            let response = rpc.request("decryptrecord", &[params]);
-
-            assert_eq!(response, format![r#""{}""#, hex::encode(to_bytes![record].unwrap())]);
-        }
 
         drop(rpc);
         kill_storage_sync(storage);

@@ -62,6 +62,37 @@ pub struct BlockInfo {
     pub transactions: Vec<String>,
 }
 
+/// Returned value for the `getblocktemplate` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BlockTemplate {
+    /// Previous block hash
+    pub previous_block_hash: String,
+
+    /// Block height
+    pub block_height: u32,
+
+    /// Block timestamp
+    pub time: i64,
+
+    /// Proof of work difficulty target
+    pub difficulty_target: u64,
+
+    /// Transactions to include in the block (excluding the coinbase transaction)
+    pub transactions: Vec<String>,
+
+    /// Amount spendable by the coinbase transaction (block rewards + transaction fees)
+    pub coinbase_value: u64,
+}
+
+/// Output for the `createrawtransaction` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CreateRawTransactionOuput {
+    /// The newly created transaction from calling the `createrawtransaction` endpoint
+    pub encoded_transaction: String,
+    /// The newly created records from calling the `createrawtransaction` endpoint
+    pub encoded_records: Vec<String>,
+}
+
 /// Input for the `decryptrecord` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DecryptRecordInput {
@@ -79,11 +110,53 @@ pub struct PeerInfo {
     pub peers: Vec<SocketAddr>,
 }
 
-/// Additional metadata included with a transaction response
+/// Record payload data
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TransactionMetadata {
-    /// The block number associated with this transaction
-    pub block_number: Option<u32>,
+pub struct RPCRecordPayload {
+    /// Record payload
+    pub payload: String,
+}
+
+/// Returned value for the `decoderawrecord` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RecordInfo {
+    /// The record owner
+    pub owner: String,
+
+    /// Record is dummy flag
+    pub is_dummy: bool,
+
+    /// Record value
+    pub value: u64,
+
+    /// Record payload
+    pub payload: RPCRecordPayload,
+
+    /// Record birth program id
+    pub birth_program_id: String,
+
+    /// Record death program id
+    pub death_program_id: String,
+
+    /// Record serial number nonce
+    pub serial_number_nonce: String,
+
+    /// Record commitment
+    pub commitment: String,
+
+    /// Record commitment randomness
+    pub commitment_randomness: String,
+}
+
+/// Output for the `createaccount` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RpcAccount {
+    /// An account private key
+    pub private_key: String,
+    /// An account view key corresponding to the account private key
+    pub view_key: String,
+    /// An account address corresponding to the account private key
+    pub address: String,
 }
 
 /// Returned value for the `gettransaction` rpc call
@@ -132,66 +205,6 @@ pub struct TransactionInfo {
     pub transaction_metadata: TransactionMetadata,
 }
 
-/// Record payload data
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RPCRecordPayload {
-    /// Record payload
-    pub payload: String,
-}
-
-/// Returned value for the `decoderawrecord` rpc call
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RecordInfo {
-    /// The record owner
-    pub owner: String,
-
-    /// Record is dummy flag
-    pub is_dummy: bool,
-
-    /// Record value
-    pub value: u64,
-
-    /// Record payload
-    pub payload: RPCRecordPayload,
-
-    /// Record birth program id
-    pub birth_program_id: String,
-
-    /// Record death program id
-    pub death_program_id: String,
-
-    /// Record serial number nonce
-    pub serial_number_nonce: String,
-
-    /// Record commitment
-    pub commitment: String,
-
-    /// Record commitment randomness
-    pub commitment_randomness: String,
-}
-
-/// Returned value for the `getblocktemplate` rpc call
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BlockTemplate {
-    /// Previous block hash
-    pub previous_block_hash: String,
-
-    /// Block height
-    pub block_height: u32,
-
-    /// Block timestamp
-    pub time: i64,
-
-    /// Proof of work difficulty target
-    pub difficulty_target: u64,
-
-    /// Transactions to include in the block (excluding the coinbase transaction)
-    pub transactions: Vec<String>,
-
-    /// Amount spendable by the coinbase transaction (block rewards + transaction fees)
-    pub coinbase_value: u64,
-}
-
 /// Input for the `createrawtransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionInputs {
@@ -215,6 +228,13 @@ pub struct TransactionInputs {
     //    pub new_payloads: Vec<String>,
 }
 
+/// Additional metadata included with a transaction response
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionMetadata {
+    /// The block number associated with this transaction
+    pub block_number: Option<u32>,
+}
+
 /// Recipient of a transaction
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionRecipient {
@@ -222,24 +242,4 @@ pub struct TransactionRecipient {
     pub address: String,
     /// The amount being sent
     pub amount: u64,
-}
-
-/// Output for the `createrawtransaction` rpc call
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct CreateRawTransactionOuput {
-    /// The newly created transaction from calling the `createrawtransaction` endpoint
-    pub encoded_transaction: String,
-    /// The newly created records from calling the `createrawtransaction` endpoint
-    pub encoded_records: Vec<String>,
-}
-
-/// Output for the `createaccount` rpc call
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RpcAccount {
-    /// An account private key
-    pub private_key: String,
-    /// An account view key corresponding to the account private key
-    pub view_key: String,
-    /// An account address corresponding to the account private key
-    pub address: String,
 }

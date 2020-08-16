@@ -67,65 +67,6 @@ Returns information about a transaction from serialized transaction bytes.
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## decoderecord
-Returns information about a record from serialized record hex.
-
-### Arguments
-
-|    Parameter   |  Type  | Required |          Description         |
-|:--------------:|:------:|:--------:|:----------------------------:|
-| `record_bytes` | string |    Yes   | The raw record hex to decode |
-
-### Response
-
-|        Parameter        |  Type  |            Description            |
-|:-----------------------:|:------:|:---------------------------------:|
-| `owner`                 | string | The owner of the record           |
-| `is_dummy`              | number | The height of the next block      |
-| `value`                 | number | The current timestamp             |
-| `payload`               | object | The record payload                |
-| `birth_program_id`      | string | The birth program representation  |
-| `death_program_id`      | string | The death program representation  |
-| `serial_number_nonce`   | string | The serial number nonce           |
-| `commitment`            | string | The record commitment             |
-| `commitment_randomness` | string | The record commitment randomness  |
-
-### Example
-```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
-```
-
-## decryptrecord
-Decrypts the encrypted record and returns the hex encoded bytes of the record.
-
-### Arguments
-
-|      Parameter      |  Type  | Required |                     Description                     |
-|:-------------------:|:------:|:--------:|:---------------------------------------------------:|
-|  `encrypted_record` | string |    Yes   |                 The encrypted record                |
-|  `account_view_key` | string |    Yes   | The account view key used to decrypt the ciphertext |
-
-### Response
-
-| Parameter |  Type  |          Description         |
-|:---------:|:------:|:---------------------------- |
-| `result`  | string | The hex-encoded record bytes |
-
-
-### Example
-```ignore
-curl --user username:password --data-binary '{ 
-    "jsonrpc":"2.0",
-    "id": "1",
-    "method": "decryptrecord",
-    "params": [
-       {
-        "encrypted_record": "encrypted_record_string",
-        "account_view_key": "account_view_key_string"
-       }
-    ]
-}' -H 'content-type: application/json' http://127.0.0.1:3030/
-```
 ## getbestblockhash
 Returns the block hash of the head of the best valid chain.
 
@@ -440,6 +381,65 @@ curl --user username:password --data-binary '{
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
+## decoderecord
+Returns information about a record from serialized record hex.
+
+### Arguments
+
+|    Parameter   |  Type  | Required |          Description         |
+|:--------------:|:------:|:--------:|:----------------------------:|
+| `record_bytes` | string |    Yes   | The raw record hex to decode |
+
+### Response
+
+|        Parameter        |  Type  |            Description            |
+|:-----------------------:|:------:|:---------------------------------:|
+| `owner`                 | string | The owner of the record           |
+| `is_dummy`              | number | The height of the next block      |
+| `value`                 | number | The current timestamp             |
+| `payload`               | object | The record payload                |
+| `birth_program_id`      | string | The birth program representation  |
+| `death_program_id`      | string | The death program representation  |
+| `serial_number_nonce`   | string | The serial number nonce           |
+| `commitment`            | string | The record commitment             |
+| `commitment_randomness` | string | The record commitment randomness  |
+
+### Example
+```ignore
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+```
+
+## decryptrecord
+Decrypts the encrypted record and returns the hex encoded bytes of the record.
+
+### Arguments
+
+|      Parameter      |  Type  | Required |                     Description                     |
+|:-------------------:|:------:|:--------:|:---------------------------------------------------:|
+|  `encrypted_record` | string |    Yes   |                 The encrypted record                |
+|  `account_view_key` | string |    Yes   | The account view key used to decrypt the ciphertext |
+
+### Response
+
+| Parameter |  Type  |          Description         |
+|:---------:|:------:|:---------------------------- |
+| `result`  | string | The hex-encoded record bytes |
+
+
+### Example
+```ignore
+curl --user username:password --data-binary '{ 
+    "jsonrpc":"2.0",
+    "id": "1",
+    "method": "decryptrecord",
+    "params": [
+       {
+        "encrypted_record": "encrypted_record_string",
+        "account_view_key": "account_view_key_string"
+       }
+    ]
+}' -H 'content-type: application/json' http://127.0.0.1:3030/
+```
 ## getrawrecord
 Returns the hex encoded bytes of a record from its record commitment.
 
