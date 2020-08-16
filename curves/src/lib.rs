@@ -22,7 +22,7 @@
 #![cfg_attr(nightly, feature(doc_cfg, external_doc))]
 // TODO (howardwu): Reenable after completing documentation in snarkOS-models.
 // #![cfg_attr(nightly, warn(missing_docs))]
-#![cfg_attr(nightly, doc(include = "../documentation/the_aleo_curves/00_the_aleo_curves.md"))]
+#![cfg_attr(nightly, doc(include = "../documentation/the_aleo_curves/00_overview.md"))]
 
 #[macro_use]
 extern crate derivative;

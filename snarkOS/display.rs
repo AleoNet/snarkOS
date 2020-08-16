@@ -1,26 +1,64 @@
-use colored::*;
+use crate::config::Config;
+use snarkos_dpc::base_dpc::instantiated::Components;
+use snarkos_objects::AccountAddress;
 
-pub fn render_init() -> String {
-    let aleo_ascii = format!(
+use colored::*;
+use std::str::FromStr;
+
+pub fn render_init(config: &Config) -> String {
+    let mut output = String::new();
+
+    output += &format!(
         r#"
 
-         ╦╬╬╬╬╦
-        ╬╬╬╬╬╬╠╬                 ▄▄▄▄▄▄     ▄▄▄▄       ▄▄▄▄▄▄▄▄▄▄   ▄▓▓▓▓▓▓▓▄
-       ╬╬╬╬╬╬╬╬╬╬               ▓▓▓▓▓▓▓▓▌  ▐▓▓▓▓      ▐▓▓▓▓▓▓▓▓▓▌ ▄▓▓▓▓▓▓▓▓▓▓▓
-      ╬╬╬╬╬╬╬╬╬╬╬╬             ▓▓▓▓  ▓▓▓█  ▐▓▓▓▓      ▐▓▓▓▓       ▓▓▓▓▌   ▓▓▓▓▌
-     ╬╬╬╬╬╬╜╙╬╬╬╬╬╬           ▐▓▓▓▓  ▓▓▓▓▌ ▐▓▓▓▓      ▐▓▓▓▓▓▓▓▓▓  ▓▓▓▓▌   ▓▓▓▓▌
-    ╬╬╬╬╬╬    ╬╬╬╬╬╬          ▓▓▓▓▓▓▓▓▓▓▓█ ▐▓▓▓▓      ▐▓▓▓▌       ▓▓▓▓▌   ▓▓▓▓▌
-   ╬╬╬╬╬╬      ╬╬╬╬╬╬         ▓▓▓▓    ▓▓▓▓ ▐▓▓▓▓▓▓▓▓▓ ▐▓▓▓▓▓▓▓▓▓▌ ▀▓▓▓▓▓▓▓▓▓▓▓
-  ╬╬╬╬╬╬        ╬╬╬╬╬╬        ▀▀▀▀    ▀▀▀▀  ▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀   ▀▀█████▀▀
-   ╙╙╙╙          ╙╙╙╙
+         ╦╬╬╬╬╬╦
+        ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
+       ╬╬╬╬╬╬╬╬╬╬╬                  ▐▓▓▓▓▌       ▓▓▓
+      ╬╬╬╬╬╬╬╬╬╬╬╬╬                ▐▓▓▓▓▓▓▌      ▓▓▓     ▄▄▄▄▄▄       ▄▄▄▄▄▄
+     ╬╬╬╬╬╬╬╬╬╬╬╬╬╬╬              ▐▓▓▓  ▓▓▓▌     ▓▓▓   ▄▓▓▀▀▀▀▓▓▄   ▐▓▓▓▓▓▓▓▓▌
+    ╬╬╬╬╬╬╬╜ ╙╬╬╬╬╬╬╬            ▐▓▓▓▌  ▐▓▓▓▌    ▓▓▓  ▐▓▓▓▄▄▄▄▓▓▓▌ ▐▓▓▓    ▓▓▓▌
+   ╬╬╬╬╬╬╣     ╠╬╬╬╬╬╬           █▓▓▓▓▓▓▓▓▓▓█    ▓▓▓  ▐▓▓▀▀▀▀▀▀▀▀▘ ▐▓▓▓    ▓▓▓▌
+  ╬╬╬╬╬╬╣       ╠╬╬╬╬╬╬         █▓▓▓▌    ▐▓▓▓█   ▓▓▓   ▀▓▓▄▄▄▄▓▓▀   ▐▓▓▓▓▓▓▓▓▌
+ ╬╬╬╬╬╬╣         ╠╬╬╬╬╬╬       ▝▀▀▀▀      ▀▀▀▀▘  ▀▀▀     ▀▀▀▀▀▀       ▀▀▀▀▀▀
+╚╬╬╬╬╬╩           ╩╬╬╬╬╩
 
 "#
     )
     .white()
-    .bold();
-    let aleo_welcome =
-        format!("Welcome to Aleo! We thank you for supporting privacy and running a network node.\n\n").bold();
-    let aleo_start = format!("{}{}", aleo_ascii, aleo_welcome);
+    .bold()
+    .to_string();
 
-    format!("{}\n", aleo_start)
+    output += &format!("Welcome to Aleo! We thank you for running a network node and supporting privacy.\n\n")
+        .bold()
+        .to_string();
+
+    if config.miner.is_miner {
+        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+            Ok(miner_address) => {
+                output += &format!("Your Aleo address is {}.\n\n", miner_address)
+                    .bold()
+                    .to_string();
+            }
+            Err(_) => output += &format!(
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI."
+            ).bold()
+                .to_string()
+        }
+    }
+
+    let network = match config.aleo.network_id {
+        0 => "mainnet".to_string(),
+        i => format!("testnet{}", i),
+    };
+    if config.miner.is_miner {
+        output += &format!("Starting a mining node on {}.\n\n", network).bold().to_string();
+    } else {
+        output += &format!("Starting a client node on {}.\n\n", network).bold().to_string();
+    }
+
+    if config.rpc.json_rpc {
+        output += &format!("Listening for RPC requests on port {}\n", config.rpc.port);
+    }
+
+    format!("{}", output)
 }

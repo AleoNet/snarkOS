@@ -116,6 +116,7 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     /// If and only if `greatest` is set will the lexicographically
     /// largest y-coordinate be selected.
     fn from_x_coordinate(x: Self::BaseField, greatest: bool) -> Option<Self> {
+        // y = sqrt( (a * x^2 - 1)  / (d * x^2 - 1) )
         let x2 = x.square();
         let one = Self::BaseField::one();
         let numerator = P::mul_by_a(&x2) - &one;
@@ -124,6 +125,25 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         y2.and_then(|y2| y2.sqrt()).map(|y| {
             let negy = -y;
             let y = if (y < negy) ^ greatest { y } else { negy };
+            Self::new(x, y)
+        })
+    }
+
+    /// Attempts to construct an affine point given a y-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_y_coordinate(y: Self::BaseField, greatest: bool) -> Option<Self> {
+        // x = sqrt( (1 - y^2) / (a - d * y^2) )
+        let y2 = y.square();
+        let one = Self::BaseField::one();
+        let numerator = one - &y2;
+        let denominator = P::mul_by_a(&one) - &(P::COEFF_D * &y2);
+        let x2 = denominator.inverse().map(|denom| denom * &numerator);
+        x2.and_then(|x2| x2.sqrt()).map(|x| {
+            let negx = -x;
+            let x = if (x < negx) ^ greatest { x } else { negx };
             Self::new(x, y)
         })
     }

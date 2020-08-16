@@ -36,7 +36,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         std::env::set_var("RUST_LOG", "info");
         env_logger::init();
 
-        println!("{}", render_init());
+        println!("{}", render_init(&config));
     }
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
@@ -97,11 +97,11 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         10000, // 10 seconds
     );
 
-    // Start rpc task
+    // Start RPC thread
 
     if config.rpc.json_rpc {
         info!("Loading Aleo parameters for RPC...");
-        let proving_parameters = PublicParameters::<Components>::load(false)?;
+        let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
         info!("Loading complete.");
 
         start_rpc_server(
@@ -133,7 +133,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
                 .spawn();
             }
             Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your snarkOS.toml file or by using the --miner-address option in the CLI."
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI."
             ),
         }
     }

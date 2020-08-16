@@ -5,7 +5,7 @@
     <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
 </p>
 
-__snarkOS__ is a decentralized operating system for confidential programs.
+__snarkOS__ is a decentralized operating system for private applications.
 
 ## <a name='TableofContents'></a>Table of Contents
 
@@ -83,7 +83,30 @@ docker run -d -p 4130:4130 --name snarkos snarkos
 
 ## 3. Usage Guide
 
-\[WIP\]
+To start a client node, run:
+```
+snarkos
+```
+
+To start a mining node, run:
+```
+snarkos --is-miner
+```
+
+#### How to guard RPC endpoints
+```
+./target/release/snarkOS --rpc-username <Username> --rpc-password <Password>
+```
+
+#### How to manually connect to a peer on the network
+```
+./target/release/snarkOS --connect "<IP ADDRESS>"
+```
+
+### Interfacing with a running node
+
+By default, snarkOS runs a JSON-RPC server to allow external interfacing with the Aleo network. Additional information can be found [here](aleo/documentation/autogen/testnet/rpc/rpc_server/00_configurations.md)
+
 
 ## 4. License
 

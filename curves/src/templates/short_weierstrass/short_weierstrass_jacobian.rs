@@ -133,6 +133,15 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
         })
     }
 
+    /// Attempts to construct an affine point given a y-coordinate. The
+    /// point is not guaranteed to be in the prime order subgroup.
+    ///
+    /// If and only if `greatest` is set will the lexicographically
+    /// largest y-coordinate be selected.
+    fn from_y_coordinate(y: Self::BaseField, greatest: bool) -> Option<Self> {
+        unimplemented!()
+    }
+
     fn add(self, _other: &Self) -> Self {
         unimplemented!()
     }

@@ -42,6 +42,7 @@ where
 {
     edwards_curve_serialization_test::<P>();
     edwards_from_random_bytes::<P>();
+    edwards_from_x_and_y_coordinates::<P>();
 }
 
 pub fn edwards_curve_serialization_test<P: TEModelParameters>() {
@@ -139,5 +140,33 @@ where
             g = GroupAffine::<P>::from_random_bytes(&bytes);
         }
         let _g = g.unwrap();
+    }
+}
+
+pub fn edwards_from_x_and_y_coordinates<P: TEModelParameters>()
+where
+    P::BaseField: PrimeField,
+{
+    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+
+    for _ in 0..ITERATIONS {
+        let a = GroupProjective::<P>::rand(&mut rng);
+        let a = a.into_affine();
+        {
+            let x = a.x;
+
+            let a1 = GroupAffine::<P>::from_x_coordinate(x, true).unwrap();
+            let a2 = GroupAffine::<P>::from_x_coordinate(x, false).unwrap();
+
+            assert!(a == a1 || a == a2);
+        }
+        {
+            let y = a.y;
+
+            let a1 = GroupAffine::<P>::from_y_coordinate(y, true).unwrap();
+            let a2 = GroupAffine::<P>::from_y_coordinate(y, false).unwrap();
+
+            assert!(a == a1 || a == a2);
+        }
     }
 }

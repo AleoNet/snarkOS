@@ -16,7 +16,7 @@ use toml;
 /// Hardcoded bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4131"
+pub const TESTNET_BOOTNODES: &'static [&str] = &["50.18.83.123:4131"]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -71,7 +71,7 @@ impl Default for Config {
             aleo: Aleo { network_id: 1 },
             node: Node {
                 dir: Self::snarkos_dir(),
-                db: "snarkos_testnet_1".into(),
+                db: "snarkos_testnet1".into(),
                 is_bootnode: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
@@ -168,7 +168,7 @@ impl Config {
         if let Some(network_id) = argument {
             match network_id {
                 0 => {
-                    self.node.db = "snarkos_db".into();
+                    self.node.db = "snarkos_mainnet".into();
                     self.node.port = 4130;
                     self.p2p.bootnodes = MAINNET_BOOTNODES
                         .iter()
@@ -177,7 +177,7 @@ impl Config {
                     self.aleo.network_id = network_id;
                 }
                 _ => {
-                    self.node.db = format!("snarkos_testnet_{}", network_id);
+                    self.node.db = format!("snarkos_testnet{}", network_id);
                     self.node.port = 4130 + (network_id as u16);
                     self.p2p.bootnodes = TESTNET_BOOTNODES
                         .iter()
@@ -282,7 +282,7 @@ pub struct ConfigCli;
 impl CLI for ConfigCli {
     type Config = Config;
 
-    const ABOUT: AboutType = "Start an Aleo Node (include -h for more options)";
+    const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER, flag::QUIET];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[

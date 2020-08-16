@@ -1,12 +1,14 @@
-FROM rust:1.43
+FROM rust:1.45
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-   make \
+ && apt-get install -y \
+   build-essential \
    clang \
+   gcc \
+   libssl-dev \
+   make \
    pkg-config \
-   xz-utils \
-   libssl-dev
+   xz-utils
 
 WORKDIR /usr/src/snarkOS
 COPY . .
