@@ -103,3 +103,6 @@ opt-level = 3 # necessary for DPC testing
 
 [profile.test.package.snarkos-network]
 opt-level = 3 # necessary for testing
+
+[profile.test.package.snarkos-posw]
+opt-level = 3 # necessary for testing
