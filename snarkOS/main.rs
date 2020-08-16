@@ -34,7 +34,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         std::env::set_var("RUST_LOG", "info");
         env_logger::init();
 
-        println!("{}", render_init());
+        println!("{}", render_init(&config));
     }
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
