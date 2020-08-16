@@ -87,11 +87,11 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         10000, // 10 seconds
     );
 
-    // Start rpc thread
+    // Start RPC thread
 
     if config.rpc.json_rpc {
         info!("Loading Aleo parameters for RPC...");
-        let proving_parameters = PublicParameters::<Components>::load(false)?;
+        let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
         info!("Loading complete.");
 
         start_rpc_server(
