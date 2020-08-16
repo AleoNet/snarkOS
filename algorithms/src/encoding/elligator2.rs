@@ -48,7 +48,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             let r = input;
 
             // Let u = D.
-            // TODO (howardwu): change to 5.
+            // TODO (howardwu): change to 11.
             let u = Self::D;
 
             // Let ur2 = u * r^2;
@@ -195,7 +195,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
 
         let x = u_reconstructed;
 
-        // TODO (howardwu): change to 5.
+        // TODO (howardwu): change to 11.
         // Let u = D.
         let u = Self::D;
 
