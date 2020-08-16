@@ -35,7 +35,7 @@ pub fn render_init(config: &Config) -> String {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                output += &format!("Your Aleo address is {}.\n\n", config.miner.miner_address)
+                output += &format!("Your Aleo address is {}.\n\n", miner_address)
                     .bold()
                     .to_string();
             }
@@ -51,11 +51,9 @@ pub fn render_init(config: &Config) -> String {
         i => format!("testnet{}", i),
     };
     if config.miner.is_miner {
-        output += &format!("Starting a full node on {}.\n\n", network).bold().to_string();
+        output += &format!("Starting a mining node on {}.\n\n", network).bold().to_string();
     } else {
-        output += &format!("Starting a light client node on {}.\n\n", network)
-            .bold()
-            .to_string();
+        output += &format!("Starting a client node on {}.\n\n", network).bold().to_string();
     }
 
     if config.rpc.json_rpc {
