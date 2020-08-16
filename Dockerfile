@@ -4,6 +4,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
    make \
    clang \
+   gcc \
    pkg-config \
    xz-utils \
    libssl-dev

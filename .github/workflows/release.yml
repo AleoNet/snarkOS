@@ -1,0 +1,127 @@
+name: snarkOS Release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  ubuntu:
+    name: Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Build snarkOS
+        run: |
+          cargo build --all --release && strip target/release/snarkos
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+      - id: get_version
+        uses: battila7/get-version-action@v2
+
+      - name: Zip
+        run: |
+          mkdir snarkos_${{ steps.get_version.outputs.version }}_ubuntu
+          mv target/release/snarkos snarkos_${{ steps.get_version.outputs.version }}_ubuntu
+          zip -r snarkos_${{ steps.get_version.outputs.version }}_ubuntu.zip snarkos_${{ steps.get_version.outputs.version }}_ubuntu
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            snarkos_${{ steps.get_version.outputs.version }}_ubuntu.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Build snarkOS
+        run: |
+          cargo build --all --release && strip target/release/snarkos
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+      - id: get_version
+        uses: battila7/get-version-action@v2
+
+      - name: Zip
+        run: |
+          mkdir snarkos_${{ steps.get_version.outputs.version }}_mac
+          mv target/release/snarkos snarkos_${{ steps.get_version.outputs.version }}_mac
+          zip -r snarkos_${{ steps.get_version.outputs.version }}_mac.zip snarkos_${{ steps.get_version.outputs.version }}_mac
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            snarkos_${{ steps.get_version.outputs.version }}_mac.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Build snarkOS
+        run: |
+          cargo build --all --release
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+      - id: get_version
+        uses: battila7/get-version-action@v2
+
+      - name: Zip
+        run: |
+          mkdir snarkos_${{ steps.get_version.outputs.version }}_windows
+          mv target/release/snarkos.exe snarkos_${{ steps.get_version.outputs.version }}_windows
+          Compress-Archive snarkos_${{ steps.get_version.outputs.version }}_windows snarkos_${{ steps.get_version.outputs.version }}_windows.zip
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            snarkos_${{ steps.get_version.outputs.version }}_windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
