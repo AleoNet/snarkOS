@@ -123,7 +123,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
                 .spawn();
             }
             Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your snarkOS.toml file or by using the --miner-address option in the CLI."
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI."
             ),
         }
     }
