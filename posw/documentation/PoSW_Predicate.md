@@ -4,7 +4,7 @@ The predicate used as part of the PoSW circuit verifies the inclusion of transac
 
 ## System State
 
-The state of the system is given by a Merkle tree <img src="https://render.githubusercontent.com/render/math?math=1\mathsf{Tree}_\mathcal{G}(h)"> of depth <img src="https://render.githubusercontent.com/render/math?math=h"> over a CRT function <img src="https://render.githubusercontent.com/render/math?math=\mathcal{G}: \{0,1\}^{k} \rightarrow \{0,1\}^{k/2}">, where <img src="https://render.githubusercontent.com/render/math?math=\mathcal{G}"> is taken to be SHA-256 with k = 512. We denote this as the "state tree". Each leaf is the unique id of a transaction to be processed, and the variable <img src="https://render.githubusercontent.com/render/math?math=\mathsf{state}"> is the root of the tree.
+The state of the system is given by a Merkle tree <img src="https://render.githubusercontent.com/render/math?math=\mathsf{Tree}_\mathcal{G}(h)"> of depth <img src="https://render.githubusercontent.com/render/math?math=h"> over a CRT function <img src="https://render.githubusercontent.com/render/math?math=\mathcal{G}: \{0,1\}^{k} \rightarrow \{0,1\}^{k/2}">, where <img src="https://render.githubusercontent.com/render/math?math=\mathcal{G}"> is taken to be SHA-256 with k = 512. We denote this as the "state tree". Each leaf is the unique id of a transaction to be processed, and the variable <img src="https://render.githubusercontent.com/render/math?math=\mathsf{state}"> is the root of the tree.
 
 <img align="left" src="Binary_tree.png" style="float:right"></img>
 
@@ -37,7 +37,10 @@ This is evaluated by ``precomputed_base_symmetric_multiscalar_mul`` in ``Pederse
 
 ### Masked Pedersen Gadget
 The <img src="https://render.githubusercontent.com/render/math?math=k">-length masked Pedersen hash function over <img src="https://render.githubusercontent.com/render/math?math=\mathbb{G}"> is a CRT hash function <img src="https://render.githubusercontent.com/render/math?math=\mathcal{H}_{mask}: \{0,1\}^{k} \times \{0,1\}^k \times \mathbb{G} \rightarrow \mathbb{G}"> given by:
-<img src="https://render.githubusercontent.com/render/math?math=\mathcal{H}_{mask}^{G,H}(\rho, x,P) = P \cdot\prod_{i = 1}^k (\mathbb{1}[x_i \oplus \rho_i = 1] G_i^{2x_i - 1} H_i^{2\rho_i -1} + \mathbb{1}[x_i \oplus \rho_i = 0] H_i^{2\rho_i -1})"> where <img src="https://render.githubusercontent.com/render/math?math=x_i"> and <img src="https://render.githubusercontent.com/render/math?math=\rho_i"> the <img src="https://render.githubusercontent.com/render/math?math=i">-th bits of <img src="https://render.githubusercontent.com/render/math?math=x"> and <img src="https://render.githubusercontent.com/render/math?math=\rho"> respectively, while <img src="https://render.githubusercontent.com/render/math?math=G_i \in \mathbb{G}"> are randomly sampled generators of <img src="https://render.githubusercontent.com/render/math?math=\mathbb{G}"> and <img src="https://render.githubusercontent.com/render/math?math=\oplus"> the bitwise XOR operation. The variable <img src="https://render.githubusercontent.com/render/math?math=P \in \mathbb{G}"> is appended as an input as well, for the demasking operation.
+
+<img src="https://render.githubusercontent.com/render/math?math=\mathcal{H}_{mask}^{G,H}(\rho, x,P) = P \cdot\prod_{i = 1}^k (\mathbb{1}[x_i \oplus \rho_i = 1] G_i^{2x_i - 1} H_i^{2\rho_i -1} + \mathbb{1}[x_i \oplus \rho_i = 0] H_i^{2\rho_i -1})">
+
+Where <img src="https://render.githubusercontent.com/render/math?math=x_i"> and <img src="https://render.githubusercontent.com/render/math?math=\rho_i"> the <img src="https://render.githubusercontent.com/render/math?math=i">-th bits of <img src="https://render.githubusercontent.com/render/math?math=x"> and <img src="https://render.githubusercontent.com/render/math?math=\rho"> respectively, while <img src="https://render.githubusercontent.com/render/math?math=G_i \in \mathbb{G}"> are randomly sampled generators of <img src="https://render.githubusercontent.com/render/math?math=\mathbb{G}"> and <img src="https://render.githubusercontent.com/render/math?math=\oplus"> the bitwise XOR operation. The variable <img src="https://render.githubusercontent.com/render/math?math=P \in \mathbb{G}"> is appended as an input as well, for the demasking operation.
 
 #### Circuit Structure
 Define group variables <img src="https://render.githubusercontent.com/render/math?math=Q = (Q_x, Q_y), g_i = (g^i_x, g^i_y) \in (\mathbb{F}_p^2)^k"> and boolean variables <img src="https://render.githubusercontent.com/render/math?math=z \in \mathbb{F}_p^k">. Perform the following evaluations:
@@ -66,7 +69,7 @@ The <img src="https://render.githubusercontent.com/render/math?math=k">-length m
 -  For all <img src="https://render.githubusercontent.com/render/math?math=i \in [M]">,  set <img src="https://render.githubusercontent.com/render/math?math=(o^x_i, o_i^y) = \mathcal{H}^{G,H}_{mask}(\rho, x^i, z)">.
 
 #### Outputs:
-The <img src="https://render.githubusercontent.com/render/math?math=k/2"> length set of variables <img src="https://render.githubusercontent.com/render/math?math=\{o^i_x\}_{i = 1}^k \in (\mathbb{F_p})^k"> as the truncated outputs.
+The <img src="https://render.githubusercontent.com/render/math?math=k/2"> length set of variables <img src="https://render.githubusercontent.com/render/math?math=o^{i}_{x}"> as the truncated outputs.
 
 ### Instantiation
 We use BLS12-377 as the underlying group, which implies an output length of 256+1 = 257 bits (using point-compression) which we truncate to 256 bits. Security reduction to the hardness of ECDLP yields a security level of <img src="https://render.githubusercontent.com/render/math?math=$\lambda \approx 128"> bits. The input length is set to k = 512 bits. 
