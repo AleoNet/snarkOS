@@ -74,7 +74,7 @@ A simulation-extractable (SE) proof system has a unique encoding for every valid
 
 A non-amortizable prover should reduce in difficulty to a problem known (or postulated) to be non-batchable (or 'hard') on average. Since the state-of-the-art proof systems are almost all built using Kate commitments, we work in this paradigm and reduce proof computation to the problem of multi-exponentiation of a set of given (random) bases <img src="https://render.githubusercontent.com/render/math?math=\{G_i\}_{i = 1}^m \in \mathbb{G}^m"> by a set of random indices <img src="https://render.githubusercontent.com/render/math?math=\{x_i\}_{i  =1}^m \in \mathbb{Z}_p^m">. In this problem, hardness is measured in the number of queries to a multiplication oracle <img src="https://render.githubusercontent.com/render/math?math=\mathcal{O}_m"> in the given group's encoding.
 
-Although the above problem is *not* non-amortizable in the setting of unbounded space, it can be shown to be non-amortizable on average for miners with a fixed size precomputation string.
+Although the above problem is *not* non-amortizable in the setting of unbounded space, it can be shown to be non-amortizable on average for miners with a fixed size precomputation string. In addition, we note that the average-case hard instances only differ from the worst-case hard instances by a small amount of computation and will not provide realistic speed-ups in practice: i.e. resampling instances until an 'easier' one is found has bounded benefit.
 
 ### Predicate Design
 
