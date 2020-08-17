@@ -16,10 +16,10 @@ For a precomputation table of <img src="https://render.githubusercontent.com/ren
 
 We fix <img src="https://render.githubusercontent.com/render/math?math=S"> and <img src="https://render.githubusercontent.com/render/math?math=k"> and investigate proof generation times for fixed table size. Proving times in the GM17 and Marlin provers alongside the corresponding quantization error and collision probabilities are provided below for a single-threaded desktop machine. Security is with respect to <img src="https://render.githubusercontent.com/render/math?math=1"> minute blocks and a circuit with <img src="https://render.githubusercontent.com/render/math?math=k \approx 2^{13}"> exponentiations per proof.
 
-|  Proof System | Proof Generation Time (s) | Quantization Error (\%) | Collision Probability |                    
+|  Proof System | Proof Generation Time (s) | Quantization Error (\%) | Collision Probability (\%)|                    
 | -----------|------------------------------|-------------| -----------|
-| Marlin              |   4.65                       | 3.82            | 0.0387
-| GM17              |     0.91                         |    0.758         | 0.0076
+| Marlin              |   4.65                       | 3.82            | 3.87
+| GM17              |     0.91                         |    0.758         | 0.76
 
 
 ### Security Implications of Hardware Acceleration
