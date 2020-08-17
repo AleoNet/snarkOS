@@ -89,4 +89,4 @@ The choice of predicate is also crucial in ensuring the above security guarantee
 
 ### Error Bounds
 
-Fix error bounds for quantization and forking error to 3% and 1.5% respectively. For a protocol with <img src="https://render.githubusercontent.com/render/math?math=1">-minute block times, this implies that average proof generation times need to be upper bounded by <img src="https://render.githubusercontent.com/render/math?math=tau = 1.8 \approx 2"> seconds.
+Fix error bounds for quantization and forking error to 3% and 1.5% respectively. For a protocol with <img src="https://render.githubusercontent.com/render/math?math=1">-minute block times, this implies that average proof generation times need to be upper bounded by <img src="https://render.githubusercontent.com/render/math?math=\tau = 1.8 \approx 2"> seconds.
