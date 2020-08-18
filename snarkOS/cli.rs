@@ -16,7 +16,7 @@ pub trait CLI {
     fn new<'a>() -> ArgMatches<'a> {
         let flags = &Self::FLAGS
             .iter()
-            .map(|a| Arg::from_usage(a).global(true))
+            .map(|a| Arg::from_usage(a))
             .collect::<Vec<Arg<'static, 'static>>>();
         let options = &Self::OPTIONS
             .iter()
@@ -44,7 +44,12 @@ pub trait CLI {
                             })
                             .collect::<Vec<Arg<'static, 'static>>>(),
                     )
-                    .settings(s.3)
+                    .args(
+                        &s.3.iter()
+                            .map(|a| Arg::from_usage(a))
+                            .collect::<Vec<Arg<'static, 'static>>>(),
+                    )
+                    .settings(s.4)
             })
             .collect::<Vec<App<'static, 'static>>>();
 

@@ -1,6 +1,7 @@
 use crate::{
     cli::CLI,
-    parameters::{flag, option, types::*},
+    parameters::{flag, option, subcommand, types::*},
+    update::UpdateCLI,
 };
 use snarkos_errors::node::CliError;
 
@@ -159,6 +160,7 @@ impl Config {
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
+            // Subcommands
             _ => (),
         });
     }
@@ -299,7 +301,7 @@ impl CLI for ConfigCli {
         option::RPC_USERNAME,
         option::RPC_PASSWORD,
     ];
-    const SUBCOMMANDS: &'static [SubCommandType] = &[];
+    const SUBCOMMANDS: &'static [SubCommandType] = &[subcommand::UPDATE];
 
     /// Handle all CLI arguments and flags for skeleton node
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CliError> {
@@ -322,6 +324,14 @@ impl CLI for ConfigCli {
             "rpc-username",
             "rpc-password",
         ]);
+
+        match arguments.subcommand() {
+            ("update", Some(arguments)) => {
+                UpdateCLI::parse(arguments)?;
+                std::process::exit(0x0100);
+            }
+            _ => {}
+        }
 
         Ok(config)
     }
