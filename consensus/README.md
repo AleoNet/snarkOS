@@ -36,7 +36,11 @@ valid - timestamp, nonce, PoSW proof, merkle root hash, difficulty target, etc.
 
 ## Memory Pool
 
-The memory pool is an in-memory storage of pending transactions that the miner can use to construct blocks.
+Full nodes need to keep track of transactions that are eligible to be included in future blocks. Because these unconfirmed transactions are not yet included in the ledger, the node stores them in memory, hence the memory pool.
+
+Transactions are removed from the memory pool when the node is shut down or when the transactions are included in valid blocks. 
+
+Transactions that are included in stale blocks, can be re-added into the memory pool because they no longer conflict with a transaction on the longest chain. 
 
 ## Miner
 
