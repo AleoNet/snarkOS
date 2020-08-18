@@ -50,7 +50,7 @@ pub trait CLI {
 
         App::new(Self::NAME)
             .about(Self::ABOUT)
-            .version("0.1.0")
+            .version("1.0.0")
             .settings(&[
                 AppSettings::ColoredHelp,
                 //                AppSettings::DisableHelpSubcommand,
