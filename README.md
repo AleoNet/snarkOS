@@ -10,10 +10,16 @@
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
     * [2.1 Install Rust](#21-install-rust)
-    * [2.2a Build from Crates.io](#22b-build-from-cratesio)
-    * [2.2b Build from Source Code](#22c-build-from-source-code)
+    * [2.2a Build from Crates.io](#22a-build-from-cratesio)
+    * [2.2b Build from Source Code](#22b-build-from-source-code)
+    * [2.2c Build with Docker](#22c-build-with-docker)
 * [3. Usage Guide](#3-usage-guide)
-* [4. License](#4-license)
+    * [3.1 Connecting to the Aleo Network](#31-connecting-to-the-aleo-network)
+    * [3.2 Command Line Interface](#32-command-line-interface)
+    * [3.3 Configuration File](#33-configuration-file)
+* [4. JSON-RPC Interface](#4-json-rpc-interface)
+* [5. Additional Information](#5-additional-information)
+* [6. License](#6-license)
 
 ## 1. Overview
 
@@ -70,7 +76,7 @@ This will generate an executable under the `./target/release` directory. To run 
 ./target/release/snarkos
 ```
 
-### 2.3b Run with Docker
+### 2.2c Build with Docker
 
 #### Docker build
 ```bash
@@ -92,7 +98,7 @@ docker-compose up
 
 ## 3. Usage Guide
 
-### Connecting to the Aleo network
+### 3.1 Connecting to the Aleo network
 
 To start a client node, run:
 ```
@@ -107,7 +113,7 @@ snarkos --is-miner
 To run a node with custom settings, refer to the full list of options and flags available 
 in the CLI or simply modify the snarkOS configuration file.
 
-### Command Line Interface
+### 3.2 Command Line Interface
 
 Full list of CLI flags and options can be viewed with `snarkos --help`:
 
@@ -152,16 +158,20 @@ snarkos --rpc-username <Username> --rpc-password <Password>
 snarkos --connect "<IP ADDRESS>"
 ```
 
-### Configuration File
+### 3.3 Configuration File
 
 A `snarkOS.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
 Updating this `snarkOS.toml` file allows node operators to specify default settings for the node without 
 having to specify additional information in the CLI.
 
-## 4. Interfacing with a running node
+## 4. JSON-RPC Interface
 
 By default, snarkOS runs a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
 
-## 5. License
+## 5. Additional Information
+
+For additional information, please refer to the official [Aleo documentation page](https://developer.aleo.org/aleo/getting_started/overview/).
+
+## 6. License
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
