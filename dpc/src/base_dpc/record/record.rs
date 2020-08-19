@@ -30,9 +30,9 @@ pub struct DPCRecord<C: BaseDPCComponents> {
     pub(crate) value: u64,
     pub(crate) payload: RecordPayload,
 
-    #[derivative(Default(value = "default_program_id::<C::ProgramVerificationKeyHash>()"))]
+    #[derivative(Default(value = "default_program_id::<C::ProgramVerificationKeyCRH>()"))]
     pub(crate) birth_program_id: Vec<u8>,
-    #[derivative(Default(value = "default_program_id::<C::ProgramVerificationKeyHash>()"))]
+    #[derivative(Default(value = "default_program_id::<C::ProgramVerificationKeyCRH>()"))]
     pub(crate) death_program_id: Vec<u8>,
 
     pub(crate) serial_number_nonce: <C::SerialNumberNonceCRH as CRH>::Output,

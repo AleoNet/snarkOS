@@ -5,12 +5,13 @@
 cargo run --release --example account_commitment
 cargo run --release --example account_encryption
 cargo run --release --example account_signature
+cargo run --release --example encrypted_record_crh
+cargo run --release --example inner_snark_vk_crh
 cargo run --release --example ledger_merkle_tree
 cargo run --release --example local_data_crh
 cargo run --release --example local_data_commitment
 cargo run --release --example program_vk_crh
 cargo run --release --example record_commitment
-cargo run --release --example encrypted_record_crh
 cargo run --release --example serial_number_nonce_crh
 
 mv account_commitment.params ../src/params
@@ -21,6 +22,12 @@ mv account_encryption.checksum ../src/params
 
 mv account_signature.params ../src/params
 mv account_signature.checksum ../src/params
+
+mv encrypted_record_crh.params ../src/params
+mv encrypted_record_crh.checksum ../src/params
+
+mv inner_snark_vk_crh.params ../src/params
+mv inner_snark_vk_crh.checksum ../src/params
 
 mv ledger_merkle_tree.params ../src/params
 mv ledger_merkle_tree.checksum ../src/params
@@ -36,9 +43,6 @@ mv program_vk_crh.checksum ../src/params
 
 mv record_commitment.params ../src/params
 mv record_commitment.checksum ../src/params
-
-mv encrypted_record_crh.params ../src/params
-mv encrypted_record_crh.checksum ../src/params
 
 mv serial_number_nonce_crh.params ../src/params
 mv serial_number_nonce_crh.checksum ../src/params

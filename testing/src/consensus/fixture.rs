@@ -47,8 +47,8 @@ fn setup(verify_only: bool) -> Fixture {
     let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     let program_vk_hash = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &parameters.system_parameters.program_verification_key_crh,
             &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()

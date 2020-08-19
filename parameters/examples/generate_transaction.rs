@@ -61,6 +61,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         target_block_time: 10i64,
         network: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
+        authorized_inner_snark_ids: vec![],
     };
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;
@@ -74,7 +75,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     let noop_program_vk_hash = parameters
         .system_parameters
-        .program_verification_key_hash
+        .program_verification_key_crh
         .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?;
     let noop_program_id = to_bytes![noop_program_vk_hash]?;
 

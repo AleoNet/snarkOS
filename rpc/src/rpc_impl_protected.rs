@@ -232,7 +232,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let program_vk_hash = self
             .parameters
             .system_parameters
-            .program_verification_key_hash
+            .program_verification_key_crh
             .hash(&to_bytes![
                 self.parameters.noop_program_snark_parameters.verification_key
             ]?)?;

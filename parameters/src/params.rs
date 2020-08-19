@@ -212,14 +212,21 @@ impl_params!(
 );
 
 // CRH
-impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
-impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
 impl_params!(
     EncryptedRecordCRHParameters,
     encrypted_record_crh_test,
     "encrypted_record_crh",
     270532
 );
+impl_params!(
+    InnerSNARKVKCRHParameters,
+    inner_snark_vk_crh_test,
+    "inner_snark_vk_crh",
+    3581604
+);
+impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
+impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
+
 impl_params!(
     SerialNumberNonceCRHParameters,
     serial_number_nonce_crh_test,
@@ -258,5 +265,5 @@ impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 250108401);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2329);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 464560481);
-impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4250);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 502942005);
+impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);

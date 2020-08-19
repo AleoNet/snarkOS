@@ -59,8 +59,8 @@ impl Miner {
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
-        let program_vk_hash = to_bytes![ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
+        let program_vk_hash = to_bytes![ProgramVerificationKeyCRH::hash(
+            &parameters.system_parameters.program_verification_key_crh,
             &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 

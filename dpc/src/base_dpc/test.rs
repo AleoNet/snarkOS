@@ -54,8 +54,8 @@ fn test_execute_base_dpc_constraints() {
         InstantiatedDPC::generate_noop_program_snark_parameters(&system_parameters, &mut rng).unwrap();
 
     let noop_program_id = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &system_parameters.program_verification_key_crh,
             &to_bytes![noop_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()
@@ -63,8 +63,8 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     let alternate_noop_program_id = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &system_parameters.program_verification_key_crh,
             &to_bytes![alternate_noop_program_snark_pp.verification_key].unwrap()
         )
         .unwrap()
@@ -302,6 +302,15 @@ fn test_execute_base_dpc_constraints() {
     )
     .unwrap();
 
+    let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
+        inner_snark_parameters.1.clone().into();
+
+    let inner_snark_id = InnerSNARKVerificationKeyCRH::hash(
+        &system_parameters.inner_snark_verification_key_crh,
+        &to_bytes![inner_snark_vk].unwrap(),
+    )
+    .unwrap();
+
     let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
         &inner_snark_parameters.0,
         InnerCircuit::new(
@@ -330,9 +339,6 @@ fn test_execute_base_dpc_constraints() {
     )
     .unwrap();
 
-    let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
-        inner_snark_parameters.1.clone().into();
-
     // Check that the proof check constraint system was satisfied.
     let mut pf_check_cs = TestConstraintSystem::<Fq>::new();
 
@@ -354,6 +360,7 @@ fn test_execute_base_dpc_constraints() {
         &program_commitment,
         &program_randomness,
         &local_data_root,
+        &inner_snark_id,
     )
     .unwrap();
 

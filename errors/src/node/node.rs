@@ -1,4 +1,5 @@
 use crate::{
+    algorithms::CRHError,
     consensus::ConsensusError,
     network::ServerError,
     node::CliError,
@@ -13,6 +14,9 @@ pub enum NodeError {
 
     #[error("{}", _0)]
     CLIError(CliError),
+
+    #[error("{}", _0)]
+    CRHError(CRHError),
 
     #[error("{}", _0)]
     ConsensusError(ConsensusError),
@@ -39,6 +43,12 @@ impl From<AccountError> for NodeError {
 impl From<CliError> for NodeError {
     fn from(error: CliError) -> Self {
         NodeError::CLIError(error)
+    }
+}
+
+impl From<CRHError> for NodeError {
+    fn from(error: CRHError) -> Self {
+        NodeError::CRHError(error)
     }
 }
 

@@ -11,13 +11,17 @@ use snarkos_utilities::{bytes::ToBytes, to_bytes};
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct OuterCircuitVerifierInput<C: BaseDPCComponents> {
     pub inner_snark_verifier_input: InnerCircuitVerifierInput<C>,
+    pub inner_snark_id: <C::InnerSNARKVerificationKeyCRH as CRH>::Output,
 }
 
 impl<C: BaseDPCComponents> ToConstraintField<C::OuterField> for OuterCircuitVerifierInput<C>
 where
     <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::OuterField>,
     <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output: ToConstraintField<C::OuterField>,
-    <C::ProgramVerificationKeyHash as CRH>::Parameters: ToConstraintField<C::OuterField>,
+    <C::ProgramVerificationKeyCRH as CRH>::Parameters: ToConstraintField<C::OuterField>,
+
+    <C::InnerSNARKVerificationKeyCRH as CRH>::Parameters: ToConstraintField<C::OuterField>,
+    <C::InnerSNARKVerificationKeyCRH as CRH>::Output: ToConstraintField<C::OuterField>,
 
     <C::AccountCommitment as CommitmentScheme>::Parameters: ToConstraintField<C::InnerField>,
     <C::AccountCommitment as CommitmentScheme>::Output: ToConstraintField<C::InnerField>,
@@ -59,11 +63,18 @@ where
             &self
                 .inner_snark_verifier_input
                 .system_parameters
-                .program_verification_key_hash
+                .program_verification_key_crh
                 .parameters()
                 .to_field_elements()?,
         );
-
+        v.extend_from_slice(
+            &self
+                .inner_snark_verifier_input
+                .system_parameters
+                .inner_snark_verification_key_crh
+                .parameters()
+                .to_field_elements()?,
+        );
         // Convert inner snark verifier inputs into `OuterField` field elements
 
         let inner_snark_field_elements = &self.inner_snark_verifier_input.to_field_elements()?;
@@ -76,6 +87,7 @@ where
         }
 
         v.extend_from_slice(&self.inner_snark_verifier_input.program_commitment.to_field_elements()?);
+        v.extend_from_slice(&self.inner_snark_id.to_field_elements()?);
         Ok(v)
     }
 }

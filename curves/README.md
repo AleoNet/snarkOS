@@ -9,7 +9,7 @@
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
-## The Aleo Curves
+## Overview
 Aleo uses a tailored set of pairing-friendly elliptic curves to perform efficient proof verification.
 
 |                     |  Edwards BLS12  |     BLS12-377      |   Edwards BW6   |   BW6-761    |
