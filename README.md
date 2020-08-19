@@ -5,21 +5,26 @@
     <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
 </p>
 
-__snarkOS__ is a decentralized operating system for private applications.
-
 ## <a name='TableofContents'></a>Table of Contents
 
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
     * [2.1 Install Rust](#21-install-rust)
-    * [2.2a Build from Crates.io](#22b-build-from-cratesio)
-    * [2.2b Build from Source Code](#22c-build-from-source-code)
+    * [2.2a Build from Crates.io](#22a-build-from-cratesio)
+    * [2.2b Build from Source Code](#22b-build-from-source-code)
+    * [2.2c Build with Docker](#22c-build-with-docker)
 * [3. Usage Guide](#3-usage-guide)
-* [4. License](#4-license)
+    * [3.1 Connecting to the Aleo Network](#31-connecting-to-the-aleo-network)
+    * [3.2 Command Line Interface](#32-command-line-interface)
+    * [3.3 Configuration File](#33-configuration-file)
+* [4. JSON-RPC Interface](#4-json-rpc-interface)
+* [5. Additional Information](#5-additional-information)
+* [6. License](#6-license)
 
 ## 1. Overview
 
-\[WIP\]
+__snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and 
+enables developers to checkpoint and finalize application state in a publicly-verifiable manner.
 
 ## 2. Build Guide
 
@@ -71,17 +76,29 @@ This will generate an executable under the `./target/release` directory. To run 
 ./target/release/snarkos
 ```
 
-### 2.3b Run by Docker
+### 2.2c Build with Docker
 
 #### Docker build
+```bash
 docker build -t snarkos:latest .
-(or docker-compose build)
+``` 
+or 
+```bash
+docker-compose build
+```
 
 #### Docker run
-docker run -d -p 4130:4130 --name snarkos snarkos
-(or docker-compose up)
+``` bash
+docker run -d -p 4131:4131 --name snarkos snarkos 
+```
+or
+```bash
+docker-compose up
+```
 
 ## 3. Usage Guide
+
+### 3.1 Connecting to the Aleo network
 
 To start a client node, run:
 ```
@@ -93,21 +110,68 @@ To start a mining node, run:
 snarkos --is-miner
 ```
 
-#### How to guard RPC endpoints
+To run a node with custom settings, refer to the full list of options and flags available 
+in the CLI or simply modify the snarkOS configuration file.
+
+### 3.2 Command Line Interface
+
+Full list of CLI flags and options can be viewed with `snarkos --help`:
+
 ```
-./target/release/snarkOS --rpc-username <Username> --rpc-password <Password>
+snarkOS 1.0.0
+Run an Aleo node (include -h for more options)
+
+USAGE:
+    snarkos [FLAGS] [OPTIONS]
+
+FLAGS:
+    -h, --help           Prints help information
+        --is-bootnode    Run the node as a bootnode (IP is hard coded in the protocol)
+        --is-miner       Start mining blocks from this node
+        --no-jsonrpc     Run the node without running the json rpc server
+    -q, --quiet          Do not show any logging in the console
+
+OPTIONS:
+        --connect <ip>                           Specify a node ip address to connect to on startup
+    -i, --ip <ip>                                Specify the ip of your node
+        --max-peers <max-peers>                  Specify the maximum number of peers the node can connect to
+        --mempool-interval <mempool-interval>    Specify the frequency in seconds the node should fetch a sync node's mempool
+        --min-peers <min-peers>                  Specify the minimum number of peers the node should connect to
+        --miner-address <miner-address>          Specify the address that will receive miner rewards
+        --network <network-id>                   Specify the network id (default = 1) of the node
+    -d, --path <path>                            Specify the node's storage path
+    -p, --port <port>                            Specify the port the node is run on
+        --rpc-password <rpc-password>            Specify a password for rpc authentication
+        --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
+        --rpc-username <rpc-username>            Specify a username for rpc authentication
 ```
 
-#### How to manually connect to a peer on the network
+#### Examples
+
+##### Guard RPC endpoints
 ```
-./target/release/snarkOS --connect "<IP ADDRESS>"
+snarkos --rpc-username <Username> --rpc-password <Password>
 ```
 
-### Interfacing with a running node
+##### Manually connect to a peer on the network
+```
+snarkos --connect "<IP ADDRESS>"
+```
 
-By default, snarkOS runs a JSON-RPC server to allow external interfacing with the Aleo network. Additional information can be found [here](aleo/documentation/autogen/testnet/rpc/rpc_server/00_configurations.md)
+### 3.3 Configuration File
 
+A `snarkOS.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
+Updating this `snarkOS.toml` file allows node operators to specify default settings for the node without 
+having to specify additional information in the CLI.
 
-## 4. License
+## 4. JSON-RPC Interface
+
+By default, snarkOS runs a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
+
+## 5. Additional Information
+
+For additional information, please refer to the official [Aleo documentation page](https://developer.aleo.org/aleo/getting_started/overview/).
+
+## 6. License
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)

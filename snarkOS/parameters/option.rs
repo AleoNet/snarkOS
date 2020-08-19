@@ -15,7 +15,7 @@ pub const PATH: OptionType = (
 pub const IP: OptionType = ("[ip] -i --ip=[ip] 'Specify the ip of your node'", &[], &[], &[]);
 
 pub const PORT: OptionType = (
-    "[port] -p --port=[port] 'Run the node on a specified port'",
+    "[port] -p --port=[port] 'Specify the port the node is run on'",
     &[],
     &[],
     &[],
@@ -36,7 +36,7 @@ pub const MINER_ADDRESS: OptionType = (
 );
 
 pub const MEMPOOL_INTERVAL: OptionType = (
-    "[mempool-interval] --mempool-interval=[mempool-interval] 'Specify the frequency in seconds x 10 the node should fetch the mempool from sync node'",
+    "[mempool-interval] --mempool-interval=[mempool-interval] 'Specify the frequency in seconds the node should fetch a sync node's mempool'",
     &[],
     &[],
     &[],
@@ -57,14 +57,14 @@ pub const MAX_PEERS: OptionType = (
 );
 
 pub const NETWORK: OptionType = (
-    "[network] --network=[network-id] 'Run the node on a specified network id (default = 0)'",
+    "[network] --network=[network-id] 'Specify the network id (default = 1) of the node'",
     &[],
     &[],
     &[],
 );
 
 pub const RPC_PORT: OptionType = (
-    "[rpc-port] --rpc-port=[rpc-port] 'Run the rpc server on a specified port'",
+    "[rpc-port] --rpc-port=[rpc-port] 'Specify the port the json rpc server is run on'",
     &["no_jsonrpc"],
     &[],
     &[],
