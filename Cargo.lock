@@ -2722,11 +2722,14 @@ name = "snarkos-toolkit"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "hex",
  "rand",
  "rand_chacha",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-models",
  "snarkos-objects",
+ "snarkos-storage",
  "snarkos-utilities",
  "thiserror",
  "wasm-bindgen",
