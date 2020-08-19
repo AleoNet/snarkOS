@@ -13,10 +13,10 @@ pub struct CommitmentMerkleTree<C: CommitmentScheme, H: CRH> {
     /// The computed root of the full Merkle tree.
     root: <H as CRH>::Output,
 
-    /// The internal hashes of the local data Merkle tree
+    /// The internal hashes of the commitment Merkle tree
     inner_hashes: (<H as CRH>::Output, <H as CRH>::Output),
 
-    /// The leaves of the local data Merkle tree
+    /// The leaves of the commitment Merkle tree
     leaves: [<C as CommitmentScheme>::Output; 4],
 
     /// The CRH parameters used to construct the Merkle tree
