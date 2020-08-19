@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use snarkos_algorithms::snark::groth16::{Groth16, Proof, VerifyingKey};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -370,6 +386,10 @@ where
         bytes.extend_from_slice(&self.beta_g2.to_bytes(&mut cs.ns(|| "beta_g2 to bytes"))?);
         bytes.extend_from_slice(&self.gamma_g2.to_bytes(&mut cs.ns(|| "gamma_g2 to bytes"))?);
         bytes.extend_from_slice(&self.delta_g2.to_bytes(&mut cs.ns(|| "delta_g2 to bytes"))?);
+        bytes.extend_from_slice(&UInt8::alloc_vec(
+            &mut cs.ns(|| "gamma_abc_g1_length"),
+            &(self.gamma_abc_g1.len() as u32).to_le_bytes()[..],
+        )?);
         for (i, g) in self.gamma_abc_g1.iter().enumerate() {
             let mut cs = cs.ns(|| format!("Iteration {}", i));
             bytes.extend_from_slice(&g.to_bytes(&mut cs.ns(|| "g"))?);
@@ -384,6 +404,10 @@ where
         bytes.extend_from_slice(&self.beta_g2.to_bytes_strict(&mut cs.ns(|| "beta_g2 to bytes"))?);
         bytes.extend_from_slice(&self.gamma_g2.to_bytes_strict(&mut cs.ns(|| "gamma_g2 to bytes"))?);
         bytes.extend_from_slice(&self.delta_g2.to_bytes_strict(&mut cs.ns(|| "delta_g2 to bytes"))?);
+        bytes.extend_from_slice(&UInt8::alloc_vec(
+            &mut cs.ns(|| "gamma_abc_g1_length"),
+            &(self.gamma_abc_g1.len() as u32).to_le_bytes()[..],
+        )?);
         for (i, g) in self.gamma_abc_g1.iter().enumerate() {
             let mut cs = cs.ns(|| format!("Iteration {}", i));
             bytes.extend_from_slice(&g.to_bytes_strict(&mut cs.ns(|| "g"))?);

@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{
     dpc::{generate_test_accounts, setup_or_load_parameters},
     storage::*,
@@ -47,8 +63,8 @@ fn setup(verify_only: bool) -> Fixture {
     let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     let program_vk_hash = to_bytes![
-        ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
+        ProgramVerificationKeyCRH::hash(
+            &parameters.system_parameters.program_verification_key_crh,
             &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
         )
         .unwrap()

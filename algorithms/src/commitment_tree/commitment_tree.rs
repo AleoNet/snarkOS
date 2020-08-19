@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::commitment_tree::CommitmentMerklePath;
 use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{CommitmentScheme, CRH};
@@ -13,10 +29,10 @@ pub struct CommitmentMerkleTree<C: CommitmentScheme, H: CRH> {
     /// The computed root of the full Merkle tree.
     root: <H as CRH>::Output,
 
-    /// The internal hashes of the local data Merkle tree
+    /// The internal hashes of the commitment Merkle tree
     inner_hashes: (<H as CRH>::Output, <H as CRH>::Output),
 
-    /// The leaves of the local data Merkle tree
+    /// The leaves of the commitment Merkle tree
     leaves: [<C as CommitmentScheme>::Output; 4],
 
     /// The CRH parameters used to construct the Merkle tree

@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH, PRF},
     curves::PrimeField,
@@ -29,8 +45,17 @@ pub trait DPCComponents: 'static + Sized {
     type AccountSignature: SignatureScheme;
     type AccountSignatureGadget: SignaturePublicKeyRandomizationGadget<Self::AccountSignature, Self::InnerField>;
 
+    /// CRH for the encrypted record.
+    type EncryptedRecordCRH: CRH;
+    type EncryptedRecordCRHGadget: CRHGadget<Self::EncryptedRecordCRH, Self::InnerField>;
+
+    /// CRH for hash of the `Self::InnerSNARK` verification keys.
+    /// This is invoked only on the larger curve.
+    type InnerSNARKVerificationKeyCRH: CRH;
+    type InnerSNARKVerificationKeyCRHGadget: CRHGadget<Self::InnerSNARKVerificationKeyCRH, Self::OuterField>;
+
     /// CRH and commitment scheme for committing to program input. Invoked inside
-    /// `Self::MainN` and every program SNARK.
+    /// `Self::InnerSNARK` and every program SNARK.
     type LocalDataCRH: CRH;
     type LocalDataCRHGadget: CRHGadget<Self::LocalDataCRH, Self::InnerField>;
     type LocalDataCommitment: CommitmentScheme;
@@ -38,8 +63,8 @@ pub trait DPCComponents: 'static + Sized {
 
     /// CRH for hashes of birth and death verification keys.
     /// This is invoked only on the larger curve.
-    type ProgramVerificationKeyHash: CRH;
-    type ProgramVerificationKeyHashGadget: CRHGadget<Self::ProgramVerificationKeyHash, Self::OuterField>;
+    type ProgramVerificationKeyCRH: CRH;
+    type ProgramVerificationKeyCRHGadget: CRHGadget<Self::ProgramVerificationKeyCRH, Self::OuterField>;
 
     /// Commitment scheme for committing to hashes of birth and death verification keys
     type ProgramVerificationKeyCommitment: CommitmentScheme;
@@ -51,10 +76,6 @@ pub trait DPCComponents: 'static + Sized {
     /// PRF for computing serial numbers. Invoked only over `Self::InnerField`.
     type PRF: PRF;
     type PRFGadget: PRFGadget<Self::PRF, Self::InnerField>;
-
-    /// CRH for the encrypted record.
-    type EncryptedRecordCRH: CRH;
-    type EncryptedRecordCRHGadget: CRHGadget<Self::EncryptedRecordCRH, Self::InnerField>;
 
     /// Commitment scheme for record contents. Invoked only over `Self::InnerField`.
     type RecordCommitment: CommitmentScheme;
