@@ -18,7 +18,7 @@ pub type MerkleTreeLedger = Ledger<Tx, CommitmentMerkleParameters>;
 
 use rand::Rng;
 
-/// Create a dummy transaction and return encoded transaction and output records
+/// Returns a transaction constructed with dummy records.
 pub fn create_dummy_transaction<R: Rng>(
     network_id: u8,
     rng: &mut R,

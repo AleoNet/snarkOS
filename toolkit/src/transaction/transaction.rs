@@ -18,6 +18,7 @@ use rand::Rng;
 
 pub type MerkleTreeLedger = Ledger<Tx, CommitmentMerkleParameters>;
 
+/// Delegated execution of program proof generation and transaction online phase.
 pub fn delegate_transaction<R: Rng>(
     execute_context: ExecuteContext<Components>,
     ledger: &MerkleTreeLedger,
