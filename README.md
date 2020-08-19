@@ -24,7 +24,7 @@
 ## 1. Overview
 
 __snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and 
-enables developers to checkpoint and finalize application state in a publicly-verifiable manner.
+enables applications to verify and store state in a publicly verifiable manner.
 
 ## 2. Build Guide
 
