@@ -6,7 +6,9 @@ use rand::thread_rng;
 pub fn main() {
     let rng = &mut thread_rng();
 
-    let (transaction, records) = create_dummy_transaction(rng).unwrap();
+    let network_id = 1;
+
+    let (transaction, records) = create_dummy_transaction(network_id, rng).unwrap();
 
     let encoded_transaction = hex::encode(to_bytes![transaction].unwrap());
     println!("transaction: {}", encoded_transaction);
