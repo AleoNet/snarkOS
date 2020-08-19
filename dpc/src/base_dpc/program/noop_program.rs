@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::base_dpc::{BaseDPCComponents, LocalData, NoopCircuit, PrivateProgramInput, ProgramLocalData};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
@@ -51,7 +67,6 @@ where
         position: u8,
         rng: &mut R,
     ) -> Result<Self::PrivateWitness, DPCError> {
-        let mut position = position;
         let records = [&local_data.old_records[..], &local_data.new_records[..]].concat();
         assert!((position as usize) < records.len());
 
@@ -61,9 +76,6 @@ where
             assert_eq!(self.identity, record.death_program_id());
         } else {
             assert_eq!(self.identity, record.birth_program_id());
-
-            // TODO (raychu86) Make this position absolute (remove this line)
-            position -= C::NUM_INPUT_RECORDS as u8;
         }
 
         let local_data_root = local_data.local_data_merkle_tree.root();

@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::base_dpc::record_payload::RecordPayload;
 use snarkos_algorithms::{
     commitment_tree::CommitmentMerkleTree,
@@ -192,48 +208,51 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         let account_signature = Components::AccountSignature::setup(rng)?;
         end_timer!(time);
 
-        let time = start_timer!(|| "Record commitment scheme setup");
-        let record_commitment = Components::RecordCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Record encrypted record CRH setup");
+        let time = start_timer!(|| "Encrypted record CRH setup");
         let encrypted_record_crh = Components::EncryptedRecordCRH::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Verification key commitment setup");
-        let program_verification_key_commitment = Components::ProgramVerificationKeyCommitment::setup(rng);
-        end_timer!(time);
-
-        let time = start_timer!(|| "Local data CRH setup");
-        let local_data_crh = Components::LocalDataCRH::setup(rng);
+        let time = start_timer!(|| "Inner SNARK verification key CRH setup");
+        let inner_snark_verification_key_crh = Components::InnerSNARKVerificationKeyCRH::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Local data commitment setup");
         let local_data_commitment = Components::LocalDataCommitment::setup(rng);
         end_timer!(time);
 
+        let time = start_timer!(|| "Local data CRH setup");
+        let local_data_crh = Components::LocalDataCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Program verification key CRH setup");
+        let program_verification_key_crh = Components::ProgramVerificationKeyCRH::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Program verification key commitment setup");
+        let program_verification_key_commitment = Components::ProgramVerificationKeyCommitment::setup(rng);
+        end_timer!(time);
+
+        let time = start_timer!(|| "Record commitment scheme setup");
+        let record_commitment = Components::RecordCommitment::setup(rng);
+        end_timer!(time);
+
         let time = start_timer!(|| "Serial nonce CRH setup");
         let serial_number_nonce = Components::SerialNumberNonceCRH::setup(rng);
         end_timer!(time);
 
-        let time = start_timer!(|| "Verification key CRH setup");
-        let program_verification_key_hash = Components::ProgramVerificationKeyHash::setup(rng);
-        end_timer!(time);
-
-        let comm_crh_sig_pp = SystemParameters {
+        Ok(SystemParameters {
             account_commitment,
             account_encryption,
             account_signature,
-            record_commitment,
             encrypted_record_crh,
-            program_verification_key_commitment,
-            program_verification_key_hash,
+            inner_snark_verification_key_crh,
             local_data_crh,
             local_data_commitment,
+            program_verification_key_commitment,
+            program_verification_key_crh,
+            record_commitment,
             serial_number_nonce,
-        };
-
-        Ok(comm_crh_sig_pp)
+        })
     }
 
     pub fn generate_noop_program_snark_parameters<R: Rng>(
@@ -790,10 +809,16 @@ where
             assert!(Components::InnerSNARK::verify(verification_key, &input, &inner_proof)?);
         }
 
+        let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
+            parameters.inner_snark_parameters.1.clone().into();
+
+        let inner_snark_id = <Components::InnerSNARKVerificationKeyCRH as CRH>::hash(
+            &parameters.system_parameters.inner_snark_verification_key_crh,
+            &to_bytes![inner_snark_vk]?,
+        )?;
+
         let transaction_proof = {
             let ledger_parameters = ledger.parameters();
-            let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
-                parameters.inner_snark_parameters.1.clone().into();
 
             let circuit = OuterCircuit::new(
                 &parameters.system_parameters,
@@ -812,6 +837,7 @@ where
                 &program_commitment,
                 &program_randomness,
                 &local_data_root,
+                &inner_snark_id,
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
@@ -827,6 +853,7 @@ where
             new_commitments,
             memorandum.clone(),
             ledger_digest,
+            inner_snark_id,
             transaction_proof,
             program_commitment,
             local_data_root,
@@ -935,8 +962,17 @@ where
             network_id: transaction.network_id(),
         };
 
+        let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
+            parameters.inner_snark_parameters.1.clone().into();
+
+        let inner_snark_id = Components::InnerSNARKVerificationKeyCRH::hash(
+            &parameters.system_parameters.inner_snark_verification_key_crh,
+            &to_bytes![inner_snark_vk]?,
+        )?;
+
         let outer_snark_input = OuterCircuitVerifierInput {
             inner_snark_verifier_input: inner_snark_input,
+            inner_snark_id,
         };
 
         if !Components::OuterSNARK::verify(

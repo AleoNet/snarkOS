@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::base_dpc::BaseDPCComponents;
 use snarkos_models::{algorithms::SNARK, parameters::Parameters};
 use snarkos_parameters::*;
@@ -13,8 +29,9 @@ pub struct SystemParameters<C: BaseDPCComponents> {
     pub account_signature: C::AccountSignature,
     pub record_commitment: C::RecordCommitment,
     pub encrypted_record_crh: C::EncryptedRecordCRH,
+    pub inner_snark_verification_key_crh: C::InnerSNARKVerificationKeyCRH,
     pub program_verification_key_commitment: C::ProgramVerificationKeyCommitment,
-    pub program_verification_key_hash: C::ProgramVerificationKeyHash,
+    pub program_verification_key_crh: C::ProgramVerificationKeyCRH,
     pub local_data_crh: C::LocalDataCRH,
     pub local_data_commitment: C::LocalDataCommitment,
     pub serial_number_nonce: C::SerialNumberNonceCRH,
@@ -29,19 +46,21 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             From::from(FromBytes::read(AccountEncryptionParameters::load_bytes()?.as_slice())?);
         let account_signature: C::AccountSignature =
             From::from(FromBytes::read(AccountSignatureParameters::load_bytes()?.as_slice())?);
-        let record_commitment: C::RecordCommitment =
-            From::from(FromBytes::read(RecordCommitmentParameters::load_bytes()?.as_slice())?);
         let encrypted_record_crh: C::EncryptedRecordCRH =
             From::from(FromBytes::read(EncryptedRecordCRHParameters::load_bytes()?.as_slice())?);
-        let program_verification_key_commitment: C::ProgramVerificationKeyCommitment =
-            From::from(FromBytes::read(vec![].as_slice())?);
-        let program_verification_key_hash: C::ProgramVerificationKeyHash =
-            From::from(FromBytes::read(ProgramVKCRHParameters::load_bytes()?.as_slice())?);
+        let inner_snark_verification_key_crh: C::InnerSNARKVerificationKeyCRH =
+            From::from(FromBytes::read(InnerSNARKVKCRHParameters::load_bytes()?.as_slice())?);
         let local_data_crh: C::LocalDataCRH =
             From::from(FromBytes::read(LocalDataCRHParameters::load_bytes()?.as_slice())?);
         let local_data_commitment: C::LocalDataCommitment = From::from(FromBytes::read(
             LocalDataCommitmentParameters::load_bytes()?.as_slice(),
         )?);
+        let program_verification_key_commitment: C::ProgramVerificationKeyCommitment =
+            From::from(FromBytes::read(vec![].as_slice())?);
+        let program_verification_key_crh: C::ProgramVerificationKeyCRH =
+            From::from(FromBytes::read(ProgramVKCRHParameters::load_bytes()?.as_slice())?);
+        let record_commitment: C::RecordCommitment =
+            From::from(FromBytes::read(RecordCommitmentParameters::load_bytes()?.as_slice())?);
         let serial_number_nonce: C::SerialNumberNonceCRH = From::from(FromBytes::read(
             SerialNumberNonceCRHParameters::load_bytes()?.as_slice(),
         )?);
@@ -50,12 +69,13 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             account_commitment,
             account_encryption,
             account_signature,
-            record_commitment,
             encrypted_record_crh,
-            program_verification_key_commitment,
-            program_verification_key_hash,
+            inner_snark_verification_key_crh,
             local_data_crh,
             local_data_commitment,
+            program_verification_key_commitment,
+            program_verification_key_crh,
+            record_commitment,
             serial_number_nonce,
         })
     }
@@ -146,8 +166,8 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         &self.system_parameters.program_verification_key_commitment
     }
 
-    pub fn program_verification_key_hash_parameters(&self) -> &C::ProgramVerificationKeyHash {
-        &self.system_parameters.program_verification_key_hash
+    pub fn program_verification_key_crh_parameters(&self) -> &C::ProgramVerificationKeyCRH {
+        &self.system_parameters.program_verification_key_crh
     }
 
     pub fn record_commitment_parameters(&self) -> &C::RecordCommitment {

@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use snarkos_errors::objects::TransactionError;
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
@@ -6,6 +22,7 @@ use std::hash::Hash;
 pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
     type Commitment: Clone + Eq + Hash + FromBytes + ToBytes;
     type Digest: Clone + Eq + Hash + FromBytes + ToBytes;
+    type InnerSNARKID: Clone + Eq + FromBytes + ToBytes;
     type LocalDataRoot: Clone + Eq + Hash + FromBytes + ToBytes;
     type Memorandum: Clone + Eq + Hash + FromBytes + ToBytes;
     type ProgramCommitment: Clone + Eq + Hash + FromBytes + ToBytes;
@@ -21,6 +38,9 @@ pub trait Transaction: Clone + Eq + FromBytes + ToBytes {
 
     /// Returns the ledger digest.
     fn ledger_digest(&self) -> &Self::Digest;
+
+    /// Returns the inner snark id.
+    fn inner_snark_id(&self) -> &Self::InnerSNARKID;
 
     /// Returns the old serial numbers.
     fn old_serial_numbers(&self) -> &[Self::SerialNumber];

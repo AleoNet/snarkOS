@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
@@ -61,6 +77,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
         target_block_time: 10i64,
         network: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
+        authorized_inner_snark_ids: vec![],
     };
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;
@@ -74,7 +91,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     let noop_program_vk_hash = parameters
         .system_parameters
-        .program_verification_key_hash
+        .program_verification_key_crh
         .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?;
     let noop_program_id = to_bytes![noop_program_vk_hash]?;
 

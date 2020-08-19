@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{difficulty::bitcoin_retarget, memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_dpc::base_dpc::{
@@ -54,6 +70,9 @@ pub struct ConsensusParameters {
 
     /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
     pub verifier: PoswMarlin,
+
+    /// The authorized inner SNARK IDs
+    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
 }
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
@@ -150,6 +169,13 @@ impl ConsensusParameters {
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
+        if !self
+            .authorized_inner_snark_ids
+            .contains(&to_bytes![transaction.inner_snark_id]?)
+        {
+            return Ok(false);
+        }
+
         Ok(InstantiatedDPC::verify(parameters, transaction, ledger)?)
     }
 
@@ -160,6 +186,12 @@ impl ConsensusParameters {
         transactions: &Vec<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
+        for tx in transactions {
+            if !self.authorized_inner_snark_ids.contains(&to_bytes![tx.inner_snark_id]?) {
+                return Ok(false);
+            }
+        }
+
         Ok(InstantiatedDPC::verify_transactions(parameters, transactions, ledger)?)
     }
 
@@ -430,8 +462,8 @@ impl ConsensusParameters {
 
         let local_data = execute_context.into_local_data();
 
-        let noop_program_snark_id = to_bytes![ProgramVerificationKeyHash::hash(
-            &parameters.system_parameters.program_verification_key_hash,
+        let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
+            &parameters.system_parameters.program_verification_key_crh,
             &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
         )?]?;
 
@@ -537,6 +569,7 @@ mod tests {
             target_block_time: 2i64, //unix seconds
             network: Network::Mainnet,
             verifier: posw,
+            authorized_inner_snark_ids: vec![],
         };
 
         let b1 = DATA.block_1.clone();

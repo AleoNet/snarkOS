@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_errors::parameters::ParametersError;
 use snarkos_models::parameters::Parameters;
@@ -212,14 +228,21 @@ impl_params!(
 );
 
 // CRH
-impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
-impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
 impl_params!(
     EncryptedRecordCRHParameters,
     encrypted_record_crh_test,
     "encrypted_record_crh",
     270532
 );
+impl_params!(
+    InnerSNARKVKCRHParameters,
+    inner_snark_vk_crh_test,
+    "inner_snark_vk_crh",
+    3581604
+);
+impl_params!(LocalDataCRHParameters, local_data_crh_test, "local_data_crh", 65604);
+impl_params!(ProgramVKCRHParameters, program_vk_crh_test, "program_vk_crh", 1742404);
+
 impl_params!(
     SerialNumberNonceCRHParameters,
     serial_number_nonce_crh_test,
@@ -258,5 +281,5 @@ impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 250108401);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2329);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 464560481);
-impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4250);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 502942005);
+impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);

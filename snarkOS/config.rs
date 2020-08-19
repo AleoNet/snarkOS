@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{
     cli::CLI,
     parameters::{flag, option, subcommand, types::*},
@@ -17,7 +33,14 @@ use toml;
 /// Hardcoded bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &["50.18.83.123:4131"]; // "192.168.0.1:4131"
+pub const TESTNET_BOOTNODES: &'static [&str] = &[
+    "50.18.83.123:4131",
+    "34.220.189.127:4131",
+    "34.220.144.175:4131",
+    "52.89.166.172:4131",
+    "52.42.131.71:4131",
+    "54.245.170.92:4131",
+]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,6 +83,7 @@ pub struct Miner {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct P2P {
+    #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
     pub mempool_interval: u8,
     pub min_peers: u16,
@@ -135,7 +159,17 @@ impl Config {
         };
 
         // Parse the contents into the `Config` struct
-        let config: Config = toml::from_str(&toml_string)?;
+        let mut config: Config = toml::from_str(&toml_string)?;
+
+        let bootnodes = match config.aleo.network_id {
+            0 => MAINNET_BOOTNODES,
+            _ => TESTNET_BOOTNODES,
+        };
+
+        config.p2p.bootnodes = bootnodes
+            .iter()
+            .map(|node| (*node).to_string())
+            .collect::<Vec<String>>();
 
         Ok(config)
     }
