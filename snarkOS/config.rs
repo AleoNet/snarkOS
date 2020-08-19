@@ -82,6 +82,7 @@ pub struct Miner {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct P2P {
+    #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
     pub mempool_interval: u8,
     pub min_peers: u16,
@@ -157,7 +158,17 @@ impl Config {
         };
 
         // Parse the contents into the `Config` struct
-        let config: Config = toml::from_str(&toml_string)?;
+        let mut config: Config = toml::from_str(&toml_string)?;
+
+        let bootnodes = match config.aleo.network_id {
+            0 => MAINNET_BOOTNODES,
+            _ => TESTNET_BOOTNODES,
+        };
+
+        config.p2p.bootnodes = bootnodes
+            .iter()
+            .map(|node| (*node).to_string())
+            .collect::<Vec<String>>();
 
         Ok(config)
     }
