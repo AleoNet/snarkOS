@@ -34,7 +34,7 @@ pub fn delegate_transaction<R: Rng>(
     let noop_program_id = to_bytes![
         parameters
             .system_parameters
-            .program_verification_key_hash
+            .program_verification_key_crh
             .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?
     ]?;
 
