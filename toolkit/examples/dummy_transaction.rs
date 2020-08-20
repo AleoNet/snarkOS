@@ -2,6 +2,7 @@ use snarkos_toolkit::transaction::create_dummy_transaction;
 use snarkos_utilities::{to_bytes, ToBytes};
 
 use rand::thread_rng;
+use std::{env::current_dir, fs::File, io::Write};
 
 pub fn main() {
     let rng = &mut thread_rng();
@@ -12,4 +13,11 @@ pub fn main() {
 
     let encoded_transaction = hex::encode(to_bytes![transaction].unwrap());
     println!("{}", encoded_transaction);
+
+    // Write the transaction to a file
+    let mut file_name = current_dir().unwrap();
+    file_name.push("dummy_transaction.txt");
+
+    let mut file = File::create(file_name).unwrap();
+    file.write_all(encoded_transaction.as_bytes()).unwrap();
 }
