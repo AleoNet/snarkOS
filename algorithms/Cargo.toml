@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-algorithms"
-version = "0.8.0"
+version = "1.0.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Algorithms for a decentralized record system"
 homepage = "https://aleo.org"
@@ -17,10 +17,10 @@ path = "examples/snark/gm17.rs"
 required-features = ["rand", "snarkos-curves/bls12_377", "snarkos-models/gadgets"]
 
 [dependencies]
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-profiler = { path = "../profiler", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "1.0.0", default-features = false }
+snarkos-models = { path = "../models", version = "1.0.0", default-features = false }
+snarkos-profiler = { path = "../profiler", version = "1.0.0" }
+snarkos-utilities = { path = "../utilities", version = "1.0.0", default-features = false }
 
 blake2 = { version = "0.8.1" }
 derivative = { version = "2" }
@@ -33,7 +33,7 @@ sha2 = { version = "0.9" }
 smallvec = { version = "1.4" }
 
 [dev-dependencies]
-snarkos-curves = { path = "../curves", version = "0.8.0" }
+snarkos-curves = { path = "../curves", version = "1.0.0" }
 
 criterion = { version = "0.3.3" }
 csv = { version = "1" }

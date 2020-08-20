@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-testing"
-version = "0.8.0"
+version = "1.0.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Testing suite for a decentralized record system"
 homepage = "https://aleo.org"
@@ -12,18 +12,18 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "0.8.0" }
-snarkos-consensus = { path = "../consensus", version = "0.8.0" }
-snarkos-curves = { path = "../curves", version = "0.8.0" }
-snarkos-dpc = { path = "../dpc", version = "0.8.0" }
-snarkos-errors = { path = "../errors", version = "0.8.0" }
-snarkos-models = { path = "../models", version = "0.8.0" }
-snarkos-network = { path = "../network", version = "0.8.0" }
-snarkos-objects = { path = "../objects", version = "0.8.0" }
-snarkos-parameters = { path = "../parameters", version = "0.8.0" }
-snarkos-posw = { path = "../posw", version = "0.8.0" }
-snarkos-storage = { path = "../storage", version = "0.8.0" }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-algorithms = { path = "../algorithms", version = "1.0.0" }
+snarkos-consensus = { path = "../consensus", version = "1.0.0" }
+snarkos-curves = { path = "../curves", version = "1.0.0" }
+snarkos-dpc = { path = "../dpc", version = "1.0.0" }
+snarkos-errors = { path = "../errors", version = "1.0.0" }
+snarkos-models = { path = "../models", version = "1.0.0" }
+snarkos-network = { path = "../network", version = "1.0.0" }
+snarkos-objects = { path = "../objects", version = "1.0.0" }
+snarkos-parameters = { path = "../parameters", version = "1.0.0" }
+snarkos-posw = { path = "../posw", version = "1.0.0" }
+snarkos-storage = { path = "../storage", version = "1.0.0" }
+snarkos-utilities = { path = "../utilities", version = "1.0.0" }
 
 once_cell = { version = "1.4.0" }
 rand = { version = "0.7.0" }

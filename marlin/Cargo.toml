@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-marlin"
-version = "0.1.0"
+version = "1.0.0"
 authors = [
   "Alessandro Chiesa <alexch@berkeley.edu>",
   "Mary Maller <mary.maller.15@ucl.ac.uk>",
@@ -11,7 +11,7 @@ authors = [
   "The Aleo Team <hello@aleo.org>",
 ]
 description = "A library for the Marlin preprocessing zkSNARK"
-repository = "https://github.com/scipr/marlin"
+repository = "https://github.com/AleoHQ/snarkOS"
 keywords = ["cryptography", "polynomial commitments", "zkSNARK"]
 categories = ["cryptography"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
