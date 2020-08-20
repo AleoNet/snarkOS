@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-errors"
-version = "0.8.0"
+version = "1.0.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Errors for a decentralized record system"
 homepage = "https://aleo.org"

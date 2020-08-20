@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-polycommit"
-version = "0.1.0"
+version = "1.0.0"
 authors = [
   "Alessandro Chiesa <alexch@berkeley.edu>",
   "Mary Maller <mary.maller.15@ucl.ac.uk>",

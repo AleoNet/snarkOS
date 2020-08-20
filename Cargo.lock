@@ -1917,7 +1917,7 @@ checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
 
 [[package]]
 name = "snarkos"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "colored",
@@ -1945,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-algorithms"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "criterion",
@@ -1968,7 +1968,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-benchmarks"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "criterion",
  "csv",
@@ -1991,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-consensus"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bincode",
  "chrono",
@@ -2017,7 +2017,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-curves"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "derivative",
  "rand",
@@ -2040,7 +2040,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-dpc"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "criterion",
@@ -2063,7 +2063,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-errors"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "base58",
  "bech32",
@@ -2078,7 +2078,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-gadgets"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "derivative",
@@ -2095,7 +2095,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-marlin"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "derivative",
@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-models"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bincode",
  "derivative",
@@ -2130,7 +2130,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-network"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bincode",
  "byteorder",
@@ -2155,7 +2155,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-objects"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "base58",
  "bech32",
@@ -2177,7 +2177,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-parameters"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "curl",
@@ -2199,7 +2199,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-polycommit"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "derivative",
@@ -2217,7 +2217,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-posw"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "rand",
@@ -2238,14 +2238,14 @@ dependencies = [
 
 [[package]]
 name = "snarkos-profiler"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "colored",
 ]
 
 [[package]]
 name = "snarkos-rpc"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.12.3",
  "chrono",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-storage"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bincode",
  "hex",
@@ -2294,7 +2294,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-testing"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "once_cell",
  "rand",
@@ -2316,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-toolkit"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "criterion",
  "rand",
@@ -2332,7 +2332,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-utilities"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bincode",
  "rand",

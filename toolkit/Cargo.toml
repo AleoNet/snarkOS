@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-toolkit"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "A developer toolkit for a decentralized record system"
 homepage = "https://aleo.org"
@@ -19,10 +19,10 @@ name = "account"
 harness = false
 
 [dependencies]
-snarkos-dpc = { path = "../dpc", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-dpc = { path = "../dpc", version = "1.0.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "1.0.0", default-features = false }
+snarkos-objects = { path = "../objects", version = "1.0.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "1.0.0" }
 
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }
