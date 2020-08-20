@@ -2,11 +2,11 @@
 name = "snarkos-rpc"
 version = "1.0.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
-description = "RPC for a decentralized record system"
+description = "RPC for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
-categories = ["cryptography"]
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
+categories = ["operating systems"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"

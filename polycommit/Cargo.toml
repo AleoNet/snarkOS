@@ -13,8 +13,8 @@ authors = [
 ]
 description = "A library for constructing polynomial commitment schemes for use in zkSNARKs"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
-categories = ["cryptography"]
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
+categories = ["operating systems"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 license = "GPL-3.0"
 edition = "2018"
