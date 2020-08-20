@@ -8,12 +8,8 @@ pub fn main() {
 
     let network_id = 1;
 
-    let (transaction, records) = create_dummy_transaction(network_id, rng).unwrap();
+    let (transaction, _records) = create_dummy_transaction(network_id, rng).unwrap();
 
     let encoded_transaction = hex::encode(to_bytes![transaction].unwrap());
-    println!("transaction: {}", encoded_transaction);
-
-    for (i, record) in records.iter().enumerate() {
-        println!("record {}: {}", i, hex::encode(to_bytes![record].unwrap()));
-    }
+    println!("{}", encoded_transaction);
 }
