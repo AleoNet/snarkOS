@@ -21,15 +21,14 @@ curl = { version = "0.4.33", optional = true }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.0.0" }
-snarkos-consensus = { path = "../consensus", version = "1.0.0" }
-snarkos-curves = { path = "../curves", version = "1.0.0" }
-snarkos-dpc = { path = "../dpc", version = "1.0.0" }
-snarkos-objects = { path = "../objects", version = "1.0.0" }
-snarkos-posw = { path = "../posw", version = "1.0.0", features = ["test-helpers"] }
-snarkos-storage = { path = "../storage", version = "1.0.0" }
-
-snarkos-marlin = { path = "../marlin", version = "1.0.0" }
+snarkos-algorithms = { path = "../algorithms" }
+snarkos-consensus = { path = "../consensus" }
+snarkos-curves = { path = "../curves" }
+snarkos-dpc = { path = "../dpc" }
+snarkos-marlin = { path = "../marlin" }
+snarkos-objects = { path = "../objects" }
+snarkos-posw = { path = "../posw", features = ["test-helpers"] }
+snarkos-storage = { path = "../storage" }
 
 chrono = { version = "0.4", features = ["serde"] }
 curl = { version = "0.4.33" }
