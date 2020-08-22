@@ -161,8 +161,8 @@ snarkos --connect "<IP ADDRESS>"
 
 ### 3.3 Configuration File
 
-A `snarkOS.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
-Updating this `snarkOS.toml` file allows node operators to specify default settings for the node without 
+A `config.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
+Updating this `config.toml` file allows node operators to specify default settings for the node without 
 having to specify additional information in the CLI.
 
 ## 4. JSON-RPC Interface
