@@ -73,7 +73,7 @@ impl MinerInstance {
 
                 match Block::<Tx>::deserialize(&block_serialized) {
                     Ok(block) => {
-                        info!("Block found!    {:?}", block.header.get_hash());
+                        info!("Block found!    {:?}", hex::encode(block.header.get_hash()));
 
                         if let Err(err) = propagate_block(context.clone(), block_serialized, local_address).await {
                             info!("Error propagating block to peers: {:?}", err);

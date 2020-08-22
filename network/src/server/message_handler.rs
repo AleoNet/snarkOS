@@ -83,7 +83,7 @@ impl Server {
                 let mut peer_book = self.context.peer_book.write().await;
                 peer_book.disconnect_peer(channel.address);
             } else {
-                info!("Name not recognized {:?}", name.to_string());
+                info!("Message name not recognized {:?}", name.to_string());
             }
             tx.send(channel).expect("error resetting message handler");
         }
@@ -99,7 +99,7 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
-        info!("Received block with hash: {:?}", block.header.get_hash());
+        info!("Received block with hash: {:?}", hex::encode(block.header.get_hash()));
 
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {
@@ -247,7 +247,7 @@ impl Server {
                     .await
                     .update_connected(channel.address, Utc::now());
             }
-            Err(error) => info!(
+            Err(error) => debug!(
                 "Invalid Pong message from: {:?}, Full error: {:?}",
                 channel.address, error
             ),
@@ -341,7 +341,7 @@ impl Server {
                 channel.write(&GetPeers).await?;
             }
             Err(error) => {
-                info!(
+                debug!(
                     "Invalid Verack message from: {:?} Full error: {:?}",
                     channel.address,
                     ServerError::HandshakeError(error)
