@@ -99,7 +99,7 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
-        info!("Received block with hash: {:?}", hex::encode(block.header.get_hash().0));
+        debug!("Received block with hash: {:?}", hex::encode(block.header.get_hash().0));
 
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {
