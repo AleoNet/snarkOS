@@ -56,7 +56,7 @@ pub fn render_init(config: &Config) -> String {
                     .to_string();
             }
             Err(_) => output += &format!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI."
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
             ).bold()
                 .to_string()
         }
