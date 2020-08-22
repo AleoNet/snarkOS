@@ -72,7 +72,6 @@ pub struct Node {
     pub ip: String,
     pub port: u16,
     pub verbose: u8,
-    pub debug: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -101,7 +100,6 @@ impl Default for Config {
                 ip: "0.0.0.0".into(),
                 port: 4131,
                 verbose: 1,
-                debug: false,
             },
             miner: Miner {
                 is_miner: false,

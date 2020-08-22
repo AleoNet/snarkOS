@@ -103,6 +103,6 @@ pub const RPC_PASSWORD: OptionType = (
 pub const VERBOSE: OptionType = (
     "[verbose] --verbose=[verbose] 'Specify the verbosity of the node. (default = 1)'",
     &[],
-    &["0, 1, 2"],
+    &["0", "1", "2"],
     &[],
 );
