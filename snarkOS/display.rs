@@ -48,17 +48,22 @@ pub fn render_init(config: &Config) -> String {
         .bold()
         .to_string();
 
-    if config.miner.is_miner {
+    let mut is_miner = config.miner.is_miner;
+    if is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 output += &format!("Your Aleo address is {}.\n\n", miner_address)
                     .bold()
                     .to_string();
             }
-            Err(_) => output += &format!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
-            ).bold()
-                .to_string()
+            Err(_) => {
+                output += &format!(
+                    "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI.\n\n"
+                ).red().bold()
+                    .to_string();
+
+                is_miner = false;
+            }
         }
     }
 
@@ -66,7 +71,7 @@ pub fn render_init(config: &Config) -> String {
         0 => "mainnet".to_string(),
         i => format!("testnet{}", i),
     };
-    if config.miner.is_miner {
+    if is_miner {
         output += &format!("Starting a mining node on {}.\n\n", network).bold().to_string();
     } else {
         output += &format!("Starting a client node on {}.\n\n", network).bold().to_string();
