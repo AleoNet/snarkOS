@@ -20,43 +20,32 @@ use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParamete
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
 use snarkos_utilities::bytes::ToBytes;
 
-use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
-pub struct Signature {
-    pub(crate) signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output,
+pub struct PublicKey {
+    pub(crate) public_key: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::PublicKey,
 }
 
-impl Signature {
-    pub fn sign<R: Rng + CryptoRng>(
-        private_key: &PrivateKey,
-        message: &[u8],
-        rng: &mut R,
-    ) -> Result<Self, SignatureError> {
+impl PublicKey {
+    pub fn from_private_key(private_key: &PrivateKey) -> Result<Self, SignatureError> {
         let parameters = SystemParameters::<Components>::load()?;
 
-        let signature = parameters
-            .account_signature
-            .sign(&private_key.private_key.sk_sig, message, rng)?;
+        let public_key = private_key.private_key.pk_sig(&parameters.account_signature)?;
 
-        Ok(Self { signature })
+        Ok(Self { public_key })
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut output = vec![];
-        self.signature
+        self.public_key
             .write(&mut output)
             .expect("serialization to bytes failed");
         output
     }
-
-    pub fn verify(&self) -> bool {
-        true
-    }
 }
 
-impl FromStr for Signature {
+impl FromStr for PublicKey {
     type Err = SignatureError;
 
     fn from_str(address: &str) -> Result<Self, Self::Err> {
@@ -64,7 +53,7 @@ impl FromStr for Signature {
     }
 }
 
-impl fmt::Display for Signature {
+impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         unimplemented!()
     }

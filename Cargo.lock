@@ -2323,6 +2323,7 @@ dependencies = [
  "rand_chacha",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-models",
  "snarkos-objects",
  "snarkos-utilities",
  "thiserror",

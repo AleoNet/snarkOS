@@ -17,5 +17,8 @@
 pub mod signature;
 pub use signature::*;
 
+pub mod public_key;
+pub use public_key::*;
+
 #[cfg(test)]
 pub mod tests;

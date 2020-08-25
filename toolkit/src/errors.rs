@@ -67,3 +67,27 @@ impl From<std::io::Error> for AddressError {
         AddressError::Crate("std::io", format!("{:?}", error))
     }
 }
+
+#[derive(Debug, Error)]
+pub enum SignatureError {
+    #[error("{}: {}", _0, _1)]
+    Crate(&'static str, String),
+}
+
+impl From<snarkos_errors::objects::account::AccountError> for SignatureError {
+    fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
+        SignatureError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+    }
+}
+
+impl From<snarkos_errors::algorithms::signature::SignatureError> for SignatureError {
+    fn from(error: snarkos_errors::algorithms::signature::SignatureError) -> Self {
+        SignatureError::Crate("snarkos_errors::algorithms::signature", format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for SignatureError {
+    fn from(error: std::io::Error) -> Self {
+        SignatureError::Crate("std::io", format!("{:?}", error))
+    }
+}
