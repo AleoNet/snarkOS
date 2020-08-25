@@ -100,18 +100,23 @@ impl Server {
         });
     }
 
-    /// Send a handshake request to all bootnodes from config.
+    /// Send a handshake request the first bootnode and store the rest as gossipped peers
     async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
         let local_address = *self.context.local_address.read().await;
 
-        for bootnode in self.context.bootnodes.clone() {
+        let mut peer_book = self.context.peer_book.write().await;
+        for (i, bootnode) in self.context.bootnodes.clone().iter().enumerate() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
 
-            // This node should not attempt to connect to itself.
-            if local_address != bootnode_address {
-                info!("Connecting to bootnode: {:?}", bootnode_address);
+            if i == 0 {
+                // This node should not attempt to connect to itself.
+                if local_address != bootnode_address {
+                    info!("Connecting to bootnode: {:?}", bootnode_address);
 
-                self.send_handshake_non_blocking(bootnode_address);
+                    self.send_handshake_non_blocking(bootnode_address);
+                }
+            } else {
+                peer_book.update_gossiped(bootnode_address, Utc::now());
             }
         }
 
