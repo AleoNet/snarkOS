@@ -90,7 +90,7 @@ impl Server {
                     let time_since_last_seen = (Utc::now() - last_seen).num_milliseconds();
                     if address != *context.local_address.read().await
                         && time_since_last_seen.is_positive()
-                        && time_since_last_seen as u64 > connection_frequency
+                        && time_since_last_seen as u64 > (connection_frequency * 3)
                     {
                         if let Some(channel) = connections.get(&address) {
                             if let Err(_) = pings.send_ping(channel).await {
@@ -101,7 +101,7 @@ impl Server {
                 }
 
                 // Purge peers that haven't responded in two frequency loops.
-                let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
+                let response_timeout = ChronoDuration::milliseconds((connection_frequency * 5) as i64);
 
                 for (address, last_seen) in peer_book.get_connected() {
                     if Utc::now() - last_seen.clone() > response_timeout {
