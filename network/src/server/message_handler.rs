@@ -282,6 +282,8 @@ impl Server {
             } else {
                 channel.write(&Sync::new(vec![])).await?;
             }
+        } else {
+            channel.write(&Sync::new(vec![])).await?;
         }
 
         Ok(())

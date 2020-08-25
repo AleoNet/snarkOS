@@ -46,10 +46,10 @@ pub struct SyncHandler {
 
 impl SyncHandler {
     /// Construct a new `SyncHandler`.
-    pub fn new(bootnode: SocketAddr) -> Self {
+    pub fn new(sync_node: SocketAddr) -> Self {
         Self {
             block_headers: vec![],
-            sync_node: bootnode,
+            sync_node,
             sync_state: SyncState::Idle,
         }
     }

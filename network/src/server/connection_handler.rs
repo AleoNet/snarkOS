@@ -121,7 +121,7 @@ impl Server {
                 // Store connected peers in database.
                 peer_book
                     .store(&storage)
-                    .unwrap_or_else(|error| info!("Failed to store connected peers in database {}", error));
+                    .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
 
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
@@ -131,12 +131,12 @@ impl Server {
                     };
 
                     memory_pool.cleanse(&storage).unwrap_or_else(|error| {
-                        info!("Failed to cleanse memory pool transactions in database {}", error)
+                        debug!("Failed to cleanse memory pool transactions in database {}", error)
                     });
 
-                    memory_pool
-                        .store(&storage)
-                        .unwrap_or_else(|error| info!("Failed to store memory pool transaction in database {}", error));
+                    memory_pool.store(&storage).unwrap_or_else(|error| {
+                        debug!("Failed to store memory pool transaction in database {}", error)
+                    });
 
                     // Ask our sync node for more transactions.
                     if *context.local_address.read().await != sync_handler.sync_node {
