@@ -154,7 +154,7 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     ///
     /// If and only if `greatest` is set will the lexicographically
     /// largest y-coordinate be selected.
-    fn from_y_coordinate(y: Self::BaseField, greatest: bool) -> Option<Self> {
+    fn from_y_coordinate(_y: Self::BaseField, _greatest: bool) -> Option<Self> {
         unimplemented!()
     }
 
