@@ -54,6 +54,14 @@ impl SyncHandler {
         }
     }
 
+    /// Returns if the sync handler is currently syncing blocks
+    pub fn is_syncing(&self) -> bool {
+        match self.sync_state {
+            SyncState::Idle => false,
+            SyncState::Syncing(_, _) => true,
+        }
+    }
+
     /// Set the SyncState to syncing and update the latest block height.
     pub fn update_syncing(&mut self, block_height: u32) {
         match self.sync_state {
