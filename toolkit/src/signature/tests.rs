@@ -14,7 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// use crate::account::{Address, PrivateKey, ViewKey};
+use crate::{
+    account::PrivateKey,
+    signature::{PublicKey, Signature},
+};
+
+use rand::SeedableRng;
+use rand_chacha::ChaChaRng;
+use std::str::FromStr;
 
 #[test]
-pub fn signature_test() {}
+pub fn signature_test() {
+    let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
+    let private_key = PrivateKey::new(rng);
+    assert!(private_key.is_ok());
+}

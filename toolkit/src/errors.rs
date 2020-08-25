@@ -74,6 +74,12 @@ pub enum SignatureError {
     Crate(&'static str, String),
 }
 
+impl From<hex::FromHexError> for SignatureError {
+    fn from(error: hex::FromHexError) -> Self {
+        SignatureError::Crate("hex", format!("{:?}", error))
+    }
+}
+
 impl From<snarkos_errors::objects::account::AccountError> for SignatureError {
     fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
         SignatureError::Crate("snarkos_errors::objects::account", format!("{:?}", error))

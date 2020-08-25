@@ -2319,6 +2319,7 @@ name = "snarkos-toolkit"
 version = "1.0.0"
 dependencies = [
  "criterion",
+ "hex",
  "rand",
  "rand_chacha",
  "snarkos-dpc",

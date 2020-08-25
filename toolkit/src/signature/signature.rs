@@ -18,7 +18,10 @@ use crate::{account::PrivateKey, errors::SignatureError};
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
@@ -59,13 +62,21 @@ impl Signature {
 impl FromStr for Signature {
     type Err = SignatureError;
 
-    fn from_str(address: &str) -> Result<Self, Self::Err> {
-        unimplemented!()
+    fn from_str(signature: &str) -> Result<Self, Self::Err> {
+        let signature_bytes = hex::decode(signature)?;
+        let signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output =
+            FromBytes::read(&signature_bytes[..])?;
+
+        Ok(Self { signature })
     }
 }
 
 impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
+        write!(
+            f,
+            "{}",
+            hex::encode(to_bytes![self.signature].expect("failed to convert to bytes"))
+        )
     }
 }
