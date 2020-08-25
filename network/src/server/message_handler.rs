@@ -83,7 +83,7 @@ impl Server {
                 let mut peer_book = self.context.peer_book.write().await;
                 peer_book.disconnect_peer(channel.address);
             } else {
-                info!("Message name not recognized {:?}", name.to_string());
+                debug!("Message name not recognized {:?}", name.to_string());
             }
             tx.send(channel).expect("error resetting message handler");
         }
@@ -174,7 +174,7 @@ impl Server {
 
             if let Ok(inserted) = memory_pool.insert(&self.storage, entry) {
                 if let Some(txid) = inserted {
-                    info!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
+                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
                 }
             }
         }

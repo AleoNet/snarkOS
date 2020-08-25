@@ -29,7 +29,7 @@ impl Server {
     ///     1.1 Ask our connected peers for their peers.
     ///     1.2 Ask our gossiped peers to handshake and become connected.
     /// 2. Maintain connected peers by sending ping messages.
-    /// 3. Purge peers that have not responded in connection_frequency x 2 seconds.
+    /// 3. Purge peers that have not responded in connection_frequency x 5 seconds.
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
@@ -100,7 +100,7 @@ impl Server {
                     }
                 }
 
-                // Purge peers that haven't responded in two frequency loops.
+                // Purge peers that haven't responded in five frequency loops.
                 let response_timeout = ChronoDuration::milliseconds((connection_frequency * 5) as i64);
 
                 for (address, last_seen) in peer_book.get_connected() {
@@ -125,7 +125,10 @@ impl Server {
 
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
-                    let mut memory_pool = memory_pool_lock.lock().await;
+                    let mut memory_pool = match memory_pool_lock.try_lock() {
+                        Ok(memory_pool) => memory_pool,
+                        _ => continue,
+                    };
 
                     memory_pool.cleanse(&storage).unwrap_or_else(|error| {
                         info!("Failed to cleanse memory pool transactions in database {}", error)
