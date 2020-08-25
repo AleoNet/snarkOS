@@ -53,3 +53,21 @@ pub fn public_key_test() {
     println!("{} == {}", expected_public_key, candidate_public_key);
     assert_eq!(expected_public_key, candidate_public_key);
 }
+
+#[test]
+pub fn signature_verification_test() {
+    let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
+
+    let message: [u8; 32] = rng.gen();
+
+    let private_key = PrivateKey::from_str("APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn").unwrap();
+    let public_key = SignaturePublicKey::from(&private_key);
+    assert!(public_key.is_ok());
+
+    let signature = Signature::sign(&private_key, &message, rng);
+    assert!(signature.is_ok());
+
+    let verification = signature.unwrap().verify(&public_key.unwrap(), &message);
+    assert!(verification.is_ok());
+    assert!(verification.unwrap())
+}

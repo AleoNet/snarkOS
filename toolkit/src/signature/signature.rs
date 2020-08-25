@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{account::PrivateKey, errors::SignatureError};
+use crate::{account::PrivateKey, errors::SignatureError, signature::SignaturePublicKey};
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
@@ -54,8 +54,12 @@ impl Signature {
         output
     }
 
-    pub fn verify(&self) -> bool {
-        true
+    pub fn verify(&self, public_key: &SignaturePublicKey, message: &[u8]) -> Result<bool, SignatureError> {
+        let parameters = SystemParameters::<Components>::load()?;
+
+        Ok(parameters
+            .account_signature
+            .verify(&public_key.public_key, message, &self.signature)?)
     }
 }
 
