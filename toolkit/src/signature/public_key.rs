@@ -26,12 +26,12 @@ use snarkos_utilities::{
 use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
-pub struct PublicKey {
+pub struct SignaturePublicKey {
     pub(crate) public_key: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::PublicKey,
 }
 
-impl PublicKey {
-    pub fn from_private_key(private_key: &PrivateKey) -> Result<Self, SignatureError> {
+impl SignaturePublicKey {
+    pub fn from(private_key: &PrivateKey) -> Result<Self, SignatureError> {
         let parameters = SystemParameters::<Components>::load()?;
 
         let public_key = private_key.private_key.pk_sig(&parameters.account_signature)?;
@@ -48,7 +48,7 @@ impl PublicKey {
     }
 }
 
-impl FromStr for PublicKey {
+impl FromStr for SignaturePublicKey {
     type Err = SignatureError;
 
     fn from_str(public_key: &str) -> Result<Self, Self::Err> {
@@ -60,7 +60,7 @@ impl FromStr for PublicKey {
     }
 }
 
-impl fmt::Display for PublicKey {
+impl fmt::Display for SignaturePublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
