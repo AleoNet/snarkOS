@@ -18,7 +18,10 @@ use crate::{account::PrivateKey, errors::SignatureError};
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use std::{fmt, str::FromStr};
 
@@ -48,13 +51,21 @@ impl PublicKey {
 impl FromStr for PublicKey {
     type Err = SignatureError;
 
-    fn from_str(address: &str) -> Result<Self, Self::Err> {
-        unimplemented!()
+    fn from_str(public_key: &str) -> Result<Self, Self::Err> {
+        let public_key_bytes = hex::decode(public_key)?;
+        let public_key: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::PublicKey =
+            FromBytes::read(&public_key_bytes[..])?;
+
+        Ok(Self { public_key })
     }
 }
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
+        write!(
+            f,
+            "{}",
+            hex::encode(to_bytes![self.public_key].expect("failed to convert to bytes"))
+        )
     }
 }
