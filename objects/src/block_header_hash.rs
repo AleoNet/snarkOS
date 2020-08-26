@@ -18,7 +18,7 @@ use hex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct BlockHeaderHash(pub [u8; 32]);
 
 impl BlockHeaderHash {
