@@ -111,6 +111,7 @@ impl Server {
             drop(memory_pool);
 
             let mut sync_handler = self.sync_handler_lock.lock().await;
+            sync_handler.clear_pending(Arc::clone(&self.storage));
 
             if inserted && propagate {
                 // This is a new block, send it to our peers.
@@ -296,6 +297,7 @@ impl Server {
 
         sync_handler.receive_hashes(message.block_hashes, height);
 
+        // Received block headers
         if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
             sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
         }
@@ -373,8 +375,9 @@ impl Server {
                 .receive_request(message.clone(), peer_address)
                 .await?;
 
-            // if our peer has a longer chain, send a sync message
+            // If our peer has a longer chain, send a sync message
             if message.height > self.storage.get_latest_block_height() {
+                // Update the sync node if the sync_handler is Idle
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                     if !sync_handler.is_syncing() {
                         sync_handler.sync_node = peer_address;

@@ -232,6 +232,7 @@ impl Server {
                             if *local_address != reciever_address {
                                 *local_address = reciever_address;
                                 info!("Discovered local address: {:?}", *local_address);
+                                context.peer_book.write().await.forget_peer(reciever_address);
                             }
                         }
 

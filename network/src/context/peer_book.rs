@@ -90,6 +90,13 @@ impl PeerBook {
         self.disconnected.update(address, Utc::now())
     }
 
+    /// Forget a peer.
+    pub fn forget_peer(&mut self, address: SocketAddr) {
+        self.connected.remove(&address);
+        self.gossiped.remove(&address);
+        self.disconnected.remove(&address);
+    }
+
     /// Returns the number of connected peers.
     pub fn connected_total(&self) -> u16 {
         self.connected.length()
