@@ -1,12 +1,12 @@
 [package]
 name = "snarkos-toolkit"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
-description = "A developer toolkit for a decentralized record system"
+description = "A developer toolkit for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
-categories = ["cryptography"]
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
+categories = ["cryptography::cryptocurrencies", "operating-systems"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
@@ -19,12 +19,12 @@ name = "account"
 harness = false
 
 [dependencies]
-snarkos-dpc = { path = "../dpc", version = "0.8.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "0.8.0", default-features = false }
-snarkos-objects = { path = "../objects", version = "0.8.0", default-features = false }
-snarkos-models = { path = "../models", version = "0.8.0", default-features = false }
-snarkos-storage = { path = "../storage", version = "0.8.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "0.8.0" }
+snarkos-dpc = { path = "../dpc", version = "1.0.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "1.0.0", default-features = false }
+snarkos-objects = { path = "../objects", version = "1.0.0", default-features = false }
+snarkos-models = { path = "../models", version = "1.0.0", default-features = false }
+snarkos-storage = { path = "../storage", version = "1.0.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "1.0.0" }
 
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }
