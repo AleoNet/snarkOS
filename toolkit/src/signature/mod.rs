@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod account;
-pub use account::*;
-
 pub mod signature;
 pub use signature::*;
+
+pub mod public_key;
+pub use public_key::*;
 
 #[cfg(test)]
 pub mod tests;

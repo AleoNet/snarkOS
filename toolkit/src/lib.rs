@@ -19,6 +19,7 @@ extern crate thiserror;
 
 pub mod account;
 pub mod errors;
+pub mod signature;
 pub mod transaction;
 
 #[cfg(target_arch = "wasm32")]

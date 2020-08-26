@@ -21,11 +21,12 @@ harness = false
 [dependencies]
 snarkos-dpc = { path = "../dpc", version = "1.0.0", default-features = false }
 snarkos-errors = { path = "../errors", version = "1.0.0", default-features = false }
-snarkos-objects = { path = "../objects", version = "1.0.0", default-features = false }
 snarkos-models = { path = "../models", version = "1.0.0", default-features = false }
+snarkos-objects = { path = "../objects", version = "1.0.0", default-features = false }
 snarkos-storage = { path = "../storage", version = "1.0.0", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "1.0.0" }
 
+hex = { version = "0.4.2" }
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }
 wasm-bindgen = { version = "0.2.67" }
