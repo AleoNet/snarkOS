@@ -1,0 +1,2 @@
+pre-release-commit-message = "chore({{crate_name}}): Release {{version}}"
+no-dev-version = true
