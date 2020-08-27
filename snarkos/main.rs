@@ -37,7 +37,7 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Builds a node from configuration parameters.
 /// 1. Creates new storage database or uses existing.
@@ -168,11 +168,12 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<(), NodeError> {
+fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::new();
 
     let config: Config = ConfigCli::parse(&arguments)?;
 
-    start_server(config).await
+    Runtime::new()?.block_on(start_server(config))?;
+
+    Ok(())
 }

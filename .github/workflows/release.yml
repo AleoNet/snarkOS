@@ -34,16 +34,19 @@ jobs:
 
       - name: Zip
         run: |
-          mkdir aleo-testnet1_${{ steps.get_version.outputs.version }}_ubuntu
-          mv target/release/snarkos aleo-testnet1_${{ steps.get_version.outputs.version }}_ubuntu
-          zip -r aleo-testnet1_${{ steps.get_version.outputs.version }}_ubuntu.zip aleo-testnet1_${{ steps.get_version.outputs.version }}_ubuntu
+          mkdir tempdir
+          mv target/release/snarkos tempdir
+          cd tempdir
+          zip -r aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-unknown-linux-gnu.zip snarkos
+          cd ..
+          mv tempdir/aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-unknown-linux-gnu.zip .
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            aleo-testnet1_${{ steps.get_version.outputs.version }}_ubuntu.zip
+            aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-unknown-linux-gnu.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -73,16 +76,19 @@ jobs:
 
       - name: Zip
         run: |
-          mkdir aleo-testnet1_${{ steps.get_version.outputs.version }}_mac
-          mv target/release/snarkos aleo-testnet1_${{ steps.get_version.outputs.version }}_mac
-          zip -r aleo-testnet1_${{ steps.get_version.outputs.version }}_mac.zip aleo-testnet1_${{ steps.get_version.outputs.version }}_mac
+          mkdir tempdir
+          mv target/release/snarkos tempdir
+          cd tempdir
+          zip -r aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-apple-darwin.zip snarkos
+          cd ..
+          mv tempdir/aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-apple-darwin.zip .
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            aleo-testnet1_${{ steps.get_version.outputs.version }}_mac.zip
+            aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-apple-darwin.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -113,15 +119,18 @@ jobs:
 
       - name: Zip
         run: |
-          mkdir aleo-testnet1_${{ steps.get_version.outputs.version }}_windows
-          mv target/release/snarkos.exe aleo-testnet1_${{ steps.get_version.outputs.version }}_windows
-          Compress-Archive aleo-testnet1_${{ steps.get_version.outputs.version }}_windows aleo-testnet1_${{ steps.get_version.outputs.version }}_windows.zip
+          mkdir tempdir
+          mv target/release/snarkos tempdir
+          cd tempdir
+          Compress-Archive aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-gnu.zip snarkos
+          cd ..
+          mv aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-gnu.zip .
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            aleo-testnet1_${{ steps.get_version.outputs.version }}_windows.zip
+            aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-gnu.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

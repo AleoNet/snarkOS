@@ -59,6 +59,7 @@ env_logger = { version = "0.7.1" }
 hex = { version = "0.4.1" }
 log = { version = "0.4.11" }
 rand = { version = "0.7" }
+self_update = { version = "0.19.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.22", features = ["full"] }
 toml = { version = "0.5.6" }
