@@ -35,7 +35,7 @@ impl UpdateCLI {
             .build()?
             .fetch()?;
 
-        println!("List of available snarkOS release verions");
+        println!("List of available snarkOS release versions");
         for release in releases {
             println!("* {}", release.version);
         }
@@ -49,6 +49,8 @@ impl UpdateCLI {
             .repo_name(SNARKOS_REPO_NAME)
             .bin_name(SNARKOS_BIN_NAME)
             .show_download_progress(true)
+            .no_confirm(false)
+            .show_output(true)
             .current_version(cargo_crate_version!())
             .build()?
             .update()?;
