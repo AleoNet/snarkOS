@@ -2040,7 +2040,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-dpc"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "blake2",
  "criterion",
