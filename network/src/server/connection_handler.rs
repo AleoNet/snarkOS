@@ -29,7 +29,7 @@ impl Server {
     ///     1.1 Ask our connected peers for their peers.
     ///     1.2 Ask our gossiped peers to handshake and become connected.
     /// 2. Maintain connected peers by sending ping messages.
-    /// 3. Purge peers that have not responded in connection_frequency x 2 seconds.
+    /// 3. Purge peers that have not responded in connection_frequency x 5 seconds.
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
@@ -90,7 +90,7 @@ impl Server {
                     let time_since_last_seen = (Utc::now() - last_seen).num_milliseconds();
                     if address != *context.local_address.read().await
                         && time_since_last_seen.is_positive()
-                        && time_since_last_seen as u64 > connection_frequency
+                        && time_since_last_seen as u64 > (connection_frequency * 3)
                     {
                         if let Some(channel) = connections.get(&address) {
                             if let Err(_) = pings.send_ping(channel).await {
@@ -100,8 +100,8 @@ impl Server {
                     }
                 }
 
-                // Purge peers that haven't responded in two frequency loops.
-                let response_timeout = ChronoDuration::milliseconds((connection_frequency * 2) as i64);
+                // Purge peers that haven't responded in five frequency loops.
+                let response_timeout = ChronoDuration::milliseconds((connection_frequency * 5) as i64);
 
                 for (address, last_seen) in peer_book.get_connected() {
                     if Utc::now() - last_seen.clone() > response_timeout {
@@ -121,19 +121,22 @@ impl Server {
                 // Store connected peers in database.
                 peer_book
                     .store(&storage)
-                    .unwrap_or_else(|error| info!("Failed to store connected peers in database {}", error));
+                    .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
 
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
-                    let mut memory_pool = memory_pool_lock.lock().await;
+                    let mut memory_pool = match memory_pool_lock.try_lock() {
+                        Ok(memory_pool) => memory_pool,
+                        _ => continue,
+                    };
 
                     memory_pool.cleanse(&storage).unwrap_or_else(|error| {
-                        info!("Failed to cleanse memory pool transactions in database {}", error)
+                        debug!("Failed to cleanse memory pool transactions in database {}", error)
                     });
 
-                    memory_pool
-                        .store(&storage)
-                        .unwrap_or_else(|error| info!("Failed to store memory pool transaction in database {}", error));
+                    memory_pool.store(&storage).unwrap_or_else(|error| {
+                        debug!("Failed to store memory pool transaction in database {}", error)
+                    });
 
                     // Ask our sync node for more transactions.
                     if *context.local_address.read().await != sync_handler.sync_node {

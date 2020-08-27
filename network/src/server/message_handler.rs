@@ -83,7 +83,7 @@ impl Server {
                 let mut peer_book = self.context.peer_book.write().await;
                 peer_book.disconnect_peer(channel.address);
             } else {
-                info!("Message name not recognized {:?}", name.to_string());
+                debug!("Message name not recognized {:?}", name.to_string());
             }
             tx.send(channel).expect("error resetting message handler");
         }
@@ -111,6 +111,7 @@ impl Server {
             drop(memory_pool);
 
             let mut sync_handler = self.sync_handler_lock.lock().await;
+            sync_handler.clear_pending(Arc::clone(&self.storage));
 
             if inserted && propagate {
                 // This is a new block, send it to our peers.
@@ -174,7 +175,7 @@ impl Server {
 
             if let Ok(inserted) = memory_pool.insert(&self.storage, entry) {
                 if let Some(txid) = inserted {
-                    info!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
+                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
                 }
             }
         }
@@ -282,6 +283,8 @@ impl Server {
             } else {
                 channel.write(&Sync::new(vec![])).await?;
             }
+        } else {
+            channel.write(&Sync::new(vec![])).await?;
         }
 
         Ok(())
@@ -294,6 +297,7 @@ impl Server {
 
         sync_handler.receive_hashes(message.block_hashes, height);
 
+        // Received block headers
         if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
             sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
         }
@@ -371,13 +375,17 @@ impl Server {
                 .receive_request(message.clone(), peer_address)
                 .await?;
 
-            // if our peer has a longer chain, send a sync message
+            // If our peer has a longer chain, send a sync message
             if message.height > self.storage.get_latest_block_height() {
-                let mut sync_handler = self.sync_handler_lock.lock().await;
-                sync_handler.sync_node = peer_address;
+                // Update the sync node if the sync_handler is Idle
+                if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
+                    if !sync_handler.is_syncing() {
+                        sync_handler.sync_node = peer_address;
 
-                if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
-                    channel.write(&GetSync::new(block_locator_hashes)).await?;
+                        if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
+                            channel.write(&GetSync::new(block_locator_hashes)).await?;
+                        }
+                    }
                 }
             }
         }
