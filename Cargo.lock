@@ -10,6 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "adler"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee2a4ec343196209d6594e19543ae87a39f96d5534d7174822a3ad825dd6ed7e"
+
+[[package]]
 name = "adler32"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -77,7 +83,7 @@ dependencies = [
  "addr2line",
  "cfg-if",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.3.7",
  "object",
  "rustc-demangle",
 ]
@@ -236,6 +242,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "118cf036fbb97d0816e3c34b2d7a1e8cfc60f68fcf63d550ddbe9bd5f59c213b"
 dependencies = [
  "loom",
+]
+
+[[package]]
+name = "bzip2"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42b7c3cbf0fa9c1b82308d57191728ca0256cb821220f4e2fd410a72ade26e3b"
+dependencies = [
+ "bzip2-sys",
+ "libc",
+]
+
+[[package]]
+name = "bzip2-sys"
+version = "0.1.9+1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad3b39a260062fca31f7b0b12f207e8f2590a67d32ec7d59c20484b07ea7285e"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
 ]
 
 [[package]]
@@ -401,6 +428,15 @@ name = "cpuid-bool"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d375c433320f6c5057ae04a04376eef4d04ce2801448cf8863a78da99107be4"
+
+[[package]]
+name = "crc32fast"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba125de2af0df55319f41944744ad91c71113bf74a4646efff39afe1f6842db1"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "criterion"
@@ -686,6 +722,18 @@ dependencies = [
  "quote",
  "syn",
  "synstructure",
+]
+
+[[package]]
+name = "flate2"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "766d0e77a2c1502169d4a93ff3b8c15a71fd946cd0126309752104e5f3c46d94"
+dependencies = [
+ "cfg-if",
+ "crc32fast",
+ "libc",
+ "miniz_oxide 0.4.1",
 ]
 
 [[package]]
@@ -1482,6 +1530,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "miniz_oxide"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d7559a8a40d0f97e1edea3220f698f78b1c5ab67532e49f68fde3910323b722"
+dependencies = [
+ "adler",
+]
+
+[[package]]
 name = "mio"
 version = "0.6.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1833,6 +1890,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "podio"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b18befed8bc2b61abc79a457295e7e838417326da1586050b919414073977f19"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2177,6 +2240,8 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ad4f32cc38aac660a9a872b5553677d59f984139f3316f642989d8232be3e5c"
 dependencies = [
+ "either",
+ "flate2",
  "hyper-old-types",
  "indicatif",
  "log",
@@ -2186,6 +2251,7 @@ dependencies = [
  "semver",
  "serde_json",
  "tempfile",
+ "zip",
 ]
 
 [[package]]
@@ -2330,7 +2396,7 @@ checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
 
 [[package]]
 name = "snarkos"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "clap",
  "colored",
@@ -2359,7 +2425,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-algorithms"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "blake2",
  "criterion",
@@ -2382,7 +2448,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-benchmarks"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "criterion",
  "csv",
@@ -2405,7 +2471,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-consensus"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "chrono",
@@ -2431,7 +2497,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-curves"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "derivative",
  "rand",
@@ -2445,7 +2511,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-derives"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2454,7 +2520,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-dpc"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "blake2",
  "criterion",
@@ -2477,7 +2543,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-errors"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "base58",
  "bech32",
@@ -2492,7 +2558,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-gadgets"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "blake2",
  "derivative",
@@ -2509,7 +2575,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-marlin"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "blake2",
  "derivative",
@@ -2529,7 +2595,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-models"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "derivative",
@@ -2544,7 +2610,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-network"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "byteorder",
@@ -2569,7 +2635,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-objects"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "base58",
  "bech32",
@@ -2591,7 +2657,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-parameters"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "chrono",
  "curl",
@@ -2613,7 +2679,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-polycommit"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "blake2",
  "derivative",
@@ -2631,7 +2697,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-posw"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "blake2",
  "rand",
@@ -2652,14 +2718,14 @@ dependencies = [
 
 [[package]]
 name = "snarkos-profiler"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "colored",
 ]
 
 [[package]]
 name = "snarkos-rpc"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "base64 0.12.3",
  "chrono",
@@ -2687,7 +2753,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-storage"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "hex",
@@ -2708,7 +2774,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-testing"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "once_cell",
  "rand",
@@ -2730,7 +2796,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-toolkit"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "criterion",
  "hex",
@@ -2749,7 +2815,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-utilities"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "rand",
@@ -3518,4 +3584,17 @@ checksum = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
+]
+
+[[package]]
+name = "zip"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58287c28d78507f5f91f2a4cf1e8310e2c76fd4c6932f93ac60fd1ceb402db7d"
+dependencies = [
+ "bzip2",
+ "crc32fast",
+ "flate2",
+ "podio",
+ "time",
 ]

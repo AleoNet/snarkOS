@@ -1,5 +1,9 @@
 # snarkos-consensus
 
+[![Crates.io](https://img.shields.io/crates/v/snarkos-consensus.svg?color=neon)](https://crates.io/crates/snarkos-consensus)
+[![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
+
 snarkOS-consensus defines the consensus mechanisms of the Aleo network - how blocks are validated, 
 block rewards are issued, block times/difficulties are established, and how blocks are mined. 
 

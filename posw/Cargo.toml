@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-posw"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Proof of Succinct Work circuit implementation based on [KB20]"
 homepage = "https://aleo.org"
@@ -12,24 +12,24 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "^1.1.4-alpha.0"}
-snarkos-curves = { path = "../curves", version = "^1.1.4-alpha.0"} # needed to instantiate with BLS12-377
-snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0"}
-snarkos-gadgets = { path = "../gadgets", version = "^1.1.4-alpha.0"}
-snarkos-marlin = { path = "../marlin", version = "^1.1.4-alpha.0"}
-snarkos-models = { path = "../models", version = "^1.1.4-alpha.0"}
-snarkos-objects = { path = "../objects", version = "^1.1.4-alpha.0"} # needed to instantiate with BLS12-377
-snarkos-parameters = { path = "../parameters", version = "^1.1.4-alpha.0"}
-snarkos-polycommit = { path = "../polycommit", version = "^1.1.4-alpha.0"}
-snarkos-profiler = { path = "../profiler", version = "^1.1.4-alpha.0"}
-snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"}
+snarkos-algorithms = { path = "../algorithms", version = "1.1.4"}
+snarkos-curves = { path = "../curves", version = "1.1.4"} # needed to instantiate with BLS12-377
+snarkos-errors = { path = "../errors", version = "1.1.4"}
+snarkos-gadgets = { path = "../gadgets", version = "1.1.4"}
+snarkos-marlin = { path = "../marlin", version = "1.1.4"}
+snarkos-models = { path = "../models", version = "1.1.4"}
+snarkos-objects = { path = "../objects", version = "1.1.4"} # needed to instantiate with BLS12-377
+snarkos-parameters = { path = "../parameters", version = "1.1.4"}
+snarkos-polycommit = { path = "../polycommit", version = "1.1.4"}
+snarkos-profiler = { path = "../profiler", version = "1.1.4"}
+snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
 thiserror = "1.0.20"
 
 [dev-dependencies]
-snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"}
+snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 rand_xorshift = { version = "0.2" }
 
 [features]

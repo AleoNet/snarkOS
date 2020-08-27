@@ -117,7 +117,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         parameters.clone(),
         memory_pool_lock.clone(),
         sync_handler_lock.clone(),
-        10000, // 10 seconds
+        15000, // 15 seconds
     );
 
     // Start RPC thread

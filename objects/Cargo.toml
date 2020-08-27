@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-objects"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Objects for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "^1.1.4-alpha.0", default-features = false }
-snarkos-curves = { path = "../curves", version = "^1.1.4-alpha.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0", default-features = false }
-snarkos-models = { path = "../models", version = "^1.1.4-alpha.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0", default-features = false }
+snarkos-algorithms = { path = "../algorithms", version = "1.1.4", default-features = false }
+snarkos-curves = { path = "../curves", version = "1.1.4", default-features = false }
+snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
+snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "1.1.4", default-features = false }
 
 base58 = { version = "0.1" }
 bech32 = { version = "0.6" }

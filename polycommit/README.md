@@ -1,4 +1,8 @@
-# Univariate polynomial commitments
+# snarkos-polycommit
+
+[![Crates.io](https://img.shields.io/crates/v/snarkos-polycommit.svg?color=neon)](https://crates.io/crates/snarkos-polycommit)
+[![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
 `snarkos-polycommit` is a Rust library that implements (univariate) *polynomial commitment schemes*. This library was initially developed as part of the [Marlin paper][marlin].
 

@@ -76,7 +76,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         while index > 0 {
             block_locator_hashes.push(self.get_block_hash(index)?);
-            if block_locator_hashes.len() >= 10 {
+            if block_locator_hashes.len() >= 20 {
                 step *= 2;
             }
 
