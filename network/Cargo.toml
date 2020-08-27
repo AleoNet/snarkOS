@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-network"
-version = "1.1.4-alpha.0"
+version = "1.1.4"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Network for a decentralized operating system"
 homepage = "https://aleo.org"

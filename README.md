@@ -48,7 +48,7 @@ We recommend installing Rust using [rustup](https://www.rustup.rs/). You can ins
 
 ### 2.2a Build from Crates.io
 
-We recommend installing snarkOS this way. In your terminal, run:
+We recommend installing snarkOS 1.1.4 way. In your terminal, run:
 
 ```bash
 cargo install snarkos
@@ -61,7 +61,7 @@ snarkos
  
 ### 2.2b Build from Source Code
 
-Alternatively, you can install snarkOS by building from the source code as follows:
+Alternatively, you can install snarkOS 1.1.4 building from the source code as follows:
 
 ```bash
 # Download the source code
@@ -112,14 +112,14 @@ snarkos --is-miner
 ```
 
 To run a node with custom settings, refer to the full list of options and flags available 
-in the CLI or simply modify the snarkOS configuration file.
+in the CLI or simply modify the snarkOS 1.1.4 file.
 
 ### 3.2 Command Line Interface
 
 Full list of CLI flags and options can be viewed with `snarkos --help`:
 
 ```
-snarkOS 1.1.14-alpha.0
+snarkOS 1.1.4
 Run an Aleo node (include -h for more options)
 
 USAGE:
@@ -167,7 +167,7 @@ having to specify additional information in the CLI.
 
 ## 4. JSON-RPC Interface
 
-By default, snarkOS runs a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
+By default, snarkOS 1.1.4 a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
 
 ## 5. Additional Information
 
