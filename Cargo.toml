@@ -11,6 +11,13 @@ include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
 
+[lib]
+path = "snarkos/lib.rs"
+
+[[bin]]
+name = "snarkos"
+path = "snarkos/main.rs"
+
 [workspace]
 members = [
     "algorithms",
@@ -32,13 +39,6 @@ members = [
     "toolkit",
     "utilities"
 ]
-
-[lib]
-path = "snarkos/lib.rs"
-
-[[bin]]
-name = "snarkos"
-path = "snarkos/main.rs"
 
 [dependencies]
 snarkos-consensus = { path = "./consensus", version = "1.0.0" }
