@@ -2238,7 +2238,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-profiler"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "colored",
 ]
