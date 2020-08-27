@@ -33,5 +33,5 @@ tokio = { version = "0.2.22", features = ["full"] }
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }
 
+serial_test = { version = "0.4.0" }
 tokio-test = { version = "0.2.0" }
-serial_test = "*"
