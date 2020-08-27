@@ -12,7 +12,7 @@ authors = [
 ]
 description = "A library for the Marlin preprocessing zkSNARK"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "polynomial commitments", "zkSNARK"]
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
 categories = ["cryptography::cryptocurrencies", "operating-systems"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 license = "GPL-3.0"
