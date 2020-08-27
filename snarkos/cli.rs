@@ -71,7 +71,7 @@ pub trait CLI {
 
         App::new(Self::NAME)
             .about(Self::ABOUT)
-            .version("1.1.14-alpha.0")// TODO (raychu86) Add auto fill for crate version
+            .version("1.1.4")// TODO (raychu86) Add auto fill for crate version
             .settings(&[
                 AppSettings::ColoredHelp,
                 //                AppSettings::DisableHelpSubcommand,
