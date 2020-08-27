@@ -1,2 +1,4 @@
 pre-release-commit-message = "chore({{crate_name}}): Release {{version}}"
 consolidate-commits = true
+#disable-push = true
+#disable-publish = true

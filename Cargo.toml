@@ -33,10 +33,6 @@ members = [
     "utilities"
 ]
 
-[lib]
-name = "snarkos"
-path = "snarkOS/lib.rs"
-
 [[bin]]
 name = "snarkos"
 path = "snarkOS/main.rs"
