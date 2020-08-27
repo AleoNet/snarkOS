@@ -34,7 +34,6 @@ members = [
 ]
 
 [lib]
-name = "snarkos"
 path = "snarkos/lib.rs"
 
 [[bin]]
