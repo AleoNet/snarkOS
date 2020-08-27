@@ -17,5 +17,8 @@
 pub mod account;
 pub use account::*;
 
+pub mod signature;
+pub use signature::*;
+
 #[cfg(test)]
 pub mod tests;

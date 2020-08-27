@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate thiserror;
-
-pub mod account;
-pub mod errors;
 pub mod signature;
+pub use signature::*;
 
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
+pub mod public_key;
+pub use public_key::*;
+
+#[cfg(test)]
+pub mod tests;

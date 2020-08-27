@@ -2329,10 +2329,12 @@ name = "snarkos-toolkit"
 version = "1.1.4-alpha.0"
 dependencies = [
  "criterion",
+ "hex",
  "rand",
  "rand_chacha",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-models",
  "snarkos-objects",
  "snarkos-utilities",
  "thiserror",
