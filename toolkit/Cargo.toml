@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [[bench]]
 name = "account"
+path = "benches/account.rs"
 harness = false
 
 [dependencies]
