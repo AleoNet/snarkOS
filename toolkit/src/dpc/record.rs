@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::PrivateKeyError;
+use crate::errors::DPCError;
 
 use snarkos_dpc::base_dpc::{instantiated::Components, DPCRecord};
 use snarkos_utilities::{
@@ -37,21 +37,24 @@ impl Record {
     }
 }
 
-// impl FromStr for Record {
-//     type Err = PrivateKeyError;
-//
-//     fn from_str(record: &str) -> Result<Self, Self::Err> {
-//
-//         let record = hex::decode(record)?;
-//
-//         Ok(Self {
-//             record: AccountPrivateKey::<Components>::from_str(private_key)?,
-//         })
-//     }
-// }
-//
-// impl fmt::Display for Record {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "{}", self.record.to_string())
-//     }
-// }
+impl FromStr for Record {
+    type Err = DPCError;
+
+    fn from_str(record: &str) -> Result<Self, Self::Err> {
+        let record = hex::decode(record)?;
+
+        Ok(Self {
+            record: DPCRecord::<Components>::read(&record[..])?,
+        })
+    }
+}
+
+impl fmt::Display for Record {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            hex::encode(to_bytes![self.record].expect("serialization to bytes failed"))
+        )
+    }
+}

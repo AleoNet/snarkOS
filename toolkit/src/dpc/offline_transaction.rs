@@ -1,29 +1,27 @@
-use crate::dpc::EmptyLedger;
+use crate::dpc::{EmptyLedger, Record};
 use snarkos_dpc::base_dpc::{
     instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
     parameters::PublicParameters,
-    record::DPCRecord,
     record_payload::RecordPayload,
     ExecuteContext,
 };
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::CRH,
-    dpc::{DPCComponents, DPCScheme},
+    dpc::{DPCComponents, DPCScheme, Record as RecordScheme},
 };
 use snarkos_objects::account::*;
 use snarkos_utilities::{to_bytes, ToBytes};
 
 use crate::account::{Address, PrivateKey};
 use rand::Rng;
-use snarkos_models::dpc::Record;
 
 pub type MerkleTreeLedger = EmptyLedger<Tx, CommitmentMerkleParameters>;
 
 /// Returns a transaction constructed with dummy records.
 pub fn offline_transaction_execution<R: Rng>(
     spenders: Vec<PrivateKey>,
-    records_to_spend: Vec<DPCRecord<Components>>,
+    records_to_spend: Vec<Record>,
     recipients: Vec<Address>,
     recipient_amounts: Vec<u64>,
     network_id: u8,
@@ -46,6 +44,9 @@ pub fn offline_transaction_execution<R: Rng>(
 
     // Construct the new records
     let mut old_records = vec![];
+    for record in records_to_spend {
+        old_records.push(record.record);
+    }
 
     let mut old_account_private_keys = vec![];
     for private_key in spenders {
