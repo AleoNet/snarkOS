@@ -1,5 +1,5 @@
-pub mod dummy_transaction;
-pub use dummy_transaction::*;
+pub mod empty_ledger;
+pub use empty_ledger::*;
 
-pub mod transaction;
-pub use transaction::*;
+pub mod offline_transaction;
+pub use offline_transaction::*;
