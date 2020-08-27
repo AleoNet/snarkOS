@@ -1,12 +1,12 @@
 [package]
 name = "snarkos-errors"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
-description = "Errors for a decentralized record system"
+description = "Errors for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
-categories = ["cryptography"]
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
+categories = ["cryptography::cryptocurrencies", "operating-systems"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
@@ -15,7 +15,7 @@ edition = "2018"
 base58 = { version = "0.1" }
 bech32 = { version = "0.6" }
 bincode = { version = "1.3.1" }
-curl = { version = "0.4.31", optional = true }
+curl = { version = "0.4.33", optional = true }
 hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.2.0" }
 rocksdb = { version = "0.13.0", optional = true }
@@ -23,7 +23,7 @@ thiserror = { version = "1.0" }
 toml = { version = "0.5.6" }
 
 [dev-dependencies]
-curl = { version = "0.4.31" }
+curl = { version = "0.4.33" }
 
 [features]
 default = [ "librocksdb", "remote" ]

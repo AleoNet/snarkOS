@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-polycommit"
-version = "0.1.0"
+version = "1.1.4-alpha.0"
 authors = [
   "Alessandro Chiesa <alexch@berkeley.edu>",
   "Mary Maller <mary.maller.15@ucl.ac.uk>",
@@ -13,18 +13,18 @@ authors = [
 ]
 description = "A library for constructing polynomial commitment schemes for use in zkSNARKs"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["cryptography", "blockchain", "decentralized", "record", "zkSNARK"]
-categories = ["cryptography"]
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
+categories = ["cryptography::cryptocurrencies", "operating-systems"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms" }
-snarkos-errors = { path = "../errors" }
-snarkos-models = { path = "../models" }
-snarkos-profiler = { path = "../profiler" }
-snarkos-utilities = { path = "../utilities" }
+snarkos-algorithms = { path = "../algorithms", version = "^1.1.4-alpha.0"}
+snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0"}
+snarkos-models = { path = "../models", version = "^1.1.4-alpha.0"}
+snarkos-profiler = { path = "../profiler", version = "^1.1.4-alpha.0"}
+snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"}
 
 derivative = { version = "2", features = [ "use_core" ] }
 digest = { version = "0.8" }

@@ -3,6 +3,7 @@
 <p align="center">
     <a href="https://circleci.com/gh/AleoHQ/snarkOS"><img src="https://circleci.com/gh/AleoHQ/snarkOS.svg?style=svg&circle-token=6e9ad6d39d95350544f352d34e0e5c62ef54db26"></a>
     <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
+    <a href="https://discord.gg/6WG7Bck"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
 </p>
 
 ## <a name='TableofContents'></a>Table of Contents
@@ -118,7 +119,7 @@ in the CLI or simply modify the snarkOS configuration file.
 Full list of CLI flags and options can be viewed with `snarkos --help`:
 
 ```
-snarkOS 1.0.0
+snarkOS 1.1.14-alpha.0
 Run an Aleo node (include -h for more options)
 
 USAGE:
@@ -129,7 +130,6 @@ FLAGS:
         --is-bootnode    Run the node as a bootnode (IP is hard coded in the protocol)
         --is-miner       Start mining blocks from this node
         --no-jsonrpc     Run the node without running the json rpc server
-    -q, --quiet          Do not show any logging in the console
 
 OPTIONS:
         --connect <ip>                           Specify a node ip address to connect to on startup
@@ -144,6 +144,7 @@ OPTIONS:
         --rpc-password <rpc-password>            Specify a password for rpc authentication
         --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
         --rpc-username <rpc-username>            Specify a username for rpc authentication
+        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2]
 ```
 
 #### Examples
@@ -160,8 +161,8 @@ snarkos --connect "<IP ADDRESS>"
 
 ### 3.3 Configuration File
 
-A `snarkOS.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
-Updating this `snarkOS.toml` file allows node operators to specify default settings for the node without 
+A `config.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
+Updating this `config.toml` file allows node operators to specify default settings for the node without 
 having to specify additional information in the CLI.
 
 ## 4. JSON-RPC Interface

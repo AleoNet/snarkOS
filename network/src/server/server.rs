@@ -62,7 +62,7 @@ impl Server {
         sync_handler_lock: Arc<Mutex<SyncHandler>>,
         connection_frequency: u64,
     ) -> Self {
-        let (sender, receiver) = mpsc::channel(512);
+        let (sender, receiver) = mpsc::channel(1024);
         Server {
             consensus,
             context: Arc::new(context),
@@ -124,7 +124,7 @@ impl Server {
             let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> = bincode::deserialize(&serialized_peers)?;
 
             for (stored_peer, _old_time) in stored_connected_peers {
-                info!("Connecting to stored peer: {:?}", stored_peer);
+                info!("Attempting to connect to stored peer: {:?}", stored_peer);
 
                 self.send_handshake_non_blocking(stored_peer);
             }

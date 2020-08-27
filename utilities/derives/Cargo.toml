@@ -1,7 +1,14 @@
 [package]
 name = "snarkos-derives"
-version = "0.1.0"
-authors = ["Georgios Konstantopoulos <me@gakonst.com>"]
+version = "1.1.4-alpha.0"
+authors = ["The Aleo Team <hello@aleo.org>"]
+description = "Canonical serialization for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
+categories = ["cryptography::cryptocurrencies", "operating-systems"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+license = "GPL-3.0"
 edition = "2018"
 
 [lib]

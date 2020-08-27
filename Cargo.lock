@@ -439,6 +439,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ee0cc8804d5393478d743b035099520087a5186f3b93fa58cec08fa62407b6"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -520,9 +530,9 @@ dependencies = [
 
 [[package]]
 name = "curl"
-version = "0.4.31"
+version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9447ad28eee2a5cfb031c329d46bef77487244fff6a724b378885b8691a35f78"
+checksum = "78baca05127a115136a9898e266988fc49ca7ea2c839f60fc6e1fc9df1599168"
 dependencies = [
  "curl-sys",
  "libc",
@@ -535,9 +545,9 @@ dependencies = [
 
 [[package]]
 name = "curl-sys"
-version = "0.4.33+curl-7.71.1"
+version = "0.4.36+curl-7.71.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e9818ea018327f79c811612f29b9834d2abddbe7db81460a2d5c7e12946b337"
+checksum = "68cad94adeb0c16558429c3c34a607acc9ea58e09a7b66310aabc9788fc5d721"
 dependencies = [
  "cc",
  "libc",
@@ -1371,9 +1381,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.0.25"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eb5e43362e38e2bca2fd5f5134c4d4564a23a5c28e9b95411652021a8675ebe"
+checksum = "af67924b8dd885cccea261866c8ce5b74d239d272e154053ff927dae839f5ae9"
 dependencies = [
  "cc",
  "libc",
@@ -1623,9 +1633,9 @@ checksum = "1ab52be62400ca80aa00285d25253d7f7c437b7375c4de678f5405d3afe82ca5"
 
 [[package]]
 name = "once_cell"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
+checksum = "260e51e7efe62b592207e9e13a68e43692a7a279171d6ba57abd208bf23645ad"
 
 [[package]]
 name = "oorandom"
@@ -1922,9 +1932,9 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f02856753d04e03e26929f820d0a0a337ebe71f849801eea335d464b349080"
+checksum = "cfd016f0c045ad38b5251be2c9c0ab806917f82da4d36b2a327e5166adad9270"
 dependencies = [
  "autocfg",
  "crossbeam-deque",
@@ -1934,12 +1944,12 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.7.1"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e92e15d89083484e11353891f1af602cc661426deb9564c298b270c726973280"
+checksum = "91739a34c4355b5434ce54c9086c5895604a9c278586d1f1aa95e04f66b525a0"
 dependencies = [
+ "crossbeam-channel",
  "crossbeam-deque",
- "crossbeam-queue",
  "crossbeam-utils",
  "lazy_static",
  "num_cpus",
@@ -2320,7 +2330,7 @@ checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
 
 [[package]]
 name = "snarkos"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "clap",
  "colored",
@@ -2349,7 +2359,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-algorithms"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "blake2",
  "criterion",
@@ -2372,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-benchmarks"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "criterion",
  "csv",
@@ -2395,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-consensus"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "bincode",
  "chrono",
@@ -2421,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-curves"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "derivative",
  "rand",
@@ -2435,7 +2445,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-derives"
-version = "0.1.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2444,7 +2454,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-dpc"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "blake2",
  "criterion",
@@ -2467,7 +2477,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-errors"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "base58",
  "bech32",
@@ -2482,7 +2492,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-gadgets"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "blake2",
  "derivative",
@@ -2499,7 +2509,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-marlin"
-version = "0.1.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "blake2",
  "derivative",
@@ -2519,7 +2529,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-models"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "bincode",
  "derivative",
@@ -2534,7 +2544,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-network"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "bincode",
  "byteorder",
@@ -2559,7 +2569,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-objects"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "base58",
  "bech32",
@@ -2581,7 +2591,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-parameters"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "chrono",
  "curl",
@@ -2603,7 +2613,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-polycommit"
-version = "0.1.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "blake2",
  "derivative",
@@ -2621,7 +2631,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-posw"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "blake2",
  "rand",
@@ -2642,14 +2652,14 @@ dependencies = [
 
 [[package]]
 name = "snarkos-profiler"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "colored",
 ]
 
 [[package]]
 name = "snarkos-rpc"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "base64 0.12.3",
  "chrono",
@@ -2677,7 +2687,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-storage"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "bincode",
  "hex",
@@ -2698,7 +2708,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-testing"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "once_cell",
  "rand",
@@ -2720,13 +2730,15 @@ dependencies = [
 
 [[package]]
 name = "snarkos-toolkit"
-version = "0.1.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "criterion",
+ "hex",
  "rand",
  "rand_chacha",
  "snarkos-dpc",
  "snarkos-errors",
+ "snarkos-models",
  "snarkos-objects",
  "snarkos-utilities",
  "thiserror",
@@ -2736,7 +2748,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-utilities"
-version = "0.8.0"
+version = "1.1.4-alpha.0"
 dependencies = [
  "bincode",
  "rand",
