@@ -33,9 +33,13 @@ members = [
     "utilities"
 ]
 
+[lib]
+name = "snarkos"
+path = "snarkos/lib.rs"
+
 [[bin]]
 name = "snarkos"
-path = "snarkOS/main.rs"
+path = "snarkos/main.rs"
 
 [dependencies]
 snarkos-consensus = { path = "./consensus", version = "1.0.0" }
