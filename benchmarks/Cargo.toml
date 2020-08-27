@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-benchmarks"
-version = "1.0.0"
+version = "1.1.4-alpha.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Benchmarks for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -22,14 +22,14 @@ path = "posw/posw.rs"
 harness = false
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.0.0" }
-snarkos-curves = { path = "../curves", version = "1.0.0" }
-snarkos-errors = { path = "../errors", version = "1.0.0" }
-snarkos-marlin = { path = "../marlin", version = "1.0.0" }
-snarkos-models = { path = "../models", version = "1.0.0" }
-snarkos-profiler = { path = "../profiler", version = "1.0.0" }
-snarkos-posw = { path = "../posw", version = "1.0.0", features = ["test-helpers"] }
-snarkos-utilities = { path = "../utilities", version = "1.0.0" }
+snarkos-algorithms = { path = "../algorithms", version = "^1.1.4-alpha.0"}
+snarkos-curves = { path = "../curves", version = "^1.1.4-alpha.0"}
+snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0"}
+snarkos-marlin = { path = "../marlin", version = "^1.1.4-alpha.0"}
+snarkos-models = { path = "../models", version = "^1.1.4-alpha.0"}
+snarkos-profiler = { path = "../profiler", version = "^1.1.4-alpha.0"}
+snarkos-posw = { path = "../posw", version = "^1.1.4-alpha.0", features = ["test-helpers"] }
+snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"}
 
 derivative = { version = "2" }
 digest = { version = "0.7" }
@@ -40,7 +40,7 @@ smallvec = { version = "1.4" }
 criterion = "0.3.3"
 
 [dev-dependencies]
-snarkos-curves = { path = "../curves", version = "1.0.0" }
+snarkos-curves = { path = "../curves", version = "^1.1.4-alpha.0"}
 
 criterion = "0.3.3"
 csv = { version = "1" }

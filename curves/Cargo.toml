@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-curves"
-version = "1.0.0"
+version = "1.1.4-alpha.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "Curves for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,9 +12,9 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-errors = { path = "../errors", version = "1.0.0", default-features = false }
-snarkos-models = { path = "../models", version = "1.0.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "1.0.0" } # TODO: Add default-features=false back in.
+snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0", default-features = false }
+snarkos-models = { path = "../models", version = "^1.1.4-alpha.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"} # TODO: Add default-features=false back in.
 
 derivative = { version = "2" }
 rand = { version = "0.7" }
