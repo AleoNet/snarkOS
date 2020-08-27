@@ -34,7 +34,7 @@ serde_json = { version = "1.0.57" }
 tokio = { version = "0.2.22", features = ["full"] }
 
 [dev-dependencies]
-snarkos-testing = { path = "../testing", version = "1.0.0" }
+snarkos-testing = { path = "../testing" }
 
 jsonrpc-test = { version = "14.2.0" }
 
