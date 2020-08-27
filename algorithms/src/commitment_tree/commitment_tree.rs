@@ -17,7 +17,9 @@
 use crate::commitment_tree::CommitmentMerklePath;
 use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{CommitmentScheme, CRH};
-use snarkos_utilities::{to_bytes, ToBytes};
+use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+
+use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Derivative)]
 #[derivative(
@@ -96,6 +98,51 @@ impl<C: CommitmentScheme, H: CRH> CommitmentMerkleTree<C, H> {
         let inner_hashes = self.inner_hashes.clone();
 
         Ok(CommitmentMerklePath { leaves, inner_hashes })
+    }
+
+    pub fn from_bytes<R: Read>(mut reader: R, parameters: H) -> IoResult<Self> {
+        let root = <H as CRH>::Output::read(&mut reader)?;
+
+        let left_inner_hash = <H as CRH>::Output::read(&mut reader)?;
+        let right_inner_hash = <H as CRH>::Output::read(&mut reader)?;
+
+        let inner_hashes = (left_inner_hash, right_inner_hash);
+
+        let mut leaves = vec![];
+        for _ in 0..4 {
+            let leaf = <C as CommitmentScheme>::Output::read(&mut reader)?;
+            leaves.push(leaf);
+        }
+
+        assert_eq!(leaves.len(), 4);
+
+        let leaves = [
+            leaves[0].clone(),
+            leaves[1].clone(),
+            leaves[2].clone(),
+            leaves[3].clone(),
+        ];
+
+        Ok(Self {
+            root,
+            inner_hashes,
+            leaves,
+            parameters,
+        })
+    }
+}
+
+impl<C: CommitmentScheme, H: CRH> ToBytes for CommitmentMerkleTree<C, H> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.root.write(&mut writer)?;
+        self.inner_hashes.0.write(&mut writer)?;
+        self.inner_hashes.1.write(&mut writer)?;
+        for leaf in &self.leaves {
+            leaf.write(&mut writer)?;
+        }
+
+        Ok(())
     }
 }
 
