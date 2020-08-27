@@ -1,10 +1,6 @@
 pre-release-commit-message = "chore({{crate_name}}): Release {{version}}"
 pre-release-replacements = [
   { file = "README.md", search = "snarkOS [a-z0-9\\.-]+", replace = "snarkOS {{version}}", min = 0 } ,
-#  {file ="Cargo.toml", search="branch=\"[a-z0-9\\.-]+\"", replace="branch=\"{{version}}\""},
-#  {file="CHANGELOG.md", search="Unreleased", replace="{{version}}"},
-#  {file="CHANGELOG.md", search="ReleaseDate", replace="{{date}}"},
-#  {file="CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\n\n## [Unreleased] - ReleaseDate"},
 ]
 post-release-commit-message = "Released new version"
 consolidate-commits = true
