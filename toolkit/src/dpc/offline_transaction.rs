@@ -1,4 +1,4 @@
-use crate::transaction::EmptyLedger;
+use crate::dpc::EmptyLedger;
 use snarkos_dpc::base_dpc::{
     instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
     parameters::PublicParameters,
