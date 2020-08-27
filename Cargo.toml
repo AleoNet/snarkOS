@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "1.1.3"
+version = "1.1.4-alpha.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -41,16 +41,16 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [dependencies]
-snarkos-consensus = { path = "./consensus", version = "1.0.0" }
-snarkos-dpc = { path = "./dpc", version = "1.0.0" }
-snarkos-errors = { path = "./errors", version = "1.0.0" }
-snarkos-models = { path = "./models", version = "1.0.0" }
-snarkos-network = { path = "./network", version = "1.0.0" }
-snarkos-objects = { path = "./objects", version = "1.0.0" }
-snarkos-posw = { path = "./posw", version = "1.0.0" }
-snarkos-rpc = { path = "./rpc", version = "1.0.0" }
-snarkos-storage = { path = "./storage", version = "1.0.0" }
-snarkos-utilities = { path = "./utilities", version = "1.0.0" }
+snarkos-consensus = { path = "./consensus", version = "^1.1.4-alpha.0"}
+snarkos-dpc = { path = "./dpc", version = "^1.1.4-alpha.0"}
+snarkos-errors = { path = "./errors", version = "^1.1.4-alpha.0"}
+snarkos-models = { path = "./models", version = "^1.1.4-alpha.0"}
+snarkos-network = { path = "./network", version = "^1.1.4-alpha.0"}
+snarkos-objects = { path = "./objects", version = "^1.1.4-alpha.0"}
+snarkos-posw = { path = "./posw", version = "^1.1.4-alpha.0"}
+snarkos-rpc = { path = "./rpc", version = "^1.1.4-alpha.0"}
+snarkos-storage = { path = "./storage", version = "^1.1.4-alpha.0"}
+snarkos-utilities = { path = "./utilities", version = "^1.1.4-alpha.0"}
 
 clap = { version = "2.33.3" }
 colored = { version = "2.0" }

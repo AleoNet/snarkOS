@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-polycommit"
-version = "1.1.3"
+version = "1.1.4-alpha.0"
 authors = [
   "Alessandro Chiesa <alexch@berkeley.edu>",
   "Mary Maller <mary.maller.15@ucl.ac.uk>",
@@ -20,11 +20,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.0.0" }
-snarkos-errors = { path = "../errors", version = "1.0.0" }
-snarkos-models = { path = "../models", version = "1.0.0" }
-snarkos-profiler = { path = "../profiler", version = "1.0.0" }
-snarkos-utilities = { path = "../utilities", version = "1.0.0" }
+snarkos-algorithms = { path = "../algorithms", version = "^1.1.4-alpha.0"}
+snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0"}
+snarkos-models = { path = "../models", version = "^1.1.4-alpha.0"}
+snarkos-profiler = { path = "../profiler", version = "^1.1.4-alpha.0"}
+snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"}
 
 derivative = { version = "2", features = [ "use_core" ] }
 digest = { version = "0.8" }
