@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-toolkit"
-version = "1.0.0"
+version = "1.1.4-alpha.0"
 authors = ["The Aleo Team <hello@aleo.org>"]
 description = "A developer toolkit for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -16,13 +16,14 @@ crate-type = ["cdylib", "rlib"]
 
 [[bench]]
 name = "account"
+path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkos-dpc = { path = "../dpc", version = "1.0.0", default-features = false }
-snarkos-errors = { path = "../errors", version = "1.0.0", default-features = false }
-snarkos-objects = { path = "../objects", version = "1.0.0", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "1.0.0" }
+snarkos-dpc = { path = "../dpc", version = "^1.1.4-alpha.0", default-features = false }
+snarkos-errors = { path = "../errors", version = "^1.1.4-alpha.0", default-features = false }
+snarkos-objects = { path = "../objects", version = "^1.1.4-alpha.0", default-features = false }
+snarkos-utilities = { path = "../utilities", version = "^1.1.4-alpha.0"}
 
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }
