@@ -1,4 +1,8 @@
-# snarkOS-network
+# snarkos-network
+
+[![Crates.io](https://img.shields.io/crates/v/snarkos-network.svg?color=neon)](https://crates.io/crates/snarkos-network)
+[![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
 The snarkOS network protocol establishes a peer-to-peer network of nodes that maintain the liveness of the 
 ledger by actively exchanging transactions and blocks.

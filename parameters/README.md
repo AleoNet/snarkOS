@@ -1,5 +1,9 @@
 # snarkos-parameters
 
+[![Crates.io](https://img.shields.io/crates/v/snarkos-parameters.svg?color=neon)](https://crates.io/crates/snarkos-parameters)
+[![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
+
 The Aleo parameters.
 
 ## Commitment 
