@@ -42,11 +42,15 @@ use snarkos_utilities::{
     has_duplicates,
     rand::UniformRand,
     to_bytes,
+    variable_length_integer::*,
 };
 
 use itertools::Itertools;
 use rand::Rng;
-use std::marker::PhantomData;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    marker::PhantomData,
+};
 
 pub mod inner_circuit;
 pub use inner_circuit::*;
@@ -170,6 +174,205 @@ impl<Components: BaseDPCComponents> ExecuteContext<Components> {
             memorandum: self.memorandum.clone(),
             network_id: self.network_id,
         }
+    }
+}
+
+impl<Components: BaseDPCComponents> ToBytes for ExecuteContext<Components> {
+    #[inline]
+    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write old record components
+        for old_account_private_key in &self.old_account_private_keys {
+            let private_key_seed = old_account_private_key.seed;
+            private_key_seed.write(&mut writer)?;
+        }
+
+        for old_record in &self.old_records {
+            old_record.write(&mut writer)?;
+        }
+
+        for old_serial_number in &self.old_serial_numbers {
+            old_serial_number.write(&mut writer)?;
+        }
+
+        for old_randomizer in &self.old_randomizers {
+            variable_length_integer(old_randomizer.len() as u64).write(&mut writer)?;
+            old_randomizer.write(&mut writer)?;
+        }
+
+        // Write new record components
+
+        for new_record in &self.new_records {
+            new_record.write(&mut writer)?;
+        }
+
+        for new_sn_nonce_randomness in &self.new_sn_nonce_randomness {
+            new_sn_nonce_randomness.write(&mut writer)?;
+        }
+
+        for new_commitment in &self.new_commitments {
+            new_commitment.write(&mut writer)?;
+        }
+
+        for new_records_encryption_randomness in &self.new_records_encryption_randomness {
+            new_records_encryption_randomness.write(&mut writer)?;
+        }
+
+        for new_encrypted_record in &self.new_encrypted_records {
+            new_encrypted_record.write(&mut writer)?;
+        }
+
+        for new_encrypted_record_hash in &self.new_encrypted_record_hashes {
+            new_encrypted_record_hash.write(&mut writer)?;
+        }
+
+        // Write transaction components
+
+        self.program_commitment.write(&mut writer)?;
+        self.program_randomness.write(&mut writer)?;
+
+        self.local_data_merkle_tree.write(&mut writer)?;
+
+        for local_data_commitment_randomizer in &self.local_data_commitment_randomizers {
+            local_data_commitment_randomizer.write(&mut writer)?;
+        }
+
+        self.value_balance.write(&mut writer)?;
+        self.memorandum.write(&mut writer)?;
+        self.network_id.write(&mut writer)
+    }
+}
+
+impl<Components: BaseDPCComponents> FromBytes for ExecuteContext<Components> {
+    #[inline]
+    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        let system_parameters = SystemParameters::<Components>::load().expect("Could not load system parameters");
+
+        // Read old record components
+
+        let mut old_account_private_keys = vec![];
+        for _ in 0..Components::NUM_INPUT_RECORDS {
+            let private_key_seed: [u8; 32] = FromBytes::read(&mut reader)?;
+            let old_account_private_key = AccountPrivateKey::<Components>::from_seed(
+                &system_parameters.account_signature,
+                &system_parameters.account_commitment,
+                &private_key_seed,
+            )
+            .expect("could not load private key");
+            old_account_private_keys.push(old_account_private_key);
+        }
+
+        let mut old_records = vec![];
+        for _ in 0..Components::NUM_INPUT_RECORDS {
+            let old_record: DPCRecord<Components> = FromBytes::read(&mut reader)?;
+            old_records.push(old_record);
+        }
+
+        let mut old_serial_numbers = vec![];
+        for _ in 0..Components::NUM_INPUT_RECORDS {
+            let old_serial_number: <Components::AccountSignature as SignatureScheme>::PublicKey =
+                FromBytes::read(&mut reader)?;
+            old_serial_numbers.push(old_serial_number);
+        }
+
+        let mut old_randomizers = vec![];
+        for _ in 0..Components::NUM_INPUT_RECORDS {
+            let num_bytes = read_variable_length_integer(&mut reader)?;
+            let mut randomizer = vec![];
+            for _ in 0..num_bytes {
+                let byte: u8 = FromBytes::read(&mut reader)?;
+                randomizer.push(byte);
+            }
+
+            old_randomizers.push(randomizer);
+        }
+
+        // Read new record components
+
+        let mut new_records = vec![];
+        for _ in 0..Components::NUM_OUTPUT_RECORDS {
+            let new_record: DPCRecord<Components> = FromBytes::read(&mut reader)?;
+            new_records.push(new_record);
+        }
+
+        let mut new_sn_nonce_randomness = vec![];
+        for _ in 0..Components::NUM_OUTPUT_RECORDS {
+            let randomness: [u8; 32] = FromBytes::read(&mut reader)?;
+            new_sn_nonce_randomness.push(randomness);
+        }
+
+        let mut new_commitments = vec![];
+        for _ in 0..Components::NUM_OUTPUT_RECORDS {
+            let new_commitment: <Components::RecordCommitment as CommitmentScheme>::Output =
+                FromBytes::read(&mut reader)?;
+            new_commitments.push(new_commitment);
+        }
+
+        let mut new_records_encryption_randomness = vec![];
+        for _ in 0..Components::NUM_OUTPUT_RECORDS {
+            let encryption_randomness: <Components::AccountEncryption as EncryptionScheme>::Randomness =
+                FromBytes::read(&mut reader)?;
+            new_records_encryption_randomness.push(encryption_randomness);
+        }
+
+        let mut new_encrypted_records = vec![];
+        for _ in 0..Components::NUM_OUTPUT_RECORDS {
+            let encrypted_record: EncryptedRecord<Components> = FromBytes::read(&mut reader)?;
+            new_encrypted_records.push(encrypted_record);
+        }
+
+        let mut new_encrypted_record_hashes = vec![];
+        for _ in 0..Components::NUM_OUTPUT_RECORDS {
+            let encrypted_record_hash: <Components::EncryptedRecordCRH as CRH>::Output = FromBytes::read(&mut reader)?;
+            new_encrypted_record_hashes.push(encrypted_record_hash);
+        }
+
+        let program_commitment: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Output =
+            FromBytes::read(&mut reader)?;
+        let program_randomness: <Components::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness =
+            FromBytes::read(&mut reader)?;
+
+        let local_data_merkle_tree =
+            CommitmentMerkleTree::<Components::LocalDataCommitment, Components::LocalDataCRH>::from_bytes(
+                &mut reader,
+                system_parameters.local_data_crh.clone(),
+            )
+            .expect("Could not load local data merkle tree");
+
+        let mut local_data_commitment_randomizers = vec![];
+        for _ in 0..4 {
+            let local_data_commitment_randomizer: <Components::LocalDataCommitment as CommitmentScheme>::Randomness =
+                FromBytes::read(&mut reader)?;
+            local_data_commitment_randomizers.push(local_data_commitment_randomizer);
+        }
+
+        let value_balance: AleoAmount = FromBytes::read(&mut reader)?;
+        let memorandum: <DPCTransaction<Components> as Transaction>::Memorandum = FromBytes::read(&mut reader)?;
+        let network_id: u8 = FromBytes::read(&mut reader)?;
+
+        Ok(Self {
+            system_parameters,
+
+            old_records,
+            old_account_private_keys,
+            old_serial_numbers,
+            old_randomizers,
+
+            new_records,
+            new_sn_nonce_randomness,
+            new_commitments,
+
+            new_records_encryption_randomness,
+            new_encrypted_records,
+            new_encrypted_record_hashes,
+
+            program_commitment,
+            program_randomness,
+            local_data_merkle_tree,
+            local_data_commitment_randomizers,
+            value_balance,
+            memorandum,
+            network_id,
+        })
     }
 }
 
