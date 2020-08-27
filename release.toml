@@ -1,3 +1,4 @@
 pre-release-commit-message = "chore({{crate_name}}): Release {{version}}"
-post-release-commit-message = "Released {{version}}, starting {{next_version}}"
+post-release-commit-message = "Released new version"
 consolidate-commits = true
+disable-tag = true
