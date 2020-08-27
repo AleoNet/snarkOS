@@ -6,3 +6,6 @@ pub use offline_transaction::*;
 
 pub mod record;
 pub use record::*;
+
+#[cfg(test)]
+pub mod tests;

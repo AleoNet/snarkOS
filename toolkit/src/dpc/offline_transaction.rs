@@ -78,6 +78,7 @@ pub fn offline_transaction_execution<R: Rng>(
         )?;
 
         old_records.push(dummy_record);
+        old_account_private_keys.push(private_key);
     }
 
     assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
