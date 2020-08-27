@@ -71,7 +71,7 @@ pub struct Node {
     pub is_bootnode: bool,
     pub ip: String,
     pub port: u16,
-    pub quiet: bool,
+    pub verbose: u8,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -99,7 +99,7 @@ impl Default for Config {
                 is_bootnode: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
-                quiet: false,
+                verbose: 1,
             },
             miner: Miner {
                 is_miner: false,
@@ -134,14 +134,14 @@ impl Config {
         path
     }
 
-    /// Read the config from the snarkOS.toml file
+    /// Read the config from the `config.toml` file
     fn read_config() -> Result<Self, CliError> {
         let snarkos_path = Self::snarkos_dir();
         let mut config_path = snarkos_path.clone();
-        config_path.push("snarkOS.toml");
+        config_path.push("config.toml");
 
         if !Path::exists(&config_path) {
-            // Create a new default snarkOS.toml file if it doesn't already exist
+            // Create a new default `config.toml` file if it doesn't already exist
             fs::create_dir_all(&snarkos_path)?;
 
             let default_config_string = toml::to_string(&Config::default())?;
@@ -179,7 +179,6 @@ impl Config {
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
-            "quiet" => self.quiet(arguments.is_present(option)),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
             "ip" => self.ip(arguments.value_of(option)),
@@ -193,6 +192,7 @@ impl Config {
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
+            "verbose" => self.verbose(clap::value_t!(arguments.value_of(*option), u8).ok()),
             _ => (),
         });
     }
@@ -236,10 +236,6 @@ impl Config {
 
     fn is_miner(&mut self, argument: bool) {
         self.miner.is_miner = argument;
-    }
-
-    fn quiet(&mut self, argument: bool) {
-        self.node.quiet = argument;
     }
 
     fn ip(&mut self, argument: Option<&str>) {
@@ -308,6 +304,12 @@ impl Config {
             self.rpc.password = Some(password.to_string());
         }
     }
+
+    fn verbose(&mut self, argument: Option<u8>) {
+        if let Some(verbose) = argument {
+            self.node.verbose = verbose
+        }
+    }
 }
 
 /// Parses command line arguments into node configuration parameters.
@@ -317,7 +319,7 @@ impl CLI for ConfigCli {
     type Config = Config;
 
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
-    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER, flag::QUIET];
+    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
@@ -332,6 +334,7 @@ impl CLI for ConfigCli {
         option::RPC_PORT,
         option::RPC_USERNAME,
         option::RPC_PASSWORD,
+        option::VERBOSE,
     ];
     const SUBCOMMANDS: &'static [SubCommandType] = &[];
 
@@ -343,7 +346,6 @@ impl CLI for ConfigCli {
             "no-jsonrpc",
             "is-bootnode",
             "is-miner",
-            "quiet",
             "ip",
             "port",
             "path",
@@ -355,6 +357,7 @@ impl CLI for ConfigCli {
             "rpc-port",
             "rpc-username",
             "rpc-password",
+            "verbose",
         ]);
 
         Ok(config)
