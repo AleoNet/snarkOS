@@ -48,11 +48,18 @@ use tokio::{runtime::Runtime, sync::Mutex};
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 async fn start_server(config: Config) -> Result<(), NodeError> {
-    if !config.node.quiet {
-        std::env::set_var("RUST_LOG", "info");
-        env_logger::init();
+    match config.node.verbose {
+        0 => {}
+        verbosity => {
+            match verbosity {
+                1 => std::env::set_var("RUST_LOG", "info"),
+                2 => std::env::set_var("RUST_LOG", "debug"),
+                _ => std::env::set_var("RUST_LOG", "info"),
+            };
 
-        println!("{}", render_init(&config));
+            env_logger::init();
+            println!("{}", render_init(&config));
+        }
     }
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
@@ -149,7 +156,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
                 .spawn();
             }
             Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI."
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
             ),
         }
     }
