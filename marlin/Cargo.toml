@@ -19,13 +19,13 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms" }
-snarkos-errors = { path = "../errors" }
-snarkos-gadgets = { path = "../gadgets" }
-snarkos-models = { path = "../models" }
-snarkos-polycommit = { path = "../polycommit", default-features = false }
-snarkos-profiler = { path = "../profiler" }
-snarkos-utilities = { path = "../utilities" }
+snarkos-algorithms = { path = "../algorithms", version = "1.1.0" }
+snarkos-errors = { path = "../errors", version = "1.1.0" }
+snarkos-gadgets = { path = "../gadgets", version = "1.1.0" }
+snarkos-models = { path = "../models", version = "1.1.0" }
+snarkos-polycommit = { path = "../polycommit", version = "1.1.0", default-features = false }
+snarkos-profiler = { path = "../profiler", version = "1.1.0" }
+snarkos-utilities = { path = "../utilities", version = "1.1.0" }
 
 blake2 = { version = "0.8", default-features = false }
 derivative = { version = "2", features = ["use_core"] }
