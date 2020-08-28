@@ -16,7 +16,6 @@
 
 use crate::{impl_bytes, *};
 use core::ops::{Add, AddAssign};
-use std::collections::BTreeMap;
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
 use snarkos_utilities::{
@@ -24,6 +23,7 @@ use snarkos_utilities::{
     error,
     serialize::{CanonicalDeserialize, CanonicalSerialize},
 };
+use std::collections::BTreeMap;
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]

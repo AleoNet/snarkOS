@@ -64,8 +64,7 @@ mod marlin {
     use blake2::Blake2s;
     use core::ops::MulAssign;
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
-    use snarkos_polycommit::marlin_pc::MarlinKZG10;
-    use snarkos_polycommit::sonic_pc::SonicKZG10;
+    use snarkos_polycommit::{marlin_pc::MarlinKZG10, sonic_pc::SonicKZG10};
     use snarkos_utilities::rand::{test_rng, UniformRand};
 
     type MultiPC = MarlinKZG10<Bls12_377>;
@@ -114,7 +113,6 @@ mod marlin {
 
     impl_marlin_test!(MarlinPCTest, MarlinInst);
     impl_marlin_test!(SonicPCTest, MarlinSonicInst);
-
 
     #[test]
     fn prove_and_verify_with_tall_matrix_big() {

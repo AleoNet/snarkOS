@@ -20,8 +20,7 @@ pub use crate::{
     Vec,
 };
 use snarkos_errors::serialization::SerializationError;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 mod flags;
 pub use flags::*;
@@ -555,7 +554,10 @@ mod test {
 }
 
 impl<K, V> CanonicalSerialize for BTreeMap<K, V>
-where K: CanonicalSerialize, V: CanonicalSerialize {
+where
+    K: CanonicalSerialize,
+    V: CanonicalSerialize,
+{
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), SerializationError> {
         let len = self.len() as u64;
         len.serialize(writer)?;
@@ -567,12 +569,18 @@ where K: CanonicalSerialize, V: CanonicalSerialize {
     }
 
     fn serialized_size(&self) -> usize {
-        8 + self.iter().map(|(k, v)| k.serialized_size() + v.serialized_size()).sum::<usize>()
+        8 + self
+            .iter()
+            .map(|(k, v)| k.serialized_size() + v.serialized_size())
+            .sum::<usize>()
     }
 }
 
-impl<K,V> CanonicalDeserialize for BTreeMap<K, V>
-where K: Ord + CanonicalDeserialize, V: CanonicalDeserialize {
+impl<K, V> CanonicalDeserialize for BTreeMap<K, V>
+where
+    K: Ord + CanonicalDeserialize,
+    V: CanonicalDeserialize,
+{
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, SerializationError> {
         let len = u64::deserialize(reader)?;
         let mut map = BTreeMap::new();

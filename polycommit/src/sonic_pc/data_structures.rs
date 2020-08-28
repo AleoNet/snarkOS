@@ -1,6 +1,6 @@
 use crate::{impl_bytes, kzg10, PCCommitterKey, PCVerifierKey, Vec};
-use snarkos_models::curves::{PairingEngine, PairingCurve};
 use snarkos_errors::serialization::SerializationError;
+use snarkos_models::curves::{PairingCurve, PairingEngine};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     error,
@@ -19,12 +19,7 @@ pub type Commitment<E> = kzg10::Commitment<E>;
 /// `ComitterKey` is used to commit to, and create evaluation proofs for, a given
 /// polynomial.
 #[derive(Derivative)]
-#[derivative(
-Default(bound = ""),
-Hash(bound = ""),
-Clone(bound = ""),
-Debug(bound = "")
-)]
+#[derivative(Default(bound = ""), Hash(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct CommitterKey<E: PairingEngine> {
     /// The key used to commit to polynomials.
@@ -61,24 +56,12 @@ impl<E: PairingEngine> CommitterKey<E> {
     }
 
     /// Obtain powers for committing to shifted polynomials.
-    pub fn shifted_powers(
-        &self,
-        degree_bound: impl Into<Option<usize>>,
-    ) -> Option<kzg10::Powers<E>> {
+    pub fn shifted_powers(&self, degree_bound: impl Into<Option<usize>>) -> Option<kzg10::Powers<E>> {
         match (&self.shifted_powers_of_g, &self.shifted_powers_of_gamma_g) {
             (Some(shifted_powers_of_g), Some(shifted_powers_of_gamma_g)) => {
                 let powers_range = if let Some(degree_bound) = degree_bound.into() {
-                    assert!(self
-                        .enforced_degree_bounds
-                        .as_ref()
-                        .unwrap()
-                        .contains(&degree_bound));
-                    let max_bound = self
-                        .enforced_degree_bounds
-                        .as_ref()
-                        .unwrap()
-                        .last()
-                        .unwrap();
+                    assert!(self.enforced_degree_bounds.as_ref().unwrap().contains(&degree_bound));
+                    let max_bound = self.enforced_degree_bounds.as_ref().unwrap().last().unwrap();
                     (max_bound - degree_bound)..
                 } else {
                     0..
@@ -147,13 +130,11 @@ impl_bytes!(VerifierKey);
 impl<E: PairingEngine> VerifierKey<E> {
     /// Find the appropriate shift for the degree bound.
     pub fn get_shift_power(&self, degree_bound: usize) -> Option<<E::G2Affine as PairingCurve>::Prepared> {
-        self.degree_bounds_and_prepared_neg_powers_of_h
-            .as_ref()
-            .and_then(|v| {
-                v.binary_search_by(|(d, _)| d.cmp(&degree_bound))
-                    .ok()
-                    .map(|i| v[i].1.clone())
-            })
+        self.degree_bounds_and_prepared_neg_powers_of_h.as_ref().and_then(|v| {
+            v.binary_search_by(|(d, _)| d.cmp(&degree_bound))
+                .ok()
+                .map(|i| v[i].1.clone())
+        })
     }
 }
 
@@ -170,11 +151,11 @@ impl<E: PairingEngine> PCVerifierKey for VerifierKey<E> {
 /// Evaluation proof at a query set.
 #[derive(Derivative)]
 #[derivative(
-Default(bound = ""),
-Hash(bound = ""),
-Clone(bound = ""),
-Debug(bound = ""),
-PartialEq(bound = ""),
-Eq(bound = "")
+    Default(bound = ""),
+    Hash(bound = ""),
+    Clone(bound = ""),
+    Debug(bound = ""),
+    PartialEq(bound = ""),
+    Eq(bound = "")
 )]
 pub struct BatchProof<E: PairingEngine>(pub(crate) Vec<kzg10::Proof<E>>);

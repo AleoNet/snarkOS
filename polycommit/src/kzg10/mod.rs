@@ -115,9 +115,13 @@ impl<E: PairingEngine> KZG10<E> {
 
             let affines = E::G2Projective::batch_normalization_into_affine(&neg_powers_of_h);
             let mut affines_map = BTreeMap::new();
-            affines.into_iter().enumerate().map(|(i, a)| (i, a.prepare())).for_each(|(i, a)| {
-                affines_map.insert(i, a);
-            });
+            affines
+                .into_iter()
+                .enumerate()
+                .map(|(i, a)| (i, a.prepare()))
+                .for_each(|(i, a)| {
+                    affines_map.insert(i, a);
+                });
             affines_map
         } else {
             BTreeMap::new()
