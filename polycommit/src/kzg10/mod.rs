@@ -36,6 +36,7 @@ use core::marker::PhantomData;
 
 mod data_structures;
 pub use data_structures::*;
+use std::collections::BTreeMap;
 
 /// `KZG10` is an implementation of the polynomial commitment scheme of
 /// [Kate, Zaverucha and Goldbgerg][kzg10]
@@ -113,9 +114,13 @@ impl<E: PairingEngine> KZG10<E> {
             );
 
             let affines = E::G2Projective::batch_normalization_into_affine(&neg_powers_of_h);
-            Some(affines.into_iter().map(|a| a.prepare()).collect())
+            let mut affines_map = BTreeMap::new();
+            affines.into_iter().enumerate().map(|(i, a)| (i, a.prepare())).for_each(|(i, a)| {
+                affines_map.insert(i, a);
+            });
+            affines_map
         } else {
-            None
+            BTreeMap::new()
         };
 
         end_timer!(prepared_neg_powers_of_h_time);
