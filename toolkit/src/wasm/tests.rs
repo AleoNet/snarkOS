@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::wasm::{Account, SignatureScheme, SignatureSchemePublicKey};
+use crate::wasm::{Account, SignatureScheme, SignatureSchemePublicKey, ViewKey};
 
 use wasm_bindgen_test::*;
 
@@ -30,6 +30,17 @@ pub fn account_from_private_key_test() {
 
     println!("{} == {}", given_address, account.address.to_string());
     assert_eq!(given_address, account.address.to_string());
+}
+
+#[wasm_bindgen_test]
+pub fn view_key_from_private_key_test() {
+    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+    let given_view_key = "AViewKey1m8gvywHKHKfUzZiLiLoHedcdHEjKwo5TWo6efz8gK7wF";
+
+    let view_key = ViewKey::from_private_key(given_private_key);
+
+    println!("{} == {}", given_view_key, view_key.view_key.to_string());
+    assert_eq!(given_view_key, view_key.view_key.to_string());
 }
 
 #[wasm_bindgen_test]
