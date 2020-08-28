@@ -38,6 +38,18 @@ impl From<snarkos_errors::algorithms::signature::SignatureError> for DPCError {
     }
 }
 
+impl From<snarkos_errors::algorithms::crh::CRHError> for DPCError {
+    fn from(error: snarkos_errors::algorithms::crh::CRHError) -> Self {
+        DPCError::Crate("snarkos_errors::algorithms::crh", format!("{:?}", error))
+    }
+}
+
+impl From<snarkos_errors::dpc::DPCError> for DPCError {
+    fn from(error: snarkos_errors::dpc::DPCError) -> Self {
+        DPCError::Crate("snarkos_errors::dpc", format!("{:?}", error))
+    }
+}
+
 impl From<std::io::Error> for DPCError {
     fn from(error: std::io::Error) -> Self {
         DPCError::Crate("std::io", format!("{:?}", error))
