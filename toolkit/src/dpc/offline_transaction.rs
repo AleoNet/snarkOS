@@ -5,7 +5,7 @@ use crate::{
 };
 use snarkos_dpc::base_dpc::{
     instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
-    parameters::PublicParameters,
+    parameters::{NoopProgramSNARKParameters, SystemParameters},
     record_payload::RecordPayload,
     ExecuteContext,
 };
@@ -35,8 +35,9 @@ impl OfflineTransaction {
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self, DPCError> {
-        let parameters = PublicParameters::<Components>::load(false).unwrap();
+        let parameters = SystemParameters::<Components>::load().unwrap();
 
+        let noop_program_snark_parameters = NoopProgramSNARKParameters::<Components>::load().unwrap();
         assert!(spenders.len() > 0);
         assert_eq!(spenders.len(), records_to_spend.len());
 
@@ -45,9 +46,8 @@ impl OfflineTransaction {
 
         let noop_program_id = to_bytes![
             parameters
-                .system_parameters
                 .program_verification_key_crh
-                .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?
+                .hash(&to_bytes![noop_program_snark_parameters.verification_key]?)?
         ]?;
 
         // Construct the new records
@@ -63,18 +63,18 @@ impl OfflineTransaction {
 
         while old_records.len() < Components::NUM_INPUT_RECORDS {
             let sn_randomness: [u8; 32] = rng.gen();
-            let old_sn_nonce = parameters.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
+            let old_sn_nonce = parameters.serial_number_nonce.hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
             let address = AccountAddress::<Components>::from_private_key(
-                parameters.account_signature_parameters(),
-                parameters.account_commitment_parameters(),
-                parameters.account_encryption_parameters(),
+                &parameters.account_signature,
+                &parameters.account_commitment,
+                &parameters.account_encryption,
                 &private_key,
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &parameters.system_parameters,
+                &parameters,
                 &old_sn_nonce,
                 &address,
                 true, // The input record is dummy
@@ -94,9 +94,9 @@ impl OfflineTransaction {
         // Enforce that the old record addresses correspond with the private keys
         for (private_key, record) in old_account_private_keys.iter().zip(&old_records) {
             let address = AccountAddress::<Components>::from_private_key(
-                parameters.account_signature_parameters(),
-                parameters.account_commitment_parameters(),
-                parameters.account_encryption_parameters(),
+                &parameters.account_signature,
+                &parameters.account_commitment,
+                &parameters.account_encryption,
                 &private_key,
             )?;
 
@@ -138,7 +138,7 @@ impl OfflineTransaction {
 
         // Offline execution to generate a DPC transaction
         let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
-            &parameters.system_parameters,
+            &parameters,
             &old_records,
             &old_account_private_keys,
             &new_record_owners,

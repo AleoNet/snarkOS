@@ -20,5 +20,8 @@ pub use account::*;
 pub mod signature;
 pub use signature::*;
 
+pub mod transaction;
+pub use transaction::*;
+
 #[cfg(test)]
 pub mod tests;
