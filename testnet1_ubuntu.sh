@@ -27,9 +27,9 @@ apt-get install -y \
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
 
-# Build snarkOS Release
+# Install snarkOS
 
-cargo build --release
+cargo install --path .
 
 echo "================================================"
 echo " Attention - Please ensure ports 4131 and 3030"
