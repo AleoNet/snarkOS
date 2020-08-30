@@ -1,3 +1,4 @@
+
 All messages are serialized into bytes when sent and deserialized into a message payload when received.
 
 ## Block
