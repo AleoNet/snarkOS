@@ -91,128 +91,164 @@ A node may broadcast a block using a `Block` message, in the same manner as broa
 
 
 
-## message_types
-
-All messages are serialized into bytes when sent and deserialized into a message payload when received.
-
 ## Block
-
 Send a block to a peer.
 
-#### Payload
+### Message Name
+
+`block`
+
+### Payload
 
 The serialized bytes of the block.
 
 ## GetBlock
-
 A request for a block with the specified hash.
 
-#### Payload
+### Message Name
+
+`getblock`
+
+### Payload
 
 |   Parameter  | Type  |              Description              |
 |:------------:|-------|:-------------------------------------:|
 | `block_hash` | bytes | The block hash of the requested block |
 
 ## GetMemoryPool
-
 A request for a peer's memory pool transactions.
 
-#### Payload
+### Message Name
 
-None
+`getmemorypool`
+
+### Payload
+
+`None`
 
 ## GetPeers
-
 A request for a list of the peer's connected peer addresses.
 
-#### Payload
+### Message Name
 
-None
+`getpeers`
+
+### Payload
+
+`None`
 
 ## GetSync
+A request for knowledge of specified block locator hashes.
 
-A request for novel block hashes.
+### Message Name
 
-#### Payload
+`getsync`
+
+### Payload
 
 |        Parameter       | Type  |                            Description                            |
 |:----------------------:|-------|:-----------------------------------------------------------------:|
 | `block_locator_hashes` | array | A list block hashes describing the state of the requester's chain |
 
 ## MemoryPool
+A response to a `GetMemoryPool` request.
 
-A response to a GetMemoryPool request.
+### Message Name
 
-#### Payload
+`memorypool`
+
+### Payload
 
 |    Parameter   | Type  |                  Description                  |
 |:--------------:|-------|:---------------------------------------------:|
 | `transactions` | array | A list of serialized memory pool transactions |
 
 ## Peers
+A response to a `GetPeers` request.
 
-A response to a GetPeers request.
+### Message Name
 
-#### Payload
+`peers`
+
+### Payload
 
 |  Parameter  | Type  |                     Description                     |
 |:-----------:|-------|:---------------------------------------------------:|
 | `addresses` | array | A list of connected peers and their last seen dates |
+
 ## Ping
+A ping protocol request for a `Pong`.
 
-A ping protocol request for a Pong.
+### Message Name
 
-#### Payload
+`ping`
+
+### Payload
 
 | Parameter | Type   |            Description            |
 |:---------:|--------|:---------------------------------:|
 | `nonce`   | number | A unique ping protocol identifier |
 
 ## Pong
+A response to a `Ping` request.
 
-A response to a Ping request.
+### Message Name
 
-#### Payload
+`pong`
+
+### Payload
 
 | Parameter | Type   |              Description              |
 |:---------:|--------|:-------------------------------------:|
 | `nonce`   | number | The received ping protocol identifier |
 
 ## Sync
+A response to a `GetSync` message.
 
-A response to a GetSync message.
+### Message Name
 
-#### Payload
+`sync`
+
+### Payload
 
 |    Parameter   | Type  |                     Description                    |
 |:--------------:|-------|:--------------------------------------------------:|
 | `block_hashes` | array | A list of block hashes to share with the requester |
 
 ## SyncBlock
+A response to a `GetBlock` request.
 
-A response to a GetBlock request.
+### Message Name
 
-#### Payload
+`syncblock`
+
+### Payload
 
 | Parameter | Type  |                 Description                 |
 |:---------:|-------|:-------------------------------------------:|
 | `data`    | bytes | The serialized bytes of the requested block |
 
 ## Transaction
+A transaction sent by a peer.
 
-Send a transaction to a peer.
+### Message Name
 
-#### Payload
+`transaction`
+
+### Payload
 
 | Parameter | Type  |              Description              |
 |:---------:|-------|:-------------------------------------:|
 | `data`    | bytes | The serialized bytes of a transaction |
 
 ## Verack
+A handshake response to a `Version` message.
 
-A handshake response to a Version message.
+### Message Name
 
-#### Payload
+`verack`
+
+### Payload
 
 |      Parameter     |  Type  |           Description          |
 |:------------------:|:------:|:------------------------------:|
@@ -221,10 +257,13 @@ A handshake response to a Version message.
 |  `address_sender`  | string |    IP of the message sender    |
 
 ## Version
+A handshake request for a `Verack` to establish a connection with a potential peer.
 
-A handshake request to esablish a connection with a potential peer.
+### Message Name
 
-#### Payload
+`version`
+
+### Payload
 
 |      Parameter     | Type   |                  Description                 |
 |:------------------:|--------|:--------------------------------------------:|
