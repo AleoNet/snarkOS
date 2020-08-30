@@ -16,7 +16,7 @@
 
 mod ping_protocol {
     use snarkos_network::{
-        types::{Ping, Pong},
+        message_types::{Ping, Pong},
         Message,
         PingProtocol,
         PingState,

@@ -1,4 +1,8 @@
-A handshake response to a Version message.
+A handshake response to a `Version` message.
+
+### Message Name
+
+`verack`
 
 ### Payload
 

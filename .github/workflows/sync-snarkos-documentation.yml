@@ -5,6 +5,8 @@ on:
     paths:
       - '**/documentation/**.md'
       - '**/documentation/config.json'
+    branches:
+      - 'master'
 
 jobs:
   sync:

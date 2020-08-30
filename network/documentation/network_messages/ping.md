@@ -1,4 +1,8 @@
-A ping protocol request for a Pong.
+A ping protocol request for a `Pong`.
+
+### Message Name
+
+`ping`
 
 ### Payload
 

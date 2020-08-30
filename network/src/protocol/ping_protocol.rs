@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message::types::{Ping, Pong},
+    message_types::{Ping, Pong},
     Channel,
 };
 use snarkos_errors::network::PingProtocolError;

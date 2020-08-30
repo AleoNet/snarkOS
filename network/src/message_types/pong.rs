@@ -14,41 +14,67 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::message::{Message, MessageName};
+use crate::{
+    message::{Message, MessageName},
+    message_types::Ping,
+};
 use snarkos_errors::network::message::MessageError;
 
-/// A request for a peer's connected peer addresses.
-#[derive(Debug, PartialEq, Clone)]
-pub struct GetPeers;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use std::io::Cursor;
 
-impl Message for GetPeers {
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/pong.md"))]
+#[derive(Debug, PartialEq, Clone)]
+pub struct Pong {
+    /// Unique ping protocol identifier
+    pub nonce: u64,
+}
+
+impl Pong {
+    pub fn new(ping: Ping) -> Self {
+        Self { nonce: ping.nonce }
+    }
+}
+
+impl Message for Pong {
     fn name() -> MessageName {
-        MessageName::from("getpeers")
+        MessageName::from("pong")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 0 {
-            return Err(MessageError::InvalidLength(vec.len(), 0));
+        if vec.len() != 8 {
+            return Err(MessageError::InvalidLength(vec.len(), 8));
         }
 
-        Ok(Self)
+        let mut reader = Cursor::new(vec);
+
+        Ok(Self {
+            nonce: reader.read_u64::<BigEndian>().expect("unable to read u64"),
+        })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(vec![])
+        let mut writer = vec![];
+        writer.write_u64::<BigEndian>(self.nonce)?;
+
+        Ok(writer)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
 
     #[test]
-    fn test_getpeers() {
-        let message = GetPeers;
+    fn test_pong() {
+        let mut rng = rand::thread_rng();
+        let message = Pong {
+            nonce: rng.gen::<u64>(),
+        };
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetPeers::deserialize(serialized).unwrap();
+        let deserialized = Pong::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

@@ -1,4 +1,8 @@
-A response to a Ping request.
+A response to a `Ping` request.
+
+### Message Name
+
+`pong`
 
 ### Payload
 

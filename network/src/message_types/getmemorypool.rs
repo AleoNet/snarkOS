@@ -14,65 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::message::{types::Ping, Message, MessageName};
+use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::io::Cursor;
-
-/// A response to a Ping request.
-/// See network/protocol/ping_protocol.rs for more details.
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_memory_pool.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Pong {
-    /// Unique ping protocol identifier
-    pub nonce: u64,
-}
+pub struct GetMemoryPool;
 
-impl Pong {
-    pub fn new(ping: Ping) -> Self {
-        Self { nonce: ping.nonce }
-    }
-}
-
-impl Message for Pong {
+impl Message for GetMemoryPool {
     fn name() -> MessageName {
-        MessageName::from("pong")
+        MessageName::from("getmempool")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 8 {
-            return Err(MessageError::InvalidLength(vec.len(), 8));
+        if vec.len() != 0 {
+            return Err(MessageError::InvalidLength(vec.len(), 0));
         }
 
-        let mut reader = Cursor::new(vec);
-
-        Ok(Self {
-            nonce: reader.read_u64::<BigEndian>().expect("unable to read u64"),
-        })
+        Ok(Self)
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = vec![];
-        writer.write_u64::<BigEndian>(self.nonce)?;
-
-        Ok(writer)
+        Ok(vec![])
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
 
     #[test]
-    fn test_pong() {
-        let mut rng = rand::thread_rng();
-        let message = Pong {
-            nonce: rng.gen::<u64>(),
-        };
+    fn test_get_memory_pool() {
+        let message = GetMemoryPool;
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Pong::deserialize(serialized).unwrap();
+        let deserialized = GetMemoryPool::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

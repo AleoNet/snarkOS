@@ -1,4 +1,8 @@
-Send a transaction to a peer.
+A transaction sent by a peer.
+
+### Message Name
+
+`transaction`
 
 ### Payload
 

@@ -16,47 +16,49 @@
 
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
+use snarkos_objects::BlockHeaderHash;
 
-/// A newly mined block message.
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_sync.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Block {
-    /// Serialized block data
-    pub data: Vec<u8>,
+pub struct GetSync {
+    /// hashes of blocks requested
+    pub block_locator_hashes: Vec<BlockHeaderHash>,
 }
 
-impl Block {
-    pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
+impl GetSync {
+    pub fn new(block_locator_hashes: Vec<BlockHeaderHash>) -> Self {
+        Self { block_locator_hashes }
     }
 }
 
-impl Message for Block {
+impl Message for GetSync {
     fn name() -> MessageName {
-        MessageName::from("block")
+        MessageName::from("getsync")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         Ok(Self {
-            data: bincode::deserialize(&vec)?,
+            block_locator_hashes: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.data)?)
+        Ok(bincode::serialize(&self.block_locator_hashes)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::BLOCK_1;
+    use snarkos_testing::consensus::BLOCK_1_HEADER_HASH;
 
     #[test]
-    fn test_block() {
-        let message = Block::new(BLOCK_1.to_vec());
+    fn test_get_sync() {
+        let data = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
+        let message = GetSync::new(vec![data]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Block::deserialize(serialized).unwrap();
+        let deserialized = GetSync::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

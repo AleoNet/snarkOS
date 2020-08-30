@@ -19,8 +19,7 @@ use snarkos_errors::network::message::MessageError;
 
 use std::net::SocketAddr;
 
-/// A handshake response to a Version message.
-/// See network/protocol/handshake.rs for more details.
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/verack.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Verack {
     /// Random nonce sequence number
@@ -72,7 +71,7 @@ impl Message for Verack {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::types::Version;
+    use crate::message_types::Version;
     use snarkos_testing::network::random_socket_address;
 
     #[test]

@@ -1,4 +1,8 @@
-A response to a GetBlock request.
+A response to a `GetBlock` request.
+
+### Message Name
+
+`syncblock`
 
 ### Payload
 

@@ -22,10 +22,8 @@ mod server_listen {
     };
     use snarkos_network::{
         context::Context,
-        message::{
-            types::{GetPeers, GetSync, Verack},
-            Message,
-        },
+        message::Message,
+        message_types::{GetPeers, GetSync, Verack},
         protocol::SyncHandler,
         server::Server,
         Handshakes,

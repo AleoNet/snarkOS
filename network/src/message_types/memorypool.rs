@@ -17,38 +17,46 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-/// A request for a peer's memory pool of transactions.
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/memory_pool.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct GetMemoryPool;
+pub struct MemoryPool {
+    /// Vector of memory pool transactions
+    pub transactions: Vec<Vec<u8>>,
+}
 
-impl Message for GetMemoryPool {
+impl MemoryPool {
+    pub fn new(transactions: Vec<Vec<u8>>) -> Self {
+        Self { transactions }
+    }
+}
+
+impl Message for MemoryPool {
     fn name() -> MessageName {
-        MessageName::from("getmempool")
+        MessageName::from("memorypool")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 0 {
-            return Err(MessageError::InvalidLength(vec.len(), 0));
-        }
-
-        Ok(Self)
+        Ok(Self {
+            transactions: bincode::deserialize(&vec)?,
+        })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(vec![])
+        Ok(bincode::serialize(&self.transactions)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkos_testing::consensus::TRANSACTION_1;
 
     #[test]
-    fn test_get_memory_pool() {
-        let message = GetMemoryPool;
+    fn test_memory_pool() {
+        let message = MemoryPool::new(vec![TRANSACTION_1.to_vec()]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetMemoryPool::deserialize(serialized).unwrap();
+        let deserialized = MemoryPool::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

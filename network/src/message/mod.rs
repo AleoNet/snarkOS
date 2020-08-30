@@ -31,5 +31,3 @@ pub use message_name::*;
 
 pub mod read;
 pub use read::*;
-
-pub mod types;
