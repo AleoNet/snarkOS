@@ -130,7 +130,7 @@ impl Channel {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::types::{Ping, Pong};
+    use crate::message_types::{Ping, Pong};
 
     use super::*;
     use snarkos_testing::network::{random_socket_address, simulate_active_node};

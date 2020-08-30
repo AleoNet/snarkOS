@@ -16,50 +16,47 @@
 
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
-use snarkos_objects::BlockHeaderHash;
 
-/// A request for knowledge of specified block locator hashes.
-/// See network/protocol/sync.rs for more details.
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/transaction.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct GetSync {
-    /// hashes of blocks requested
-    pub block_locator_hashes: Vec<BlockHeaderHash>,
+pub struct Transaction {
+    /// Serialized transaction bytes
+    pub(crate) bytes: Vec<u8>,
 }
 
-impl GetSync {
-    pub fn new(block_locator_hashes: Vec<BlockHeaderHash>) -> Self {
-        Self { block_locator_hashes }
+impl Transaction {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self { bytes }
     }
 }
 
-impl Message for GetSync {
+impl Message for Transaction {
     fn name() -> MessageName {
-        MessageName::from("getsync")
+        MessageName::from("transaction")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         Ok(Self {
-            block_locator_hashes: bincode::deserialize(&vec)?,
+            bytes: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.block_locator_hashes)?)
+        Ok(bincode::serialize(&self.bytes)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::BLOCK_1_HEADER_HASH;
+    use snarkos_testing::consensus::TRANSACTION_1;
 
     #[test]
-    fn test_get_sync() {
-        let data = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
-        let message = GetSync::new(vec![data]);
+    fn test_transaction() {
+        let message = Transaction::new(TRANSACTION_1.to_vec());
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetSync::deserialize(serialized).unwrap();
+        let deserialized = Transaction::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

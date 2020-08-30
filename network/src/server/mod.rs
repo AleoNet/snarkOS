@@ -25,7 +25,7 @@ pub mod server;
 pub use server::*;
 
 use crate::{
-    message::types::{Block, Transaction},
+    message_types::{Block, Transaction},
     Context,
 };
 use snarkos_consensus::{

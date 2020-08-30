@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message::types::{GetPeers, Verack, Version},
+    message_types::{GetPeers, Verack, Version},
     Channel,
     Handshake,
     HandshakeState,

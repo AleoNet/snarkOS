@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message::types::{GetMemoryPool, GetPeers},
+    message_types::{GetMemoryPool, GetPeers},
     Server,
 };
 

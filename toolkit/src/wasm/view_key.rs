@@ -14,44 +14,27 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod block;
-pub use block::*;
+use crate::account::{PrivateKey, ViewKey as ViewKeyNative};
 
-pub mod getblock;
-pub use getblock::*;
+use std::str::FromStr;
+use wasm_bindgen::prelude::*;
 
-pub mod getmemorypool;
-pub use getmemorypool::*;
+#[wasm_bindgen]
+pub struct ViewKey {
+    pub(crate) view_key: ViewKeyNative,
+}
 
-pub mod getpeers;
-pub use getpeers::*;
+#[wasm_bindgen]
+impl ViewKey {
+    #[wasm_bindgen]
+    pub fn from_private_key(private_key: &str) -> Self {
+        let private_key = PrivateKey::from_str(private_key).unwrap();
+        let view_key = ViewKeyNative::from(&private_key).unwrap();
+        Self { view_key }
+    }
 
-pub mod getsync;
-pub use getsync::*;
-
-pub mod memorypool;
-pub use memorypool::*;
-
-pub mod peers;
-pub use peers::*;
-
-pub mod ping;
-pub use ping::*;
-
-pub mod pong;
-pub use pong::*;
-
-pub mod sync;
-pub use sync::*;
-
-pub mod syncblock;
-pub use syncblock::*;
-
-pub mod transaction;
-pub use transaction::*;
-
-pub mod verack;
-pub use verack::*;
-
-pub mod version;
-pub use version::*;
+    #[wasm_bindgen]
+    pub fn to_string(&self) -> String {
+        format!("ViewKey {{ view_key: {} }}", self.view_key)
+    }
+}
