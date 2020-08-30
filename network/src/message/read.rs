@@ -49,7 +49,10 @@ pub async fn stream_read<'a, T: AsyncRead + Unpin>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::{message::Message, message_types::Ping, MessageHeader};
+    use crate::{
+        message::{message::Message, MessageHeader},
+        message_types::Ping,
+    };
     use snarkos_testing::network::random_socket_address;
 
     use serial_test::serial;
