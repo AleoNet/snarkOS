@@ -20,7 +20,7 @@
 // Documentation
 #![cfg_attr(nightly, feature(doc_cfg, external_doc))]
 #![cfg_attr(nightly, warn(missing_docs))]
-#![cfg_attr(nightly, doc(include = "../documentation/rpc_server/configurations.md"))]
+#![cfg_attr(nightly, doc(include = "../documentation/concepts/rpc_server.md"))]
 
 pub mod rpc_impl;
 #[doc(inline)]
