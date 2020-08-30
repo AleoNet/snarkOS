@@ -185,12 +185,10 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         kzg10::KZG10::setup(max_degree, false, rng).map_err(Into::into)
     }
 
-    // TODO: should trim also take in the hiding_bounds? That way we don't
-    // have to store many powers of gamma_g.
-    // TODO: add an optional hiding_bound.
     fn trim(
         pp: &Self::UniversalParams,
         supported_degree: usize,
+        supported_hiding_bound: usize,
         enforced_degree_bounds: Option<&[usize]>,
     ) -> Result<(Self::CommitterKey, Self::VerifierKey), Self::Error> {
         let max_degree = pp.max_degree();
@@ -204,7 +202,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let powers = pp.powers_of_g[..=supported_degree].to_vec();
         // We want to support making up to supported_degree queries to committed
         // polynomials.
-        let powers_of_gamma_g = pp.powers_of_gamma_g[..=(supported_degree + 1)].to_vec();
+        let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_hiding_bound].to_vec();
         end_timer!(ck_time);
 
         // Construct the core KZG10 verifier key.
