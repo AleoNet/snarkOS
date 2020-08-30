@@ -35,7 +35,7 @@ the `-rpc-username` and `-rpc-password` flags when booting up a full node.
 
 
 
-## Decoderawtransaction
+## decoderawtransaction
 Returns information about a transaction from serialized transaction bytes.
 
 ### Arguments
@@ -67,7 +67,7 @@ Returns information about a transaction from serialized transaction bytes.
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderawtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getbestblockhash
+## getbestblockhash
 Returns the block hash of the head of the best valid chain.
 
 ### Arguments
@@ -85,7 +85,7 @@ None
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getbestblockhash", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getblock
+## getblock
 Returns information about a block from a block hash.
 
 ### Arguments
@@ -116,7 +116,7 @@ Returns information about a block from a block hash.
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": ["caf49293d36f0215cfb3296dbc871a0ef5e5dcfc61f91cd0c9ac2c730f84d853"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getblockcount
+## getblockcount
 Returns the number of blocks in the best valid chain.
 
 ### Arguments
@@ -134,7 +134,7 @@ None
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockcount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getblockhash
+## getblockhash
 Returns the block hash of a block at the given block height in the best valid chain.
 
 ### Arguments
@@ -154,7 +154,7 @@ Returns the block hash of a block at the given block height in the best valid ch
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getblocktemplate
+## getblocktemplate
 Returns the current mempool and consensus information known by this node.
 
 ### Arguments
@@ -177,7 +177,7 @@ None
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocktemplate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getconnectioncount
+## getconnectioncount
 Returns the number of connected peers this node has.
 
 ### Arguments
@@ -195,7 +195,7 @@ None
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectioncount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getpeerinfo
+## getpeerinfo
 Returns the node's connected peers.
 
 ### Arguments
@@ -213,7 +213,7 @@ None
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getpeerinfo", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Getrawtransaction
+## getrawtransaction
 Returns hex encoded bytes of a transaction from its transaction id.
 
 ### Arguments
@@ -233,7 +233,7 @@ Returns hex encoded bytes of a transaction from its transaction id.
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawtransaction", "params": ["83fc73b8a104d7cdabe514ec4ddfeb7fd6284ff8e0a757d25d8479ed0ffe608b"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Gettransactioninfo
+## gettransactioninfo
 Returns information about a transaction from a transaction id.
 
 ### Arguments
@@ -264,7 +264,7 @@ Returns information about a transaction from a transaction id.
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettransactioninfo", "params": ["83fc73b8a104d7cdabe514ec4ddfeb7fd6284ff8e0a757d25d8479ed0ffe608b"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Sendtransaction
+## sendtransaction
 Send raw transaction bytes to this node to be added into the mempool. If valid, the transaction will be stored and propagated to all peers.
 
 ### Arguments
@@ -284,7 +284,7 @@ Send raw transaction bytes to this node to be added into the mempool. If valid, 
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Validaterawtransaction
+## validaterawtransaction
 Validate and return if the transaction is valid.
 
 ### Arguments
@@ -306,7 +306,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "validate
 
 
 
-## Createaccount
+## createaccount
 Generate a new account private key and its corresponding account address.
 
 ### Protected Endpoint
@@ -329,7 +329,7 @@ Yes
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "createaccount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
-## Createrawtransaction
+## createrawtransaction
 Create a new transaction, returning the encoded transaction and the new records.
 
 ### Protected Endpoint
@@ -381,7 +381,7 @@ curl --user username:password --data-binary '{
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Decoderecord
+## decoderecord
 Returns information about a record from serialized record hex.
 
 ### Arguments
@@ -409,7 +409,7 @@ Returns information about a record from serialized record hex.
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "decoderecord", "params": ["record_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## Decryptrecord
+## decryptrecord
 Decrypts the encrypted record and returns the hex encoded bytes of the record.
 
 ### Arguments
@@ -440,7 +440,7 @@ curl --user username:password --data-binary '{
     ]
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
-## Getrawrecord
+## getrawrecord
 Returns the hex encoded bytes of a record from its record commitment.
 
 ### Protected Endpoint
@@ -464,7 +464,7 @@ Yes
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrawrecord", "params": ["86be61d5f3bd795e31615d6834efefca01ad023d57c0383e2231e094bcabfc05"] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
-## Getrecordcommitmentcount
+## getrecordcommitmentcount
 Returns the number of record commitments that are stored on the full node.
 
 ### Protected Endpoint
@@ -486,7 +486,7 @@ Yes
 curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getrecordcommitmentcount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/ 
 ```
 
-## Getrecordcommitments
+## getrecordcommitments
 Returns a list of record commitments that are stored on the full node.
 
 ### Protected Endpoint
