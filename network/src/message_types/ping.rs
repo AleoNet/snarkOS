@@ -16,50 +16,62 @@
 
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
-use snarkos_objects::BlockHeaderHash;
 
-/// A request for a block with the specified hash.
-/// See network/protocol/sync.rs for more details.
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use rand::Rng;
+use std::io::Cursor;
+
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/ping.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct GetBlock {
-    /// Header hash of requested block
-    pub block_hash: BlockHeaderHash,
+pub struct Ping {
+    /// Unique ping protocol identifier
+    pub nonce: u64,
 }
 
-impl GetBlock {
-    pub fn new(block_hash: BlockHeaderHash) -> Self {
-        Self { block_hash }
+impl Ping {
+    pub fn new() -> Self {
+        let mut rng = rand::thread_rng();
+        Self {
+            nonce: rng.gen::<u64>(),
+        }
     }
 }
 
-impl Message for GetBlock {
+impl Message for Ping {
     fn name() -> MessageName {
-        MessageName::from("getblock")
+        MessageName::from("ping")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+        if vec.len() != 8 {
+            return Err(MessageError::InvalidLength(vec.len(), 8));
+        }
+
+        let mut reader = Cursor::new(vec);
+
         Ok(Self {
-            block_hash: bincode::deserialize(&vec)?,
+            nonce: reader.read_u64::<BigEndian>().expect("unable to read u64"),
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.block_hash)?)
+        let mut writer = vec![];
+        writer.write_u64::<BigEndian>(self.nonce)?;
+
+        Ok(writer)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::BLOCK_1_HEADER_HASH;
 
     #[test]
-    fn test_block() {
-        let block_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
-        let message = GetBlock::new(block_hash);
+    fn test_ping() {
+        let message = Ping::new();
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetBlock::deserialize(serialized).unwrap();
+        let deserialized = Ping::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

@@ -1,4 +1,8 @@
-A response to a GetPeers request.
+A response to a `GetPeers` request.
+
+### Message Name
+
+`peers`
 
 ### Payload
 

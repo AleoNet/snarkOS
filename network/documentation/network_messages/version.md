@@ -1,4 +1,8 @@
-A handshake request to esablish a connection with a potential peer.
+A handshake request for a `Verack` to establish a connection with a potential peer.
+
+### Message Name
+
+`version`
 
 ### Payload
 

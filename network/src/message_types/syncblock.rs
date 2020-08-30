@@ -17,8 +17,7 @@
 use crate::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-/// A response to a GetBlock request.
-/// See network/protocol/sync.rs for more details.
+#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/sync_block.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct SyncBlock {
     /// block data

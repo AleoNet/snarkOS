@@ -1,4 +1,8 @@
-A request for novel block hashes.
+A request for knowledge of specified block locator hashes.
+
+### Message Name
+
+`getsync`
 
 ### Payload
 

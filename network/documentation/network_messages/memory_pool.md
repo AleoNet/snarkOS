@@ -1,4 +1,8 @@
-A response to a GetMemoryPool request.
+A response to a `GetMemoryPool` request.
+
+### Message Name
+
+`memorypool`
 
 ### Payload
 

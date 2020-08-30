@@ -18,7 +18,8 @@ mod server_message_handler {
     use snarkos_consensus::memory_pool::Entry;
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
-        message::{types::*, Channel, Message},
+        message::{Channel, Message},
+        message_types::*,
         PingState,
     };
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};

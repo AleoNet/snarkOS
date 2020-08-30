@@ -17,7 +17,8 @@
 mod sync_integration {
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::{
-        message::{types::*, Channel, Message},
+        message::{Channel, Message},
+        message_types::*,
         protocol::sync::*,
     };
     use snarkos_objects::BlockHeaderHash;

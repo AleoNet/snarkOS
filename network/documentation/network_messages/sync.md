@@ -1,4 +1,8 @@
-A response to a GetSync message.
+A response to a `GetSync` message.
+
+### Message Name
+
+`sync`
 
 ### Payload
 

@@ -1,5 +1,9 @@
 A request for a block with the specified hash.
 
+### Message Name
+
+`getblock`
+
 ### Payload
 
 |   Parameter  | Type  |              Description              |

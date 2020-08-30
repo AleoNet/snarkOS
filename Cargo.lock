@@ -2618,6 +2618,7 @@ dependencies = [
  "hex",
  "log",
  "rand",
+ "rustc_version",
  "serde",
  "serial_test",
  "snarkos-algorithms",
