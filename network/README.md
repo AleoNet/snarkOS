@@ -91,128 +91,112 @@ A node may broadcast a block using a `Block` message, in the same manner as broa
 
 
 
-## message_types
-
-All messages are serialized into bytes when sent and deserialized into a message payload when received.
-
-## Block
-
+## block
 Send a block to a peer.
 
-#### Payload
+### Payload
 
 The serialized bytes of the block.
 
-## GetBlock
-
+## get_block
 A request for a block with the specified hash.
 
-#### Payload
+### Payload
 
 |   Parameter  | Type  |              Description              |
 |:------------:|-------|:-------------------------------------:|
 | `block_hash` | bytes | The block hash of the requested block |
 
-## GetMemoryPool
-
+## get_memory_pool
 A request for a peer's memory pool transactions.
 
-#### Payload
+### Payload
 
-None
+`None`
 
-## GetPeers
-
+## get_peers
 A request for a list of the peer's connected peer addresses.
 
-#### Payload
+### Payload
 
-None
+`None`
 
-## GetSync
-
+## get_sync
 A request for novel block hashes.
 
-#### Payload
+### Payload
 
 |        Parameter       | Type  |                            Description                            |
 |:----------------------:|-------|:-----------------------------------------------------------------:|
 | `block_locator_hashes` | array | A list block hashes describing the state of the requester's chain |
 
-## MemoryPool
-
+## memory_pool
 A response to a GetMemoryPool request.
 
-#### Payload
+### Payload
 
 |    Parameter   | Type  |                  Description                  |
 |:--------------:|-------|:---------------------------------------------:|
 | `transactions` | array | A list of serialized memory pool transactions |
 
-## Peers
-
+## peers
 A response to a GetPeers request.
 
-#### Payload
+### Payload
 
 |  Parameter  | Type  |                     Description                     |
 |:-----------:|-------|:---------------------------------------------------:|
 | `addresses` | array | A list of connected peers and their last seen dates |
-## Ping
 
+## ping
 A ping protocol request for a Pong.
 
-#### Payload
+### Payload
 
 | Parameter | Type   |            Description            |
 |:---------:|--------|:---------------------------------:|
 | `nonce`   | number | A unique ping protocol identifier |
 
-## Pong
-
+## pong
 A response to a Ping request.
 
-#### Payload
+### Payload
 
 | Parameter | Type   |              Description              |
 |:---------:|--------|:-------------------------------------:|
 | `nonce`   | number | The received ping protocol identifier |
 
-## Sync
-
+## sync
 A response to a GetSync message.
 
-#### Payload
+### Payload
 
 |    Parameter   | Type  |                     Description                    |
 |:--------------:|-------|:--------------------------------------------------:|
 | `block_hashes` | array | A list of block hashes to share with the requester |
 
-## SyncBlock
-
+## sync_block
 A response to a GetBlock request.
 
-#### Payload
+### Payload
 
 | Parameter | Type  |                 Description                 |
 |:---------:|-------|:-------------------------------------------:|
 | `data`    | bytes | The serialized bytes of the requested block |
 
-## Transaction
-
+## transaction
 Send a transaction to a peer.
 
-#### Payload
+### Payload
 
 | Parameter | Type  |              Description              |
 |:---------:|-------|:-------------------------------------:|
 | `data`    | bytes | The serialized bytes of a transaction |
 
-## Verack
-
+## verack
 A handshake response to a Version message.
 
-#### Payload
+### Payload
 
 |      Parameter     |  Type  |           Description          |
 |:------------------:|:------:|:------------------------------:|
@@ -220,11 +204,10 @@ A handshake response to a Version message.
 | `address_receiver` | string |   IP of the message receiver   |
 |  `address_sender`  | string |    IP of the message sender    |
 
-## Version
-
+## version
 A handshake request to esablish a connection with a potential peer.
 
-#### Payload
+### Payload
 
 |      Parameter     | Type   |                  Description                 |
 |:------------------:|--------|:--------------------------------------------:|
