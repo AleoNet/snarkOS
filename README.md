@@ -9,11 +9,10 @@
 ## <a name='TableofContents'></a>Table of Contents
 
 * [1. Overview](#1-overview)
-* [2. Build Guide](#2-build-guide)
-    * [2.1 Install Rust](#21-install-rust)
-    * [2.2a Build from Crates.io](#22a-build-from-cratesio)
-    * [2.2b Build from Source Code](#22b-build-from-source-code)
-    * [2.2c Build with Docker](#22c-build-with-docker)
+* [2. Quick Start](#2-quick-start)
+    * [Option 1 - Download snarkOS](#option-1---download-snarkos)
+    * [Option 2 - Build from Crates.io](#option-2---build-from-cratesio)
+    * [Option 3 - Build from Source Code](#option-3---build-from-source-code)
 * [3. Usage Guide](#3-usage-guide)
     * [3.1 Connecting to the Aleo Network](#31-connecting-to-the-aleo-network)
     * [3.2 Command Line Interface](#32-command-line-interface)
@@ -27,45 +26,105 @@
 __snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and 
 enables applications to verify and store state in a publicly verifiable manner.
 
-## 2. Build Guide
+## 2. Quick Start
 
-### 2.1 Install Rust
+### Option 1 - Download snarkOS
+
+#### Step 1. Download the executable
+
+![platform](https://img.shields.io/static/v1.svg?label=Platform&message=Linux-64%20|%20macOS-64%20|%20Win-32%20|%20Win-64&style=for-the-badge)
+
+| [![[]][mac_logo]][mac_dl]    | [![[]][linux_logo]][linux_dl]   | ![[]][windows_logo]   |
+|:----------------------------:|:-------------------------------:|:---------------------:|
+| [![[]][mac_badge]][mac_dl]   | [![[]][linux_badge]][linux_dl]  | ![[]][windows_badge]  |
+
+[mac_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/mac-pass-sm.png
+[mac_badge]: https://img.shields.io/badge/download-testnet1_for_mac-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[0].name&style=for-the-badge
+[mac_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.1.4/aleo-testnet1-v1.1.4-x86_64-apple-darwin.zip
+
+[linux_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/linux-pass-sm.png
+[linux_badge]: https://img.shields.io/badge/download-testnet1_for_linux-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[1].name&style=for-the-badge
+[linux_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.1.4/aleo-testnet1-v1.1.4-x86_64-unknown-linux-gnu.zip
+
+[windows_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/windows-pass-sm.png
+[windows_badge]: https://img.shields.io/badge/download-coming_soon-orange?style=for-the-badge
+
+#### Step 2. Install the executable
+
+##### macOS or Linux
+
+Unzip the package and in terminal, `cd` into the unzipped folder and run:
+```
+mv snarkos /usr/local/bin
+```
+
+##### Windows
+
+```
+Coming Soon
+```
+
+#### Step 3. Start snarkOS
+
+To start a snarkOS client node, run:
+```bash
+snarkos
+```
+
+### Option 2 - Build from Crates.io
+
+#### Step 1. Install Rust
 
 We recommend installing Rust using [rustup](https://www.rustup.rs/). You can install `rustup` as follows:
 
-- macOS or Linux:
-  ```bash
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-  ```
+##### macOS or Linux
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
-- Windows (64-bit):  
+##### Windows
   
-  Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) and follow the on-screen instructions.
+Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
+and follow the on-screen instructions.
 
-- Windows (32-bit):  
-  
-  Download the [Windows 32-bit executable](https://win.rustup.rs/i686) and follow the on-screen instructions.
+#### Step 2. Install from Crates.io
 
-### 2.2a Build from Crates.io
-
-We recommend installing snarkOS 1.1.4 way. In your terminal, run:
+In your terminal, run:
 
 ```bash
 cargo install snarkos
 ```
 
-Now to use snarkOS, in your terminal, run:
+#### Step 3. Start snarkOS
+
+To start a snarkOS client node, run:
 ```bash
 snarkos
 ```
- 
-### 2.2b Build from Source Code
 
-Alternatively, you can install snarkOS 1.1.4 building from the source code as follows:
+### Option 3 - Build from Source Code
+
+#### Step 1. Install Rust
+
+We recommend installing Rust using [rustup](https://www.rustup.rs/). You can install `rustup` as follows:
+
+##### macOS or Linux
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+##### Windows
+  
+Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
+and follow the on-screen instructions.
+
+#### Step 2. Build from Source Code
+
+To build from the source code, run:
 
 ```bash
 # Download the source code
-git clone https://github.com/AleoHQ/snarkOS
+git clone https://github.com/AleoHQ/snarkOS --depth 1
 cd snarkOS
 
 # Build in release mode
@@ -77,6 +136,14 @@ This will generate an executable under the `./target/release` directory. To run 
 ./target/release/snarkos
 ```
 
+#### Step 3. Start snarkOS
+
+To start a snarkOS client node, run:
+```bash
+snarkos
+```
+
+<!--
 ### 2.2c Build with Docker
 
 #### Docker build
@@ -96,10 +163,11 @@ or
 ```bash
 docker-compose up
 ```
+-->
 
 ## 3. Usage Guide
 
-### 3.1 Connecting to the Aleo network
+### 3.1 Connecting to Aleo Testnet I
 
 To start a client node, run:
 ```
@@ -112,7 +180,7 @@ snarkos --is-miner
 ```
 
 To run a node with custom settings, refer to the full list of options and flags available 
-in the CLI or simply modify the snarkOS 1.1.4 file.
+in the CLI.
 
 ### 3.2 Command Line Interface
 
