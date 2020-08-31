@@ -11,7 +11,7 @@
 * [1. Overview](#1-overview)
 * [2. Quick Start](#2-quick-start)
     * [Option 1 - Download snarkOS](#option-1---download-snarkos)
-    * [Option 2 - Build from Crates.io](#option-2---build-from-cratesio)
+    * [Option 2 - Install from Crates.io](#option-2---install-from-cratesio)
     * [Option 3 - Build from Source Code](#option-3---build-from-source-code)
 * [3. Usage Guide](#3-usage-guide)
     * [3.1 Connecting to the Aleo Network](#31-connecting-to-the-aleo-network)
@@ -31,8 +31,6 @@ enables applications to verify and store state in a publicly verifiable manner.
 ### Option 1 - Download snarkOS
 
 #### Step 1. Download the executable
-
-![platform](https://img.shields.io/static/v1.svg?label=Platform&message=Linux-64%20|%20macOS-64%20|%20Win-32%20|%20Win-64&style=for-the-badge)
 
 | [![[]][mac_logo]][mac_dl]    | [![[]][linux_logo]][linux_dl]   | ![[]][windows_logo]   |
 |:----------------------------:|:-------------------------------:|:---------------------:|
@@ -71,7 +69,7 @@ To start a snarkOS client node, run:
 snarkos
 ```
 
-### Option 2 - Build from Crates.io
+### Option 2 - Install from Crates.io
 
 #### Step 1. Install Rust
 
