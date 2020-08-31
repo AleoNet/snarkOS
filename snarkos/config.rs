@@ -34,12 +34,7 @@ use toml;
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &'static [&str] = &[
-    "50.18.83.123:4131",
-    "34.220.189.127:4131",
-    "34.220.144.175:4131",
-    "52.89.166.172:4131",
-    "52.42.131.71:4131",
-    "54.245.170.92:4131",
+    "50.18.83.123:4131"
 ]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
