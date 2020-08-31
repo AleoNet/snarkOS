@@ -153,7 +153,7 @@ where
     ) -> Result<Self::Proof, SNARKError> {
         let proving_time = start_timer!(|| "{Marlin}::Proving");
         let proof = Marlin::prove(&pp.prover_key, circuit, rng)
-            .map_err(|e| SNARKError::Crate("marlin", "Could not generate proof".to_owned()))?;
+            .map_err(|_| SNARKError::Crate("marlin", "Could not generate proof".to_owned()))?;
         end_timer!(proving_time);
         Ok(proof)
     }
