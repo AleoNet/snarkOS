@@ -527,12 +527,7 @@ pub mod tests {
             }
 
             println!("supported degree: {:?}", supported_degree);
-            let (ck, vk) = PC::trim(
-                &pp,
-                supported_degree,
-                supported_degree + 1,
-                Some(degree_bounds.as_slice()),
-            )?;
+            let (ck, vk) = PC::trim(&pp, supported_degree, supported_degree, Some(degree_bounds.as_slice()))?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;
@@ -623,7 +618,7 @@ pub mod tests {
             let (ck, vk) = PC::trim(
                 &pp,
                 supported_degree,
-                supported_degree + 1,
+                supported_degree,
                 degree_bounds.as_ref().map(|s| s.as_slice()),
             )?;
             println!("Trimmed");
@@ -738,7 +733,7 @@ pub mod tests {
             let (ck, vk) = PC::trim(
                 &pp,
                 supported_degree,
-                supported_degree + 1,
+                supported_degree,
                 degree_bounds.as_ref().map(|s| s.as_slice()),
             )?;
             println!("Trimmed");

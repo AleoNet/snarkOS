@@ -200,9 +200,9 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let ck_time =
             start_timer!(|| format!("Constructing `powers` of size {} for unshifted polys", supported_degree));
         let powers = pp.powers_of_g[..=supported_degree].to_vec();
-        // We want to support making up to supported_degree queries to committed
+        // We want to support making up to `supported_hiding_bound` queries to committed
         // polynomials.
-        let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_hiding_bound].to_vec();
+        let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_hiding_bound + 1].to_vec();
         end_timer!(ck_time);
 
         // Construct the core KZG10 verifier key.
