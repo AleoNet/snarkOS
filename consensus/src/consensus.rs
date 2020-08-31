@@ -304,6 +304,10 @@ impl ConsensusParameters {
             if Self::is_genesis(&block.header) && storage.is_empty() {
                 self.process_block(parameters, &storage, memory_pool, &block)?;
             } else {
+                // TODO (howardwu): Add logic to check if this is a known side chain.
+                // TODO (howardwu): Add logic to begin a side chain and track COL_BLOCK_LOCATOR.
+                // TODO (howardwu): Add logic to get block height of block.header.previous_block_hash.
+                // TODO (howardwu): Add logic perform a fork if side chain grows to be longer.
                 storage.insert_only(block)?;
             }
         } else {
