@@ -120,20 +120,14 @@ and follow the on-screen instructions.
 
 #### Step 2. Build from Source Code
 
-To build from the source code, run:
-
+Start by cloning this repository:
 ```bash
-# Download the source code
 git clone https://github.com/AleoHQ/snarkOS --depth 1
-cd snarkOS
-
-# Build in release mode
-$ cargo build --release
 ```
 
-This will generate an executable under the `./target/release` directory. To run snarkOS, run the following command:
+Next, compile and install snarkOS:
 ```bash
-./target/release/snarkos
+cd snarkOS && cargo install --path .
 ```
 
 #### Step 3. Start snarkOS
