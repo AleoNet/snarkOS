@@ -147,29 +147,78 @@ impl Server {
         mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     ) {
         task::spawn(async move {
+            // Determines the criteria for disconnecting from a peer.
+            fn should_disconnect(failure_count: &u8) -> bool {
+                // Tolerate up to 3 failed communications.
+                *failure_count >= 3
+            }
+
+            // Logs the failure and determines whether to disconnect from a peer.
+            fn handle_failure<T: std::fmt::Display>(
+                failure: &mut bool,
+                failure_count: &mut u8,
+                disconnect_from_peer: &mut bool,
+                error: T,
+            ) {
+                // Only increment failure_count if we haven't seen a failure yet.
+                if !*failure {
+                    // Update the state to reflect a new failure.
+                    *failure = true;
+                    *failure_count += 1;
+                    error!(
+                        "Connection errored {} time(s) (error message: {})",
+                        failure_count, error
+                    );
+
+                    // Determine if we should disconnect.
+                    *disconnect_from_peer = should_disconnect(failure_count);
+                } else {
+                    debug!("Connection errored again in the same loop (error message: {})", error);
+                }
+            }
+
+            let mut failure_count = 0u8;
+            let mut disconnect_from_peer = false;
+
             loop {
-                // Use a oneshot channel to give channel control to the message handler after reading from the channel.
+                // Initialize the failure indicator.
+                let mut failure = false;
+
+                // Use a oneshot channel to give the channel control
+                // to the message handler after reading from the channel.
                 let (tx, rx) = oneshot::channel();
 
-                let mut disconnect = false;
-
                 // Read the next message from the channel. This is a blocking operation.
-                let (message_name, message_bytes) = channel.read().await.unwrap_or_else(|_error| {
-                    disconnect = true;
-                    (MessageName::from("disconnect"), vec![])
-                });
+                let (message_name, message_bytes) = match channel.read().await {
+                    Ok((message_name, message_bytes)) => (message_name, message_bytes),
+                    Err(error) => {
+                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+
+                        // Determine if we should send a disconnect message.
+                        match disconnect_from_peer {
+                            true => (MessageName::from("disconnect"), vec![]),
+                            false => continue,
+                        }
+                    }
+                };
 
                 // Send the successful read data to the message handler.
-                message_handler_sender
+                if let Err(error) = message_handler_sender
                     .send((tx, message_name, message_bytes, channel.clone()))
                     .await
-                    .expect("could not send to message handler");
+                {
+                    handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+                };
 
                 // Wait for the message handler to give back channel control.
-                channel = rx.await.expect("message handler errored");
+                match rx.await {
+                    Ok(peer_channel) => channel = peer_channel,
+                    Err(error) => handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error),
+                };
 
                 // Break out of the loop if the peer disconnects.
-                if disconnect {
+                if disconnect_from_peer {
+                    warn!("Disconnecting from an unreliable peer");
                     break;
                 }
             }
@@ -177,35 +226,52 @@ impl Server {
     }
 
     /// Starts the server event loop.
-    /// 1. Send a handshake request to all bootnodes.
-    /// 2. Send a handshake request to all stored peers.
-    /// 3. Listen for and accept new tcp connections at local_address.
-    /// 4. Manage peers via handshake and ping protocols.
-    /// 5. Handle all messages sent to this server.
-    /// 6. Start connection handler.
+    ///
+    /// 1. Initialize TCP listener at `local_address` and accept new TCP connections.
+    /// 2. Send a handshake request to all bootnodes.
+    /// 3. Send a handshake request to all stored peers.
+    /// 4. Spawn a new thread to handle new connections.
+    /// 5. Start the connection handler.
+    /// 6. Start the message handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
+        // 1. Initialize TCP listener at `local_address` and accept new TCP connections.
         let local_address = self.context.local_address.read().await.clone();
-
-        let address = format! {"{}:{}", "0.0.0.0", local_address.port()};
+        let address = format!("0.0.0.0:{}", local_address.port());
         let listening_address = address.parse::<SocketAddr>()?;
-
         let mut listener = TcpListener::bind(&listening_address).await?;
-        info!("listening at: {:?}", listening_address);
+        info!("listening at {:?}", listening_address);
 
+        // 2. Send handshake request to all bootnodes.
         self.connect_bootnodes().await?;
+
+        // 3. Send a handshake request to all stored peers.
         self.connect_peers_from_storage().await?;
 
+        // Prepare to spawn the main loop.
         let sender = self.sender.clone();
         let storage = self.storage.clone();
         let context = self.context.clone();
 
-        // Outer loop spawns one thread to accept new connections.
+        // 4. Spawn a new thread to handle new connections.
         task::spawn(async move {
             loop {
-                let (stream, peer_address) = listener.accept().await.expect("Listener failed to accept connection");
+                // Listen for new peers.
+                let (stream, peer_address) = match listener.accept().await {
+                    Ok((stream, peer_address)) => {
+                        info!("Listener received a new connection request from {}", peer_address);
+                        (stream, peer_address)
+                    }
+                    Err(error) => {
+                        error!("Listener failed to accept connection {}", error);
+                        break;
+                    }
+                };
 
-                // Check if we have too many connected peers
+                // Check if we've exceed our maximum number of allowed peers.
                 if context.peer_book.read().await.connected_total() >= context.max_peers {
+                    warn!(
+                        "Listener will exceed maximum number of allowed peers and is rejecting this connection request."
+                    );
                     stream
                         .shutdown(Shutdown::Write)
                         .expect("Failed to shutdown peer stream");
@@ -213,7 +279,7 @@ impl Server {
                     let local_address = context.local_address.read().await.clone();
 
                     // Follow handshake protocol and drop peer connection if unsuccessful.
-                    if let Ok((handshake, reciever_address)) = context
+                    if let Ok((handshake, receiver_address)) = context
                         .handshakes
                         .write()
                         .await
@@ -227,12 +293,12 @@ impl Server {
                         .await
                     {
                         {
-                            // Bootstrap discovery of local node ip via VERACK responses
+                            // Bootstrap discovery of local node IP via VERACK responses
                             let mut local_address = context.local_address.write().await;
-                            if *local_address != reciever_address {
-                                *local_address = reciever_address;
+                            if *local_address != receiver_address {
+                                *local_address = receiver_address;
                                 info!("Discovered local address: {:?}", *local_address);
-                                context.peer_book.write().await.forget_peer(reciever_address);
+                                context.peer_book.write().await.forget_peer(receiver_address);
                             }
                         }
 
@@ -245,8 +311,10 @@ impl Server {
             }
         });
 
+        // 5. Start the connection handler.
         self.connection_handler().await;
 
+        // 6. Start the message handler.
         self.message_handler().await?;
 
         Ok(())

@@ -57,12 +57,12 @@ pub async fn process_transaction_internal(
         let mut memory_pool = memory_pool_lock.lock().await;
 
         if !consensus.verify_transaction(parameters, &transaction, &storage)? {
-            error!("Received transaction was invalid");
+            error!("Received a transaction that was invalid");
             return Ok(());
         }
 
         if transaction.value_balance.is_negative() {
-            error!("Received transaction was a coinbase transaction");
+            error!("Received a transaction that was a coinbase transaction");
             return Ok(());
         }
 
@@ -73,7 +73,7 @@ pub async fn process_transaction_internal(
 
         if let Ok(inserted) = memory_pool.insert(&storage, entry) {
             if inserted.is_some() {
-                debug!("Transaction added to mempool. Propagating transaction to peers");
+                debug!("Transaction added to memory pool. Propagating transaction to peers");
 
                 for (socket, _) in &context.peer_book.read().await.get_connected() {
                     if *socket != transaction_sender && *socket != *context.local_address.read().await {
@@ -91,7 +91,7 @@ pub async fn process_transaction_internal(
 
 /// Broadcast block to connected peers
 pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: SocketAddr) -> Result<(), SendError> {
-    debug!("Propagating block to peers");
+    debug!("Propagating a block to peers");
 
     for (socket, _) in &context.peer_book.read().await.get_connected() {
         if *socket != block_miner && *socket != *context.local_address.read().await {

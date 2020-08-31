@@ -36,9 +36,12 @@ use chrono::Utc;
 use std::sync::Arc;
 
 impl Server {
-    /// Handles all messages sent from connected peers.
-    /// Messages are received by a single tokio mpsc receiver with the message name, bytes, associated channel, and a tokio oneshot sender.
-    /// The oneshot sender lets connection thread know when the message is handled.
+    /// This method handles all messages sent from connected peers.
+    ///
+    /// Messages are received by a single tokio MPSC receiver with
+    /// the message name, bytes, associated channel, and a tokio oneshot sender.
+    ///
+    /// The oneshot sender lets the connection thread know when the message is handled.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
@@ -100,7 +103,11 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
-        debug!("Received block with hash: {:?}", hex::encode(block.header.get_hash().0));
+        info!(
+            "Received a block from epoch {} with hash {:?}",
+            block.header.time,
+            hex::encode(block.header.get_hash().0)
+        );
 
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {

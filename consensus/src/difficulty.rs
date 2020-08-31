@@ -72,16 +72,6 @@ pub fn bitcoin_retarget(
     x
 }
 
-/// Custom difficulty retarget algorithm.
-pub fn custom_retarget(
-    _block_timestamp: i64,
-    _parent_timestamp: i64,
-    _target_block_time: i64,
-    _parent_difficulty: u64,
-) -> u64 {
-    unimplemented!()
-}
-
 /// Ethereum difficulty retarget algorithm.
 pub fn ethereum_retarget(block_timestamp: i64, parent_timestamp: i64, parent_difficulty: u64) -> u64 {
     let parent_diff = parent_difficulty as f64;

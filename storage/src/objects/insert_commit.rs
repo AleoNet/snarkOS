@@ -77,6 +77,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     pub fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
+
+        // Check that the block does not already exist.
         if self.block_hash_exists(&block_hash) {
             return Err(StorageError::BlockError(BlockError::BlockExists(
                 block_hash.to_string(),
@@ -304,7 +306,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         self.block_hash_exists(block_hash) && self.get_block_number(block_hash).is_ok()
     }
 
-    /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.
+    /// Returns true if the block corresponding to this block's previous_block_hash is in the canon chain.
     pub fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
         self.is_canon(&block_header.previous_block_hash)
     }
@@ -314,6 +316,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         let latest_block_height = self.get_latest_block_height();
 
         if side_chain_path.new_block_number > latest_block_height {
+            // Decommit all blocks on canon chain up to the shared block number with the side chain.
             for _ in (side_chain_path.shared_block_number)..latest_block_height {
                 self.decommit_latest_block()?;
             }

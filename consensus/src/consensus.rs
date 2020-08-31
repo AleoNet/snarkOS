@@ -265,7 +265,7 @@ impl ConsensusParameters {
             return Ok(());
         }
 
-        // 1. verify that the block valid
+        // 1. Verify that the block valid
         if !self.verify_block(parameters, block, storage)? {
             return Err(ConsensusError::InvalidBlock(block.header.get_hash().0.to_vec()));
         }
@@ -296,6 +296,11 @@ impl ConsensusParameters {
 
         // Block is an unknown orphan
         if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
+            debug!("Processing a block that is an unknown orphan");
+
+            // There are two possible cases for an unknown orphan.
+            // 1) The block is a genesis block, or
+            // 2) The block is unknown and does not correspond with the canon chain.
             if Self::is_genesis(&block.header) && storage.is_empty() {
                 self.process_block(parameters, &storage, memory_pool, &block)?;
             } else {
@@ -306,6 +311,8 @@ impl ConsensusParameters {
             match storage.get_block_path(&block.header)? {
                 BlockPath::ExistingBlock => {}
                 BlockPath::CanonChain(_) => {
+                    debug!("Processing a block that is on canon chain");
+
                     self.process_block(parameters, &storage, memory_pool, block)?;
 
                     let (_, child_path) = storage.longest_child_path(block.header.get_hash())?;
@@ -315,7 +322,14 @@ impl ConsensusParameters {
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
+                    debug!("Processing a block that is on side chain");
+
+                    // If the side chain is now longer than the canon chain,
+                    // perform a fork to the side chain.
                     if side_chain_path.new_block_number > storage.get_latest_block_height() {
+                        debug!("Determined side chain is longer than canon chain");
+                        warn!("A valid fork has been detected. Performing a fork to the side chain.");
+
                         // Fork to superior chain
                         storage.revert_for_fork(&side_chain_path)?;
 
