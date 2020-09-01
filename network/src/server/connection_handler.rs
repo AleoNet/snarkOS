@@ -53,6 +53,11 @@ impl Server {
                 let connections = context.connections.read().await;
                 let pings = &mut context.pings.write().await;
 
+                // Remove the local_address from the peer book
+                // if the node somehow discovered itself as a peer.
+                let local_address = *context.local_address.read().await;
+                peer_book.forget_peer(local_address);
+
                 // We have less peers than our minimum peer requirement. Look for more peers.
                 if peer_book.connected_total() < context.min_peers {
                     // Ask our connected peers.
