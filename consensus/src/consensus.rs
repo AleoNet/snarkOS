@@ -311,7 +311,7 @@ impl ConsensusParameters {
                 storage.insert_only(block)?;
             }
         } else {
-            // Find the origin of the block
+            // If the block is not an unknown orphan, find the origin of the block
             match storage.get_block_path(&block.header)? {
                 BlockPath::ExistingBlock => {}
                 BlockPath::CanonChain(_) => {
@@ -326,7 +326,10 @@ impl ConsensusParameters {
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
-                    debug!("Processing a block that is on side chain");
+                    debug!(
+                        "Processing a block that is on side chain - length: {}",
+                        side_chain_path.new_block_number
+                    );
 
                     // If the side chain is now longer than the canon chain,
                     // perform a fork to the side chain.
@@ -334,7 +337,7 @@ impl ConsensusParameters {
                         debug!("Determined side chain is longer than canon chain");
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
-                        // Fork to superior chain
+                        // Fork to superior side chain
                         storage.revert_for_fork(&side_chain_path)?;
 
                         if !side_chain_path.path.is_empty() {
@@ -348,6 +351,7 @@ impl ConsensusParameters {
                             }
                         }
                     } else {
+                        // If the sidechain is not longer than the main canon chain, simply store the block
                         storage.insert_only(block)?;
                     }
                 }

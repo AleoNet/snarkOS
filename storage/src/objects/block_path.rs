@@ -44,10 +44,13 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();
+
+        // The given block header already exists
         if self.block_hash_exists(&block_hash) {
             return Ok(BlockPath::ExistingBlock);
         }
 
+        // The given block header is valid on the canon chain
         if &self.get_latest_block()?.header.get_hash() == &block_header.previous_block_hash {
             return Ok(BlockPath::CanonChain(self.get_latest_block_height() + 1));
         }
@@ -55,6 +58,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         let mut side_chain_path = vec![];
         let mut parent_hash = block_header.previous_block_hash.clone();
 
+        // Find the sidechain path (with a maximum size of OLDEST_FORK_THRESHOLD)
         for _ in 0..=OLDEST_FORK_THRESHOLD {
             // check if the part is part of the canon chain
             match &self.get_block_number(&parent_hash) {
@@ -85,7 +89,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         )))
     }
 
-    /// Find the longest path of non-canon children from the given block header
+    /// Returns the path length and the longest path of children from the given block header
     pub fn longest_child_path(
         &self,
         block_hash: BlockHeaderHash,
