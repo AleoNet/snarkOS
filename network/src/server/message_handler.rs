@@ -33,7 +33,7 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 impl Server {
     /// This method handles all messages sent from connected peers.
@@ -370,7 +370,8 @@ impl Server {
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<Arc<Channel>, ServerError> {
-        let peer_address = channel.address;
+        let peer_address = SocketAddr::new(channel.address.ip(), message.address_sender.port());
+
         let peer_book = &mut self.context.peer_book.read().await;
 
         if peer_book.connected_total() < self.context.max_peers

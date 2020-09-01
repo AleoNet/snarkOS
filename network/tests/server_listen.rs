@@ -110,7 +110,6 @@ mod server_listen {
 
     #[test]
     #[serial]
-    #[ignore] // TODO (howardwu): channel.address does not match message.address_sender.
     fn startup_handshake_bootnode() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.db.path().to_owned();
@@ -144,7 +143,7 @@ mod server_listen {
             // 4. Send handshake response from bootnode to server
 
             let mut bootnode_handshakes = Handshakes::new();
-            let (mut bootnode_hand, _) = bootnode_handshakes
+            let (mut bootnode_hand, _, _) = bootnode_handshakes
                 .receive_any(1u64, 1u32, bootnode_address, server_address, reader)
                 .await
                 .unwrap();
