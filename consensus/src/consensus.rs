@@ -323,7 +323,7 @@ impl ConsensusParameters {
                 }
                 BlockPath::SideChain(side_chain_path) => {
                     debug!(
-                        "Processing a block that is on side chain - length: {}",
+                        "Processing a block that is on side chain - length {}",
                         side_chain_path.new_block_number
                     );
 
