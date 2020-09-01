@@ -158,6 +158,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
     fn trim(
         pp: &Self::UniversalParams,
         supported_degree: usize,
+        supported_hiding_bound: usize, // TODO (howardwu): Look into updating method with this.
         enforced_degree_bounds: Option<&[usize]>,
     ) -> Result<(Self::CommitterKey, Self::VerifierKey), Self::Error> {
         let trim_time = start_timer!(|| "Trimming public parameters");
