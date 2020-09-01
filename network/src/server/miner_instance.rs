@@ -64,7 +64,7 @@ impl MinerInstance {
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
 
             loop {
-                info!("Mining new block");
+                info!("Starting to mine the next block");
 
                 let (block_serialized, _coinbase_records) = miner
                     .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
@@ -73,10 +73,10 @@ impl MinerInstance {
 
                 match Block::<Tx>::deserialize(&block_serialized) {
                     Ok(block) => {
-                        info!("Block found!    {:?}", hex::encode(block.header.get_hash().0));
+                        info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
 
                         if let Err(err) = propagate_block(context.clone(), block_serialized, local_address).await {
-                            info!("Error propagating block to peers: {:?}", err);
+                            error!("Error propagating block to peers: {:?}", err);
                         }
                     }
                     Err(_) => continue,

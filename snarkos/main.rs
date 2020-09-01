@@ -94,6 +94,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
 
+    // Set the initial consensus parameters.
     let consensus = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
@@ -103,6 +104,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         authorized_inner_snark_ids,
     };
 
+    // Construct the server instance. Note this does not start the server.
     let server = Server::new(
         Context::new(
             socket_address,
@@ -120,8 +122,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         15000, // 15 seconds
     );
 
-    // Start RPC thread
-
+    // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
         info!("Loading Aleo parameters for RPC...");
         let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
@@ -140,8 +141,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         .await?;
     }
 
-    // Start miner task
-
+    // Start the miner task, if the mining configuration is enabled.
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
@@ -161,8 +161,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         }
     }
 
-    // Start server thread
-
+    // Start the main server thread.
     server.listen().await?;
 
     Ok(())

@@ -36,9 +36,12 @@ use chrono::Utc;
 use std::sync::Arc;
 
 impl Server {
-    /// Handles all messages sent from connected peers.
-    /// Messages are received by a single tokio mpsc receiver with the message name, bytes, associated channel, and a tokio oneshot sender.
-    /// The oneshot sender lets connection thread know when the message is handled.
+    /// This method handles all messages sent from connected peers.
+    ///
+    /// Messages are received by a single tokio MPSC receiver with
+    /// the message name, bytes, associated channel, and a tokio oneshot sender.
+    ///
+    /// The oneshot sender lets the connection thread know when the message is handled.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
@@ -100,7 +103,11 @@ impl Server {
     ) -> Result<(), ServerError> {
         let block = BlockStruct::deserialize(&message.data)?;
 
-        debug!("Received block with hash: {:?}", hex::encode(block.header.get_hash().0));
+        info!(
+            "Received a block from epoch {} with hash {:?}",
+            block.header.time,
+            hex::encode(block.header.get_hash().0)
+        );
 
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {
@@ -267,10 +274,10 @@ impl Server {
             if height < current_height {
                 let mut max_height = current_height;
 
-                // if the requester is behind more than 100 blocks
-                if height + 100 < current_height {
-                    // send the max 100 blocks
-                    max_height = height + 100;
+                // if the requester is behind more than 4000 blocks
+                if height + 4000 < current_height {
+                    // send the max 4000 blocks
+                    max_height = height + 4000;
                 }
 
                 let mut block_hashes: Vec<BlockHeaderHash> = vec![];
@@ -363,7 +370,7 @@ impl Server {
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<Arc<Channel>, ServerError> {
-        let peer_address = message.address_sender;
+        let peer_address = channel.address;
         let peer_book = &mut self.context.peer_book.read().await;
 
         if peer_book.connected_total() < self.context.max_peers

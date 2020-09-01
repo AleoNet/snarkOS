@@ -127,8 +127,8 @@ impl SyncHandler {
                 self.update_syncing(storage.get_latest_block_height());
             }
 
-            // Sync up to 10 blocks at once
-            for _ in 0..10 {
+            // Sync up to 3 blocks at once
+            for _ in 0..3 {
                 if self.block_headers.is_empty() {
                     break;
                 }
