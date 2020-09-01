@@ -30,7 +30,7 @@ use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     net::{Shutdown, SocketAddr},
-    sync::Arc,
+    sync::{atomic::Ordering, Arc},
 };
 use tokio::{
     net::TcpListener,
@@ -184,10 +184,6 @@ impl Server {
                 // Initialize the failure indicator.
                 let mut failure = false;
 
-                // Use a oneshot channel to give the channel control
-                // to the message handler after reading from the channel.
-                let (tx, rx) = oneshot::channel();
-
                 // Read the next message from the channel. This is a blocking operation.
                 let (message_name, message_bytes) = match channel.read().await {
                     Ok((message_name, message_bytes)) => (message_name, message_bytes),
@@ -201,6 +197,10 @@ impl Server {
                         }
                     }
                 };
+
+                // Use a oneshot channel to give the channel control
+                // to the message handler after reading from the channel.
+                let (tx, rx) = oneshot::channel();
 
                 // Send the successful read data to the message handler.
                 if let Err(error) = message_handler_sender
@@ -242,9 +242,11 @@ impl Server {
         info!("listening at {:?}", listening_address);
 
         // 2. Send handshake request to all bootnodes.
+        debug!("Sending handshake request to bootnodes");
         self.connect_bootnodes().await?;
 
         // 3. Send a handshake request to all stored peers.
+        debug!("Sending handshake request to all stored peers");
         self.connect_peers_from_storage().await?;
 
         // Prepare to spawn the main loop.
@@ -254,6 +256,8 @@ impl Server {
 
         // 4. Spawn a new thread to handle new connections.
         task::spawn(async move {
+            debug!("Spawning a new thread to handle new connections");
+
             loop {
                 // Listen for new peers.
                 let (stream, peer_address) = match listener.accept().await {
@@ -292,14 +296,12 @@ impl Server {
                         )
                         .await
                     {
-                        {
-                            // Bootstrap discovery of local node IP via VERACK responses
-                            let mut local_address = context.local_address.write().await;
-                            if *local_address != receiver_address {
-                                *local_address = receiver_address;
-                                info!("Discovered local address: {:?}", *local_address);
-                                context.peer_book.write().await.forget_peer(receiver_address);
-                            }
+                        // Bootstrap discovery of local node IP via VERACK responses
+                        let mut local_address = context.local_address.write().await;
+                        if *local_address != receiver_address {
+                            *local_address = receiver_address;
+                            info!("Discovered local address: {:?}", *local_address);
+                            context.peer_book.write().await.forget_peer(receiver_address);
                         }
 
                         context.connections.write().await.store_channel(&handshake.channel);
@@ -312,9 +314,11 @@ impl Server {
         });
 
         // 5. Start the connection handler.
+        debug!("Starting connection handler");
         self.connection_handler().await;
 
         // 6. Start the message handler.
+        debug!("Starting message handler");
         self.message_handler().await?;
 
         Ok(())
