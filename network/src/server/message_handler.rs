@@ -370,7 +370,7 @@ impl Server {
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<Arc<Channel>, ServerError> {
-        let peer_address = message.address_sender;
+        let peer_address = channel.address;
         let peer_book = &mut self.context.peer_book.read().await;
 
         if peer_book.connected_total() < self.context.max_peers
