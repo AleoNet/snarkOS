@@ -30,7 +30,7 @@ use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     net::{Shutdown, SocketAddr},
-    sync::{atomic::Ordering, Arc},
+    sync::Arc,
 };
 use tokio::{
     net::TcpListener,
@@ -165,7 +165,7 @@ impl Server {
                     // Update the state to reflect a new failure.
                     *failure = true;
                     *failure_count += 1;
-                    error!(
+                    warn!(
                         "Connection errored {} time(s) (error message: {})",
                         failure_count, error
                     );
@@ -228,10 +228,10 @@ impl Server {
     /// Starts the server event loop.
     ///
     /// 1. Initialize TCP listener at `local_address` and accept new TCP connections.
-    /// 2. Send a handshake request to all bootnodes.
-    /// 3. Send a handshake request to all stored peers.
-    /// 4. Spawn a new thread to handle new connections.
-    /// 5. Start the connection handler.
+    /// 2. Spawn a new thread to handle new connections.
+    /// 3. Start the connection handler.
+    /// 4. Send a handshake request to all bootnodes.
+    /// 5. Send a handshake request to all stored peers.
     /// 6. Start the message handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
         // 1. Initialize TCP listener at `local_address` and accept new TCP connections.
@@ -241,20 +241,12 @@ impl Server {
         let mut listener = TcpListener::bind(&listening_address).await?;
         info!("listening at {:?}", listening_address);
 
-        // 2. Send handshake request to all bootnodes.
-        debug!("Sending handshake request to bootnodes");
-        self.connect_bootnodes().await?;
-
-        // 3. Send a handshake request to all stored peers.
-        debug!("Sending handshake request to all stored peers");
-        self.connect_peers_from_storage().await?;
-
         // Prepare to spawn the main loop.
         let sender = self.sender.clone();
         let storage = self.storage.clone();
         let context = self.context.clone();
 
-        // 4. Spawn a new thread to handle new connections.
+        // 2. Spawn a new thread to handle new connections.
         task::spawn(async move {
             debug!("Spawning a new thread to handle new connections");
 
@@ -313,9 +305,17 @@ impl Server {
             }
         });
 
-        // 5. Start the connection handler.
+        // 3. Start the connection handler.
         debug!("Starting connection handler");
         self.connection_handler().await;
+
+        // 4. Send handshake request to all bootnodes.
+        debug!("Sending handshake request to bootnodes");
+        self.connect_bootnodes().await?;
+
+        // 5. Send a handshake request to all stored peers.
+        debug!("Sending handshake request to all stored peers");
+        self.connect_peers_from_storage().await?;
 
         // 6. Start the message handler.
         debug!("Starting message handler");
