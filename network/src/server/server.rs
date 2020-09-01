@@ -17,6 +17,7 @@
 use crate::{
     context::Context,
     message::{Channel, MessageName},
+    message_types::GetSync,
     protocol::*,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
@@ -245,6 +246,7 @@ impl Server {
         let sender = self.sender.clone();
         let storage = self.storage.clone();
         let context = self.context.clone();
+        let sync_handler_lock = self.sync_handler_lock.clone();
 
         // 2. Spawn a new thread to handle new connections.
         task::spawn(async move {
@@ -275,7 +277,7 @@ impl Server {
                     let local_address = context.local_address.read().await.clone();
 
                     // Follow handshake protocol and drop peer connection if unsuccessful.
-                    if let Ok((handshake, receiver_address)) = context
+                    if let Ok((handshake, receiver_address, version_message)) = context
                         .handshakes
                         .write()
                         .await
@@ -297,6 +299,26 @@ impl Server {
                         }
 
                         context.connections.write().await.store_channel(&handshake.channel);
+
+                        if let Some(version) = version_message {
+                            // If our peer has a longer chain, send a sync message
+                            if version.height > storage.get_latest_block_height() {
+                                // Update the sync node if the sync_handler is Idle
+                                if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                                    if !sync_handler.is_syncing() {
+                                        sync_handler.sync_node = handshake.channel.address;
+
+                                        if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                                            handshake
+                                                .channel
+                                                .write(&GetSync::new(block_locator_hashes))
+                                                .await
+                                                .unwrap();
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         // Inner loop spawns one thread per connection to read messages
                         Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());

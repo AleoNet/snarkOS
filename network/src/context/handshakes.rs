@@ -62,7 +62,7 @@ impl Handshakes {
     ///     1. Create a new handshake.
     ///     2. Send a handshake response.
     ///     3. If the response is sent successfully, store the handshake.
-    ///     4. Return the handshake and your address as seen by sender.
+    ///     4. Return the handshake, your address as seen by sender, and the version message.
     /// If the message is a Verack:
     ///     1. Get the existing handshake.
     ///     2. Mark the handshake as accepted.
@@ -75,7 +75,7 @@ impl Handshakes {
         local_address: SocketAddr,
         peer_address: SocketAddr,
         reader: TcpStream,
-    ) -> Result<(Handshake, SocketAddr), HandshakeError> {
+    ) -> Result<(Handshake, SocketAddr, Option<Version>), HandshakeError> {
         let channel = Channel::new_read_only(reader)?;
 
         // Read the first message or error
@@ -89,12 +89,19 @@ impl Handshakes {
             // Peer address and specified port from the version message
             let peer_address = SocketAddr::new(peer_address.ip(), peer_message.address_sender.port());
 
-            let handshake =
-                Handshake::receive_new(version, height, channel, peer_message, local_address, peer_address).await?;
+            let handshake = Handshake::receive_new(
+                version,
+                height,
+                channel,
+                peer_message.clone(),
+                local_address,
+                peer_address,
+            )
+            .await?;
 
             self.addresses.insert(peer_address, handshake.clone());
 
-            Ok((handshake, receiver))
+            Ok((handshake, receiver, Some(peer_message)))
         } else if Verack::name() == name {
             let peer_message = Verack::deserialize(bytes)?;
             let peer_address = SocketAddr::new(peer_address.ip(), peer_message.address_sender.port());
@@ -109,7 +116,7 @@ impl Handshakes {
                     // Get our new peer's peer_list
                     handshake.channel.write(&GetPeers).await?;
 
-                    Ok((handshake.clone(), receiver))
+                    Ok((handshake.clone(), receiver, None))
                 }
                 None => Err(HandshakeError::HandshakeMissing(peer_address)),
             }
@@ -232,7 +239,7 @@ mod tests {
         // 4. Peer sends server_handshake response, peer_handshake request
 
         let mut peer_handshakes = Handshakes::new();
-        let (peer_hand, _) = peer_handshakes
+        let (peer_hand, _, _) = peer_handshakes
             .receive_any(1u64, 0u32, peer_address, server_address, reader)
             .await
             .unwrap();
