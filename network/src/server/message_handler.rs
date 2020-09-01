@@ -274,10 +274,10 @@ impl Server {
             if height < current_height {
                 let mut max_height = current_height;
 
-                // if the requester is behind more than 100 blocks
-                if height + 100 < current_height {
-                    // send the max 100 blocks
-                    max_height = height + 100;
+                // if the requester is behind more than 4000 blocks
+                if height + 4000 < current_height {
+                    // send the max 4000 blocks
+                    max_height = height + 4000;
                 }
 
                 let mut block_hashes: Vec<BlockHeaderHash> = vec![];
