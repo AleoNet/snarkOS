@@ -110,7 +110,6 @@ mod server_listen {
 
     #[test]
     #[serial]
-    #[ignore] // TODO (howardwu): channel.address does not match message.address_sender.
     fn startup_handshake_bootnode() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.db.path().to_owned();
