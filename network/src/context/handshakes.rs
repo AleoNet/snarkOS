@@ -104,7 +104,7 @@ impl Handshakes {
             Ok((handshake, receiver, Some(peer_message)))
         } else if Verack::name() == name {
             let peer_message = Verack::deserialize(bytes)?;
-            let peer_address = SocketAddr::new(peer_address.ip(), peer_message.address_sender.port());
+            let peer_address = peer_message.address_sender;
             let receiver = peer_message.address_receiver;
 
             match self.get_mut(&peer_address) {
