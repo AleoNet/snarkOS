@@ -33,7 +33,7 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 
 impl Server {
     /// This method handles all messages sent from connected peers.
