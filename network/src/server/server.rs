@@ -331,13 +331,16 @@ impl Server {
         debug!("Starting connection handler");
         self.connection_handler().await;
 
-        // 4. Send handshake request to all bootnodes.
+        // 4. Send handshake request to bootnodes.
         debug!("Sending handshake request to bootnodes");
         self.connect_bootnodes().await?;
 
-        // 5. Send a handshake request to all stored peers.
-        debug!("Sending handshake request to all stored peers");
-        self.connect_peers_from_storage().await?;
+        // If the node is a bootnode, do not send requests to stored peers
+        if !self.context.is_bootnode {
+            // 5. Send a handshake request to all stored peers.
+            debug!("Sending handshake request to all stored peers");
+            self.connect_peers_from_storage().await?;
+        }
 
         // 6. Start the message handler.
         debug!("Starting message handler");
