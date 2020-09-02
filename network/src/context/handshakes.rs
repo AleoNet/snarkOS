@@ -164,6 +164,11 @@ impl Handshakes {
         }
     }
 
+    /// Returns a reference to the handshake at a peer address.
+    pub fn get(&self, address: &SocketAddr) -> Option<&Handshake> {
+        self.addresses.get(&address)
+    }
+
     /// Returns a mutable reference to the handshake at a peer address.
     fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut Handshake> {
         self.addresses.get_mut(&address)

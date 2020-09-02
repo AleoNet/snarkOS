@@ -89,7 +89,10 @@ impl Server {
             } else {
                 debug!("Message name not recognized {:?}", name.to_string());
             }
-            tx.send(channel).expect("error resetting message handler");
+
+            if let Err(_) = tx.send(channel) {
+                warn!("error resetting connection thread");
+            }
         }
         Ok(())
     }
@@ -374,7 +377,7 @@ impl Server {
 
         let peer_book = &mut self.context.peer_book.read().await;
 
-        if peer_book.connected_total() < self.context.max_peers
+        if (peer_book.connected_total() < self.context.max_peers || peer_book.connected_contains(&peer_address))
             && *self.context.local_address.read().await != peer_address
         {
             self.context

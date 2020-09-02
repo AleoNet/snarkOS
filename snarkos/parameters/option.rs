@@ -38,7 +38,7 @@ pub const PORT: OptionType = (
 );
 
 pub const CONNECT: OptionType = (
-    "[connect] --connect=[ip] 'Specify a node ip address to connect to on startup'",
+    "[connect] --connect=[ip] 'Specify one or more node ip addresses to connect to on startup'",
     &[],
     &[],
     &[],

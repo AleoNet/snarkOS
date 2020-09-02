@@ -150,8 +150,8 @@ impl Server {
         task::spawn(async move {
             // Determines the criteria for disconnecting from a peer.
             fn should_disconnect(failure_count: &u8) -> bool {
-                // Tolerate up to 3 failed communications.
-                *failure_count >= 3
+                // Tolerate up to 10 failed communications.
+                *failure_count >= 10
             }
 
             // Logs the failure and determines whether to disconnect from a peer.
@@ -261,7 +261,7 @@ impl Server {
                     }
                     Err(error) => {
                         error!("Listener failed to accept connection {}", error);
-                        break;
+                        continue;
                     }
                 };
 
@@ -331,13 +331,16 @@ impl Server {
         debug!("Starting connection handler");
         self.connection_handler().await;
 
-        // 4. Send handshake request to all bootnodes.
+        // 4. Send handshake request to bootnodes.
         debug!("Sending handshake request to bootnodes");
         self.connect_bootnodes().await?;
 
-        // 5. Send a handshake request to all stored peers.
-        debug!("Sending handshake request to all stored peers");
-        self.connect_peers_from_storage().await?;
+        // If the node is a bootnode, do not send requests to stored peers
+        if !self.context.is_bootnode {
+            // 5. Send a handshake request to all stored peers.
+            debug!("Sending handshake request to all stored peers");
+            self.connect_peers_from_storage().await?;
+        }
 
         // 6. Start the message handler.
         debug!("Starting message handler");

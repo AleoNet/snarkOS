@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message_types::{GetMemoryPool, GetPeers},
+    message_types::{GetMemoryPool, GetPeers, Version},
     Server,
 };
 
@@ -53,12 +53,24 @@ impl Server {
                 let connections = context.connections.read().await;
                 let pings = &mut context.pings.write().await;
 
+                // Remove the local_address from the peer book
+                // if the node somehow discovered itself as a peer.
+                let local_address = *context.local_address.read().await;
+                peer_book.forget_peer(local_address);
+
                 // We have less peers than our minimum peer requirement. Look for more peers.
                 if peer_book.connected_total() < context.min_peers {
                     // Ask our connected peers.
                     for (address, _last_seen) in peer_book.get_connected() {
-                        if let Some(channel) = connections.get(&address) {
-                            if let Err(_) = channel.write(&GetPeers).await {
+                        match connections.get(&address) {
+                            Some(channel) => {
+                                // Disconnect from the peer if the get peers message was not sent properly
+                                if let Err(_) = channel.write(&GetPeers).await {
+                                    peer_book.disconnect_peer(address);
+                                }
+                            }
+                            // Disconnect from the peer if there is no active connection channel
+                            None => {
                                 peer_book.disconnect_peer(address);
                             }
                         }
@@ -72,7 +84,7 @@ impl Server {
                                 .write()
                                 .await
                                 .send_request(
-                                    1u64,
+                                    1u64, // TODO (raychu86) Establish a formal node version
                                     storage.get_latest_block_height(),
                                     *context.local_address.read().await,
                                     address,
@@ -92,8 +104,15 @@ impl Server {
                         && time_since_last_seen.is_positive()
                         && time_since_last_seen as u64 > (connection_frequency * 3)
                     {
-                        if let Some(channel) = connections.get(&address) {
-                            if let Err(_) = pings.send_ping(channel).await {
+                        match connections.get(&address) {
+                            Some(channel) => {
+                                // Disconnect from the peer if the ping message was not sent properly
+                                if let Err(_) = pings.send_ping(channel).await {
+                                    peer_book.disconnect_peer(address);
+                                }
+                            }
+                            // Disconnect from the peer if there is no active connection channel
+                            None => {
                                 peer_book.disconnect_peer(address);
                             }
                         }
@@ -123,8 +142,53 @@ impl Server {
                     .store(&storage)
                     .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
 
+                // Every two frequency loops, send a version message to all peers for periodic syncs.
+                if interval_ticker % 2 == 1 {
+                    if peer_book.connected_total() > 0 {
+                        debug!("Sending out periodic version message to peers");
+                    }
+
+                    for (address, _last_seen) in peer_book.get_connected() {
+                        match connections.get(&address) {
+                            Some(channel) => {
+                                // Send a version message to peers.
+                                // If they are behind, they will attempt to sync.
+                                if let Some(handshake) = context.handshakes.read().await.get(&address) {
+                                    let nonce = handshake.nonce;
+                                    let version = 1u64; // TODO (raychu86) Establish a formal node version
+                                    let message = Version::from(
+                                        version,
+                                        storage.get_latest_block_height(),
+                                        address,
+                                        *context.local_address.read().await,
+                                        nonce,
+                                    );
+                                    if let Err(_) = channel.write(&message).await {
+                                        peer_book.disconnect_peer(address);
+                                    }
+                                }
+                            }
+                            // Disconnect from the peer if there is no active connection channel
+                            None => {
+                                peer_book.disconnect_peer(address);
+                            }
+                        }
+                    }
+                }
+
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
+                    // Ask our sync node for more transactions.
+                    if *context.local_address.read().await != sync_handler.sync_node {
+                        if let Some(channel) = connections.get(&sync_handler.sync_node) {
+                            if let Err(_) = channel.write(&GetMemoryPool).await {
+                                peer_book.disconnect_peer(sync_handler.sync_node);
+                            }
+                        }
+                    }
+
+                    // Update our memory pool
+
                     let mut memory_pool = match memory_pool_lock.try_lock() {
                         Ok(memory_pool) => memory_pool,
                         _ => continue,
@@ -137,15 +201,6 @@ impl Server {
                     memory_pool.store(&storage).unwrap_or_else(|error| {
                         debug!("Failed to store memory pool transaction in database {}", error)
                     });
-
-                    // Ask our sync node for more transactions.
-                    if *context.local_address.read().await != sync_handler.sync_node {
-                        if let Some(channel) = connections.get(&sync_handler.sync_node) {
-                            if let Err(_) = channel.write(&GetMemoryPool).await {
-                                peer_book.disconnect_peer(sync_handler.sync_node);
-                            }
-                        }
-                    }
 
                     interval_ticker = 0;
                 } else {

@@ -42,10 +42,10 @@ pub enum HandshakeState {
 #[derive(Clone, Debug)]
 pub struct Handshake {
     pub channel: Arc<Channel>,
-    state: HandshakeState,
-    version: u64,
-    height: u32,
-    nonce: u64,
+    pub state: HandshakeState,
+    pub version: u64,
+    pub height: u32,
+    pub nonce: u64,
 }
 
 impl Handshake {
