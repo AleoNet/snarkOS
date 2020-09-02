@@ -252,8 +252,10 @@ impl Config {
     }
 
     fn connect(&mut self, argument: Option<&str>) {
-        if let Some(bootnode) = argument {
-            self.p2p.bootnodes = vec![bootnode.to_string()];
+        if let Some(bootnodes) = argument {
+            let sanitize_bootnodes = bootnodes.replace(&['[', ']', ' '][..], "");
+            let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
+            self.p2p.bootnodes = bootnodes;
         }
     }
 
