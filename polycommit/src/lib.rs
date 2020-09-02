@@ -94,6 +94,18 @@ pub mod kzg10;
 /// [marlin]: https://eprint.iacr.org/2019/1047
 pub mod marlin_pc;
 
+/// Polynomial commitment scheme based on the construction in [[KZG10]][kzg],
+/// modified to obtain batching and to enforce strict
+/// degree bounds by following the approach outlined in [[MBKM19,
+/// “Sonic”]][sonic] (more precisely, via the variant in
+/// [[Gabizon19, “AuroraLight”]][al] that avoids negative G1 powers).
+///
+/// [kzg]: http://cacr.uwaterloo.ca/techreports/2010/cacr2010-10.pdf
+/// [sonic]: https://eprint.iacr.org/2019/099
+/// [al]: https://eprint.iacr.org/2019/601
+/// [marlin]: https://eprint.iacr.org/2019/1047
+pub mod sonic_pc;
+
 /// `QuerySet` is the set of queries that are to be made to a set of labeled polynomials/equations
 /// `p` that have previously been committed to. Each element of a `QuerySet` is a `(label, query)`
 /// pair, where `label` is the label of a polynomial in `p`, and `query` is the field element
@@ -165,6 +177,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
     fn trim(
         pp: &Self::UniversalParams,
         supported_degree: usize,
+        supported_hiding_bound: usize,
         enforced_degree_bounds: Option<&[usize]>,
     ) -> Result<(Self::CommitterKey, Self::VerifierKey), Self::Error>;
 
@@ -526,7 +539,7 @@ pub mod tests {
             }
 
             println!("supported degree: {:?}", supported_degree);
-            let (ck, vk) = PC::trim(&pp, supported_degree, Some(degree_bounds.as_slice()))?;
+            let (ck, vk) = PC::trim(&pp, supported_degree, supported_degree, Some(degree_bounds.as_slice()))?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;
@@ -614,7 +627,12 @@ pub mod tests {
             }
             println!("supported degree: {:?}", supported_degree);
             println!("num_points_in_query_set: {:?}", num_points_in_query_set);
-            let (ck, vk) = PC::trim(&pp, supported_degree, degree_bounds.as_ref().map(|s| s.as_slice()))?;
+            let (ck, vk) = PC::trim(
+                &pp,
+                supported_degree,
+                supported_degree,
+                degree_bounds.as_ref().map(|s| s.as_slice()),
+            )?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;
@@ -724,7 +742,12 @@ pub mod tests {
             println!("{}", num_polynomials);
             println!("{}", enforce_degree_bounds);
 
-            let (ck, vk) = PC::trim(&pp, supported_degree, degree_bounds.as_ref().map(|s| s.as_slice()))?;
+            let (ck, vk) = PC::trim(
+                &pp,
+                supported_degree,
+                supported_degree,
+                degree_bounds.as_ref().map(|s| s.as_slice()),
+            )?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;

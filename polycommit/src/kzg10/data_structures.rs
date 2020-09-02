@@ -23,6 +23,7 @@ use snarkos_utilities::{
     error,
     serialize::{CanonicalDeserialize, CanonicalSerialize},
 };
+use std::collections::BTreeMap;
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]
@@ -38,7 +39,7 @@ pub struct UniversalParams<E: PairingEngine> {
     /// \beta times the above generator of G2.
     pub beta_h: E::G2Affine,
     /// Group elements of the form `{ \beta^i G2 }`, where `i` ranges from `0` to `-degree`.
-    pub prepared_neg_powers_of_h: Option<Vec<<E::G2Affine as PairingCurve>::Prepared>>,
+    pub prepared_neg_powers_of_h: BTreeMap<usize, <E::G2Affine as PairingCurve>::Prepared>,
     /// The generator of G2, prepared for use in pairings.
     #[derivative(Debug = "ignore")]
     pub prepared_h: <E::G2Affine as PairingCurve>::Prepared,
