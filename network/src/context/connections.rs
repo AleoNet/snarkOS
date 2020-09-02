@@ -40,4 +40,6 @@ impl Connections {
     pub fn store_channel(&mut self, channel: &Arc<Channel>) {
         self.channels.insert(channel.address, channel.clone());
     }
+
+    // TODO (raychu86) Clean up connections if peers are disconnected
 }

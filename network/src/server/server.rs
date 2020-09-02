@@ -261,7 +261,7 @@ impl Server {
                     }
                     Err(error) => {
                         error!("Listener failed to accept connection {}", error);
-                        break;
+                        continue;
                     }
                 };
 
