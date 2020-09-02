@@ -150,8 +150,8 @@ impl Server {
         task::spawn(async move {
             // Determines the criteria for disconnecting from a peer.
             fn should_disconnect(failure_count: &u8) -> bool {
-                // Tolerate up to 3 failed communications.
-                *failure_count >= 3
+                // Tolerate up to 10 failed communications.
+                *failure_count >= 10
             }
 
             // Logs the failure and determines whether to disconnect from a peer.
