@@ -202,13 +202,13 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let powers = pp.powers_of_g[..=supported_degree].to_vec();
         // We want to support making up to `supported_hiding_bound` queries to committed
         // polynomials.
-        let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_hiding_bound + 1].to_vec();
+        let powers_of_gamma_g = (0..=supported_hiding_bound + 1).map(|i| pp.powers_of_gamma_g[&i]).collect::<Vec<_>>();
         end_timer!(ck_time);
 
         // Construct the core KZG10 verifier key.
         let vk = kzg10::VerifierKey {
             g: pp.powers_of_g[0],
-            gamma_g: pp.powers_of_gamma_g[0],
+            gamma_g: pp.powers_of_gamma_g[&0],
             h: pp.h,
             beta_h: pp.beta_h,
             prepared_h: pp.prepared_h.clone(),

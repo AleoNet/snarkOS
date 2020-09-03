@@ -33,7 +33,7 @@ pub struct UniversalParams<E: PairingEngine> {
     /// Group elements of the form `{ \beta^i G }`, where `i` ranges from 0 to `degree`.
     pub powers_of_g: Vec<E::G1Affine>,
     /// Group elements of the form `{ \beta^i \gamma G }`, where `i` ranges from 0 to `degree`.
-    pub powers_of_gamma_g: Vec<E::G1Affine>,
+    pub powers_of_gamma_g: BTreeMap<usize, E::G1Affine>,
     /// The generator of G2.
     pub h: E::G2Affine,
     /// \beta times the above generator of G2.
