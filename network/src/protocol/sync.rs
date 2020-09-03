@@ -44,7 +44,7 @@ pub struct SyncHandler {
     /// Current state of the sync handler
     pub sync_state: SyncState,
     /// Block headers of blocks that need to be downloaded
-    block_headers: Vec<BlockHeaderHash>,
+    pub block_headers: Vec<BlockHeaderHash>,
     /// Pending blocks - Blocks that have been requested and the time of the request
     pub pending_blocks: HashMap<BlockHeaderHash, DateTime<Utc>>,
 }

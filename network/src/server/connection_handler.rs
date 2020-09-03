@@ -16,6 +16,7 @@
 
 use crate::{
     message_types::{GetMemoryPool, GetPeers, Version},
+    protocol::sync::SyncState,
     Server,
 };
 
@@ -78,7 +79,7 @@ impl Server {
 
                     // Try and connect to our gossiped peers.
                     for (address, _last_seen) in peer_book.get_gossiped() {
-                        if address != *context.local_address.read().await {
+                        if address != *context.local_address.read().await && !peer_book.connected_contains(&address) {
                             if let Err(_) = context
                                 .handshakes
                                 .write()
@@ -91,7 +92,8 @@ impl Server {
                                 )
                                 .await
                             {
-                                peer_book.disconnect_peer(address);
+                                debug!("Could not connect to gossiped peer {}", address);
+                                peer_book.forget_peer(address);
                             }
                         }
                     }
@@ -108,6 +110,7 @@ impl Server {
                             Some(channel) => {
                                 // Disconnect from the peer if the ping message was not sent properly
                                 if let Err(_) = pings.send_ping(channel).await {
+                                    warn!("Ping message failed to send to {}", address);
                                     peer_book.disconnect_peer(address);
                                 }
                             }

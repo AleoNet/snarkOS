@@ -378,8 +378,17 @@ impl Server {
         let peer_book = &mut self.context.peer_book.read().await;
 
         if *self.context.local_address.read().await != peer_address {
+            if peer_book.connected_total() < self.context.max_peers {
+                self.context
+                    .handshakes
+                    .write()
+                    .await
+                    .receive_request(message.clone(), peer_address)
+                    .await?;
+            }
+
             // If our peer has a longer chain, send a sync message
-            if message.height > self.storage.get_latest_block_height() && peer_book.connected_contains(&peer_address) {
+            if message.height > self.storage.get_latest_block_height() {
                 // Update the sync node if the sync_handler is Idle or there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                     if !sync_handler.is_syncing()
@@ -391,17 +400,12 @@ impl Server {
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
                         }
+                    } else {
+                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                        }
                     }
                 }
-            }
-
-            if !peer_book.connected_contains(&peer_address) && (peer_book.connected_total() < self.context.max_peers) {
-                self.context
-                    .handshakes
-                    .write()
-                    .await
-                    .receive_request(message.clone(), peer_address)
-                    .await?;
             }
         }
         Ok(channel)
