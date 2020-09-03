@@ -94,7 +94,10 @@ impl<E: PairingEngine> KZG10<E> {
         end_timer!(gamma_g_time);
 
         let powers_of_g = E::G1Projective::batch_normalization_into_affine(&powers_of_g);
-        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g).into_iter().enumerate().collect();
+        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g)
+            .into_iter()
+            .enumerate()
+            .collect();
 
         let prepared_neg_powers_of_h_time = start_timer!(|| "Generating negative powers of h in G2");
         let prepared_neg_powers_of_h = if produce_g2_powers {

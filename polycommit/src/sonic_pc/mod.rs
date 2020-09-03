@@ -180,15 +180,13 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
                     let shifted_powers_of_g = pp.powers_of_g[lowest_shift_degree..].to_vec();
                     let mut shifted_powers_of_gamma_g = BTreeMap::new();
                     // Also add degree 0.
-                    for degree_bound in [enforced_degree_bounds.clone(), vec![max_degree]].concat() {
+                    for degree_bound in enforced_degree_bounds {
                         let shift_degree = max_degree - degree_bound;
                         let mut powers_for_degree_bound = vec![];
                         for i in 0..=supported_hiding_bound + 1 {
-                            if shift_degree + i < pp.powers_of_gamma_g.len() {
-                                powers_for_degree_bound.push(pp.powers_of_gamma_g[&(shift_degree + i)]);
-                            }
+                            powers_for_degree_bound.push(pp.powers_of_gamma_g[&(shift_degree + i)]);
                         }
-                        shifted_powers_of_gamma_g.insert(degree_bound, powers_for_degree_bound);
+                        shifted_powers_of_gamma_g.insert(*degree_bound, powers_for_degree_bound);
                     }
 
                     end_timer!(shifted_ck_time);
