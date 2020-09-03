@@ -1,7 +1,22 @@
 use crate::{
-    kzg10, BTreeMap, BTreeSet, BatchLCProof, Error, Evaluations, LabeledCommitment, LabeledPolynomial,
-    LinearCombination, PCCommitterKey, PCRandomness, PCUniversalParams, Polynomial, PolynomialCommitment, QuerySet,
-    String, ToString, Vec,
+    kzg10,
+    BTreeMap,
+    BTreeSet,
+    BatchLCProof,
+    Error,
+    Evaluations,
+    LabeledCommitment,
+    LabeledPolynomial,
+    LinearCombination,
+    PCCommitterKey,
+    PCRandomness,
+    PCUniversalParams,
+    Polynomial,
+    PolynomialCommitment,
+    QuerySet,
+    String,
+    ToString,
+    Vec,
 };
 
 use snarkos_models::curves::{AffineCurve, Group, One, PairingCurve, PairingEngine, ProjectiveCurve, Zero};

@@ -625,10 +625,14 @@ pub mod tests {
 
                 polynomials.push(LabeledPolynomial::new_owned(label, poly, degree_bound, hiding_bound))
             }
-            let supported_hiding_bound = polynomials.iter().map(|p| match p.hiding_bound() {
-                Some(b) => b,
-                None => 0,
-            }).max().unwrap_or(0);
+            let supported_hiding_bound = polynomials
+                .iter()
+                .map(|p| match p.hiding_bound() {
+                    Some(b) => b,
+                    None => 0,
+                })
+                .max()
+                .unwrap_or(0);
             println!("supported degree: {:?}", supported_degree);
             println!("supported hiding bound: {:?}", supported_hiding_bound);
             println!("num_points_in_query_set: {:?}", num_points_in_query_set);
@@ -741,10 +745,14 @@ pub mod tests {
 
                 polynomials.push(LabeledPolynomial::new_owned(label, poly, degree_bound, hiding_bound))
             }
-            let supported_hiding_bound = polynomials.iter().map(|p| match p.hiding_bound() {
-                Some(b) => b,
-                None => 0,
-            }).max().unwrap_or(0);
+            let supported_hiding_bound = polynomials
+                .iter()
+                .map(|p| match p.hiding_bound() {
+                    Some(b) => b,
+                    None => 0,
+                })
+                .max()
+                .unwrap_or(0);
             println!("supported degree: {:?}", supported_degree);
             println!("supported hiding bound: {:?}", supported_hiding_bound);
             println!("num_points_in_query_set: {:?}", num_points_in_query_set);
