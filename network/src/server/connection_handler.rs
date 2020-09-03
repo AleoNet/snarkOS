@@ -128,11 +128,15 @@ impl Server {
                     }
                 }
 
-                // If we have disconnected from our sync node, then find a new one.
+                // If we have disconnected from our sync node,
+                // then set our sync state to idle and find a new sync node.
                 let mut sync_handler = sync_handler_lock.lock().await;
                 if peer_book.disconnected_contains(&sync_handler.sync_node) {
                     match peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
-                        Some(peer) => sync_handler.sync_node = peer.0.clone(),
+                        Some(peer) => {
+                            sync_handler.sync_state = SyncState::Idle;
+                            sync_handler.sync_node = peer.0.clone();
+                        }
                         None => continue,
                     };
                 }
