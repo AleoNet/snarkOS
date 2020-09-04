@@ -193,7 +193,20 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
                     ));
 
                     let shifted_powers_of_g = pp.powers_of_g[lowest_shift_degree..].to_vec();
-                    let shifted_powers_of_gamma_g = pp.powers_of_gamma_g[lowest_shift_degree..].to_vec();
+                    let mut shifted_powers_of_gamma_g = BTreeMap::new();
+                    // Also add degree 0.
+                    let max_gamma_g = pp.powers_of_gamma_g.keys().last().unwrap();
+                    for degree_bound in enforced_degree_bounds {
+                        let shift_degree = max_degree - degree_bound;
+                        let mut powers_for_degree_bound = vec![];
+                        for i in 0..=supported_hiding_bound + 1 {
+                            // We have an additional degree in `powers_of_gamma_g` beyond `powers_of_g`.
+                            if shift_degree + i < max_degree + 2 {
+                                powers_for_degree_bound.push(pp.powers_of_gamma_g[&(shift_degree + i)]);
+                            }
+                        }
+                        shifted_powers_of_gamma_g.insert(*degree_bound, powers_for_degree_bound);
+                    }
 
                     end_timer!(shifted_ck_time);
 
@@ -220,7 +233,9 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
             };
 
         let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();
-        let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_hiding_bound + 1].to_vec();
+        let powers_of_gamma_g = (0..=supported_hiding_bound + 1)
+            .map(|i| pp.powers_of_gamma_g[&i])
+            .collect();
 
         let ck = CommitterKey {
             powers_of_g,
@@ -234,7 +249,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
         let g = pp.powers_of_g[0];
         let h = pp.h;
         let beta_h = pp.beta_h;
-        let gamma_g = pp.powers_of_gamma_g[0];
+        let gamma_g = pp.powers_of_gamma_g[&0];
         let prepared_h = (&pp.prepared_h).clone();
         let prepared_beta_h = (&pp.prepared_beta_h).clone();
 

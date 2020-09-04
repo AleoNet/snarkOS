@@ -94,7 +94,10 @@ impl<E: PairingEngine> KZG10<E> {
         end_timer!(gamma_g_time);
 
         let powers_of_g = E::G1Projective::batch_normalization_into_affine(&powers_of_g);
-        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g);
+        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g)
+            .into_iter()
+            .enumerate()
+            .collect();
 
         let prepared_neg_powers_of_h_time = start_timer!(|| "Generating negative powers of h in G2");
         let prepared_neg_powers_of_h = if produce_g2_powers {
@@ -458,7 +461,7 @@ mod tests {
                 supported_degree += 1;
             }
             let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();
-            let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_degree].to_vec();
+            let powers_of_gamma_g = (0..=supported_degree).map(|i| pp.powers_of_gamma_g[&i]).collect();
 
             let powers = Powers {
                 powers_of_g: Cow::Owned(powers_of_g),
@@ -466,7 +469,7 @@ mod tests {
             };
             let vk = VerifierKey {
                 g: pp.powers_of_g[0],
-                gamma_g: pp.powers_of_gamma_g[0],
+                gamma_g: pp.powers_of_gamma_g[&0],
                 h: pp.h,
                 beta_h: pp.beta_h,
                 prepared_h: pp.prepared_h.clone(),
