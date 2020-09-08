@@ -96,7 +96,9 @@ pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: 
     for (socket, _) in &context.peer_book.read().await.get_connected() {
         if *socket != block_miner && *socket != *context.local_address.read().await {
             if let Some(channel) = context.connections.read().await.get(socket) {
-                channel.write(&Block::new(data.clone())).await?;
+                if let Err(_) = channel.write(&Block::new(data.clone())).await {
+                    warn!("Failed to send block to {}", socket);
+                }
             }
         }
     }

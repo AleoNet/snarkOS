@@ -310,8 +310,8 @@ impl ConsensusParameters {
             // If the block is not an unknown orphan, find the origin of the block
             match storage.get_block_path(&block.header)? {
                 BlockPath::ExistingBlock => {}
-                BlockPath::CanonChain(_) => {
-                    debug!("Processing a block that is on canon chain");
+                BlockPath::CanonChain(block_height) => {
+                    debug!("Processing a block that is on canon chain. Height {}", block_height);
 
                     self.process_block(parameters, &storage, memory_pool, block)?;
 
@@ -323,7 +323,7 @@ impl ConsensusParameters {
                 }
                 BlockPath::SideChain(side_chain_path) => {
                     debug!(
-                        "Processing a block that is on side chain - length {}",
+                        "Processing a block that is on side chain. Height {}",
                         side_chain_path.new_block_number
                     );
 

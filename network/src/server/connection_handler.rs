@@ -16,6 +16,7 @@
 
 use crate::{
     message_types::{GetMemoryPool, GetPeers, Version},
+    protocol::sync::SyncState,
     Server,
 };
 
@@ -78,7 +79,7 @@ impl Server {
 
                     // Try and connect to our gossiped peers.
                     for (address, _last_seen) in peer_book.get_gossiped() {
-                        if address != *context.local_address.read().await {
+                        if address != *context.local_address.read().await && !peer_book.connected_contains(&address) {
                             if let Err(_) = context
                                 .handshakes
                                 .write()
@@ -91,7 +92,8 @@ impl Server {
                                 )
                                 .await
                             {
-                                peer_book.disconnect_peer(address);
+                                debug!("Could not connect to gossiped peer {}", address);
+                                peer_book.forget_peer(address);
                             }
                         }
                     }
@@ -108,6 +110,7 @@ impl Server {
                             Some(channel) => {
                                 // Disconnect from the peer if the ping message was not sent properly
                                 if let Err(_) = pings.send_ping(channel).await {
+                                    warn!("Ping message failed to send to {}", address);
                                     peer_book.disconnect_peer(address);
                                 }
                             }
@@ -128,11 +131,15 @@ impl Server {
                     }
                 }
 
-                // If we have disconnected from our sync node, then find a new one.
+                // If we have disconnected from our sync node,
+                // then set our sync state to idle and find a new sync node.
                 let mut sync_handler = sync_handler_lock.lock().await;
                 if peer_book.disconnected_contains(&sync_handler.sync_node) {
                     match peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
-                        Some(peer) => sync_handler.sync_node = peer.0.clone(),
+                        Some(peer) => {
+                            sync_handler.sync_state = SyncState::Idle;
+                            sync_handler.sync_node = peer.0.clone();
+                        }
                         None => continue,
                     };
                 }
