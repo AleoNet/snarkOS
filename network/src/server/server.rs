@@ -309,11 +309,14 @@ impl Server {
                                         sync_handler.sync_node = handshake.channel.address;
 
                                         if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
-                                            handshake
-                                                .channel
-                                                .write(&GetSync::new(block_locator_hashes))
-                                                .await
-                                                .unwrap();
+                                            if let Err(err) =
+                                                handshake.channel.write(&GetSync::new(block_locator_hashes)).await
+                                            {
+                                                error!(
+                                                    "Error sending GetSync message to {}, {}",
+                                                    handshake.channel.address, err
+                                                );
+                                            }
                                         }
                                     }
                                 }
