@@ -58,6 +58,35 @@ impl Storage {
         Ok(Self { db: storage, cf_names })
     }
 
+    /// Opens a secondary storage instance from the given path with its given names.
+    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
+    pub fn open_secondary_cf<P: AsRef<Path> + Clone>(
+        primary_path: P,
+        secondary_path: P,
+        num_cfs: u32,
+    ) -> Result<Self, StorageError> {
+        let mut cf_names: Vec<String> = Vec::with_capacity(num_cfs as usize);
+
+        for column in 0..num_cfs {
+            let column_name = format!("col{}", column.to_string());
+
+            cf_names.push(column_name);
+        }
+
+        let mut storage_opts = Options::default();
+        storage_opts.increase_parallelism(3);
+
+        // TODO (raychu86) Test with open_cf_as_read_only to see if it works
+        let storage = Arc::new(DB::open_cf_as_secondary(
+            &storage_opts,
+            primary_path,
+            secondary_path,
+            cf_names.clone(),
+        )?);
+
+        Ok(Self { db: storage, cf_names })
+    }
+
     /// Returns the column family reference from a given index.
     /// If the given index does not exist, returns [None](std::option::Option).
     pub(crate) fn get_cf_ref(&self, index: u32) -> &ColumnFamily {
