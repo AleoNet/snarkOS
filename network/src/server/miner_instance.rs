@@ -63,6 +63,8 @@ impl MinerInstance {
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
 
+            let mut mining_failure_count = 0;
+
             loop {
                 info!("Starting to mine the next block");
 
@@ -71,7 +73,15 @@ impl MinerInstance {
                     .await
                 {
                     Ok(mined_block) => mined_block,
-                    Err(_) => continue,
+                    Err(_) => {
+                        mining_failure_count += 1;
+
+                        if mining_failure_count >= 10 {
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
                 };
 
                 match Block::<Tx>::deserialize(&block_serialized) {
