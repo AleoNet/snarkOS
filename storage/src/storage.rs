@@ -75,7 +75,7 @@ impl Storage {
     /// Returns the iterator from a given col.
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn get_iter(&self, col: u32) -> Result<DBIterator, StorageError> {
-        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start)?)
+        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start))
     }
 
     /// Returns `Ok(())` after executing a database transaction
@@ -87,11 +87,11 @@ impl Storage {
             match operation {
                 Op::Insert { col, key, value } => {
                     let cf = self.get_cf_ref(col);
-                    batch.put_cf(cf, &key, value)?;
+                    batch.put_cf(cf, &key, value);
                 }
                 Op::Delete { col, key } => {
                     let cf = self.get_cf_ref(col);
-                    batch.delete_cf(cf, &key)?;
+                    batch.delete_cf(cf, &key);
                 }
             };
         }
