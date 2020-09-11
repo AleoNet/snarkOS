@@ -330,7 +330,10 @@ impl ConsensusParameters {
                     // If the side chain is now longer than the canon chain,
                     // perform a fork to the side chain.
                     if side_chain_path.new_block_number > storage.get_latest_block_height() {
-                        debug!("Determined side chain is longer than canon chain");
+                        debug!(
+                            "Determined side chain is longer than canon chain by {} blocks",
+                            side_chain_path.new_block_number - storage.get_latest_block_height()
+                        );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
                         // Fork to superior side chain
