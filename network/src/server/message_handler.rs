@@ -43,46 +43,132 @@ impl Server {
     ///
     /// The oneshot sender lets the connection thread know when the message is handled.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
-        // TODO (raychu86) Update error handling to prevent breaking the message handler
+        // TODO (raychu86) Create a macro to the handle the error messages.
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
-                self.receive_block_message(Block::deserialize(bytes)?, channel.clone(), true)
-                    .await?;
+                if let Err(err) = self
+                    .receive_block_message(Block::deserialize(bytes)?, channel.clone(), true)
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == GetBlock::name() {
-                self.receive_get_block(GetBlock::deserialize(bytes)?, channel.clone())
-                    .await?;
+                if let Err(err) = self
+                    .receive_get_block(GetBlock::deserialize(bytes)?, channel.clone())
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == GetMemoryPool::name() {
-                self.receive_get_memory_pool(GetMemoryPool::deserialize(bytes)?, channel.clone())
-                    .await?;
+                if let Err(err) = self
+                    .receive_get_memory_pool(GetMemoryPool::deserialize(bytes)?, channel.clone())
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == GetPeers::name() {
-                self.receive_get_peers(GetPeers::deserialize(bytes)?, channel.clone())
-                    .await?;
+                if let Err(err) = self
+                    .receive_get_peers(GetPeers::deserialize(bytes)?, channel.clone())
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == GetSync::name() {
-                self.receive_get_sync(GetSync::deserialize(bytes)?, channel.clone())
-                    .await?;
+                if let Err(err) = self
+                    .receive_get_sync(GetSync::deserialize(bytes)?, channel.clone())
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == MemoryPool::name() {
-                self.receive_memory_pool(MemoryPool::deserialize(bytes)?).await?;
+                if let Err(err) = self.receive_memory_pool(MemoryPool::deserialize(bytes)?).await {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == Peers::name() {
-                self.receive_peers(Peers::deserialize(bytes)?, channel.clone()).await?;
+                if let Err(err) = self.receive_peers(Peers::deserialize(bytes)?, channel.clone()).await {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == Ping::name() {
-                self.receive_ping(Ping::deserialize(bytes)?, channel.clone()).await?;
+                if let Err(err) = self.receive_ping(Ping::deserialize(bytes)?, channel.clone()).await {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == Pong::name() {
-                self.receive_pong(Pong::deserialize(bytes)?, channel.clone()).await?;
+                if let Err(err) = self.receive_pong(Pong::deserialize(bytes)?, channel.clone()).await {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == Sync::name() {
-                self.receive_sync(Sync::deserialize(bytes)?).await?;
+                if let Err(err) = self.receive_sync(Sync::deserialize(bytes)?).await {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == SyncBlock::name() {
-                self.receive_block_message(Block::deserialize(bytes)?, channel.clone(), false)
-                    .await?;
+                if let Err(err) = self
+                    .receive_block_message(Block::deserialize(bytes)?, channel.clone(), false)
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == Transaction::name() {
-                self.receive_transaction(Transaction::deserialize(bytes)?, channel.clone())
-                    .await?;
+                if let Err(err) = self
+                    .receive_transaction(Transaction::deserialize(bytes)?, channel.clone())
+                    .await
+                {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == Version::name() {
-                channel = self
+                // TODO (raychu86) Does `receive_version` need to return a channel?
+                match self
                     .receive_version(Version::deserialize(bytes)?, channel.clone())
-                    .await?;
+                    .await
+                {
+                    Ok(returned_channel) => channel = returned_channel,
+                    Err(err) => error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    ),
+                }
             } else if name == Verack::name() {
-                self.receive_verack(Verack::deserialize(bytes)?, channel.clone())
-                    .await?;
+                if let Err(err) = self.receive_verack(Verack::deserialize(bytes)?, channel.clone()).await {
+                    error!(
+                        "Message handler errored when receiving a {} message from {}. {}",
+                        name, channel.address, err
+                    );
+                }
             } else if name == MessageName::from("disconnect") {
                 info!("Disconnected from peer: {:?}", channel.address);
                 let mut peer_book = self.context.peer_book.write().await;
@@ -122,18 +208,20 @@ impl Server {
                 .is_ok();
             drop(memory_pool);
 
-            let mut sync_handler = self.sync_handler_lock.lock().await;
-            sync_handler.clear_pending(Arc::clone(&self.storage));
-
             if inserted && propagate {
                 // This is a new block, send it to our peers.
 
                 propagate_block(self.context.clone(), message.data, channel.address).await?;
-            } else if !propagate && sync_handler.sync_state != SyncState::Idle {
-                // We are syncing with another node, ask for the next block.
+            } else if !propagate {
+                if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
+                    sync_handler.clear_pending(Arc::clone(&self.storage));
 
-                if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                    sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                    if sync_handler.sync_state != SyncState::Idle {
+                        // We are currently syncing with a node, ask for the next block.
+                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                        }
+                    }
                 }
             }
         }
@@ -393,7 +481,7 @@ impl Server {
                 // Update the sync node if the sync_handler is Idle or there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                     if !sync_handler.is_syncing()
-                        || (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
+                        && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
                     {
                         debug!("Received a version message with a greater height. Attempting to sync.");
                         sync_handler.sync_node = peer_address;

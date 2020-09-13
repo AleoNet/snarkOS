@@ -133,15 +133,14 @@ impl Server {
 
                 // If we have disconnected from our sync node,
                 // then set our sync state to idle and find a new sync node.
-                let mut sync_handler = sync_handler_lock.lock().await;
-                if peer_book.disconnected_contains(&sync_handler.sync_node) {
-                    match peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
-                        Some(peer) => {
+                if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                    if peer_book.disconnected_contains(&sync_handler.sync_node) {
+                        if let Some(peer) = peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
                             sync_handler.sync_state = SyncState::Idle;
                             sync_handler.sync_node = peer.0.clone();
-                        }
-                        None => continue,
-                    };
+                        };
+                    }
+                    // drop(sync_handler);
                 }
 
                 // Store connected peers in database.
@@ -185,13 +184,16 @@ impl Server {
 
                 // Update our memory pool after memory_pool_interval frequency loops.
                 if interval_ticker >= context.memory_pool_interval {
-                    // Ask our sync node for more transactions.
-                    if *context.local_address.read().await != sync_handler.sync_node {
-                        if let Some(channel) = connections.get(&sync_handler.sync_node) {
-                            if let Err(_) = channel.write(&GetMemoryPool).await {
-                                peer_book.disconnect_peer(sync_handler.sync_node);
+                    if let Ok(sync_handler) = sync_handler_lock.try_lock() {
+                        // Ask our sync node for more transactions.
+                        if *context.local_address.read().await != sync_handler.sync_node {
+                            if let Some(channel) = connections.get(&sync_handler.sync_node) {
+                                if let Err(_) = channel.write(&GetMemoryPool).await {
+                                    peer_book.disconnect_peer(sync_handler.sync_node);
+                                }
                             }
                         }
+                        drop(sync_handler);
                     }
 
                     // Update our memory pool
@@ -213,8 +215,6 @@ impl Server {
                 } else {
                     interval_ticker += 1;
                 }
-
-                drop(sync_handler);
             }
         });
     }
