@@ -112,8 +112,8 @@ impl Default for Config {
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
                 mempool_interval: 5,
-                min_peers: 2,
-                max_peers: 20,
+                min_peers: 7,
+                max_peers: 25,
             },
         }
     }
