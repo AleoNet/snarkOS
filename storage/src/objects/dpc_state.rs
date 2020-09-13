@@ -107,7 +107,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         }
     }
 
-    /// Get memo index
+    /// Build a new commitment merkle tree from the stored commitments
     pub fn build_merkle_tree(
         &self,
         additional_cms: Vec<(T::Commitment, usize)>,

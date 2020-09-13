@@ -315,6 +315,8 @@ impl ConsensusParameters {
 
                     self.process_block(parameters, &storage, memory_pool, block)?;
 
+                    // Attempt to fast forward the block state if the node already stores
+                    // the children of the new canon block.
                     let (_, child_path) = storage.longest_child_path(block.header.get_hash())?;
                     for child_block_hash in child_path {
                         let new_block = storage.get_block(&child_block_hash)?;
@@ -330,7 +332,10 @@ impl ConsensusParameters {
                     // If the side chain is now longer than the canon chain,
                     // perform a fork to the side chain.
                     if side_chain_path.new_block_number > storage.get_latest_block_height() {
-                        debug!("Determined side chain is longer than canon chain");
+                        debug!(
+                            "Determined side chain is longer than canon chain by {} blocks",
+                            side_chain_path.new_block_number - storage.get_latest_block_height()
+                        );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
                         // Fork to superior side chain

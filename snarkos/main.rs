@@ -67,7 +67,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = Arc::new(MerkleTreeLedger::open_at_path(path)?);
+    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
     let memory_pool = MemoryPool::from_storage(&storage.clone())?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
@@ -128,9 +128,13 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
         info!("Loading complete.");
 
+        // Open a secondary storage instance to prevent resource sharing and bottle-necking.
+        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
+
         start_rpc_server(
             config.rpc.port,
-            storage.clone(),
+            secondary_storage.clone(),
+            path,
             proving_parameters,
             server.context.clone(),
             consensus.clone(),

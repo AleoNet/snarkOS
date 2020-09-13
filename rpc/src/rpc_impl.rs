@@ -35,7 +35,7 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
@@ -44,6 +44,9 @@ use tokio::{runtime::Runtime, sync::Mutex};
 pub struct RpcImpl {
     /// Blockchain database storage.
     pub(crate) storage: Arc<MerkleTreeLedger>,
+
+    /// The path to the Blockchain database storage.
+    pub(crate) storage_path: PathBuf,
 
     /// Public Parameters
     pub(crate) parameters: PublicParameters<Components>,
@@ -65,6 +68,7 @@ impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
+        storage_path: PathBuf,
         parameters: PublicParameters<Components>,
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
@@ -73,12 +77,18 @@ impl RpcImpl {
     ) -> Self {
         Self {
             storage,
+            storage_path,
             parameters,
             server_context,
             consensus,
             memory_pool_lock,
             credentials,
         }
+    }
+
+    /// Open a new secondary storage instance.
+    pub fn new_secondary_storage_instance(&self) -> Result<MerkleTreeLedger, RpcError> {
+        Ok(MerkleTreeLedger::open_secondary_at_path(self.storage_path.clone())?)
     }
 }
 
@@ -87,6 +97,8 @@ impl RpcFunctions for RpcImpl {
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
         let block_hash = hex::decode(&block_hash_string)?;
         assert_eq!(block_hash.len(), 32);
+
+        self.storage.catch_up_secondary()?;
 
         let block_header_hash = BlockHeaderHash::new(block_hash);
         let height = match self.storage.get_block_number(&block_header_hash) {
@@ -130,11 +142,13 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the number of blocks in the canonical chain.
     fn get_block_count(&self) -> Result<u32, RpcError> {
+        self.storage.catch_up_secondary()?;
         Ok(self.storage.get_block_count())
     }
 
     /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
+        self.storage.catch_up_secondary()?;
         let best_block_hash = self.storage.get_block_hash(self.storage.get_latest_block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
@@ -142,6 +156,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the block hash of the index specified if it exists in the canonical chain.
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
+        self.storage.catch_up_secondary()?;
         let block_hash = self.storage.get_block_hash(block_height)?;
 
         Ok(hex::encode(&block_hash.0))
@@ -149,6 +164,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
+        self.storage.catch_up_secondary()?;
         Ok(hex::encode(
             &self.storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
         ))
@@ -162,6 +178,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns information about a transaction from serialized transaction bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
+        self.storage.catch_up_secondary()?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
@@ -227,6 +244,7 @@ impl RpcFunctions for RpcImpl {
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
+        self.storage.catch_up_secondary()?;
 
         if !self
             .consensus
@@ -258,6 +276,7 @@ impl RpcFunctions for RpcImpl {
     fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
+        self.storage.catch_up_secondary()?;
 
         Ok(self
             .consensus
@@ -288,6 +307,8 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the current mempool and consensus information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
+        self.storage.catch_up_secondary()?;
+
         let block_height = self.storage.get_latest_block_height();
         let block = self.storage.get_block_from_block_number(block_height)?;
 

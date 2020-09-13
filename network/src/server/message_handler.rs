@@ -43,6 +43,7 @@ impl Server {
     ///
     /// The oneshot sender lets the connection thread know when the message is handled.
     pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
+        // TODO (raychu86) Update error handling to prevent breaking the message handler
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
                 self.receive_block_message(Block::deserialize(bytes)?, channel.clone(), true)

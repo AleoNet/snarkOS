@@ -46,9 +46,14 @@ mod rpc_tests {
         );
 
         let consensus = TEST_CONSENSUS.clone();
+
+        let storage = storage.clone();
+        let storage_path = storage.storage.db.path().to_path_buf();
+
         Rpc::new(
             RpcImpl::new(
-                storage.clone(),
+                storage,
+                storage_path,
                 parameters,
                 server.context.clone(),
                 consensus,

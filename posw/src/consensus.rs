@@ -92,11 +92,8 @@ where
 
     /// Loads the PoSW runner from the locally stored parameters.
     pub fn load() -> Result<Self, PoswError> {
-        let params = PoswSNARKVKParameters::load_bytes()?;
-        let vk = S::VerificationParameters::read(&params[..])?;
-
-        let params = PoswSNARKPKParameters::load_bytes()?;
-        let pk = S::ProvingParameters::read(&params[..])?;
+        let vk = S::VerificationParameters::read(&PoswSNARKVKParameters::load_bytes()?[..])?;
+        let pk = S::ProvingParameters::read(&PoswSNARKPKParameters::load_bytes()?[..])?;
 
         Ok(Self {
             pk: Some(pk),

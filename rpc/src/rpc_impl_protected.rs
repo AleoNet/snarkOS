@@ -343,6 +343,10 @@ impl ProtectedRpcFunctions for RpcImpl {
             memo = rng.gen();
         }
 
+        // Because this is a computationally heavy endpoint, we open a
+        // new secondary storage instance to prevent storage bottle-necking.
+        let storage = self.new_secondary_storage_instance()?;
+
         // Generate transaction
         let (records, transaction) = self.consensus.create_transaction(
             &self.parameters,
@@ -355,7 +359,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values,
             new_payloads,
             memo,
-            &self.storage,
+            &storage,
             rng,
         )?;
 
@@ -373,6 +377,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
+        self.storage.catch_up_secondary()?;
         let record_commitments = self.storage.get_record_commitments(None)?;
 
         Ok(record_commitments.len())
@@ -380,6 +385,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
+        self.storage.catch_up_secondary()?;
         let record_commitments = self.storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
 
