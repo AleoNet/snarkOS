@@ -162,6 +162,23 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         }
     }
 
+    /// Attempt to catch the secondary read-only storage instance with the primary instance.
+    pub fn catch_up_secondary(&self) -> Result<(), StorageError> {
+        // Sync the secondary and primary instances
+        self.storage.db.try_catch_up_with_primary()?;
+
+        // Update the Merkle tree of the secondary instance.
+        let mut merkle_tree = self.cm_merkle_tree.write();
+        *merkle_tree = self.build_merkle_tree(vec![])?;
+
+        // Update the latest block height of the secondary instance.
+        let latest_block_height_bytes = self.get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?;
+        let mut latest_block_height = self.latest_block_height.write();
+        *latest_block_height = bytes_to_u32(latest_block_height_bytes);
+
+        Ok(())
+    }
+
     /// Retrieve a value given a key.
     pub(crate) fn get(&self, col: u32, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(col, key)? {

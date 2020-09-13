@@ -74,15 +74,16 @@ impl Storage {
         }
 
         let mut storage_opts = Options::default();
-        storage_opts.increase_parallelism(3);
+        storage_opts.increase_parallelism(2);
 
-        // TODO (raychu86) Test with open_cf_as_read_only to see if it works
         let storage = Arc::new(DB::open_cf_as_secondary(
             &storage_opts,
             primary_path,
             secondary_path,
             cf_names.clone(),
         )?);
+
+        storage.try_catch_up_with_primary()?;
 
         Ok(Self { db: storage, cf_names })
     }
