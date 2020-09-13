@@ -377,7 +377,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
-        self.storage.catch_up_secondary()?;
+        self.storage.catch_up_secondary(false)?;
         let record_commitments = self.storage.get_record_commitments(None)?;
 
         Ok(record_commitments.len())
@@ -385,7 +385,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        self.storage.catch_up_secondary()?;
+        self.storage.catch_up_secondary(false)?;
         let record_commitments = self.storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
 
