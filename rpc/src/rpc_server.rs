@@ -29,7 +29,7 @@ use snarkos_dpc::base_dpc::{
 use snarkos_network::context::Context;
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
@@ -38,6 +38,7 @@ use tokio::sync::Mutex;
 pub async fn start_rpc_server(
     rpc_port: u16,
     storage: Arc<MerkleTreeLedger>,
+    storage_path: PathBuf,
     parameters: PublicParameters<Components>,
     server_context: Arc<Context>,
     consensus: ConsensusParameters,
@@ -54,6 +55,7 @@ pub async fn start_rpc_server(
 
     let rpc_impl = RpcImpl::new(
         storage,
+        storage_path,
         parameters,
         server_context,
         consensus,

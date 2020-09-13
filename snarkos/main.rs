@@ -128,11 +128,13 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
         info!("Loading complete.");
 
-        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path)?);
+        // Open a secondary storage instance to prevent resource sharing and bottle-necking.
+        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
 
         start_rpc_server(
             config.rpc.port,
             secondary_storage.clone(),
+            path,
             proving_parameters,
             server.context.clone(),
             consensus.clone(),
