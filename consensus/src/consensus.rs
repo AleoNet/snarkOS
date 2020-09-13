@@ -314,12 +314,6 @@ impl ConsensusParameters {
                     debug!("Processing a block that is on canon chain. Height {}", block_height);
 
                     self.process_block(parameters, &storage, memory_pool, block)?;
-
-                    let (_, child_path) = storage.longest_child_path(block.header.get_hash())?;
-                    for child_block_hash in child_path {
-                        let new_block = storage.get_block(&child_block_hash)?;
-                        self.process_block(parameters, &storage, memory_pool, &new_block)?;
-                    }
                 }
                 BlockPath::SideChain(side_chain_path) => {
                     debug!(
