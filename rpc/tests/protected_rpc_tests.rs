@@ -80,7 +80,7 @@ mod protected_rpc_tests {
         let context = Context::new(server_address, 5, 1, 10, true, vec![]);
 
         let storage = storage.clone();
-        let storage_path = storage.storage.db.path().into_path_buf();
+        let storage_path = storage.storage.db.path().to_path_buf();
 
         let rpc_impl = RpcImpl::new(
             storage,
