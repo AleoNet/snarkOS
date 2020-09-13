@@ -281,7 +281,7 @@ impl ConsensusParameters {
         Ok(())
     }
 
-    /// Receive a block from an external source and process it based on ledger state
+    /// Receive a block from an external source and process it based on ledger state.
     pub fn receive_block(
         &self,
         parameters: &PublicParameters<Components>,

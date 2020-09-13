@@ -64,6 +64,7 @@ impl MinerInstance {
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
 
             let mut mining_failure_count = 0;
+            let mining_failure_threshold = 10;
 
             loop {
                 info!("Starting to mine the next block");
@@ -73,10 +74,18 @@ impl MinerInstance {
                     .await
                 {
                     Ok(mined_block) => mined_block,
-                    Err(_) => {
+                    Err(error) => {
+                        warn!(
+                            "Miner failed to mine a block {} time(s). (error message: {}).",
+                            mining_failure_count, error
+                        );
                         mining_failure_count += 1;
 
-                        if mining_failure_count >= 10 {
+                        if mining_failure_count >= mining_failure_threshold {
+                            warn!(
+                                "Miner has failed to mine a block {} times. Shutting down miner.",
+                                mining_failure_count
+                            );
                             break;
                         } else {
                             continue;

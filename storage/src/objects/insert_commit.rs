@@ -21,7 +21,8 @@ use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
-    pub(crate) fn process_transaction(
+    /// Commit a transaction to the canon chain
+    pub(crate) fn commit_transaction(
         &self,
         sn_index: &mut usize,
         cm_index: &mut usize,
@@ -75,6 +76,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         Ok((ops, cms))
     }
 
+    /// Insert a block into storage without canonizing/committing it.
     pub fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
 
@@ -128,7 +130,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_HEADER,
-            key: block.header.get_hash().0.to_vec(),
+            key: block_hash.0.to_vec(),
             value: to_bytes![block.header]?.to_vec(),
         });
         database_transaction.push(Op::Insert {
@@ -207,7 +209,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         let mut transaction_cms = vec![];
 
         for transaction in block.transactions.0.iter() {
-            let (tx_ops, cms) = self.process_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
+            let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
         }
