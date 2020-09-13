@@ -171,7 +171,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             let new_latest_block_height = bytes_to_u32(latest_block_height_bytes);
             let mut latest_block_height = self.latest_block_height.write();
 
-            if new_latest_block_height >= *latest_block_height {
+            if new_latest_block_height > *latest_block_height {
                 *latest_block_height = new_latest_block_height;
 
                 // Update the Merkle tree of the secondary instance.
