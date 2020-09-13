@@ -208,18 +208,20 @@ impl Server {
                 .is_ok();
             drop(memory_pool);
 
-            let mut sync_handler = self.sync_handler_lock.lock().await;
-            sync_handler.clear_pending(Arc::clone(&self.storage));
-
             if inserted && propagate {
                 // This is a new block, send it to our peers.
 
                 propagate_block(self.context.clone(), message.data, channel.address).await?;
-            } else if !propagate && sync_handler.sync_state != SyncState::Idle {
-                // We are syncing with another node, ask for the next block.
+            } else if !propagate {
+                if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
+                    sync_handler.clear_pending(Arc::clone(&self.storage));
 
-                if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                    sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                    if sync_handler.sync_state != SyncState::Idle {
+                        // We are currently syncing with a node, ask for the next block.
+                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                        }
+                    }
                 }
             }
         }
