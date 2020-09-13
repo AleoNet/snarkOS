@@ -37,7 +37,7 @@ use tokio::sync::Mutex;
 /// This may be changed in the future to give the node more control of the rpc server.
 pub async fn start_rpc_server(
     rpc_port: u16,
-    storage: Arc<MerkleTreeLedger>,
+    secondary_storage: Arc<MerkleTreeLedger>,
     storage_path: PathBuf,
     parameters: PublicParameters<Components>,
     server_context: Arc<Context>,
@@ -54,7 +54,7 @@ pub async fn start_rpc_server(
     };
 
     let rpc_impl = RpcImpl::new(
-        storage,
+        secondary_storage,
         storage_path,
         parameters,
         server_context,
