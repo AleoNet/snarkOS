@@ -298,6 +298,8 @@ impl Server {
                             context.peer_book.write().await.forget_peer(receiver_address);
                         }
 
+                        drop(local_address);
+
                         context.connections.write().await.store_channel(&handshake.channel);
 
                         if let Some(version) = version_message {

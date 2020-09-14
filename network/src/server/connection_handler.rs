@@ -140,7 +140,7 @@ impl Server {
                             sync_handler.sync_node = peer.0.clone();
                         };
                     }
-                    // drop(sync_handler);
+                    drop(sync_handler);
                 }
 
                 // Store connected peers in database.
@@ -215,6 +215,11 @@ impl Server {
                 } else {
                     interval_ticker += 1;
                 }
+
+                // Drop the locks
+                drop(peer_book);
+                drop(connections);
+                drop(pings);
             }
         });
     }
