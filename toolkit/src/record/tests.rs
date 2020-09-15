@@ -16,7 +16,7 @@
 
 use crate::{
     account::{Address, PrivateKey},
-    dpc::{OfflineTransaction, Record},
+    record::Record,
 };
 
 use rand::SeedableRng;
