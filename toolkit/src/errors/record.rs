@@ -20,6 +20,12 @@ pub enum RecordError {
     Crate(&'static str, String),
 }
 
+impl From<hex::FromHexError> for RecordError {
+    fn from(error: hex::FromHexError) -> Self {
+        RecordError::Crate("hex", format!("{:?}", error))
+    }
+}
+
 impl From<snarkos_errors::dpc::DPCError> for RecordError {
     fn from(error: snarkos_errors::dpc::DPCError) -> Self {
         RecordError::Crate("snarkos_errors::dpc", format!("{:?}", error))
