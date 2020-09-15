@@ -97,3 +97,21 @@ impl From<std::io::Error> for SignatureError {
         SignatureError::Crate("std::io", format!("{:?}", error))
     }
 }
+
+#[derive(Debug, Error)]
+pub enum RecordError {
+    #[error("{}: {}", _0, _1)]
+    Crate(&'static str, String),
+}
+
+impl From<snarkos_errors::dpc::DPCError> for RecordError {
+    fn from(error: snarkos_errors::dpc::DPCError) -> Self {
+        RecordError::Crate("snarkos_errors::dpc", format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for RecordError {
+    fn from(error: std::io::Error) -> Self {
+        RecordError::Crate("std::io", format!("{:?}", error))
+    }
+}
