@@ -54,7 +54,7 @@ pub fn view_key_from_private_key_test() {
 pub fn record_decrpyption_test() {
     let view_key = ViewKey::from_private_key(TEST_PRIVATE_KEY).view_key.to_string();
 
-    let record = Record::decrypt_record(TEST_ENCRYPTED_RECORD, &view_key);
+    let record = Record::decrypt(TEST_ENCRYPTED_RECORD, &view_key);
 
     println!("{} == {}", TEST_RECORD, record.record.to_string());
     assert_eq!(TEST_RECORD, record.record.to_string());
@@ -66,7 +66,7 @@ pub fn serial_number_derivation_test() {
     let private_key = account.private_key.to_string();
 
     let record = Record::from_string(TEST_RECORD);
-    let serial_number = record.derive_serial_number(&private_key);
+    let serial_number = record.to_serial_number(&private_key);
 
     println!("{} == {}", TEST_SERIAL_NUMBER, serial_number);
     assert_eq!(TEST_SERIAL_NUMBER, serial_number);

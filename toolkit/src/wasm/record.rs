@@ -36,16 +36,16 @@ impl Record {
     }
 
     #[wasm_bindgen]
-    pub fn decrypt_record(encrypted_record: &str, view_key: &str) -> Self {
+    pub fn decrypt(encrypted_record: &str, view_key: &str) -> Self {
         let view_key = ViewKey::from_str(view_key).unwrap();
-        let record = RecordNative::decrypt_record(encrypted_record, &view_key).unwrap();
+        let record = RecordNative::decrypt(encrypted_record, &view_key).unwrap();
         Self { record }
     }
 
     #[wasm_bindgen]
-    pub fn derive_serial_number(&self, private_key: &str) -> String {
+    pub fn to_serial_number(&self, private_key: &str) -> String {
         let private_key = PrivateKey::from_str(private_key).unwrap();
-        let serial_number = self.record.derive_serial_number(&private_key).unwrap();
+        let serial_number = self.record.to_serial_number(&private_key).unwrap();
         hex::encode(serial_number)
     }
 

@@ -45,7 +45,7 @@ impl Record {
         output
     }
 
-    pub fn decrypt_record(encrypted_record: &str, view_key: &ViewKey) -> Result<Self, RecordError> {
+    pub fn decrypt(encrypted_record: &str, view_key: &ViewKey) -> Result<Self, RecordError> {
         let encrypted_record_bytes = hex::decode(encrypted_record)?;
         let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
 
@@ -55,7 +55,7 @@ impl Record {
         Ok(Self { record })
     }
 
-    pub fn derive_serial_number(&self, private_key: &PrivateKey) -> Result<Vec<u8>, RecordError> {
+    pub fn to_serial_number(&self, private_key: &PrivateKey) -> Result<Vec<u8>, RecordError> {
         let address = Address::from(&private_key)?;
 
         // Check that the private key corresponds with the owner of the record

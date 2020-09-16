@@ -44,7 +44,7 @@ pub fn serial_number_derivation_test() {
     let record = Record::from_str(TEST_RECORD).unwrap();
     let private_key = PrivateKey::from_str(TEST_PRIVATE_KEY).unwrap();
 
-    let serial_number = record.derive_serial_number(&private_key);
+    let serial_number = record.to_serial_number(&private_key);
     assert!(serial_number.is_ok());
 
     let candidate_serial_number = hex::encode(serial_number.unwrap());
@@ -58,7 +58,7 @@ pub fn decrypt_record_test() {
     let private_key = PrivateKey::from_str(TEST_PRIVATE_KEY).unwrap();
     let view_key = ViewKey::from(&private_key).unwrap();
 
-    let record = Record::decrypt_record(TEST_ENCRYPTED_RECORD, &view_key);
+    let record = Record::decrypt(TEST_ENCRYPTED_RECORD, &view_key);
     assert!(record.is_ok());
 
     let candidate_record = record.unwrap().to_string();
