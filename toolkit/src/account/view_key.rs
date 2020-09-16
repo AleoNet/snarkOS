@@ -40,9 +40,9 @@ impl ViewKey {
 impl FromStr for ViewKey {
     type Err = ViewKeyError;
 
-    fn from_str(private_key: &str) -> Result<Self, Self::Err> {
+    fn from_str(view_key: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            view_key: AccountViewKey::<Components>::from_str(private_key)?,
+            view_key: AccountViewKey::<Components>::from_str(view_key)?,
         })
     }
 }

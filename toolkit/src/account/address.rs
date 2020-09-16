@@ -24,7 +24,7 @@ use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
 pub struct Address {
-    address: AccountAddress<Components>,
+    pub(crate) address: AccountAddress<Components>,
 }
 
 impl Address {
