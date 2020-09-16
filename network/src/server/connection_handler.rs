@@ -79,30 +79,39 @@ impl Server {
 
                     // Try and connect to our gossiped peers.
                     for (address, _last_seen) in peer_book.get_gossiped() {
-                        if address != *context.local_address.read().await && !peer_book.connected_contains(&address) {
-                            if let Err(_) = context
-                                .handshakes
-                                .write()
-                                .await
-                                .send_request(
-                                    1u64, // TODO (raychu86) Establish a formal node version
-                                    storage.get_latest_block_height(),
-                                    *context.local_address.read().await,
-                                    address,
-                                )
-                                .await
+                        if address != local_address && !peer_book.connected_contains(&address) {
+                            // Create a non-blocking handshake request
                             {
-                                debug!("Could not connect to gossiped peer {}", address);
-                                peer_book.forget_peer(address);
+                                let new_context = context.clone();
+                                let latest_block_height = storage.get_latest_block_height();
+
+                                task::spawn(async move {
+                                    if let Err(_) = new_context
+                                        .handshakes
+                                        .write()
+                                        .await
+                                        .send_request(
+                                            1u64, // TODO (raychu86) Establish a formal node version
+                                            latest_block_height,
+                                            local_address,
+                                            address,
+                                        )
+                                        .await
+                                    {
+                                        debug!("Could not connect to gossiped peer {}", address);
+                                    }
+                                });
                             }
                         }
+
+                        peer_book.remove_gossiped(address);
                     }
                 }
 
                 // Send a ping protocol request to each of our connected peers to maintain the connection.
                 for (address, last_seen) in peer_book.get_connected() {
                     let time_since_last_seen = (Utc::now() - last_seen).num_milliseconds();
-                    if address != *context.local_address.read().await
+                    if address != local_address
                         && time_since_last_seen.is_positive()
                         && time_since_last_seen as u64 > (connection_frequency * 3)
                     {
@@ -166,7 +175,7 @@ impl Server {
                                         version,
                                         storage.get_latest_block_height(),
                                         address,
-                                        *context.local_address.read().await,
+                                        local_address,
                                         nonce,
                                     );
                                     if let Err(_) = channel.write(&message).await {
@@ -186,7 +195,7 @@ impl Server {
                 if interval_ticker >= context.memory_pool_interval {
                     if let Ok(sync_handler) = sync_handler_lock.try_lock() {
                         // Ask our sync node for more transactions.
-                        if *context.local_address.read().await != sync_handler.sync_node {
+                        if local_address != sync_handler.sync_node {
                             if let Some(channel) = connections.get(&sync_handler.sync_node) {
                                 if let Err(_) = channel.write(&GetMemoryPool).await {
                                     peer_book.disconnect_peer(sync_handler.sync_node);
@@ -220,6 +229,7 @@ impl Server {
                 drop(peer_book);
                 drop(connections);
                 drop(pings);
+                drop(local_address);
             }
         });
     }
