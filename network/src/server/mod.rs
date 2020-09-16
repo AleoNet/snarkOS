@@ -93,12 +93,23 @@ pub async fn process_transaction_internal(
 pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: SocketAddr) -> Result<(), SendError> {
     debug!("Propagating a block to peers");
 
+    let mut num_peers = 0;
+
     for (socket, _) in &context.peer_book.read().await.get_connected() {
         if *socket != block_miner && *socket != *context.local_address.read().await {
             if let Some(channel) = context.connections.read().await.get(socket) {
-                channel.write(&Block::new(data.clone())).await?;
+                match channel.write(&Block::new(data.clone())).await {
+                    Ok(_) => num_peers += 1,
+                    Err(error) => warn!(
+                        "Failed to propagate block to peer {}. (error message: {})",
+                        channel.address, error
+                    ),
+                }
             }
         }
     }
+
+    debug!("Block propagated to {} peers", num_peers);
+
     Ok(())
 }
