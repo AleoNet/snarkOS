@@ -295,12 +295,19 @@ impl Server {
                         if *local_address != receiver_address {
                             *local_address = receiver_address;
                             info!("Discovered local address: {:?}", *local_address);
-                            context.peer_book.write().await.forget_peer(receiver_address);
+                            let mut peer_book = context.peer_book.write().await;
+                            peer_book.forget_peer(receiver_address);
+                            drop(peer_book);
                         }
 
                         drop(local_address);
 
-                        context.connections.write().await.store_channel(&handshake.channel);
+                        // Store the channel established with the handshake
+                        {
+                            let mut connections = context.connections.write().await;
+                            connections.store_channel(&handshake.channel);
+                            drop(connections);
+                        }
 
                         if let Some(version) = version_message {
                             // If our peer has a longer chain, send a sync message

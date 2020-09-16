@@ -479,7 +479,7 @@ impl Server {
 
             // If our peer has a longer chain, send a sync message
             if message.height > self.storage.get_latest_block_height() {
-                debug!("Received a version message with a greater height.");
+                debug!("Received a version message with a greater height {}", message.height);
                 // Update the sync node if the sync_handler is Idle or there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                     if !sync_handler.is_syncing()
