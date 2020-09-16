@@ -173,6 +173,7 @@ impl Server {
                 info!("Disconnected from peer: {:?}", channel.address);
                 let mut peer_book = self.context.peer_book.write().await;
                 peer_book.disconnect_peer(channel.address);
+                drop(peer_book);
             } else {
                 debug!("Message name not recognized {:?}", name.to_string());
             }
