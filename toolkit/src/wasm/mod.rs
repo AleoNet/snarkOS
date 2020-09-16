@@ -17,6 +17,9 @@
 pub mod account;
 pub use account::*;
 
+pub mod record;
+pub use record::*;
+
 pub mod signature;
 pub use signature::*;
 
