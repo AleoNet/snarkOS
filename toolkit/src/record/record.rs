@@ -45,6 +45,7 @@ impl Record {
         output
     }
 
+    /// Decrypt the encrypted record given a view key.
     pub fn decrypt(encrypted_record: &str, view_key: &ViewKey) -> Result<Self, RecordError> {
         let encrypted_record_bytes = hex::decode(encrypted_record)?;
         let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
@@ -55,6 +56,7 @@ impl Record {
         Ok(Self { record })
     }
 
+    /// Return the serial number that corresponds to the record.
     pub fn to_serial_number(&self, private_key: &PrivateKey) -> Result<Vec<u8>, RecordError> {
         let address = Address::from(&private_key)?;
 
