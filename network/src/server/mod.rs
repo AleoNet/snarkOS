@@ -75,13 +75,26 @@ pub async fn process_transaction_internal(
             if inserted.is_some() {
                 debug!("Transaction added to memory pool. Propagating transaction to peers");
 
-                for (socket, _) in &context.peer_book.read().await.get_connected() {
-                    if *socket != transaction_sender && *socket != *context.local_address.read().await {
-                        if let Some(channel) = context.connections.read().await.get(socket) {
-                            channel.write(&Transaction::new(transaction_bytes.clone())).await?;
+                let peer_book = context.peer_book.read().await;
+                let local_address = *context.local_address.read().await;
+                let connections = context.connections.read().await;
+                let mut num_peers = 0;
+
+                for (socket, _) in &peer_book.get_connected() {
+                    if *socket != transaction_sender && *socket != local_address {
+                        if let Some(channel) = connections.get(socket) {
+                            match channel.write(&Transaction::new(transaction_bytes.clone())).await {
+                                Ok(_) => num_peers += 1,
+                                Err(error) => warn!(
+                                    "Failed to propagate transaction to peer {}. (error message: {})",
+                                    channel.address, error
+                                ),
+                            }
                         }
                     }
                 }
+
+                debug!("Transaction propagated to {} peers", num_peers);
             }
         }
     }
@@ -93,12 +106,26 @@ pub async fn process_transaction_internal(
 pub async fn propagate_block(context: Arc<Context>, data: Vec<u8>, block_miner: SocketAddr) -> Result<(), SendError> {
     debug!("Propagating a block to peers");
 
-    for (socket, _) in &context.peer_book.read().await.get_connected() {
-        if *socket != block_miner && *socket != *context.local_address.read().await {
-            if let Some(channel) = context.connections.read().await.get(socket) {
-                channel.write(&Block::new(data.clone())).await?;
+    let peer_book = context.peer_book.read().await;
+    let local_address = *context.local_address.read().await;
+    let connections = context.connections.read().await;
+    let mut num_peers = 0;
+
+    for (socket, _) in &peer_book.get_connected() {
+        if *socket != block_miner && *socket != local_address {
+            if let Some(channel) = connections.get(socket) {
+                match channel.write(&Block::new(data.clone())).await {
+                    Ok(_) => num_peers += 1,
+                    Err(error) => warn!(
+                        "Failed to propagate block to peer {}. (error message: {})",
+                        channel.address, error
+                    ),
+                }
             }
         }
     }
+
+    debug!("Block propagated to {} peers", num_peers);
+
     Ok(())
 }

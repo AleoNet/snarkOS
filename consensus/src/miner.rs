@@ -197,7 +197,14 @@ impl Miner {
         self.consensus
             .receive_block(parameters, storage, &mut memory_pool, &block)?;
 
-        storage.store_records(&coinbase_records)?;
+        // Store the non-dummy coinbase records.
+        let mut records_to_store = vec![];
+        for record in &coinbase_records {
+            if !record.is_dummy() {
+                records_to_store.push(record.clone());
+            }
+        }
+        storage.store_records(&records_to_store)?;
 
         Ok((block.serialize()?, coinbase_records))
     }

@@ -105,8 +105,9 @@ impl Channel {
         let serialized = message.serialize()?;
         let header = MessageHeader::new(M::name(), serialized.len() as u32);
 
-        self.writer.lock().await.write_all(&header.serialize()?).await?;
-        self.writer.lock().await.write_all(&serialized).await?;
+        let mut writer = self.writer.lock().await;
+        writer.write_all(&header.serialize()?).await?;
+        writer.write_all(&serialized).await?;
 
         Ok(())
     }

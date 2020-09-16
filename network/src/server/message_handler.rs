@@ -171,9 +171,10 @@ impl Server {
                 }
             } else if name == MessageName::from("disconnect") {
                 info!("Disconnected from peer: {:?}", channel.address);
-                let mut peer_book = self.context.peer_book.write().await;
-                peer_book.disconnect_peer(channel.address);
-                drop(peer_book);
+                {
+                    let mut peer_book = self.context.peer_book.write().await;
+                    peer_book.disconnect_peer(channel.address);
+                }
             } else {
                 debug!("Message name not recognized {:?}", name.to_string());
             }
@@ -202,25 +203,26 @@ impl Server {
 
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {
-            let mut memory_pool = self.memory_pool_lock.lock().await;
-            let inserted = self
-                .consensus
-                .receive_block(&self.parameters, &self.storage, &mut memory_pool, &block)
-                .is_ok();
-            drop(memory_pool);
+            {
+                let mut memory_pool = self.memory_pool_lock.lock().await;
+                let inserted = self
+                    .consensus
+                    .receive_block(&self.parameters, &self.storage, &mut memory_pool, &block)
+                    .is_ok();
 
-            if inserted && propagate {
-                // This is a new block, send it to our peers.
+                if inserted && propagate {
+                    // This is a new block, send it to our peers.
 
-                propagate_block(self.context.clone(), message.data, channel.address).await?;
-            } else if !propagate {
-                if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
-                    sync_handler.clear_pending(Arc::clone(&self.storage));
+                    propagate_block(self.context.clone(), message.data, channel.address).await?;
+                } else if !propagate {
+                    if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
+                        sync_handler.clear_pending(Arc::clone(&self.storage));
 
-                    if sync_handler.sync_state != SyncState::Idle {
-                        // We are currently syncing with a node, ask for the next block.
-                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                        if sync_handler.sync_state != SyncState::Idle {
+                            // We are currently syncing with a node, ask for the next block.
+                            if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                                sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                            }
                         }
                     }
                 }
@@ -254,7 +256,6 @@ impl Server {
                 transactions.push(transaction_bytes);
             }
         }
-        drop(memory_pool);
 
         if !transactions.is_empty() {
             channel.write(&MemoryPool::new(transactions)).await?;
@@ -479,12 +480,13 @@ impl Server {
 
             // If our peer has a longer chain, send a sync message
             if message.height > self.storage.get_latest_block_height() {
+                debug!("Received a version message with a greater height {}", message.height);
                 // Update the sync node if the sync_handler is Idle or there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                     if !sync_handler.is_syncing()
-                        && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
+                        || (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
                     {
-                        debug!("Received a version message with a greater height. Attempting to sync.");
+                        debug!("Attempting to sync with peer {}", peer_address);
                         sync_handler.sync_node = peer_address;
 
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {

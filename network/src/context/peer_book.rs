@@ -97,6 +97,11 @@ impl PeerBook {
         self.disconnected.remove(&address);
     }
 
+    /// Remove_gossiped peer
+    pub fn remove_gossiped(&mut self, address: SocketAddr) -> bool {
+        self.gossiped.remove(&address).is_some()
+    }
+
     /// Returns the number of connected peers.
     pub fn connected_total(&self) -> u16 {
         self.connected.length()

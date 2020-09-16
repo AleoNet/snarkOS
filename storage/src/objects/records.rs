@@ -55,7 +55,6 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Get a transaction bytes given the transaction id.
     pub fn store_record<R: Record>(&self, record: &R) -> Result<(), StorageError> {
-        // TODO (raychu86) No need to store dummy records
         let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Insert {
