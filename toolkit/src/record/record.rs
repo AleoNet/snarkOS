@@ -14,9 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::RecordError;
+use crate::{
+    account::{Address, PrivateKey, ViewKey},
+    errors::RecordError,
+};
 
-use snarkos_dpc::base_dpc::{instantiated::Components, DPCRecord};
+use snarkos_dpc::base_dpc::{
+    instantiated::Components,
+    parameters::SystemParameters,
+    record::{DPCRecord, EncryptedRecord, RecordEncryption},
+    DPC,
+};
+use snarkos_models::dpc::Record as RecordTrait;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -34,6 +43,31 @@ impl Record {
         let mut output = vec![];
         self.record.write(&mut output).expect("serialization to bytes failed");
         output
+    }
+
+    pub fn decrypt_record(encrypted_record: &str, view_key: &ViewKey) -> Result<Self, RecordError> {
+        let encrypted_record_bytes = hex::decode(encrypted_record)?;
+        let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
+
+        let parameters = SystemParameters::<Components>::load()?;
+        let record = RecordEncryption::decrypt_record(&parameters, &view_key.view_key, &encrypted_record)?;
+
+        Ok(Self { record })
+    }
+
+    pub fn derive_serial_number(&self, private_key: &PrivateKey) -> Result<Vec<u8>, RecordError> {
+        let address = Address::from(&private_key)?;
+
+        // Check that the private key corresponds with the owner of the record
+        if self.record.owner() != &address.address {
+            return Err(RecordError::InvalidPrivateKey);
+        }
+
+        let parameters = SystemParameters::<Components>::load()?;
+        let (serial_number, _randomizer) =
+            DPC::<Components>::generate_sn(&parameters, &self.record, &private_key.private_key)?;
+
+        Ok(to_bytes![serial_number]?)
     }
 }
 

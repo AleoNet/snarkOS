@@ -14,10 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::errors::AddressError;
+
 #[derive(Debug, Error)]
 pub enum RecordError {
+    #[error("{}", _0)]
+    AddressError(AddressError),
+
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[error("invalid private key for the record")]
+    InvalidPrivateKey,
+}
+
+impl From<AddressError> for RecordError {
+    fn from(error: AddressError) -> Self {
+        RecordError::AddressError(error)
+    }
 }
 
 impl From<hex::FromHexError> for RecordError {
