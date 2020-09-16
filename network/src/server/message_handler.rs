@@ -171,9 +171,10 @@ impl Server {
                 }
             } else if name == MessageName::from("disconnect") {
                 info!("Disconnected from peer: {:?}", channel.address);
-                let mut peer_book = self.context.peer_book.write().await;
-                peer_book.disconnect_peer(channel.address);
-                drop(peer_book);
+                {
+                    let mut peer_book = self.context.peer_book.write().await;
+                    peer_book.disconnect_peer(channel.address);
+                }
             } else {
                 debug!("Message name not recognized {:?}", name.to_string());
             }
@@ -202,12 +203,13 @@ impl Server {
 
         // Verify the block and insert it into the storage.
         if !self.storage.block_hash_exists(&block.header.get_hash()) {
-            let mut memory_pool = self.memory_pool_lock.lock().await;
-            let inserted = self
-                .consensus
-                .receive_block(&self.parameters, &self.storage, &mut memory_pool, &block)
-                .is_ok();
-            drop(memory_pool);
+            {
+                let mut memory_pool = self.memory_pool_lock.lock().await;
+                let inserted = self
+                    .consensus
+                    .receive_block(&self.parameters, &self.storage, &mut memory_pool, &block)
+                    .is_ok();
+            }
 
             if inserted && propagate {
                 // This is a new block, send it to our peers.
@@ -254,7 +256,6 @@ impl Server {
                 transactions.push(transaction_bytes);
             }
         }
-        drop(memory_pool);
 
         if !transactions.is_empty() {
             channel.write(&MemoryPool::new(transactions)).await?;

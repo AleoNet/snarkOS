@@ -291,22 +291,20 @@ impl Server {
                         .await
                     {
                         // Bootstrap discovery of local node IP via VERACK responses
-                        let mut local_address = context.local_address.write().await;
-                        if *local_address != receiver_address {
-                            *local_address = receiver_address;
-                            info!("Discovered local address: {:?}", *local_address);
-                            let mut peer_book = context.peer_book.write().await;
-                            peer_book.forget_peer(receiver_address);
-                            drop(peer_book);
+                        {
+                            let mut local_address = context.local_address.write().await;
+                            if *local_address != receiver_address {
+                                *local_address = receiver_address;
+                                info!("Discovered local address: {:?}", *local_address);
+                                let mut peer_book = context.peer_book.write().await;
+                                peer_book.forget_peer(receiver_address);
+                            }
                         }
-
-                        drop(local_address);
 
                         // Store the channel established with the handshake
                         {
                             let mut connections = context.connections.write().await;
                             connections.store_channel(&handshake.channel);
-                            drop(connections);
                         }
 
                         if let Some(version) = version_message {
