@@ -16,3 +16,6 @@
 
 pub mod connection_handler;
 pub use connection_handler::*;
+
+pub mod message_handler;
+pub use message_handler::*;

@@ -15,14 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message::{Message, MessageName},
-    message_types::*,
-    outbound::Channel,
+    outbound::{
+        message::{Message, MessageName},
+        message_types::*,
+        protocol::SyncState,
+        Channel,
+    },
     process_transaction_internal,
     propagate_block,
     Pings,
     Server,
-    SyncState,
 };
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_dpc::base_dpc::instantiated::Tx;
@@ -43,7 +45,7 @@ impl Server {
     /// the message name, bytes, associated channel, and a tokio oneshot sender.
     ///
     /// The oneshot sender lets the connection thread know when the message is handled.
-    pub(in crate::server) async fn message_handler(&mut self) -> Result<(), ServerError> {
+    pub async fn message_handler(&mut self) -> Result<(), ServerError> {
         // TODO (raychu86) Create a macro to the handle the error messages.
         while let Some((tx, name, bytes, mut channel)) = self.receiver.recv().await {
             if name == Block::name() {
