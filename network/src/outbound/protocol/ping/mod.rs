@@ -14,14 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod address_book;
-pub use address_book::*;
+pub mod ping;
+pub use ping::*;
 
-pub mod connections;
-pub use connections::*;
-
-pub mod context;
-pub use context::*;
-
-pub mod peer_book;
-pub use peer_book::*;
+pub mod pings;
+pub use pings::*;
