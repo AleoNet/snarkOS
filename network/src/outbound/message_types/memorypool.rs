@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::message::{Message, MessageName};
+use crate::outbound::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/memory_pool.md"))]

@@ -17,6 +17,9 @@
 pub mod channel;
 pub use channel::*;
 
+pub mod message;
+pub use message::*;
+
 /// Messages are serialized into bytes for transmission, and deserialized into a message payload when received.
 pub mod message_types;
 #[doc(inline)]

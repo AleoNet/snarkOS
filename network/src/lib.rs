@@ -30,9 +30,6 @@ pub use context::*;
 pub mod inbound;
 pub use inbound::*;
 
-pub mod message;
-pub use message::*;
-
 pub mod outbound;
 pub use outbound::*;
 

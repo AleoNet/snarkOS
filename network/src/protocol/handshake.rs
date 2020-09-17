@@ -163,7 +163,7 @@ impl Handshake {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::Message;
+    use crate::outbound::message::Message;
     use snarkos_testing::network::random_socket_address;
 
     use serial_test::serial;

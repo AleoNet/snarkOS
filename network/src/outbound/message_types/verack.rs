@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::message::{Message, MessageName};
+use crate::outbound::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 use std::net::SocketAddr;
@@ -71,7 +71,7 @@ impl Message for Verack {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message_types::Version;
+    use crate::outbound::message_types::Version;
     use snarkos_testing::network::random_socket_address;
 
     #[test]

@@ -178,7 +178,7 @@ impl Handshakes {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Message;
+    use crate::outbound::Message;
     use snarkos_testing::network::random_socket_address;
 
     use serial_test::serial;
