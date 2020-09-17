@@ -21,7 +21,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use rand::Rng;
 use std::io::Cursor;
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/ping.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/ping.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Ping {
     /// Unique ping protocol identifier

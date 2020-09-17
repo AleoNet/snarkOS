@@ -18,7 +18,7 @@ use crate::outbound::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_block.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_block.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct GetBlock {
     /// Header hash of requested block

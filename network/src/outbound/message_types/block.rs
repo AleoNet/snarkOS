@@ -17,7 +17,7 @@
 use crate::outbound::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/block.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/block.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
     /// Serialized block data

@@ -21,7 +21,7 @@ use chrono::Utc;
 use rand::Rng;
 use std::net::SocketAddr;
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/version.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Version {
     /// The network version number

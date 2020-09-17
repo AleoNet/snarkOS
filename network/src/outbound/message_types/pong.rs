@@ -23,7 +23,7 @@ use snarkos_errors::network::message::MessageError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/pong.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/pong.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pong {
     /// Unique ping protocol identifier

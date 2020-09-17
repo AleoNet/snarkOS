@@ -19,7 +19,7 @@ use snarkos_errors::network::message::MessageError;
 
 use std::net::SocketAddr;
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/verack.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/verack.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Verack {
     /// Random nonce sequence number

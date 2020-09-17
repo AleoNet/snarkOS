@@ -20,7 +20,7 @@ use snarkos_errors::network::message::MessageError;
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/peers.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Peers {
     /// A list of gossiped peer addresses and their last seen dates
