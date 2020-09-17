@@ -28,7 +28,7 @@ use snarkos_errors::node::NodeError;
 use snarkos_models::algorithms::{CRH, SNARK};
 use snarkos_network::{
     context::Context,
-    protocol::SyncHandler,
+    outbound::protocol::SyncHandler,
     server::{MinerInstance, Server},
 };
 use snarkos_objects::{AccountAddress, Network};

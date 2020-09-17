@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{context::Context, message::MessageName, message_types::GetSync, outbound::Channel, protocol::*};
+use crate::{
+    context::Context,
+    outbound::{message::MessageName, message_types::GetSync, protocol::*, Channel},
+};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},

@@ -33,8 +33,5 @@ pub use inbound::*;
 pub mod outbound;
 pub use outbound::*;
 
-pub mod protocol;
-pub use protocol::*;
-
 pub mod server;
 pub use server::*;
