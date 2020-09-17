@@ -13,36 +13,3 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-
-// Compilation
-#![warn(unused_extern_crates)]
-#![forbid(unsafe_code)]
-// Documentation
-#![cfg_attr(nightly, feature(doc_cfg, external_doc))]
-#![cfg_attr(nightly, doc(include = "../documentation/concepts/network_server.md"))]
-
-#[macro_use]
-extern crate log;
-
-pub mod context;
-pub use context::*;
-
-pub mod inbound;
-pub use inbound::*;
-
-pub mod message;
-pub use message::*;
-
-/// Messages are serialized into bytes for transmission, and deserialized into a message payload when received.
-pub mod message_types;
-#[doc(inline)]
-pub use message_types::*;
-
-pub mod outbound;
-pub use outbound::*;
-
-pub mod protocol;
-pub use protocol::*;
-
-pub mod server;
-pub use server::*;
