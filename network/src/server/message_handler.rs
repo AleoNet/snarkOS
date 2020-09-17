@@ -15,8 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message::{Channel, Message, MessageName},
+    message::{Message, MessageName},
     message_types::*,
+    outbound::Channel,
     process_transaction_internal,
     propagate_block,
     Pings,

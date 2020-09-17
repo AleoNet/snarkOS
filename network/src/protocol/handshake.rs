@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    message::Channel,
     message_types::{Verack, Version},
+    outbound::Channel,
 };
 use snarkos_errors::network::HandshakeError;
 
