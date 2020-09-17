@@ -15,8 +15,12 @@ pub fn main() {
     println!("{}", encoded_transaction);
 
     // Write the transaction to a file
-    let mut file_name = current_dir().unwrap();
-    file_name.push("dummy_transaction.txt");
+    //let mut file_name = current_dir().unwrap();
+    //file_name.push("dummy_transaction.txt");
+
+    let file_name = "/home/ubuntu/snarkOS/toolkit/dummy_transaction.txt";
+
+    std::fs::remove_file(file_name).unwrap();
 
     let mut file = File::create(file_name).unwrap();
     file.write_all(encoded_transaction.as_bytes()).unwrap();
