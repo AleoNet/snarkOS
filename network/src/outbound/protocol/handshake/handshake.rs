@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
+use crate::outbound::{
     message_types::{Verack, Version},
-    outbound::Channel,
+    Channel,
 };
 use snarkos_errors::network::HandshakeError;
 
