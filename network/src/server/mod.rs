@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod context;
+pub use context::*;
+
 pub mod miner_instance;
 pub use miner_instance::*;
 
 pub mod server;
 pub use server::*;
 
-use crate::{
-    message_types::{Block, Transaction},
-    Context,
-};
+use crate::outbound::message_types::{Block, Transaction};
+
 use snarkos_consensus::{
     memory_pool::{Entry, MemoryPool},
     ConsensusParameters,

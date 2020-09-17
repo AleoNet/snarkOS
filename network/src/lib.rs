@@ -24,9 +24,6 @@
 #[macro_use]
 extern crate log;
 
-pub mod context;
-pub use context::*;
-
 pub mod inbound;
 pub use inbound::*;
 
