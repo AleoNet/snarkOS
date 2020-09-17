@@ -13,3 +13,6 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
+pub mod connection_handler;
+pub use connection_handler::*;
