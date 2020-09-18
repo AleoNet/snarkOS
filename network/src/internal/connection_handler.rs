@@ -207,13 +207,16 @@ impl Server {
 
                     // Update our memory pool after memory_pool_interval frequency loops.
                     if interval_ticker >= context.memory_pool_interval {
-                        // Ask our connected peers for their memory pool transactions
+                        // Ask our sync node for their memory pool transactions
                         {
-                            for (address, _last_seen) in peer_book.get_connected() {
-                                if let Some(channel) = connections.get(&address) {
-                                    // Disconnect from the peer if the GetMemoryPool message was not sent properly
-                                    if let Err(_) = channel.write(&GetMemoryPool).await {
-                                        peer_book.disconnect_peer(address);
+                            if let Ok(sync_handler) = sync_handler_lock.try_lock() {
+                                // Ask our sync node for more transactions.
+                                if local_address != sync_handler.sync_node {
+                                    if let Some(channel) = connections.get(&sync_handler.sync_node) {
+                                        // Disconnect from the peer if the GetMemoryPool message was not sent properly
+                                        if let Err(_) = channel.write(&GetMemoryPool).await {
+                                            peer_book.disconnect_peer(sync_handler.sync_node);
+                                        }
                                     }
                                 }
                             }
