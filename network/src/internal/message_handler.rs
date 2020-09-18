@@ -228,8 +228,8 @@ impl Server {
                         if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                             sync_handler.update_pending_blocks(Arc::clone(&self.storage));
 
-                            if sync_handler.sync_state != SyncState::Idle {
-                                // We are currently syncing with a node, ask for the next block.
+                            if sync_handler.is_syncing() {
+                                // We are currently syncing with a node. Poll the sync handler to continue syncing.
                                 if let Some(channel) =
                                     self.context.connections.read().await.get(&sync_handler.sync_node)
                                 {
@@ -492,23 +492,39 @@ impl Server {
                 debug!("Received a version message with a greater height {}", message.height);
                 // Update the sync node if the sync_handler is Idle and there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
-                    if !sync_handler.is_syncing()
-                        && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
-                    {
+                    let mut swap_sync_nodes = false;
+
+                    match sync_handler.sync_state {
+                        SyncState::Idle => swap_sync_nodes = true,
+                        SyncState::Syncing(last_updated, _height) => {
+                            // If the node is currently syncing and the sync_node has not responded in 15 seconds,
+                            // attempt to connect to a new sync node
+                            if Utc::now().timestamp() - last_updated.timestamp() > 15 {
+                                swap_sync_nodes = true;
+                            } else {
+                                // We are currently syncing with a node. Poll the sync handler to continue syncing.
+                                if let Some(channel) =
+                                    self.context.connections.read().await.get(&sync_handler.sync_node)
+                                {
+                                    sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
+                                }
+                            }
+                        }
+                    }
+
+                    // If the node should swap sync nodes, then update the sync node and restart the sync
+                    if swap_sync_nodes {
                         debug!("Attempting to sync with peer {}", peer_address);
                         sync_handler.sync_node = peer_address;
 
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
                         }
-                    } else {
-                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                            sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
-                        }
                     }
                 }
             }
         }
+
         Ok(channel)
     }
 }
