@@ -88,9 +88,10 @@ impl Server {
         let (mut listener, local_address) = {
             let address = self.context.local_address.read().await;
             let local_address = format!("0.0.0.0:{}", address.port()).parse::<SocketAddr>()?;
+            info!("Starting listener...");
             (TcpListener::bind(&local_address).await?, local_address)
         };
-        info!("listening at {:?}", local_address);
+        info!("Listening at {:?}", local_address);
 
         // Prepare to spawn the main loop.
         let sender = self.sender.clone();
@@ -119,7 +120,7 @@ impl Server {
                 if context.peer_book.read().await.connected_total() >= context.max_peers {
                     warn!("Rejected a connection request as this exceeds the maximum number of peers allowed");
                     if let Err(error) = reader.shutdown(Shutdown::Write) {
-                        error!("Failed to shutdown peer reader");
+                        error!("Failed to shutdown peer reader ({})", error);
                     }
                     continue;
                 }
@@ -215,7 +216,7 @@ impl Server {
             }
 
             // Logs the failure and determines whether to disconnect from a peer.
-            fn handle_failure<T: std::fmt::Display>(
+            async fn handle_failure<T: std::fmt::Display>(
                 failure: &mut bool,
                 failure_count: &mut u8,
                 disconnect_from_peer: &mut bool,
@@ -236,6 +237,9 @@ impl Server {
                 } else {
                     debug!("Connection errored again in the same loop (error message: {})", error);
                 }
+
+                // Sleep for 10 seconds
+                tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
             }
 
             let mut failure_count = 0u8;
@@ -249,7 +253,7 @@ impl Server {
                 let (message_name, message_bytes) = match channel.read().await {
                     Ok((message_name, message_bytes)) => (message_name, message_bytes),
                     Err(error) => {
-                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
 
                         // Determine if we should send a disconnect message.
                         match disconnect_from_peer {
@@ -268,13 +272,16 @@ impl Server {
                     .send((tx, message_name, message_bytes, channel.clone()))
                     .await
                 {
-                    handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+                    handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
+                    continue;
                 };
 
                 // Wait for the message handler to give back channel control.
                 match rx.await {
                     Ok(peer_channel) => channel = peer_channel,
-                    Err(error) => handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error),
+                    Err(error) => {
+                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await
+                    }
                 };
 
                 // Break out of the loop if the peer disconnects.
