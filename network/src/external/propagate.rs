@@ -1,6 +1,6 @@
 use crate::{
     external::{Block, Transaction},
-    server::Context,
+    internal::context::Context,
 };
 use snarkos_errors::network::SendError;
 

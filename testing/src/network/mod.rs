@@ -19,7 +19,8 @@ use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{
     external::{Channel, SyncHandler},
-    server::{Context, Server},
+    internal::context::Context,
+    Server,
 };
 
 use rand::Rng;
