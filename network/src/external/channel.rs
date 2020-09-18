@@ -142,14 +142,14 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_write() {
-        // 1. Start peer node
+        // 1. Start remote node
 
-        let peer_address = random_socket_address();
-        simulate_active_node(peer_address).await;
+        let remote_address = random_socket_address();
+        simulate_active_node(remote_address).await;
 
         // 2. Server connect to peer
 
-        let server_channel = Channel::new_write_only(peer_address).await.unwrap();
+        let server_channel = Channel::new_write_only(remote_address).await.unwrap();
 
         // 3. Server write message to peer
 
@@ -159,13 +159,13 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_read() {
-        let peer_address = random_socket_address();
-        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+        let remote_address = random_socket_address();
+        let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         tokio::spawn(async move {
             // 1. Server connects to peer
 
-            let server_channel = Channel::new_write_only(peer_address).await.unwrap();
+            let server_channel = Channel::new_write_only(remote_address).await.unwrap();
 
             // 2. Server writes ping message
 
@@ -174,7 +174,7 @@ mod tests {
 
         // 2. Peer accepts server connection
 
-        let (reader, _address) = peer_listener.accept().await.unwrap();
+        let (reader, _address) = remote_listener.accept().await.unwrap();
         let peer_channel = Channel::new_read_only(reader).unwrap();
 
         // 4. Peer reads ping message
@@ -188,30 +188,30 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_channel_update() {
-        let server_address = random_socket_address();
-        let peer_address = random_socket_address();
+        let local_address = random_socket_address();
+        let remote_address = random_socket_address();
 
-        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+        let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         let (ty, ry) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
-            let mut server_listener = TcpListener::bind(server_address).await.unwrap();
+            let mut server_listener = TcpListener::bind(local_address).await.unwrap();
 
             tx.send(()).unwrap();
 
-            // 1. Server connects to peer
+            // 1. Local node connects to Remote node
 
-            let mut channel = Channel::new_write_only(peer_address).await.unwrap();
+            let mut channel = Channel::new_write_only(remote_address).await.unwrap();
 
-            // 4. Server accepts peer connection
+            // 4. Local node accepts Remote node connection
 
             let (reader, _socket) = server_listener.accept().await.unwrap();
 
             channel = channel.update_reader(Arc::new(Mutex::new(reader)));
 
-            // 5. Server writes ping
+            // 5. Local node writes ping
 
             let server_ping = Ping {
                 nonce: 18446744073709551615u64,
@@ -219,7 +219,7 @@ mod tests {
 
             channel.write(&server_ping).await.unwrap();
 
-            // 6. Server reads pong
+            // 6. Local node reads pong
 
             let (name, bytes) = channel.read().await.unwrap();
             let peer_pong = Pong::deserialize(bytes).unwrap();
@@ -230,16 +230,16 @@ mod tests {
         });
         rx.await.unwrap();
 
-        // 2. Peer accepts server connection
+        // 2. Remote node accepts Local node connection
 
-        let (reader, _address) = peer_listener.accept().await.unwrap();
+        let (reader, _address) = remote_listener.accept().await.unwrap();
         let mut channel = Channel::new_read_only(reader).unwrap();
 
-        // 3. Peer connects to server
+        // 3. Remote node connects to Local node
 
-        channel = channel.update_writer(server_address).await.unwrap();
+        channel = channel.update_writer(local_address).await.unwrap();
 
-        // 6. Peer reads ping message
+        // 6. Remote node reads ping message
 
         let (name, bytes) = channel.read().await.unwrap();
         let server_ping = Ping::deserialize(bytes).unwrap();
@@ -252,7 +252,7 @@ mod tests {
             server_ping
         );
 
-        // 7. Peer writes pong message
+        // 7. Remote node writes pong message
 
         channel.write(&Pong::new(server_ping)).await.unwrap();
 

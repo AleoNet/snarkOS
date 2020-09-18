@@ -16,8 +16,7 @@
 
 use crate::{
     external::{Handshakes, Pings},
-    Connections,
-    PeerBook,
+    internal::{Connections, PeerBook},
 };
 
 use std::net::SocketAddr;

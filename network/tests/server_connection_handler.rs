@@ -244,7 +244,7 @@ mod server_connection_handler {
             let local_address = random_socket_address();
             let remote_address = random_socket_address();
 
-            let peer_listener = TcpListener::bind(remote_address).await.unwrap();
+            let remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
                 local_address,
@@ -262,9 +262,9 @@ mod server_connection_handler {
             peer_book.update_connected(remote_address, Utc::now());
             drop(peer_book);
 
-            // 2. Start peer_listener
+            // 2. Start remote_listener
 
-            accept_all_messages(peer_listener);
+            accept_all_messages(remote_listener);
 
             // 2. Start server
 

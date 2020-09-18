@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::address_book::AddressBook;
+use crate::internal::address_book::AddressBook;
 use snarkos_errors::network::ServerError;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;

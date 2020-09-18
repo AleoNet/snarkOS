@@ -21,13 +21,13 @@ mod server_listen {
         parameters::PublicParameters,
     };
     use snarkos_network::{
-        context::Context,
         external::{
             message::Message,
             message_types::{GetPeers, GetSync, Verack},
             protocol::SyncHandler,
             Handshakes,
         },
+        internal::context::Context,
         server::Server,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
