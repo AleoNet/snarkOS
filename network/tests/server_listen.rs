@@ -160,6 +160,8 @@ mod server_listen {
 
             let (name, bytes) = bootnode_hand.channel.read().await.unwrap();
 
+            println!("GetPeers::name(): {:?}", GetPeers::name());
+
             assert_eq!(Verack::name(), name);
             let verack_message = Verack::deserialize(bytes).unwrap();
             bootnode_hand.accept(verack_message).await.unwrap();
