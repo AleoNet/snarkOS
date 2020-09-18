@@ -16,7 +16,7 @@
 
 use crate::{
     context::Context,
-    external::{message::MessageName, message_types::GetSync, protocol::*, Channel},
+    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, Version},
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
@@ -85,13 +85,12 @@ impl Server {
     /// 6. Start the message handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
         // 1. Initialize TCP listener at `local_address` and accept new TCP connections.
-        let (mut listener, listening_address) = {
-            let local_address = self.context.local_address.read().await.clone();
-            let address = format!("0.0.0.0:{}", local_address.port());
-            let listening_address = address.parse::<SocketAddr>()?;
-            (TcpListener::bind(&listening_address).await?, listening_address)
+        let (mut listener, local_address) = {
+            let address = self.context.local_address.read().await;
+            let local_address = format!("0.0.0.0:{}", address.port()).parse::<SocketAddr>()?;
+            (TcpListener::bind(&local_address).await?, local_address)
         };
-        info!("listening at {:?}", listening_address);
+        info!("listening at {:?}", local_address);
 
         // Prepare to spawn the main loop.
         let sender = self.sender.clone();
@@ -105,10 +104,10 @@ impl Server {
 
             loop {
                 // Listen for new peers.
-                let (stream, peer_address) = match listener.accept().await {
-                    Ok((stream, peer_address)) => {
-                        info!("Received a new connection request from {}", peer_address);
-                        (stream, peer_address)
+                let (reader, remote_address) = match listener.accept().await {
+                    Ok((reader, remote_address)) => {
+                        info!("Received a connection request from {}", remote_address);
+                        (reader, remote_address)
                     }
                     Err(error) => {
                         error!("Failed to accept connection {}", error);
@@ -118,40 +117,34 @@ impl Server {
 
                 // Check if we've exceed our maximum number of allowed peers.
                 if context.peer_book.read().await.connected_total() >= context.max_peers {
-                    warn!("Rejected a new connection request as node will exceed maximum number of allowed peers");
-                    if let Err(error) = stream.shutdown(Shutdown::Write) {
-                        error!("Failed to shutdown peer stream");
+                    warn!("Rejected a connection request as this exceeds the maximum number of peers allowed");
+                    if let Err(error) = reader.shutdown(Shutdown::Write) {
+                        error!("Failed to shutdown peer reader");
                     }
                     continue;
                 }
 
                 // Follow handshake protocol and drop peer connection if unsuccessful.
-                let local_address = context.local_address.read().await.clone();
+                let height = storage.get_latest_block_height();
                 let mut handshakes = context.handshakes.write().await; // Acquire the handshake lock
-                if let Ok((handshake, receiver_address, version_message)) = handshakes
-                    .receive_any(
-                        1u64,
-                        storage.get_latest_block_height(),
-                        local_address,
-                        peer_address,
-                        stream,
-                    )
-                    .await
+                // TODO (raychu86) Establish a formal node version
+                if let Ok((handshake, discovered_local_address, version_message)) =
+                    handshakes.receive_any(1u64, height, remote_address, reader).await
                 {
                     // Bootstrap discovery of local node IP via VERACK responses
                     {
                         let mut local_address = context.local_address.write().await;
-                        if *local_address != receiver_address {
-                            *local_address = receiver_address;
+                        if *local_address != discovered_local_address {
+                            *local_address = discovered_local_address;
                             info!("Discovered local address: {:?}", *local_address);
                             let mut peer_book = context.peer_book.write().await;
-                            peer_book.forget_peer(receiver_address);
+                            peer_book.forget_peer(discovered_local_address);
                         }
                     }
 
                     // Store the channel established with the handshake
                     {
-                        let mut connections = context.connections.write().await;
+                        let mut connections = context.connections.write().await; // Acquire the connections lock
                         connections.store_channel(&handshake.channel);
                     }
 
@@ -294,26 +287,19 @@ impl Server {
     }
 
     /// Send a handshake request to a node at address without blocking the server listener.
-    fn send_handshake_non_blocking(&self, address: SocketAddr) {
+    fn send_handshake_non_blocking(&self, remote_address: SocketAddr) {
         let context = self.context.clone();
         let storage = self.storage.clone();
 
         task::spawn(async move {
-            context
-                .handshakes
-                .write()
-                .await
-                .send_request(
-                    1u64,
-                    storage.get_latest_block_height(),
-                    *context.local_address.read().await,
-                    address,
-                )
-                .await
-                .unwrap_or_else(|error| {
-                    info!("Failed to connect to address: {:?}", error);
-                    ()
-                });
+            let height = storage.get_latest_block_height();
+            let version = Version::new(1u64, height, remote_address, *context.local_address.read().await);
+
+            let mut handshakes = context.handshakes.write().await;
+            handshakes.send_request(&version).await.unwrap_or_else(|error| {
+                info!("Failed to connect to address: {:?}", error);
+                ()
+            });
         });
     }
 
