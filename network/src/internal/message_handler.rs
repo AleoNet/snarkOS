@@ -499,7 +499,12 @@ impl Server {
                         SyncState::Syncing(last_updated, _height) => {
                             // If the node is currently syncing and the sync_node has not responded in 15 seconds,
                             // attempt to connect to a new sync node
-                            if Utc::now().timestamp() - last_updated.timestamp() > 15 {
+                            let last_sync_response = Utc::now().timestamp() - last_updated.timestamp();
+                            if last_sync_response > 15 {
+                                debug!(
+                                    "Current sync node has not responded in {} seconds. Attempting to find new sync node.",
+                                    last_sync_response
+                                );
                                 swap_sync_nodes = true;
                             } else {
                                 // We are currently syncing with a node. Poll the sync handler to continue syncing.
