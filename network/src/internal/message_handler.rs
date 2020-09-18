@@ -222,13 +222,18 @@ impl Server {
 
                     propagate_block(self.context.clone(), message.data, channel.address).await?;
                 } else if !propagate {
-                    if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
-                        sync_handler.clear_pending(Arc::clone(&self.storage));
+                    // Poll the sync handler to continue the sync
+                    {
+                        if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
+                            sync_handler.update_pending_blocks(Arc::clone(&self.storage));
 
-                        if sync_handler.sync_state != SyncState::Idle {
-                            // We are currently syncing with a node, ask for the next block.
-                            if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                                sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                            if sync_handler.sync_state != SyncState::Idle {
+                                // We are currently syncing with a node, ask for the next block.
+                                if let Some(channel) =
+                                    self.context.connections.read().await.get(&sync_handler.sync_node)
+                                {
+                                    sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                                }
                             }
                         }
                     }

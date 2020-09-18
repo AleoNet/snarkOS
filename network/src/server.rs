@@ -153,18 +153,20 @@ impl Server {
                         // If our peer has a longer chain, send a sync message
                         if version.height > storage.get_latest_block_height() {
                             // Update the sync node if the sync_handler is Idle
-                            if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
-                                if !sync_handler.is_syncing() {
-                                    sync_handler.sync_node = handshake.channel.address;
+                            {
+                                if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                                    if !sync_handler.is_syncing() {
+                                        sync_handler.sync_node = handshake.channel.address;
 
-                                    if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
-                                        if let Err(err) =
-                                            handshake.channel.write(&GetSync::new(block_locator_hashes)).await
-                                        {
-                                            error!(
-                                                "Error sending GetSync message to {}, {}",
-                                                handshake.channel.address, err
-                                            );
+                                        if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                                            if let Err(err) =
+                                                handshake.channel.write(&GetSync::new(block_locator_hashes)).await
+                                            {
+                                                error!(
+                                                    "Error sending GetSync message to {}, {}",
+                                                    handshake.channel.address, err
+                                                );
+                                            }
                                         }
                                     }
                                 }

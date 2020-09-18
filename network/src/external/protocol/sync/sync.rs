@@ -74,7 +74,7 @@ impl SyncHandler {
     }
 
     /// Remove the blocks that are now included in the chain.
-    pub fn clear_pending<T: Transaction, P: LoadableMerkleParameters>(&mut self, storage: Arc<Ledger<T, P>>) {
+    pub fn update_pending_blocks<T: Transaction, P: LoadableMerkleParameters>(&mut self, storage: Arc<Ledger<T, P>>) {
         for (block_hash, _time_sent) in &self.pending_blocks.clone() {
             if !storage.block_hash_exists(&block_hash) {
                 self.pending_blocks.remove(block_hash);
@@ -83,7 +83,7 @@ impl SyncHandler {
     }
 
     /// Set the SyncState to syncing and update the latest block height.
-    pub fn update_syncing(&mut self, block_height: u32) {
+    pub fn update_sync_state(&mut self, block_height: u32) {
         match self.sync_state {
             SyncState::Idle => {
                 info!("Syncing blocks");
@@ -103,7 +103,7 @@ impl SyncHandler {
                 if !self.block_headers.contains(&block_hash) && self.pending_blocks.get(&block_hash).is_none() {
                     self.block_headers.push(block_hash.clone());
                 }
-                self.update_syncing(height);
+                self.update_sync_state(height);
             }
         } else if self.pending_blocks.is_empty() {
             info!("Sync state is set to Idle");
@@ -124,7 +124,7 @@ impl SyncHandler {
                     storage.get_latest_block_height() - height,
                     (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
                 );
-                self.update_syncing(storage.get_latest_block_height());
+                self.update_sync_state(storage.get_latest_block_height());
             }
 
             // Sync up to 3 blocks at once
@@ -166,11 +166,9 @@ impl SyncHandler {
                     }
                 }
             }
-
-            self.clear_pending(Arc::clone(&storage));
-        } else {
-            self.clear_pending(Arc::clone(&storage));
         }
+
+        self.update_pending_blocks(Arc::clone(&storage));
 
         Ok(())
     }
