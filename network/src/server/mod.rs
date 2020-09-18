@@ -20,7 +20,7 @@ pub use context::*;
 pub mod server;
 pub use server::*;
 
-use crate::outbound::message_types::{Block, Transaction};
+use crate::external::message_types::{Block, Transaction};
 
 use snarkos_consensus::{
     memory_pool::{Entry, MemoryPool},

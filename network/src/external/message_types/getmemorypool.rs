@@ -14,49 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/block.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_memory_pool.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Block {
-    /// Serialized block data
-    pub data: Vec<u8>,
-}
+pub struct GetMemoryPool;
 
-impl Block {
-    pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
-    }
-}
-
-impl Message for Block {
+impl Message for GetMemoryPool {
     fn name() -> MessageName {
-        MessageName::from("block")
+        MessageName::from("getmempool")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        Ok(Self {
-            data: bincode::deserialize(&vec)?,
-        })
+        if vec.len() != 0 {
+            return Err(MessageError::InvalidLength(vec.len(), 0));
+        }
+
+        Ok(Self)
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.data)?)
+        Ok(vec![])
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::BLOCK_1;
 
     #[test]
-    fn test_block() {
-        let message = Block::new(BLOCK_1.to_vec());
+    fn test_get_memory_pool() {
+        let message = GetMemoryPool;
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Block::deserialize(serialized).unwrap();
+        let deserialized = GetMemoryPool::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

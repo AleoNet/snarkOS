@@ -22,7 +22,7 @@ mod server_listen {
     };
     use snarkos_network::{
         context::Context,
-        outbound::{
+        external::{
             message::Message,
             message_types::{GetPeers, GetSync, Verack},
             protocol::SyncHandler,

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{
+use crate::external::message::{
     read::{read_header, read_message},
     Message,
     MessageHeader,
@@ -131,7 +131,7 @@ impl Channel {
 
 #[cfg(test)]
 mod tests {
-    use crate::outbound::message_types::{Ping, Pong};
+    use crate::external::message_types::{Ping, Pong};
 
     use super::*;
     use snarkos_testing::network::{random_socket_address, simulate_active_node};

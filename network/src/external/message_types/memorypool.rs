@@ -14,53 +14,49 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-use chrono::{DateTime, Utc};
-use std::{collections::HashMap, net::SocketAddr};
-
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/memory_pool.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Peers {
-    /// A list of gossiped peer addresses and their last seen dates
-    pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
+pub struct MemoryPool {
+    /// Vector of memory pool transactions
+    pub transactions: Vec<Vec<u8>>,
 }
 
-impl Peers {
-    pub fn new(addresses: HashMap<SocketAddr, DateTime<Utc>>) -> Self {
-        Self { addresses }
+impl MemoryPool {
+    pub fn new(transactions: Vec<Vec<u8>>) -> Self {
+        Self { transactions }
     }
 }
 
-impl Message for Peers {
+impl Message for MemoryPool {
     fn name() -> MessageName {
-        MessageName::from("peers")
+        MessageName::from("memorypool")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         Ok(Self {
-            addresses: bincode::deserialize(&vec)?,
+            transactions: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.addresses)?)
+        Ok(bincode::serialize(&self.transactions)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkos_testing::consensus::TRANSACTION_1;
 
     #[test]
-    fn test_peers() {
-        let message = Peers {
-            addresses: HashMap::<SocketAddr, DateTime<Utc>>::new(),
-        };
+    fn test_memory_pool() {
+        let message = MemoryPool::new(vec![TRANSACTION_1.to_vec()]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Peers::deserialize(serialized).unwrap();
+        let deserialized = MemoryPool::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

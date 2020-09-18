@@ -14,49 +14,51 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
+use snarkos_objects::BlockHeaderHash;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/memory_pool.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_sync.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct MemoryPool {
-    /// Vector of memory pool transactions
-    pub transactions: Vec<Vec<u8>>,
+pub struct GetSync {
+    /// hashes of blocks requested
+    pub block_locator_hashes: Vec<BlockHeaderHash>,
 }
 
-impl MemoryPool {
-    pub fn new(transactions: Vec<Vec<u8>>) -> Self {
-        Self { transactions }
+impl GetSync {
+    pub fn new(block_locator_hashes: Vec<BlockHeaderHash>) -> Self {
+        Self { block_locator_hashes }
     }
 }
 
-impl Message for MemoryPool {
+impl Message for GetSync {
     fn name() -> MessageName {
-        MessageName::from("memorypool")
+        MessageName::from("getsync")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         Ok(Self {
-            transactions: bincode::deserialize(&vec)?,
+            block_locator_hashes: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.transactions)?)
+        Ok(bincode::serialize(&self.block_locator_hashes)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::TRANSACTION_1;
+    use snarkos_testing::consensus::BLOCK_1_HEADER_HASH;
 
     #[test]
-    fn test_memory_pool() {
-        let message = MemoryPool::new(vec![TRANSACTION_1.to_vec()]);
+    fn test_get_sync() {
+        let data = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
+        let message = GetSync::new(vec![data]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = MemoryPool::deserialize(serialized).unwrap();
+        let deserialized = GetSync::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

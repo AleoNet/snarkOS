@@ -27,7 +27,7 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
 use snarkos_errors::node::NodeError;
 use snarkos_models::algorithms::{CRH, SNARK};
-use snarkos_network::{context::Context, outbound::protocol::SyncHandler, server::Server};
+use snarkos_network::{context::Context, external::protocol::SyncHandler, server::Server};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;

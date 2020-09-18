@@ -14,64 +14,49 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use rand::Rng;
-use std::io::Cursor;
-
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/ping.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync_block.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Ping {
-    /// Unique ping protocol identifier
-    pub nonce: u64,
+pub struct SyncBlock {
+    /// block data
+    pub data: Vec<u8>,
 }
 
-impl Ping {
-    pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        Self {
-            nonce: rng.gen::<u64>(),
-        }
+impl SyncBlock {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
     }
 }
 
-impl Message for Ping {
+impl Message for SyncBlock {
     fn name() -> MessageName {
-        MessageName::from("ping")
+        MessageName::from("syncblock")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 8 {
-            return Err(MessageError::InvalidLength(vec.len(), 8));
-        }
-
-        let mut reader = Cursor::new(vec);
-
         Ok(Self {
-            nonce: reader.read_u64::<BigEndian>().expect("unable to read u64"),
+            data: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = vec![];
-        writer.write_u64::<BigEndian>(self.nonce)?;
-
-        Ok(writer)
+        Ok(bincode::serialize(&self.data)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkos_testing::consensus::BLOCK_1;
 
     #[test]
-    fn test_ping() {
-        let message = Ping::new();
+    fn test_sync_block() {
+        let message = SyncBlock::new(BLOCK_1.to_vec());
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Ping::deserialize(serialized).unwrap();
+        let deserialized = SyncBlock::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

@@ -14,28 +14,51 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_peers.md"))]
-#[derive(Debug, PartialEq, Clone)]
-pub struct GetPeers;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use rand::Rng;
+use std::io::Cursor;
 
-impl Message for GetPeers {
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/ping.md"))]
+#[derive(Debug, PartialEq, Clone)]
+pub struct Ping {
+    /// Unique ping protocol identifier
+    pub nonce: u64,
+}
+
+impl Ping {
+    pub fn new() -> Self {
+        let mut rng = rand::thread_rng();
+        Self {
+            nonce: rng.gen::<u64>(),
+        }
+    }
+}
+
+impl Message for Ping {
     fn name() -> MessageName {
-        MessageName::from("getpeers")
+        MessageName::from("ping")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 0 {
-            return Err(MessageError::InvalidLength(vec.len(), 0));
+        if vec.len() != 8 {
+            return Err(MessageError::InvalidLength(vec.len(), 8));
         }
 
-        Ok(Self)
+        let mut reader = Cursor::new(vec);
+
+        Ok(Self {
+            nonce: reader.read_u64::<BigEndian>().expect("unable to read u64"),
+        })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(vec![])
+        let mut writer = vec![];
+        writer.write_u64::<BigEndian>(self.nonce)?;
+
+        Ok(writer)
     }
 }
 
@@ -44,11 +67,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_getpeers() {
-        let message = GetPeers;
+    fn test_ping() {
+        let message = Ping::new();
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetPeers::deserialize(serialized).unwrap();
+        let deserialized = Ping::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

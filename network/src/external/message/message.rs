@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::MessageName;
+use crate::external::message::MessageName;
 use snarkos_errors::network::message::MessageError;
 
 /// A trait used to abstract over network messages.

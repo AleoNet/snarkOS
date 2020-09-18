@@ -14,49 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/transaction.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_peers.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Transaction {
-    /// Serialized transaction bytes
-    pub(crate) bytes: Vec<u8>,
-}
+pub struct GetPeers;
 
-impl Transaction {
-    pub fn new(bytes: Vec<u8>) -> Self {
-        Self { bytes }
-    }
-}
-
-impl Message for Transaction {
+impl Message for GetPeers {
     fn name() -> MessageName {
-        MessageName::from("transaction")
+        MessageName::from("getpeers")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        Ok(Self {
-            bytes: bincode::deserialize(&vec)?,
-        })
+        if vec.len() != 0 {
+            return Err(MessageError::InvalidLength(vec.len(), 0));
+        }
+
+        Ok(Self)
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.bytes)?)
+        Ok(vec![])
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::TRANSACTION_1;
 
     #[test]
-    fn test_transaction() {
-        let message = Transaction::new(TRANSACTION_1.to_vec());
+    fn test_getpeers() {
+        let message = GetPeers;
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Transaction::deserialize(serialized).unwrap();
+        let deserialized = GetPeers::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

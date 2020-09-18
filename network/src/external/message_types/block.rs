@@ -14,51 +14,49 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
-use snarkos_objects::BlockHeaderHash;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_sync.md"))]
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/block.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct GetSync {
-    /// hashes of blocks requested
-    pub block_locator_hashes: Vec<BlockHeaderHash>,
+pub struct Block {
+    /// Serialized block data
+    pub data: Vec<u8>,
 }
 
-impl GetSync {
-    pub fn new(block_locator_hashes: Vec<BlockHeaderHash>) -> Self {
-        Self { block_locator_hashes }
+impl Block {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
     }
 }
 
-impl Message for GetSync {
+impl Message for Block {
     fn name() -> MessageName {
-        MessageName::from("getsync")
+        MessageName::from("block")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         Ok(Self {
-            block_locator_hashes: bincode::deserialize(&vec)?,
+            data: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.block_locator_hashes)?)
+        Ok(bincode::serialize(&self.data)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::BLOCK_1_HEADER_HASH;
+    use snarkos_testing::consensus::BLOCK_1;
 
     #[test]
-    fn test_get_sync() {
-        let data = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
-        let message = GetSync::new(vec![data]);
+    fn test_block() {
+        let message = Block::new(BLOCK_1.to_vec());
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetSync::deserialize(serialized).unwrap();
+        let deserialized = Block::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

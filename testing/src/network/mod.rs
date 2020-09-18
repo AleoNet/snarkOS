@@ -18,7 +18,7 @@ use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{
-    outbound::{Channel, SyncHandler},
+    external::{Channel, SyncHandler},
     server::{Context, Server},
 };
 

@@ -24,11 +24,11 @@
 #[macro_use]
 extern crate log;
 
-pub mod inbound;
-pub use inbound::*;
+pub mod external;
+pub use external::*;
 
-pub mod outbound;
-pub use outbound::*;
+pub mod internal;
+pub use internal::*;
 
 pub mod server;
 pub use server::*;

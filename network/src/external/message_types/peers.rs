@@ -14,49 +14,53 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::message::{Message, MessageName};
+use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync_block.md"))]
+use chrono::{DateTime, Utc};
+use std::{collections::HashMap, net::SocketAddr};
+
+#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
 #[derive(Debug, PartialEq, Clone)]
-pub struct SyncBlock {
-    /// block data
-    pub data: Vec<u8>,
+pub struct Peers {
+    /// A list of gossiped peer addresses and their last seen dates
+    pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }
 
-impl SyncBlock {
-    pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
+impl Peers {
+    pub fn new(addresses: HashMap<SocketAddr, DateTime<Utc>>) -> Self {
+        Self { addresses }
     }
 }
 
-impl Message for SyncBlock {
+impl Message for Peers {
     fn name() -> MessageName {
-        MessageName::from("syncblock")
+        MessageName::from("peers")
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
         Ok(Self {
-            data: bincode::deserialize(&vec)?,
+            addresses: bincode::deserialize(&vec)?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        Ok(bincode::serialize(&self.data)?)
+        Ok(bincode::serialize(&self.addresses)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::BLOCK_1;
 
     #[test]
-    fn test_sync_block() {
-        let message = SyncBlock::new(BLOCK_1.to_vec());
+    fn test_peers() {
+        let message = Peers {
+            addresses: HashMap::<SocketAddr, DateTime<Utc>>::new(),
+        };
 
         let serialized = message.serialize().unwrap();
-        let deserialized = SyncBlock::deserialize(serialized).unwrap();
+        let deserialized = Peers::deserialize(serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

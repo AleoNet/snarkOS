@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    outbound::{
+    external::{
         message_types::{GetMemoryPool, GetPeers, Version},
         protocol::sync::SyncState,
     },

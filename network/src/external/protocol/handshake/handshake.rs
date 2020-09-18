@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::outbound::{
+use crate::external::{
     message_types::{Verack, Version},
     Channel,
 };
@@ -163,7 +163,7 @@ impl Handshake {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::outbound::message::Message;
+    use crate::external::message::Message;
     use snarkos_testing::network::random_socket_address;
 
     use serial_test::serial;

@@ -16,7 +16,7 @@
 
 mod sync_integration {
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
-    use snarkos_network::outbound::{message::Message, message_types::*, protocol::sync::*, Channel};
+    use snarkos_network::external::{message::Message, message_types::*, protocol::sync::*, Channel};
     use snarkos_objects::BlockHeaderHash;
     use snarkos_testing::{consensus::*, network::*, storage::*};
 
