@@ -29,14 +29,14 @@ use tokio::net::TcpStream;
 /// Stores the address and latest state of peers we are handshaking with.
 #[derive(Clone, Debug)]
 pub struct Handshakes {
-    addresses: HashMap<SocketAddr, Handshake>,
+    handshakes: HashMap<SocketAddr, Handshake>,
 }
 
 impl Handshakes {
     /// Construct a new store of connected peer `Handshakes`.
     pub fn new() -> Self {
         Self {
-            addresses: HashMap::default(),
+            handshakes: HashMap::default(),
         }
     }
 
@@ -51,7 +51,7 @@ impl Handshakes {
     ) -> Result<(), HandshakeError> {
         let handshake = Handshake::send_new(version, height, address_sender, address_receiver).await?;
 
-        self.addresses.insert(address_receiver, handshake);
+        self.handshakes.insert(address_receiver, handshake);
         info!("Request handshake with: {:?}", address_receiver);
 
         Ok(())
@@ -99,7 +99,7 @@ impl Handshakes {
             )
             .await?;
 
-            self.addresses.insert(peer_address, handshake.clone());
+            self.handshakes.insert(peer_address, handshake.clone());
 
             Ok((handshake, receiver, Some(peer_message)))
         } else if Verack::name() == name {
@@ -158,7 +158,7 @@ impl Handshakes {
 
     /// Returns the state of the handshake at a peer address.
     pub fn get_state(&self, address: SocketAddr) -> Option<HandshakeState> {
-        match self.addresses.get(&address) {
+        match self.handshakes.get(&address) {
             Some(stored_handshake) => Some(stored_handshake.get_state()),
             None => None,
         }
@@ -166,12 +166,12 @@ impl Handshakes {
 
     /// Returns a reference to the handshake at a peer address.
     pub fn get(&self, address: &SocketAddr) -> Option<&Handshake> {
-        self.addresses.get(&address)
+        self.handshakes.get(&address)
     }
 
     /// Returns a mutable reference to the handshake at a peer address.
     fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut Handshake> {
-        self.addresses.get_mut(&address)
+        self.handshakes.get_mut(&address)
     }
 }
 

@@ -85,10 +85,12 @@ impl Server {
     /// 6. Start the message handler.
     pub async fn listen(mut self) -> Result<(), ServerError> {
         // 1. Initialize TCP listener at `local_address` and accept new TCP connections.
-        let local_address = self.context.local_address.read().await.clone();
-        let address = format!("0.0.0.0:{}", local_address.port());
-        let listening_address = address.parse::<SocketAddr>()?;
-        let mut listener = TcpListener::bind(&listening_address).await?;
+        let (mut listener, listening_address) = {
+            let local_address = self.context.local_address.read().await.clone();
+            let address = format!("0.0.0.0:{}", local_address.port());
+            let listening_address = address.parse::<SocketAddr>()?;
+            (TcpListener::bind(&listening_address).await?, listening_address)
+        };
         info!("listening at {:?}", listening_address);
 
         // Prepare to spawn the main loop.
@@ -105,83 +107,79 @@ impl Server {
                 // Listen for new peers.
                 let (stream, peer_address) = match listener.accept().await {
                     Ok((stream, peer_address)) => {
-                        info!("Listener received a new connection request from {}", peer_address);
+                        info!("Received a new connection request from {}", peer_address);
                         (stream, peer_address)
                     }
                     Err(error) => {
-                        error!("Listener failed to accept connection {}", error);
+                        error!("Failed to accept connection {}", error);
                         continue;
                     }
                 };
 
                 // Check if we've exceed our maximum number of allowed peers.
                 if context.peer_book.read().await.connected_total() >= context.max_peers {
-                    warn!(
-                        "Listener will exceed maximum number of allowed peers and is rejecting this connection request."
-                    );
-                    stream
-                        .shutdown(Shutdown::Write)
-                        .expect("Failed to shutdown peer stream");
-                } else {
-                    let local_address = context.local_address.read().await.clone();
+                    warn!("Rejected a new connection request as node will exceed maximum number of allowed peers");
+                    if let Err(error) = stream.shutdown(Shutdown::Write) {
+                        error!("Failed to shutdown peer stream");
+                    }
+                    continue;
+                }
 
-                    // Follow handshake protocol and drop peer connection if unsuccessful.
-                    if let Ok((handshake, receiver_address, version_message)) = context
-                        .handshakes
-                        .write()
-                        .await
-                        .receive_any(
-                            1u64,
-                            storage.get_latest_block_height(),
-                            local_address,
-                            peer_address,
-                            stream,
-                        )
-                        .await
+                // Follow handshake protocol and drop peer connection if unsuccessful.
+                let local_address = context.local_address.read().await.clone();
+                let mut handshakes = context.handshakes.write().await; // Acquire the handshake lock
+                if let Ok((handshake, receiver_address, version_message)) = handshakes
+                    .receive_any(
+                        1u64,
+                        storage.get_latest_block_height(),
+                        local_address,
+                        peer_address,
+                        stream,
+                    )
+                    .await
+                {
+                    // Bootstrap discovery of local node IP via VERACK responses
                     {
-                        // Bootstrap discovery of local node IP via VERACK responses
-                        {
-                            let mut local_address = context.local_address.write().await;
-                            if *local_address != receiver_address {
-                                *local_address = receiver_address;
-                                info!("Discovered local address: {:?}", *local_address);
-                                let mut peer_book = context.peer_book.write().await;
-                                peer_book.forget_peer(receiver_address);
-                            }
+                        let mut local_address = context.local_address.write().await;
+                        if *local_address != receiver_address {
+                            *local_address = receiver_address;
+                            info!("Discovered local address: {:?}", *local_address);
+                            let mut peer_book = context.peer_book.write().await;
+                            peer_book.forget_peer(receiver_address);
                         }
+                    }
 
-                        // Store the channel established with the handshake
-                        {
-                            let mut connections = context.connections.write().await;
-                            connections.store_channel(&handshake.channel);
-                        }
+                    // Store the channel established with the handshake
+                    {
+                        let mut connections = context.connections.write().await;
+                        connections.store_channel(&handshake.channel);
+                    }
 
-                        if let Some(version) = version_message {
-                            // If our peer has a longer chain, send a sync message
-                            if version.height > storage.get_latest_block_height() {
-                                // Update the sync node if the sync_handler is Idle
-                                if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
-                                    if !sync_handler.is_syncing() {
-                                        sync_handler.sync_node = handshake.channel.address;
+                    if let Some(version) = version_message {
+                        // If our peer has a longer chain, send a sync message
+                        if version.height > storage.get_latest_block_height() {
+                            // Update the sync node if the sync_handler is Idle
+                            if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                                if !sync_handler.is_syncing() {
+                                    sync_handler.sync_node = handshake.channel.address;
 
-                                        if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
-                                            if let Err(err) =
-                                                handshake.channel.write(&GetSync::new(block_locator_hashes)).await
-                                            {
-                                                error!(
-                                                    "Error sending GetSync message to {}, {}",
-                                                    handshake.channel.address, err
-                                                );
-                                            }
+                                    if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                                        if let Err(err) =
+                                            handshake.channel.write(&GetSync::new(block_locator_hashes)).await
+                                        {
+                                            error!(
+                                                "Error sending GetSync message to {}, {}",
+                                                handshake.channel.address, err
+                                            );
                                         }
                                     }
                                 }
                             }
                         }
-
-                        // Inner loop spawns one thread per connection to read messages
-                        Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
                     }
+
+                    // Inner loop spawns one thread per connection to read messages
+                    Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
                 }
             }
         });
