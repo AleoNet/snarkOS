@@ -195,7 +195,7 @@ impl Server {
 
         // 6. Start the message handler.
         debug!("Starting message handler");
-        self.message_handler().await?;
+        self.message_handler().await;
 
         Ok(())
     }
