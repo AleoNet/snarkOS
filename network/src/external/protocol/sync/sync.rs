@@ -106,8 +106,10 @@ impl SyncHandler {
                 self.update_sync_state(height);
             }
         } else if self.pending_blocks.is_empty() {
-            info!("Sync state is set to Idle");
-            self.sync_state = SyncState::Idle;
+            if self.sync_state != SyncState::Idle {
+                info!("Sync state is set to Idle");
+                self.sync_state = SyncState::Idle;
+            }
         }
     }
 
