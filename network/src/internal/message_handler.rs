@@ -232,7 +232,7 @@ impl Server {
                                 if let Some(channel) =
                                     self.context.connections.read().await.get(&sync_handler.sync_node)
                                 {
-                                    sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                                    sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
                                 }
                             }
                         }
@@ -413,7 +413,7 @@ impl Server {
 
         // Received block headers
         if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+            sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
         }
 
         Ok(())
@@ -494,7 +494,7 @@ impl Server {
                         }
                     } else {
                         if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                            sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
                         }
                     }
                 }

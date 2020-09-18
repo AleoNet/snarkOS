@@ -111,8 +111,8 @@ impl SyncHandler {
         }
     }
 
-    /// Finish syncing or ask for the next block from the sync node.
-    pub async fn increment<T: Transaction, P: LoadableMerkleParameters>(
+    /// Poll the sync handler to finish syncing or ask for the next block from the sync node.
+    pub async fn poll<T: Transaction, P: LoadableMerkleParameters>(
         &mut self,
         channel: Arc<Channel>,
         storage: Arc<Ledger<T, P>>,
