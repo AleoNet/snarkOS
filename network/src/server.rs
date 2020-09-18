@@ -190,7 +190,7 @@ impl Server {
         if !self.context.is_bootnode {
             // 5. Send a handshake request to all stored peers.
             debug!("Sending handshake request to all stored peers");
-            self.connect_peers_from_storage().await?;
+            self.connect_peers_from_storage().await;
         }
 
         // 6. Start the message handler.
@@ -325,17 +325,20 @@ impl Server {
     }
 
     /// Send a handshake request to every peer this server previously connected to.
-    async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
+    async fn connect_peers_from_storage(&mut self) {
         if let Ok(serialized_peers) = self.storage.get_peer_book() {
-            let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> = bincode::deserialize(&serialized_peers)?;
-
-            for (stored_peer, _old_time) in stored_connected_peers {
-                info!("Connecting to stored peer {:?}", stored_peer);
-
-                self.send_handshake_non_blocking(stored_peer);
+            if let Ok(stored_connected_peers) =
+                bincode::deserialize::<HashMap<SocketAddr, DateTime<Utc>>>(&serialized_peers)
+            {
+                let local_address = *self.context.local_address.read().await;
+                for (saved_address, _old_time) in stored_connected_peers {
+                    // This node should not attempt to connect to itself.
+                    if local_address != saved_address {
+                        info!("Connecting to {:?} (saved peer)...", saved_address);
+                        self.send_handshake_non_blocking(saved_address);
+                    }
+                }
             }
         }
-
-        Ok(())
     }
 }
