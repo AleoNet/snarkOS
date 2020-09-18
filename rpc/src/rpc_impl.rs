@@ -26,7 +26,7 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
-use snarkos_network::{context::Context, process_transaction_internal};
+use snarkos_network::internal::{context::Context, process_transaction_internal};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},

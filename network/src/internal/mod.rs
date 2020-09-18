@@ -17,10 +17,13 @@
 pub mod connection_handler;
 pub use connection_handler::*;
 
+pub mod context;
+pub use context::*;
+
 pub mod message_handler;
 pub use message_handler::*;
 
-use crate::{external::propagate_transaction, server::Context};
+use crate::{external::propagate_transaction, internal::Context};
 use snarkos_consensus::{
     memory_pool::{Entry, MemoryPool},
     ConsensusParameters,

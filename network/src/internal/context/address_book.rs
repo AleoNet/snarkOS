@@ -32,7 +32,7 @@ impl AddressBook {
     }
 
     /// Insert or update a new date for an address. Returns true if the new date is stored.
-    pub fn update(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+    pub fn insert_or_update(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
         match self.addresses.get(&address) {
             Some(stored_date) => {
                 if stored_date > &date {

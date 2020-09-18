@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod ping_protocol {
-    use snarkos_network::{
+    use snarkos_network::external::{
         message_types::{Ping, Pong},
         Message,
         PingProtocol,
@@ -31,72 +31,70 @@ mod ping_protocol {
     #[tokio::test]
     #[serial]
     async fn test_pings() {
-        let server_address = random_socket_address();
-        let peer_address = random_socket_address();
+        let local_address = random_socket_address();
+        let remote_address = random_socket_address();
 
         // 1. Bind to server address
 
-        let mut server_listener = TcpListener::bind(server_address).await.unwrap();
+        let mut local_listener = TcpListener::bind(local_address).await.unwrap();
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             // 2. Peer connects to server address
 
-            let channel = Arc::new(connect_channel(&mut peer_listener, server_address).await);
+            let channel = Arc::new(connect_channel(&mut remote_listener, local_address).await);
 
             // 4. Peer sends ping request
 
             let mut pings = Pings::new();
-
             pings.send_ping(channel.clone()).await.unwrap();
-
-            assert_eq!(PingState::Waiting, pings.get_state(server_address).unwrap());
+            assert_eq!(PingState::Waiting, pings.get_state(local_address).unwrap());
 
             // 7. Peer receives pong response
 
             let (_name, bytes) = channel.read().await.unwrap();
-            let message = Pong::deserialize(bytes).unwrap();
+            let pong = Pong::deserialize(bytes).unwrap();
 
-            pings.accept_pong(channel.address, message).await.unwrap();
+            pings.accept_pong(channel.address, pong).await.unwrap();
 
-            assert_eq!(PingState::Accepted, pings.get_state(server_address).unwrap());
+            assert_eq!(PingState::Accepted, pings.get_state(local_address).unwrap());
             tx.send(()).unwrap();
         });
 
         // 3. Server accepts peer connection
 
-        let channel = Arc::new(accept_channel(&mut server_listener, peer_address).await);
+        let channel = Arc::new(accept_channel(&mut local_listener, remote_address).await);
 
         // 5. Server receives ping request
 
         let (_name, bytes) = channel.read().await.unwrap();
-        let message = Ping::deserialize(bytes).unwrap();
+        let ping = Ping::deserialize(bytes).unwrap();
 
         // 6. Server sends pong response
 
-        Pings::send_pong(message, channel).await.unwrap();
+        Pings::send_pong(ping, channel).await.unwrap();
         rx.await.unwrap();
     }
 
     #[tokio::test]
     #[serial]
     async fn test_ping_protocol() {
-        let server_address = random_socket_address();
-        let peer_address = random_socket_address();
+        let local_address = random_socket_address();
+        let remote_address = random_socket_address();
 
         // 1. Bind listener to Server address
 
-        let mut server_listener = TcpListener::bind(server_address).await.unwrap();
+        let mut local_listener = TcpListener::bind(local_address).await.unwrap();
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             // 2. Peer connects to server address
 
-            let channel = Arc::new(connect_channel(&mut peer_listener, server_address).await);
+            let channel = Arc::new(connect_channel(&mut remote_listener, local_address).await);
 
             // 4. Peer send ping request
 
@@ -115,7 +113,7 @@ mod ping_protocol {
 
         // 3. Server accepts Peer connection
 
-        let channel = Arc::new(accept_channel(&mut server_listener, peer_address).await);
+        let channel = Arc::new(accept_channel(&mut local_listener, remote_address).await);
 
         // 4. Server receives peer ping request. Sends pong response
 

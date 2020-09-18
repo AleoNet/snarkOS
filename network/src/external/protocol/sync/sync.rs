@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::Channel,
+use crate::external::{
     message_types::{GetBlock, GetSync},
+    Channel,
 };
 use snarkos_errors::network::SendError;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};

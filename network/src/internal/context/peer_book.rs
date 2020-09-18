@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::address_book::AddressBook;
+use crate::internal::address_book::AddressBook;
 use snarkos_errors::network::ServerError;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
@@ -31,7 +31,7 @@ pub struct PeerBook {
     /// Disconnected peers
     disconnected: AddressBook,
 
-    /// Gossiped but uncontacted peers
+    /// Gossiped but unconnected peers
     gossiped: AddressBook,
 }
 
@@ -73,21 +73,21 @@ impl PeerBook {
     pub fn update_connected(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
         self.disconnected.remove(&address);
         self.gossiped.remove(&address);
-        self.connected.update(address, date)
+        self.connected.insert_or_update(address, date)
     }
 
     /// Move a peer from connected/disconnected to gossiped peers.
     pub fn update_gossiped(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
         self.connected.remove(&address);
         self.disconnected.remove(&address);
-        self.gossiped.update(address, date)
+        self.gossiped.insert_or_update(address, date)
     }
 
     /// Move a peer from connected peers to disconnected peers.
     pub fn disconnect_peer(&mut self, address: SocketAddr) -> bool {
         self.connected.remove(&address);
         self.gossiped.remove(&address);
-        self.disconnected.update(address, Utc::now())
+        self.disconnected.insert_or_update(address, Utc::now())
     }
 
     /// Forget a peer.
