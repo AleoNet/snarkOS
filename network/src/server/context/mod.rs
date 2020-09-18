@@ -14,21 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// Compilation
-#![warn(unused_extern_crates)]
-#![forbid(unsafe_code)]
-// Documentation
-#![cfg_attr(nightly, feature(doc_cfg, external_doc))]
-#![cfg_attr(nightly, doc(include = "../documentation/concepts/network_server.md"))]
+pub mod address_book;
+pub use address_book::*;
 
-#[macro_use]
-extern crate log;
+pub mod connections;
+pub use connections::*;
 
-pub mod external;
-pub use external::*;
+pub mod context;
+pub use context::*;
 
-pub mod internal;
-pub use internal::*;
-
-pub mod server;
-pub use server::*;
+pub mod peer_book;
+pub use peer_book::*;

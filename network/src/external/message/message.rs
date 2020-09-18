@@ -14,21 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// Compilation
-#![warn(unused_extern_crates)]
-#![forbid(unsafe_code)]
-// Documentation
-#![cfg_attr(nightly, feature(doc_cfg, external_doc))]
-#![cfg_attr(nightly, doc(include = "../documentation/concepts/network_server.md"))]
+use crate::external::message::MessageName;
+use snarkos_errors::network::message::MessageError;
 
-#[macro_use]
-extern crate log;
-
-pub mod external;
-pub use external::*;
-
-pub mod internal;
-pub use internal::*;
-
-pub mod server;
-pub use server::*;
+/// A trait used to abstract over network messages.
+pub trait Message: Send + 'static {
+    fn name() -> MessageName;
+    fn deserialize(bytes: Vec<u8>) -> Result<Self, MessageError>
+    where
+        Self: Sized;
+    fn serialize(&self) -> Result<Vec<u8>, MessageError>;
+}

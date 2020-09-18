@@ -16,9 +16,7 @@
 
 use crate::{
     context::Context,
-    message::{Channel, MessageName},
-    message_types::GetSync,
-    protocol::*,
+    external::{message::MessageName, message_types::GetSync, protocol::*, Channel},
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
