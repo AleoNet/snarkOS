@@ -43,88 +43,66 @@ pub enum HandshakeState {
 pub struct Handshake {
     pub channel: Arc<Channel>,
     pub state: HandshakeState,
-    pub version: u64,
     pub height: u32,
     pub nonce: u64,
 }
 
 impl Handshake {
     /// Send the initial Version message to a peer
-    pub async fn send_new(
-        version: u64,
-        height: u32,
-        address_sender: SocketAddr,
-        address_receiver: SocketAddr,
-    ) -> Result<Self, HandshakeError> {
+    pub async fn send_new(local_version: &Version) -> Result<Self, HandshakeError> {
         // Create temporary write only channel
-        let channel = Arc::new(Channel::new_write_only(address_receiver).await?);
+        let channel = Arc::new(Channel::new_write_only(local_version.address_receiver).await?);
 
         // Write Version request
-        let message = Version::new(version, height, address_receiver, address_sender);
-
-        channel.write(&message).await?;
+        channel.write(local_version).await?;
 
         Ok(Self {
             channel,
             state: HandshakeState::Waiting,
-            version,
-            height,
-            nonce: message.nonce,
+            height: local_version.height,
+            nonce: local_version.nonce,
         })
     }
 
     /// Receive the initial Version message from a new peer.
     /// Send a Verack message + Version message
     pub async fn receive_new(
-        version: u64,
-        height: u32,
         channel: Channel,
-        peer_message: Version,
-        local_address: SocketAddr,
-        peer_address: SocketAddr,
+        local_version: &Version,
+        remote_version: &Version,
     ) -> Result<Handshake, HandshakeError> {
         // Connect to the address specified in the peer_message
-        let channel = channel.update_writer(peer_address).await?;
+        let channel = channel.update_writer(local_version.address_receiver).await?;
 
         // Write Verack response
-
-        // You are the new sender and your peer is the receiver
-        let address_receiver = peer_address;
-        let address_sender = peer_message.address_receiver;
-
         channel
-            .write(&Verack::new(peer_message.nonce, address_receiver, address_sender))
+            .write(&Verack::new(
+                remote_version.nonce,
+                local_version.address_receiver,
+                local_version.address_sender,
+            ))
             .await?;
 
         // Write Version request
-        channel
-            .write(&Version::from(
-                version,
-                height,
-                peer_address,
-                local_address,
-                peer_message.nonce,
-            ))
-            .await?;
+        channel.write(local_version).await?;
 
         Ok(Self {
             channel: Arc::new(channel),
             state: HandshakeState::Waiting,
-            version,
-            height,
-            nonce: peer_message.nonce,
+            height: local_version.height,
+            nonce: local_version.nonce,
         })
     }
 
     /// Receive the Version message for an existing peer handshake.
     /// Send a Verack message.
-    pub async fn receive(&mut self, message: Version) -> Result<(), HandshakeError> {
+    pub async fn receive(&mut self, version: Version) -> Result<(), HandshakeError> {
         // You are the new sender and your peer is the receiver
         let address_receiver = self.channel.address;
-        let address_sender = message.address_receiver;
+        let address_sender = version.address_receiver;
 
         self.channel
-            .write(&Verack::new(message.nonce, address_receiver, address_sender))
+            .write(&Verack::new(version.nonce, address_receiver, address_sender))
             .await?;
         Ok(())
     }
@@ -150,8 +128,8 @@ impl Handshake {
     }
 
     /// Updates the stored reader stream for an existing peer handshake.
-    pub fn update_reader(&mut self, read_channel: Channel) {
-        self.channel = Arc::new(self.channel.update_reader(read_channel.reader))
+    pub fn update_reader(&mut self, channel: Channel) {
+        self.channel = Arc::new(self.channel.update_reader(channel.reader))
     }
 
     /// Returns current handshake state.
@@ -172,69 +150,64 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_handshake_full() {
-        let server_address = random_socket_address();
-        let peer_address = random_socket_address();
+        let local_address = random_socket_address();
+        let remote_address = random_socket_address();
 
-        // 1. Bind to peer address
+        // 1. Bind to remote address
 
-        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+        let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         tokio::spawn(async move {
-            let mut server_listener = TcpListener::bind(server_address).await.unwrap();
+            let mut local_listener = TcpListener::bind(local_address).await.unwrap();
 
-            // 2. Server connects to peer, server sends server_hand Version
+            // 2. Local node connects to remote. Remote node sends handshake Version
 
-            let mut server_hand = Handshake::send_new(1u64, 0u32, server_address, peer_address)
-                .await
-                .unwrap();
+            let local_version = Version::new(1u64, 0u32, remote_address, local_address);
+            let mut handshake = Handshake::send_new(&local_version).await.unwrap();
 
-            let (reader, _socket) = server_listener.accept().await.unwrap();
-            let read_channel = Channel::new_read_only(reader).unwrap();
+            let (reader, _socket) = local_listener.accept().await.unwrap();
+            let channel = Channel::new_read_only(reader).unwrap();
 
-            server_hand.update_reader(read_channel);
+            handshake.update_reader(channel);
 
-            // 5. Server accepts server_hand Verack
+            // 5. Local node accepts handshake Verack
 
-            let (_name, bytes) = server_hand.channel.read().await.unwrap();
-            let message = Verack::deserialize(bytes).unwrap();
+            let (_name, bytes) = handshake.channel.read().await.unwrap();
+            let verack = Verack::deserialize(bytes).unwrap();
 
-            server_hand.accept(message).await.unwrap();
+            handshake.accept(verack).await.unwrap();
 
-            // 6. Server receives peer_hand Version
+            // 6. Local node receives handshake Version
 
-            let (_name, bytes) = server_hand.channel.read().await.unwrap();
-            let message = Version::deserialize(bytes).unwrap();
+            let (_name, bytes) = handshake.channel.read().await.unwrap();
+            let remote_version = Version::deserialize(bytes).unwrap();
 
-            // 7. Server sends peer_hand Verack
+            // 7. Local node sends handshake Verack
 
-            server_hand.receive(message).await.unwrap();
+            handshake.receive(remote_version).await.unwrap();
         });
 
-        // 3. Peer accepts Server connection
+        // 3. Remote node accepts Local node connection
 
-        let (reader, _socket) = peer_listener.accept().await.unwrap();
-        let read_channel = Channel::new_read_only(reader).unwrap();
-        let (_name, bytes) = read_channel.read().await.unwrap();
+        let (reader, _socket) = remote_listener.accept().await.unwrap();
+        let channel = Channel::new_read_only(reader).unwrap();
+        let (_name, bytes) = channel.read().await.unwrap();
 
-        // 4. Peer receives server_handshake Version.
-        // Peer sends server_handshake Verack, peer_handshake Version
+        // 4. Remote node receives handshake Version.
+        // Remote node sends handshake Verack, handshake Version
 
-        let mut peer_hand = Handshake::receive_new(
-            1u64,
-            0u32,
-            read_channel,
-            Version::deserialize(bytes).unwrap(),
-            peer_address,
-            server_address,
-        )
-        .await
-        .unwrap();
+        let local_version = Version::new(1u64, 0u32, local_address, remote_address);
+        let remote_version = Version::deserialize(bytes).unwrap();
 
-        // 8. Peer accepts peer_handshake Verack
+        let mut handshake = Handshake::receive_new(channel, &local_version, &remote_version)
+            .await
+            .unwrap();
 
-        let (_name, bytes) = peer_hand.channel.read().await.unwrap();
-        let message = Verack::deserialize(bytes).unwrap();
+        // 8. Remote node accepts handshake Verack
 
-        peer_hand.accept(message).await.unwrap();
+        let (_name, bytes) = handshake.channel.read().await.unwrap();
+        let verack = Verack::deserialize(bytes).unwrap();
+
+        handshake.accept(verack).await.unwrap();
     }
 }

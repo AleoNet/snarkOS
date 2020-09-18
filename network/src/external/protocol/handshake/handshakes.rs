@@ -29,30 +29,24 @@ use tokio::net::TcpStream;
 /// Stores the address and latest state of peers we are handshaking with.
 #[derive(Clone, Debug)]
 pub struct Handshakes {
-    addresses: HashMap<SocketAddr, Handshake>,
+    handshakes: HashMap<SocketAddr, Handshake>,
 }
 
 impl Handshakes {
     /// Construct a new store of connected peer `Handshakes`.
     pub fn new() -> Self {
         Self {
-            addresses: HashMap::default(),
+            handshakes: HashMap::default(),
         }
     }
 
     /// Create a new handshake with a peer and send a handshake request to them.
     /// If the request is sent successfully, the handshake is stored and returned.
-    pub async fn send_request(
-        &mut self,
-        version: u64,
-        height: u32,
-        address_sender: SocketAddr,
-        address_receiver: SocketAddr,
-    ) -> Result<(), HandshakeError> {
-        let handshake = Handshake::send_new(version, height, address_sender, address_receiver).await?;
+    pub async fn send_request(&mut self, version: &Version) -> Result<(), HandshakeError> {
+        let handshake = Handshake::send_new(version).await?;
 
-        self.addresses.insert(address_receiver, handshake);
-        info!("Request handshake with: {:?}", address_receiver);
+        self.handshakes.insert(version.address_receiver.clone(), handshake);
+        info!("Request handshake with: {:?}", version.address_receiver);
 
         Ok(())
     }
@@ -72,7 +66,6 @@ impl Handshakes {
         &mut self,
         version: u64,
         height: u32,
-        local_address: SocketAddr,
         peer_address: SocketAddr,
         reader: TcpStream,
     ) -> Result<(Handshake, SocketAddr, Option<Version>), HandshakeError> {
@@ -81,44 +74,40 @@ impl Handshakes {
         // Read the first message or error
         let (name, bytes) = channel.read().await?;
 
+        // Create and insert a new handshake when the channel contains a version message.
         if Version::name() == name {
-            let peer_message = Version::deserialize(bytes)?;
-
-            let receiver = peer_message.address_receiver;
+            let remote_version = Version::deserialize(bytes)?;
 
             // Peer address and specified port from the version message
-            let peer_address = SocketAddr::new(peer_address.ip(), peer_message.address_sender.port());
+            let remote_address = SocketAddr::new(peer_address.ip(), remote_version.address_sender.port());
+            let local_address = remote_version.address_receiver;
 
-            let handshake = Handshake::receive_new(
-                version,
-                height,
-                channel,
-                peer_message.clone(),
-                local_address,
-                peer_address,
-            )
-            .await?;
+            let local_version = Version::new(version, height, remote_address, local_address);
+            let handshake = Handshake::receive_new(channel, &local_version, &remote_version).await?;
 
-            self.addresses.insert(peer_address, handshake.clone());
+            self.handshakes.insert(remote_address, handshake.clone());
 
-            Ok((handshake, receiver, Some(peer_message)))
-        } else if Verack::name() == name {
-            let peer_message = Verack::deserialize(bytes)?;
-            let peer_address = peer_message.address_sender;
-            let receiver = peer_message.address_receiver;
+            Ok((handshake, local_address, Some(local_version)))
+        }
+        // Establish the channel when the channel contains a verack message.
+        else if Verack::name() == name {
+            let verack = Verack::deserialize(bytes)?;
 
-            match self.get_mut(&peer_address) {
+            let remote_address = verack.address_sender;
+            let local_address = verack.address_receiver;
+
+            match self.get_mut(&remote_address) {
                 Some(handshake) => {
-                    handshake.accept(peer_message).await?;
+                    handshake.accept(verack).await?;
                     handshake.update_reader(channel);
-                    info!("New handshake with: {:?}", peer_address);
+                    info!("New handshake with: {:?}", remote_address);
 
                     // Get our new peer's peer_list
                     handshake.channel.write(&GetPeers).await?;
 
-                    Ok((handshake.clone(), receiver, None))
+                    Ok((handshake.clone(), local_address, None))
                 }
-                None => Err(HandshakeError::HandshakeMissing(peer_address)),
+                None => Err(HandshakeError::HandshakeMissing(remote_address)),
             }
         } else {
             Err(HandshakeError::InvalidMessage(name.to_string()))
@@ -158,7 +147,7 @@ impl Handshakes {
 
     /// Returns the state of the handshake at a peer address.
     pub fn get_state(&self, address: SocketAddr) -> Option<HandshakeState> {
-        match self.addresses.get(&address) {
+        match self.handshakes.get(&address) {
             Some(stored_handshake) => Some(stored_handshake.get_state()),
             None => None,
         }
@@ -166,12 +155,12 @@ impl Handshakes {
 
     /// Returns a reference to the handshake at a peer address.
     pub fn get(&self, address: &SocketAddr) -> Option<&Handshake> {
-        self.addresses.get(&address)
+        self.handshakes.get(&address)
     }
 
     /// Returns a mutable reference to the handshake at a peer address.
     fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut Handshake> {
-        self.addresses.get_mut(&address)
+        self.handshakes.get_mut(&address)
     }
 }
 
@@ -187,83 +176,66 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_handshakes() {
-        let server_address = random_socket_address();
-        let peer_address = random_socket_address();
+        let local_address = random_socket_address();
+        let remote_address = random_socket_address();
 
-        // 1. Bind to peer address
-        let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+        // 1. Bind to remote address
+        let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         tokio::spawn(async move {
-            let mut server_listener = TcpListener::bind(server_address).await.unwrap();
+            let mut local_listener = TcpListener::bind(local_address).await.unwrap();
 
-            // 2. Server sends server_handshake request
+            // 2. Local node sends handshake request
 
-            let mut server_handshakes = Handshakes::new();
+            let local_version = Version::new(1u64, 0u32, remote_address, local_address);
 
-            server_handshakes
-                .send_request(1u64, 0u32, server_address, peer_address)
-                .await
-                .unwrap();
+            let mut handshake = Handshakes::new();
+            handshake.send_request(&local_version).await.unwrap();
 
-            // 5. Check server handshake state
+            // 5. Check local node handshake state
 
-            let (reader, _socket) = server_listener.accept().await.unwrap();
-            let read_channel = Channel::new_read_only(reader).unwrap();
+            let (reader, _socket) = local_listener.accept().await.unwrap();
+            let channel = Channel::new_read_only(reader).unwrap();
 
-            assert_eq!(
-                HandshakeState::Waiting,
-                server_handshakes.get_state(peer_address).unwrap()
-            );
+            assert_eq!(HandshakeState::Waiting, handshake.get_state(remote_address).unwrap());
 
-            // 6. Server accepts server_handshake response
+            // 6. Local node accepts handshake response
 
-            let (_name, bytes) = read_channel.read().await.unwrap();
-            let message = Verack::deserialize(bytes).unwrap();
+            let (_name, bytes) = channel.read().await.unwrap();
+            let verack = Verack::deserialize(bytes).unwrap();
 
-            server_handshakes.accept_response(peer_address, message).await.unwrap();
+            handshake.accept_response(remote_address, verack).await.unwrap();
 
-            assert_eq!(
-                HandshakeState::Accepted,
-                server_handshakes.get_state(peer_address).unwrap()
-            );
+            assert_eq!(HandshakeState::Accepted, handshake.get_state(remote_address).unwrap());
 
-            // 7. Server receives peer_handshake request
+            // 7. Local node receives handshake request
 
-            let (_name, bytes) = read_channel.read().await.unwrap();
-            let message = Version::deserialize(bytes).unwrap();
+            let (_name, bytes) = channel.read().await.unwrap();
+            let remote_version = Version::deserialize(bytes).unwrap();
 
-            // 8. Server sends peer_handshake response
+            // 8. Local node sends handshake response
 
-            server_handshakes.receive_request(message, peer_address).await.unwrap();
+            handshake.receive_request(remote_version, remote_address).await.unwrap();
         });
 
-        // 3. Peer accepts Server connection
+        // 3. Remote node accepts Local node connection
 
-        let (reader, _socket) = peer_listener.accept().await.unwrap();
+        let (reader, _socket) = remote_listener.accept().await.unwrap();
 
-        // 4. Peer sends server_handshake response, peer_handshake request
+        // 4. Remote node sends handshake response, handshake request
 
-        let mut peer_handshakes = Handshakes::new();
-        let (peer_hand, _, _) = peer_handshakes
-            .receive_any(1u64, 0u32, peer_address, server_address, reader)
-            .await
-            .unwrap();
+        let mut handshakes = Handshakes::new();
+        let (handshake, _, _) = handshakes.receive_any(1u64, 0u32, local_address, reader).await.unwrap();
 
-        assert_eq!(
-            HandshakeState::Waiting,
-            peer_handshakes.get_state(server_address).unwrap()
-        );
+        assert_eq!(HandshakeState::Waiting, handshakes.get_state(local_address).unwrap());
 
-        // 9. Server accepts server_handshake response
+        // 9. Local node accepts handshake response
 
-        let (_name, bytes) = peer_hand.channel.read().await.unwrap();
-        let message = Verack::deserialize(bytes).unwrap();
+        let (_name, bytes) = handshake.channel.read().await.unwrap();
+        let verack = Verack::deserialize(bytes).unwrap();
 
-        peer_handshakes.accept_response(server_address, message).await.unwrap();
+        handshakes.accept_response(local_address, verack).await.unwrap();
 
-        assert_eq!(
-            HandshakeState::Accepted,
-            peer_handshakes.get_state(server_address).unwrap()
-        )
+        assert_eq!(HandshakeState::Accepted, handshakes.get_state(local_address).unwrap())
     }
 }

@@ -81,33 +81,27 @@ impl Server {
                         }
 
                         // Try and connect to our gossiped peers.
-                        for (address, _last_seen) in peer_book.get_gossiped() {
-                            if address != local_address && !peer_book.connected_contains(&address) {
+                        for (remote_address, _last_seen) in peer_book.get_gossiped() {
+                            if remote_address != local_address && !peer_book.connected_contains(&remote_address) {
                                 // Create a non-blocking handshake request
                                 {
                                     let new_context = context.clone();
                                     let latest_block_height = storage.get_latest_block_height();
 
                                     task::spawn(async move {
-                                        if let Err(_) = new_context
-                                            .handshakes
-                                            .write()
-                                            .await
-                                            .send_request(
-                                                1u64, // TODO (raychu86) Establish a formal node version
-                                                latest_block_height,
-                                                local_address,
-                                                address,
-                                            )
-                                            .await
-                                        {
-                                            debug!("Could not connect to gossiped peer {}", address);
+                                        // TODO (raychu86) Establish a formal node version
+                                        let version =
+                                            Version::new(1u64, latest_block_height, remote_address, local_address);
+
+                                        let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
+                                        if let Err(_) = handshakes.send_request(&version).await {
+                                            debug!("Could not connect to gossiped peer {}", remote_address);
                                         }
                                     });
                                 }
                             }
 
-                            peer_book.remove_gossiped(address);
+                            peer_book.remove_gossiped(remote_address);
                         }
                     }
 
@@ -167,29 +161,27 @@ impl Server {
                             debug!("Sending out periodic version message to peers");
                         }
 
-                        for (address, _last_seen) in peer_book.get_connected() {
-                            match connections.get(&address) {
+                        for (remote_address, _last_seen) in peer_book.get_connected() {
+                            match connections.get(&remote_address) {
                                 Some(channel) => {
                                     // Send a version message to peers.
                                     // If they are behind, they will attempt to sync.
-                                    if let Some(handshake) = context.handshakes.read().await.get(&address) {
-                                        let nonce = handshake.nonce;
-                                        let version = 1u64; // TODO (raychu86) Establish a formal node version
-                                        let message = Version::from(
-                                            version,
+                                    if let Some(handshake) = context.handshakes.read().await.get(&remote_address) {
+                                        let version = Version::from(
+                                            1u64, // TODO (raychu86) Establish a formal node version
                                             storage.get_latest_block_height(),
-                                            address,
+                                            remote_address,
                                             local_address,
-                                            nonce,
+                                            handshake.nonce,
                                         );
-                                        if let Err(_) = channel.write(&message).await {
-                                            peer_book.disconnect_peer(address);
+                                        if let Err(_) = channel.write(&version).await {
+                                            peer_book.disconnect_peer(remote_address);
                                         }
                                     }
                                 }
                                 // Disconnect from the peer if there is no active connection channel
                                 None => {
-                                    peer_book.disconnect_peer(address);
+                                    peer_book.disconnect_peer(remote_address);
                                 }
                             }
                         }

@@ -17,7 +17,7 @@
 mod server_message_handler {
     use snarkos_consensus::memory_pool::Entry;
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
-    use snarkos_network::{external::Channel, message::Message, message_types::*, PingState};
+    use snarkos_network::external::{message::Message, message_types::*, Channel, PingState};
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkos_utilities::{
@@ -44,11 +44,11 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -58,7 +58,7 @@ mod server_message_handler {
 
             // 1. Start peer and server
 
-            simulate_active_node(peer_address).await;
+            simulate_active_node(remote_address).await;
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
@@ -71,7 +71,7 @@ mod server_message_handler {
                         tx,
                         Block::name(),
                         Block::new(BLOCK_1.to_vec()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -101,13 +101,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -131,7 +131,7 @@ mod server_message_handler {
                         GetBlock::new(BlockHeaderHash::new(GENESIS_BLOCK_HEADER_HASH.to_vec()))
                             .serialize()
                             .unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -140,7 +140,7 @@ mod server_message_handler {
 
             // 3. Check that server correctly sent SyncBlock message
 
-            let channel = accept_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut remote_listener, local_address).await;
             let (name, bytes) = channel.read().await.unwrap();
             assert_eq!(SyncBlock::name(), name);
 
@@ -168,9 +168,9 @@ mod server_message_handler {
             let bootnode_address = random_socket_address();
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
-            let server_address = random_socket_address();
+            let local_address = random_socket_address();
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -184,7 +184,7 @@ mod server_message_handler {
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
             let channel_server_side = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
-            accept_channel(&mut bootnode_listener, server_address).await;
+            accept_channel(&mut bootnode_listener, local_address).await;
 
             // 2. Send SyncBlock message to server
 
@@ -224,13 +224,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -272,7 +272,7 @@ mod server_message_handler {
                         GetSync::new(vec![BlockHeaderHash::new(GENESIS_BLOCK_HEADER_HASH.to_vec())])
                             .serialize()
                             .unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -281,7 +281,7 @@ mod server_message_handler {
 
             // 4. Check that server correctly sent Sync message
 
-            let channel = accept_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut remote_listener, local_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(Sync::name(), name);
@@ -307,13 +307,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -332,7 +332,7 @@ mod server_message_handler {
 
             // 1. Start server
 
-            simulate_active_node(peer_address).await;
+            simulate_active_node(remote_address).await;
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
@@ -345,7 +345,7 @@ mod server_message_handler {
                         tx,
                         Sync::name(),
                         Sync::new(vec![block_hash_clone]).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -354,7 +354,7 @@ mod server_message_handler {
 
             // 3. Check that server sent a BlockRequest message to sync node
 
-            let channel = accept_channel(&mut bootnode_listener, server_address).await;
+            let channel = accept_channel(&mut bootnode_listener, local_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(GetBlock::name(), name);
@@ -375,10 +375,10 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -390,7 +390,7 @@ mod server_message_handler {
 
             // 1. Start server
 
-            simulate_active_node(peer_address).await;
+            simulate_active_node(remote_address).await;
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
@@ -406,7 +406,7 @@ mod server_message_handler {
                         tx,
                         Transaction::name(),
                         Transaction::new(transaction_bytes_clone).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -436,13 +436,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -464,13 +464,13 @@ mod server_message_handler {
                         tx,
                         GetMemoryPool::name(),
                         GetMemoryPool.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
             });
             rx.await.unwrap();
-            accept_channel(&mut peer_listener, server_address).await;
+            accept_channel(&mut remote_listener, local_address).await;
         });
 
         drop(rt);
@@ -487,13 +487,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -528,7 +528,7 @@ mod server_message_handler {
                         tx,
                         GetMemoryPool::name(),
                         GetMemoryPool.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -537,7 +537,7 @@ mod server_message_handler {
 
             // 4. Check that server correctly responded with MemoryPool
 
-            let channel = accept_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut remote_listener, local_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(MemoryPool::name(), name);
@@ -561,11 +561,11 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -576,7 +576,7 @@ mod server_message_handler {
 
             // 1. Start server
 
-            simulate_active_node(peer_address).await;
+            simulate_active_node(remote_address).await;
             start_test_server(server);
 
             // 2. Send MemoryPoolResponse to server from peer
@@ -588,7 +588,7 @@ mod server_message_handler {
                         tx,
                         MemoryPool::name(),
                         MemoryPool::new(vec![TRANSACTION_2.to_vec()]).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -620,13 +620,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -649,7 +649,7 @@ mod server_message_handler {
                         tx,
                         GetPeers::name(),
                         GetPeers.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -658,7 +658,7 @@ mod server_message_handler {
 
             // 3. Check that server correctly responded with PeersResponse message
 
-            let channel = accept_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut remote_listener, local_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(Peers::name(), name);
@@ -684,11 +684,11 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -705,7 +705,7 @@ mod server_message_handler {
             // 2. Send Peers message to server with new peer address form bootnode
 
             let mut addresses = HashMap::<SocketAddr, DateTime<Utc>>::new();
-            addresses.insert(peer_address, Utc::now());
+            addresses.insert(remote_address, Utc::now());
 
             let (tx, rx) = oneshot::channel();
             tokio::spawn(async move {
@@ -723,7 +723,7 @@ mod server_message_handler {
 
             // 3. Check that new peer address was added correctly
 
-            assert!(server_context.peer_book.read().await.gossiped_contains(&peer_address));
+            assert!(server_context.peer_book.read().await.gossiped_contains(&remote_address));
         });
 
         drop(rt);
@@ -740,13 +740,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -770,7 +770,7 @@ mod server_message_handler {
                         tx,
                         Ping::name(),
                         ping_bytes,
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -779,7 +779,7 @@ mod server_message_handler {
 
             // 3. Check that peer received pong
 
-            let channel = accept_channel(&mut peer_listener, server_address).await;
+            let channel = accept_channel(&mut remote_listener, local_address).await;
             let (name, bytes) = channel.read().await.unwrap();
 
             assert_eq!(Pong::name(), name);
@@ -800,11 +800,11 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -815,7 +815,7 @@ mod server_message_handler {
 
             // 1. Start peer and server
 
-            simulate_active_node(peer_address).await;
+            simulate_active_node(remote_address).await;
             start_test_server(server);
 
             // 2. Send pong response to server from peer
@@ -827,7 +827,7 @@ mod server_message_handler {
                         tx,
                         Pong::name(),
                         Pong::new(Ping::new()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(peer_address).await.unwrap()),
+                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -837,7 +837,7 @@ mod server_message_handler {
             // 3. Check that server updated peer
 
             let peer_book = context.peer_book.read().await;
-            assert!(!peer_book.connected_contains(&peer_address));
+            assert!(!peer_book.connected_contains(&remote_address));
         });
 
         drop(rt);
@@ -854,13 +854,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -874,8 +874,8 @@ mod server_message_handler {
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
-            let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
+            let channel_server_side = Arc::new(Channel::new_write_only(remote_address).await.unwrap());
+            let channel_peer_side = accept_channel(&mut remote_listener, local_address).await;
 
             // 2. Add peer to pings
 
@@ -917,8 +917,8 @@ mod server_message_handler {
             let pings = context.pings.read().await;
             let peer_book = context.peer_book.read().await;
 
-            assert_eq!(PingState::Rejected, pings.get_state(peer_address).unwrap());
-            assert!(!peer_book.connected_contains(&peer_address));
+            assert_eq!(PingState::Rejected, pings.get_state(remote_address).unwrap());
+            assert!(!peer_book.connected_contains(&remote_address));
         });
 
         drop(rt);
@@ -935,13 +935,13 @@ mod server_message_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -955,8 +955,8 @@ mod server_message_handler {
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
-            let channel_server_side = Arc::new(Channel::new_write_only(peer_address).await.unwrap());
-            let channel_peer_side = accept_channel(&mut peer_listener, server_address).await;
+            let channel_server_side = Arc::new(Channel::new_write_only(remote_address).await.unwrap());
+            let channel_peer_side = accept_channel(&mut remote_listener, local_address).await;
 
             // 2. Add peer to pings
 
@@ -1000,8 +1000,8 @@ mod server_message_handler {
             let pings = context.pings.read().await;
             let peer_book = context.peer_book.read().await;
 
-            assert_eq!(PingState::Accepted, pings.get_state(peer_address).unwrap());
-            assert!(peer_book.connected_contains(&peer_address));
+            assert_eq!(PingState::Accepted, pings.get_state(remote_address).unwrap());
+            assert!(peer_book.connected_contains(&remote_address));
         });
 
         drop(rt);

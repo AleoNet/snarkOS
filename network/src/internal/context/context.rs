@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Connections, Handshakes, PeerBook, Pings};
+use crate::{
+    external::{Handshakes, Pings},
+    internal::{Connections, PeerBook},
+};
 
 use std::net::SocketAddr;
 use tokio::sync::RwLock;
