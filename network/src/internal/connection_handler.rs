@@ -210,15 +210,9 @@ impl Server {
                         // Ask our connected peers for their memory pool transactions
                         {
                             for (address, _last_seen) in peer_book.get_connected() {
-                                match connections.get(&address) {
-                                    Some(channel) => {
-                                        // Disconnect from the peer if the GetMemoryPool message was not sent properly
-                                        if let Err(_) = channel.write(&GetMemoryPool).await {
-                                            peer_book.disconnect_peer(address);
-                                        }
-                                    }
-                                    // Disconnect from the peer if there is no active connection channel
-                                    None => {
+                                if let Some(channel) = connections.get(&address) {
+                                    // Disconnect from the peer if the GetMemoryPool message was not sent properly
+                                    if let Err(_) = channel.write(&GetMemoryPool).await {
                                         peer_book.disconnect_peer(address);
                                     }
                                 }
