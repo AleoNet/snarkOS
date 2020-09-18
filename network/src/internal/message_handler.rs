@@ -188,7 +188,7 @@ impl Server {
             }
 
             if let Err(error) = tx.send(channel) {
-                warn!("Error resetting connection thread ({})", error);
+                warn!("Error resetting connection thread ({:?})", error);
             }
         }
     }
