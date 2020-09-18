@@ -297,7 +297,7 @@ impl Server {
 
             let mut handshakes = context.handshakes.write().await;
             handshakes.send_request(&version).await.unwrap_or_else(|error| {
-                info!("Failed to connect to address: {:?}", error);
+                info!("Failed to connect to {:?}", error);
                 ()
             });
         });
@@ -308,13 +308,13 @@ impl Server {
         let local_address = *self.context.local_address.read().await;
 
         let mut peer_book = self.context.peer_book.write().await;
-        for (i, bootnode) in self.context.bootnodes.clone().iter().enumerate() {
+        for (i, bootnode) in self.context.bootnodes.iter().enumerate() {
             let bootnode_address = bootnode.parse::<SocketAddr>()?;
 
             if i == 0 {
                 // This node should not attempt to connect to itself.
                 if local_address != bootnode_address {
-                    info!("Connecting to bootnode: {:?}", bootnode_address);
+                    info!("Connecting to bootnode {:?}", bootnode_address);
 
                     self.send_handshake_non_blocking(bootnode_address);
                 }
@@ -332,7 +332,7 @@ impl Server {
             let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> = bincode::deserialize(&serialized_peers)?;
 
             for (stored_peer, _old_time) in stored_connected_peers {
-                info!("Attempting to connect to stored peer: {:?}", stored_peer);
+                info!("Connecting to stored peer {:?}", stored_peer);
 
                 self.send_handshake_non_blocking(stored_peer);
             }
