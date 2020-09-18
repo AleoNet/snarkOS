@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{context::Context, server::propagate_block};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkos_network::server::{context::Context, propagate_block};
 use snarkos_objects::{AccountAddress, Block};
 
 use std::sync::Arc;
