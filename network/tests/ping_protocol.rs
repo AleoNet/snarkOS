@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod ping_protocol {
-    use snarkos_network::{
+    use snarkos_network::external::{
         message_types::{Ping, Pong},
         Message,
         PingProtocol,

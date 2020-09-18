@@ -16,7 +16,7 @@
 
 mod server_connection_handler {
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
-    use snarkos_network::{message::Message, message_types::GetMemoryPool, Channel};
+    use snarkos_network::external::{message::Message, message_types::GetMemoryPool, Channel};
     use snarkos_testing::{consensus::FIXTURE_VK, dpc::load_verifying_parameters, network::*, storage::*};
 
     use chrono::{Duration, Utc};

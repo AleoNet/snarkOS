@@ -18,12 +18,12 @@ use crate::{
     external::{
         message::{Message, MessageName},
         message_types::*,
+        propagate_block,
         protocol::SyncState,
         Channel,
+        Pings,
     },
-    process_transaction_internal,
-    propagate_block,
-    Pings,
+    internal::process_transaction_internal,
     Server,
 };
 use snarkos_consensus::memory_pool::Entry;

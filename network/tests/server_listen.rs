@@ -26,9 +26,9 @@ mod server_listen {
             message::Message,
             message_types::{GetPeers, GetSync, Verack},
             protocol::SyncHandler,
+            Handshakes,
         },
         server::Server,
-        Handshakes,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 

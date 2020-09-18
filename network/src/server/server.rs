@@ -75,155 +75,6 @@ impl Server {
         }
     }
 
-    /// Send a handshake request to a node at address without blocking the server listener.
-    fn send_handshake_non_blocking(&self, address: SocketAddr) {
-        let context = self.context.clone();
-        let storage = self.storage.clone();
-
-        task::spawn(async move {
-            context
-                .handshakes
-                .write()
-                .await
-                .send_request(
-                    1u64,
-                    storage.get_latest_block_height(),
-                    *context.local_address.read().await,
-                    address,
-                )
-                .await
-                .unwrap_or_else(|error| {
-                    info!("Failed to connect to address: {:?}", error);
-                    ()
-                });
-        });
-    }
-
-    /// Send a handshake request the first bootnode and store the rest as gossipped peers
-    async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
-        let local_address = *self.context.local_address.read().await;
-
-        let mut peer_book = self.context.peer_book.write().await;
-        for (i, bootnode) in self.context.bootnodes.clone().iter().enumerate() {
-            let bootnode_address = bootnode.parse::<SocketAddr>()?;
-
-            if i == 0 {
-                // This node should not attempt to connect to itself.
-                if local_address != bootnode_address {
-                    info!("Connecting to bootnode: {:?}", bootnode_address);
-
-                    self.send_handshake_non_blocking(bootnode_address);
-                }
-            } else {
-                peer_book.update_gossiped(bootnode_address, Utc::now());
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Send a handshake request to every peer this server previously connected to.
-    async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
-        if let Ok(serialized_peers) = self.storage.get_peer_book() {
-            let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> = bincode::deserialize(&serialized_peers)?;
-
-            for (stored_peer, _old_time) in stored_connected_peers {
-                info!("Attempting to connect to stored peer: {:?}", stored_peer);
-
-                self.send_handshake_non_blocking(stored_peer);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Spawns one thread per peer tcp connection to read messages.
-    /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
-    /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
-    /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
-    fn spawn_connection_thread(
-        mut channel: Arc<Channel>,
-        mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
-    ) {
-        task::spawn(async move {
-            // Determines the criteria for disconnecting from a peer.
-            fn should_disconnect(failure_count: &u8) -> bool {
-                // Tolerate up to 10 failed communications.
-                *failure_count >= 10
-            }
-
-            // Logs the failure and determines whether to disconnect from a peer.
-            fn handle_failure<T: std::fmt::Display>(
-                failure: &mut bool,
-                failure_count: &mut u8,
-                disconnect_from_peer: &mut bool,
-                error: T,
-            ) {
-                // Only increment failure_count if we haven't seen a failure yet.
-                if !*failure {
-                    // Update the state to reflect a new failure.
-                    *failure = true;
-                    *failure_count += 1;
-                    warn!(
-                        "Connection errored {} time(s) (error message: {})",
-                        failure_count, error
-                    );
-
-                    // Determine if we should disconnect.
-                    *disconnect_from_peer = should_disconnect(failure_count);
-                } else {
-                    debug!("Connection errored again in the same loop (error message: {})", error);
-                }
-            }
-
-            let mut failure_count = 0u8;
-            let mut disconnect_from_peer = false;
-
-            loop {
-                // Initialize the failure indicator.
-                let mut failure = false;
-
-                // Read the next message from the channel. This is a blocking operation.
-                let (message_name, message_bytes) = match channel.read().await {
-                    Ok((message_name, message_bytes)) => (message_name, message_bytes),
-                    Err(error) => {
-                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
-
-                        // Determine if we should send a disconnect message.
-                        match disconnect_from_peer {
-                            true => (MessageName::from("disconnect"), vec![]),
-                            false => continue,
-                        }
-                    }
-                };
-
-                // Use a oneshot channel to give the channel control
-                // to the message handler after reading from the channel.
-                let (tx, rx) = oneshot::channel();
-
-                // Send the successful read data to the message handler.
-                if let Err(error) = message_handler_sender
-                    .send((tx, message_name, message_bytes, channel.clone()))
-                    .await
-                {
-                    handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
-                };
-
-                // Wait for the message handler to give back channel control.
-                match rx.await {
-                    Ok(peer_channel) => channel = peer_channel,
-                    Err(error) => handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error),
-                };
-
-                // Break out of the loop if the peer disconnects.
-                if disconnect_from_peer {
-                    warn!("Disconnecting from an unreliable peer");
-                    break;
-                }
-            }
-        });
-    }
-
     /// Starts the server event loop.
     ///
     /// 1. Initialize TCP listener at `local_address` and accept new TCP connections.
@@ -353,6 +204,155 @@ impl Server {
         // 6. Start the message handler.
         debug!("Starting message handler");
         self.message_handler().await?;
+
+        Ok(())
+    }
+
+    /// Spawns one thread per peer tcp connection to read messages.
+    /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
+    /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
+    /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
+    fn spawn_connection_thread(
+        mut channel: Arc<Channel>,
+        mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+    ) {
+        task::spawn(async move {
+            // Determines the criteria for disconnecting from a peer.
+            fn should_disconnect(failure_count: &u8) -> bool {
+                // Tolerate up to 10 failed communications.
+                *failure_count >= 10
+            }
+
+            // Logs the failure and determines whether to disconnect from a peer.
+            fn handle_failure<T: std::fmt::Display>(
+                failure: &mut bool,
+                failure_count: &mut u8,
+                disconnect_from_peer: &mut bool,
+                error: T,
+            ) {
+                // Only increment failure_count if we haven't seen a failure yet.
+                if !*failure {
+                    // Update the state to reflect a new failure.
+                    *failure = true;
+                    *failure_count += 1;
+                    warn!(
+                        "Connection errored {} time(s) (error message: {})",
+                        failure_count, error
+                    );
+
+                    // Determine if we should disconnect.
+                    *disconnect_from_peer = should_disconnect(failure_count);
+                } else {
+                    debug!("Connection errored again in the same loop (error message: {})", error);
+                }
+            }
+
+            let mut failure_count = 0u8;
+            let mut disconnect_from_peer = false;
+
+            loop {
+                // Initialize the failure indicator.
+                let mut failure = false;
+
+                // Read the next message from the channel. This is a blocking operation.
+                let (message_name, message_bytes) = match channel.read().await {
+                    Ok((message_name, message_bytes)) => (message_name, message_bytes),
+                    Err(error) => {
+                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+
+                        // Determine if we should send a disconnect message.
+                        match disconnect_from_peer {
+                            true => (MessageName::from("disconnect"), vec![]),
+                            false => continue,
+                        }
+                    }
+                };
+
+                // Use a oneshot channel to give the channel control
+                // to the message handler after reading from the channel.
+                let (tx, rx) = oneshot::channel();
+
+                // Send the successful read data to the message handler.
+                if let Err(error) = message_handler_sender
+                    .send((tx, message_name, message_bytes, channel.clone()))
+                    .await
+                {
+                    handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+                };
+
+                // Wait for the message handler to give back channel control.
+                match rx.await {
+                    Ok(peer_channel) => channel = peer_channel,
+                    Err(error) => handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error),
+                };
+
+                // Break out of the loop if the peer disconnects.
+                if disconnect_from_peer {
+                    warn!("Disconnecting from an unreliable peer");
+                    break;
+                }
+            }
+        });
+    }
+
+    /// Send a handshake request to a node at address without blocking the server listener.
+    fn send_handshake_non_blocking(&self, address: SocketAddr) {
+        let context = self.context.clone();
+        let storage = self.storage.clone();
+
+        task::spawn(async move {
+            context
+                .handshakes
+                .write()
+                .await
+                .send_request(
+                    1u64,
+                    storage.get_latest_block_height(),
+                    *context.local_address.read().await,
+                    address,
+                )
+                .await
+                .unwrap_or_else(|error| {
+                    info!("Failed to connect to address: {:?}", error);
+                    ()
+                });
+        });
+    }
+
+    /// Send a handshake request the first bootnode and store the rest as gossipped peers
+    async fn connect_bootnodes(&mut self) -> Result<(), ServerError> {
+        let local_address = *self.context.local_address.read().await;
+
+        let mut peer_book = self.context.peer_book.write().await;
+        for (i, bootnode) in self.context.bootnodes.clone().iter().enumerate() {
+            let bootnode_address = bootnode.parse::<SocketAddr>()?;
+
+            if i == 0 {
+                // This node should not attempt to connect to itself.
+                if local_address != bootnode_address {
+                    info!("Connecting to bootnode: {:?}", bootnode_address);
+
+                    self.send_handshake_non_blocking(bootnode_address);
+                }
+            } else {
+                peer_book.update_gossiped(bootnode_address, Utc::now());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Send a handshake request to every peer this server previously connected to.
+    async fn connect_peers_from_storage(&mut self) -> Result<(), ServerError> {
+        if let Ok(serialized_peers) = self.storage.get_peer_book() {
+            let stored_connected_peers: HashMap<SocketAddr, DateTime<Utc>> = bincode::deserialize(&serialized_peers)?;
+
+            for (stored_peer, _old_time) in stored_connected_peers {
+                info!("Attempting to connect to stored peer: {:?}", stored_peer);
+
+                self.send_handshake_non_blocking(stored_peer);
+            }
+        }
 
         Ok(())
     }

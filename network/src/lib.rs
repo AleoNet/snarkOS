@@ -25,7 +25,6 @@
 extern crate log;
 
 pub mod external;
-pub use external::*;
 
 pub mod internal;
 pub use internal::*;

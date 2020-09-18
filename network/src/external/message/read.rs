@@ -38,10 +38,7 @@ pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<Mes
 }
 
 /// Reads bytes from an input stream to fill the buffer.
-pub async fn stream_read<'a, T: AsyncRead + Unpin>(
-    stream: &'a mut T,
-    buffer: &'a mut [u8],
-) -> Result<(), StreamReadError> {
+async fn stream_read<'a, T: AsyncRead + Unpin>(stream: &'a mut T, buffer: &'a mut [u8]) -> Result<(), StreamReadError> {
     stream.read_exact(buffer).await?;
     return Ok(());
 }
@@ -49,7 +46,7 @@ pub async fn stream_read<'a, T: AsyncRead + Unpin>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use crate::external::{
         message::{message::Message, MessageHeader},
         message_types::Ping,
     };
