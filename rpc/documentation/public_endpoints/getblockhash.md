@@ -4,7 +4,7 @@ Returns the block hash of a block at the given block height in the best valid ch
 
 |    Parameter   |  Type  | Required |                  Description                 |
 |:-------------- |:------:|:--------:|:-------------------------------------------- |
-| `block_height` | string |    Yes   | The block height of the requested block hash |
+| `block_height` | number |    Yes   | The block height of the requested block hash |
 
 ### Response
 
