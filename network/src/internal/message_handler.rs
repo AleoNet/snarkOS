@@ -434,21 +434,13 @@ impl Server {
     /// Check if the Verack matches the last handshake message we sent.
     /// Update our peer book and send a request for more peers.
     async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
-        match self
-            .context
-            .handshakes
-            .write()
-            .await
-            .accept_response(channel.address, message)
-            .await
-        {
+        let mut handshakes = self.context.handshakes.write().await; // Acquire the handshake lock
+
+        match handshakes.accept_response(channel.address, message).await {
             Ok(()) => {
                 // Add connected peer.
-                self.context
-                    .peer_book
-                    .write()
-                    .await
-                    .update_connected(channel.address, Utc::now());
+                let mut peer_book = self.context.peer_book.write().await; // Acquire the peerbook lock
+                peer_book.update_connected(channel.address, Utc::now());
 
                 // Ask connected peer for more peers.
                 channel.write(&GetPeers).await?;
@@ -477,12 +469,8 @@ impl Server {
 
         if *self.context.local_address.read().await != peer_address {
             if peer_book.connected_total() < self.context.max_peers {
-                self.context
-                    .handshakes
-                    .write()
-                    .await
-                    .receive_request(message.clone(), peer_address)
-                    .await?;
+                let mut handshakes = self.context.handshakes.write().await; // Acquire the handshake lock
+                handshakes.receive_request(message.clone(), peer_address).await?;
             }
 
             // If our peer has a longer chain, send a sync message
