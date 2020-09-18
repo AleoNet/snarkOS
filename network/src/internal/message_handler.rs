@@ -37,6 +37,7 @@ use snarkos_utilities::{
 
 use chrono::Utc;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::task;
 
 impl Server {
     /// This method handles all messages sent from connected peers.
@@ -407,14 +408,22 @@ impl Server {
     /// A peer has sent us their chain state.
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
         let height = self.storage.get_latest_block_height();
-        let mut sync_handler = self.sync_handler_lock.lock().await;
+        let context = self.context.clone();
+        let sync_handler_lock = self.sync_handler_lock.clone();
+        let storage = self.storage.clone();
 
-        sync_handler.receive_hashes(message.block_hashes, height);
+        task::spawn(async move {
+            let mut sync_handler = sync_handler_lock.lock().await;
 
-        // Received block headers
-        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-            sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
-        }
+            sync_handler.receive_hashes(message.block_hashes, height);
+
+            // Received block headers
+            if let Some(channel) = context.connections.read().await.get(&sync_handler.sync_node) {
+                if let Err(error) = sync_handler.poll(channel, Arc::clone(&storage)).await {
+                    error!("Error polling sync handler (error {})", error);
+                }
+            }
+        });
 
         Ok(())
     }
