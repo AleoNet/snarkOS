@@ -23,7 +23,7 @@ use crate::external::message::{
 use snarkos_errors::network::ConnectError;
 
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex, task};
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
 /// A channel for reading and writing messages to a peer.
 /// The channel manages two streams to allow for simultaneous reading and writing.
@@ -103,28 +103,11 @@ impl Channel {
         debug!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
 
         let serialized_message = message.serialize()?;
-        let header = MessageHeader::new(M::name(), serialized_message.len() as u32);
-        let header_bytes = header.serialize()?;
+        let header = MessageHeader::new(M::name(), serialized.len() as u32);
 
-        let writer = self.writer.clone();
-
-        // Spawn a tokio task to send the message.
-        task::spawn(async move {
-            let mut writer = writer.lock().await;
-
-            match writer.write_all(&header_bytes).await {
-                Ok(_) => {
-                    if let Err(error) = writer.write_all(&serialized_message).await {
-                        error!(
-                            "Failed to send message body {} (error {})",
-                            M::name().to_string(),
-                            error
-                        )
-                    }
-                }
-                Err(error) => error!("Failed to send message header {} (error {})", M::name(), error),
-            }
-        });
+        let mut writer = self.writer.lock().await;
+        writer.write_all(&header.serialize()?).await?;
+        writer.write_all(&serialized).await?;
 
         Ok(())
     }
