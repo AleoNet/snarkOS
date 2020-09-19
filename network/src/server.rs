@@ -325,7 +325,7 @@ impl Server {
                     if local_address != bootnode_address {
                         info!("Connecting to {:?} (bootnode)...", bootnode_address);
                         Server::send_handshake_non_blocking(context.clone(), storage.clone(), bootnode_address);
-                        delay_for(Duration::from_millis(100)).await;
+                        delay_for(Duration::from_millis(500)).await;
                     }
                 }
             }
@@ -349,7 +349,7 @@ impl Server {
                         if local_address != saved_address {
                             info!("Connecting to {:?} (saved peer)...", saved_address);
                             Server::send_handshake_non_blocking(context.clone(), storage.clone(), saved_address);
-                            delay_for(Duration::from_millis(100)).await;
+                            delay_for(Duration::from_millis(500)).await;
                         }
                     }
                 });
