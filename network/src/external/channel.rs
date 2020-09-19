@@ -22,8 +22,8 @@ use crate::external::message::{
 };
 use snarkos_errors::network::ConnectError;
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex, task};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
 /// A channel for reading and writing messages to a peer.
 /// The channel manages two streams to allow for simultaneous reading and writing.
@@ -50,11 +50,7 @@ impl Channel {
 
     /// Returns a new channel with a writer only stream.
     pub async fn new_write_only(address: SocketAddr) -> Result<Self, ConnectError> {
-        // Attempt to create a TcpStream with a timeout duration of 2 seconds.
-        let std_stream = std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2))?;
-        let tokio_tcp_stream = TcpStream::from_std(std_stream)?;
-
-        let stream = Arc::new(Mutex::new(tokio_tcp_stream));
+        let stream = Arc::new(Mutex::new(TcpStream::connect(address).await?));
 
         Ok(Self {
             address,
@@ -106,29 +102,12 @@ impl Channel {
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
         debug!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
 
-        let serialized_message = message.serialize()?;
-        let header = MessageHeader::new(M::name(), serialized_message.len() as u32);
-        let header_bytes = header.serialize()?;
+        let serialized = message.serialize()?;
+        let header = MessageHeader::new(M::name(), serialized.len() as u32);
 
-        let writer = self.writer.clone();
-
-        // Spawn a tokio task to send the message.
-        task::spawn(async move {
-            let mut writer = writer.lock().await;
-
-            match writer.write_all(&header_bytes).await {
-                Ok(_) => {
-                    if let Err(error) = writer.write_all(&serialized_message).await {
-                        error!(
-                            "Failed to send message body {} (error {})",
-                            M::name().to_string(),
-                            error
-                        )
-                    }
-                }
-                Err(error) => error!("Failed to send message header {} (error {})", M::name(), error),
-            }
-        });
+        let mut writer = self.writer.lock().await;
+        writer.write_all(&header.serialize()?).await?;
+        writer.write_all(&serialized).await?;
 
         Ok(())
     }

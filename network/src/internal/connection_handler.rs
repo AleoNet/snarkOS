@@ -23,7 +23,7 @@ use crate::{
 };
 
 use chrono::{Duration as ChronoDuration, Utc};
-use std::{net::SocketAddr, time::Duration};
+use std::time::Duration;
 use tokio::{task, time::delay_for};
 
 impl Server {
@@ -80,46 +80,28 @@ impl Server {
                             }
                         }
 
-                        // Create a list of gossiped peers and bootnodes to connect to.
-                        let mut gossiped_peers = vec![];
-
-                        // Add gossiped peers.
+                        // Try and connect to our gossiped peers.
                         for (remote_address, _last_seen) in peer_book.get_gossiped() {
                             if remote_address != local_address && !peer_book.connected_contains(&remote_address) {
-                                gossiped_peers.push(remote_address);
-                            }
-                        }
-
-                        // Add unconnected bootnodes to the list of gossiped peers.
-                        for bootnode in context.bootnodes.iter() {
-                            if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
-                                if bootnode_address != local_address && !peer_book.connected_contains(&bootnode_address)
+                                // Create a non-blocking handshake request
                                 {
-                                    gossiped_peers.push(bootnode_address);
+                                    let new_context = context.clone();
+                                    let latest_block_height = storage.get_latest_block_height();
+
+                                    task::spawn(async move {
+                                        // TODO (raychu86) Establish a formal node version
+                                        let version =
+                                            Version::new(1u64, latest_block_height, remote_address, local_address);
+
+                                        let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
+                                        if let Err(_) = handshakes.send_request(&version).await {
+                                            debug!("Could not connect to gossiped peer {}", remote_address);
+                                        }
+                                    });
                                 }
                             }
-                        }
 
-                        // Try and connect to gossiped peers and unconnected bootnodes.
-                        for remote_address in gossiped_peers {
-                            // Create a non-blocking handshake request
-                            {
-                                let new_context = context.clone();
-                                let latest_block_height = storage.get_latest_block_height();
-
-                                task::spawn(async move {
-                                    // TODO (raychu86) Establish a formal node version
-                                    let version =
-                                        Version::new(1u64, latest_block_height, remote_address, local_address);
-
-                                    let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
-                                    if let Err(_) = handshakes.send_request(&version).await {
-                                        debug!("Could not connect to gossiped peer {}", remote_address);
-                                    }
-                                });
-
-                                peer_book.remove_gossiped(remote_address);
-                            }
+                            peer_book.remove_gossiped(remote_address);
                         }
                     }
 
@@ -169,9 +151,9 @@ impl Server {
                     }
 
                     // Store connected peers in database.
-                    if let Err(error) = peer_book.store(&storage) {
-                        debug!("Failed to store connected peers in database {}", error);
-                    }
+                    peer_book
+                        .store(&storage)
+                        .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
 
                     // Every two frequency loops, send a version message to all peers for periodic syncs.
                     if interval_ticker % 2 == 1 {
@@ -207,16 +189,12 @@ impl Server {
 
                     // Update our memory pool after memory_pool_interval frequency loops.
                     if interval_ticker >= context.memory_pool_interval {
-                        // Ask our sync node for their memory pool transactions
-                        {
-                            if let Ok(sync_handler) = sync_handler_lock.try_lock() {
-                                // Ask our sync node for more transactions.
-                                if local_address != sync_handler.sync_node {
-                                    if let Some(channel) = connections.get(&sync_handler.sync_node) {
-                                        // Disconnect from the peer if the GetMemoryPool message was not sent properly
-                                        if let Err(_) = channel.write(&GetMemoryPool).await {
-                                            peer_book.disconnect_peer(sync_handler.sync_node);
-                                        }
+                        if let Ok(sync_handler) = sync_handler_lock.try_lock() {
+                            // Ask our sync node for more transactions.
+                            if local_address != sync_handler.sync_node {
+                                if let Some(channel) = connections.get(&sync_handler.sync_node) {
+                                    if let Err(_) = channel.write(&GetMemoryPool).await {
+                                        peer_book.disconnect_peer(sync_handler.sync_node);
                                     }
                                 }
                             }
@@ -229,13 +207,13 @@ impl Server {
                             _ => continue,
                         };
 
-                        if let Err(error) = memory_pool.cleanse(&storage) {
+                        memory_pool.cleanse(&storage).unwrap_or_else(|error| {
                             debug!("Failed to cleanse memory pool transactions in database {}", error)
-                        };
+                        });
 
-                        if let Err(error) = memory_pool.store(&storage) {
+                        memory_pool.store(&storage).unwrap_or_else(|error| {
                             debug!("Failed to store memory pool transaction in database {}", error)
-                        };
+                        });
 
                         interval_ticker = 0;
                     } else {
