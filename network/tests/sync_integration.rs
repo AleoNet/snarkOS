@@ -48,7 +48,7 @@ mod sync_integration {
             let (tx, rx) = oneshot::channel();
             tokio::spawn(async move {
                 sync_handler
-                    .increment(
+                    .poll(
                         Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
                         storage,
                     )
@@ -83,13 +83,13 @@ mod sync_integration {
             // 1. Set syncing to true
 
             let mut sync_handler = SyncHandler::new(bootnode_address);
-            sync_handler.update_syncing(0);
+            sync_handler.update_sync_state(0);
 
             // 2. Call increment_sync_handler_internally
             let (tx, rx) = oneshot::channel();
             tokio::spawn(async move {
                 sync_handler
-                    .increment(
+                    .poll(
                         Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
                         storage,
                     )

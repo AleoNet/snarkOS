@@ -30,11 +30,13 @@ use std::{
     collections::HashMap,
     net::{Shutdown, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, Mutex},
     task,
+    time::delay_for,
 };
 
 /// The main networking component of a node.
@@ -153,18 +155,20 @@ impl Server {
                         // If our peer has a longer chain, send a sync message
                         if version.height > storage.get_latest_block_height() {
                             // Update the sync node if the sync_handler is Idle
-                            if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
-                                if !sync_handler.is_syncing() {
-                                    sync_handler.sync_node = handshake.channel.address;
+                            {
+                                if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                                    if !sync_handler.is_syncing() {
+                                        sync_handler.sync_node = handshake.channel.address;
 
-                                    if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
-                                        if let Err(err) =
-                                            handshake.channel.write(&GetSync::new(block_locator_hashes)).await
-                                        {
-                                            error!(
-                                                "Error sending GetSync message to {}, {}",
-                                                handshake.channel.address, err
-                                            );
+                                        if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                                            if let Err(err) =
+                                                handshake.channel.write(&GetSync::new(block_locator_hashes)).await
+                                            {
+                                                error!(
+                                                    "Error sending GetSync message to {}, {}",
+                                                    handshake.channel.address, err
+                                                );
+                                            }
                                         }
                                     }
                                 }
@@ -239,7 +243,7 @@ impl Server {
                 }
 
                 // Sleep for 10 seconds
-                tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+                delay_for(Duration::from_secs(10)).await;
             }
 
             let mut failure_count = 0u8;
@@ -294,34 +298,38 @@ impl Server {
     }
 
     /// Send a handshake request to a node at address without blocking the server listener.
-    fn send_handshake_non_blocking(&self, remote_address: SocketAddr) {
-        let context = self.context.clone();
-        let storage = self.storage.clone();
-
+    fn send_handshake_non_blocking(context: Arc<Context>, storage: Arc<MerkleTreeLedger>, remote_address: SocketAddr) {
         task::spawn(async move {
             let height = storage.get_latest_block_height();
             let version = Version::new(1u64, height, remote_address, *context.local_address.read().await);
 
             let mut handshakes = context.handshakes.write().await;
-            handshakes.send_request(&version).await.unwrap_or_else(|error| {
-                info!("Failed to connect to {:?}", error);
-                ()
-            });
+            if let Err(error) = handshakes.send_request(&version).await {
+                debug!("Failed to connect to peer {} (error {})", remote_address, error);
+            }
         });
     }
 
     /// Send a handshake request the first bootnode and store the rest as gossipped peers
     async fn connect_bootnodes(&mut self) {
         let local_address = *self.context.local_address.read().await;
-        for bootnode in self.context.bootnodes.iter() {
-            if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
-                // This node should not attempt to connect to itself.
-                if local_address != bootnode_address {
-                    info!("Connecting to {:?} (bootnode)...", bootnode_address);
-                    self.send_handshake_non_blocking(bootnode_address);
+        let bootnodes = self.context.bootnodes.clone();
+        let context = self.context.clone();
+        let storage = self.storage.clone();
+
+        // Create a thread to send handshake requests to bootnodes
+        task::spawn(async move {
+            for bootnode in bootnodes.iter() {
+                if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
+                    // This node should not attempt to connect to itself.
+                    if local_address != bootnode_address {
+                        info!("Connecting to {:?} (bootnode)...", bootnode_address);
+                        Server::send_handshake_non_blocking(context.clone(), storage.clone(), bootnode_address);
+                        delay_for(Duration::from_millis(500)).await;
+                    }
                 }
             }
-        }
+        });
     }
 
     /// Send a handshake request to every peer this server previously connected to.
@@ -331,13 +339,20 @@ impl Server {
                 bincode::deserialize::<HashMap<SocketAddr, DateTime<Utc>>>(&serialized_peers)
             {
                 let local_address = *self.context.local_address.read().await;
-                for (saved_address, _old_time) in stored_connected_peers {
-                    // This node should not attempt to connect to itself.
-                    if local_address != saved_address {
-                        info!("Connecting to {:?} (saved peer)...", saved_address);
-                        self.send_handshake_non_blocking(saved_address);
+                let context = self.context.clone();
+                let storage = self.storage.clone();
+
+                // Create a thread to send handshake requests to stored peers
+                task::spawn(async move {
+                    for (saved_address, _old_time) in stored_connected_peers {
+                        // This node should not attempt to connect to itself.
+                        if local_address != saved_address {
+                            info!("Connecting to {:?} (saved peer)...", saved_address);
+                            Server::send_handshake_non_blocking(context.clone(), storage.clone(), saved_address);
+                            delay_for(Duration::from_millis(500)).await;
+                        }
                     }
-                }
+                });
             }
         }
     }

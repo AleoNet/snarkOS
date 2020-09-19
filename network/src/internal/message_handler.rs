@@ -37,6 +37,7 @@ use snarkos_utilities::{
 
 use chrono::Utc;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::task;
 
 impl Server {
     /// This method handles all messages sent from connected peers.
@@ -222,13 +223,18 @@ impl Server {
 
                     propagate_block(self.context.clone(), message.data, channel.address).await?;
                 } else if !propagate {
-                    if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
-                        sync_handler.clear_pending(Arc::clone(&self.storage));
+                    // Poll the sync handler to continue the sync
+                    {
+                        if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
+                            sync_handler.update_pending_blocks(Arc::clone(&self.storage));
 
-                        if sync_handler.sync_state != SyncState::Idle {
-                            // We are currently syncing with a node, ask for the next block.
-                            if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                                sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
+                            if sync_handler.is_syncing() {
+                                // We are currently syncing with a node. Poll the sync handler to continue syncing.
+                                if let Some(channel) =
+                                    self.context.connections.read().await.get(&sync_handler.sync_node)
+                                {
+                                    sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
+                                }
                             }
                         }
                     }
@@ -402,14 +408,22 @@ impl Server {
     /// A peer has sent us their chain state.
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
         let height = self.storage.get_latest_block_height();
-        let mut sync_handler = self.sync_handler_lock.lock().await;
+        let context = self.context.clone();
+        let sync_handler_lock = self.sync_handler_lock.clone();
+        let storage = self.storage.clone();
 
-        sync_handler.receive_hashes(message.block_hashes, height);
+        task::spawn(async move {
+            let mut sync_handler = sync_handler_lock.lock().await;
 
-        // Received block headers
-        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
-        }
+            sync_handler.receive_hashes(message.block_hashes, height);
+
+            // Received block headers
+            if let Some(channel) = context.connections.read().await.get(&sync_handler.sync_node) {
+                if let Err(error) = sync_handler.poll(channel, Arc::clone(&storage)).await {
+                    error!("Error polling sync handler (error {})", error);
+                }
+            }
+        });
 
         Ok(())
     }
@@ -478,23 +492,44 @@ impl Server {
                 debug!("Received a version message with a greater height {}", message.height);
                 // Update the sync node if the sync_handler is Idle and there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
-                    if !sync_handler.is_syncing()
-                        && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
-                    {
+                    let mut swap_sync_nodes = false;
+
+                    match sync_handler.sync_state {
+                        SyncState::Idle => swap_sync_nodes = true,
+                        SyncState::Syncing(last_updated, _height) => {
+                            // If the node is currently syncing and the sync_node has not responded in 15 seconds,
+                            // attempt to connect to a new sync node
+                            let last_sync_response = Utc::now().timestamp() - last_updated.timestamp();
+                            if last_sync_response > 15 {
+                                debug!(
+                                    "Current sync node has not responded in {} seconds. Attempting to find new sync node.",
+                                    last_sync_response
+                                );
+                                swap_sync_nodes = true;
+                            } else {
+                                // We are currently syncing with a node. Poll the sync handler to continue syncing.
+                                if let Some(channel) =
+                                    self.context.connections.read().await.get(&sync_handler.sync_node)
+                                {
+                                    sync_handler.poll(channel, Arc::clone(&self.storage)).await?;
+                                }
+                            }
+                        }
+                    }
+
+                    // If the node should swap sync nodes, then update the sync node and restart the sync
+                    if swap_sync_nodes {
                         debug!("Attempting to sync with peer {}", peer_address);
                         sync_handler.sync_node = peer_address;
 
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
                         }
-                    } else {
-                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
-                        }
                     }
                 }
             }
         }
+
         Ok(channel)
     }
 }

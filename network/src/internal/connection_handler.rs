@@ -169,9 +169,9 @@ impl Server {
                     }
 
                     // Store connected peers in database.
-                    peer_book
-                        .store(&storage)
-                        .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
+                    if let Err(error) = peer_book.store(&storage) {
+                        debug!("Failed to store connected peers in database {}", error);
+                    }
 
                     // Every two frequency loops, send a version message to all peers for periodic syncs.
                     if interval_ticker % 2 == 1 {
@@ -207,12 +207,16 @@ impl Server {
 
                     // Update our memory pool after memory_pool_interval frequency loops.
                     if interval_ticker >= context.memory_pool_interval {
-                        if let Ok(sync_handler) = sync_handler_lock.try_lock() {
-                            // Ask our sync node for more transactions.
-                            if local_address != sync_handler.sync_node {
-                                if let Some(channel) = connections.get(&sync_handler.sync_node) {
-                                    if let Err(_) = channel.write(&GetMemoryPool).await {
-                                        peer_book.disconnect_peer(sync_handler.sync_node);
+                        // Ask our sync node for their memory pool transactions
+                        {
+                            if let Ok(sync_handler) = sync_handler_lock.try_lock() {
+                                // Ask our sync node for more transactions.
+                                if local_address != sync_handler.sync_node {
+                                    if let Some(channel) = connections.get(&sync_handler.sync_node) {
+                                        // Disconnect from the peer if the GetMemoryPool message was not sent properly
+                                        if let Err(_) = channel.write(&GetMemoryPool).await {
+                                            peer_book.disconnect_peer(sync_handler.sync_node);
+                                        }
                                     }
                                 }
                             }
@@ -225,13 +229,13 @@ impl Server {
                             _ => continue,
                         };
 
-                        memory_pool.cleanse(&storage).unwrap_or_else(|error| {
+                        if let Err(error) = memory_pool.cleanse(&storage) {
                             debug!("Failed to cleanse memory pool transactions in database {}", error)
-                        });
+                        };
 
-                        memory_pool.store(&storage).unwrap_or_else(|error| {
+                        if let Err(error) = memory_pool.store(&storage) {
                             debug!("Failed to store memory pool transaction in database {}", error)
-                        });
+                        };
 
                         interval_ticker = 0;
                     } else {

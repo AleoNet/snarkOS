@@ -22,7 +22,7 @@ use crate::external::message::{
 };
 use snarkos_errors::network::ConnectError;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex, task};
 
 /// A channel for reading and writing messages to a peer.
@@ -50,7 +50,11 @@ impl Channel {
 
     /// Returns a new channel with a writer only stream.
     pub async fn new_write_only(address: SocketAddr) -> Result<Self, ConnectError> {
-        let stream = Arc::new(Mutex::new(TcpStream::connect(address).await?));
+        // Attempt to create a TcpStream with a timeout duration of 2 seconds.
+        let std_stream = std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2))?;
+        let tokio_tcp_stream = TcpStream::from_std(std_stream)?;
+
+        let stream = Arc::new(Mutex::new(tokio_tcp_stream));
 
         Ok(Self {
             address,
