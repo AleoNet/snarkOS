@@ -23,7 +23,7 @@ mod protected_rpc_tests {
         record::DPCRecord,
     };
     use snarkos_models::dpc::Record;
-    use snarkos_network::internal::context::Context;
+    use snarkos_network::{external::SyncHandler, internal::context::Context};
     use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
@@ -77,6 +77,9 @@ mod protected_rpc_tests {
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
+        let sync_handler = SyncHandler::new(server_address.clone());
+        let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
+
         let context = Context::new(server_address, 5, 1, 10, true, vec![], false);
 
         let storage = storage.clone();
@@ -89,6 +92,7 @@ mod protected_rpc_tests {
             Arc::new(context),
             consensus,
             memory_pool_lock,
+            sync_handler_lock,
             Some(credentials),
         );
         let mut io = jsonrpc_core::MetaIoHandler::default();

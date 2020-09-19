@@ -6,9 +6,10 @@ None
 
 ### Response
 
-|  Parameter | Type |               Description              |
-|:----------:|:----:|:--------------------------------------:|
-| `is_miner` | bool | Flag indicating if the node is a miner |
+|   Parameter  | Type |                  Description                  |
+|:------------:|:----:|:---------------------------------------------:|
+|  `is_miner`  | bool | Flag indicating if the node is a miner        |
+| `is_snycing` | bool | Flag indicating if the node currently syncing |
 
 ### Example
 ```ignore

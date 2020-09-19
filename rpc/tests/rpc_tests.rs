@@ -58,6 +58,7 @@ mod rpc_tests {
                 server.context.clone(),
                 consensus,
                 server.memory_pool_lock,
+                server.sync_handler_lock,
                 None,
             )
             .to_delegate(),
@@ -342,6 +343,7 @@ mod rpc_tests {
         let peer_info: NodeInfo = serde_json::from_value(result).unwrap();
 
         assert_eq!(peer_info.is_miner, false);
+        assert_eq!(peer_info.is_syncing, false);
 
         drop(rpc);
         kill_storage_sync(storage);

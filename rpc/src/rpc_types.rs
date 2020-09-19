@@ -124,6 +124,9 @@ pub struct DecryptRecordInput {
 pub struct NodeInfo {
     /// Flag indicating if the node is operating as a miner
     pub is_miner: bool,
+
+    /// Flag indicating if the node is currently syncing
+    pub is_syncing: bool,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

@@ -26,7 +26,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::internal::context::Context;
+use snarkos_network::{external::SyncHandler, internal::context::Context};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
@@ -43,6 +43,7 @@ pub async fn start_rpc_server(
     server_context: Arc<Context>,
     consensus: ConsensusParameters,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
+    sync_handler_lock: Arc<Mutex<SyncHandler>>,
     username: Option<String>,
     password: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -60,6 +61,7 @@ pub async fn start_rpc_server(
         server_context,
         consensus,
         memory_pool_lock,
+        sync_handler_lock,
         credentials,
     );
     let mut io = jsonrpc_core::MetaIoHandler::default();
