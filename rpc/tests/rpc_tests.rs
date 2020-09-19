@@ -331,6 +331,23 @@ mod rpc_tests {
     }
 
     #[test]
+    fn test_rpc_get_node_info() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getnodeinfo".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        let peer_info: NodeInfo = serde_json::from_value(result).unwrap();
+
+        assert_eq!(peer_info.is_miner, false);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
     fn test_rpc_get_block_template() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(&storage);

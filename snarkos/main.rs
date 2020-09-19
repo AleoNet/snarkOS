@@ -101,19 +101,46 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         authorized_inner_snark_ids,
     };
 
+    let mut context = Arc::new(Context::new(
+        socket_address,
+        config.p2p.mempool_interval,
+        config.p2p.min_peers,
+        config.p2p.max_peers,
+        config.node.is_bootnode,
+        config.p2p.bootnodes.clone(),
+        false,
+    ));
+
+    // Start the miner task, if the mining configuration is enabled.
+    if config.miner.is_miner {
+        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+            Ok(miner_address) => {
+                if let Some(mutable_context) = Arc::get_mut(&mut context) {
+                    mutable_context.is_miner = true;
+                }
+
+                MinerInstance::new(
+                    miner_address,
+                    consensus.clone(),
+                    parameters.clone(),
+                    storage.clone(),
+                    memory_pool_lock.clone(),
+                    context.clone(),
+                )
+                .spawn();
+            }
+            Err(_) => info!(
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
+            ),
+        }
+    }
+
     // Construct the server instance. Note this does not start the server.
     let server = Server::new(
-        Context::new(
-            socket_address,
-            config.p2p.mempool_interval,
-            config.p2p.min_peers,
-            config.p2p.max_peers,
-            config.node.is_bootnode,
-            config.p2p.bootnodes.clone(),
-        ),
+        context,
         consensus.clone(),
         storage.clone(),
-        parameters.clone(),
+        parameters,
         memory_pool_lock.clone(),
         sync_handler_lock.clone(),
         15000, // 15 seconds
@@ -140,26 +167,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             config.rpc.password,
         )
         .await?;
-    }
-
-    // Start the miner task, if the mining configuration is enabled.
-    if config.miner.is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
-            Ok(miner_address) => {
-                MinerInstance::new(
-                    miner_address,
-                    consensus.clone(),
-                    parameters,
-                    storage.clone(),
-                    memory_pool_lock.clone(),
-                    server.context.clone(),
-                )
-                .spawn();
-            }
-            Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
-            ),
-        }
     }
 
     // Start the main server thread.

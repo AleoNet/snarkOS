@@ -43,6 +43,9 @@ pub struct Context {
     /// Hardcoded nodes and user-specified nodes this node should connect to on startup.
     pub bootnodes: Vec<String>,
 
+    /// If enabled, node will operate as a miner
+    pub is_miner: bool,
+
     /// Manages connected, gossiped, and disconnected peers
     pub peer_book: RwLock<PeerBook>,
 
@@ -65,6 +68,7 @@ impl Context {
         max_peers: u16,
         is_bootnode: bool,
         bootnodes: Vec<String>,
+        is_miner: bool,
     ) -> Self {
         Self {
             local_address: RwLock::new(local_address),
@@ -73,6 +77,7 @@ impl Context {
             max_peers,
             is_bootnode,
             bootnodes,
+            is_miner,
             connections: RwLock::new(Connections::new()),
             peer_book: RwLock::new(PeerBook::new()),
             handshakes: RwLock::new(Handshakes::new()),

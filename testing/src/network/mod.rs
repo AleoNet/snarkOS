@@ -60,7 +60,7 @@ pub fn initialize_test_server(
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
     Server::new(
-        Context::new(server_address, 5, 1, 10, true, vec![]),
+        Arc::new(Context::new(server_address, 5, 1, 10, true, vec![], false)),
         consensus,
         storage,
         parameters,
