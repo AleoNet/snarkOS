@@ -23,7 +23,7 @@ use crate::{
 };
 
 use chrono::{Duration as ChronoDuration, Utc};
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 use tokio::{task, time::delay_for};
 
 impl Server {
@@ -80,28 +80,46 @@ impl Server {
                             }
                         }
 
-                        // Try and connect to our gossiped peers.
+                        // Create a list of gossiped peers and bootnodes to connect to.
+                        let mut gossiped_peers = vec![];
+
+                        // Add gossiped peers.
                         for (remote_address, _last_seen) in peer_book.get_gossiped() {
                             if remote_address != local_address && !peer_book.connected_contains(&remote_address) {
-                                // Create a non-blocking handshake request
+                                gossiped_peers.push(remote_address);
+                            }
+                        }
+
+                        // Add unconnected bootnodes to the list of gossiped peers.
+                        for bootnode in context.bootnodes.iter() {
+                            if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
+                                if bootnode_address != local_address && !peer_book.connected_contains(&bootnode_address)
                                 {
-                                    let new_context = context.clone();
-                                    let latest_block_height = storage.get_latest_block_height();
-
-                                    task::spawn(async move {
-                                        // TODO (raychu86) Establish a formal node version
-                                        let version =
-                                            Version::new(1u64, latest_block_height, remote_address, local_address);
-
-                                        let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
-                                        if let Err(_) = handshakes.send_request(&version).await {
-                                            debug!("Could not connect to gossiped peer {}", remote_address);
-                                        }
-                                    });
+                                    gossiped_peers.push(bootnode_address);
                                 }
                             }
+                        }
 
-                            peer_book.remove_gossiped(remote_address);
+                        // Try and connect to gossiped peers and unconnected bootnodes.
+                        for remote_address in gossiped_peers {
+                            // Create a non-blocking handshake request
+                            {
+                                let new_context = context.clone();
+                                let latest_block_height = storage.get_latest_block_height();
+
+                                task::spawn(async move {
+                                    // TODO (raychu86) Establish a formal node version
+                                    let version =
+                                        Version::new(1u64, latest_block_height, remote_address, local_address);
+
+                                    let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
+                                    if let Err(_) = handshakes.send_request(&version).await {
+                                        debug!("Could not connect to gossiped peer {}", remote_address);
+                                    }
+                                });
+
+                                peer_book.remove_gossiped(remote_address);
+                            }
                         }
                     }
 
