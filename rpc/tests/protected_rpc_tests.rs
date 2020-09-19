@@ -77,7 +77,7 @@ mod protected_rpc_tests {
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-        let context = Context::new(server_address, 5, 1, 10, true, vec![]);
+        let context = Context::new(server_address, 5, 1, 10, true, vec![], false);
 
         let storage = storage.clone();
         let storage_path = storage.storage.db.path().to_path_buf();

@@ -59,9 +59,15 @@ mod server_listen {
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
         let server = Server::new(
-            Context::new(server_address, 5, 0, 10, is_bootnode, vec![
-                bootnode_address.to_string(),
-            ]),
+            Arc::new(Context::new(
+                server_address,
+                5,
+                0,
+                10,
+                is_bootnode,
+                vec![bootnode_address.to_string()],
+                false,
+            )),
             consensus,
             storage,
             parameters,
