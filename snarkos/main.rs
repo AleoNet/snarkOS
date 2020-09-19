@@ -163,6 +163,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             server.context.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
+            sync_handler_lock.clone(),
             config.rpc.username,
             config.rpc.password,
         )

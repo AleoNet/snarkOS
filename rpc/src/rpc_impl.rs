@@ -26,7 +26,10 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
-use snarkos_network::internal::{context::Context, process_transaction_internal};
+use snarkos_network::{
+    external::SyncHandler,
+    internal::{context::Context, process_transaction_internal},
+};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -60,6 +63,9 @@ pub struct RpcImpl {
     /// Handle to access the memory pool of transactions.
     pub(crate) memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
 
+    /// Handle to access the sync state of the node
+    pub(crate) sync_handler_lock: Arc<Mutex<SyncHandler>>,
+
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
 }
@@ -73,6 +79,7 @@ impl RpcImpl {
         server_context: Arc<Context>,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
+        sync_handler_lock: Arc<Mutex<SyncHandler>>,
         credentials: Option<RpcCredentials>,
     ) -> Self {
         Self {
@@ -82,6 +89,7 @@ impl RpcImpl {
             server_context,
             consensus,
             memory_pool_lock,
+            sync_handler_lock,
             credentials,
         }
     }
@@ -307,8 +315,15 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns data about the node.
     fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
+        let mut is_syncing = false;
+
+        if let Ok(sync_handler) = self.sync_handler_lock.try_lock() {
+            is_syncing = sync_handler.is_syncing();
+        }
+
         Ok(NodeInfo {
             is_miner: self.server_context.is_miner,
+            is_syncing,
         })
     }
 
