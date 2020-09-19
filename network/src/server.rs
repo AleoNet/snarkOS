@@ -53,7 +53,7 @@ pub struct Server {
 impl Server {
     /// Constructs a new `Server`.
     pub fn new(
-        context: Context,
+        context: Arc<Context>,
         consensus: ConsensusParameters,
         storage: Arc<MerkleTreeLedger>,
         parameters: PublicParameters<Components>,
@@ -64,7 +64,7 @@ impl Server {
         let (sender, receiver) = mpsc::channel(1024);
         Server {
             consensus,
-            context: Arc::new(context),
+            context,
             storage,
             parameters,
             memory_pool_lock,
