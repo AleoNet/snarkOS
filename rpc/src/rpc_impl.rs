@@ -305,6 +305,13 @@ impl RpcFunctions for RpcImpl {
         Ok(PeerInfo { peers })
     }
 
+    /// Returns data about the node.
+    fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
+        Ok(NodeInfo {
+            is_miner: self.server_context.is_miner,
+        })
+    }
+
     /// Returns the current mempool and consensus information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         self.storage.catch_up_secondary(false)?;

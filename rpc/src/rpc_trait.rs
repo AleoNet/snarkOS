@@ -71,6 +71,9 @@ pub trait RpcFunctions {
     #[rpc(name = "getpeerinfo")]
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError>;
 
+    #[rpc(name = "getnodeinfo")]
+    fn get_node_info(&self) -> Result<NodeInfo, RpcError>;
+
     #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/getblocktemplate.md"))]
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
