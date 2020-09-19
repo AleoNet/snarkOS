@@ -102,7 +102,7 @@ impl Channel {
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
         debug!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
 
-        let serialized_message = message.serialize()?;
+        let serialized = message.serialize()?;
         let header = MessageHeader::new(M::name(), serialized.len() as u32);
 
         let mut writer = self.writer.lock().await;

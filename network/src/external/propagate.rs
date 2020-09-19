@@ -5,7 +5,6 @@ use crate::{
 use snarkos_errors::network::SendError;
 
 use std::{net::SocketAddr, sync::Arc};
-use tokio::task;
 
 /// Broadcast transaction to connected peers
 pub async fn propagate_transaction(
