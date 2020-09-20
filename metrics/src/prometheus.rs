@@ -29,18 +29,6 @@ lazy_static! {
 
     /// Counts the number of requests sent to the RPC server.
     pub static ref RPC_REQUESTS: IntCounter = IntCounter::new("rpc_requests", "RPC Requests").expect("rpc_requests to be created");
-
-    // pub static ref RESPONSE_CODE_COLLECTOR: IntCounterVec =
-    //     IntCounterVec::new(Opts::new("response_code", "Response Codes"), &[
-    //         "env",
-    //         "statuscode",
-    //         "type"
-    //     ])
-    //     .expect("metric can be created");
-
-    // pub static ref RESPONSE_TIME_COLLECTOR: HistogramVec =
-    //     HistogramVec::new(HistogramOpts::new("response_time", "Response Times"), &["env"])
-    //         .expect("metric can be created");
 }
 
 /// Initialize the metrics by registering them with the `Registry`.
@@ -57,14 +45,6 @@ pub fn initialize() {
     REGISTRY
         .register(Box::new(RPC_REQUESTS.clone()))
         .expect("RPC_REQUESTS to be registered");
-
-    // REGISTRY
-    //     .register(Box::new(RESPONSE_CODE_COLLECTOR.clone()))
-    //     .expect("RESPONSE_CODE_COLLECTOR to be registered");
-    //
-    // REGISTRY
-    //     .register(Box::new(RESPONSE_TIME_COLLECTOR.clone()))
-    //     .expect("RESPONSE_TIME_COLLECTOR to be registered");
 }
 
 pub async fn metrics_handler() -> Result<impl Reply, Rejection> {
