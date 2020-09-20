@@ -836,7 +836,7 @@ mod server_message_handler {
             // 3. Check that server updated peer
 
             let peer_book = context.peer_book.read().await;
-            assert!(!peer_book.connected_contains(&remote_address));
+            assert!(!peer_book.is_connected(&remote_address));
         });
 
         drop(rt);
@@ -917,7 +917,7 @@ mod server_message_handler {
             let peer_book = context.peer_book.read().await;
 
             assert_eq!(PingState::Rejected, pings.get_state(remote_address).unwrap());
-            assert!(!peer_book.connected_contains(&remote_address));
+            assert!(!peer_book.is_connected(&remote_address));
         });
 
         drop(rt);
@@ -1000,7 +1000,7 @@ mod server_message_handler {
             let peer_book = context.peer_book.read().await;
 
             assert_eq!(PingState::Accepted, pings.get_state(remote_address).unwrap());
-            assert!(peer_book.connected_contains(&remote_address));
+            assert!(peer_book.is_connected(&remote_address));
         });
 
         drop(rt);

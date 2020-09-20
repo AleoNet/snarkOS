@@ -51,7 +51,7 @@ mod server_connection_handler {
             // 1. Add peer to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.connect_peer(remote_address, Utc::now());
+            peer_book.connected_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start server
@@ -66,9 +66,8 @@ mod server_connection_handler {
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(peer_book.connected_contains(&remote_address));
-            assert!(!peer_book.gossiped_contains(&remote_address));
-            assert!(!peer_book.disconnected_contains(&remote_address));
+            assert!(peer_book.is_connected(&remote_address));
+            assert!(!peer_book.is_disconnected(&remote_address));
         });
 
         drop(rt);
@@ -100,7 +99,7 @@ mod server_connection_handler {
             // 1. Add peer with old date to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.connect_peer(remote_address, Utc::now() - Duration::minutes(1));
+            peer_book.connected_peer_with_datetime(&remote_address, Utc::now() - Duration::minutes(1));
             drop(peer_book);
 
             // 2. Start server
@@ -111,13 +110,12 @@ mod server_connection_handler {
 
             sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
 
-            // 4. Check that the server moved peer from peers to disconnected
+            // 4. Check that the server moved peer from connected to disconnected
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(!peer_book.connected_contains(&remote_address));
-            assert!(!peer_book.gossiped_contains(&remote_address));
-            assert!(peer_book.disconnected_contains(&remote_address));
+            assert!(!peer_book.is_connected(&remote_address));
+            assert!(peer_book.is_disconnected(&remote_address));
         });
 
         drop(rt);
@@ -126,7 +124,7 @@ mod server_connection_handler {
 
     #[test]
     #[serial]
-    fn gossiped_peer_connect() {
+    fn found_peer() {
         let mut rt = Runtime::new().unwrap();
         let storage = Arc::new(FIXTURE_VK.ledger());
         let path = storage.storage.db.path().to_owned();
@@ -151,7 +149,7 @@ mod server_connection_handler {
             // 1. Add peer to gossiped in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.gossiped_peer(remote_address, Utc::now());
+            peer_book.found_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start server
@@ -166,65 +164,8 @@ mod server_connection_handler {
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(!peer_book.connected_contains(&remote_address));
-            assert!(peer_book.gossiped_contains(&remote_address));
-            assert!(!peer_book.disconnected_contains(&remote_address));
-        });
-
-        drop(rt);
-        kill_storage_async::<Tx, CommitmentMerkleParameters>(path);
-    }
-
-    #[test]
-    #[serial]
-    fn gossiped_peer_disconnect() {
-        let mut rt = Runtime::new().unwrap();
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let path = storage.storage.db.path().to_owned();
-        let parameters = load_verifying_parameters();
-
-        rt.block_on(async move {
-            let bootnode_address = random_socket_address();
-            let local_address = random_socket_address();
-            let remote_address = random_socket_address();
-
-            let server = initialize_test_server(
-                local_address,
-                bootnode_address,
-                storage,
-                parameters,
-                CONNECTION_FREQUENCY_SHORT,
-            );
-            let context = Arc::clone(&server.context);
-
-            let mut peer_book = context.peer_book.write().await;
-
-            // 1. Add the maximum number of connected to the local node peer book
-
-            for _x in 0..10 {
-                peer_book.connect_peer(random_socket_address(), Utc::now());
-            }
-
-            // 2. Add peer with old date to gossiped in peer_book
-
-            peer_book.gossiped_peer(remote_address, Utc::now() - Duration::minutes(1));
-            drop(peer_book);
-
-            // 3. Start server
-
-            start_test_server(server);
-
-            // 4. Wait for connection handler loop
-
-            sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
-
-            // 5. Check that the server did not move peer from gossiped
-
-            let peer_book = context.peer_book.read().await;
-
-            assert!(!peer_book.connected_contains(&remote_address));
-            assert!(peer_book.gossiped_contains(&remote_address));
-            assert!(!peer_book.disconnected_contains(&remote_address));
+            assert!(!peer_book.is_connected(&remote_address));
+            assert!(peer_book.is_disconnected(&remote_address));
         });
 
         drop(rt);
@@ -259,7 +200,7 @@ mod server_connection_handler {
             // 1. Add peer to peers
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.connect_peer(remote_address, Utc::now());
+            peer_book.connected_peer(remote_address, Utc::now());
             drop(peer_book);
 
             // 2. Start remote_listener
@@ -273,7 +214,7 @@ mod server_connection_handler {
             // 4. Add sync_handler to disconnected
 
             peer_book = context.peer_book.write().await;
-            peer_book.disconnect_peer(bootnode_address);
+            peer_book.disconnected_peer(bootnode_address);
             drop(peer_book);
 
             // 5. Wait for connection handler loop

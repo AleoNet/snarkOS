@@ -188,13 +188,13 @@ impl Server {
 
         // 4. Send handshake request to bootnodes.
         debug!("Sending handshake request to bootnodes");
-        self.connect_bootnodes().await;
+        self.connect_to_bootnodes().await;
 
         // If the node is a bootnode, do not send requests to stored peers
         if !self.context.is_bootnode {
             // 5. Send a handshake request to all stored peers.
             debug!("Sending handshake request to all stored peers");
-            self.connect_peers_from_storage().await;
+            self.connect_to_peers_from_storage().await;
         }
 
         // 6. Start the message handler.
@@ -318,7 +318,7 @@ impl Server {
     }
 
     /// Send a handshake request the first bootnode and store the rest as gossipped peers
-    async fn connect_bootnodes(&mut self) {
+    async fn connect_to_bootnodes(&mut self) {
         let local_address = *self.context.local_address.read().await;
         for bootnode in self.context.bootnodes.iter() {
             if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
@@ -332,7 +332,7 @@ impl Server {
     }
 
     /// Send a handshake request to every peer this server previously connected to.
-    async fn connect_peers_from_storage(&mut self) {
+    async fn connect_to_peers_from_storage(&mut self) {
         if let Ok(serialized_peers) = self.storage.get_peer_book() {
             if let Ok(stored_connected_peers) =
                 bincode::deserialize::<HashMap<SocketAddr, DateTime<Utc>>>(&serialized_peers)

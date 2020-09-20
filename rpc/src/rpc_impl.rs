@@ -297,7 +297,7 @@ impl RpcFunctions for RpcImpl {
         // Create a temporary tokio runtime to make an asynchronous function call
         let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
 
-        Ok(peer_book.connected_total() as usize)
+        Ok(peer_book.num_connected() as usize)
     }
 
     /// Returns this nodes connected peers.

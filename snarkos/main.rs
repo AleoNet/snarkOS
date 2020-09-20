@@ -20,7 +20,7 @@ extern crate tracing;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
-    display::render_init,
+    display::render_welcome,
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
@@ -38,7 +38,27 @@ use tokio::{runtime::Builder, sync::Mutex};
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
+fn initialize_logger(config: &Config) {
+    match config.node.verbose {
+        0 => {}
+        verbosity => {
+            match verbosity {
+                1 => std::env::set_var("RUST_LOG", "info"),
+                2 => std::env::set_var("RUST_LOG", "debug"),
+                _ => std::env::set_var("RUST_LOG", "info"),
+            };
+            env_logger::init();
+        }
+    }
+}
+
+fn print_welcome(config: &Config) {
+    println!("{}", render_welcome(config));
+}
+
+///
 /// Builds a node from configuration parameters.
+///
 /// 1. Creates new storage database or uses existing.
 /// 2. Creates new memory pool or uses existing from storage.
 /// 3. Creates consensus parameters.
@@ -46,7 +66,12 @@ use tracing_subscriber::EnvFilter;
 /// 5. Starts rpc server thread.
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
-async fn start_server(config: Config) -> Result<(), NodeError> {
+///
+async fn start_server(config: &Config) -> Result<(), NodeError> {
+    initialize_logger(config);
+
+    print_welcome(config);
+
     let address = format! {"{}:{}", config.node.ip, config.node.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
@@ -166,40 +191,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
 fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::new();
-
     let config: Config = ConfigCli::parse(&arguments)?;
-
-    match config.node.verbose {
-        0 => {}
-        verbosity => {
-            match verbosity {
-                1 => std::env::set_var("RUST_LOG", "info"),
-                2 => std::env::set_var("RUST_LOG", "debug"),
-                _ => std::env::set_var("RUST_LOG", "info"),
-            };
-
-            // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-
-            // initialize tracing
-            tracing_subscriber::fmt()
-                .with_env_filter(filter)
-                .with_target(false)
-                .init();
-
-            println!("{}", render_init(&config));
-        }
-    }
-
-    // create a tracing span dedicated to the entire node
-    let node_span = debug_span!("node");
-
-    Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .thread_stack_size(4 * 1024 * 1024)
-        .build()?
-        .block_on(start_server(config).instrument(node_span))?;
-
+    Runtime::new()?.block_on(start_server(config))?;
     Ok(())
 }
