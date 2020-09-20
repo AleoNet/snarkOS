@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(super) mod address_book;
+#[macro_use]
+extern crate lazy_static;
 
-pub mod connections;
-pub use connections::*;
+pub mod macros;
 
-pub mod context;
-pub use context::*;
+pub mod metrics;
+pub use metrics::*;
 
-pub mod peer_book;
-pub use peer_book::*;
+pub mod prometheus;
+
+#[cfg(test)]
+pub mod testing;

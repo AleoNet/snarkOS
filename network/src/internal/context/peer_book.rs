@@ -16,6 +16,7 @@
 
 use crate::internal::address_book::AddressBook;
 use snarkos_errors::network::ServerError;
+use snarkos_metrics::Metrics;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
 
@@ -66,29 +67,33 @@ impl PeerBook {
     }
 
     /// Move a peer from disconnected/gossiped to connected peers.
-    pub fn update_connected(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+    pub fn connect_peer(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
         self.disconnected.remove(&address);
         self.gossiped.remove(&address);
-        self.connected.insert_or_update(address, date)
+        let peer_connected = self.connected.insert_or_update(address, date);
+        connected_peers_inc!(peer_connected)
     }
 
     /// Move a peer from connected/disconnected to gossiped peers.
-    pub fn update_gossiped(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
-        self.connected.remove(&address);
+    pub fn gossiped_peer(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
+        let peer_removed = self.connected.remove(&address).is_some();
+        connected_peers_dec!(peer_removed);
         self.disconnected.remove(&address);
         self.gossiped.insert_or_update(address, date)
     }
 
     /// Move a peer from connected peers to disconnected peers.
     pub fn disconnect_peer(&mut self, address: SocketAddr) -> bool {
-        self.connected.remove(&address);
+        let peer_removed = self.connected.remove(&address).is_some();
+        connected_peers_dec!(peer_removed);
         self.gossiped.remove(&address);
         self.disconnected.insert_or_update(address, Utc::now())
     }
 
     /// Forget a peer.
     pub fn forget_peer(&mut self, address: SocketAddr) {
-        self.connected.remove(&address);
+        let peer_removed = self.connected.remove(&address).is_some();
+        connected_peers_dec!(peer_removed);
         self.gossiped.remove(&address);
         self.disconnected.remove(&address);
     }

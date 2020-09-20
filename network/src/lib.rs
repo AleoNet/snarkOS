@@ -24,6 +24,9 @@
 
 #[macro_use]
 extern crate tracing;
+extern crate log;
+#[macro_use]
+extern crate snarkos_metrics;
 
 pub mod external;
 

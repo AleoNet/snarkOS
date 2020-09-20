@@ -15,15 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use proc_macro2::TokenStream;
-use syn::{parse_macro_input, Data, DeriveInput, Index, Type};
-
 use quote::{quote, ToTokens};
-
-#[proc_macro_derive(CanonicalSerialize)]
-pub fn derive_canonical_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
-    proc_macro::TokenStream::from(impl_canonical_serialize(&ast))
-}
+use syn::{Data, Index, Type};
 
 enum IdentOrIndex {
     Ident(proc_macro2::Ident),
@@ -74,7 +67,7 @@ fn impl_serialize_field(
     }
 }
 
-fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
@@ -149,12 +142,6 @@ fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
     gen
 }
 
-#[proc_macro_derive(CanonicalDeserialize)]
-pub fn derive_canonical_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
-    proc_macro::TokenStream::from(impl_canonical_deserialize(&ast))
-}
-
 /// Returns two TokenStreams, one for the compressed deserialize, one for the
 /// uncompressed.
 fn impl_deserialize_field(ty: &Type) -> (TokenStream, TokenStream) {
@@ -178,7 +165,7 @@ fn impl_deserialize_field(ty: &Type) -> (TokenStream, TokenStream) {
     }
 }
 
-fn impl_canonical_deserialize(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_canonical_deserialize(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
