@@ -40,7 +40,7 @@ pub enum SyncState {
 /// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the message.
 pub struct SyncHandler {
     /// The address of the sync node
-    pub sync_node: SocketAddr,
+    pub sync_node_address: SocketAddr,
     /// Current state of the sync handler
     pub sync_state: SyncState,
     /// Block headers of blocks that need to be downloaded
@@ -51,11 +51,11 @@ pub struct SyncHandler {
 
 impl SyncHandler {
     /// Construct a new `SyncHandler`.
-    pub fn new(sync_node: SocketAddr) -> Self {
+    pub fn new(sync_node_address: SocketAddr) -> Self {
         Self {
             block_headers: vec![],
             pending_blocks: HashMap::new(),
-            sync_node,
+            sync_node_address,
             sync_state: SyncState::Idle,
         }
     }

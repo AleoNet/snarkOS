@@ -19,7 +19,6 @@ mod server_connection_handler {
     use snarkos_network::external::{message::Message, message_types::GetMemoryPool, Channel};
     use snarkos_testing::{consensus::FIXTURE_VK, dpc::load_verifying_parameters, network::*, storage::*};
 
-    use chrono::{Duration, Utc};
     use serial_test::serial;
     use std::sync::Arc;
     use tokio::{net::TcpListener, runtime::Runtime};
@@ -99,7 +98,7 @@ mod server_connection_handler {
             // 1. Add peer with old date to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.connected_peer_with_datetime(&remote_address, Utc::now() - Duration::minutes(1));
+            peer_book.connected_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start server
@@ -108,7 +107,7 @@ mod server_connection_handler {
 
             // 3. Wait for connection handler loop
 
-            sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
+            sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT * 5).await;
 
             // 4. Check that the server moved peer from connected to disconnected
 
@@ -200,7 +199,7 @@ mod server_connection_handler {
             // 1. Add peer to peers
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.connected_peer(remote_address, Utc::now());
+            peer_book.connected_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start remote_listener
@@ -214,7 +213,7 @@ mod server_connection_handler {
             // 4. Add sync_handler to disconnected
 
             peer_book = context.peer_book.write().await;
-            peer_book.disconnected_peer(bootnode_address);
+            peer_book.disconnected_peer(&bootnode_address);
             drop(peer_book);
 
             // 5. Wait for connection handler loop
@@ -223,7 +222,7 @@ mod server_connection_handler {
 
             // 6. Check that the server set sync_node to peer
 
-            assert_eq!(sync_handler_lock.lock().await.sync_node, remote_address);
+            assert_eq!(sync_handler_lock.lock().await.sync_node_address, remote_address);
         });
 
         drop(rt);

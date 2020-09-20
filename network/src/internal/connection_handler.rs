@@ -54,133 +54,174 @@ impl Server {
                     // Let's wait for connection_frequency seconds before starting each loop.
                     delay_for(Duration::from_millis(connection_frequency)).await;
 
-                    let peer_book = &mut context.peer_book.write().await;
-                    let connections = context.connections.read().await;
-                    let pings = &mut context.pings.write().await;
-
                     // Remove the local_address from the peer book
                     // if the node somehow discovered itself as a peer.
                     let local_address = *context.local_address.read().await;
-                    peer_book.forget_peer(local_address);
+                    {
+                        // Acquire the peer book write lock.
+                        let mut peer_book = context.peer_book.write().await;
+                        peer_book.forget_peer(local_address);
+                        drop(peer_book);
+                    }
 
-                    // We have less peers than our minimum peer requirement. Look for more peers.
-                    if peer_book.num_connected() < context.min_peers {
-                        // Ask our connected peers.
-                        for (address, _last_seen) in peer_book.get_connected() {
-                            match connections.get(address) {
+                    let (num_connected_peers, connected_peers, disconnected_peers) = {
+                        let peer_book = context.peer_book.read().await;
+                        let num_connected_peers = peer_book.num_connected();
+                        let connected_peers = peer_book.get_connected().clone();
+                        let disconnected_peers = peer_book.get_disconnected().clone();
+                        drop(peer_book);
+                        (num_connected_peers, connected_peers, disconnected_peers)
+                    };
+
+                    let connections = context.connections.read().await;
+                    let pings = &mut context.pings.write().await;
+
+                    // If the node is connected to less peers than the minimum required,
+                    // broadcast a `GetPeers` message to request for more peers.
+                    if num_connected_peers < context.min_peers {
+                        // Send a `GetPeers` message to every peer the node is connected to.
+                        for (remote_address, _) in &connected_peers {
+                            match connections.get(&remote_address) {
+                                // Disconnect from the peer if the message fails to send.
                                 Some(channel) => {
-                                    // Disconnect from the peer if the get peers message was not sent properly
                                     if let Err(_) = channel.write(&GetPeers).await {
-                                        peer_book.disconnected_peer(address);
+                                        // Acquire the peer book write lock.
+                                        let mut peer_book = context.peer_book.write().await;
+                                        peer_book.disconnected_peer(&remote_address);
+                                        drop(peer_book);
                                     }
                                 }
-                                // Disconnect from the peer if there is no active connection channel
+                                // Disconnect from the peer if the channel is not active.
                                 None => {
-                                    peer_book.disconnected_peer(address);
+                                    // Acquire the peer book write lock.
+                                    let mut peer_book = context.peer_book.write().await;
+                                    peer_book.disconnected_peer(&remote_address);
+                                    drop(peer_book);
                                 }
                             }
                         }
 
                         // Try and connect to our disconnected peers.
-                        for (remote_address, _) in peer_book.get_disconnected() {
-                            if *remote_address != local_address {
-                                let new_context = context.clone();
-                                let latest_block_height = storage.get_latest_block_height();
+                        for (remote_address, _) in disconnected_peers {
+                            let new_context = context.clone();
+                            let latest_block_height = storage.get_latest_block_height();
 
-                                // Create a non-blocking handshake request
-                                let handshake_future = async move {
-                                    // TODO (raychu86) Establish a formal node version
-                                    let version =
-                                        Version::new(1u64, latest_block_height, *remote_address, local_address);
-                                    let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
-                                    if let Err(_) = handshakes.send_request(&version).await {
-                                        debug!("Tried connecting to disconnected peer {} and failed", remote_address);
-                                    }
-                                };
-                                task::spawn(
-                                    handshake_future.instrument(debug_span!("handshake", addr = %remote_address)),
-                                );
-                            }
+                            // Create a non-blocking handshake request
+                            let handshake_future = async move {
+                                // TODO (raychu86) Establish a formal node version
+                                let version = Version::new(1u64, latest_block_height, remote_address, local_address);
+
+                                // Acquire the handshake lock
+                                let mut handshakes = new_context.handshakes.write().await;
+                                // Attempt a handshake with the remote address.
+                                if let Err(_) = handshakes.send_request(&version).await {
+                                    debug!("Tried connecting to disconnected peer {} and failed", remote_address);
+                                }
+                                drop(handshakes)
+                            };
+                            task::spawn(handshake_future.instrument(debug_span!("handshake", addr = %remote_address)));
                         }
                     }
 
-                    // Send a ping protocol request to each of our connected peers to maintain the connection.
-                    for (address, peer_info) in peer_book.get_connected() {
-                        let time_since_last_seen = (Utc::now() - peer_info.last_seen()).num_milliseconds();
-                        if *address != local_address
-                            && time_since_last_seen.is_positive()
-                            && time_since_last_seen as u64 > (connection_frequency * 3)
-                        {
-                            match connections.get(&address) {
+                    // Broadcast a `Ping` request to every connected peers
+                    // that the node hasn't heard from in a while.
+                    for (remote_address, peer_info) in &connected_peers {
+                        // Calculate the time since we last saw the peer.
+                        let elapsed_in_millis = (Utc::now() - *peer_info.last_seen()).num_milliseconds();
+                        if elapsed_in_millis.is_positive() && elapsed_in_millis as u64 > (connection_frequency * 3) {
+                            match connections.get(&remote_address) {
+                                // Disconnect from the peer if the ping request fails to send.
                                 Some(channel) => {
-                                    // Disconnect from the peer if the ping message was not sent properly
-                                    if pings.send_ping(channel).await.is_err() {
-                                        warn!("Ping message failed to send to {}", address);
-                                        peer_book.disconnected_peer(&address);
+                                    if let Err(_) = pings.send_ping(channel).await {
+                                        warn!("Ping message failed to send to {}", remote_address);
+                                        // Acquire the peer book write lock.
+                                        let mut peer_book = context.peer_book.write().await;
+                                        peer_book.disconnected_peer(&remote_address);
+                                        drop(peer_book);
                                     }
                                 }
-                                // Disconnect from the peer if there is no active connection channel
+                                // Disconnect from the peer if the channel is not active.
                                 None => {
-                                    peer_book.disconnected_peer(&address);
+                                    // Acquire the peer book write lock.
+                                    let mut peer_book = context.peer_book.write().await;
+                                    peer_book.disconnected_peer(&remote_address);
+                                    drop(peer_book);
                                 }
                             }
                         }
                     }
 
                     // Purge peers that haven't responded in five frequency loops.
-                    let response_timeout = ChronoDuration::milliseconds((connection_frequency * 5) as i64);
-
-                    for (address, last_seen) in peer_book.get_connected() {
-                        if Utc::now() - last_seen > response_timeout {
-                            peer_book.disconnected_peer(&address);
+                    let timeout_duration = ChronoDuration::milliseconds((connection_frequency * 5) as i64);
+                    for (remote_address, peer_info) in &connected_peers {
+                        if Utc::now() - *peer_info.last_seen() > timeout_duration {
+                            // Acquire the peer book write lock.
+                            let mut peer_book = context.peer_book.write().await;
+                            peer_book.disconnected_peer(&remote_address);
+                            drop(peer_book);
                         }
                     }
 
                     // If we have disconnected from our sync node,
                     // then set our sync state to idle and find a new sync node.
-                    {
-                        if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
-                            if peer_book.disconnected_contains(&sync_handler.sync_node) {
-                                if let Some(peer) = peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
-                                    sync_handler.sync_state = SyncState::Idle;
-                                    sync_handler.sync_node = *peer.0;
-                                };
-                            }
+                    if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                        let peer_book = context.peer_book.read().await;
+                        if peer_book.is_disconnected(&sync_handler.sync_node_address) {
+                            if let Some(peer) = peer_book
+                                .get_connected()
+                                .iter()
+                                .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
+                            {
+                                sync_handler.sync_state = SyncState::Idle;
+                                sync_handler.sync_node_address = *peer.0;
+                            };
                         }
+                        drop(peer_book)
                     }
 
-                    // Store connected peers in database.
-                    peer_book
-                        .store(&storage)
-                        .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
+                    // Save the peer book to the database.
+                    {
+                        // Acquire the peer book write lock.
+                        let peer_book = context.peer_book.read().await;
+                        peer_book
+                            .store(&storage)
+                            .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
+                        drop(peer_book);
+                    }
 
-                    // Every two frequency loops, send a version message to all peers for periodic syncs.
-                    if interval_ticker % 2 == 1 {
-                        if peer_book.connected_total() > 0 {
-                            debug!("Sending out periodic version message to peers");
-                        }
-
-                        for (remote_address, _last_seen) in peer_book.get_connected() {
+                    // On every other loop, broadcast a version message to all peers for a periodic sync.
+                    if interval_ticker % 2 == 1 && num_connected_peers > 0 {
+                        debug!("Sending out periodic version message to peers");
+                        // Send a `Version` message to every peer the node is connected to.
+                        for (remote_address, _) in &connected_peers {
                             match connections.get(&remote_address) {
+                                // Send a version message to peers.
+                                // If they are behind, they will attempt to sync.
                                 Some(channel) => {
-                                    // Send a version message to peers.
-                                    // If they are behind, they will attempt to sync.
-                                    if let Some(handshake) = context.handshakes.read().await.get(&remote_address) {
+                                    let handshakes = context.handshakes.read().await;
+                                    if let Some(handshake) = handshakes.get(&remote_address) {
                                         let version = Version::from(
                                             1u64, // TODO (raychu86) Establish a formal node version
                                             storage.get_latest_block_height(),
-                                            remote_address,
+                                            *remote_address,
                                             local_address,
                                             handshake.nonce,
                                         );
+                                        // Disconnect from the peer if the version request fails to send.
                                         if let Err(_) = channel.write(&version).await {
-                                            peer_book.disconnected_peer(remote_address);
+                                            // Acquire the peer book write lock.
+                                            let mut peer_book = context.peer_book.write().await;
+                                            peer_book.disconnected_peer(&remote_address);
+                                            drop(peer_book);
                                         }
                                     }
                                 }
                                 // Disconnect from the peer if there is no active connection channel
                                 None => {
-                                    peer_book.disconnected_peer(remote_address);
+                                    // Acquire the peer book write lock.
+                                    let mut peer_book = context.peer_book.write().await;
+                                    peer_book.disconnected_peer(&remote_address);
+                                    drop(peer_book);
                                 }
                             }
                         }
@@ -190,26 +231,26 @@ impl Server {
                     if interval_ticker >= context.memory_pool_interval {
                         if let Ok(sync_handler) = sync_handler_lock.try_lock() {
                             // Ask our sync node for more transactions.
-                            if local_address != sync_handler.sync_node {
-                                if let Some(channel) = connections.get(&sync_handler.sync_node) {
+                            if local_address != sync_handler.sync_node_address {
+                                if let Some(channel) = connections.get(&sync_handler.sync_node_address) {
                                     if let Err(_) = channel.write(&GetMemoryPool).await {
-                                        peer_book.disconnected_peer(sync_handler.sync_node);
+                                        // Acquire the peer book write lock.
+                                        let mut peer_book = context.peer_book.write().await;
+                                        peer_book.disconnected_peer(&sync_handler.sync_node_address);
+                                        drop(peer_book);
                                     }
                                 }
                             }
                         }
 
-                        // Update our memory pool
-
+                        // Update the node's memory pool.
                         let mut memory_pool = match memory_pool_lock.try_lock() {
                             Ok(memory_pool) => memory_pool,
                             _ => continue,
                         };
-
                         memory_pool.cleanse(&storage).unwrap_or_else(|error| {
                             debug!("Failed to cleanse memory pool transactions in database {}", error)
                         });
-
                         memory_pool.store(&storage).unwrap_or_else(|error| {
                             debug!("Failed to store memory pool transaction in database {}", error)
                         });

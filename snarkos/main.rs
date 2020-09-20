@@ -67,10 +67,10 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: &Config) -> Result<(), NodeError> {
-    initialize_logger(config);
+async fn start_server(config: Config) -> Result<(), NodeError> {
+    initialize_logger(&config);
 
-    print_welcome(config);
+    print_welcome(&config);
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
     let socket_address = address.parse::<SocketAddr>()?;
@@ -171,7 +171,7 @@ async fn start_server(config: &Config) -> Result<(), NodeError> {
         start_rpc_server(
             config.rpc.port,
             secondary_storage.clone(),
-            path,
+            path.to_path_buf(),
             proving_parameters,
             server.context.clone(),
             consensus.clone(),

@@ -120,7 +120,7 @@ impl Server {
                 };
 
                 // Check if we've exceed our maximum number of allowed peers.
-                if context.peer_book.read().await.connected_total() >= context.max_peers {
+                if context.peer_book.read().await.num_connected() >= context.max_peers {
                     warn!("Rejected a connection request as this exceeds the maximum number of peers allowed");
                     if let Err(error) = reader.shutdown(Shutdown::Write) {
                         error!("Failed to shutdown peer reader ({})", error);
@@ -158,7 +158,7 @@ impl Server {
                             // Update the sync node if the sync_handler is Idle
                             if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
                                 if !sync_handler.is_syncing() {
-                                    sync_handler.sync_node = handshake.channel.address;
+                                    sync_handler.sync_node_address = handshake.channel.address;
 
                                     if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
                                         if let Err(err) =
