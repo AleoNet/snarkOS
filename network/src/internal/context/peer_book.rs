@@ -45,25 +45,25 @@ impl PeerBook {
         }
     }
 
-    /// Returns copy of connected peers.
-    pub fn get_connected(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
-        self.connected.get_addresses()
-    }
+    // /// Returns copy of connected peers.
+    // pub fn get_connected(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
+    //     self.connected.get_addresses()
+    // }
 
-    /// Returns copy of gossiped peers.
-    pub fn get_gossiped(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
-        self.gossiped.get_addresses()
-    }
+    // /// Returns copy of gossiped peers.
+    // pub fn get_gossiped(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
+    //     self.gossiped.get_addresses()
+    // }
 
-    /// Returns true if address is a connected peer.
-    pub fn connected_contains(&self, address: &SocketAddr) -> bool {
-        self.connected.contains(address)
-    }
+    // /// Returns `true` if address is a connected peer.
+    // pub fn connected_contains(&self, address: &SocketAddr) -> bool {
+    //     self.connected.contains(address)
+    // }
 
-    /// Returns true if address is a disconnected peer.
-    pub fn disconnected_contains(&self, address: &SocketAddr) -> bool {
-        self.disconnected.contains(address)
-    }
+    // /// Returns true if address is a disconnected peer.
+    // pub fn disconnected_contains(&self, address: &SocketAddr) -> bool {
+    //     self.disconnected.contains(address)
+    // }
 
     /// Returns true if address is a gossiped peer.
     pub fn gossiped_contains(&self, address: &SocketAddr) -> bool {
