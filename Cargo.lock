@@ -3053,7 +3053,6 @@ dependencies = [
  "futures-util",
  "lazy_static",
  "prometheus",
- "rand 0.7.3",
  "serial_test",
  "snarkos-derives",
  "tokio 0.2.22",
