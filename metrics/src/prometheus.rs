@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use prometheus::{Encoder, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts, Registry};
+use prometheus::{Encoder, IntCounter, IntGauge, Registry};
 use warp::{Rejection, Reply};
 
 lazy_static! {

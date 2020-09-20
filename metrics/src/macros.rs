@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[allow(unused_imports)]
 use crate::Metrics;
 
 #[macro_export]
@@ -50,7 +51,7 @@ macro_rules! connected_peers_dec {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prometheus, testing, Metrics};
+    use crate::Metrics;
     use snarkos_derives::test_with_metrics;
 
     use serial_test::serial;
