@@ -723,7 +723,7 @@ mod server_message_handler {
 
             // 3. Check that new peer address was added correctly
 
-            assert!(server_context.peer_book.read().await.gossiped_contains(&remote_address));
+            assert!(server_context.peer_book.read().await.is_disconnected(&remote_address));
         });
 
         drop(rt);

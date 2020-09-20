@@ -20,6 +20,7 @@ use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction}
 use snarkos_storage::Ledger;
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use std::{collections::HashMap, net::SocketAddr};
 
 pub enum PeerStatus {
@@ -30,7 +31,7 @@ pub enum PeerStatus {
 }
 
 /// Stores relevant metadata about a peer.
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct PeerInfo {
     /// The IP address of the peer.
     address: SocketAddr,
@@ -64,6 +65,23 @@ impl PeerInfo {
         }
     }
 
+    /// Updates the last seen datetime of the peer.
+    #[inline]
+    pub fn set_last_seen(&mut self) {
+        // Only update the last seen datetime if the peer is connected.
+        match self.status() {
+            PeerStatus::Connected => {
+                self.last_seen = Utc::now();
+            }
+            PeerStatus::Disconnected | PeerStatus::NeverConnected | PeerStatus::Unknown => {
+                error!(
+                    "Attempted to set the last seen datetime for a disconnected peer ({})",
+                    self.address
+                );
+            }
+        }
+    }
+
     /// Updates the connected metrics of the peer.
     #[inline]
     pub fn set_connected(&mut self) {
@@ -87,7 +105,7 @@ impl PeerInfo {
     /// Updates the disconnected metrics of the peer.
     #[inline]
     pub fn set_disconnected(&mut self) {
-        // Only update the last disconnected metrics if the peer is new or currently disconnected.
+        // Only update the last disconnected metrics if the peer is connected.
         match self.status() {
             PeerStatus::Connected => {
                 let now = Utc::now();
@@ -186,7 +204,7 @@ impl PeerInfo {
 
 /// Stores the existence of a peer and the date they were last seen.
 #[derive(Debug)]
-pub(crate) struct PeerBook {
+pub struct PeerBook {
     /// A mapping of connected peers.
     connected_peers: HashMap<SocketAddr, PeerInfo>,
     /// A mapping of disconnected peers.
@@ -283,6 +301,7 @@ impl PeerBook {
     pub fn found_peer(&mut self, address: &SocketAddr) -> bool {
         if self.is_connected(address) || self.is_disconnected(address) {
             // Case 1: The peer is already-known.
+            // self.set_last_seen();
             false
         } else {
             // Case 2: The peer is newly-discovered.
@@ -317,194 +336,6 @@ impl PeerBook {
         &self,
         storage: &Ledger<T, P>,
     ) -> Result<(), ServerError> {
-        Ok(storage.store_to_peer_book(bincode::serialize(&self.get_connected())?)?)
+        Ok(storage.store_to_peer_book(bincode::serialize(&(self.get_connected().clone()))?)?)
     }
-
-    /// [This method is for testing use only.]
-    /// Add the given address to the connected peers in the `PeerBook` with a given datetime.
-    /// Returns `true` on success. Otherwise, returns `false`.
-    #[cfg(test)]
-    #[inline]
-    pub fn connected_peer_with_datetime(&mut self, address: &SocketAddr, datetime: DateTime<Utc>) -> bool {
-        // Remove the address from the disconnected peers, if it exists.
-        let peer_info = match self.disconnected_peers.remove(&address) {
-            // Case 1: A previously-known peer.
-            Some(peer_info) => {
-                peer_info.refresh();
-                peer_info
-            }
-            // Case 2: A newly-discovered peer.
-            _ => PeerInfo {
-                address,
-                connected_count: 0,
-                disconnected_count: 0,
-                last_connected: datetime.clone(),
-                last_disconnected: datetime.clone(),
-                first_seen: datetime,
-            },
-        };
-        // Add the address into the connected peers.
-        let success = self.connected_peers.insert(address, peer_info);
-        connected_peers_inc!(success)
-    }
-
-    // ///
-    // /// Insert or update a new date for an address.
-    // /// Returns `true` if the address is new and inserted.
-    // /// Returns `false` if the address already exists.
-    // ///
-    // /// If the address already exists in the address book,
-    // /// the datetime will be updated to reflect the latest datetime.
-    // ///
-    // fn insert_or_update(&mut self, address: SocketAddr, peer_info: PeerInfo) -> bool {
-    //     match self.0.get(&address) {
-    //         Some(stored_date) => {
-    //             if stored_date < &date {
-    //                 self.0.insert(address, date);
-    //             }
-    //             false
-    //         }
-    //         None => self.0.insert(address, date).is_none(),
-    //     }
-    // }
-    //
-    // /// Checks if a given address exists in the `PeerBook`.
-    // /// Returns `true` if it exists. Otherwise, returns `false`.
-    // pub fn contains(&self, address: &SocketAddr) -> bool {
-    //     self.0.contains_key(address)
-    // }
-    //
-    // /// Removes a given address from the `PeerBook`.
-    // /// Returns `true` if a given address existed and was removed.
-    // /// Otherwise, returns `false`.
-    // pub fn remove(&mut self, address: &SocketAddr) -> bool {
-    //     // `HashMap::remove` returns `Some(_)`
-    //     // if it successfully removed a (key, value) pair.
-    //     self.0.remove(address).is_some()
-    // }
-    //
-    // // /// Returns the number of peers.
-    // // pub fn length(&self) -> u16 {
-    // //     self.0.len() as u16
-    // // }
-    //
 }
-
-// // Copyright (C) 2019-2020 Aleo Systems Inc.
-// // This file is part of the snarkOS library.
-//
-// // The snarkOS library is free software: you can redistribute it and/or modify
-// // it under the terms of the GNU General Public License as published by
-// // the Free Software Foundation, either version 3 of the License, or
-// // (at your option) any later version.
-//
-// // The snarkOS library is distributed in the hope that it will be useful,
-// // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// // GNU General Public License for more details.
-//
-// // You should have received a copy of the GNU General Public License
-// // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-//
-//
-//
-// use chrono::{DateTime, Utc};
-// use std::{collections::HashMap, net::SocketAddr};
-//
-// /// Stores connected, disconnected, and known peers.
-// #[derive(Clone, Debug, Eq, PartialEq)]
-// pub struct PeerBook {
-//     /// Connected peers
-//     connected: AddressBook,
-//
-//     /// Disconnected peers
-//     disconnected: AddressBook,
-//
-//     /// Gossiped but unconnected peers
-//     gossiped: AddressBook,
-// }
-//
-// impl PeerBook {
-//     pub fn new() -> Self {
-//         Self {
-//             connected: AddressBook::new(),
-//             disconnected: AddressBook::new(),
-//             gossiped: AddressBook::new(),
-//         }
-//     }
-//
-//     // /// Returns copy of connected peers.
-//     // pub fn get_connected(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
-//     //     self.connected.get_addresses()
-//     // }
-//
-//     // /// Returns copy of gossiped peers.
-//     // pub fn get_gossiped(&self) -> HashMap<SocketAddr, DateTime<Utc>> {
-//     //     self.gossiped.get_addresses()
-//     // }
-//
-//     // /// Returns `true` if address is a connected peer.
-//     // pub fn connected_contains(&self, address: &SocketAddr) -> bool {
-//     //     self.connected.contains(address)
-//     // }
-//
-//     // /// Returns true if address is a disconnected peer.
-//     // pub fn disconnected_contains(&self, address: &SocketAddr) -> bool {
-//     //     self.disconnected.contains(address)
-//     // }
-//
-//     // /// Returns true if address is a gossiped peer.
-//     //     // pub fn gossiped_contains(&self, address: &SocketAddr) -> bool {
-//     //     //     self.gossiped.contains(address)
-//     //     // }
-//
-//     // /// Move a peer from disconnected/gossiped to connected peers.
-//     // pub fn connected_peer(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
-//     //     self.disconnected.remove(&address);
-//     //     self.gossiped.remove(&address);
-//     //     let peer_connected = self.connected.insert_or_update(address, date);
-//     //     connected_peers_inc!(peer_connected)
-//     // }
-//
-//     // /// Move a peer from connected/disconnected to gossiped peers.
-//     // pub fn gossiped_peer(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
-//     //     let peer_removed = self.connected.remove(&address).is_some();
-//     //     connected_peers_dec!(peer_removed);
-//     //     self.disconnected.remove(&address);
-//     //     self.gossiped.insert_or_update(address, date)
-//     // }
-//
-//     // /// Move a peer from connected peers to disconnected peers.
-//     // pub fn disconnected_peer(&mut self, address: SocketAddr) -> bool {
-//     //     let peer_removed = self.connected.remove(&address).is_some();
-//     //     connected_peers_dec!(peer_removed);
-//     //     self.gossiped.remove(&address);
-//     //     self.disconnected.insert_or_update(address, Utc::now())
-//     // }
-//
-//     // /// Forget a peer.
-//     // pub fn forget_peer(&mut self, address: SocketAddr) {
-//     //     let peer_removed = self.connected.remove(&address).is_some();
-//     //     connected_peers_dec!(peer_removed);
-//     //     self.gossiped.remove(&address);
-//     //     self.disconnected.remove(&address);
-//     // }
-//
-//     // /// Remove_gossiped peer
-//     // pub fn remove_gossiped(&mut self, address: SocketAddr) -> bool {
-//     //     self.gossiped.remove(&address).is_some()
-//     // }
-//
-//     // /// Returns the number of connected peers.
-//     // pub fn connected_total(&self) -> u16 {
-//     //     self.connected.length()
-//     // }
-//
-//     // /// Writes connected peers to storage.
-//     // pub fn store<T: Transaction, P: LoadableMerkleParameters>(
-//     //     &self,
-//     //     storage: &Ledger<T, P>,
-//     // ) -> Result<(), ServerError> {
-//     //     Ok(storage.store_to_peer_book(bincode::serialize(&self.get_connected())?)?)
-//     // }
-// }

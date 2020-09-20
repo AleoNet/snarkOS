@@ -35,8 +35,11 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use chrono::Utc;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 impl Server {
     /// This method handles all messages sent from connected peers.
@@ -181,7 +184,7 @@ impl Server {
                 info!("Disconnected from peer {:?}", channel.address);
                 {
                     let mut peer_book = self.context.peer_book.write().await;
-                    peer_book.disconnected_peer(channel.address);
+                    peer_book.disconnected_peer(&channel.address);
                 }
             } else {
                 debug!("Message name not recognized {:?}", name.to_string());
@@ -227,7 +230,13 @@ impl Server {
 
                         if sync_handler.sync_state != SyncState::Idle {
                             // We are currently syncing with a node, ask for the next block.
-                            if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                            if let Some(channel) = self
+                                .context
+                                .connections
+                                .read()
+                                .await
+                                .get(&sync_handler.sync_node_address)
+                            {
                                 sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
                             }
                         }
@@ -304,12 +313,17 @@ impl Server {
             peer_book.found_peer(&channel.address);
         }
 
-        // Fetch the connected peers, and remove the requesting peer from the list of peers.
-        let mut connected_peers = peer_book.get_connected();
-        connected_peers.remove(&channel.address);
-
         // Broadcast the sanitized list of connected peers back to requesting peer.
-        channel.write(&Peers::new(connected_peers)).await?;
+        let mut peers = HashMap::new();
+        for (remote_address, peer_info) in peer_book.get_connected().iter() {
+            // Skip the iteration if the requesting peer that we're sending the response to
+            // appears in the list of peers.
+            if *remote_address == channel.address {
+                continue;
+            }
+            peers.insert(*remote_address, *peer_info.last_seen());
+        }
+        channel.write(&Peers::new(peers)).await?;
 
         Ok(())
     }
@@ -329,10 +343,15 @@ impl Server {
 
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
-        let local_address = self.context.local_address.read().await;
+        let local_address = *self.context.local_address.read().await;
+
         for (peer_address, _) in message.addresses.iter() {
             // Skip if the peer address is the node's local address.
-            if peer_address == local_address || peer_address.address == [0, 0, 0, 0].into() {
+            let is_zero_address = match "0.0.0.0".to_string().parse::<IpAddr>() {
+                Ok(zero_ip) => (*peer_address).ip() == zero_ip,
+                _ => false,
+            };
+            if *peer_address == local_address || is_zero_address {
                 continue;
             }
             // Inform the peer book that we found a peer.
@@ -432,7 +451,13 @@ impl Server {
         sync_handler.receive_hashes(message.block_hashes, height);
 
         // Received block headers
-        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+        if let Some(channel) = self
+            .context
+            .connections
+            .read()
+            .await
+            .get(&sync_handler.sync_node_address)
+        {
             sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
         }
 
@@ -468,12 +493,14 @@ impl Server {
             .await
         {
             Ok(()) => {
-                // Add connected peer.
-                self.context
-                    .peer_book
-                    .write()
-                    .await
-                    .connected_peer(channel.address, Utc::now());
+                // If we received a verack, but aren't connected to the peer,
+                // inform the peer book that we found a peer.
+                // The peer book will determine if we have seen the peer before,
+                // and include the peer if it is new.
+                let mut peer_book = self.context.peer_book.write().await;
+                if !peer_book.is_connected(&channel.address) {
+                    peer_book.found_peer(&channel.address);
+                }
 
                 // Ask connected peer for more peers.
                 channel.write(&GetPeers).await?;
@@ -501,7 +528,7 @@ impl Server {
         let peer_book = &mut self.context.peer_book.read().await;
 
         if *self.context.local_address.read().await != peer_address {
-            if peer_book.connected_total() < self.context.max_peers {
+            if peer_book.num_connected() < self.context.max_peers {
                 self.context
                     .handshakes
                     .write()
@@ -519,13 +546,19 @@ impl Server {
                         && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
                     {
                         debug!("Attempting to sync with peer {}", peer_address);
-                        sync_handler.sync_node = peer_address;
+                        sync_handler.sync_node_address = peer_address;
 
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
                         }
                     } else {
-                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                        if let Some(channel) = self
+                            .context
+                            .connections
+                            .read()
+                            .await
+                            .get(&sync_handler.sync_node_address)
+                        {
                             sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
                         }
                     }
