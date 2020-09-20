@@ -20,7 +20,7 @@ extern crate log;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
-    display::render_init,
+    display::render_welcome,
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
@@ -36,15 +36,7 @@ use snarkos_utilities::{to_bytes, ToBytes};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
 
-/// Builds a node from configuration parameters.
-/// 1. Creates new storage database or uses existing.
-/// 2. Creates new memory pool or uses existing from storage.
-/// 3. Creates consensus parameters.
-/// 4. Creates network server.
-/// 5. Starts rpc server thread.
-/// 6. Starts miner thread.
-/// 7. Starts network server listener.
-async fn start_server(config: Config) -> Result<(), NodeError> {
+fn initialize_logger(config: &Config) {
     match config.node.verbose {
         0 => {}
         verbosity => {
@@ -53,11 +45,30 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
                 2 => std::env::set_var("RUST_LOG", "debug"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
-
             env_logger::init();
-            println!("{}", render_init(&config));
         }
     }
+}
+
+fn print_welcome(config: &Config) {
+    println!("{}", render_welcome(config));
+}
+
+///
+/// Builds a node from configuration parameters.
+///
+/// 1. Creates new storage database or uses existing.
+/// 2. Creates new memory pool or uses existing from storage.
+/// 3. Creates consensus parameters.
+/// 4. Creates network server.
+/// 5. Starts rpc server thread.
+/// 6. Starts miner thread.
+/// 7. Starts network server listener.
+///
+async fn start_server(config: &Config) -> Result<(), NodeError> {
+    initialize_logger(config);
+
+    print_welcome(config);
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
     let socket_address = address.parse::<SocketAddr>()?;
@@ -178,10 +189,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
 fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::new();
-
     let config: Config = ConfigCli::parse(&arguments)?;
-
     Runtime::new()?.block_on(start_server(config))?;
-
     Ok(())
 }

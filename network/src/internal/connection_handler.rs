@@ -63,52 +63,48 @@ impl Server {
                     peer_book.forget_peer(local_address);
 
                     // We have less peers than our minimum peer requirement. Look for more peers.
-                    if peer_book.connected_total() < context.min_peers {
+                    if peer_book.num_connected() < context.min_peers {
                         // Ask our connected peers.
                         for (address, _last_seen) in peer_book.get_connected() {
-                            match connections.get(&address) {
+                            match connections.get(address) {
                                 Some(channel) => {
                                     // Disconnect from the peer if the get peers message was not sent properly
                                     if let Err(_) = channel.write(&GetPeers).await {
-                                        peer_book.disconnect_peer(address);
+                                        peer_book.disconnected_peer(address);
                                     }
                                 }
                                 // Disconnect from the peer if there is no active connection channel
                                 None => {
-                                    peer_book.disconnect_peer(address);
+                                    peer_book.disconnected_peer(address);
                                 }
                             }
                         }
 
-                        // Try and connect to our gossiped peers.
-                        for (remote_address, _last_seen) in peer_book.get_gossiped() {
-                            if remote_address != local_address && !peer_book.connected_contains(&remote_address) {
+                        // Try and connect to our disconnected peers.
+                        for (remote_address, _) in peer_book.get_disconnected() {
+                            if *remote_address != local_address {
+                                let new_context = context.clone();
+                                let latest_block_height = storage.get_latest_block_height();
+
                                 // Create a non-blocking handshake request
-                                {
-                                    let new_context = context.clone();
-                                    let latest_block_height = storage.get_latest_block_height();
+                                task::spawn(async move {
+                                    // TODO (raychu86) Establish a formal node version
+                                    let version =
+                                        Version::new(1u64, latest_block_height, *remote_address, local_address);
 
-                                    task::spawn(async move {
-                                        // TODO (raychu86) Establish a formal node version
-                                        let version =
-                                            Version::new(1u64, latest_block_height, remote_address, local_address);
-
-                                        let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
-                                        if let Err(_) = handshakes.send_request(&version).await {
-                                            debug!("Could not connect to gossiped peer {}", remote_address);
-                                        }
-                                    });
-                                }
+                                    let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
+                                    if let Err(_) = handshakes.send_request(&version).await {
+                                        debug!("Tried connecting to disconnected peer {} and failed", remote_address);
+                                    }
+                                });
                             }
-
-                            peer_book.remove_gossiped(remote_address);
                         }
                     }
 
                     // Send a ping protocol request to each of our connected peers to maintain the connection.
-                    for (address, last_seen) in peer_book.get_connected() {
-                        let time_since_last_seen = (Utc::now() - last_seen).num_milliseconds();
-                        if address != local_address
+                    for (address, peer_info) in peer_book.get_connected() {
+                        let time_since_last_seen = (Utc::now() - peer_info.last_seen()).num_milliseconds();
+                        if *address != local_address
                             && time_since_last_seen.is_positive()
                             && time_since_last_seen as u64 > (connection_frequency * 3)
                         {
@@ -117,12 +113,12 @@ impl Server {
                                     // Disconnect from the peer if the ping message was not sent properly
                                     if let Err(_) = pings.send_ping(channel).await {
                                         warn!("Ping message failed to send to {}", address);
-                                        peer_book.disconnect_peer(address);
+                                        peer_book.disconnected_peer(&address);
                                     }
                                 }
                                 // Disconnect from the peer if there is no active connection channel
                                 None => {
-                                    peer_book.disconnect_peer(address);
+                                    peer_book.disconnected_peer(&address);
                                 }
                             }
                         }
@@ -133,7 +129,7 @@ impl Server {
 
                     for (address, last_seen) in peer_book.get_connected() {
                         if Utc::now() - last_seen.clone() > response_timeout {
-                            peer_book.disconnect_peer(address);
+                            peer_book.disconnected_peer(&address);
                         }
                     }
 
@@ -175,13 +171,13 @@ impl Server {
                                             handshake.nonce,
                                         );
                                         if let Err(_) = channel.write(&version).await {
-                                            peer_book.disconnect_peer(remote_address);
+                                            peer_book.disconnected_peer(remote_address);
                                         }
                                     }
                                 }
                                 // Disconnect from the peer if there is no active connection channel
                                 None => {
-                                    peer_book.disconnect_peer(remote_address);
+                                    peer_book.disconnected_peer(remote_address);
                                 }
                             }
                         }
@@ -194,7 +190,7 @@ impl Server {
                             if local_address != sync_handler.sync_node {
                                 if let Some(channel) = connections.get(&sync_handler.sync_node) {
                                     if let Err(_) = channel.write(&GetMemoryPool).await {
-                                        peer_book.disconnect_peer(sync_handler.sync_node);
+                                        peer_book.disconnected_peer(sync_handler.sync_node);
                                     }
                                 }
                             }

@@ -21,7 +21,7 @@ use snarkos_objects::AccountAddress;
 use colored::*;
 use std::str::FromStr;
 
-pub fn render_init(config: &Config) -> String {
+pub fn render_welcome(config: &Config) -> String {
     let mut output = String::new();
 
     output += &format!(

@@ -181,7 +181,7 @@ impl Server {
                 info!("Disconnected from peer {:?}", channel.address);
                 {
                     let mut peer_book = self.context.peer_book.write().await;
-                    peer_book.disconnect_peer(channel.address);
+                    peer_book.disconnected_peer(channel.address);
                 }
             } else {
                 debug!("Message name not recognized {:?}", name.to_string());
@@ -295,11 +295,20 @@ impl Server {
     /// A node has requested our list of peer addresses.
     /// Send an Address message with our current peer list.
     async fn receive_get_peers(&mut self, _message: GetPeers, channel: Arc<Channel>) -> Result<(), ServerError> {
-        let mut connected_peers = self.context.peer_book.read().await.get_connected();
+        // If we received a message, but aren't connected to the peer,
+        // inform the peer book that we found a peer.
+        // The peer book will determine if we have seen the peer before,
+        // and include the peer if it is new.
+        let mut peer_book = self.context.peer_book.write().await;
+        if !peer_book.is_connected(&channel.address) {
+            peer_book.found_peer(&channel.address);
+        }
 
-        // Remove the requester from list of peers
+        // Fetch the connected peers, and remove the requesting peer from the list of peers.
+        let mut connected_peers = peer_book.get_connected();
         connected_peers.remove(&channel.address);
 
+        // Broadcast the sanitized list of connected peers back to requesting peer.
         channel.write(&Peers::new(connected_peers)).await?;
 
         Ok(())
@@ -309,18 +318,30 @@ impl Server {
     /// Add all new/updated addresses to our gossiped.
     /// The connection handler will be responsible for sending out handshake requests to them.
     async fn receive_peers(&mut self, message: Peers, channel: Arc<Channel>) -> Result<(), ServerError> {
-        let peer_book = &mut self.context.peer_book.write().await;
-        for (addr, time) in message.addresses.iter() {
-            if &*self.context.local_address.read().await == addr {
-                continue;
-            } else if peer_book.connected_contains(addr) {
-                peer_book.connect_peer(addr.clone(), time.clone());
-            } else {
-                peer_book.gossiped_peer(addr.clone(), time.clone());
-            }
+        // If we received a message, but aren't connected to the peer,
+        // inform the peer book that we found a peer.
+        // The peer book will determine if we have seen the peer before,
+        // and include the peer if it is new.
+        let mut peer_book = self.context.peer_book.write().await;
+        if !peer_book.is_connected(&channel.address) {
+            peer_book.found_peer(&channel.address);
         }
 
-        peer_book.connect_peer(channel.address, Utc::now());
+        // Process all of the peers sent in the message,
+        // by informing the peer book of that we found peers.
+        let local_address = self.context.local_address.read().await;
+        for (peer_address, _) in message.addresses.iter() {
+            // Skip if the peer address is the node's local address.
+            if peer_address == local_address || peer_address.address == [0, 0, 0, 0].into() {
+                continue;
+            }
+            // Inform the peer book that we found a peer.
+            // The peer book will determine if we have seen the peer before,
+            // and include the peer if it is new.
+            else if !peer_book.is_connected(&channel.address) {
+                peer_book.found_peer(&channel.address);
+            }
+        }
 
         Ok(())
     }
@@ -328,21 +349,32 @@ impl Server {
     /// A peer has sent us a ping message.
     /// Reply with a pong message.
     async fn receive_ping(&mut self, message: Ping, channel: Arc<Channel>) -> Result<(), ServerError> {
+        // If we received a ping, but aren't connected to the peer,
+        // inform the peer book that we found a peer.
+        // The peer book will determine if we have seen the peer before,
+        // and include the peer if it is new.
         let mut peer_book = self.context.peer_book.write().await;
-
-        if peer_book.connected_contains(&channel.address) {
-            peer_book.connect_peer(channel.address, Utc::now());
+        if !peer_book.is_connected(&channel.address) {
+            peer_book.found_peer(&channel.address);
         }
 
         Pings::send_pong(message, channel).await?;
-
         Ok(())
     }
 
     /// A peer has sent us a pong message.
-    /// See if it matches a ping we sent out.
+    /// Check if it matches a ping we sent out.
     async fn receive_pong(&mut self, message: Pong, channel: Arc<Channel>) -> Result<(), ServerError> {
-        match self
+        // If we received a pong, but aren't connected to the peer,
+        // inform the peer book that we found a peer.
+        // The peer book will determine if we have seen the peer before,
+        // and include the peer if it is new.
+        let mut peer_book = self.context.peer_book.write().await;
+        if !peer_book.is_connected(&channel.address) {
+            peer_book.found_peer(&channel.address);
+        }
+
+        if let Err(error) = self
             .context
             .pings
             .write()
@@ -350,17 +382,10 @@ impl Server {
             .accept_pong(channel.address, message)
             .await
         {
-            Ok(()) => {
-                self.context
-                    .peer_book
-                    .write()
-                    .await
-                    .connect_peer(channel.address, Utc::now());
-            }
-            Err(error) => debug!(
-                "Invalid Pong message from: {:?}, Full error: {:?}",
+            debug!(
+                "Invalid pong message from: {:?}, Full error: {:?}",
                 channel.address, error
-            ),
+            )
         }
 
         Ok(())
@@ -448,7 +473,7 @@ impl Server {
                     .peer_book
                     .write()
                     .await
-                    .connect_peer(channel.address, Utc::now());
+                    .connected_peer(channel.address, Utc::now());
 
                 // Ask connected peer for more peers.
                 channel.write(&GetPeers).await?;

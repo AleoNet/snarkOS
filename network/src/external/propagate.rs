@@ -35,7 +35,7 @@ pub async fn propagate_transaction(
     let connections = context.connections.read().await;
     let mut num_peers = 0;
 
-    for (socket, _) in &peer_book.get_connected() {
+    for (socket, _) in peer_book.get_connected() {
         if *socket != transaction_sender && *socket != local_address {
             if let Some(channel) = connections.get(socket) {
                 match channel.write(&Transaction::new(transaction_bytes.clone())).await {
@@ -67,7 +67,7 @@ pub async fn propagate_block(
     let connections = context.connections.read().await;
     let mut num_peers = 0;
 
-    for (socket, _) in &peer_book.get_connected() {
+    for (socket, _) in peer_book.get_connected() {
         if *socket != block_miner && *socket != local_address {
             if let Some(channel) = connections.get(socket) {
                 match channel.write(&Block::new(block_bytes.clone())).await {
