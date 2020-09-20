@@ -51,7 +51,7 @@ mod server_connection_handler {
             // 1. Add peer to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_connected(remote_address, Utc::now());
+            peer_book.connect_peer(remote_address, Utc::now());
             drop(peer_book);
 
             // 2. Start server
@@ -100,7 +100,7 @@ mod server_connection_handler {
             // 1. Add peer with old date to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_connected(remote_address, Utc::now() - Duration::minutes(1));
+            peer_book.connect_peer(remote_address, Utc::now() - Duration::minutes(1));
             drop(peer_book);
 
             // 2. Start server
@@ -151,7 +151,7 @@ mod server_connection_handler {
             // 1. Add peer to gossiped in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_gossiped(remote_address, Utc::now());
+            peer_book.gossiped_peer(remote_address, Utc::now());
             drop(peer_book);
 
             // 2. Start server
@@ -202,12 +202,12 @@ mod server_connection_handler {
             // 1. Add the maximum number of connected to the local node peer book
 
             for _x in 0..10 {
-                peer_book.update_connected(random_socket_address(), Utc::now());
+                peer_book.connect_peer(random_socket_address(), Utc::now());
             }
 
             // 2. Add peer with old date to gossiped in peer_book
 
-            peer_book.update_gossiped(remote_address, Utc::now() - Duration::minutes(1));
+            peer_book.gossiped_peer(remote_address, Utc::now() - Duration::minutes(1));
             drop(peer_book);
 
             // 3. Start server
@@ -259,7 +259,7 @@ mod server_connection_handler {
             // 1. Add peer to peers
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_connected(remote_address, Utc::now());
+            peer_book.connect_peer(remote_address, Utc::now());
             drop(peer_book);
 
             // 2. Start remote_listener

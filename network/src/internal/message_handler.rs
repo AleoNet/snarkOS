@@ -314,13 +314,13 @@ impl Server {
             if &*self.context.local_address.read().await == addr {
                 continue;
             } else if peer_book.connected_contains(addr) {
-                peer_book.update_connected(addr.clone(), time.clone());
+                peer_book.connect_peer(addr.clone(), time.clone());
             } else {
-                peer_book.update_gossiped(addr.clone(), time.clone());
+                peer_book.gossiped_peer(addr.clone(), time.clone());
             }
         }
 
-        peer_book.update_connected(channel.address, Utc::now());
+        peer_book.connect_peer(channel.address, Utc::now());
 
         Ok(())
     }
@@ -331,7 +331,7 @@ impl Server {
         let mut peer_book = self.context.peer_book.write().await;
 
         if peer_book.connected_contains(&channel.address) {
-            peer_book.update_connected(channel.address, Utc::now());
+            peer_book.connect_peer(channel.address, Utc::now());
         }
 
         Pings::send_pong(message, channel).await?;
@@ -355,7 +355,7 @@ impl Server {
                     .peer_book
                     .write()
                     .await
-                    .update_connected(channel.address, Utc::now());
+                    .connect_peer(channel.address, Utc::now());
             }
             Err(error) => debug!(
                 "Invalid Pong message from: {:?}, Full error: {:?}",
@@ -448,7 +448,7 @@ impl Server {
                     .peer_book
                     .write()
                     .await
-                    .update_connected(channel.address, Utc::now());
+                    .connect_peer(channel.address, Utc::now());
 
                 // Ask connected peer for more peers.
                 channel.write(&GetPeers).await?;

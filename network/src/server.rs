@@ -89,6 +89,7 @@ impl Server {
             let address = self.context.local_address.read().await;
             let local_address = format!("0.0.0.0:{}", address.port()).parse::<SocketAddr>()?;
             info!("Starting listener...");
+            debug!("Starting listener at {:?}...", local_address);
             (TcpListener::bind(&local_address).await?, local_address)
         };
         info!("Listening at {:?}", local_address);

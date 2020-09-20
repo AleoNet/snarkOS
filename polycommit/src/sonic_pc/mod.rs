@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{
     kzg10,
     BTreeMap,
@@ -195,7 +211,8 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
                     let shifted_powers_of_g = pp.powers_of_g[lowest_shift_degree..].to_vec();
                     let mut shifted_powers_of_gamma_g = BTreeMap::new();
                     // Also add degree 0.
-                    let max_gamma_g = pp.powers_of_gamma_g.keys().last().unwrap();
+                    // TODO (howardwu): Confirm that max_gamma_g is not used.
+                    let _max_gamma_g = pp.powers_of_gamma_g.keys().last().unwrap();
                     for degree_bound in enforced_degree_bounds {
                         let shift_degree = max_degree - degree_bound;
                         let mut powers_for_degree_bound = vec![];

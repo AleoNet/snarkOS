@@ -19,7 +19,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 /// Stores the existence of a peer and the date they were last seen.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AddressBook {
+pub(super) struct AddressBook {
     addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }
 
@@ -31,21 +31,23 @@ impl AddressBook {
         }
     }
 
-    /// Insert or update a new date for an address. Returns true if the new date is stored.
+    ///
+    /// Insert or update a new date for an address.
+    /// Returns `true` if the address is new and inserted.
+    /// Returns `false` if the address already exists.
+    ///
+    /// If the address already exists in the address book,
+    /// the datetime will be updated to reflect the latest datetime.
+    ///
     pub fn insert_or_update(&mut self, address: SocketAddr, date: DateTime<Utc>) -> bool {
         match self.addresses.get(&address) {
             Some(stored_date) => {
-                if stored_date > &date {
-                    false
-                } else {
+                if stored_date < &date {
                     self.addresses.insert(address, date);
-                    true
                 }
+                false
             }
-            None => {
-                self.addresses.insert(address, date);
-                true
-            }
+            None => self.addresses.insert(address, date).is_none(),
         }
     }
 

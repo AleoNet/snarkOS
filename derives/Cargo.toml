@@ -15,6 +15,10 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
+snarkos-metrics = { path = "../metrics", version = "1.1.4" }
+
+proc-macro-crate = { version = "0.1" }
+proc-macro-error = { version = "1", default-features = false }
 proc-macro2 = "1.0"
 syn = "1.0"
 quote = "1.0"
