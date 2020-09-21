@@ -203,7 +203,7 @@ impl PeerInfo {
 }
 
 /// Stores the existence of a peer and the date they were last seen.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PeerBook {
     /// A mapping of connected peers.
     connected_peers: HashMap<SocketAddr, PeerInfo>,
@@ -336,6 +336,6 @@ impl PeerBook {
         &self,
         storage: &Ledger<T, P>,
     ) -> Result<(), ServerError> {
-        Ok(storage.store_to_peer_book(bincode::serialize(&(self.get_connected().clone()))?)?)
+        Ok(storage.store_to_peer_book(bincode::serialize(&self.clone())?)?)
     }
 }
