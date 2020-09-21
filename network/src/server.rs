@@ -148,6 +148,7 @@ impl Server {
                     {
                         let mut connections = context.connections.write().await; // Acquire the connections lock
                         connections.store_channel(&handshake.channel);
+                        drop(connections);
                     }
 
                     if let Some(version) = version_message {
