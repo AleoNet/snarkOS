@@ -25,10 +25,10 @@ mod server_listen {
             message::Message,
             message_types::{GetPeers, GetSync, Verack},
             protocol::SyncHandler,
-            Handshakes,
         },
         internal::context::Context,
-        server::Server,
+        RequestManager,
+        Server,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 
@@ -99,7 +99,6 @@ mod server_listen {
             let (tx, rx) = oneshot::channel();
 
             // 1. Simulate server
-
             tokio::spawn(async move {
                 start_server(tx, server_address, bootnode_address, storage, parameters, true).await;
                 sleep(5000).await;
@@ -107,7 +106,6 @@ mod server_listen {
             rx.await.unwrap();
 
             // 2. Try and bind to server listener port
-
             sleep(100).await;
             assert_err!(TcpListener::bind(server_address).await);
         });
@@ -130,49 +128,39 @@ mod server_listen {
             let bootnode_address = random_socket_address();
 
             // 1. Start bootnode
-
             let mut bootnode_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
             // 2. Start server
-
             let (tx, rx) = oneshot::channel();
-
             tokio::spawn(async move {
                 start_server(tx, server_address, bootnode_address, storage, parameters, false).await;
                 sleep(5000).await;
             });
-
             rx.await.unwrap();
 
             // 3. Check that bootnode received Version message
-
             let (reader, _peer) = bootnode_listener.accept().await.unwrap();
 
             // 4. Send handshake response from bootnode to server
-
-            let mut bootnode_handshakes = Handshakes::new();
-            let (mut bootnode_hand, _, _) = bootnode_handshakes
-                .receive_any(1u64, 1u32, server_address, reader)
+            let mut bootnode_manager = RequestManager::new();
+            let (mut bootnode_handshake, _, _) = bootnode_manager
+                .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await
                 .unwrap();
 
             // 5. Check that bootnode received a GetPeers message
-
-            let (name, _bytes) = bootnode_hand.channel.read().await.unwrap();
-
+            let (name, _bytes) = bootnode_handshake.channel.read().await.unwrap();
             assert_eq!(GetPeers::name(), name);
 
             // 6. Check that bootnode received Verack message
-
-            let (name, bytes) = bootnode_hand.channel.read().await.unwrap();
-
+            let (name, bytes) = bootnode_handshake.channel.read().await.unwrap();
             assert_eq!(Verack::name(), name);
+
             let verack_message = Verack::deserialize(bytes).unwrap();
-            bootnode_hand.accept(verack_message).await.unwrap();
+            bootnode_handshake.accept(verack_message).await.unwrap();
 
             // 7. Check that bootnode received GetSync message
-
-            let (name, _bytes) = bootnode_hand.channel.read().await.unwrap();
+            let (name, _bytes) = bootnode_handshake.channel.read().await.unwrap();
             assert_eq!(GetSync::name(), name);
         });
 
@@ -194,11 +182,9 @@ mod server_listen {
             let peer_address = random_socket_address();
 
             // 1. Start peer
-
             let mut peer_listener = TcpListener::bind(peer_address).await.unwrap();
 
             // 2. Add peer to storage
-
             let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
             connected_peers.insert(peer_address, Utc::now());
             storage
@@ -206,26 +192,21 @@ mod server_listen {
                 .unwrap();
 
             // 3. Start server
-
             let (tx, rx) = oneshot::channel();
-
             tokio::spawn(async move {
                 start_server(tx, server_address, peer_address, storage, parameters, false).await;
                 sleep(5000).await;
             });
-
             rx.await.unwrap();
 
             // 4. Check that peer received Version message
-
             let (reader, _peer) = peer_listener.accept().await.unwrap();
             sleep(1000).await;
 
             // 5. Send handshake response from remote node to local node
-
-            let mut peer_handshakes = Handshakes::new();
-            peer_handshakes
-                .receive_any(1u64, 1u32, server_address, reader)
+            let mut peer_manager = RequestManager::new();
+            peer_manager
+                .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await
                 .unwrap();
         });

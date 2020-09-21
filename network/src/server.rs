@@ -51,12 +51,11 @@ pub struct Server {
     pub sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     pub receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     pub request_manager: RequestManager,
-    pub local_address: SocketAddr,
 }
 
 impl Server {
     /// Constructs a new `Server`.
-    pub async fn new(
+    pub fn new(
         context: Arc<Context>,
         consensus: ConsensusParameters,
         storage: Arc<MerkleTreeLedger>,
@@ -67,10 +66,6 @@ impl Server {
     ) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
         let request_manager = RequestManager::new();
-        let local_address = {
-            let address = context.local_address.read().await;
-            format!("0.0.0.0:{}", address.port()).parse().unwrap()
-        };
 
         Server {
             consensus,
@@ -83,7 +78,6 @@ impl Server {
             sync_handler_lock,
             connection_frequency,
             request_manager,
-            local_address,
         }
     }
 
@@ -109,18 +103,30 @@ impl Server {
     /// 6. Start the message handler.
     ///
     pub async fn listen(mut self) -> Result<(), ServerError> {
-        // TODO (howardwu): Find the actual address of the node.
-        // 1. Initialize TCP listener and accept new TCP connections.
-        debug!("Starting listener at {:?}...", self.local_address);
-        let mut listener = TcpListener::bind(&self.local_address).await?;
-        info!("Listening at {:?}", self.local_address);
-
         // Prepare to spawn the main loop.
         let sender = self.sender.clone();
         let storage = self.storage.clone();
         let context = self.context.clone();
         let sync_handler_lock = self.sync_handler_lock.clone();
         let mut request_manager = self.request_manager.clone();
+
+        let connection_manager = ConnectionManager::new(
+            &context,
+            request_manager.clone(),
+            self.context.connections.clone(),
+            &storage,
+            self.get_bootnodes(),
+            self.connection_frequency,
+        )
+        .await;
+        let mut new_connection_manager = connection_manager.clone();
+
+        // TODO (howardwu): Find the actual address of the node.
+        // 1. Initialize TCP listener and accept new TCP connections.
+        let local_address = new_connection_manager.get_local_address().await;
+        debug!("Starting listener at {:?}...", local_address);
+        let mut listener = TcpListener::bind(&local_address).await?;
+        info!("Listening at {:?}", local_address);
 
         // 2. Spawn a new thread to handle new connections.
         task::spawn(async move {
@@ -157,21 +163,14 @@ impl Server {
                 {
                     // Bootstrap discovery of local node IP via VERACK responses
                     {
-                        let mut local_address = context.local_address.write().await;
-                        if *local_address != discovered_local_address {
-                            *local_address = discovered_local_address;
-                            info!("Discovered local address: {:?}", *local_address);
-                            let mut peer_book = context.peer_book.write().await;
-                            peer_book.forget_peer(discovered_local_address);
+                        let local_address = new_connection_manager.get_local_address().await;
+                        if local_address != discovered_local_address {
+                            new_connection_manager.set_local_address(discovered_local_address).await;
+                            info!("Discovered local address: {:?}", local_address);
                         }
                     }
-
                     // Store the channel established with the handshake
-                    {
-                        let mut connections = context.connections.write().await; // Acquire the connections lock
-                        connections.store_channel(&handshake.channel);
-                        drop(connections);
-                    }
+                    new_connection_manager.add_channel(&handshake.channel);
 
                     if let Some(version) = version_message {
                         // If our peer has a longer chain, send a sync message
@@ -204,7 +203,7 @@ impl Server {
 
         // 3. Start the connection handler.
         debug!("Starting connection handler");
-        self.connection_handler().await;
+        self.connection_handler(connection_manager).await;
 
         // 4. Start the message handler.
         debug!("Starting message handler");
@@ -316,29 +315,12 @@ impl Server {
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
-    pub async fn connection_handler(&self) {
+    pub async fn connection_handler(&self, connection_manager: ConnectionManager) {
         let context = self.context.clone();
         let memory_pool_lock = self.memory_pool_lock.clone();
         let sync_handler_lock = self.sync_handler_lock.clone();
         let storage = self.storage.clone();
         let connection_frequency = self.connection_frequency;
-
-        let local_address = *context.local_address.read().await;
-        let channels = context.connections.clone();
-        let bootnode_addresses = self.get_bootnodes();
-
-        let request_manager = self.request_manager.clone();
-
-        let connection_manager = ConnectionManager::new(
-            &context,
-            local_address,
-            request_manager,
-            channels,
-            &storage,
-            bootnode_addresses,
-            connection_frequency,
-        )
-        .await;
 
         // Start a separate thread for the handler.
         task::spawn(async move {
@@ -352,7 +334,7 @@ impl Server {
 
                 // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
                 {
-                    let local_address = connection_manager.local_address();
+                    let local_address = connection_manager.get_local_address().await;
 
                     // If we have disconnected from our sync node,
                     // then set our sync state to idle and find a new sync node.

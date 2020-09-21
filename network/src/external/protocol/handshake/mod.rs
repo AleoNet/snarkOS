@@ -16,6 +16,3 @@
 
 pub mod handshake;
 pub use handshake::*;
-
-pub mod handshakes;
-pub use handshakes::*;
