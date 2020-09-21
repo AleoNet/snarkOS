@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{message::message::Message, message_types::Version, Channel, Handshake, Verack};
+use crate::external::{message::message::Message, message_types::Version, Channel, Handshake, HandshakeStatus, Verack};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -288,6 +288,16 @@ impl RequestManager {
 
         None
     }
+
+    /// Returns the state of the handshake at a peer address.
+    pub async fn get_state(&self, address: SocketAddr) -> Option<HandshakeStatus> {
+        // Acquire the handshake read lock.
+        let handshakes = self.handshakes.read().await;
+        match handshakes.get(&address) {
+            Some(handshake) => Some(handshake.get_state()),
+            None => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -315,29 +325,32 @@ mod tests {
 
             // 2. Local node sends handshake request
             let local_version = Version::new(1u64, 0u32, remote_address, local_address);
-            local_manager.send_connection_request(&local_version).await.unwrap();
+            local_manager.send_connection_request(&local_version).await;
 
             // 5. Check local node handshake state
             let (reader, _) = local_listener.accept().await.unwrap();
             let channel = Channel::new_read_only(reader).unwrap();
-            assert_eq!(HandshakeStatus::Waiting, handshake.get_state(remote_address).unwrap());
+            assert_eq!(
+                HandshakeStatus::Waiting,
+                local_manager.get_state(remote_address).await.unwrap()
+            );
 
             // 6. Local node accepts handshake response
             let (_name, bytes) = channel.read().await.unwrap();
             let verack = Verack::deserialize(bytes).unwrap();
 
-            local_manager.accept_response(remote_address, verack).await.unwrap();
-            assert_eq!(HandshakeStatus::Accepted, handshake.get_state(remote_address).unwrap());
+            local_manager.accept_response(remote_address, verack).await;
+            assert_eq!(
+                HandshakeStatus::Accepted,
+                local_manager.get_state(remote_address).await.unwrap()
+            );
 
             // 7. Local node receives handshake request
             let (_name, bytes) = channel.read().await.unwrap();
             let remote_version = Version::deserialize(bytes).unwrap();
 
             // 8. Local node sends handshake response
-            local_manager
-                .receive_request(remote_version, remote_address)
-                .await
-                .unwrap();
+            local_manager.receive_request(remote_version, remote_address).await;
         });
 
         // 3. Remote node accepts Local node connection
@@ -345,17 +358,22 @@ mod tests {
 
         // 4. Remote node sends handshake response, handshake request
         let (handshake, _, _) = remote_manager
-            .receive_any(1u64, 0u32, local_address, reader)
+            .receive_connection_request(1u64, 0u32, local_address, reader)
             .await
             .unwrap();
-        assert_eq!(HandshakeStatus::Waiting, handshakes.get_state(local_address).unwrap());
+        assert_eq!(
+            HandshakeStatus::Waiting,
+            remote_manager.get_state(local_address).await.unwrap()
+        );
 
         // 9. Local node accepts handshake response
         let (_, bytes) = handshake.channel.read().await.unwrap();
         let verack = Verack::deserialize(bytes).unwrap();
 
-        handshakes.accept_response(local_address, verack).await.unwrap();
-
-        assert_eq!(HandshakeStatus::Accepted, handshakes.get_state(local_address).unwrap())
+        remote_manager.accept_response(local_address, verack).await;
+        assert_eq!(
+            HandshakeStatus::Accepted,
+            remote_manager.get_state(local_address).await.unwrap()
+        )
     }
 }

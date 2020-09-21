@@ -33,24 +33,23 @@ use chrono::Utc;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 
+#[derive(Clone)]
 pub struct ConnectionManager {
-    /// The address of the node.
-    local_address: SocketAddr,
     /// The set of connected and disconnected peers to the node.
     peer_book: Arc<RwLock<PeerBook>>,
+    /// The channels of the peers that the node is connected to.
+    channels: HashMap<SocketAddr, Arc<Channel>>,
     /// The request manager of the node.
     request_manager: RequestManager,
     /// The ledger storage of the node.
     storage: Arc<MerkleTreeLedger>,
-    /// The channels of the peers that the node is connected to.
-    channels: HashMap<SocketAddr, Arc<Channel>>,
     /// TODO (howardwu): Remove this.
-    /// The ping pong manager for the node.
+    /// The ping pong manager of the node.
     ping_pong: Arc<RwLock<PingPongManager>>,
-    /// The minimum number of peers the node should be connected to.
-    minimum_peer_count: u16,
     /// The default bootnode addresses of the network.
     bootnode_addresses: Vec<SocketAddr>,
+    /// The minimum number of peers the node should be connected to.
+    minimum_peer_count: u16,
     /// The frequency that the manager should run the handler.
     connection_frequency: u64,
 
@@ -68,35 +67,40 @@ impl ConnectionManager {
     #[inline]
     pub async fn new(
         context: &Arc<Context>,
-        local_address: SocketAddr,
         request_manager: RequestManager,
         connections: Arc<RwLock<Connections>>,
         storage: &Arc<MerkleTreeLedger>,
         bootnode_addresses: Vec<SocketAddr>,
         connection_frequency: u64,
     ) -> Self {
+        // Load the preliminary local address from context.
+        let preliminary_local_address = context.local_address.read().await;
+
         // Load the peer book from storage.
         let peer_book = PeerBook::load(&storage).unwrap_or_else(|| {
             // If the load fails, either the peer book does not exist,
             // or it has been corrupted (e.g. from a data structure change).
-            let peer_book = PeerBook::new();
+            let local_address = format!("0.0.0.0:{}", preliminary_local_address.port())
+                .parse()
+                .expect("local address");
+            let mut peer_book = PeerBook::new(local_address);
             // Store the new peer book into the database.
             peer_book
                 .store(&storage)
                 .unwrap_or_else(|error| debug!("Failed to store peer book into database {}", error));
             peer_book
         });
+        drop(preliminary_local_address);
 
         // Instantiate a connection manager.
         let connection_manager = Self {
-            local_address,
             peer_book: Arc::new(RwLock::new(peer_book)),
             request_manager,
             storage: storage.clone(),
             channels: HashMap::new(),
             ping_pong: context.pings.clone(),
-            minimum_peer_count: context.min_peers,
             bootnode_addresses,
+            minimum_peer_count: context.min_peers,
             connection_frequency,
 
             tmp_connections: connections,
@@ -121,8 +125,25 @@ impl ConnectionManager {
 
     /// Returns the local address of the node.
     #[inline]
-    pub fn local_address(&self) -> SocketAddr {
-        self.local_address
+    pub async fn get_local_address(&self) -> SocketAddr {
+        // Acquire the peer book reader.
+        let peer_book = self.peer_book.read().await;
+        // Get the local address of the node.
+        let local_address = peer_book.local_address().clone();
+        // Drop the peer book reader.
+        drop(peer_book);
+        local_address
+    }
+
+    /// Updates the local address stored in the `PeerBook`.
+    #[inline]
+    pub async fn set_local_address(&mut self, local_address: SocketAddr) {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Update the local address stored in the peer book.
+        peer_book.set_local_address(local_address);
+        // Drop the peer book write lock.
+        drop(peer_book);
     }
 
     /// Returns the number of peers connected to the node.
@@ -193,12 +214,14 @@ impl ConnectionManager {
         channel
     }
 
+    /// Stores a new channel at the peer address it is connected to.
+    pub fn add_channel(&mut self, channel: &Arc<Channel>) {
+        self.channels.insert(channel.address, channel.clone());
+    }
+
     /// Manages all peer connections and processes updates with all connected peers.
     #[inline]
     pub async fn handler(&self) {
-        // Refresh the internal state of the peer book.
-        self.refresh_peer_book().await;
-
         // If the node is connected to less peers than the minimum required,
         // ask every peer the node is connected to for more peers.
         if self.get_num_connected().await < self.minimum_peer_count {
@@ -218,7 +241,6 @@ impl ConnectionManager {
 
         // Broadcast a `Ping` request to each connected peer.
         self.broadcast_ping_requests().await;
-
         // Broadcast a `Version` request to each connected peer.
         self.broadcast_version_requests().await;
 
@@ -226,32 +248,16 @@ impl ConnectionManager {
         self.store_peer_book().await;
     }
 
-    /// An internal operation to update the internal state of the peer book.
-    #[inline]
-    async fn refresh_peer_book(&self) {
-        // [This is a redundant check for added safety]
-        // Remove the local_address from the peer book
-        // in case the node found itself as a peer.
-        {
-            // Acquire the peer book write lock.
-            let mut peer_book = self.peer_book.write().await;
-            // Forget the local address.
-            peer_book.forget_peer(self.local_address());
-            // Drop the peer book write lock.
-            drop(peer_book);
-        }
-    }
-
     /// An internal operation to write the internal state of the peer book to storage.
     #[inline]
     async fn store_peer_book(&self) {
-        // Acquire the peer book reader.
-        let peer_book = self.peer_book.read().await;
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
         // Store the peer book into the database.
         peer_book
             .store(&self.storage)
             .unwrap_or_else(|error| debug!("Failed to store connected peers in database {}", error));
-        // Drop the peer book reader.
+        // Drop the peer book write lock.
         drop(peer_book);
     }
 
@@ -259,7 +265,7 @@ impl ConnectionManager {
     #[inline]
     async fn broadcast_version_requests(&self) {
         // Get the local address of the node.
-        let local_address = self.local_address();
+        let local_address = self.get_local_address().await;
 
         // Broadcast a `Version` message to each connected peer for a periodic sync.
         if self.get_num_connected().await > 0 {
@@ -344,7 +350,7 @@ impl ConnectionManager {
     #[inline]
     async fn connect_to_all_disconnected_peers(&self) {
         // Get the local address of the node.
-        let local_address = self.local_address();
+        let local_address = self.get_local_address().await;
         // Get the current block height of the node.
         let block_height = self.storage.get_current_block_height();
         // Get the current pending peers of the request manager.
@@ -369,7 +375,7 @@ impl ConnectionManager {
     #[inline]
     async fn connect_to_bootnodes(&self) {
         // Get the local address of the node.
-        let local_address = self.local_address();
+        let local_address = self.get_local_address().await;
         // Get the current block height of the node.
         let block_height = self.storage.get_current_block_height();
         // Get the current connected peers of the node.

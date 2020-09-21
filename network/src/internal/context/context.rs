@@ -71,7 +71,7 @@ impl Context {
         is_miner: bool,
     ) -> Self {
         Self {
-            local_address: RwLock::new(local_address),
+            local_address: RwLock::new(local_address.clone()),
             memory_pool_interval,
             min_peers,
             max_peers,
@@ -79,7 +79,7 @@ impl Context {
             bootnodes,
             is_miner,
             connections: Arc::new(RwLock::new(Connections::new())),
-            peer_book: Arc::new(RwLock::new(PeerBook::new())),
+            peer_book: Arc::new(RwLock::new(PeerBook::new(local_address))),
             pings: Arc::new(RwLock::new(PingPongManager::new())),
         }
     }
