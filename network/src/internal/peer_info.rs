@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 pub enum PeerStatus {
@@ -26,7 +26,7 @@ pub enum PeerStatus {
 }
 
 /// A data structure that contains metadata about a peer.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// The IP address of the peer.
     address: SocketAddr,

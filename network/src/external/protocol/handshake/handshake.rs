@@ -23,7 +23,7 @@ use snarkos_errors::network::HandshakeError;
 use std::{net::SocketAddr, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum HandshakeState {
+pub enum HandshakeStatus {
     Waiting,
     Accepted,
     Rejected,
@@ -42,81 +42,74 @@ pub enum HandshakeState {
 #[derive(Clone, Debug)]
 pub struct Handshake {
     pub channel: Arc<Channel>,
-    pub state: HandshakeState,
+    pub state: HandshakeStatus,
     pub height: u32,
     pub nonce: u64,
 }
 
 impl Handshake {
-    /// Send the initial Version message to a peer
-    pub async fn send_new(local_version: &Version) -> Result<Self, HandshakeError> {
-        // Create temporary write only channel
-        let channel = Arc::new(Channel::new_write_only(local_version.address_receiver).await?);
-
-        // Write Version request
-        channel.write(local_version).await?;
-
+    /// Sends a version message to a remote peer.
+    pub async fn send_new(version: &Version) -> Result<Self, HandshakeError> {
+        // Create a temporary write-only channel.
+        let channel = Arc::new(Channel::new_write_only(version.address_receiver).await?);
+        // Write the version message to the channel.
+        channel.write(version).await?;
         Ok(Self {
             channel,
-            state: HandshakeState::Waiting,
-            height: local_version.height,
-            nonce: local_version.nonce,
+            state: HandshakeStatus::Waiting,
+            height: version.height,
+            nonce: version.nonce,
         })
     }
 
-    /// Receive the initial Version message from a new peer.
-    /// Send a Verack message + Version message
+    /// Receives the first version message from a new remote peer,
+    /// and sends a verack and version message to the remote peer
+    /// to acknowledge the handshake and initiate a full handshake.
     pub async fn receive_new(
         channel: Channel,
         local_version: &Version,
         remote_version: &Version,
     ) -> Result<Handshake, HandshakeError> {
-        // Connect to the address specified in the peer_message
-        let channel = channel.update_writer(local_version.address_receiver).await?;
-
-        // Write Verack response
+        // Connect to the remote address.
+        let remote_address = local_version.address_receiver;
+        let channel = channel.update_writer(remote_address).await?;
+        // Write a verack response to the remote peer.
+        let local_address = local_version.address_sender;
+        let remote_nonce = remote_version.nonce;
         channel
-            .write(&Verack::new(
-                remote_version.nonce,
-                local_version.address_receiver,
-                local_version.address_sender,
-            ))
+            .write(&Verack::new(remote_nonce, remote_address, local_address))
             .await?;
-
-        // Write Version request
+        // Write version request to the remote peer.
         channel.write(local_version).await?;
-
         Ok(Self {
             channel: Arc::new(channel),
-            state: HandshakeState::Waiting,
+            state: HandshakeStatus::Waiting,
             height: local_version.height,
             nonce: local_version.nonce,
         })
     }
 
-    /// Receive the Version message for an existing peer handshake.
-    /// Send a Verack message.
+    /// Receives the version message from a connected peer,
+    /// and sends a verack message to acknowledge back.
     pub async fn receive(&mut self, version: Version) -> Result<(), HandshakeError> {
         // You are the new sender and your peer is the receiver
         let address_receiver = self.channel.address;
         let address_sender = version.address_receiver;
-
         self.channel
             .write(&Verack::new(version.nonce, address_receiver, address_sender))
             .await?;
         Ok(())
     }
 
-    /// Accept the Verack from a peer.
+    /// If the nonce matches, accepts a given verack message from a peer.
+    /// Else, returns a `HandshakeError`.
     pub async fn accept(&mut self, message: Verack) -> Result<(), HandshakeError> {
         if self.nonce != message.nonce {
-            self.state = HandshakeState::Rejected;
-
+            self.state = HandshakeStatus::Rejected;
             return Err(HandshakeError::InvalidNonce(self.nonce, message.nonce));
-        } else if self.state == HandshakeState::Waiting {
-            self.state = HandshakeState::Accepted;
+        } else if self.state == HandshakeStatus::Waiting {
+            self.state = HandshakeStatus::Accepted;
         }
-
         Ok(())
     }
 
@@ -133,7 +126,7 @@ impl Handshake {
     }
 
     /// Returns current handshake state.
-    pub fn get_state(&self) -> HandshakeState {
+    pub fn get_state(&self) -> HandshakeStatus {
         self.state.clone()
     }
 }

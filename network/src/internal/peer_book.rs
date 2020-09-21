@@ -20,12 +20,12 @@ use snarkos_metrics::Metrics;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 
 /// An data structure for tracking and indexing the history of
 /// all connected and disconnected peers to the node.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PeerBook {
     /// A mapping of connected peers.
     connected_peers: HashMap<SocketAddr, PeerInfo>,
@@ -201,6 +201,16 @@ impl PeerBook {
         } else {
             // We cannot forget the peer if we are connected to them.
             false
+        }
+    }
+
+    /// Deserializes and creates the `PeerBook` from storage.
+    /// Returns `Some(peer_book)` on success. Otherwise, returns `None`.
+    #[inline]
+    pub fn load<T: Transaction, P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Option<Self> {
+        match storage.get_peer_book() {
+            Ok(serialized_peer_book) => bincode::deserialize(&serialized_peer_book).ok(),
+            _ => None,
         }
     }
 

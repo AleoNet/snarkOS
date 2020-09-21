@@ -16,8 +16,9 @@
 
 use crate::{
     connection_manager::ConnectionManager,
-    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, GetMemoryPool, Version},
+    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, GetMemoryPool},
     internal::context::Context,
+    RequestManager,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
@@ -26,9 +27,7 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::network::ServerError;
 
-use chrono::{DateTime, Utc};
 use std::{
-    collections::HashMap,
     net::{Shutdown, SocketAddr},
     sync::Arc,
     time::Duration,
@@ -53,11 +52,13 @@ pub struct Server {
     pub connection_frequency: u64,
     pub sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     pub receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+    pub request_manager: RequestManager,
+    pub local_address: SocketAddr,
 }
 
 impl Server {
     /// Constructs a new `Server`.
-    pub fn new(
+    pub async fn new(
         context: Arc<Context>,
         consensus: ConsensusParameters,
         storage: Arc<MerkleTreeLedger>,
@@ -67,6 +68,12 @@ impl Server {
         connection_frequency: u64,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
+        let request_manager = RequestManager::new();
+        let local_address = {
+            let address = context.local_address.read().await;
+            format!("0.0.0.0:{}", address.port()).parse().unwrap()
+        };
+
         Server {
             consensus,
             context,
@@ -77,38 +84,49 @@ impl Server {
             sender,
             sync_handler_lock,
             connection_frequency,
+            request_manager,
+            local_address,
         }
     }
 
+    /// Returns the default bootnode addresses of the network.
+    pub fn get_bootnodes(&self) -> Vec<SocketAddr> {
+        // Initialize the vector to be returned.
+        let mut bootnode_addresses = Vec::with_capacity(self.context.bootnodes.len());
+        // Iterate through and parse the list of bootnode addresses.
+        for bootnode in self.context.bootnodes.iter() {
+            if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
+                bootnode_addresses.push(bootnode_address);
+            }
+        }
+        bootnode_addresses
+    }
+
+    ///
     /// Starts the server event loop.
     ///
     /// 1. Initialize TCP listener at `local_address` and accept new TCP connections.
     /// 2. Spawn a new thread to handle new connections.
     /// 3. Start the connection handler.
-    /// 4. Send a handshake request to all bootnodes.
-    /// 5. Send a handshake request to all stored peers.
     /// 6. Start the message handler.
+    ///
     pub async fn listen(mut self) -> Result<(), ServerError> {
-        // 1. Initialize TCP listener at `local_address` and accept new TCP connections.
-        let (mut listener, local_address) = {
-            let address = self.context.local_address.read().await;
-            let local_address = format!("0.0.0.0:{}", address.port()).parse::<SocketAddr>()?;
-            info!("Starting listener...");
-            debug!("Starting listener at {:?}...", local_address);
-            (TcpListener::bind(&local_address).await?, local_address)
-        };
-        info!("Listening at {:?}", local_address);
+        // TODO (howardwu): Find the actual address of the node.
+        // 1. Initialize TCP listener and accept new TCP connections.
+        debug!("Starting listener at {:?}...", self.local_address);
+        let mut listener = TcpListener::bind(&self.local_address).await?;
+        info!("Listening at {:?}", self.local_address);
 
         // Prepare to spawn the main loop.
         let sender = self.sender.clone();
         let storage = self.storage.clone();
         let context = self.context.clone();
         let sync_handler_lock = self.sync_handler_lock.clone();
+        let mut request_manager = self.request_manager.clone();
 
         // 2. Spawn a new thread to handle new connections.
         let future = async move {
             debug!("Spawning a new thread to handle new connections");
-
             loop {
                 // Listen for new peers.
                 let (reader, remote_address) = match listener.accept().await {
@@ -133,10 +151,11 @@ impl Server {
 
                 // Follow handshake protocol and drop peer connection if unsuccessful.
                 let height = storage.get_current_block_height();
-                let mut handshakes = context.handshakes.write().await; // Acquire the handshake lock
+
                 // TODO (raychu86) Establish a formal node version
-                if let Ok((handshake, discovered_local_address, version_message)) =
-                    handshakes.receive_any(1u64, height, remote_address, reader).await
+                if let Some((handshake, discovered_local_address, version_message)) = request_manager
+                    .receive_connection_request(1u64, height, remote_address, reader)
+                    .await
                 {
                     // Bootstrap discovery of local node IP via VERACK responses
                     {
@@ -190,18 +209,7 @@ impl Server {
         debug!("Starting connection handler");
         self.connection_handler().await;
 
-        // 4. Send handshake request to bootnodes.
-        debug!("Sending handshake request to bootnodes");
-        self.connect_to_bootnodes().await;
-
-        // If the node is a bootnode, do not send requests to stored peers
-        if !self.context.is_bootnode {
-            // 5. Send a handshake request to all stored peers.
-            debug!("Sending handshake request to all stored peers");
-            self.connect_to_peers_from_storage().await;
-        }
-
-        // 6. Start the message handler.
+        // 4. Start the message handler.
         debug!("Starting message handler");
         self.message_handler().await;
 
@@ -304,58 +312,7 @@ impl Server {
         task::spawn(future.instrument(debug_span!("connection", addr = %peer_address)));
     }
 
-    /// Send a handshake request to a node at address without blocking the server listener.
-    fn send_handshake_non_blocking(&self, remote_address: SocketAddr) {
-        let context = self.context.clone();
-        let storage = self.storage.clone();
-
-        let future = async move {
-            let height = storage.get_current_block_height();
-            let version = Version::new(1u64, height, remote_address, *context.local_address.read().await);
-
-            let mut handshakes = context.handshakes.write().await;
-            handshakes.send_request(&version).await.unwrap_or_else(|error| {
-                info!("Failed to connect to {:?}", error);
-            });
-        };
-        task::spawn(future.instrument(debug_span!("handshake", addr = %remote_address)));
-    }
-
-    /// Send a handshake request the first bootnode and store the rest as gossipped peers
-    async fn connect_to_bootnodes(&mut self) {
-        let local_address = *self.context.local_address.read().await;
-        for bootnode in self.context.bootnodes.iter() {
-            if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
-                // This node should not attempt to connect to itself.
-                if local_address != bootnode_address {
-                    info!("Connecting to {:?} (bootnode)...", bootnode_address);
-                    self.send_handshake_non_blocking(bootnode_address);
-                }
-            }
-        }
-    }
-
-    /// Send a handshake request to every peer this server previously connected to.
-    async fn connect_to_peers_from_storage(&mut self) {
-        if let Ok(serialized_peers) = self.storage.get_peer_book() {
-            if let Ok(stored_connected_peers) =
-                bincode::deserialize::<HashMap<SocketAddr, DateTime<Utc>>>(&serialized_peers)
-            {
-                let local_address = *self.context.local_address.read().await;
-                for (saved_address, _old_time) in stored_connected_peers {
-                    // This node should not attempt to connect to itself.
-                    if local_address != saved_address {
-                        info!("Connecting to {:?} (saved peer)...", saved_address);
-                        self.send_handshake_non_blocking(saved_address);
-                    }
-                }
-            }
-        }
-    }
-}
-
-// TODO (howardwu): Untangle this and find its components new homes.
-impl Server {
+    // TODO (howardwu): Untangle this and find its components new homes.
     /// Manages the number of active connections according to the connection frequency.
     /// 1. Get more connected peers if we are under the minimum number specified by the network context.
     ///     1.1 Ask our connected peers for their peers.
@@ -374,9 +331,20 @@ impl Server {
 
         let local_address = *context.local_address.read().await;
         let channels = context.connections.clone();
+        let bootnode_addresses = self.get_bootnodes();
 
-        let connection_manager =
-            ConnectionManager::new(&context, local_address, channels, &storage, connection_frequency);
+        let request_manager = self.request_manager.clone();
+
+        let connection_manager = ConnectionManager::new(
+            &context,
+            local_address,
+            request_manager,
+            channels,
+            &storage,
+            bootnode_addresses,
+            connection_frequency,
+        )
+        .await;
 
         // Start a separate thread for the handler.
         task::spawn(async move {

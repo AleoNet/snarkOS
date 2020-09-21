@@ -26,19 +26,14 @@ use std::net::SocketAddr;
 pub struct Version {
     /// The network version number
     pub version: u64,
-
     /// Latest block number of node sending this message
     pub height: u32,
-
     /// Random nonce sequence number
     pub nonce: u64,
-
     /// Message timestamp
     pub timestamp: i64,
-
     /// Network address of message recipient
     pub address_receiver: SocketAddr,
-
     /// Network address of message sender
     pub address_sender: SocketAddr,
 }

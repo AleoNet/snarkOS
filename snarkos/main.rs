@@ -47,7 +47,17 @@ fn initialize_logger(config: &Config) {
                 2 => std::env::set_var("RUST_LOG", "debug"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
-            env_logger::init();
+
+             // disable undesirable logs
+             let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+
+             // initialize tracing
+             tracing_subscriber::fmt()
+                 .with_env_filter(filter)
+                 .with_target(false)
+                 .init();
+ 
+             println!("{}", render_welcome(&config));
         }
     }
 }
@@ -157,7 +167,8 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         memory_pool_lock.clone(),
         sync_handler_lock.clone(),
         15000, // 15 seconds
-    );
+    )
+    .await;
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
@@ -192,6 +203,14 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::new();
     let config: Config = ConfigCli::parse(&arguments)?;
-    Runtime::new()?.block_on(start_server(config))?;
+    let node_span = debug_span!("node");
+
+    Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .thread_stack_size(4 * 1024 * 1024)
+        .build()?
+        .block_on(start_server(config).instrument(node_span))?;
+
     Ok(())
 }

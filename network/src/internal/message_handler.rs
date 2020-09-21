@@ -173,10 +173,10 @@ impl Server {
                 }
             } else if name == Verack::name() {
                 if let Ok(verack) = Verack::deserialize(bytes) {
-                    if let Err(err) = self.receive_verack(verack, channel.clone()).await {
+                    if !self.receive_verack(verack, channel.clone()).await {
                         error!(
-                            "Message handler errored when receiving a {} message from {}. {}",
-                            name, channel.address, err
+                            "Message handler errored when receiving a {} message from {}",
+                            name, channel.address
                         );
                     }
                 }
@@ -483,16 +483,9 @@ impl Server {
     /// A connected peer has acknowledged a handshake request.
     /// Check if the Verack matches the last handshake message we sent.
     /// Update our peer book and send a request for more peers.
-    async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> Result<(), ServerError> {
-        match self
-            .context
-            .handshakes
-            .write()
-            .await
-            .accept_response(channel.address, message)
-            .await
-        {
-            Ok(()) => {
+    async fn receive_verack(&mut self, message: Verack, channel: Arc<Channel>) -> bool {
+        match self.request_manager.accept_response(channel.address, message).await {
+            true => {
                 // If we received a verack, but aren't connected to the peer,
                 // inform the peer book that we found a peer.
                 // The peer book will determine if we have seen the peer before,
@@ -501,19 +494,14 @@ impl Server {
                 if !peer_book.is_connected(&channel.address) {
                     peer_book.found_peer(&channel.address);
                 }
-
                 // Ask connected peer for more peers.
-                channel.write(&GetPeers).await?;
+                channel.write(&GetPeers).await.is_ok()
             }
-            Err(error) => {
-                let error = ServerError::HandshakeError(error);
-                debug!(
-                    "Invalid Verack message from: {:?} Full error: {:?}",
-                    channel.address, &error
-                );
+            false => {
+                debug!("Received an invalid verack message from {:?}", channel.address);
+                false
             }
         }
-        Ok(())
     }
 
     /// A connected peer has sent handshake request.
@@ -529,12 +517,9 @@ impl Server {
 
         if *self.context.local_address.read().await != peer_address {
             if peer_book.num_connected() < self.context.max_peers {
-                self.context
-                    .handshakes
-                    .write()
-                    .await
+                self.request_manager
                     .receive_request(message.clone(), peer_address)
-                    .await?;
+                    .await;
             }
 
             // If our peer has a longer chain, send a sync message
