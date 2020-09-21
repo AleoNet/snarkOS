@@ -1271,7 +1271,7 @@ checksum = "ecbdaacc17243168d9d1fa6b2bd7556a27e1e60a621d8a2a6e590ae2b145d158"
 dependencies = [
  "failure",
  "futures",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-pubsub",
  "log",
  "serde",
@@ -1284,6 +1284,19 @@ name = "jsonrpc-core"
 version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0747307121ffb9703afd93afbd0fb4f854c38fb873f2c8b90e0e902f27c7b62"
+dependencies = [
+ "futures",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "jsonrpc-core"
+version = "15.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f30b12567a31d48588a65b6cf870081e6ba1d7b2ae353977cb9820d512e69c70"
 dependencies = [
  "futures",
  "log",
@@ -1320,7 +1333,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0da906d682799df05754480dac1b9e70ec92e12c19ebafd2662a5ea1c9fd6522"
 dependencies = [
  "hyper 0.12.35",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-server-utils",
  "log",
  "net2",
@@ -1334,7 +1347,7 @@ version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d44f5602a11d657946aac09357956d2841299ed422035edf140c552cb057986"
 dependencies = [
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "log",
  "parking_lot 0.10.2",
  "rand",
@@ -1349,7 +1362,7 @@ checksum = "56cbfb462e7f902e21121d9f0d1c2b77b2c5b642e1a4e8f4ebfa2e15b94402bb"
 dependencies = [
  "bytes 0.4.12",
  "globset",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "lazy_static",
  "log",
  "tokio 0.1.22",
@@ -1363,7 +1376,7 @@ version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fdbfe280021d220b3392e38b34781647f8268eef6d71564074a870a08404899"
 dependencies = [
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-core-client",
  "jsonrpc-pubsub",
  "log",
@@ -2550,7 +2563,7 @@ dependencies = [
  "bincode",
  "curl",
  "hex",
- "jsonrpc-core",
+ "jsonrpc-core 15.0.0",
  "rocksdb",
  "thiserror",
  "toml",
@@ -2731,7 +2744,7 @@ dependencies = [
  "base64 0.12.3",
  "chrono",
  "hex",
- "jsonrpc-core",
+ "jsonrpc-core 15.0.0",
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpc-http-server",
