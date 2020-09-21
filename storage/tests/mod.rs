@@ -32,7 +32,7 @@ mod test_storage {
     pub fn test_new_blockchain() {
         let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
 
-        assert_eq!(blockchain.get_latest_block_height(), 0);
+        assert_eq!(blockchain.get_current_block_height(), 0);
 
         let _latest_block = blockchain.get_latest_block().unwrap();
 
@@ -43,7 +43,7 @@ mod test_storage {
     pub fn remove_decrements_height() {
         let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
 
-        assert_eq!(blockchain.get_latest_block_height(), 0);
+        assert_eq!(blockchain.get_current_block_height(), 0);
 
         // insert a block
         let block = Block {
@@ -60,11 +60,11 @@ mod test_storage {
         };
 
         blockchain.insert_and_commit(&block).unwrap();
-        assert_eq!(blockchain.get_latest_block_height(), 1);
+        assert_eq!(blockchain.get_current_block_height(), 1);
 
         // removing it decrements the chain's height
         blockchain.remove_latest_block().unwrap();
-        assert_eq!(blockchain.get_latest_block_height(), 0);
+        assert_eq!(blockchain.get_current_block_height(), 0);
 
         kill_storage_sync(blockchain);
     }

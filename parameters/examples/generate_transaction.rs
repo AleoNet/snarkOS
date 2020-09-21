@@ -60,7 +60,7 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
 
     Ok(Ledger {
-        latest_block_height: RwLock::new(0),
+        current_block_height: RwLock::new(0),
         storage: Arc::new(storage),
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,

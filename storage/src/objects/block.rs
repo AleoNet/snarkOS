@@ -23,7 +23,7 @@ use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the latest block in the chain.
     pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
-        self.get_block_from_block_number(self.get_latest_block_height())
+        self.get_block_from_block_number(self.get_current_block_height())
     }
 
     /// Get a block given the block hash.
@@ -36,7 +36,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Get a block given the block number.
     pub fn get_block_from_block_number(&self, block_number: u32) -> Result<Block<T>, StorageError> {
-        if block_number > self.get_latest_block_height() {
+        if block_number > self.get_current_block_height() {
             return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_number)));
         }
 
@@ -146,13 +146,13 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// De-commit the latest block and return its header hash.
     pub fn decommit_latest_block(&self) -> Result<BlockHeaderHash, StorageError> {
-        let latest_block_height = self.get_latest_block_height();
-        if latest_block_height == 0 {
+        let current_block_height = self.get_current_block_height();
+        if current_block_height == 0 {
             return Err(StorageError::InvalidBlockDecommit);
         }
 
-        let update_best_block_num = latest_block_height - 1;
-        let block_hash: BlockHeaderHash = self.get_block_hash(latest_block_height)?;
+        let update_best_block_num = current_block_height - 1;
+        let block_hash: BlockHeaderHash = self.get_block_hash(current_block_height)?;
 
         let mut database_transaction = DatabaseTransaction::new();
 
@@ -217,7 +217,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         database_transaction.push(Op::Delete {
             col: COL_BLOCK_LOCATOR,
-            key: latest_block_height.to_le_bytes().to_vec(),
+            key: current_block_height.to_le_bytes().to_vec(),
         });
 
         database_transaction.push(Op::Delete {
@@ -227,8 +227,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         self.storage.write(database_transaction)?;
 
-        let mut latest_block_height = self.latest_block_height.write();
-        *latest_block_height -= 1;
+        let mut current_block_height = self.current_block_height.write();
+        *current_block_height -= 1;
 
         self.update_merkle_tree()?;
 
@@ -243,9 +243,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Remove the latest `num_blocks` blocks.
     pub fn remove_latest_blocks(&self, num_blocks: u32) -> Result<(), StorageError> {
-        let latest_block_height = self.get_latest_block_height();
-        if num_blocks > latest_block_height {
-            return Err(StorageError::InvalidBlockRemovalNum(num_blocks, latest_block_height));
+        let current_block_height = self.get_current_block_height();
+        if num_blocks > current_block_height {
+            return Err(StorageError::InvalidBlockRemovalNum(num_blocks, current_block_height));
         }
 
         for _ in 0..num_blocks {

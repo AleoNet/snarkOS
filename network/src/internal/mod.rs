@@ -14,14 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod connection_handler;
-pub use connection_handler::*;
-
 pub mod context;
 pub use context::*;
 
 pub mod message_handler;
 pub use message_handler::*;
+
+pub mod peer_book;
+pub use peer_book::*;
+
+pub mod peer_info;
+pub use peer_info::*;
 
 use crate::{external::propagate_transaction, internal::Context};
 use snarkos_consensus::{

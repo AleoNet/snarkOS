@@ -20,7 +20,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Stores connected peers and the channels for reading/writing messages to them.
 pub struct Connections {
-    channels: HashMap<SocketAddr, Arc<Channel>>,
+    pub channels: HashMap<SocketAddr, Arc<Channel>>,
 }
 
 impl Connections {

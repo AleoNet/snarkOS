@@ -18,9 +18,9 @@ mod ping_protocol {
     use snarkos_network::external::{
         message_types::{Ping, Pong},
         Message,
-        PingProtocol,
+        PingPongManager,
+        PingPongWorker,
         PingState,
-        Pings,
     };
     use snarkos_testing::network::{accept_channel, connect_channel, random_socket_address};
 
@@ -48,8 +48,8 @@ mod ping_protocol {
 
             // 4. Peer sends ping request
 
-            let mut pings = Pings::new();
-            pings.send_ping(channel.clone()).await.unwrap();
+            let mut pings = PingPongManager::new();
+            pings.send_ping(&channel).await.unwrap();
             assert_eq!(PingState::Waiting, pings.get_state(local_address).unwrap());
 
             // 7. Peer receives pong response
@@ -74,7 +74,7 @@ mod ping_protocol {
 
         // 6. Server sends pong response
 
-        Pings::send_pong(ping, channel).await.unwrap();
+        PingPongManager::send_pong(ping, channel).await.unwrap();
         rx.await.unwrap();
     }
 
@@ -98,7 +98,7 @@ mod ping_protocol {
 
             // 4. Peer send ping request
 
-            let mut peer_ping = PingProtocol::send(channel.clone()).await.unwrap();
+            let mut peer_ping = PingPongWorker::send(&channel).await.unwrap();
 
             // 5. Peer accepts server pong response
 
@@ -121,7 +121,7 @@ mod ping_protocol {
 
         assert_eq!(Ping::name(), name);
 
-        PingProtocol::receive(Ping::deserialize(bytes).unwrap(), channel)
+        PingPongWorker::receive(Ping::deserialize(bytes).unwrap(), channel)
             .await
             .unwrap();
 

@@ -66,7 +66,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// wrong branches in the caller's canon chain.
     pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
         // Start from the latest block and work backwards
-        let mut index = self.get_latest_block_height();
+        let mut index = self.get_current_block_height();
 
         // Update the step size with each iteration
         let mut step = 1;

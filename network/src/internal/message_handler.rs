@@ -21,7 +21,7 @@ use crate::{
         propagate_block,
         protocol::SyncState,
         Channel,
-        Pings,
+        PingPongManager,
     },
     internal::process_transaction_internal,
     Server,
@@ -315,7 +315,7 @@ impl Server {
 
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = HashMap::new();
-        for (remote_address, peer_info) in peer_book.get_connected().iter() {
+        for (remote_address, peer_info) in peer_book.get_all_connected().iter() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if *remote_address == channel.address {
@@ -377,7 +377,7 @@ impl Server {
             peer_book.found_peer(&channel.address);
         }
 
-        Pings::send_pong(message, channel).await?;
+        PingPongManager::send_pong(message, channel).await?;
         Ok(())
     }
 
@@ -413,7 +413,7 @@ impl Server {
     /// A peer has requested our chain state to sync with.
     async fn receive_get_sync(&mut self, message: GetSync, channel: Arc<Channel>) -> Result<(), ServerError> {
         let latest_shared_hash = self.storage.get_latest_shared_hash(message.block_locator_hashes)?;
-        let current_height = self.storage.get_latest_block_height();
+        let current_height = self.storage.get_current_block_height();
 
         if let Ok(height) = self.storage.get_block_number(&latest_shared_hash) {
             if height < current_height {
@@ -445,7 +445,7 @@ impl Server {
 
     /// A peer has sent us their chain state.
     async fn receive_sync(&mut self, message: Sync) -> Result<(), ServerError> {
-        let height = self.storage.get_latest_block_height();
+        let height = self.storage.get_current_block_height();
         let mut sync_handler = self.sync_handler_lock.lock().await;
 
         sync_handler.receive_hashes(message.block_hashes, height);
@@ -538,7 +538,7 @@ impl Server {
             }
 
             // If our peer has a longer chain, send a sync message
-            if message.height > self.storage.get_latest_block_height() {
+            if message.height > self.storage.get_current_block_height() {
                 debug!("Received a version message with a greater height {}", message.height);
                 // Update the sync node if the sync_handler is Idle and there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {

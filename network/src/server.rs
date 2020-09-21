@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, Version},
+    connection_manager::ConnectionManager,
+    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, GetMemoryPool, Version},
     internal::context::Context,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
@@ -30,11 +31,13 @@ use std::{
     collections::HashMap,
     net::{Shutdown, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, Mutex},
     task,
+    time::delay_for,
 };
 
 /// The main networking component of a node.
@@ -127,7 +130,7 @@ impl Server {
                 }
 
                 // Follow handshake protocol and drop peer connection if unsuccessful.
-                let height = storage.get_latest_block_height();
+                let height = storage.get_current_block_height();
                 let mut handshakes = context.handshakes.write().await; // Acquire the handshake lock
                 // TODO (raychu86) Establish a formal node version
                 if let Ok((handshake, discovered_local_address, version_message)) =
@@ -153,7 +156,7 @@ impl Server {
 
                     if let Some(version) = version_message {
                         // If our peer has a longer chain, send a sync message
-                        if version.height > storage.get_latest_block_height() {
+                        if version.height > storage.get_current_block_height() {
                             // Update the sync node if the sync_handler is Idle
                             if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
                                 if !sync_handler.is_syncing() {
@@ -301,7 +304,7 @@ impl Server {
         let storage = self.storage.clone();
 
         task::spawn(async move {
-            let height = storage.get_latest_block_height();
+            let height = storage.get_current_block_height();
             let version = Version::new(1u64, height, remote_address, *context.local_address.read().await);
 
             let mut handshakes = context.handshakes.write().await;
@@ -342,5 +345,100 @@ impl Server {
                 }
             }
         }
+    }
+}
+
+// TODO (howardwu): Untangle this and find its components new homes.
+impl Server {
+    /// Manages the number of active connections according to the connection frequency.
+    /// 1. Get more connected peers if we are under the minimum number specified by the network context.
+    ///     1.1 Ask our connected peers for their peers.
+    ///     1.2 Ask our gossiped peers to handshake and become connected.
+    /// 2. Maintain connected peers by sending ping messages.
+    /// 3. Purge peers that have not responded in connection_frequency x 5 seconds.
+    /// 4. Reselect a sync node if we purged it.
+    /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
+    /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
+    pub async fn connection_handler(&self) {
+        let context = self.context.clone();
+        let memory_pool_lock = self.memory_pool_lock.clone();
+        let sync_handler_lock = self.sync_handler_lock.clone();
+        let storage = self.storage.clone();
+        let connection_frequency = self.connection_frequency;
+
+        let local_address = *context.local_address.read().await;
+        let channels = context.connections.clone();
+
+        let connection_manager =
+            ConnectionManager::new(&context, local_address, channels, &storage, connection_frequency);
+
+        // Start a separate thread for the handler.
+        task::spawn(async move {
+            let mut interval_ticker: u8 = 0;
+
+            loop {
+                // Wait for connection_frequency seconds in between each loop
+                delay_for(Duration::from_millis(connection_frequency)).await;
+
+                connection_manager.handler().await;
+
+                // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
+                {
+                    let local_address = connection_manager.local_address();
+
+                    // If we have disconnected from our sync node,
+                    // then set our sync state to idle and find a new sync node.
+                    if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                        let peer_book = context.peer_book.read().await;
+                        if peer_book.is_disconnected(&sync_handler.sync_node_address) {
+                            if let Some(peer) = peer_book
+                                .get_all_connected()
+                                .iter()
+                                .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
+                            {
+                                sync_handler.sync_state = SyncState::Idle;
+                                sync_handler.sync_node_address = peer.0.clone();
+                            };
+                        }
+                        drop(peer_book)
+                    }
+
+                    // Update our memory pool after memory_pool_interval frequency loops.
+                    if interval_ticker >= context.memory_pool_interval {
+                        if let Ok(sync_handler) = sync_handler_lock.try_lock() {
+                            // Ask our sync node for more transactions.
+                            if local_address != sync_handler.sync_node_address {
+                                if let Some(channel) =
+                                    connection_manager.get_channel(&sync_handler.sync_node_address).await
+                                {
+                                    if let Err(_) = channel.write(&GetMemoryPool).await {
+                                        // Acquire the peer book write lock.
+                                        let mut peer_book = context.peer_book.write().await;
+                                        peer_book.disconnected_peer(&sync_handler.sync_node_address);
+                                        drop(peer_book);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update the node's memory pool.
+                        let mut memory_pool = match memory_pool_lock.try_lock() {
+                            Ok(memory_pool) => memory_pool,
+                            _ => continue,
+                        };
+                        memory_pool.cleanse(&storage).unwrap_or_else(|error| {
+                            debug!("Failed to cleanse memory pool transactions in database {}", error)
+                        });
+                        memory_pool.store(&storage).unwrap_or_else(|error| {
+                            debug!("Failed to store memory pool transaction in database {}", error)
+                        });
+
+                        interval_ticker = 0;
+                    } else {
+                        interval_ticker += 1;
+                    }
+                }
+            }
+        });
     }
 }
