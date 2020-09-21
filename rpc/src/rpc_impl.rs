@@ -119,7 +119,7 @@ impl RpcFunctions for RpcImpl {
         };
 
         let confirmations = match height {
-            Some(block_height) => self.storage.get_latest_block_height() - block_height,
+            Some(block_height) => self.storage.get_current_block_height() - block_height,
             None => 0,
         };
 
@@ -158,7 +158,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
         self.storage.catch_up_secondary(false)?;
-        let best_block_hash = self.storage.get_block_hash(self.storage.get_latest_block_height())?;
+        let best_block_hash = self.storage.get_block_hash(self.storage.get_current_block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
     }
@@ -307,7 +307,7 @@ impl RpcFunctions for RpcImpl {
 
         let mut peers = vec![];
 
-        for (peer, _last_seen) in peer_book.get_connected() {
+        for (peer, _last_seen) in peer_book.get_all_connected() {
             peers.push(peer.clone());
         }
 
@@ -332,7 +332,7 @@ impl RpcFunctions for RpcImpl {
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         self.storage.catch_up_secondary(false)?;
 
-        let block_height = self.storage.get_latest_block_height();
+        let block_height = self.storage.get_current_block_height();
         let block = self.storage.get_block_from_block_number(block_height)?;
 
         let time = Utc::now().timestamp();

@@ -886,7 +886,7 @@ mod server_message_handler {
                 .pings
                 .write()
                 .await
-                .send_ping(channel_server_side.clone())
+                .send_ping(&channel_server_side)
                 .await
                 .unwrap();
 
@@ -967,7 +967,7 @@ mod server_message_handler {
                 .pings
                 .write()
                 .await
-                .send_ping(channel_server_side.clone())
+                .send_ping(&channel_server_side)
                 .await
                 .unwrap();
 

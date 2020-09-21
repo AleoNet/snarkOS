@@ -118,13 +118,13 @@ impl SyncHandler {
         storage: Arc<Ledger<T, P>>,
     ) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
-            if storage.get_latest_block_height() > height {
+            if storage.get_current_block_height() > height {
                 debug!(
                     "Synced {} Block(s) in {:.2} seconds",
-                    storage.get_latest_block_height() - height,
+                    storage.get_current_block_height() - height,
                     (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
                 );
-                self.update_syncing(storage.get_latest_block_height());
+                self.update_syncing(storage.get_current_block_height());
             }
 
             // Sync up to 3 blocks at once

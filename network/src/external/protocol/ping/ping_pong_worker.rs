@@ -34,21 +34,19 @@ pub enum PingState {
 /// 2. The peer responds with a Pong message.
 /// 3. The server verifies the Pong message and updates the peer's last seen date
 #[derive(Clone, Debug)]
-pub struct PingProtocol {
+pub struct PingPongWorker {
     state: PingState,
-    channel: Arc<Channel>,
     nonce: u64,
 }
 
-impl PingProtocol {
+impl PingPongWorker {
     /// Send the initial ping message to a peer.
-    pub async fn send(channel: Arc<Channel>) -> Result<Self, PingProtocolError> {
+    pub async fn send(channel: &Arc<Channel>) -> Result<Self, PingProtocolError> {
         let message = Ping::new();
         channel.write(&message).await?;
 
         Ok(Self {
             state: PingState::Waiting,
-            channel,
             nonce: message.nonce,
         })
     }
@@ -56,7 +54,6 @@ impl PingProtocol {
     /// Receive the initial ping message from a peer. Respond with a pong.
     pub async fn receive(message: Ping, channel: Arc<Channel>) -> Result<(), PingProtocolError> {
         channel.write(&Pong::new(message)).await?;
-
         Ok(())
     }
 
@@ -64,13 +61,11 @@ impl PingProtocol {
     pub async fn accept(&mut self, message: Pong) -> Result<(), PingProtocolError> {
         if self.nonce != message.nonce {
             self.state = PingState::Rejected;
-
-            return Err(PingProtocolError::InvalidNonce(self.nonce, message.nonce));
+            Err(PingProtocolError::InvalidNonce(self.nonce, message.nonce))
+        } else {
+            self.state = PingState::Accepted;
+            Ok(())
         }
-
-        self.state = PingState::Accepted;
-
-        Ok(())
     }
 
     /// Returns current ping protocol state.

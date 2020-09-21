@@ -28,6 +28,8 @@ extern crate log;
 #[macro_use]
 extern crate snarkos_metrics;
 
+pub mod connection_manager;
+
 pub mod external;
 
 pub mod internal;

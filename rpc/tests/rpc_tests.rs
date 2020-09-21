@@ -362,7 +362,7 @@ mod rpc_tests {
 
         let expected_transactions: Vec<String> = vec![];
 
-        let new_height = storage.get_latest_block_height() + 1;
+        let new_height = storage.get_current_block_height() + 1;
         let block_reward = get_block_reward(new_height);
         let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
 

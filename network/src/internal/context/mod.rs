@@ -19,6 +19,3 @@ pub use connections::*;
 
 pub mod context;
 pub use context::*;
-
-pub mod peer_book;
-pub use peer_book::*;

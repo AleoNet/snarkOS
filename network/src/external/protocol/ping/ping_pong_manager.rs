@@ -17,7 +17,7 @@
 use crate::external::{
     message_types::{Ping, Pong},
     Channel,
-    PingProtocol,
+    PingPongWorker,
     PingState,
 };
 use snarkos_errors::network::PingProtocolError;
@@ -25,28 +25,30 @@ use snarkos_errors::network::PingProtocolError;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Stores connected peers and the latest state of a ping/pong protocol.
-#[derive(Clone, Debug, Default)]
-pub struct Pings {
-    addresses: HashMap<SocketAddr, PingProtocol>,
+#[derive(Clone, Debug)]
+pub struct PingPongManager {
+    addresses: HashMap<SocketAddr, PingPongWorker>,
 }
 
-impl Pings {
+impl PingPongManager {
     /// Construct new store of connected peer `Pings`.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            addresses: HashMap::default(),
+        }
     }
 
     /// Send a ping request to a peer.
     /// Store the result upon success.
-    pub async fn send_ping(&mut self, channel: Arc<Channel>) -> Result<(), PingProtocolError> {
+    pub async fn send_ping(&mut self, channel: &Arc<Channel>) -> Result<(), PingProtocolError> {
         self.addresses
-            .insert(channel.address, PingProtocol::send(channel).await?);
+            .insert(channel.address, PingPongWorker::send(channel).await?);
         Ok(())
     }
 
     /// Send a pong response to a ping request.
     pub async fn send_pong(message: Ping, channel: Arc<Channel>) -> Result<(), PingProtocolError> {
-        PingProtocol::receive(message, channel).await
+        PingPongWorker::receive(message, channel).await
     }
 
     /// Accept a pong response.

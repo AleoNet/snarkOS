@@ -93,7 +93,7 @@ impl Miner {
         }
 
         let (records, tx) = self.consensus.create_coinbase_transaction(
-            storage.get_latest_block_height() + 1,
+            storage.get_current_block_height() + 1,
             transactions,
             parameters,
             program_vk_hash,

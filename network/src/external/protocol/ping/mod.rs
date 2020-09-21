@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod ping;
-pub use ping::*;
+pub mod ping_pong_worker;
+pub use ping_pong_worker::*;
 
-pub mod pings;
-pub use pings::*;
+pub mod ping_pong_manager;
+pub use ping_pong_manager::*;
