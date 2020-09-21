@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{Handshakes, PingPongManager},
+    external::PingPongManager,
     internal::{Connections, PeerBook},
 };
 
@@ -52,9 +52,6 @@ pub struct Context {
     /// Manages connected, gossiped, and disconnected peers
     pub peer_book: Arc<RwLock<PeerBook>>,
 
-    /// Handshakes to make connected peers
-    pub handshakes: Arc<RwLock<Handshakes>>,
-
     /// Connected peer channels for reading/writing messages
     pub connections: Arc<RwLock<Connections>>,
 
@@ -83,7 +80,6 @@ impl Context {
             is_miner,
             connections: Arc::new(RwLock::new(Connections::new())),
             peer_book: Arc::new(RwLock::new(PeerBook::new())),
-            handshakes: Arc::new(RwLock::new(Handshakes::new())),
             pings: Arc::new(RwLock::new(PingPongManager::new())),
         }
     }

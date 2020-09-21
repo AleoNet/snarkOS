@@ -18,7 +18,6 @@ use crate::{
     external::{
         message_types::{GetPeers, Version},
         Channel,
-        Handshakes,
         PingPongManager,
     },
     internal::{
@@ -26,6 +25,7 @@ use crate::{
         PeerBook,
         PeerInfo,
     },
+    RequestManager,
 };
 use snarkos_consensus::MerkleTreeLedger;
 
@@ -38,17 +38,19 @@ pub struct ConnectionManager {
     local_address: SocketAddr,
     /// The set of connected and disconnected peers to the node.
     peer_book: Arc<RwLock<PeerBook>>,
+    /// The request manager of the node.
+    request_manager: RequestManager,
     /// The ledger storage of the node.
     storage: Arc<MerkleTreeLedger>,
     /// The channels of the peers that the node is connected to.
     channels: HashMap<SocketAddr, Arc<Channel>>,
     /// TODO (howardwu): Remove this.
-    /// The handshakes with connected peers
-    handshakes: Arc<RwLock<Handshakes>>,
     /// The ping pong manager for the node.
     ping_pong: Arc<RwLock<PingPongManager>>,
     /// The minimum number of peers the node should be connected to.
     minimum_peer_count: u16,
+    /// The default bootnode addresses of the network.
+    bootnode_addresses: Vec<SocketAddr>,
     /// The frequency that the manager should run the handler.
     connection_frequency: u64,
 
@@ -56,27 +58,65 @@ pub struct ConnectionManager {
 }
 
 impl ConnectionManager {
+    ///
     /// Creates a new instance of a `ConnectionManager`.
+    ///
+    /// Initializes the `ConnectionManager` with the following steps.
+    /// 1. Attempt to connect to all default bootnodes on the network.
+    /// 2. Attempt to connect to all disconnected peers from the stored peer book.
+    ///
     #[inline]
-    pub fn new(
+    pub async fn new(
         context: &Arc<Context>,
         local_address: SocketAddr,
+        request_manager: RequestManager,
         connections: Arc<RwLock<Connections>>,
         storage: &Arc<MerkleTreeLedger>,
+        bootnode_addresses: Vec<SocketAddr>,
         connection_frequency: u64,
     ) -> Self {
-        Self {
+        // Load the peer book from storage.
+        let peer_book = PeerBook::load(&storage).unwrap_or_else(|| {
+            // If the load fails, either the peer book does not exist,
+            // or it has been corrupted (e.g. from a data structure change).
+            let peer_book = PeerBook::new();
+            // Store the new peer book into the database.
+            peer_book
+                .store(&storage)
+                .unwrap_or_else(|error| debug!("Failed to store peer book into database {}", error));
+            peer_book
+        });
+
+        // Instantiate a connection manager.
+        let connection_manager = Self {
             local_address,
-            peer_book: context.peer_book.clone(),
+            peer_book: Arc::new(RwLock::new(peer_book)),
+            request_manager,
             storage: storage.clone(),
             channels: HashMap::new(),
-            handshakes: context.handshakes.clone(),
             ping_pong: context.pings.clone(),
             minimum_peer_count: context.min_peers,
+            bootnode_addresses,
             connection_frequency,
 
             tmp_connections: connections,
+        };
+
+        // Initialize the connection manager.
+        debug!("Initializing the connection manager...");
+        {
+            // 1. Attempt to connect to all default bootnodes on the network.
+            connection_manager.connect_to_bootnodes().await;
+            // 2. Attempt to connect to all disconnected peers from the stored peer book.
+            if !context.is_bootnode {
+                // Only attempt the connection if the node is not a bootnode.
+                connection_manager.connect_to_all_disconnected_peers().await;
+            }
         }
+        // Completed initializing connection manager.
+        debug!("Completed initializing connection manager.");
+
+        connection_manager
     }
 
     /// Returns the local address of the node.
@@ -121,7 +161,8 @@ impl ConnectionManager {
         disconnected_peers
     }
 
-    /// TODO (howardwu): Remove the active channels and handshakes of the peer from this struct.
+    /// TODO (howardwu): Add logic to remove the active channels
+    ///  and handshakes of the peer from this struct.
     /// Disconnects the given address from the node.
     #[inline]
     pub async fn disconnect_from_peer(&self, remote_address: &SocketAddr) -> bool {
@@ -163,8 +204,13 @@ impl ConnectionManager {
         if self.get_num_connected().await < self.minimum_peer_count {
             // Broadcast a `GetPeers` message to request for more peers.
             self.broadcast_getpeers_requests().await;
-            // Attempt a handshake connection with every disconnected peer.
+            // Attempt a connection request with every disconnected peer.
             self.connect_to_all_disconnected_peers().await;
+            // Attempt a connection request with every bootnode peer again.
+            // The goal is to reconnect with any bootnode peers we might
+            // have failed to connect to. The manager will filter attempts
+            // to connect with itself or already connected bootnode peers.
+            self.connect_to_bootnodes().await;
         }
 
         // TODO (howardwu): Unify `Ping` and `Version`requests.
@@ -212,7 +258,7 @@ impl ConnectionManager {
     /// Broadcasts a `Version` message to all connected peers.
     #[inline]
     async fn broadcast_version_requests(&self) {
-        // Get the local address.
+        // Get the local address of the node.
         let local_address = self.local_address();
 
         // Broadcast a `Version` message to each connected peer for a periodic sync.
@@ -222,25 +268,23 @@ impl ConnectionManager {
             // Send a `Version` message to every connected peer of the node.
             for (remote_address, _) in self.get_all_connected().await {
                 if let Some(channel) = self.get_channel(&remote_address).await {
-                    // Acquire the handshakes read lock.
-                    let handshakes = self.handshakes.read().await;
-                    if let Some(handshake) = handshakes.get(&remote_address) {
+                    // Get the handshake nonce.
+                    if let Some(nonce) = self.request_manager.get_handshake_nonce(&remote_address).await {
                         // Send a version message to peers.
                         // If they are behind, they will attempt to sync.
+                        // TODO (raychu86) Establish a formal node version
                         let version = Version::from(
-                            1u64, // TODO (raychu86) Establish a formal node version
+                            1u64,
                             self.storage.get_current_block_height(),
                             remote_address,
                             local_address,
-                            handshake.nonce,
+                            nonce,
                         );
                         // Disconnect from the peer if the version request fails to send.
                         if let Err(_) = channel.write(&version).await {
                             self.disconnect_from_peer(&remote_address).await;
                         }
                     }
-                    // Drop the handshakes read lock.
-                    drop(handshakes);
                 } else {
                     // Disconnect from the peer if there is no active connection channel
                     self.disconnect_from_peer(&remote_address).await;
@@ -296,28 +340,59 @@ impl ConnectionManager {
         }
     }
 
-    /// Attempts a handshake connection with every disconnected peer.
+    /// Attempts a connection request with all disconnected peers.
     #[inline]
     async fn connect_to_all_disconnected_peers(&self) {
-        // Get the local address.
+        // Get the local address of the node.
         let local_address = self.local_address();
-        // Get the current block height.
+        // Get the current block height of the node.
         let block_height = self.storage.get_current_block_height();
+        // Get the current pending peers of the request manager.
+        let pending_peers = self.request_manager.get_pending_addresses().await;
 
-        // Iterate through each connected peer and attempts a handshake request.
+        // Iterate through each connected peer and attempts a connection request.
         for (remote_address, _) in self.get_all_disconnected().await {
-            // Create a version message.
-            // TODO (raychu86) Establish a formal node version
-            let version = Version::new(1u64, block_height, remote_address, local_address);
+            // Ensure the node does not try requesting a duplicate connection.
+            let is_pending = pending_peers.contains(&remote_address);
 
-            // Acquire the handshake write lock.
-            let mut handshakes = self.handshakes.write().await;
-            // Attempt a handshake with the remote address.
-            if let Err(_) = handshakes.send_request(&version).await {
-                debug!("Unable to establish a handshake with peer ({})", remote_address);
+            if !is_pending {
+                // TODO (raychu86) Establish a formal node version
+                // Create a version message.
+                let version = Version::new(1u64, block_height, remote_address, local_address);
+                // Send a connection request with the request manager.
+                self.request_manager.send_connection_request(&version).await;
             }
-            // Drop the handshake write lock.
-            drop(handshakes)
+        }
+    }
+
+    /// Attempts a connection request with all bootnode addresses provided by the network.
+    #[inline]
+    async fn connect_to_bootnodes(&self) {
+        // Get the local address of the node.
+        let local_address = self.local_address();
+        // Get the current block height of the node.
+        let block_height = self.storage.get_current_block_height();
+        // Get the current connected peers of the node.
+        let connected_peers = self.get_all_connected().await;
+        // Get the current pending peers of the request manager.
+        let pending_peers = self.request_manager.get_pending_addresses().await;
+
+        // Iterate through each bootnode address and attempt a connection request.
+        for bootnode_address in self.bootnode_addresses.iter() {
+            // Ensure the node does not try connecting to itself.
+            let is_self = local_address == *bootnode_address;
+            // Ensure the node does not try reconnecting to a connected peer.
+            let is_connected = connected_peers.contains_key(bootnode_address);
+            // Ensure the node does not try requesting a duplicate connection.
+            let is_pending = pending_peers.contains(bootnode_address);
+
+            if !is_self && !is_connected && !is_pending {
+                // TODO (raychu86) Establish a formal node version
+                // Create a version message.
+                let version = Version::new(1u64, block_height, *bootnode_address, local_address);
+                // Send a connection request with the request manager.
+                self.request_manager.send_connection_request(&version).await;
+            }
         }
     }
 }
