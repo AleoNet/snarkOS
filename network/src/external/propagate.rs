@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::{Block, Transaction},
-    internal::context::Context,
-};
+use crate::{external::Block, internal::context::Context};
 use snarkos_errors::network::SendError;
 
 use std::{net::SocketAddr, sync::Arc};
