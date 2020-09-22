@@ -131,9 +131,8 @@ impl Channel {
 
 #[cfg(test)]
 mod tests {
-    use crate::external::message_types::{Ping, Pong};
-
     use super::*;
+    use crate::external::message_types::{Ping, Pong};
     use snarkos_testing::network::{random_socket_address, simulate_active_node};
 
     use serial_test::serial;
@@ -143,16 +142,13 @@ mod tests {
     #[serial]
     async fn test_write() {
         // 1. Start remote node
-
         let remote_address = random_socket_address();
         simulate_active_node(remote_address).await;
 
         // 2. Server connect to peer
-
         let server_channel = Channel::new_write_only(remote_address).await.unwrap();
 
         // 3. Server write message to peer
-
         server_channel.write(&Ping::new()).await.unwrap();
     }
 
@@ -164,21 +160,17 @@ mod tests {
 
         tokio::spawn(async move {
             // 1. Server connects to peer
-
             let server_channel = Channel::new_write_only(remote_address).await.unwrap();
 
             // 2. Server writes ping message
-
             server_channel.write(&Ping::new()).await.unwrap();
         });
 
         // 2. Peer accepts server connection
-
         let (reader, _address) = remote_listener.accept().await.unwrap();
         let peer_channel = Channel::new_read_only(reader).unwrap();
 
         // 4. Peer reads ping message
-
         let (name, bytes) = peer_channel.read().await.unwrap();
 
         assert_eq!(Ping::name(), name);

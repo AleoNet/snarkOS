@@ -17,8 +17,11 @@
 pub mod handshake;
 pub use handshake::*;
 
-pub mod ping;
-pub use ping::*;
+pub mod ping_pong_manager;
+pub use ping_pong_manager::*;
+
+pub mod ping_pong_worker;
+pub use ping_pong_worker::*;
 
 pub mod sync;
 pub use sync::*;
