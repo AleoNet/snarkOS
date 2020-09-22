@@ -155,8 +155,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         memory_pool_lock.clone(),
         sync_handler_lock.clone(),
         15000, // 15 seconds
-    )
-    .await;
+    );
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {

@@ -20,11 +20,7 @@ use crate::{
         Channel,
         PingPongManager,
     },
-    internal::{
-        context::{Connections, Context},
-        PeerBook,
-        PeerInfo,
-    },
+    internal::{context::Context, PeerBook, PeerInfo},
     RequestManager,
 };
 use snarkos_consensus::MerkleTreeLedger;
@@ -52,8 +48,6 @@ pub struct ConnectionManager {
     minimum_peer_count: u16,
     /// The frequency that the manager should run the handler.
     connection_frequency: u64,
-
-    tmp_connections: Arc<RwLock<Connections>>,
 }
 
 impl ConnectionManager {
@@ -68,7 +62,6 @@ impl ConnectionManager {
     pub async fn new(
         context: &Arc<Context>,
         request_manager: RequestManager,
-        connections: Arc<RwLock<Connections>>,
         storage: &Arc<MerkleTreeLedger>,
         bootnode_addresses: Vec<SocketAddr>,
         connection_frequency: u64,
@@ -102,8 +95,6 @@ impl ConnectionManager {
             bootnode_addresses,
             minimum_peer_count: context.min_peers,
             connection_frequency,
-
-            tmp_connections: connections,
         };
 
         // Initialize the connection manager.
@@ -200,18 +191,8 @@ impl ConnectionManager {
     /// Returns `Some(channel)` if the address is a connected peer.
     /// Otherwise, returns `None`.
     #[inline]
-    pub async fn get_channel(&self, remote_address: &SocketAddr) -> Option<Arc<Channel>> {
-        // TODO (howardwu): Remove this logic in favor of the below calling convention.
-        //  This is a temporary solution as part of a much larger refactor.
-        // self.channels.get(remote_address)
-
-        // Acquire the tmp_connections read lock.
-        let tmp_connections = self.tmp_connections.read().await;
-        // Forget the local address.
-        let channel = tmp_connections.get(remote_address);
-        // Drop the tmp_connections read lock.
-        drop(tmp_connections);
-        channel
+    pub async fn get_channel(&self, remote_address: &SocketAddr) -> Option<&Arc<Channel>> {
+        self.channels.get(remote_address)
     }
 
     /// Stores a new channel at the peer address it is connected to.

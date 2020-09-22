@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod connections;
+pub use connections::*;
+
 pub mod context;
 pub use context::*;
-
-pub mod message_handler;
-pub use message_handler::*;
 
 pub mod peer_book;
 pub use peer_book::*;
@@ -26,7 +26,7 @@ pub use peer_book::*;
 pub mod peer_info;
 pub use peer_info::*;
 
-use crate::{external::propagate_transaction, internal::Context};
+use crate::{external::Transaction, internal::Context};
 use snarkos_consensus::{
     memory_pool::{Entry, MemoryPool},
     ConsensusParameters,
@@ -41,6 +41,38 @@ use snarkos_utilities::bytes::FromBytes;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
+
+/// Broadcast transaction to connected peers
+pub async fn propagate_transaction(
+    context: Arc<Context>,
+    transaction_bytes: Vec<u8>,
+    transaction_sender: SocketAddr,
+) -> Result<(), SendError> {
+    debug!("Propagating a transaction to peers");
+
+    let peer_book = context.peer_book.read().await;
+    let local_address = *context.local_address.read().await;
+    let connections = context.connections.read().await;
+    let mut num_peers = 0u16;
+
+    for (socket, _) in peer_book.get_all_connected() {
+        if *socket != transaction_sender && *socket != local_address {
+            if let Some(channel) = connections.get(socket) {
+                match channel.write(&Transaction::new(transaction_bytes.clone())).await {
+                    Ok(_) => num_peers += 1,
+                    Err(error) => warn!(
+                        "Failed to propagate transaction to peer {}. (error message: {})",
+                        channel.address, error
+                    ),
+                }
+            }
+        }
+    }
+
+    debug!("Transaction propagated to {} peers", num_peers);
+
+    Ok(())
+}
 
 /// Verify a transaction, add it to the memory pool, propagate it to peers.
 pub async fn process_transaction_internal(

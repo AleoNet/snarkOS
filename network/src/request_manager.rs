@@ -41,7 +41,7 @@ pub struct RequestManager {
 }
 
 impl RequestManager {
-    /// Creates a new instance of a `ConnectionManager`.
+    /// Creates a new instance of a `RequestManager`.
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -338,7 +338,6 @@ mod tests {
             // 6. Local node accepts handshake response
             let (_name, bytes) = channel.read().await.unwrap();
             let verack = Verack::deserialize(bytes).unwrap();
-
             local_manager.accept_response(remote_address, verack).await;
             assert_eq!(
                 HandshakeStatus::Accepted,
@@ -369,7 +368,6 @@ mod tests {
         // 9. Local node accepts handshake response
         let (_, bytes) = handshake.channel.read().await.unwrap();
         let verack = Verack::deserialize(bytes).unwrap();
-
         remote_manager.accept_response(local_address, verack).await;
         assert_eq!(
             HandshakeStatus::Accepted,
