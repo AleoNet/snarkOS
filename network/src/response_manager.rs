@@ -14,8 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod connections;
-pub use connections::*;
+pub struct ResponseManager {}
 
-pub mod context;
-pub use context::*;
+impl ResponseManager {
+    /// Creates a new instance of a `ResponseManager`.
+    #[inline]
+    pub fn new() -> Self {
+        Self {}
+    }
+}

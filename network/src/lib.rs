@@ -22,8 +22,6 @@
 #![cfg_attr(nightly, feature(doc_cfg, external_doc))]
 #![cfg_attr(nightly, doc(include = "../documentation/concepts/network_server.md"))]
 
-// #[macro_use]
-// extern crate lazy_static;
 #[macro_use]
 extern crate tracing;
 extern crate log;
@@ -38,6 +36,9 @@ pub mod internal;
 
 pub mod request_manager;
 pub use request_manager::*;
+
+pub mod response_manager;
+pub use response_manager::*;
 
 pub mod server;
 pub use server::*;

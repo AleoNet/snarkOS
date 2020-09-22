@@ -52,9 +52,8 @@ pub struct Context {
     /// Manages connected, gossiped, and disconnected peers
     pub peer_book: Arc<RwLock<PeerBook>>,
 
-    /// Connected peer channels for reading/writing messages
+    // /// Connected peer channels for reading/writing messages
     pub connections: Arc<RwLock<Connections>>,
-
     /// Ping/pongs with connected peers
     pub pings: Arc<RwLock<PingPongManager>>,
 }
