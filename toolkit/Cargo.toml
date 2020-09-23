@@ -35,3 +35,6 @@ wasm-bindgen = { version = "0.2.68" }
 criterion = { version = "0.3.1" }
 rand_chacha = { version = "0.2", default-features = false }
 wasm-bindgen-test = { version = "0.3.18" }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
