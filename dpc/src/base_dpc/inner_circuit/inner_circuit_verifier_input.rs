@@ -89,10 +89,7 @@ where
                 .to_field_elements()?,
         );
         v.extend_from_slice(
-            &self
-                .system_parameters
-                .account_encryption
-                .parameters()
+            &<C::AccountEncryption as EncryptionScheme>::parameters(&self.system_parameters.account_encryption)
                 .to_field_elements()?,
         );
         v.extend_from_slice(

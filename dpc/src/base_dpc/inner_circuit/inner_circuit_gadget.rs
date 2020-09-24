@@ -287,7 +287,11 @@ where
 
         let account_encryption_parameters = AccountEncryptionGadget::ParametersGadget::alloc_input(
             &mut cs.ns(|| "Declare account encryption parameters"),
-            || Ok(system_parameters.account_encryption.parameters()),
+            || {
+                Ok(<C::AccountEncryption as EncryptionScheme>::parameters(
+                    &system_parameters.account_encryption,
+                ))
+            },
         )?;
 
         let account_signature_parameters = AccountSignatureGadget::ParametersGadget::alloc_input(

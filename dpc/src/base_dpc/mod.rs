@@ -201,7 +201,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         end_timer!(time);
 
         let time = start_timer!(|| "Account encryption scheme setup");
-        let account_encryption = Components::AccountEncryption::setup(rng);
+        let account_encryption = <Components::AccountEncryption as EncryptionScheme>::setup(rng);
         end_timer!(time);
 
         let time = start_timer!(|| "Account signature setup");

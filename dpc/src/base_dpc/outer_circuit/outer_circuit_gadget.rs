@@ -157,9 +157,10 @@ where
         ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_commitment.parameters())
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let account_encryption_parameters_fe =
-        ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_encryption.parameters())
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
+    let account_encryption_parameters_fe = ToConstraintField::<C::InnerField>::to_field_elements(
+        <C::AccountEncryption as EncryptionScheme>::parameters(&system_parameters.account_encryption),
+    )
+    .map_err(|_| SynthesisError::AssignmentMissing)?;
 
     let account_signature_fe =
         ToConstraintField::<C::InnerField>::to_field_elements(system_parameters.account_signature.parameters())
