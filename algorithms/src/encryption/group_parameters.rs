@@ -30,6 +30,7 @@ use std::io::{Read, Result as IoResult, Write};
 )]
 pub struct GroupEncryptionParameters<G: Group> {
     pub generator_powers: Vec<G>,
+    pub salt: [u8; 32],
 }
 
 impl<G: Group> GroupEncryptionParameters<G> {
@@ -39,6 +40,7 @@ impl<G: Group> GroupEncryptionParameters<G> {
         let num_powers = (private_key_size_in_bits + 63) & !63usize;
         Self {
             generator_powers: Self::generator(num_powers, rng),
+            salt: rng.gen(),
         }
     }
 
@@ -59,7 +61,7 @@ impl<G: Group> ToBytes for GroupEncryptionParameters<G> {
         for g in &self.generator_powers {
             g.write(&mut writer)?;
         }
-        Ok(())
+        self.salt.write(&mut writer)
     }
 }
 
@@ -73,7 +75,9 @@ impl<G: Group> FromBytes for GroupEncryptionParameters<G> {
             generator_powers.push(g);
         }
 
-        Ok(Self { generator_powers })
+        let salt: [u8; 32] = FromBytes::read(&mut reader)?;
+
+        Ok(Self { generator_powers, salt })
     }
 }
 
