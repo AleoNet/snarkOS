@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::algorithms::SignatureScheme;
 use snarkos_errors::algorithms::EncryptionError;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -23,7 +24,7 @@ use snarkos_utilities::{
 use rand::Rng;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Parameters> {
+pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Parameters> + SignatureScheme {
     type Parameters: Clone + Debug + Eq + ToBytes + FromBytes;
     type PrivateKey: Clone + Debug + Default + Eq + Hash + ToBytes + FromBytes + UniformRand;
     type PublicKey: Clone + Debug + Default + Eq + ToBytes + FromBytes;
@@ -33,37 +34,40 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
 
     fn setup<R: Rng>(rng: &mut R) -> Self;
 
-    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> Self::PrivateKey;
+    fn generate_private_key<R: Rng>(&self, rng: &mut R) -> <Self as EncryptionScheme>::PrivateKey;
 
-    fn generate_public_key(&self, private_key: &Self::PrivateKey) -> Result<Self::PublicKey, EncryptionError>;
+    fn generate_public_key(
+        &self,
+        private_key: &<Self as EncryptionScheme>::PrivateKey,
+    ) -> Result<<Self as EncryptionScheme>::PublicKey, EncryptionError>;
 
     fn generate_randomness<R: Rng>(
         &self,
-        public_key: &Self::PublicKey,
+        public_key: &<Self as EncryptionScheme>::PublicKey,
         rng: &mut R,
     ) -> Result<Self::Randomness, EncryptionError>;
 
     fn generate_blinding_exponents(
         &self,
-        public_key: &Self::PublicKey,
+        public_key: &<Self as EncryptionScheme>::PublicKey,
         randomness: &Self::Randomness,
         message_length: usize,
     ) -> Result<Vec<Self::BlindingExponent>, EncryptionError>;
 
     fn encrypt(
         &self,
-        public_key: &Self::PublicKey,
+        public_key: &<Self as EncryptionScheme>::PublicKey,
         randomness: &Self::Randomness,
         message: &Vec<Self::Text>,
     ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn decrypt(
         &self,
-        private_key: &Self::PrivateKey,
+        private_key: &<Self as EncryptionScheme>::PrivateKey,
         ciphertext: &Vec<Self::Text>,
     ) -> Result<Vec<Self::Text>, EncryptionError>;
 
-    fn parameters(&self) -> &Self::Parameters;
+    fn parameters(&self) -> &<Self as EncryptionScheme>::Parameters;
 
     fn private_key_size_in_bits() -> usize;
 }

@@ -27,9 +27,18 @@ use snarkos_errors::gadgets::SynthesisError;
 use std::fmt::Debug;
 
 pub trait EncryptionGadget<E: EncryptionScheme, F: Field> {
-    type ParametersGadget: AllocGadget<E::Parameters, F> + Clone;
-    type PrivateKeyGadget: AllocGadget<E::PrivateKey, F> + ToBytesGadget<F> + Clone + Sized + Debug;
-    type PublicKeyGadget: AllocGadget<E::PublicKey, F> + EqGadget<F> + ToBytesGadget<F> + Clone + Sized + Debug;
+    type ParametersGadget: AllocGadget<<E as EncryptionScheme>::Parameters, F> + Clone;
+    type PrivateKeyGadget: AllocGadget<<E as EncryptionScheme>::PrivateKey, F>
+        + ToBytesGadget<F>
+        + Clone
+        + Sized
+        + Debug;
+    type PublicKeyGadget: AllocGadget<<E as EncryptionScheme>::PublicKey, F>
+        + EqGadget<F>
+        + ToBytesGadget<F>
+        + Clone
+        + Sized
+        + Debug;
     type CiphertextGadget: AllocGadget<Vec<E::Text>, F> + ToBytesGadget<F> + EqGadget<F> + Clone + Sized + Debug;
     type PlaintextGadget: AllocGadget<Vec<E::Text>, F> + EqGadget<F> + Clone + Sized + Debug;
     type RandomnessGadget: AllocGadget<E::Randomness, F> + Clone + Sized + Debug;
