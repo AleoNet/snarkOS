@@ -367,6 +367,7 @@ impl<'a, 'b, F: PrimeField> Mul<&'a DensePolynomial<F>> for &'b DensePolynomial<
     type Output = DensePolynomial<F>;
 
     #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, other: &'a DensePolynomial<F>) -> DensePolynomial<F> {
         if self.is_zero() || other.is_zero() {
             DensePolynomial::zero()

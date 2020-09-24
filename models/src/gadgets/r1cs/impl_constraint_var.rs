@@ -289,6 +289,7 @@ impl<'a, F: Field> Sub<(F, &'a Self)> for ConstraintVar<F> {
     type Output = Self;
 
     #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, (coeff, other): (F, &'a Self)) -> Self {
         let mut lc = match self {
             LC(lc2) => lc2,

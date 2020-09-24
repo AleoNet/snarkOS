@@ -357,6 +357,7 @@ impl<F: Field> Sub<LinearCombination<F>> for LinearCombination<F> {
 impl<F: Field> Add<(F, &LinearCombination<F>)> for &LinearCombination<F> {
     type Output = LinearCombination<F>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, other): (F, &LinearCombination<F>)) -> LinearCombination<F> {
         if other.0.is_empty() {
             return self.clone();
@@ -377,6 +378,7 @@ impl<F: Field> Add<(F, &LinearCombination<F>)> for &LinearCombination<F> {
 impl<'a, F: Field> Add<(F, &'a LinearCombination<F>)> for LinearCombination<F> {
     type Output = LinearCombination<F>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, other): (F, &'a LinearCombination<F>)) -> LinearCombination<F> {
         if other.0.is_empty() {
             return self;
@@ -397,6 +399,7 @@ impl<'a, F: Field> Add<(F, &'a LinearCombination<F>)> for LinearCombination<F> {
 impl<F: Field> Add<(F, LinearCombination<F>)> for &LinearCombination<F> {
     type Output = LinearCombination<F>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, mut other): (F, LinearCombination<F>)) -> LinearCombination<F> {
         if other.0.is_empty() {
             return self.clone();
@@ -416,6 +419,7 @@ impl<F: Field> Add<(F, LinearCombination<F>)> for &LinearCombination<F> {
 impl<F: Field> Add<(F, Self)> for LinearCombination<F> {
     type Output = Self;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, other): (F, Self)) -> Self {
         if other.0.is_empty() {
             return self;
