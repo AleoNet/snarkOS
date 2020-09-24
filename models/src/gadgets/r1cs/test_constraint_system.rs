@@ -215,7 +215,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn().into();
         let path = compute_path(&self.current_namespace, name.clone());
-        self.set_named_obj(path.clone(), NamedObject::Namespace);
+        self.set_named_obj(path, NamedObject::Namespace);
         self.current_namespace.push(name);
     }
 
