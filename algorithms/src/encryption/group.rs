@@ -81,17 +81,20 @@ impl<G: Group + ProjectiveCurve + CanonicalSerialize + CanonicalDeserialize> Def
 
 #[derive(Derivative)]
 #[derivative(
-    Clone(bound = "G: Group, D: Digest"),
-    Debug(bound = "G: Group, D: Digest"),
-    PartialEq(bound = "G: Group, D: Digest"),
-    Eq(bound = "G: Group, D: Digest")
+    Clone(bound = "G: Group, SG: Group, D: Digest"),
+    Debug(bound = "G: Group, SG: Group, D: Digest"),
+    PartialEq(bound = "G: Group, SG: Group, D: Digest"),
+    Eq(bound = "G: Group, SG: Group, D: Digest")
 )]
-pub struct GroupEncryption<G: Group + ProjectiveCurve, D: Digest> {
+pub struct GroupEncryption<G: Group + ProjectiveCurve, SG: Group, D: Digest> {
     pub parameters: GroupEncryptionParameters<G>,
+    pub _signature_group: PhantomData<SG>,
     pub _hash: PhantomData<D>,
 }
 
-impl<G: Group + ProjectiveCurve, D: Digest + Send + Sync> EncryptionScheme for GroupEncryption<G, D> {
+impl<G: Group + ProjectiveCurve, SG: Group + CanonicalSerialize + CanonicalDeserialize, D: Digest + Send + Sync>
+    EncryptionScheme for GroupEncryption<G, SG, D>
+{
     type BlindingExponent = <G as Group>::ScalarField;
     type Parameters = GroupEncryptionParameters<G>;
     type PrivateKey = <G as Group>::ScalarField;
@@ -105,6 +108,7 @@ impl<G: Group + ProjectiveCurve, D: Digest + Send + Sync> EncryptionScheme for G
                 rng,
                 <Self as EncryptionScheme>::PrivateKey::size_in_bits(),
             ),
+            _signature_group: PhantomData,
             _hash: PhantomData,
         }
     }
@@ -271,10 +275,13 @@ impl<G: Group + ProjectiveCurve, D: Digest + Send + Sync> EncryptionScheme for G
     }
 }
 
-impl<G: Group + ProjectiveCurve, D: Digest> From<GroupEncryptionParameters<G>> for GroupEncryption<G, D> {
+impl<G: Group + ProjectiveCurve, SG: Group, D: Digest> From<GroupEncryptionParameters<G>>
+    for GroupEncryption<G, SG, D>
+{
     fn from(parameters: GroupEncryptionParameters<G>) -> Self {
         Self {
             parameters,
+            _signature_group: PhantomData,
             _hash: PhantomData,
         }
     }

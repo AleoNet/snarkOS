@@ -15,17 +15,18 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::encryption::GroupEncryption;
-use snarkos_curves::edwards_bls12::EdwardsProjective;
+use snarkos_curves::edwards_bls12::{EdwardsAffine, EdwardsProjective};
 use snarkos_models::{
     algorithms::EncryptionScheme,
     curves::{Group, ProjectiveCurve},
 };
 use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 
+use blake2::Blake2s;
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-type TestEncryptionScheme = GroupEncryption<EdwardsProjective>;
+type TestEncryptionScheme = GroupEncryption<EdwardsProjective, EdwardsAffine, Blake2s>;
 
 pub const ITERATIONS: usize = 1000;
 

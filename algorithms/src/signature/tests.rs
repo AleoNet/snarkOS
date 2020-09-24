@@ -14,8 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::signature::SchnorrSignature;
-use snarkos_curves::edwards_sw6::EdwardsAffine as Edwards;
+use crate::{encryption::GroupEncryption, signature::SchnorrSignature};
+use snarkos_curves::{
+    edwards_bls12::{EdwardsAffine, EdwardsProjective},
+    edwards_sw6::EdwardsAffine as Edwards,
+};
 use snarkos_models::{algorithms::SignatureScheme, curves::Group};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -28,6 +31,7 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 
 type TestSignature = SchnorrSignature<Edwards, Blake2s>;
+type TestGroupEncryptionSignature = GroupEncryption<EdwardsProjective, EdwardsAffine, Blake2s>;
 
 fn sign_and_verify<S: SignatureScheme>(message: &[u8]) {
     let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
@@ -90,4 +94,16 @@ fn schnorr_signature_test() {
 #[test]
 fn schnorr_signature_scheme_parameters_serialization() {
     signature_scheme_parameter_serialization::<TestSignature>();
+}
+
+#[test]
+fn group_encryption_schnorr_signature_test() {
+    let message = "Hi, I am a Schnorr signature!";
+    sign_and_verify::<TestGroupEncryptionSignature>(message.as_bytes());
+    failed_verification::<TestGroupEncryptionSignature>(message.as_bytes(), "Bad message".as_bytes());
+}
+
+#[test]
+fn group_encryption_schnorr_signature_scheme_parameters_serialization() {
+    signature_scheme_parameter_serialization::<TestGroupEncryptionSignature>();
 }

@@ -23,16 +23,28 @@ use snarkos_models::{
     algorithms::{EncryptionScheme, SignatureScheme},
     curves::{Group, PrimeField, ProjectiveCurve},
 };
-use snarkos_utilities::serialize::*;
+use snarkos_utilities::{serialize::*, to_bytes, FromBytes, ToBytes};
 
 use digest::Digest;
 use rand::Rng;
 use std::{hash::Hash, marker::PhantomData};
 
-impl<G: Group + ProjectiveCurve, D: Digest> From<GroupEncryptionParameters<G>> for SchnorrSignature<G, D> {
+/// Map the encryption group into the signature group
+fn into_signature_group<G: Group + ProjectiveCurve, SG: Group>(projective: G) -> SG {
+    let bytes = to_bytes![&projective.into_affine()].expect("failed to convert to bytes");
+    FromBytes::read(&bytes[..]).expect("failed to convert to signature group")
+}
+
+impl<G: Group + ProjectiveCurve, SG: Group, D: Digest> From<GroupEncryptionParameters<G>> for SchnorrSignature<SG, D> {
     fn from(parameters: GroupEncryptionParameters<G>) -> Self {
+        let generator_powers: Vec<SG> = parameters
+            .generator_powers
+            .iter()
+            .map(|p| into_signature_group(*p))
+            .collect();
+
         let parameters = SchnorrParameters {
-            generator_powers: parameters.generator_powers,
+            generator_powers,
             salt: parameters.salt,
             _hash: PhantomData,
         };
@@ -41,24 +53,20 @@ impl<G: Group + ProjectiveCurve, D: Digest> From<GroupEncryptionParameters<G>> f
     }
 }
 
-impl<G: Group + ProjectiveCurve> From<GroupEncryptionPublicKey<G>> for SchnorrPublicKey<G> {
+impl<G: Group + ProjectiveCurve, SG: Group + CanonicalSerialize + CanonicalDeserialize>
+    From<GroupEncryptionPublicKey<G>> for SchnorrPublicKey<SG>
+{
     fn from(public_key: GroupEncryptionPublicKey<G>) -> Self {
-        Self(public_key.0)
+        Self(into_signature_group(public_key.0))
     }
 }
 
-impl<G: Group + ProjectiveCurve> From<SchnorrPublicKey<G>> for GroupEncryptionPublicKey<G> {
-    fn from(public_key: SchnorrPublicKey<G>) -> Self {
-        Self(public_key.0)
-    }
-}
-
-impl<G: Group + ProjectiveCurve + Hash + CanonicalSerialize + CanonicalDeserialize, D: Digest + Send + Sync>
-    SignatureScheme for GroupEncryption<G, D>
+impl<G: Group + ProjectiveCurve, SG: Group + Hash + CanonicalSerialize + CanonicalDeserialize, D: Digest + Send + Sync>
+    SignatureScheme for GroupEncryption<G, SG, D>
 where
     <G as Group>::ScalarField: PrimeField,
 {
-    type Output = SchnorrOutput<G>;
+    type Output = SchnorrOutput<SG>;
     type Parameters = GroupEncryptionParameters<G>;
     type PrivateKey = <G as Group>::ScalarField;
     type PublicKey = GroupEncryptionPublicKey<G>;
@@ -85,9 +93,10 @@ where
         message: &[u8],
         rng: &mut R,
     ) -> Result<Self::Output, SignatureError> {
-        let schnorr_signature: SchnorrSignature<G, D> = self.parameters.clone().into();
+        let schnorr_signature: SchnorrSignature<SG, D> = self.parameters.clone().into();
+        let private_key = <SG as Group>::ScalarField::read(&to_bytes![private_key]?[..])?;
 
-        Ok(schnorr_signature.sign(private_key, message, rng)?)
+        Ok(schnorr_signature.sign(&private_key, message, rng)?)
     }
 
     fn verify(
@@ -96,28 +105,25 @@ where
         message: &[u8],
         signature: &Self::Output,
     ) -> Result<bool, SignatureError> {
-        let schnorr_signature: SchnorrSignature<G, D> = self.parameters.clone().into();
-        let schnorr_public_key: SchnorrPublicKey<G> = public_key.clone().into();
+        let schnorr_signature: SchnorrSignature<SG, D> = self.parameters.clone().into();
+        let schnorr_public_key: SchnorrPublicKey<SG> = (*public_key).into();
 
         Ok(schnorr_signature.verify(&schnorr_public_key, message, signature)?)
     }
 
     fn randomize_public_key(
         &self,
-        public_key: &Self::PublicKey,
-        randomness: &[u8],
+        _public_key: &Self::PublicKey,
+        _randomness: &[u8],
     ) -> Result<Self::PublicKey, SignatureError> {
-        let schnorr_signature: SchnorrSignature<G, D> = self.parameters.clone().into();
-        let schnorr_public_key: SchnorrPublicKey<G> = public_key.clone().into();
-
-        Ok(schnorr_signature
-            .randomize_public_key(&schnorr_public_key, randomness)?
-            .into())
+        unimplemented!()
     }
 
-    fn randomize_signature(&self, signature: &Self::Output, randomness: &[u8]) -> Result<Self::Output, SignatureError> {
-        let schnorr_signature: SchnorrSignature<G, D> = self.parameters.clone().into();
-
-        Ok(schnorr_signature.randomize_signature(&signature, randomness)?)
+    fn randomize_signature(
+        &self,
+        _signature: &Self::Output,
+        _randomness: &[u8],
+    ) -> Result<Self::Output, SignatureError> {
+        unimplemented!()
     }
 }
