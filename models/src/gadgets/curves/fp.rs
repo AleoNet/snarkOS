@@ -270,7 +270,7 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
 
 impl<F: PrimeField> PartialEq for FpGadget<F> {
     fn eq(&self, other: &Self) -> bool {
-        !self.value.is_none() && !other.value.is_none() && self.value == other.value
+        self.value.is_some() && other.value.is_some() && self.value == other.value
     }
 }
 
