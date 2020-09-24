@@ -68,6 +68,7 @@ impl<P: Fp832Parameters> Fp832<P> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn mont_reduce(
         &mut self,
         r0: u64,

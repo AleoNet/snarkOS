@@ -41,6 +41,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
     /// Returns the execution context required for program snark and DPC transaction generation.
+    #[allow(clippy::too_many_arguments)]
     fn execute_offline<R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],

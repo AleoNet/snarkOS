@@ -69,6 +69,7 @@ impl<P: Fp256Parameters> Fp256<P> {
     }
 
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     fn mont_reduce(
         &mut self,
         r0: u64,
