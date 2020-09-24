@@ -430,6 +430,7 @@ impl<'a, P: Fp12Parameters> SubAssign<&'a Self> for Fp12<P> {
 
 impl<'a, P: Fp12Parameters> MulAssign<&'a Self> for Fp12<P> {
     #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn mul_assign(&mut self, other: &Self) {
         let v0 = self.c0 * &other.c0;
         let v1 = self.c1 * &other.c1;

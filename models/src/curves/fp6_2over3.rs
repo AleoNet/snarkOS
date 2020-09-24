@@ -454,6 +454,7 @@ impl<'a, P: Fp6Parameters> SubAssign<&'a Self> for Fp6<P> {
 
 impl<'a, P: Fp6Parameters> MulAssign<&'a Self> for Fp6<P> {
     #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn mul_assign(&mut self, other: &Self) {
         // Devegili OhEig Scott Dahab --- Multiplication and Squaring on
         // Pairing-Friendly

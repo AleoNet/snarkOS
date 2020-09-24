@@ -641,6 +641,7 @@ impl<'a, P: Parameters> Add<&'a Self> for GroupProjective<P> {
 
 impl<'a, P: Parameters> AddAssign<&'a Self> for GroupProjective<P> {
     #[allow(clippy::many_single_char_names)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, other: &'a Self) {
         if self.is_zero() {
             *self = *other;

@@ -228,6 +228,7 @@ impl<'a, 'b, F: Field> AddAssign<&'a DensePolynomial<F>> for DensePolynomial<F> 
 }
 
 impl<'a, 'b, F: Field> AddAssign<(F, &'a DensePolynomial<F>)> for DensePolynomial<F> {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, (f, other): (F, &'a DensePolynomial<F>)) {
         if self.is_zero() {
             self.coeffs.truncate(0);
