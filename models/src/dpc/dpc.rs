@@ -73,7 +73,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     /// Returns true iff all the transactions in the block are valid according to the ledger.
     fn verify_transactions(
         parameters: &Self::Parameters,
-        block: &Vec<Self::Transaction>,
+        block: &[Self::Transaction],
         ledger: &L,
     ) -> Result<bool, DPCError>;
 }

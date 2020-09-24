@@ -992,7 +992,7 @@ where
     /// Returns true iff all the transactions in the block are valid according to the ledger.
     fn verify_transactions(
         parameters: &Self::Parameters,
-        transactions: &Vec<Self::Transaction>,
+        transactions: &[Self::Transaction],
         ledger: &L,
     ) -> Result<bool, DPCError> {
         for transaction in transactions {
