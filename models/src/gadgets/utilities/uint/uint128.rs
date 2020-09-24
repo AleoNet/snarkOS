@@ -241,7 +241,7 @@ impl UInt for UInt128 {
                             lc = lc - (coeff, bit.get_variable());
                         } else {
                             // Add coeff * bit_gadget
-                            lc = lc + (coeff, bit.get_variable());
+                            lc += (coeff, bit.get_variable());
                         }
                     }
                     Boolean::Not(ref bit) => {
@@ -260,7 +260,7 @@ impl UInt for UInt128 {
                             if op.negated {
                                 lc = lc - (coeff, CS::one());
                             } else {
-                                lc = lc + (coeff, CS::one());
+                                lc += (coeff, CS::one());
                             }
                         }
                     }

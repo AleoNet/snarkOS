@@ -352,7 +352,7 @@ impl<F: PrimeField> ToBitsGadget<F> for FpGadget<F> {
         let mut coeff = F::one();
 
         for bit in bits.iter().rev() {
-            lc = lc + (coeff, bit.get_variable());
+            lc += (coeff, bit.get_variable());
 
             coeff.double_in_place();
         }
@@ -391,7 +391,7 @@ impl<F: PrimeField> ToBytesGadget<F> for FpGadget<F> {
         for bit in bytes.iter().flat_map(|byte_gadget| byte_gadget.bits.clone()) {
             match bit {
                 Boolean::Is(bit) => {
-                    lc = lc + (coeff, bit.get_variable());
+                    lc += (coeff, bit.get_variable());
                     coeff.double_in_place();
                 }
                 Boolean::Constant(_) | Boolean::Not(_) => unreachable!(),

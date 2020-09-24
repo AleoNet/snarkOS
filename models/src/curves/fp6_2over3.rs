@@ -171,9 +171,9 @@ impl<P: Fp6Parameters> Fp6<P> {
                 found_nonzero = true;
 
                 if value > 0 {
-                    res = res * self;
+                    res *= self;
                 } else {
-                    res = res * &self_inverse;
+                    res *= &self_inverse;
                 }
             }
         }
