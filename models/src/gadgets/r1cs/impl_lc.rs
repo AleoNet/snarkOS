@@ -84,7 +84,7 @@ impl<F: Field> LinearCombination<F> {
                     found_index += 1;
                 }
             }
-            return Err(found_index);
+            Err(found_index)
         } else {
             self.0.binary_search_by_key(search_var, |&(cur_var, _)| cur_var)
         }

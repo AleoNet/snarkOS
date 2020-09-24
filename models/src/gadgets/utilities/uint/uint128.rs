@@ -389,7 +389,7 @@ impl UInt for UInt128 {
             (_, _) => {
                 // If either of our operands have unknown value, we won't
                 // know the value of the result
-                return Err(SynthesisError::AssignmentMissing);
+                Err(SynthesisError::AssignmentMissing)
             }
         }
     }
