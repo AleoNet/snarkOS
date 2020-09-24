@@ -47,6 +47,12 @@ impl<G: Group + ProjectiveCurve> From<GroupEncryptionPublicKey<G>> for SchnorrPu
     }
 }
 
+impl<G: Group + ProjectiveCurve> From<SchnorrPublicKey<G>> for GroupEncryptionPublicKey<G> {
+    fn from(public_key: SchnorrPublicKey<G>) -> Self {
+        Self(public_key.0)
+    }
+}
+
 impl<G: Group + ProjectiveCurve + Hash + CanonicalSerialize + CanonicalDeserialize, D: Digest + Send + Sync>
     SignatureScheme for GroupEncryption<G, D>
 where
@@ -98,17 +104,20 @@ where
 
     fn randomize_public_key(
         &self,
-        _public_key: &Self::PublicKey,
-        _randomness: &[u8],
+        public_key: &Self::PublicKey,
+        randomness: &[u8],
     ) -> Result<Self::PublicKey, SignatureError> {
-        unimplemented!()
+        let schnorr_signature: SchnorrSignature<G, D> = self.parameters.clone().into();
+        let schnorr_public_key: SchnorrPublicKey<G> = public_key.clone().into();
+
+        Ok(schnorr_signature
+            .randomize_public_key(&schnorr_public_key, randomness)?
+            .into())
     }
 
-    fn randomize_signature(
-        &self,
-        _signature: &Self::Output,
-        _randomness: &[u8],
-    ) -> Result<Self::Output, SignatureError> {
-        unimplemented!()
+    fn randomize_signature(&self, signature: &Self::Output, randomness: &[u8]) -> Result<Self::Output, SignatureError> {
+        let schnorr_signature: SchnorrSignature<G, D> = self.parameters.clone().into();
+
+        Ok(schnorr_signature.randomize_signature(&signature, randomness)?)
     }
 }
