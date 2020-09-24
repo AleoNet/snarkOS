@@ -114,7 +114,7 @@ impl UInt8 {
         T: Into<Option<u8>> + Copy,
     {
         let mut output_vec = Vec::with_capacity(values.len());
-        for (i, value) in values.into_iter().enumerate() {
+        for (i, value) in values.iter().enumerate() {
             let byte: Option<u8> = Into::into(*value);
             let alloc_byte = Self::alloc(&mut cs.ns(|| format!("byte_{}", i)), || byte.get())?;
             output_vec.push(alloc_byte);
