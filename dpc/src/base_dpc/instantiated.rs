@@ -183,7 +183,7 @@ pub type InnerField = Bls12_377Fr;
 pub type OuterField = Bls12_377Fq;
 
 pub type AccountCommitment = PedersenCompressedCommitment<EdwardsBls, AccountWindow>;
-pub type AccountEncryption = GroupEncryption<EdwardsBls>;
+pub type AccountEncryption = GroupEncryption<EdwardsBls, Blake2sHash>;
 pub type RecordCommitment = PedersenCompressedCommitment<EdwardsBls, RecordWindow>;
 pub type ProgramVerificationKeyCommitment = Blake2sCommitment;
 pub type LocalDataCRH = BoweHopwoodPedersenCompressedCRH<EdwardsBls, LocalDataCRHWindow>;
