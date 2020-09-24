@@ -20,8 +20,5 @@ pub use group::*;
 pub mod group_parameters;
 pub use group_parameters::*;
 
-pub mod group_signature;
-pub use group_signature::*;
-
 #[cfg(test)]
 pub mod tests;

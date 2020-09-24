@@ -22,9 +22,13 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes_to_bits, rand::UniformRand, serialize::*, to_bytes, FromBytes, ToBytes};
 
+use digest::Digest;
 use itertools::Itertools;
 use rand::Rng;
-use std::io::{Read, Result as IoResult, Write};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    marker::PhantomData,
+};
 
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
@@ -75,12 +79,19 @@ impl<G: Group + ProjectiveCurve + CanonicalSerialize + CanonicalDeserialize> Def
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GroupEncryption<G: Group + ProjectiveCurve> {
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "G: Group, D: Digest"),
+    Debug(bound = "G: Group, D: Digest"),
+    PartialEq(bound = "G: Group, D: Digest"),
+    Eq(bound = "G: Group, D: Digest")
+)]
+pub struct GroupEncryption<G: Group + ProjectiveCurve, D: Digest> {
     pub parameters: GroupEncryptionParameters<G>,
+    pub _hash: PhantomData<D>,
 }
 
-impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
+impl<G: Group + ProjectiveCurve, D: Digest + Send + Sync> EncryptionScheme for GroupEncryption<G, D> {
     type BlindingExponent = <G as Group>::ScalarField;
     type Parameters = GroupEncryptionParameters<G>;
     type PrivateKey = <G as Group>::ScalarField;
@@ -94,6 +105,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
                 rng,
                 <Self as EncryptionScheme>::PrivateKey::size_in_bits(),
             ),
+            _hash: PhantomData,
         }
     }
 
@@ -259,8 +271,11 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     }
 }
 
-impl<G: Group + ProjectiveCurve> From<GroupEncryptionParameters<G>> for GroupEncryption<G> {
+impl<G: Group + ProjectiveCurve, D: Digest> From<GroupEncryptionParameters<G>> for GroupEncryption<G, D> {
     fn from(parameters: GroupEncryptionParameters<G>) -> Self {
-        Self { parameters }
+        Self {
+            parameters,
+            _hash: PhantomData,
+        }
     }
 }
