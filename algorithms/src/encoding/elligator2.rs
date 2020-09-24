@@ -41,6 +41,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
     const D: P::BaseField = <P as TEModelParameters>::COEFF_D;
 
     /// Returns the encoded group element for a given base field element.
+    #[allow(clippy::many_single_char_names)]
     pub fn encode(input: &P::BaseField) -> Result<(<G as ProjectiveCurve>::Affine, bool), EncodingError> {
         // The input base field must be nonzero, otherwise inverses will fail.
         if input.is_zero() {
@@ -157,6 +158,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
         Ok((<G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?, sign_high))
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn decode(
         group_element: &<G as ProjectiveCurve>::Affine,
         sign_high: bool,

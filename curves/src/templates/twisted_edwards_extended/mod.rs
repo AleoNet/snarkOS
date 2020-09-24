@@ -534,6 +534,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         self
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn add_assign_mixed(&mut self, other: &Self::Affine) {
         // A = X1*X2
         let a = self.x * &other.x;
@@ -615,6 +616,7 @@ impl<'a, P: Parameters> Add<&'a Self> for GroupProjective<P> {
 }
 
 impl<'a, P: Parameters> AddAssign<&'a Self> for GroupProjective<P> {
+    #[allow(clippy::many_single_char_names)]
     fn add_assign(&mut self, other: &'a Self) {
         // See "Twisted Edwards Curves Revisited"
         // Huseyin Hisil, Kenneth Koon-Ho Wong, Gary Carter, and Ed Dawson

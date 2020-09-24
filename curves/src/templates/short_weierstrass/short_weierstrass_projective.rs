@@ -413,6 +413,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         }
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn double_in_place(&mut self) -> &mut Self {
         if self.is_zero() {
             self

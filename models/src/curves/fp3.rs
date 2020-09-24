@@ -452,6 +452,7 @@ impl<'a, P: Fp3Parameters> SubAssign<&'a Self> for Fp3<P> {
 
 impl<'a, P: Fp3Parameters> MulAssign<&'a Self> for Fp3<P> {
     #[inline]
+    #[allow(clippy::many_single_char_names)]
     fn mul_assign(&mut self, other: &Self) {
         // Devegili OhEig Scott Dahab --- Multiplication and Squaring on
         // AbstractPairing-Friendly
