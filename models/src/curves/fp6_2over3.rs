@@ -258,11 +258,11 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
         // Pairing-Friendly
         // Fields.pdf; Section 3 (Complex)
         let a = self.c0;
-        let mut b = self.c1;
+        let b = self.c1;
         let ab_add = a + &b;
-        let mut ab_mul = a * &b;
+        let ab_mul = a * &b;
 
-        let c0 = ab_add * &(a + &Self::mul_by_nonresidue(&mut b)) - &ab_mul - &Self::mul_by_nonresidue(&mut ab_mul);
+        let c0 = ab_add * &(a + &Self::mul_by_nonresidue(&b)) - &ab_mul - &Self::mul_by_nonresidue(&ab_mul);
         let c1 = ab_mul.double();
 
         self.c0 = c0;
@@ -280,8 +280,8 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
             let a = self.c0;
             let b = self.c1;
 
-            let mut t1 = b.square();
-            let t0 = a.square() - &Self::mul_by_nonresidue(&mut t1);
+            let t1 = b.square();
+            let t0 = a.square() - &Self::mul_by_nonresidue(&t1);
             let t2 = t0.inverse().unwrap();
 
             let c0 = a * &t2;
@@ -464,8 +464,8 @@ impl<'a, P: Fp6Parameters> MulAssign<&'a Self> for Fp6<P> {
         let b1 = other.c1;
 
         let a0a1 = a0 * &a1;
-        let mut b0b1 = b0 * &b1;
-        let beta_b0b1 = Self::mul_by_nonresidue(&mut b0b1);
+        let b0b1 = b0 * &b1;
+        let beta_b0b1 = Self::mul_by_nonresidue(&b0b1);
 
         let c0 = a0a1 + &beta_b0b1;
         let c1 = (a0 + &b0) * &(a1 + &b1) - &a0a1 - &b0b1;
