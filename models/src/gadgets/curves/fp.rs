@@ -540,7 +540,7 @@ impl<F: PrimeField> ThreeBitCondNegLookupGadget<F> for FpGadget<F> {
 impl<F: PrimeField> Clone for FpGadget<F> {
     fn clone(&self) -> Self {
         Self {
-            value: self.value.clone(),
+            value: self.value,
             variable: self.variable.clone(),
         }
     }

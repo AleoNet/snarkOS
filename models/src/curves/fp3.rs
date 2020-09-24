@@ -148,7 +148,7 @@ impl<P: Fp3Parameters> Field for Fp3<P> {
     }
 
     fn double(&self) -> Self {
-        let mut result = self.clone();
+        let mut result = *self;
         result.double_in_place();
         result
     }
@@ -182,7 +182,7 @@ impl<P: Fp3Parameters> Field for Fp3<P> {
     }
 
     fn square(&self) -> Self {
-        let mut result = self.clone();
+        let mut result = *self;
         result.square_in_place();
         result
     }
@@ -191,9 +191,9 @@ impl<P: Fp3Parameters> Field for Fp3<P> {
         // Devegili OhEig Scott Dahab --- Multiplication and Squaring on
         // AbstractPairing-Friendly
         // Fields.pdf; Section 4 (CH-SQR2)
-        let a = self.c0.clone();
-        let b = self.c1.clone();
-        let c = self.c2.clone();
+        let a = self.c0;
+        let b = self.c1;
+        let c = self.c2;
 
         let s0 = a.square();
         let ab = a * &b;
@@ -219,38 +219,38 @@ impl<P: Fp3Parameters> Field for Fp3<P> {
             let t0 = self.c0.square();
             let t1 = self.c1.square();
             let t2 = self.c2.square();
-            let mut t3 = self.c0.clone();
+            let mut t3 = self.c0;
             t3.mul_assign(&self.c1);
-            let mut t4 = self.c0.clone();
+            let mut t4 = self.c0;
             t4.mul_assign(&self.c2);
-            let mut t5 = self.c1.clone();
+            let mut t5 = self.c1;
             t5.mul_assign(&self.c2);
             let n5 = P::mul_fp_by_nonresidue(&t5);
 
-            let mut s0 = t0.clone();
+            let mut s0 = t0;
             s0.sub_assign(&n5);
             let mut s1 = P::mul_fp_by_nonresidue(&t2);
             s1.sub_assign(&t3);
-            let mut s2 = t1.clone();
+            let mut s2 = t1;
             s2.sub_assign(&t4); // typo in paper referenced above. should be "-" as per Scott, but is "*"
 
-            let mut a1 = self.c2.clone();
+            let mut a1 = self.c2;
             a1.mul_assign(&s1);
-            let mut a2 = self.c1.clone();
+            let mut a2 = self.c1;
             a2.mul_assign(&s2);
-            let mut a3 = a1.clone();
+            let mut a3 = a1;
             a3.add_assign(&a2);
             a3 = P::mul_fp_by_nonresidue(&a3);
-            let mut t6 = self.c0.clone();
+            let mut t6 = self.c0;
             t6.mul_assign(&s0);
             t6.add_assign(&a3);
             t6.inverse_in_place();
 
-            let mut c0 = t6.clone();
+            let mut c0 = t6;
             c0.mul_assign(&s0);
-            let mut c1 = t6.clone();
+            let mut c1 = t6;
             c1.mul_assign(&s1);
-            let mut c2 = t6.clone();
+            let mut c2 = t6;
             c2.mul_assign(&s2);
 
             Some(Self::new(c0, c1, c2))
@@ -373,7 +373,7 @@ impl<P: Fp3Parameters> Neg for Fp3<P> {
 
     #[inline]
     fn neg(self) -> Self {
-        let mut res = self.clone();
+        let mut res = self;
         res.c0 = res.c0.neg();
         res.c1 = res.c1.neg();
         res.c2 = res.c2.neg();

@@ -76,7 +76,7 @@ impl UInt for UInt128 {
         Self {
             bits: self.bits.clone(),
             negated: true,
-            value: self.value.clone(),
+            value: self.value,
         }
     }
 
@@ -546,7 +546,7 @@ impl UInt for UInt128 {
             let index = 127 - i as usize;
             let bit_value = 1u128 << (index as u128);
             let mut new_quotient = quotient.clone();
-            new_quotient.bits[index] = true_bit.clone();
+            new_quotient.bits[index] = true_bit;
             new_quotient.value = Some(new_quotient.value.unwrap() + bit_value);
 
             quotient = Self::conditionally_select(

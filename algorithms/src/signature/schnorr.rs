@@ -250,7 +250,7 @@ where
     ) -> Result<Self::PublicKey, SignatureError> {
         let rand_pk_time = start_timer!(|| "SchnorrSignature::randomize_public_key");
 
-        let mut randomized_pk = public_key.0.clone();
+        let mut randomized_pk = public_key.0;
 
         let mut encoded = G::zero();
         for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?)

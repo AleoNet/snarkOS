@@ -174,7 +174,7 @@ impl<P: Fp256Parameters> Field for Fp256<P> {
 
     #[inline]
     fn square(&self) -> Self {
-        let mut temp = self.clone();
+        let mut temp = *self;
         temp.square_in_place();
         temp
     }

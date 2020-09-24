@@ -587,7 +587,7 @@ impl Boolean {
 
             if b {
                 // This is part of a run of ones.
-                current_run.push(a.clone());
+                current_run.push(*a);
             } else {
                 if !current_run.is_empty() {
                     // This is the start of a run of zeros, but we need
@@ -744,8 +744,8 @@ impl<F: PrimeField> CondSelectGadget<F> for Boolean {
         CS: ConstraintSystem<F>,
     {
         match cond {
-            Boolean::Constant(true) => Ok(first.clone()),
-            Boolean::Constant(false) => Ok(second.clone()),
+            Boolean::Constant(true) => Ok(first),
+            Boolean::Constant(false) => Ok(second),
             cond @ Boolean::Not(_) => Self::conditionally_select(cs, &cond.not(), second, first),
             cond @ Boolean::Is(_) => match (first, second) {
                 (x, &Boolean::Constant(false)) => Boolean::and(cs.ns(|| "and"), cond, x).into(),

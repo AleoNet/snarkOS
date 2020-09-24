@@ -119,7 +119,7 @@ impl<P: Fp2Parameters> Field for Fp2<P> {
     }
 
     fn double(&self) -> Self {
-        let mut result = self.clone();
+        let mut result = *self;
         result.double_in_place();
         result
     }
@@ -324,7 +324,7 @@ impl<P: Fp2Parameters> Neg for Fp2<P> {
     #[inline]
     #[must_use]
     fn neg(self) -> Self {
-        let mut res = self.clone();
+        let mut res = self;
         res.c0 = res.c0.neg();
         res.c1 = res.c1.neg();
         res
