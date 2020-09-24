@@ -17,7 +17,7 @@
 #[macro_use]
 extern crate criterion;
 
-use snarkos_algorithms::snark::GM17;
+use snarkos_algorithms::snark::gm17::GM17;
 use snarkos_curves::bls12_377::{Bls12_377, Fr};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
