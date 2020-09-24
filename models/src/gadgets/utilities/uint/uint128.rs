@@ -110,24 +110,32 @@ impl UInt for UInt128 {
 
         let mut value = Some(0u128);
         for b in bits.iter().rev() {
-            value.as_mut().map(|v| *v <<= 1);
+            if let Some(v) = value.as_mut() {
+                *v <<= 1;
+            }
 
             match b {
                 &Boolean::Constant(b) => {
                     if b {
-                        value.as_mut().map(|v| *v |= 1);
+                        if let Some(v) = value.as_mut() {
+                            *v |= 1;
+                        }
                     }
                 }
                 &Boolean::Is(ref b) => match b.get_value() {
                     Some(true) => {
-                        value.as_mut().map(|v| *v |= 1);
+                        if let Some(v) = value.as_mut() {
+                            *v |= 1;
+                        }
                     }
                     Some(false) => {}
                     None => value = None,
                 },
                 &Boolean::Not(ref b) => match b.get_value() {
                     Some(false) => {
-                        value.as_mut().map(|v| *v |= 1);
+                        if let Some(v) = value.as_mut() {
+                            *v |= 1;
+                        }
                     }
                     Some(true) => {}
                     None => value = None,

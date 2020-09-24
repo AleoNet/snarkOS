@@ -149,7 +149,9 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
 
     #[inline]
     fn negate_in_place<CS: ConstraintSystem<F>>(&mut self, _cs: CS) -> Result<&mut Self, SynthesisError> {
-        self.value.as_mut().map(|val| *val = -(*val));
+        if let Some(val) = self.value.as_mut() {
+            *val = -(*val);
+        }
         self.variable.negate_in_place();
         Ok(self)
     }
@@ -181,7 +183,9 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
         _cs: CS,
         other: &F,
     ) -> Result<&mut Self, SynthesisError> {
-        self.value.as_mut().map(|val| *val += other);
+        if let Some(val) = self.value.as_mut() {
+            *val += other;
+        }
         self.variable += (*other, CS::one());
         Ok(self)
     }
@@ -199,7 +203,9 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
         mut _cs: CS,
         other: &F,
     ) -> Result<&mut Self, SynthesisError> {
-        self.value.as_mut().map(|val| *val *= other);
+        if let Some(val) = self.value.as_mut() {
+            *val *= other;
+        }
         self.variable *= *other;
         Ok(self)
     }
