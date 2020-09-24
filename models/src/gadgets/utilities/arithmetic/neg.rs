@@ -30,7 +30,6 @@ where
 {
     type ErrorType;
 
-    #[must_use]
     fn neg<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Self, Self::ErrorType>;
 }
 
