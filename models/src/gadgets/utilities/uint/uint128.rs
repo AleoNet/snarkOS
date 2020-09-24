@@ -443,7 +443,7 @@ impl UInt for UInt128 {
             })
             .collect::<Vec<Self>>();
 
-        Self::addmany(&mut cs.ns(|| format!("partial_products")), &partial_products)
+        Self::addmany(&mut cs.ns(|| "partial_products"), &partial_products)
     }
 
     /// Perform long division of two `UInt128` objects.
