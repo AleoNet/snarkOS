@@ -748,9 +748,9 @@ impl<F: PrimeField> CondSelectGadget<F> for Boolean {
             Boolean::Constant(false) => Ok(*second),
             cond @ Boolean::Not(_) => Self::conditionally_select(cs, &cond.not(), second, first),
             cond @ Boolean::Is(_) => match (first, second) {
-                (x, &Boolean::Constant(false)) => Boolean::and(cs.ns(|| "and"), cond, x).into(),
+                (x, &Boolean::Constant(false)) => Boolean::and(cs.ns(|| "and"), cond, x),
                 (&Boolean::Constant(false), x) => Boolean::and(cs.ns(|| "and"), &cond.not(), x),
-                (&Boolean::Constant(true), x) => Boolean::or(cs.ns(|| "or"), cond, x).into(),
+                (&Boolean::Constant(true), x) => Boolean::or(cs.ns(|| "or"), cond, x),
                 (x, &Boolean::Constant(true)) => Boolean::or(cs.ns(|| "or"), &cond.not(), x),
                 (a @ Boolean::Is(_), b @ Boolean::Is(_))
                 | (a @ Boolean::Not(_), b @ Boolean::Not(_))

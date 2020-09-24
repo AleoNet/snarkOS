@@ -821,7 +821,7 @@ impl<F: Field> ToBytesGadget<F> for UInt128 {
             None => [None, None, None, None],
         };
         let mut bytes = Vec::new();
-        for (i, chunk8) in self.to_bits_le().chunks(8).into_iter().enumerate() {
+        for (i, chunk8) in self.to_bits_le().chunks(8).enumerate() {
             let byte = UInt8 {
                 bits: chunk8.to_vec(),
                 negated: false,
