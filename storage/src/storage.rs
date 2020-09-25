@@ -143,7 +143,7 @@ impl Storage {
     /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
     pub fn destroy(&self) -> Result<(), StorageError> {
         let path = self.db.path();
-        drop(&self.db);
+        // drop(&self.db); FIXME: this didn't actually drop self.db
         Self::destroy_storage(path.into())
     }
 
