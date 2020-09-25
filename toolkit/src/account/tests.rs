@@ -21,7 +21,7 @@ use rand_chacha::ChaChaRng;
 use std::str::FromStr;
 
 #[test]
-pub fn test_private_key() {
+pub fn private_key_test() {
     let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
     let private_key = PrivateKey::new(rng);
     assert!(private_key.is_ok());
@@ -34,7 +34,7 @@ pub fn test_private_key() {
 }
 
 #[test]
-pub fn test_view_key_from_private_key() {
+pub fn view_key_test() {
     let private_key = PrivateKey::from_str("APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn").unwrap();
     let view_key = ViewKey::from(&private_key);
     assert!(view_key.is_ok());
@@ -47,7 +47,7 @@ pub fn test_view_key_from_private_key() {
 }
 
 #[test]
-pub fn test_address_from_private_key() {
+pub fn address_test() {
     let private_key = PrivateKey::from_str("APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn").unwrap();
     let address = Address::from(&private_key);
     assert!(address.is_ok());
@@ -58,18 +58,3 @@ pub fn test_address_from_private_key() {
     println!("{} == {}", expected_address, candidate_address);
     assert_eq!(expected_address, candidate_address);
 }
-
-#[test]
-pub fn test_address_from_view_key() {
-    let view_key = ViewKey::from_str("AViewKey1m8gvywHKHKfUzZiLiLoHedcdHEjKwo5TWo6efz8gK7wF").unwrap();
-    let address = Address::from_view_key(&view_key);
-    assert!(address.is_ok());
-
-    let expected_address = "aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh";
-    let candidate_address = address.unwrap().to_string();
-
-    println!("{} == {}", expected_address, candidate_address);
-    assert_eq!(expected_address, candidate_address);
-}
-
-// Signature Tests

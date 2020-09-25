@@ -15,11 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    account::{PrivateKey, ViewKey},
+    account::{
+        view_key::{Signature as ViewKeySignature, ViewKey},
+        PrivateKey,
+    },
     errors::AddressError,
 };
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
+use snarkos_models::algorithms::signature::SignatureScheme;
 use snarkos_objects::AccountAddress;
 use snarkos_utilities::bytes::ToBytes;
 
@@ -52,6 +56,16 @@ impl Address {
         let mut output = vec![];
         self.address.write(&mut output).expect("serialization to bytes failed");
         output
+    }
+
+    /// Verify a signature signed by the view key
+    /// Returns `true` if the signature is verified correctly. Otherwise, returns `false`.
+    pub fn verify(&self, message: &[u8], signature: ViewKeySignature) -> Result<bool, AddressError> {
+        let parameters = SystemParameters::<Components>::load()?;
+
+        Ok(parameters
+            .account_encryption
+            .verify(&self.address.encryption_key, message, &signature.0)?)
     }
 }
 

@@ -24,7 +24,6 @@ use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
-#[derive(Debug)]
 pub struct Signature(pub <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output);
 
 impl FromStr for Signature {
@@ -32,7 +31,7 @@ impl FromStr for Signature {
 
     fn from_str(signature: &str) -> Result<Self, Self::Err> {
         let signature_bytes = hex::decode(signature)?;
-        let signature: <<Components as DPCComponents>::AccountEncryption as SignatureScheme>::Output =
+        let signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output =
             FromBytes::read(&signature_bytes[..])?;
 
         Ok(Self(signature))
@@ -49,7 +48,6 @@ impl fmt::Display for Signature {
     }
 }
 
-#[derive(Debug)]
 pub struct SignaturePublicKey(pub <<Components as DPCComponents>::AccountSignature as SignatureScheme>::PublicKey);
 
 impl FromStr for SignaturePublicKey {
@@ -108,6 +106,7 @@ impl PrivateKey {
         Ok(SignaturePublicKey(public_key))
     }
 
+    /// Verify a signature signed by the private key
     /// Returns `true` if the signature is verified correctly. Otherwise, returns `false`.
     pub fn verify(
         public_key: &SignaturePublicKey,

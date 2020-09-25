@@ -50,6 +50,18 @@ pub enum ViewKeyError {
     Crate(&'static str, String),
 }
 
+impl From<hex::FromHexError> for ViewKeyError {
+    fn from(error: hex::FromHexError) -> Self {
+        ViewKeyError::Crate("hex", format!("{:?}", error))
+    }
+}
+
+impl From<snarkos_errors::algorithms::signature::SignatureError> for ViewKeyError {
+    fn from(error: snarkos_errors::algorithms::signature::SignatureError) -> Self {
+        ViewKeyError::Crate("snarkos_errors::algorithms::signature", format!("{:?}", error))
+    }
+}
+
 impl From<snarkos_errors::objects::account::AccountError> for ViewKeyError {
     fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
         ViewKeyError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
@@ -66,6 +78,12 @@ impl From<std::io::Error> for ViewKeyError {
 pub enum AddressError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
+}
+
+impl From<snarkos_errors::algorithms::signature::SignatureError> for AddressError {
+    fn from(error: snarkos_errors::algorithms::signature::SignatureError) -> Self {
+        AddressError::Crate("snarkos_errors::algorithms::signature", format!("{:?}", error))
+    }
 }
 
 impl From<snarkos_errors::objects::account::AccountError> for AddressError {
