@@ -29,7 +29,7 @@ use digest::Digest;
 use rand::Rng;
 use std::{hash::Hash, marker::PhantomData};
 
-/// Map the encryption group into the signature group
+/// Map the encryption group into the signature group.
 fn into_signature_group<G: Group + ProjectiveCurve + CanonicalSerialize, SG: Group + CanonicalDeserialize>(
     projective: G,
 ) -> SG {
@@ -38,6 +38,7 @@ fn into_signature_group<G: Group + ProjectiveCurve + CanonicalSerialize, SG: Gro
     CanonicalDeserialize::deserialize(&mut &bytes[..]).expect("failed to convert to signature group")
 }
 
+/// Map the GroupEncryption parameters into a Schnorr signature scheme.
 impl<G: Group + ProjectiveCurve + CanonicalSerialize, SG: Group + CanonicalDeserialize, D: Digest>
     From<GroupEncryptionParameters<G>> for SchnorrSignature<SG, D>
 {
@@ -58,6 +59,7 @@ impl<G: Group + ProjectiveCurve + CanonicalSerialize, SG: Group + CanonicalDeser
     }
 }
 
+/// Map the GroupEncryption public key into a Schnorr public key.
 impl<G: Group + ProjectiveCurve, SG: Group + CanonicalSerialize + CanonicalDeserialize>
     From<GroupEncryptionPublicKey<G>> for SchnorrPublicKey<SG>
 {

@@ -98,6 +98,7 @@ fn schnorr_signature_scheme_parameters_serialization() {
 
 #[test]
 fn group_encryption_schnorr_signature_test() {
+    // Test the encryption scheme's Schnorr signature implementation, excluding randomized signatures
     let message = "Hi, I am a Schnorr signature!";
     sign_and_verify::<TestGroupEncryptionSignature>(message.as_bytes());
     failed_verification::<TestGroupEncryptionSignature>(message.as_bytes(), "Bad message".as_bytes());
