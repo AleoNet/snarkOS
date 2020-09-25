@@ -17,6 +17,9 @@
 pub mod account;
 pub use account::*;
 
+pub mod address;
+pub use address::*;
+
 pub mod record;
 pub use record::*;
 

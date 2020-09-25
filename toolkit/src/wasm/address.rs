@@ -14,40 +14,49 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::{PrivateKey, ViewKey as ViewKeyNative};
+use crate::account::{
+    address::Address as AddressNative,
+    private_key::PrivateKey,
+    view_key::{Signature, ViewKey},
+};
 
 use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub struct ViewKey {
-    pub(crate) view_key: ViewKeyNative,
+pub struct Address {
+    pub(crate) address: AddressNative,
 }
 
 #[wasm_bindgen]
-impl ViewKey {
+impl Address {
     #[wasm_bindgen]
     pub fn from_private_key(private_key: &str) -> Self {
         let private_key = PrivateKey::from_str(private_key).unwrap();
-        let view_key = ViewKeyNative::from(&private_key).unwrap();
-        Self { view_key }
+        let address = AddressNative::from(&private_key).unwrap();
+        Self { address }
+    }
+
+    #[wasm_bindgen]
+    pub fn from_view_key(view_key: &str) -> Self {
+        let view_key = ViewKey::from_str(view_key).unwrap();
+        let address = AddressNative::from_view_key(&view_key).unwrap();
+        Self { address }
+    }
+
+    /// Verify a signature signed by the view key
+    /// Returns `true` if the signature is verified correctly. Otherwise, returns `false`.
+    #[wasm_bindgen]
+    pub fn verify(&self, message: &str, signature: &str) -> bool {
+        let signature = Signature::from_str(signature).unwrap();
+        let message = message.as_bytes();
+
+        self.address.verify(&message, &signature).unwrap()
     }
 
     #[wasm_bindgen]
     pub fn to_string(&self) -> String {
-        format!("ViewKey {{ view_key: {} }}", self.view_key)
-    }
-
-    /// Sign a message with the view key
-    #[wasm_bindgen]
-    pub fn sign(&self, message: &str) -> String {
-        let rng = &mut StdRng::from_entropy();
-
-        let message = message.as_bytes();
-
-        let signature = self.view_key.sign(&message, rng).unwrap();
-
-        signature.to_string()
+        format!("Address {{ address: {} }}", self.address)
     }
 }
