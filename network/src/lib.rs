@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 // Compilation
+#![allow(clippy::module_inception)]
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
