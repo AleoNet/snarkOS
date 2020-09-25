@@ -20,8 +20,11 @@ pub use account::*;
 pub mod record;
 pub use record::*;
 
-pub mod signature;
-pub use signature::*;
+pub mod signature_private;
+pub use signature_private::*;
+
+pub mod signature_public;
+pub use signature_public::*;
 
 pub mod view_key;
 pub use view_key::*;

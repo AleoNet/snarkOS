@@ -16,7 +16,13 @@
 
 use crate::{
     record::tests::{TEST_ENCRYPTED_RECORD, TEST_PRIVATE_KEY, TEST_RECORD, TEST_SERIAL_NUMBER},
-    wasm::{Account, Record, SignatureScheme, SignatureSchemePublicKey, ViewKey},
+    wasm::{
+        signature_private::{SignatureScheme, SignatureSchemePublicKey},
+        signature_public::SignatureSchemePublic,
+        Account,
+        Record,
+        ViewKey,
+    },
 };
 
 use wasm_bindgen_test::*;
@@ -24,7 +30,7 @@ use wasm_bindgen_test::*;
 // Account Tests
 
 #[wasm_bindgen_test]
-pub fn account_from_private_key_test() {
+pub fn test_account_from_private_key() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_address = "aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh";
 
@@ -38,7 +44,7 @@ pub fn account_from_private_key_test() {
 }
 
 #[wasm_bindgen_test]
-pub fn view_key_from_private_key_test() {
+pub fn test_view_key_from_private_key() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_view_key = "AViewKey1m8gvywHKHKfUzZiLiLoHedcdHEjKwo5TWo6efz8gK7wF";
 
@@ -51,7 +57,7 @@ pub fn view_key_from_private_key_test() {
 // Record Tests
 
 #[wasm_bindgen_test]
-pub fn record_decrpyption_test() {
+pub fn test_record_decryption() {
     let view_key = ViewKey::from_private_key(TEST_PRIVATE_KEY).view_key.to_string();
 
     let record = Record::decrypt(TEST_ENCRYPTED_RECORD, &view_key);
@@ -61,7 +67,7 @@ pub fn record_decrpyption_test() {
 }
 
 #[wasm_bindgen_test]
-pub fn serial_number_derivation_test() {
+pub fn test_serial_number_derivation() {
     let account = Account::from_private_key(TEST_PRIVATE_KEY);
     let private_key = account.private_key.to_string();
 
@@ -74,8 +80,10 @@ pub fn serial_number_derivation_test() {
 
 // Signature Tests
 
+// Private
+
 #[wasm_bindgen_test]
-pub fn signature_public_key_from_private_key_test() {
+pub fn test_signature_public_key_from_private_key() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_public_key = "17e858cfba9f42335bd7d4751f9284671f913d841325ce548f98ae46d480211038530919083215e5376a472a61eefad25b545d3b75d43c8e2f8f821a17500103";
 
@@ -86,7 +94,7 @@ pub fn signature_public_key_from_private_key_test() {
 }
 
 #[wasm_bindgen_test]
-pub fn signature_verification_test() {
+pub fn test_signature_verification() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_message = "test message";
 
@@ -97,4 +105,56 @@ pub fn signature_verification_test() {
 
     println!("{} == {}", true, signature_verification);
     assert!(signature_verification);
+}
+
+#[wasm_bindgen_test]
+pub fn test_signature_failed_verification() {
+    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+    let given_message = "test message";
+    let bad_message = "bad message";
+
+    let signature = SignatureScheme::sign(given_private_key, given_message);
+    let public_key = SignatureSchemePublicKey::from_private_key(given_private_key);
+
+    let signature_verification = signature.verify(&public_key.public_key.to_string(), bad_message);
+
+    println!("{} == {}", false, signature_verification);
+    assert!(!signature_verification);
+}
+
+// Public
+
+#[wasm_bindgen_test]
+pub fn test_signature_public_verification() {
+    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+    let given_message = "test message";
+
+    let view_key = ViewKey::from_private_key(given_private_key);
+    let account = Account::from_private_key(given_private_key);
+    let address = account.address;
+
+    let signature = SignatureSchemePublic::sign(&view_key.view_key.to_string(), given_message);
+
+    let signature_verification = signature.verify(&address.address.to_string(), given_message);
+
+    println!("{} == {}", true, signature_verification);
+    assert!(signature_verification);
+}
+
+#[wasm_bindgen_test]
+pub fn test_signature_public_failed_verification() {
+    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+    let given_message = "test message";
+    let bad_message = "bad message";
+
+    let view_key = ViewKey::from_private_key(given_private_key);
+    let account = Account::from_private_key(given_private_key);
+    let address = account.address;
+
+    let signature = SignatureSchemePublic::sign(&view_key.view_key.to_string(), given_message);
+
+    let signature_verification = signature.verify(&address.address.to_string(), bad_message);
+
+    println!("{} == {}", false, signature_verification);
+    assert!(!signature_verification);
 }

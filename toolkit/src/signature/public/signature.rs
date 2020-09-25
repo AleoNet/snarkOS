@@ -38,16 +38,12 @@ pub struct Signature {
 }
 
 impl Signature {
-    pub fn sign<R: Rng + CryptoRng>(
-        private_key: &ViewKey,
-        message: &[u8],
-        rng: &mut R,
-    ) -> Result<Self, SignatureError> {
+    pub fn sign<R: Rng + CryptoRng>(view_key: &ViewKey, message: &[u8], rng: &mut R) -> Result<Self, SignatureError> {
         let parameters = SystemParameters::<Components>::load()?;
 
         let signature = parameters
             .account_encryption
-            .sign(&private_key.view_key.decryption_key, message, rng)?;
+            .sign(&view_key.view_key.decryption_key, message, rng)?;
 
         Ok(Self { signature })
     }
@@ -60,12 +56,12 @@ impl Signature {
         output
     }
 
-    pub fn verify(&self, public_key: &Address, message: &[u8]) -> Result<bool, SignatureError> {
+    pub fn verify(&self, address: &Address, message: &[u8]) -> Result<bool, SignatureError> {
         let parameters = SystemParameters::<Components>::load()?;
 
         Ok(parameters
             .account_encryption
-            .verify(&public_key.address.encryption_key, message, &self.signature)?)
+            .verify(&address.address.encryption_key, message, &self.signature)?)
     }
 }
 
