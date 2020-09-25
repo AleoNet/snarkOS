@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{account::PrivateKey, errors::SignatureError, signature::SignaturePublicKey};
+use crate::{account::PrivateKey, errors::SignatureError, signature::private::SignaturePublicKey};
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
@@ -26,6 +26,9 @@ use snarkos_utilities::{
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
+/// Schnorr signature scheme where:
+///   The Account Private Key `sk_sig` is the signature private key.
+///   The Account Private Key `pk_sig` is the signature public key.
 #[derive(Debug)]
 pub struct Signature {
     pub(crate) signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output,

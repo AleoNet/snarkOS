@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// TODO (raychu86) RENAME THESE MODULES.
-pub mod private;
-pub mod public;
+pub mod public_key;
+pub use public_key::*;
 
-#[cfg(test)]
-pub mod tests;
+pub mod signature;
+pub use signature::*;
