@@ -258,7 +258,7 @@ impl Server {
 
         let mut transactions = vec![];
 
-        for (_tx_id, entry) in &memory_pool.transactions {
+        for entry in memory_pool.transactions.values() {
             if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                 transactions.push(transaction_bytes);
             }

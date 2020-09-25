@@ -75,8 +75,8 @@ impl SyncHandler {
 
     /// Remove the blocks that are now included in the chain.
     pub fn clear_pending<T: Transaction, P: LoadableMerkleParameters>(&mut self, storage: Arc<Ledger<T, P>>) {
-        for (block_hash, _time_sent) in &self.pending_blocks.clone() {
-            if !storage.block_hash_exists(&block_hash) {
+        for block_hash in self.pending_blocks.clone().keys() {
+            if !storage.block_hash_exists(block_hash) {
                 self.pending_blocks.remove(block_hash);
             }
         }

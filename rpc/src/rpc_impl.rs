@@ -306,8 +306,8 @@ impl RpcFunctions for RpcImpl {
 
         let mut peers = vec![];
 
-        for (peer, _last_seen) in &peer_book.get_connected() {
-            peers.push(peer.clone());
+        for peer in peer_book.get_connected().keys() {
+            peers.push(*peer);
         }
 
         Ok(PeerInfo { peers })
