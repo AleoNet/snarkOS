@@ -20,7 +20,6 @@ use snarkos_errors::algorithms::CRHError;
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-use hex;
 use rand::thread_rng;
 use std::{
     fs::{self, File},
@@ -39,7 +38,7 @@ pub fn setup<C: DPCComponents>() -> Result<Vec<u8>, CRHError> {
     Ok(encrypted_record_crh_parameters_bytes)
 }
 
-pub fn store(file_path: &PathBuf, checksum_path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
+pub fn store(file_path: &PathBuf, checksum_path: &PathBuf, bytes: &[u8]) -> IoResult<()> {
     // Save checksum to file
     fs::write(checksum_path, hex::encode(sha256(bytes)))?;
 
