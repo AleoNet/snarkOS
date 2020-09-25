@@ -71,3 +71,5 @@ pub fn test_address_from_view_key() {
     println!("{} == {}", expected_address, candidate_address);
     assert_eq!(expected_address, candidate_address);
 }
+
+// Signature Tests

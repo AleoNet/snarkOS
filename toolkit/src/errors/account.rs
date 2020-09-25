@@ -20,9 +20,21 @@ pub enum PrivateKeyError {
     Crate(&'static str, String),
 }
 
+impl From<hex::FromHexError> for PrivateKeyError {
+    fn from(error: hex::FromHexError) -> Self {
+        PrivateKeyError::Crate("hex", format!("{:?}", error))
+    }
+}
+
 impl From<snarkos_errors::objects::account::AccountError> for PrivateKeyError {
     fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
         PrivateKeyError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+    }
+}
+
+impl From<snarkos_errors::algorithms::signature::SignatureError> for PrivateKeyError {
+    fn from(error: snarkos_errors::algorithms::signature::SignatureError) -> Self {
+        PrivateKeyError::Crate("snarkos_errors::algorithms::signature", format!("{:?}", error))
     }
 }
 
