@@ -299,7 +299,7 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
 
     // Recall that we are computing the arithmetization of M^*,
     // where `M^*(i, j) := M(j, i) * u_H(j, j)`.
-    for (r, row) in matrix.into_iter().enumerate() {
+    for (r, row) in matrix.iter_mut().enumerate() {
         if !is_in_ascending_order(&row, |(_, a), (_, b)| a < b) {
             row.sort_by(|(_, a), (_, b)| a.cmp(b));
         };

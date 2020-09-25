@@ -364,18 +364,22 @@ where
 
     let mut old_death_program_ids = Vec::new();
     let mut new_birth_program_ids = Vec::new();
-    for i in 0..C::NUM_INPUT_RECORDS {
+    for (i, input) in old_death_program_verification_inputs
+        .iter()
+        .enumerate()
+        .take(C::NUM_INPUT_RECORDS)
+    {
         let cs = &mut cs.ns(|| format!("Check death program for input record {}", i));
 
         let death_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc_bytes(
             &mut cs.ns(|| "Allocate proof"),
-            || Ok(&old_death_program_verification_inputs[i].proof),
+            || Ok(&input.proof),
         )?;
 
         let death_program_vk =
             <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc_bytes(
                 &mut cs.ns(|| "Allocate verification key"),
-                || Ok(&old_death_program_verification_inputs[i].verification_key),
+                || Ok(&input.verification_key),
             )?;
 
         let death_program_vk_bytes = death_program_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
@@ -403,18 +407,22 @@ where
         )?;
     }
 
-    for j in 0..C::NUM_OUTPUT_RECORDS {
+    for (j, input) in new_birth_program_verification_inputs
+        .iter()
+        .enumerate()
+        .take(C::NUM_OUTPUT_RECORDS)
+    {
         let cs = &mut cs.ns(|| format!("Check birth program for output record {}", j));
 
         let birth_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc_bytes(
             &mut cs.ns(|| "Allocate proof"),
-            || Ok(&new_birth_program_verification_inputs[j].proof),
+            || Ok(&input.proof),
         )?;
 
         let birth_program_vk =
             <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc_bytes(
                 &mut cs.ns(|| "Allocate verification key"),
-                || Ok(&new_birth_program_verification_inputs[j].verification_key),
+                || Ok(&input.verification_key),
             )?;
 
         let birth_program_vk_bytes = birth_program_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
@@ -450,12 +458,12 @@ where
         let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
-        for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_program_ids[i]);
+        for id in old_death_program_ids.iter().take(C::NUM_INPUT_RECORDS) {
+            input.extend_from_slice(&id);
         }
 
-        for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_program_ids[j]);
+        for id in new_birth_program_ids.iter().take(C::NUM_OUTPUT_RECORDS) {
+            input.extend_from_slice(&id);
         }
 
         let given_commitment_randomness =

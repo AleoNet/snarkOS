@@ -546,8 +546,7 @@ where
         }
 
         let mut new_record_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
-            let record = &new_records[j];
+        for record in new_records.iter().take(Components::NUM_OUTPUT_RECORDS) {
             let input_bytes = to_bytes![record.commitment(), memorandum, network_id]?;
 
             let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);

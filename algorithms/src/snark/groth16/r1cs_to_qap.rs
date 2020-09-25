@@ -67,14 +67,14 @@ impl R1CStoQAP {
             a[i] = u[assembly.num_constraints + i];
         }
 
-        for i in 0..assembly.num_constraints {
+        for (i, x) in u.iter().enumerate().take(assembly.num_constraints) {
             for &(ref coeff, index) in assembly.at[i].iter() {
                 let index = match index {
                     Index::Input(i) => i,
                     Index::Aux(i) => assembly.num_inputs + i,
                 };
 
-                a[index] += &(u[i] * coeff);
+                a[index] += &(*x * coeff);
             }
             for &(ref coeff, index) in assembly.bt[i].iter() {
                 let index = match index {
@@ -121,9 +121,7 @@ impl R1CStoQAP {
                 *b = evaluate_constraint::<E>(&bt_i, &full_input_assignment, num_inputs);
             });
 
-        for i in 0..num_inputs {
-            a[num_constraints + i] = full_input_assignment[i];
-        }
+        a[num_constraints..(num_inputs + num_constraints)].clone_from_slice(&full_input_assignment[..num_inputs]);
 
         domain.ifft_in_place(&mut a);
         domain.ifft_in_place(&mut b);

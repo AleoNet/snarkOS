@@ -1224,12 +1224,12 @@ where
         let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
-        for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_program_ids_gadgets[i]);
+        for id_gadget in old_death_program_ids_gadgets.iter().take(C::NUM_INPUT_RECORDS) {
+            input.extend_from_slice(id_gadget);
         }
 
-        for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_program_ids_gadgets[j]);
+        for id_gadget in new_birth_program_ids_gadgets.iter().take(C::NUM_OUTPUT_RECORDS) {
+            input.extend_from_slice(id_gadget);
         }
 
         let given_commitment_randomness =
