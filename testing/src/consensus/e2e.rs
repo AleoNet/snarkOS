@@ -27,7 +27,7 @@ use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};
 
 /// Helper providing pre-calculated data for e2e tests
-pub static DATA: Lazy<TestData> = Lazy::new(|| load_test_data());
+pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
@@ -81,10 +81,10 @@ impl ToBytes for TestData {
 
         self.block_2.write(&mut writer)?;
 
-        writer.write(&(self.records_1.len() as u64).to_le_bytes())?;
+        writer.write_all(&(self.records_1.len() as u64).to_le_bytes())?;
         self.records_1.write(&mut writer)?;
 
-        writer.write(&(self.records_2.len() as u64).to_le_bytes())?;
+        writer.write_all(&(self.records_2.len() as u64).to_le_bytes())?;
         self.records_2.write(&mut writer)?;
 
         self.alternative_block_1_header.write(&mut writer)?;
