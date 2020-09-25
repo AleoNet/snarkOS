@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::{Address, PrivateKey};
+use crate::account::{
+    address::Address,
+    private_key::{PrivateKey, Signature, SignaturePublicKey},
+};
 
 use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
@@ -49,5 +52,34 @@ impl Account {
             "Account {{ private_key: {}, address: {} }}",
             self.private_key, self.address
         )
+    }
+
+    #[wasm_bindgen]
+    pub fn to_signature_public_key(&self) -> String {
+        let public_key = self.private_key.to_signature_public_key().unwrap();
+        public_key.to_string()
+    }
+
+    /// Sign a message with the private key `sk_sig`
+    #[wasm_bindgen]
+    pub fn sign(&self, message: &str) -> String {
+        let rng = &mut StdRng::from_entropy();
+
+        let message = message.as_bytes();
+
+        let signature = self.private_key.sign(&message, rng).unwrap();
+
+        signature.to_string()
+    }
+
+    /// Verify a signature signed by the private key
+    /// Returns `true` if the signature is verified correctly. Otherwise, returns `false`.
+    #[wasm_bindgen]
+    pub fn verify(public_key: &str, message: &str, signature: &str) -> bool {
+        let public_key = SignaturePublicKey::from_str(public_key).unwrap();
+        let signature = Signature::from_str(signature).unwrap();
+        let message = message.as_bytes();
+
+        PrivateKey::verify(&public_key, &message, &signature).unwrap()
     }
 }
