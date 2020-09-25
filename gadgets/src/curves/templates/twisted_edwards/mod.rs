@@ -74,14 +74,12 @@ mod montgomery_affine_impl {
         pub fn from_edwards_to_coords(p: &TEAffine<P>) -> Result<(P::BaseField, P::BaseField), SynthesisError> {
             let montgomery_point: GroupAffine<P> = if p.y == P::BaseField::one() {
                 GroupAffine::zero()
+            } else if p.x == P::BaseField::zero() {
+                GroupAffine::new(P::BaseField::zero(), P::BaseField::zero())
             } else {
-                if p.x == P::BaseField::zero() {
-                    GroupAffine::new(P::BaseField::zero(), P::BaseField::zero())
-                } else {
-                    let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
-                    let v = u * &p.x.inverse().unwrap();
-                    GroupAffine::new(u, v)
-                }
+                let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
+                let v = u * &p.x.inverse().unwrap();
+                GroupAffine::new(u, v)
             };
 
             Ok((montgomery_point.x, montgomery_point.y))

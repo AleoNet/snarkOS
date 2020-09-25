@@ -499,10 +499,8 @@ impl Server {
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
                         }
-                    } else {
-                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
-                        }
+                    } else if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                        sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
                     }
                 }
             }

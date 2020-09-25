@@ -256,10 +256,9 @@ impl Config {
     }
 
     fn path(&mut self, argument: Option<&str>) {
-        match argument {
-            Some(path) => self.node.db = path.into(),
-            _ => (),
-        };
+        if let Some(path) = argument {
+            self.node.db = path.into();
+        }
     }
 
     fn connect(&mut self, argument: Option<&str>) {
@@ -367,12 +366,9 @@ impl CLI for ConfigCli {
             "verbose",
         ]);
 
-        match arguments.subcommand() {
-            ("update", Some(arguments)) => {
-                UpdateCLI::parse(arguments)?;
-                std::process::exit(0x0100);
-            }
-            _ => {}
+        if let ("update", Some(arguments)) = arguments.subcommand() {
+            UpdateCLI::parse(arguments)?;
+            std::process::exit(0x0100);
         }
 
         Ok(config)

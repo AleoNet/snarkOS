@@ -114,15 +114,15 @@ impl UInt for UInt128 {
                 *v <<= 1;
             }
 
-            match b {
-                &Boolean::Constant(b) => {
+            match *b {
+                Boolean::Constant(b) => {
                     if b {
                         if let Some(v) = value.as_mut() {
                             *v |= 1;
                         }
                     }
                 }
-                &Boolean::Is(ref b) => match b.get_value() {
+                Boolean::Is(ref b) => match b.get_value() {
                     Some(true) => {
                         if let Some(v) = value.as_mut() {
                             *v |= 1;
@@ -131,7 +131,7 @@ impl UInt for UInt128 {
                     Some(false) => {}
                     None => value = None,
                 },
-                &Boolean::Not(ref b) => match b.get_value() {
+                Boolean::Not(ref b) => match b.get_value() {
                     Some(false) => {
                         if let Some(v) = value.as_mut() {
                             *v |= 1;
