@@ -16,7 +16,7 @@
 
 use crate::{
     account::{
-        view_key::{Signature as ViewKeySignature, ViewKey},
+        view_key::{Signature, ViewKey},
         PrivateKey,
     },
     errors::AddressError,
@@ -60,7 +60,7 @@ impl Address {
 
     /// Verify a signature signed by the view key
     /// Returns `true` if the signature is verified correctly. Otherwise, returns `false`.
-    pub fn verify(&self, message: &[u8], signature: ViewKeySignature) -> Result<bool, AddressError> {
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<bool, AddressError> {
         let parameters = SystemParameters::<Components>::load()?;
 
         Ok(parameters
