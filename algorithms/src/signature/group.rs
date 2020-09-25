@@ -30,12 +30,17 @@ use rand::Rng;
 use std::{hash::Hash, marker::PhantomData};
 
 /// Map the encryption group into the signature group
-fn into_signature_group<G: Group + ProjectiveCurve, SG: Group>(projective: G) -> SG {
-    let bytes = to_bytes![&projective.into_affine()].expect("failed to convert to bytes");
-    FromBytes::read(&bytes[..]).expect("failed to convert to signature group")
+fn into_signature_group<G: Group + ProjectiveCurve + CanonicalSerialize, SG: Group + CanonicalDeserialize>(
+    projective: G,
+) -> SG {
+    let mut bytes = vec![];
+    CanonicalSerialize::serialize(&projective.into_affine(), &mut bytes).expect("failed to convert to bytes");
+    CanonicalDeserialize::deserialize(&mut &bytes[..]).expect("failed to convert to signature group")
 }
 
-impl<G: Group + ProjectiveCurve, SG: Group, D: Digest> From<GroupEncryptionParameters<G>> for SchnorrSignature<SG, D> {
+impl<G: Group + ProjectiveCurve + CanonicalSerialize, SG: Group + CanonicalDeserialize, D: Digest>
+    From<GroupEncryptionParameters<G>> for SchnorrSignature<SG, D>
+{
     fn from(parameters: GroupEncryptionParameters<G>) -> Self {
         let generator_powers: Vec<SG> = parameters
             .generator_powers

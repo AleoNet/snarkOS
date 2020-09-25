@@ -32,12 +32,12 @@ use std::{
 
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
-    Copy(bound = "G: Group + ProjectiveCurve"),
-    Clone(bound = "G: Group + ProjectiveCurve"),
-    PartialEq(bound = "G: Group + ProjectiveCurve"),
-    Eq(bound = "G: Group + ProjectiveCurve"),
-    Debug(bound = "G: Group + ProjectiveCurve"),
-    Hash(bound = "G: Group + ProjectiveCurve")
+    Copy(bound = "G: Group"),
+    Clone(bound = "G: Group"),
+    PartialEq(bound = "G: Group"),
+    Eq(bound = "G: Group"),
+    Debug(bound = "G: Group"),
+    Hash(bound = "G: Group")
 )]
 pub struct GroupEncryptionPublicKey<G: Group + ProjectiveCurve + CanonicalSerialize + CanonicalDeserialize>(pub G);
 
