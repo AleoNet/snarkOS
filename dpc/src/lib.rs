@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![allow(clippy::module_inception)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts, trivial_numeric_casts)]
 #![deny(
     single_use_lifetimes,

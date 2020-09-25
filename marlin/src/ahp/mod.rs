@@ -134,7 +134,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
 
         let public_input = constraint_systems::ProverConstraintSystem::format_public_input(public_input);
         if !Self::formatted_public_input_is_admissible(&public_input) {
-            Err(Error::InvalidPublicInputLength)?
+            return Err(Error::InvalidPublicInputLength);
         }
         let x_domain = EvaluationDomain::new(public_input.len()).ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
 

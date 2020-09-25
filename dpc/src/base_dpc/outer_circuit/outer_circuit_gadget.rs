@@ -38,7 +38,7 @@ use itertools::Itertools;
 
 fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
-    field_elements: &Vec<C::InnerField>,
+    field_elements: &[C::InnerField],
     name: &str,
 ) -> Result<Vec<Vec<UInt8>>, SynthesisError> {
     if field_elements.len() <= 1 {
@@ -58,6 +58,7 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
@@ -66,9 +67,9 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Inner snark verifier public inputs
     ledger_parameters: &C::MerkleParameters,
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
-    old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
-    new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    new_encrypted_record_hashes: &Vec<<C::EncryptedRecordCRH as CRH>::Output>,
+    old_serial_numbers: &[<C::AccountSignature as SignatureScheme>::PublicKey],
+    new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
+    new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
     memo: &[u8; 32],
     value_balance: AleoAmount,
     network_id: u8,

@@ -179,7 +179,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Removes transaction from memory pool based on the transaction id.
     #[inline]
-    pub fn remove_by_hash(&mut self, transaction_id: &Vec<u8>) -> Result<Option<Entry<T>>, ConsensusError> {
+    pub fn remove_by_hash(&mut self, transaction_id: &[u8]) -> Result<Option<Entry<T>>, ConsensusError> {
         match self.transactions.clone().get(transaction_id) {
             Some(entry) => {
                 self.total_size -= entry.size;

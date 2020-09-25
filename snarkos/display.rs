@@ -24,8 +24,7 @@ use std::str::FromStr;
 pub fn render_init(config: &Config) -> String {
     let mut output = String::new();
 
-    output += &format!(
-        r#"
+    output += &r#"
 
          ╦╬╬╬╬╬╦
         ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
@@ -39,14 +38,10 @@ pub fn render_init(config: &Config) -> String {
 ╚╬╬╬╬╬╩           ╩╬╬╬╬╩
 
 "#
-    )
     .white()
-    .bold()
-    .to_string();
+    .bold();
 
-    output += &format!("Welcome to Aleo! We thank you for running a network node and supporting privacy.\n\n")
-        .bold()
-        .to_string();
+    output += &"Welcome to Aleo! We thank you for running a network node and supporting privacy.\n\n".bold();
 
     let mut is_miner = config.miner.is_miner;
     if is_miner {
@@ -57,10 +52,9 @@ pub fn render_init(config: &Config) -> String {
                     .to_string();
             }
             Err(_) => {
-                output += &format!(
-                    "Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI.\n\n"
-                ).red().bold()
-                    .to_string();
+                output +=
+                    &"Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI.\n\n"
+                .red().bold();
 
                 is_miner = false;
             }
@@ -81,5 +75,5 @@ pub fn render_init(config: &Config) -> String {
         output += &format!("Listening for RPC requests on port {}\n", config.rpc.port);
     }
 
-    format!("{}", output)
+    output
 }

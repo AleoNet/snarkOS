@@ -133,7 +133,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
         // TODO: Add check that c is in the correct mode.
         let index = AHPForR1CS::index(c)?;
         if srs.max_degree() < index.max_degree() {
-            Err(Error::IndexTooLarge)?;
+            return Err(Error::IndexTooLarge);
         }
 
         let coeff_support = AHPForR1CS::get_degree_bounds::<C>(&index.index_info);
@@ -383,7 +383,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             if AHPForR1CS::<F>::LC_WITH_ZERO_EVAL.contains(&q.0.as_ref()) {
                 evaluations.insert(q, F::zero());
             } else {
-                evaluations.insert(q, proof_evals.next().unwrap().clone());
+                evaluations.insert(q, *proof_evals.next().unwrap());
             }
         }
 

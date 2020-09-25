@@ -72,7 +72,7 @@ impl<F: Field> DensePolynomial<F> {
 
     /// Checks if the given polynomial is zero.
     pub fn is_zero(&self) -> bool {
-        self.coeffs.len() == 0 || self.coeffs.iter().all(|coeff| coeff.is_zero())
+        self.coeffs.is_empty() || self.coeffs.iter().all(|coeff| coeff.is_zero())
     }
 
     /// Constructs a new polynomial from a list of coefficients.

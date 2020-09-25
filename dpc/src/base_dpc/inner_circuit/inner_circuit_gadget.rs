@@ -62,6 +62,7 @@ use snarkos_utilities::{
 use snarkos_models::gadgets::utilities::eq::NEqGadget;
 use std::ops::Mul;
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
@@ -146,6 +147,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
@@ -389,7 +391,7 @@ where
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
-                    Ok(record.commitment().clone())
+                    Ok(record.commitment())
                 })?;
             old_record_commitments_gadgets.push(given_commitment.clone());
 
@@ -941,7 +943,7 @@ where
             );
 
             let fq_high_and_payload_and_value_bits = [
-                &vec![Boolean::Constant(true)],
+                &[Boolean::Constant(true)],
                 &fq_high_bits[..],
                 &value_bits[..],
                 &payload_field_bits[..],

@@ -19,6 +19,7 @@ use snarkos_errors::dpc::LedgerError;
 
 use std::path::PathBuf;
 
+#[allow(clippy::len_without_is_empty)]
 pub trait LedgerScheme: Sized {
     type Block: BlockScheme;
     type Commitment;

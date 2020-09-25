@@ -43,7 +43,7 @@ impl Handshakes {
     pub async fn send_request(&mut self, version: &Version) -> Result<(), HandshakeError> {
         let handshake = Handshake::send_new(version).await?;
 
-        self.handshakes.insert(version.address_receiver.clone(), handshake);
+        self.handshakes.insert(version.address_receiver, handshake);
         info!("Request handshake with: {:?}", version.address_receiver);
 
         Ok(())

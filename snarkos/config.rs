@@ -28,12 +28,11 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use toml;
 
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
-pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &[
+pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
+pub const TESTNET_BOOTNODES: &[&str] = &[
     "138.197.232.178:4131",
     "64.225.91.42:4131",
     "64.225.91.43:4131",

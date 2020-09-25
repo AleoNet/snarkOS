@@ -230,7 +230,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             // Fetch the ciphertext selector bit
             let selector =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                    ciphertext_x_coordinate.clone(),
+                    ciphertext_x_coordinate,
                     true,
                 ) {
                     Some(affine) => ciphertext_element_affine == affine,

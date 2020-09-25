@@ -72,6 +72,7 @@ pub struct RpcImpl {
 
 impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
         storage_path: PathBuf,

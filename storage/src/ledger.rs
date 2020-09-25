@@ -190,7 +190,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Retrieve a value given a key.
-    pub(crate) fn get(&self, col: u32, key: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
+    pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(col, key)? {
             Some(data) => Ok(data),
             None => Err(StorageError::MissingValue(hex::encode(key))),

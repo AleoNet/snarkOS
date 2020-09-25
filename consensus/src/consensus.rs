@@ -183,7 +183,7 @@ impl ConsensusParameters {
     pub fn verify_transactions(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-        transactions: &Vec<Tx>,
+        transactions: &[Tx],
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
         for tx in transactions {
@@ -363,12 +363,13 @@ impl ConsensusParameters {
     }
 
     /// Generate a coinbase transaction given candidate block transactions
+    #[allow(clippy::too_many_arguments)]
     pub fn create_coinbase_transaction<R: Rng>(
         &self,
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
-        program_vk_hash: &Vec<u8>,
+        program_vk_hash: &[u8],
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
@@ -421,7 +422,7 @@ impl ConsensusParameters {
             old_records.push(old_record);
         }
 
-        let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_values = [vec![total_value_balance.0 as u64], vec![
             0;
@@ -450,6 +451,7 @@ impl ConsensusParameters {
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes
+    #[allow(clippy::too_many_arguments)]
     pub fn create_transaction<R: Rng>(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,

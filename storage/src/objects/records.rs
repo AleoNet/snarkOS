@@ -43,7 +43,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn get_record<R: Record>(&self, record_commitment: &Vec<u8>) -> Result<Option<R>, StorageError> {
+    pub fn get_record<R: Record>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
         match self.storage.get(COL_RECORDS, &record_commitment)? {
             Some(record_bytes) => {
                 let record: R = FromBytes::read(&record_bytes[..])?;
@@ -67,7 +67,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn store_records<R: Record>(&self, records: &Vec<R>) -> Result<(), StorageError> {
+    pub fn store_records<R: Record>(&self, records: &[R]) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         for record in records {

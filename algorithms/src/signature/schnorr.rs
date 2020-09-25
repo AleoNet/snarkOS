@@ -191,7 +191,7 @@ where
         };
 
         // k - xe;
-        let prover_response = random_scalar - &(verifier_challenge * &private_key);
+        let prover_response = random_scalar - &(verifier_challenge * private_key);
         let signature = SchnorrOutput {
             prover_response,
             verifier_challenge,

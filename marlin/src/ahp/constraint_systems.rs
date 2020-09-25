@@ -363,7 +363,7 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
         row: LabeledPolynomial::new_owned(m_name.clone() + "_row", row, None, None),
         col: LabeledPolynomial::new_owned(m_name.clone() + "_col", col, None, None),
         val: LabeledPolynomial::new_owned(m_name.clone() + "_val", val, None, None),
-        row_col: LabeledPolynomial::new_owned(m_name.clone() + "_row_col", row_col, None, None),
+        row_col: LabeledPolynomial::new_owned(m_name + "_row_col", row_col, None, None),
         evals_on_K,
         evals_on_B,
         row_col_evals_on_B: Cow::Owned(row_col_evals_on_B),

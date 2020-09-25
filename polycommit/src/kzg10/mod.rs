@@ -225,7 +225,7 @@ impl<E: PairingEngine> KZG10<E> {
         Ok((witness_polynomial, random_witness_polynomial))
     }
 
-    pub(crate) fn open_with_witness_polynomial<'a>(
+    pub(crate) fn open_with_witness_polynomial(
         powers: &Powers<E>,
         point: E::Fr,
         randomness: &Randomness<E>,
@@ -261,7 +261,7 @@ impl<E: PairingEngine> KZG10<E> {
     }
 
     /// On input a polynomial `p` and a point `point`, outputs a proof for the same.
-    pub(crate) fn open<'a>(
+    pub(crate) fn open(
         powers: &Powers<E>,
         p: &Polynomial<E::Fr>,
         point: E::Fr,
@@ -332,7 +332,7 @@ impl<E: PairingEngine> KZG10<E> {
             let mut temp = w.mul(*z);
             temp.add_assign_mixed(&c.0);
             let c = temp;
-            g_multiplier += &(randomizer * &v);
+            g_multiplier += &(randomizer * v);
             if let Some(random_v) = proof.random_v {
                 gamma_g_multiplier += &(randomizer * &random_v);
             }
@@ -410,12 +410,12 @@ impl<E: PairingEngine> KZG10<E> {
             if enforced_degree_bounds.binary_search(&bound).is_err() {
                 Err(Error::UnsupportedDegreeBound(bound))
             } else if bound < p.degree() || bound > max_degree {
-                return Err(Error::IncorrectDegreeBound {
+                Err(Error::IncorrectDegreeBound {
                     poly_degree: p.degree(),
                     degree_bound: p.degree_bound().unwrap(),
                     supported_degree,
                     label: p.label().to_string(),
-                });
+                })
             } else {
                 Ok(())
             }

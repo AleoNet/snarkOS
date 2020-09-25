@@ -101,7 +101,7 @@ impl<E: PairingEngine> MarlinKZG10<E> {
         (combined_comm, combined_shifted_comm)
     }
 
-    fn normalize_commitments<'a>(commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>) -> Vec<Commitment<E>> {
+    fn normalize_commitments(commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>) -> Vec<Commitment<E>> {
         let mut comms = Vec::with_capacity(commitments.len());
         let mut s_comms = Vec::with_capacity(commitments.len());
         let mut s_flags = Vec::with_capacity(commitments.len());
@@ -116,7 +116,7 @@ impl<E: PairingEngine> MarlinKZG10<E> {
             }
         }
         let comms = E::G1Projective::batch_normalization_into_affine(&comms);
-        let s_comms = E::G1Projective::batch_normalization_into_affine(&mut s_comms);
+        let s_comms = E::G1Projective::batch_normalization_into_affine(&s_comms);
         comms
             .into_iter()
             .zip(s_comms)
@@ -287,8 +287,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
             let hiding_bound = p.hiding_bound();
             let polynomial = p.polynomial();
 
-            let enforced_degree_bounds: Option<&[usize]> =
-                ck.enforced_degree_bounds.as_ref().map(|bounds| bounds.as_slice());
+            let enforced_degree_bounds: Option<&[usize]> = ck.enforced_degree_bounds.as_deref();
             kzg10::KZG10::<E>::check_degrees_and_bounds(
                 ck.supported_degree(),
                 ck.max_degree,
@@ -350,8 +349,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         for (j, (polynomial, rand)) in labeled_polynomials.into_iter().zip(rands).enumerate() {
             let degree_bound = polynomial.degree_bound();
 
-            let enforced_degree_bounds: Option<&[usize]> =
-                ck.enforced_degree_bounds.as_ref().map(|bounds| bounds.as_slice());
+            let enforced_degree_bounds: Option<&[usize]> = ck.enforced_degree_bounds.as_deref();
             kzg10::KZG10::<E>::check_degrees_and_bounds(
                 ck.supported_degree(),
                 ck.max_degree,
@@ -451,7 +449,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let mut query_to_labels_map = BTreeMap::new();
 
         for (label, point) in query_set.iter() {
-            let labels = query_to_labels_map.entry(point).or_insert(BTreeSet::new());
+            let labels = query_to_labels_map.entry(point).or_insert_with(BTreeSet::new);
             labels.insert(label);
         }
         assert_eq!(proof.len(), query_to_labels_map.len());

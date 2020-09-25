@@ -307,7 +307,6 @@ impl Server {
             let mut handshakes = context.handshakes.write().await;
             handshakes.send_request(&version).await.unwrap_or_else(|error| {
                 info!("Failed to connect to {:?}", error);
-                ()
             });
         });
     }

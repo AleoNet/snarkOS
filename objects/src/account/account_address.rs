@@ -65,6 +65,7 @@ impl<C: DPCComponents> AccountAddress<C> {
         Ok(Self { encryption_key })
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn into_repr(&self) -> &<C::AccountEncryption as EncryptionScheme>::PublicKey {
         &self.encryption_key
     }
@@ -96,7 +97,7 @@ impl<C: DPCComponents> FromStr for AccountAddress<C> {
         }
 
         let prefix = &address.to_lowercase()[0..4];
-        if prefix != account_format::ADDRESS_PREFIX.to_string() {
+        if prefix != account_format::ADDRESS_PREFIX {
             return Err(AccountError::InvalidPrefix(prefix.to_string()));
         };
 

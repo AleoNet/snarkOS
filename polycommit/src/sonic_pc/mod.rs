@@ -44,6 +44,7 @@ pub struct SonicKZG10<E: PairingEngine> {
 }
 
 impl<E: PairingEngine> SonicKZG10<E> {
+    #[allow(clippy::too_many_arguments)]
     fn accumulate_elems<'a>(
         combined_comms: &mut BTreeMap<Option<usize>, E::G1Projective>,
         combined_witness: &mut E::G1Projective,
@@ -77,7 +78,7 @@ impl<E: PairingEngine> SonicKZG10<E> {
             }
 
             // Accumulate values in the BTreeMap
-            *combined_comms.entry(degree_bound).or_insert(E::G1Projective::zero()) += &comm_with_challenge;
+            *combined_comms.entry(degree_bound).or_insert_with(E::G1Projective::zero) += &comm_with_challenge;
             curr_challenge *= &opening_challenge;
         }
 
@@ -283,8 +284,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
         let mut randomness: Vec<Self::Randomness> = Vec::new();
 
         for labeled_polynomial in polynomials {
-            let enforced_degree_bounds: Option<&[usize]> =
-                ck.enforced_degree_bounds.as_ref().map(|bounds| bounds.as_slice());
+            let enforced_degree_bounds: Option<&[usize]> = ck.enforced_degree_bounds.as_deref();
 
             kzg10::KZG10::<E>::check_degrees_and_bounds(
                 ck.supported_degree(),
@@ -341,8 +341,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
         let mut curr_challenge = opening_challenge;
 
         for (polynomial, rand) in labeled_polynomials.into_iter().zip(rands) {
-            let enforced_degree_bounds: Option<&[usize]> =
-                ck.enforced_degree_bounds.as_ref().map(|bounds| bounds.as_slice());
+            let enforced_degree_bounds: Option<&[usize]> = ck.enforced_degree_bounds.as_deref();
 
             kzg10::KZG10::<E>::check_degrees_and_bounds(
                 ck.supported_degree(),
@@ -414,7 +413,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
         let mut query_to_labels_map = BTreeMap::new();
 
         for (label, point) in query_set.iter() {
-            let labels = query_to_labels_map.entry(point).or_insert(BTreeSet::new());
+            let labels = query_to_labels_map.entry(point).or_insert_with(BTreeSet::new);
             labels.insert(label);
         }
 
@@ -526,7 +525,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
 
         let comms: Vec<Self::Commitment> = E::G1Projective::batch_normalization_into_affine(&lc_commitments)
             .into_iter()
-            .map(|c| kzg10::Commitment::<E>(c))
+            .map(kzg10::Commitment::<E>)
             .collect();
 
         let lc_commitments = lc_info
@@ -607,7 +606,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
 
         let comms: Vec<Self::Commitment> = E::G1Projective::batch_normalization_into_affine(&lc_commitments)
             .into_iter()
-            .map(|c| kzg10::Commitment(c))
+            .map(kzg10::Commitment)
             .collect();
 
         let lc_commitments = lc_info

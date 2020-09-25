@@ -68,7 +68,7 @@ impl Debug for ProofOfSuccinctWork {
 
 impl PartialEq for ProofOfSuccinctWork {
     fn eq(&self, other: &ProofOfSuccinctWork) -> bool {
-        &self.0[..] == &other.0[..]
+        self.0[..] == other.0[..]
     }
 }
 

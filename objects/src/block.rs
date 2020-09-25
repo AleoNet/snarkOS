@@ -80,7 +80,7 @@ impl<T: Transaction> Block<T> {
         Ok(serialization)
     }
 
-    pub fn deserialize(bytes: &Vec<u8>) -> Result<Self, BlockError> {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, BlockError> {
         const HEADER_SIZE: usize = BlockHeader::size();
         let (header_bytes, transactions_bytes) = bytes.split_at(HEADER_SIZE);
 

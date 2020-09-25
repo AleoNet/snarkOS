@@ -204,7 +204,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         private_key: &Self::PrivateKey,
         ciphertext: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
-        assert!(ciphertext.len() > 0);
+        assert!(!ciphertext.is_empty());
         let c_0 = &ciphertext[0];
 
         let record_view_key = c_0.mul(&private_key);

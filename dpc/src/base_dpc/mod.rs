@@ -155,6 +155,7 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
 }
 
 impl<Components: BaseDPCComponents> ExecuteContext<Components> {
+    #[allow(clippy::wrong_self_convention)]
     pub fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             system_parameters: self.system_parameters.clone(),
@@ -167,7 +168,7 @@ impl<Components: BaseDPCComponents> ExecuteContext<Components> {
             local_data_merkle_tree: self.local_data_merkle_tree.clone(),
             local_data_commitment_randomizers: self.local_data_commitment_randomizers.clone(),
 
-            memorandum: self.memorandum.clone(),
+            memorandum: self.memorandum,
             network_id: self.network_id,
         }
     }
@@ -289,6 +290,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok((sn, sig_and_pk_randomizer))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_record<R: Rng>(
         system_parameters: &SystemParameters<Components>,
         sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
@@ -296,8 +298,8 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         is_dummy: bool,
         value: u64,
         payload: &RecordPayload,
-        birth_program_id: &Vec<u8>,
-        death_program_id: &Vec<u8>,
+        birth_program_id: &[u8],
+        death_program_id: &[u8],
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
@@ -635,7 +637,7 @@ where
             local_data_commitment_randomizers,
 
             value_balance,
-            memorandum: memorandum.clone(),
+            memorandum: *memorandum,
             network_id,
         };
         Ok(context)
@@ -796,7 +798,7 @@ where
                 old_serial_numbers: old_serial_numbers.clone(),
                 new_commitments: new_commitments.clone(),
                 new_encrypted_record_hashes: new_encrypted_record_hashes.clone(),
-                memo: memorandum.clone(),
+                memo: memorandum,
                 program_commitment: program_commitment.clone(),
                 local_data_root: local_data_root.clone(),
                 value_balance,
@@ -850,7 +852,7 @@ where
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
-            memorandum.clone(),
+            memorandum,
             ledger_digest,
             inner_snark_id,
             transaction_proof,
@@ -954,7 +956,7 @@ where
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
             new_encrypted_record_hashes,
-            memo: transaction.memorandum().clone(),
+            memo: *transaction.memorandum(),
             program_commitment: transaction.program_commitment().clone(),
             local_data_root: transaction.local_data_root().clone(),
             value_balance: transaction.value_balance(),
