@@ -82,7 +82,7 @@ fn schnorr_signature_test() {
     let message = "Hi, I am a Schnorr signature!";
     let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
     sign_and_verify::<TestSignature>(message.as_bytes());
-    failed_verification::<TestSignature>(message.as_bytes(), "Bad message".as_bytes());
+    failed_verification::<TestSignature>(message.as_bytes(), b"Bad message");
     let random_scalar = to_bytes!(<Edwards as Group>::ScalarField::rand(rng)).unwrap();
     randomize_and_verify::<TestSignature>(message.as_bytes(), &random_scalar.as_slice());
 }

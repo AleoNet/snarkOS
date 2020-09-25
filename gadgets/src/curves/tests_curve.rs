@@ -58,24 +58,23 @@ fn bls12_377_gadget_bilinearity_test() {
     let sb_prep_g = G2PreparedGadget::from_affine(&mut cs.ns(|| "sb_prep"), &sb_g).unwrap();
 
     let (ans1_g, ans1_n) = {
-        let ans_g = Bls12PairingGadget::pairing(cs.ns(|| "pair(sa, b)"), sa_prep_g.clone(), b_prep_g.clone()).unwrap();
+        let ans_g = Bls12PairingGadget::pairing(cs.ns(|| "pair(sa, b)"), sa_prep_g, b_prep_g.clone()).unwrap();
         let ans_n = Bls12_377::pairing(sa, b);
         (ans_g, ans_n)
     };
 
     let (ans2_g, ans2_n) = {
-        let ans_g = Bls12PairingGadget::pairing(cs.ns(|| "pair(a, sb)"), a_prep_g.clone(), sb_prep_g.clone()).unwrap();
+        let ans_g = Bls12PairingGadget::pairing(cs.ns(|| "pair(a, sb)"), a_prep_g.clone(), sb_prep_g).unwrap();
         let ans_n = Bls12_377::pairing(a, sb);
         (ans_g, ans_n)
     };
 
     let (ans3_g, ans3_n) = {
         let s_iter = BitIterator::new(s.into_repr())
-            .map(|bit| Boolean::constant(bit))
+            .map(Boolean::constant)
             .collect::<Vec<_>>();
 
-        let mut ans_g =
-            Bls12PairingGadget::pairing(cs.ns(|| "pair(a, b)"), a_prep_g.clone(), b_prep_g.clone()).unwrap();
+        let mut ans_g = Bls12PairingGadget::pairing(cs.ns(|| "pair(a, b)"), a_prep_g, b_prep_g).unwrap();
         let mut ans_n = Bls12_377::pairing(a, b);
         ans_n = ans_n.pow(s.into_repr());
         ans_g = ans_g.pow(cs.ns(|| "pow"), &s_iter).unwrap();

@@ -60,7 +60,7 @@ impl PedersenSize for BoweHopwoodSize {
 fn generate_merkle_tree<P: MerkleParameters, F: PrimeField, HG: CRHGadget<P::H, F>>(
     leaves: &[[u8; 30]],
     use_bad_root: bool,
-) -> () {
+) {
     let parameters = P::default();
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();
@@ -129,7 +129,7 @@ fn generate_merkle_tree<P: MerkleParameters, F: PrimeField, HG: CRHGadget<P::H, 
 fn generate_masked_merkle_tree<P: MaskedMerkleParameters, F: PrimeField, HG: MaskedCRHGadget<P::H, F>>(
     leaves: &[[u8; 30]],
     use_bad_root: bool,
-) -> () {
+) {
     let parameters = P::default();
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     let root = tree.root();

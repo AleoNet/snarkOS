@@ -30,24 +30,24 @@ fn biginteger_arithmetic_test<B: BigInteger>(a: B, b: B, zero: B) {
     assert_eq!(a, a);
 
     // a + 0 = a
-    let mut a0_add = a.clone();
+    let mut a0_add = a;
     a0_add.add_nocarry(&zero);
     assert_eq!(a0_add, a);
 
     // a - 0 = a
-    let mut a0_sub = a.clone();
+    let mut a0_sub = a;
     a0_sub.sub_noborrow(&zero);
     assert_eq!(a0_sub, a);
 
     // a - a = 0
-    let mut aa_sub = a.clone();
+    let mut aa_sub = a;
     aa_sub.sub_noborrow(&a);
     assert_eq!(aa_sub, zero);
 
     // a + b = b + a
-    let mut ab_add = a.clone();
+    let mut ab_add = a;
     ab_add.add_nocarry(&b);
-    let mut ba_add = b.clone();
+    let mut ba_add = b;
     ba_add.add_nocarry(&a);
     assert_eq!(ab_add, ba_add);
 }

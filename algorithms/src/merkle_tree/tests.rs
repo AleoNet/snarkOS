@@ -37,7 +37,7 @@ fn generate_merkle_tree<P: LoadableMerkleParameters, L: ToBytes + Clone + Eq>(
 }
 
 /// Generates a valid Merkle tree and verifies the Merkle path witness for each leaf does not verify to an invalid root hash.
-fn bad_merkle_tree_verify<P: LoadableMerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) -> () {
+fn bad_merkle_tree_verify<P: LoadableMerkleParameters, L: ToBytes + Clone + Eq>(leaves: &[L], parameters: &P) {
     let tree = MerkleTree::<P>::new(parameters.clone(), leaves).unwrap();
     for (i, leaf) in leaves.iter().enumerate() {
         let proof = tree.generate_proof(i, &leaf).unwrap();
@@ -47,7 +47,7 @@ fn bad_merkle_tree_verify<P: LoadableMerkleParameters, L: ToBytes + Clone + Eq>(
 
 fn run_empty_merkle_tree_test<P: LoadableMerkleParameters>() {
     let parameters = &P::default();
-    generate_merkle_tree::<P, Vec<u8>>(&vec![], parameters);
+    generate_merkle_tree::<P, Vec<u8>>(&[], parameters);
 }
 
 fn run_good_root_test<P: LoadableMerkleParameters>() {

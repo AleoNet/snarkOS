@@ -486,7 +486,7 @@ mod tests {
             let size = 1 << coeffs;
             let domain = EvaluationDomain::<Fr>::new(size).unwrap();
             let domain_size = domain.size();
-            assert_eq!(domain_size, domain.elements().collect::<Vec<_>>().len());
+            assert_eq!(domain_size, domain.elements().count());
         }
     }
 

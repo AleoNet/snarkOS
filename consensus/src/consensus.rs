@@ -598,10 +598,10 @@ mod tests {
         };
 
         let b1 = DATA.block_1.clone();
-        let h1 = b1.header.clone();
+        let h1 = b1.header;
 
         let b2 = DATA.block_2.clone();
-        let h2 = b2.header.clone();
+        let h2 = b2.header;
         let merkle_root_hash = h2.merkle_root_hash.clone();
         let pedersen_merkle_root = h2.pedersen_merkle_root_hash.clone();
 
@@ -660,7 +660,7 @@ mod tests {
             .unwrap_err();
 
         // expected difficulty did not match the difficulty target
-        let mut h2_err = h2.clone();
+        let mut h2_err = h2;
         h2_err.difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp()) + 1;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)

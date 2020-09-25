@@ -73,12 +73,11 @@ fn generate_merkle_tree<C: CommitmentScheme, H: CRH, R: Rng>(
     let default = <C as CommitmentScheme>::Output::default();
     let mut leaves = [default.clone(), default.clone(), default.clone(), default];
 
-    for i in 0..4 {
+    for leaf in &mut leaves {
         let leaf_input: [u8; 32] = rng.gen();
         let randomness = <C as CommitmentScheme>::Randomness::rand(rng);
 
-        let leaf = commitment.commit(&leaf_input, &randomness).unwrap();
-        leaves[i] = leaf;
+        *leaf = commitment.commit(&leaf_input, &randomness).unwrap();
     }
 
     CommitmentMerkleTree::new(crh.clone(), &leaves).unwrap()
