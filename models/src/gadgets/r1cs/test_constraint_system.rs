@@ -56,8 +56,8 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 }
 
-impl<F: Field> TestConstraintSystem<F> {
-    pub fn new() -> TestConstraintSystem<F> {
+impl<F: Field> Default for TestConstraintSystem<F> {
+    fn default() -> Self {
         let mut map = BTreeMap::new();
         map.insert("ONE".into(), NamedObject::Var(TestConstraintSystem::<F>::one()));
 
@@ -68,6 +68,12 @@ impl<F: Field> TestConstraintSystem<F> {
             inputs: vec![(F::one(), "ONE".into())],
             aux: vec![],
         }
+    }
+}
+
+impl<F: Field> TestConstraintSystem<F> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn print_named_objects(&self) {

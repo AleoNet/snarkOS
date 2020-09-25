@@ -27,7 +27,7 @@ use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::TcpStream;
 
 /// Stores the address and latest state of peers we are handshaking with.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Handshakes {
     handshakes: HashMap<SocketAddr, Handshake>,
 }
@@ -35,9 +35,7 @@ pub struct Handshakes {
 impl Handshakes {
     /// Construct a new store of connected peer `Handshakes`.
     pub fn new() -> Self {
-        Self {
-            handshakes: HashMap::default(),
-        }
+        Self::default()
     }
 
     /// Create a new handshake with a peer and send a handshake request to them.
