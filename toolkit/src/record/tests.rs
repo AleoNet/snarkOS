@@ -29,7 +29,7 @@ pub const TEST_SERIAL_NUMBER: &str = "7b5ead0c963658ed7127bcdcb916eb42397824ee82
 pub const TEST_PRIVATE_KEY: &str = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
 
 #[test]
-pub fn record_test() {
+pub fn test_record() {
     let record = Record::from_str(TEST_RECORD);
     assert!(record.is_ok());
 
@@ -40,7 +40,7 @@ pub fn record_test() {
 }
 
 #[test]
-pub fn serial_number_derivation_test() {
+pub fn test_serial_number_derivation() {
     let record = Record::from_str(TEST_RECORD).unwrap();
     let private_key = PrivateKey::from_str(TEST_PRIVATE_KEY).unwrap();
 
@@ -54,7 +54,7 @@ pub fn serial_number_derivation_test() {
 }
 
 #[test]
-pub fn decrypt_record_test() {
+pub fn test_decrypt_record() {
     let private_key = PrivateKey::from_str(TEST_PRIVATE_KEY).unwrap();
     let view_key = ViewKey::from(&private_key).unwrap();
 
