@@ -279,7 +279,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             let lc = lc_s
                 .iter()
                 .find(|lc| &lc.label == label)
-                .ok_or(ahp::Error::MissingEval(label.to_string()))?;
+                .ok_or_else(|| ahp::Error::MissingEval(label.to_string()))?;
             let eval = polynomials.get_lc_eval(&lc, *point)?;
             if !AHPForR1CS::<F>::LC_WITH_ZERO_EVAL.contains(&lc.label.as_ref()) {
                 evaluations.push(eval);

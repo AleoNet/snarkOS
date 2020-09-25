@@ -133,7 +133,7 @@ impl Default for Config {
 impl Config {
     /// The directory that snarkOS system files will be stored
     fn snarkos_dir() -> PathBuf {
-        let mut path = home_dir().unwrap_or(std::env::current_dir().unwrap());
+        let mut path = home_dir().unwrap_or_else(|| std::env::current_dir().unwrap());
         path.push(".snarkOS/");
 
         path
