@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{account::PrivateKey, errors::AddressError};
+use crate::{
+    account::{PrivateKey, ViewKey},
+    errors::AddressError,
+};
 
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_objects::AccountAddress;
@@ -36,6 +39,12 @@ impl Address {
             &parameters.account_encryption,
             &private_key.private_key,
         )?;
+        Ok(Self { address })
+    }
+
+    pub fn from_view_key(view_key: &ViewKey) -> Result<Self, AddressError> {
+        let parameters = SystemParameters::<Components>::load()?;
+        let address = AccountAddress::<Components>::from_view_key(&parameters.account_encryption, &view_key.view_key)?;
         Ok(Self { address })
     }
 
