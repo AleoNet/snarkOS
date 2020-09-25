@@ -30,7 +30,7 @@ mod miner {
     fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountAddress<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
-        let enc_params = C::AccountEncryption::setup(rng);
+        let enc_params = <C::AccountEncryption as EncryptionScheme>::setup(rng);
 
         let private_key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
         let address = AccountAddress::from_private_key(&sig_params, &comm_params, &enc_params, &private_key).unwrap();

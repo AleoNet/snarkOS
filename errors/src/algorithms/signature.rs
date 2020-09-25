@@ -24,10 +24,10 @@ pub enum SignatureError {
     Crate(&'static str, String),
 
     #[error("{}", _0)]
-    Message(String),
+    EncryptionError(EncryptionError),
 
     #[error("{}", _0)]
-    EncryptionError(EncryptionError),
+    Message(String),
 }
 
 impl From<EncryptionError> for SignatureError {
