@@ -20,7 +20,6 @@ use crate::account::{
     view_key::{Signature, ViewKey},
 };
 
-use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
@@ -42,6 +41,12 @@ impl Address {
     pub fn from_view_key(view_key: &str) -> Self {
         let view_key = ViewKey::from_str(view_key).unwrap();
         let address = AddressNative::from_view_key(&view_key).unwrap();
+        Self { address }
+    }
+
+    #[wasm_bindgen]
+    pub fn from_string(address: &str) -> Self {
+        let address = AddressNative::from_str(address).unwrap();
         Self { address }
     }
 

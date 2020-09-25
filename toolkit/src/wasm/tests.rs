@@ -16,13 +16,7 @@
 
 use crate::{
     record::tests::{TEST_ENCRYPTED_RECORD, TEST_PRIVATE_KEY, TEST_RECORD, TEST_SERIAL_NUMBER},
-    wasm::{
-        signature_private::{SignatureScheme, SignatureSchemePublicKey},
-        signature_public::SignatureSchemePublic,
-        Account,
-        Record,
-        ViewKey,
-    },
+    wasm::{Account, Address, Record, ViewKey},
 };
 
 use wasm_bindgen_test::*;
@@ -80,80 +74,87 @@ pub fn test_serial_number_derivation() {
 
 // Signature Tests
 
-// Private
+// Test Schnorr signatures where:
+//   The Account Private Key `sk_sig` is the signature private key.
+//   The Account Private Key `pk_sig` is the signature public key.
 
 #[wasm_bindgen_test]
 pub fn test_signature_public_key_from_private_key() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_public_key = "17e858cfba9f42335bd7d4751f9284671f913d841325ce548f98ae46d480211038530919083215e5376a472a61eefad25b545d3b75d43c8e2f8f821a17500103";
 
-    let public_key = SignatureSchemePublicKey::from_private_key(given_private_key);
+    let account = Account::from_private_key(given_private_key);
+    let candidate_public_key = account.to_signature_public_key();
 
-    println!("{} == {}", given_public_key, public_key.public_key.to_string());
-    assert_eq!(given_public_key, public_key.public_key.to_string());
+    println!("{} == {}", given_public_key, candidate_public_key);
+    assert_eq!(given_public_key, candidate_public_key);
 }
 
 #[wasm_bindgen_test]
-pub fn test_signature_verification() {
+pub fn test_private_key_signature_verification() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_message = "test message";
 
-    let signature = SignatureScheme::sign(given_private_key, given_message);
-    let public_key = SignatureSchemePublicKey::from_private_key(given_private_key);
+    let account = Account::from_private_key(given_private_key);
+    let public_key = account.to_signature_public_key();
 
-    let signature_verification = signature.verify(&public_key.public_key.to_string(), given_message);
+    let signature = account.sign(given_message);
+
+    let signature_verification = Account::verify(&public_key.to_string(), given_message, &signature);
 
     println!("{} == {}", true, signature_verification);
     assert!(signature_verification);
 }
 
 #[wasm_bindgen_test]
-pub fn test_signature_failed_verification() {
+pub fn test_private_key_signature_failed_verification() {
     let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
     let given_message = "test message";
     let bad_message = "bad message";
 
-    let signature = SignatureScheme::sign(given_private_key, given_message);
-    let public_key = SignatureSchemePublicKey::from_private_key(given_private_key);
+    let account = Account::from_private_key(given_private_key);
+    let public_key = account.to_signature_public_key();
 
-    let signature_verification = signature.verify(&public_key.public_key.to_string(), bad_message);
+    let signature = account.sign(given_message);
+
+    let signature_verification = Account::verify(&public_key.to_string(), bad_message, &signature);
 
     println!("{} == {}", false, signature_verification);
     assert!(!signature_verification);
 }
 
-// Public
+// Test Schnorr signature scheme where:
+//   The Account View Key is the signature private key.
+//   The Account Address is the signature public key.
 
 #[wasm_bindgen_test]
-pub fn test_signature_public_verification() {
-    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+pub fn test_view_key_signature_verification() {
+    let given_view_key = "AViewKey1m8gvywHKHKfUzZiLiLoHedcdHEjKwo5TWo6efz8gK7wF";
     let given_message = "test message";
 
-    let view_key = ViewKey::from_private_key(given_private_key);
-    let account = Account::from_private_key(given_private_key);
-    let address = account.address;
+    let view_key = ViewKey::from_string(given_view_key);
+    let address = Address::from_view_key(given_view_key);
 
-    let signature = SignatureSchemePublic::sign(&view_key.view_key.to_string(), given_message);
+    let signature = view_key.sign(given_message);
 
-    let signature_verification = signature.verify(&address.address.to_string(), given_message);
+    let signature_verification = address.verify(given_message, &signature);
 
     println!("{} == {}", true, signature_verification);
     assert!(signature_verification);
 }
 
 #[wasm_bindgen_test]
-pub fn test_signature_public_failed_verification() {
-    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+pub fn test_view_key_signature_failed_verification() {
+    let given_view_key = "AViewKey1m8gvywHKHKfUzZiLiLoHedcdHEjKwo5TWo6efz8gK7wF";
     let given_message = "test message";
     let bad_message = "bad message";
 
-    let view_key = ViewKey::from_private_key(given_private_key);
-    let account = Account::from_private_key(given_private_key);
-    let address = account.address;
+    let view_key = ViewKey::from_string(given_view_key);
+    let address = Address::from_view_key(given_view_key);
 
-    let signature = SignatureSchemePublic::sign(&view_key.view_key.to_string(), given_message);
+    let signature = view_key.sign(given_message);
 
-    let signature_verification = signature.verify(&address.address.to_string(), bad_message);
+    let signature_verification = address.verify(bad_message, &signature);
 
     println!("{} == {}", false, signature_verification);
     assert!(!signature_verification);

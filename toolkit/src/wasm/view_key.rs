@@ -35,6 +35,12 @@ impl ViewKey {
     }
 
     #[wasm_bindgen]
+    pub fn from_string(view_key: &str) -> Self {
+        let view_key = ViewKeyNative::from_str(view_key).unwrap();
+        Self { view_key }
+    }
+
+    #[wasm_bindgen]
     pub fn to_string(&self) -> String {
         format!("ViewKey {{ view_key: {} }}", self.view_key)
     }
