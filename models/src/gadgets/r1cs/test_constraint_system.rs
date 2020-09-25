@@ -29,11 +29,13 @@ enum NamedObject {
     Namespace,
 }
 
+type TestConstraint<T> = (LinearCombination<T>, LinearCombination<T>, LinearCombination<T>, String);
+
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     named_objects: BTreeMap<String, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: Vec<(LinearCombination<F>, LinearCombination<F>, LinearCombination<F>, String)>,
+    pub constraints: Vec<TestConstraint<F>>,
     inputs: Vec<(F, String)>,
     aux: Vec<(F, String)>,
 }

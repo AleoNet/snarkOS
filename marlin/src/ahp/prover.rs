@@ -235,6 +235,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
     }
 
     /// Output the first round message and the next state.
+    #[allow(clippy::type_complexity)]
     pub fn prover_first_round<'a, 'b, R: RngCore, C: ConstraintSynthesizer<F>>(
         mut state: ProverState<'a, 'b, F, C>,
         rng: &mut R,

@@ -25,11 +25,11 @@ pub type MerkleTreeDigest<P> = <<P as MerkleParameters>::H as CRH>::Output;
 #[derive(Clone, Debug)]
 pub struct MerklePath<P: MerkleParameters> {
     pub parameters: P,
-    pub path: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>,
+    pub path: Vec<(MerkleTreeDigest<P>, MerkleTreeDigest<P>)>,
 }
 
 impl<P: MerkleParameters> MerklePath<P> {
-    pub fn verify<L: ToBytes>(&self, root_hash: &<P::H as CRH>::Output, leaf: &L) -> Result<bool, MerkleError> {
+    pub fn verify<L: ToBytes>(&self, root_hash: &MerkleTreeDigest<P>, leaf: &L) -> Result<bool, MerkleError> {
         if self.path.len() != P::DEPTH {
             return Ok(false);
         }
@@ -72,7 +72,7 @@ impl<P: MerkleParameters> Default for MerklePath<P> {
     fn default() -> Self {
         let mut path = Vec::with_capacity(P::DEPTH);
         for _i in 0..P::DEPTH {
-            path.push((<P::H as CRH>::Output::default(), <P::H as CRH>::Output::default()));
+            path.push((MerkleTreeDigest::<P>::default(), MerkleTreeDigest::<P>::default()));
         }
         Self {
             parameters: P::default(),

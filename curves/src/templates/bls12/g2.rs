@@ -26,6 +26,7 @@ use std::io::{Result as IoResult, Write};
 
 pub type G2Affine<P> = GroupAffine<<P as Bls12Parameters>::G2Parameters>;
 pub type G2Projective<P> = GroupProjective<<P as Bls12Parameters>::G2Parameters>;
+type CoeffTriplet<T> = (Fp2<T>, Fp2<T>, Fp2<T>);
 
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(
@@ -37,7 +38,7 @@ pub type G2Projective<P> = GroupProjective<<P as Bls12Parameters>::G2Parameters>
 pub struct G2Prepared<P: Bls12Parameters> {
     // Stores the coefficients of the line evaluations as calculated in
     // https://eprint.iacr.org/2013/722.pdf
-    pub ell_coeffs: Vec<(Fp2<P::Fp2Params>, Fp2<P::Fp2Params>, Fp2<P::Fp2Params>)>,
+    pub ell_coeffs: Vec<CoeffTriplet<P::Fp2Params>>,
     pub infinity: bool,
 }
 
@@ -107,10 +108,7 @@ impl<P: Bls12Parameters> G2Prepared<P> {
 }
 
 #[allow(clippy::many_single_char_names)]
-fn doubling_step<B: Bls12Parameters>(
-    r: &mut G2HomProjective<B>,
-    two_inv: &B::Fp,
-) -> (Fp2<B::Fp2Params>, Fp2<B::Fp2Params>, Fp2<B::Fp2Params>) {
+fn doubling_step<B: Bls12Parameters>(r: &mut G2HomProjective<B>, two_inv: &B::Fp) -> CoeffTriplet<B::Fp2Params> {
     // Formula for line function when working with
     // homogeneous projective coordinates.
 
@@ -137,10 +135,7 @@ fn doubling_step<B: Bls12Parameters>(
 }
 
 #[allow(clippy::many_single_char_names)]
-fn addition_step<B: Bls12Parameters>(
-    r: &mut G2HomProjective<B>,
-    q: &G2Affine<B>,
-) -> (Fp2<B::Fp2Params>, Fp2<B::Fp2Params>, Fp2<B::Fp2Params>) {
+fn addition_step<B: Bls12Parameters>(r: &mut G2HomProjective<B>, q: &G2Affine<B>) -> CoeffTriplet<B::Fp2Params> {
     // Formula for line function when working with
     // homogeneous projective coordinates.
     let theta = r.y - &(q.y * &r.z);

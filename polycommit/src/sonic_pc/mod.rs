@@ -98,6 +98,7 @@ impl<E: PairingEngine> SonicKZG10<E> {
         end_timer!(acc_time);
     }
 
+    #[allow(clippy::type_complexity)]
     fn check_elems(
         combined_comms: BTreeMap<Option<usize>, E::G1Projective>,
         combined_witness: E::G1Projective,
@@ -270,6 +271,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
     }
 
     /// Outputs a commitment to `polynomial`.
+    #[allow(clippy::type_complexity)]
     fn commit<'a>(
         ck: &Self::CommitterKey,
         polynomials: impl IntoIterator<Item = &'a LabeledPolynomial<'a, E::Fr>>,

@@ -109,6 +109,7 @@ impl Miner {
     }
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
+    #[allow(clippy::type_complexity)]
     pub fn establish_block(
         &self,
         parameters: &PublicParameters<Components>,

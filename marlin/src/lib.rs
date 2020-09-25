@@ -123,6 +123,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
 
     /// Generate the index-specific (i.e., circuit-specific) prover and verifier
     /// keys. This is a deterministic algorithm that anyone can rerun.
+    #[allow(clippy::type_complexity)]
     pub fn index<'a, C: ConstraintSynthesizer<F>>(
         srs: UniversalSRS<F, PC>,
         c: C,

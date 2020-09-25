@@ -16,6 +16,8 @@
 
 use std::{error::Error, fmt, io};
 
+pub type SynthesisResult<T> = Result<T, SynthesisError>;
+
 /// This is an error that could occur during circuit synthesis contexts,
 /// such as CRS generation, proving or verification.
 #[derive(Debug)]

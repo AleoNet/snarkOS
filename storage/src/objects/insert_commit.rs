@@ -22,6 +22,7 @@ use snarkos_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Commit a transaction to the canon chain
+    #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(
         &self,
         sn_index: &mut usize,
