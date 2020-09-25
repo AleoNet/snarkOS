@@ -16,7 +16,6 @@
 
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
-use hex;
 use serde::{
     de::{Error as DeserializeError, SeqAccess, Visitor},
     ser::SerializeTuple,
