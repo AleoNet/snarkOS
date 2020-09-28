@@ -28,7 +28,7 @@ use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
 use snarkos_network::{
     external::SyncHandler,
-    internal::{context::Context, process_transaction_internal},
+    internal::{environment::Environment, process_transaction_internal},
 };
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
@@ -55,7 +55,7 @@ pub struct RpcImpl {
     pub(crate) parameters: PublicParameters<Components>,
 
     /// Network context held by the server.
-    pub(crate) server_context: Arc<Context>,
+    pub(crate) server_context: Arc<Environment>,
 
     /// Consensus parameters generated from node config.
     pub(crate) consensus: ConsensusParameters,
@@ -77,7 +77,7 @@ impl RpcImpl {
         storage: Arc<MerkleTreeLedger>,
         storage_path: PathBuf,
         parameters: PublicParameters<Components>,
-        server_context: Arc<Context>,
+        server_context: Arc<Environment>,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
         sync_handler_lock: Arc<Mutex<SyncHandler>>,

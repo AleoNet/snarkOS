@@ -14,36 +14,90 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub struct ResponseManager {}
-
-impl ResponseManager {
-    /// Creates a new instance of a `ResponseManager`.
-    #[inline]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 use crate::{
-    external::{message::Message, message_types::*, propagate_block, protocol::SyncState, PingPongManager},
-    internal::process_transaction_internal,
+    external::{
+        message::Message,
+        message_types::*,
+        propagate_block,
+        protocol::SyncState,
+        Channel,
+        MessageName,
+        PingPongManager,
+        SyncHandler,
+    },
+    internal::{process_transaction_internal, PeerBook},
+    Environment,
+    RequestManager,
 };
-use snarkos_consensus::memory_pool::Entry;
+use snarkos_consensus::{memory_pool::Entry, ConsensusParameters, MemoryPool as Mempool, MerkleTreeLedger};
+use snarkos_dpc::{
+    instantiated::{Components, Tx},
+    PublicParameters,
+};
+use snarkos_errors::network::ServerError;
 use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
-use std::{collections::HashMap, net::IpAddr};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
-impl Server {
+pub struct ResponseManager {
+    /// The set of connected and disconnected peers to the node.
+    peer_book: Arc<RwLock<PeerBook>>,
+    consensus: ConsensusParameters,
+    environment: Arc<Environment>,
+    storage: Arc<MerkleTreeLedger>,
+    parameters: PublicParameters<Components>,
+    memory_pool_lock: Arc<Mutex<Mempool<Tx>>>,
+    sync_handler_lock: Arc<Mutex<SyncHandler>>,
+    connection_frequency: u64,
+    receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+    request_manager: RequestManager,
+}
+
+impl ResponseManager {
+    /// Creates a new instance of a `ResponseManager`.
+    #[inline]
+    pub fn new(
+        peer_book: Arc<RwLock<PeerBook>>,
+        consensus: ConsensusParameters,
+        environment: Arc<Environment>,
+        storage: Arc<MerkleTreeLedger>,
+        parameters: PublicParameters<Components>,
+        memory_pool_lock: Arc<Mutex<Mempool<Tx>>>,
+        sync_handler_lock: Arc<Mutex<SyncHandler>>,
+        connection_frequency: u64,
+        receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
+        request_manager: RequestManager,
+    ) -> Self {
+        Self {
+            peer_book,
+            consensus,
+            environment,
+            storage,
+            parameters,
+            memory_pool_lock,
+            sync_handler_lock,
+            connection_frequency,
+            receiver,
+            request_manager,
+        }
+    }
+
     /// This method handles all messages sent from connected peers.
     ///
     /// Messages are received by a single tokio MPSC receiver with
     /// the message name, bytes, associated channel, and a tokio oneshot sender.
     ///
     /// The oneshot sender lets the connection thread know when the message is handled.
+    #[inline]
     pub async fn message_handler(&mut self) {
         // TODO (raychu86) Create a macro to the handle the error messages.
         // TODO (howardwu): Come back and add error handlers to these.
@@ -93,8 +147,8 @@ impl Server {
                         );
                     }
                 }
-            } else if name == MemoryPoolMessage::name() {
-                if let Ok(mempool) = MemoryPoolMessage::deserialize(bytes) {
+            } else if name == MemoryPool::name() {
+                if let Ok(mempool) = MemoryPool::deserialize(bytes) {
                     if let Err(err) = self.receive_memory_pool(mempool).await {
                         error!(
                             "Message handler errored when receiving a {} message from {}. {}",
@@ -179,7 +233,7 @@ impl Server {
             } else if name == MessageName::from("disconnect") {
                 info!("Disconnected from peer {:?}", channel.address);
                 {
-                    let mut peer_book = self.context.peer_book.write().await;
+                    let mut peer_book = self.peer_book.write().await;
                     peer_book.disconnected_peer(&channel.address);
                 }
             } else {
@@ -218,7 +272,7 @@ impl Server {
 
                 if inserted && propagate {
                     // This is a new block, send it to our peers.
-                    propagate_block(self.context.clone(), message.data, channel.address).await?;
+                    propagate_block(self.environment.clone(), message.data, channel.address).await?;
                 } else if !propagate {
                     if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                         sync_handler.clear_pending(Arc::clone(&self.storage));
@@ -226,7 +280,7 @@ impl Server {
                         if sync_handler.sync_state != SyncState::Idle {
                             // We are currently syncing with a node, ask for the next block.
                             if let Some(channel) = self
-                                .context
+                                .environment
                                 .connections
                                 .read()
                                 .await
@@ -269,14 +323,14 @@ impl Server {
         }
 
         if !transactions.is_empty() {
-            channel.write(&MemoryPoolMessage::new(transactions)).await?;
+            channel.write(&MemoryPool::new(transactions)).await?;
         }
 
         Ok(())
     }
 
     /// A peer has sent us their memory pool transactions.
-    async fn receive_memory_pool(&mut self, message: MemoryPoolMessage) -> Result<(), ServerError> {
+    async fn receive_memory_pool(&mut self, message: MemoryPool) -> Result<(), ServerError> {
         let mut memory_pool = self.memory_pool_lock.lock().await;
 
         for transaction_bytes in message.transactions {
@@ -303,7 +357,7 @@ impl Server {
         // inform the peer book that we found a peer.
         // The peer book will determine if we have seen the peer before,
         // and include the peer if it is new.
-        let mut peer_book = self.context.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().await;
         if !peer_book.is_connected(&channel.address) {
             peer_book.found_peer(&channel.address);
         }
@@ -331,14 +385,14 @@ impl Server {
         // inform the peer book that we found a peer.
         // The peer book will determine if we have seen the peer before,
         // and include the peer if it is new.
-        let mut peer_book = self.context.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().await;
         if !peer_book.is_connected(&channel.address) {
             peer_book.found_peer(&channel.address);
         }
 
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
-        let local_address = *self.context.local_address.read().await;
+        let local_address = *self.environment.local_address.read().await;
 
         for (peer_address, _) in message.addresses.iter() {
             // Skip if the peer address is the node's local address.
@@ -367,7 +421,7 @@ impl Server {
         // inform the peer book that we found a peer.
         // The peer book will determine if we have seen the peer before,
         // and include the peer if it is new.
-        let mut peer_book = self.context.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().await;
         if !peer_book.is_connected(&channel.address) {
             peer_book.found_peer(&channel.address);
         }
@@ -383,13 +437,13 @@ impl Server {
         // inform the peer book that we found a peer.
         // The peer book will determine if we have seen the peer before,
         // and include the peer if it is new.
-        let mut peer_book = self.context.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().await;
         if !peer_book.is_connected(&channel.address) {
             peer_book.found_peer(&channel.address);
         }
 
         if let Err(error) = self
-            .context
+            .environment
             .pings
             .write()
             .await
@@ -447,7 +501,7 @@ impl Server {
 
         // Received block headers
         if let Some(channel) = self
-            .context
+            .environment
             .connections
             .read()
             .await
@@ -462,7 +516,7 @@ impl Server {
     /// A peer has sent us a transaction.
     async fn receive_transaction(&mut self, message: Transaction, channel: Arc<Channel>) -> Result<(), ServerError> {
         process_transaction_internal(
-            self.context.clone(),
+            self.environment.clone(),
             &self.consensus,
             &self.parameters,
             self.storage.clone(),
@@ -485,7 +539,7 @@ impl Server {
                 // inform the peer book that we found a peer.
                 // The peer book will determine if we have seen the peer before,
                 // and include the peer if it is new.
-                let mut peer_book = self.context.peer_book.write().await;
+                let mut peer_book = self.peer_book.write().await;
                 if !peer_book.is_connected(&channel.address) {
                     peer_book.found_peer(&channel.address);
                 }
@@ -508,10 +562,10 @@ impl Server {
     async fn receive_version(&mut self, message: Version, channel: Arc<Channel>) -> Result<Arc<Channel>, ServerError> {
         let peer_address = SocketAddr::new(channel.address.ip(), message.address_sender.port());
 
-        let peer_book = &mut self.context.peer_book.read().await;
+        let peer_book = &mut self.peer_book.read().await;
 
-        if *self.context.local_address.read().await != peer_address {
-            if peer_book.num_connected() < self.context.max_peers {
+        if *self.environment.local_address.read().await != peer_address {
+            if peer_book.num_connected() < self.environment.max_peers {
                 self.request_manager
                     .receive_request(message.clone(), peer_address)
                     .await;
@@ -533,7 +587,7 @@ impl Server {
                         }
                     } else {
                         if let Some(channel) = self
-                            .context
+                            .environment
                             .connections
                             .read()
                             .await

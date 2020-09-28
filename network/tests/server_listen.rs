@@ -21,12 +21,12 @@ mod server_listen {
         parameters::PublicParameters,
     };
     use snarkos_network::{
+        environment::Environment,
         external::{
             message::Message,
             message_types::{GetPeers, GetSync, Verack},
             protocol::SyncHandler,
         },
-        internal::context::Context,
         RequestManager,
         Server,
     };
@@ -59,7 +59,7 @@ mod server_listen {
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
         let server = Server::new(
-            Arc::new(Context::new(
+            Arc::new(Environment::new(
                 server_address,
                 5,
                 0,

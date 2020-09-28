@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::Block, internal::context::Context};
+use crate::{environment::Environment, external::Block};
 use snarkos_errors::network::SendError;
 
 use std::{net::SocketAddr, sync::Arc};
 
 /// Broadcast block to connected peers
 pub async fn propagate_block(
-    context: Arc<Context>,
+    context: Arc<Environment>,
     block_bytes: Vec<u8>,
     block_miner: SocketAddr,
 ) -> Result<(), SendError> {

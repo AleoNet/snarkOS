@@ -17,16 +17,13 @@
 pub mod connections;
 pub use connections::*;
 
-pub mod context;
-pub use context::*;
-
 pub mod peer_book;
 pub use peer_book::*;
 
 pub mod peer_info;
 pub use peer_info::*;
 
-use crate::{external::Transaction, internal::Context};
+use crate::{external::Transaction, Environment};
 use snarkos_consensus::{
     memory_pool::{Entry, MemoryPool},
     ConsensusParameters,
@@ -44,7 +41,7 @@ use tokio::sync::Mutex;
 
 /// Broadcast transaction to connected peers
 pub async fn propagate_transaction(
-    context: Arc<Context>,
+    context: Arc<Environment>,
     transaction_bytes: Vec<u8>,
     transaction_sender: SocketAddr,
 ) -> Result<(), SendError> {
@@ -76,7 +73,7 @@ pub async fn propagate_transaction(
 
 /// Verify a transaction, add it to the memory pool, propagate it to peers.
 pub async fn process_transaction_internal(
-    context: Arc<Context>,
+    context: Arc<Environment>,
     consensus: &ConsensusParameters,
     parameters: &PublicParameters<Components>,
     storage: Arc<MerkleTreeLedger>,

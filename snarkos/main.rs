@@ -27,7 +27,7 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
 use snarkos_errors::node::NodeError;
 use snarkos_models::algorithms::{CRH, SNARK};
-use snarkos_network::{external::protocol::SyncHandler, internal::context::Context, Server};
+use snarkos_network::{environment::Environment, external::protocol::SyncHandler, Server};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
@@ -124,7 +124,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         authorized_inner_snark_ids,
     };
 
-    let mut context = Arc::new(Context::new(
+    let mut context = Arc::new(Environment::new(
         socket_address,
         config.p2p.mempool_interval,
         config.p2p.min_peers,
@@ -183,7 +183,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             secondary_storage.clone(),
             path.to_path_buf(),
             proving_parameters,
-            server.context.clone(),
+            server.environment.clone(),
             consensus.clone(),
             memory_pool_lock.clone(),
             sync_handler_lock.clone(),

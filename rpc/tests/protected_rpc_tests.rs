@@ -23,7 +23,7 @@ mod protected_rpc_tests {
         record::DPCRecord,
     };
     use snarkos_models::dpc::Record;
-    use snarkos_network::{external::SyncHandler, internal::context::Context};
+    use snarkos_network::{environment::Environment, external::SyncHandler};
     use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
@@ -80,7 +80,7 @@ mod protected_rpc_tests {
         let sync_handler = SyncHandler::new(server_address);
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
-        let context = Context::new(server_address, 5, 1, 10, true, vec![], false);
+        let context = Environment::new(server_address, 5, 1, 10, true, vec![], false);
 
         let storage = storage.clone();
         let storage_path = storage.storage.db.path().to_path_buf();

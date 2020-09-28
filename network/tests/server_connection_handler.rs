@@ -45,7 +45,7 @@ mod server_connection_handler {
                 parameters,
                 CONNECTION_FREQUENCY_SHORT,
             );
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
 
             // 1. Add peer to connected in peer_book
 
@@ -93,7 +93,7 @@ mod server_connection_handler {
                 parameters,
                 CONNECTION_FREQUENCY_SHORT,
             );
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
 
             // 1. Add peer with old date to connected in peer_book
 
@@ -143,7 +143,7 @@ mod server_connection_handler {
                 parameters,
                 CONNECTION_FREQUENCY_SHORT,
             );
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
 
             // 1. Add peer to gossiped in peer_book
 
@@ -193,7 +193,7 @@ mod server_connection_handler {
                 parameters,
                 CONNECTION_FREQUENCY_SHORT,
             );
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
             let sync_handler_lock = Arc::clone(&server.sync_handler_lock);
 
             // 1. Add peer to peers
@@ -250,7 +250,7 @@ mod server_connection_handler {
                 parameters,
                 CONNECTION_FREQUENCY_SHORT,
             );
-            let context = server.context.clone();
+            let context = server.environment.clone();
 
             // 1. Start server
 

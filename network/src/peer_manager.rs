@@ -20,7 +20,8 @@ use crate::{
         Channel,
         PingPongManager,
     },
-    internal::{context::Context, PeerBook, PeerInfo},
+    internal::{PeerBook, PeerInfo},
+    Environment,
     RequestManager,
 };
 use snarkos_consensus::MerkleTreeLedger;
@@ -52,7 +53,7 @@ pub struct ConnectionManager {
 
 impl ConnectionManager {
     ///
-    /// Creates a new instance of a `ConnectionManager`.
+    /// Creates a new instance of `ConnectionManager`.
     ///
     /// Initializes the `ConnectionManager` with the following steps.
     /// 1. Attempt to connect to all default bootnodes on the network.
@@ -60,14 +61,14 @@ impl ConnectionManager {
     ///
     #[inline]
     pub async fn new(
-        context: &Arc<Context>,
+        environment: &Arc<Environment>,
         request_manager: RequestManager,
         storage: &Arc<MerkleTreeLedger>,
         bootnode_addresses: Vec<SocketAddr>,
         connection_frequency: u64,
     ) -> Self {
-        // Load the preliminary local address from context.
-        let preliminary_local_address = context.local_address.read().await;
+        // Load the preliminary local address from environment.
+        let preliminary_local_address = environment.local_address.read().await;
 
         // Load the peer book from storage.
         let peer_book = PeerBook::load(&storage).unwrap_or_else(|| {
@@ -85,31 +86,31 @@ impl ConnectionManager {
         });
         drop(preliminary_local_address);
 
-        // Instantiate a connection manager.
+        // Instantiate a peer manager.
         let connection_manager = Self {
             peer_book: Arc::new(RwLock::new(peer_book)),
             request_manager,
             storage: storage.clone(),
             channels: HashMap::new(),
-            ping_pong: context.pings.clone(),
+            ping_pong: environment.pings.clone(),
             bootnode_addresses,
-            minimum_peer_count: context.min_peers,
+            minimum_peer_count: environment.min_peers,
             connection_frequency,
         };
 
-        // Initialize the connection manager.
-        debug!("Initializing the connection manager...");
+        // Initialize the peer manager.
+        debug!("Initializing the peer manager...");
         {
-            // 1. Attempt to connect to all default bootnodes on the network.
+            // Attempt to connect to the default bootnodes of the network.
             connection_manager.connect_to_bootnodes().await;
-            // 2. Attempt to connect to all disconnected peers from the stored peer book.
-            if !context.is_bootnode {
-                // Only attempt the connection if the node is not a bootnode.
+            // Check that this node is not a bootnode.
+            if !environment.is_bootnode {
+                // Attempt to connect to each disconnected peer saved in the peer book.
                 connection_manager.connect_to_all_disconnected_peers().await;
             }
         }
-        // Completed initializing connection manager.
-        debug!("Completed initializing connection manager.");
+        // Completed initializing peer manager.
+        debug!("Completed initializing peer manager.");
 
         connection_manager
     }
@@ -339,9 +340,9 @@ impl ConnectionManager {
 
         // Iterate through each connected peer and attempts a connection request.
         for (remote_address, _) in self.get_all_disconnected().await {
-            // Ensure the node does not try requesting a duplicate connection.
+            // Check if the peer manager is already attempting to connect to the remote address.
             let is_pending = pending_peers.contains(&remote_address);
-
+            // Ensure the peer manager does not create a duplicate connection request.
             if !is_pending {
                 // TODO (raychu86) Establish a formal node version
                 // Create a version message.

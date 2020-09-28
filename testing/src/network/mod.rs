@@ -18,8 +18,8 @@ use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{
+    environment::Environment,
     external::{Channel, SyncHandler},
-    internal::context::Context,
     Server,
 };
 
@@ -60,7 +60,7 @@ pub fn initialize_test_server(
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
     Server::new(
-        Arc::new(Context::new(server_address, 5, 1, 10, true, vec![], false)),
+        Arc::new(Environment::new(server_address, 5, 1, 10, true, vec![], false)),
         consensus,
         storage,
         parameters,

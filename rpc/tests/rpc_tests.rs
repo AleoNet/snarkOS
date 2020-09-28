@@ -55,7 +55,7 @@ mod rpc_tests {
                 storage,
                 storage_path,
                 parameters,
-                server.context.clone(),
+                server.environment.clone(),
                 consensus,
                 server.memory_pool_lock,
                 server.sync_handler_lock,

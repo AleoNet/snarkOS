@@ -320,7 +320,7 @@ mod server_message_handler {
                 CONNECTION_FREQUENCY_LONG,
             );
             let mut server_sender = server.sender.clone();
-            let context = server.context.clone();
+            let context = server.environment.clone();
 
             let bootnode_channel = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
 
@@ -694,7 +694,7 @@ mod server_message_handler {
                 CONNECTION_FREQUENCY_LONG,
             );
             let mut server_sender = server.sender.clone();
-            let server_context = Arc::clone(&server.context);
+            let server_context = Arc::clone(&server.environment);
 
             // 1. Start peer and server
 
@@ -810,7 +810,7 @@ mod server_message_handler {
                 CONNECTION_FREQUENCY_LONG,
             );
             let mut server_sender = server.sender.clone();
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
 
             // 1. Start peer and server
 
@@ -866,7 +866,7 @@ mod server_message_handler {
                 CONNECTION_FREQUENCY_LONG,
             );
             let mut server_sender = server.sender.clone();
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
 
             // 1. Start server
 
@@ -947,7 +947,7 @@ mod server_message_handler {
                 CONNECTION_FREQUENCY_LONG,
             );
             let mut server_sender = server.sender.clone();
-            let context = Arc::clone(&server.context);
+            let context = Arc::clone(&server.environment);
 
             // 1. Start server
 

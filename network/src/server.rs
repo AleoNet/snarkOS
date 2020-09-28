@@ -15,16 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    connection_manager::ConnectionManager,
-    external::{
-        message::MessageName,
-        message_types::{GetSync, MemoryPool as MemoryPoolMessage},
-        protocol::*,
-        Channel,
-        GetMemoryPool,
-    },
-    internal::context::Context,
+    environment::Environment,
+    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, GetMemoryPool},
+    peer_manager::ConnectionManager,
     RequestManager,
+    ResponseManager,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
@@ -50,7 +45,7 @@ use tracing_futures::Instrument;
 #[allow(clippy::type_complexity)]
 pub struct Server {
     pub consensus: ConsensusParameters,
-    pub context: Arc<Context>,
+    pub environment: Arc<Environment>,
     pub storage: Arc<MerkleTreeLedger>,
     pub parameters: PublicParameters<Components>,
     pub memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
@@ -64,7 +59,7 @@ pub struct Server {
 impl Server {
     /// Constructs a new `Server`.
     pub fn new(
-        context: Arc<Context>,
+        environment: Arc<Environment>,
         consensus: ConsensusParameters,
         storage: Arc<MerkleTreeLedger>,
         parameters: PublicParameters<Components>,
@@ -77,7 +72,7 @@ impl Server {
 
         Server {
             consensus,
-            context,
+            environment,
             storage,
             parameters,
             memory_pool_lock,
@@ -92,9 +87,9 @@ impl Server {
     /// Returns the default bootnode addresses of the network.
     pub fn get_bootnodes(&self) -> Vec<SocketAddr> {
         // Initialize the vector to be returned.
-        let mut bootnode_addresses = Vec::with_capacity(self.context.bootnodes.len());
+        let mut bootnode_addresses = Vec::with_capacity(self.environment.bootnodes.len());
         // Iterate through and parse the list of bootnode addresses.
-        for bootnode in self.context.bootnodes.iter() {
+        for bootnode in self.environment.bootnodes.iter() {
             if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
                 bootnode_addresses.push(bootnode_address);
             }
@@ -114,12 +109,12 @@ impl Server {
         // Prepare to spawn the main loop.
         let sender = self.sender.clone();
         let storage = self.storage.clone();
-        let context = self.context.clone();
+        let environment = self.environment.clone();
         let sync_handler_lock = self.sync_handler_lock.clone();
         let mut request_manager = self.request_manager.clone();
 
         let connection_manager = ConnectionManager::new(
-            &context,
+            &environment,
             request_manager.clone(),
             &storage,
             self.get_bootnodes(),
@@ -152,7 +147,7 @@ impl Server {
                 };
 
                 // Check if we've exceed our maximum number of allowed peers.
-                if context.peer_book.read().await.num_connected() >= context.max_peers {
+                if environment.peer_book.read().await.num_connected() >= environment.max_peers {
                     warn!("Rejected a connection request as this exceeds the maximum number of peers allowed");
                     if let Err(error) = reader.shutdown(Shutdown::Write) {
                         error!("Failed to shutdown peer reader ({})", error);
@@ -215,7 +210,21 @@ impl Server {
 
         // 4. Start the message handler.
         debug!("Starting message handler");
-        self.message_handler().await;
+
+        let mut response_manager = ResponseManager::new(
+            self.environment.peer_book.clone(),
+            self.consensus,
+            self.environment.clone(),
+            self.storage.clone(),
+            self.parameters.clone(),
+            self.memory_pool_lock.clone(),
+            self.sync_handler_lock.clone(),
+            self.connection_frequency.clone(),
+            self.receiver,
+            self.request_manager.clone(),
+        );
+        response_manager.message_handler().await;
+        // self.message_handler().await;
 
         Ok(())
     }
@@ -327,7 +336,7 @@ impl Server {
     /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
     pub async fn connection_handler(&self, connection_manager: ConnectionManager) {
-        let context = self.context.clone();
+        let context = self.environment.clone();
         let memory_pool_lock = self.memory_pool_lock.clone();
         let sync_handler_lock = self.sync_handler_lock.clone();
         let storage = self.storage.clone();
