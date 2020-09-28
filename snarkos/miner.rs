@@ -16,7 +16,7 @@
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
-use snarkos_network::{external::propagate_block, internal::context::Context};
+use snarkos_network::{environment::Environment, external::propagate_block};
 use snarkos_objects::{AccountAddress, Block};
 
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub struct MinerInstance {
     parameters: PublicParameters<Components>,
     storage: Arc<MerkleTreeLedger>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    server_context: Arc<Context>,
+    server_context: Arc<Environment>,
 }
 
 impl MinerInstance {
@@ -40,7 +40,7 @@ impl MinerInstance {
         parameters: PublicParameters<Components>,
         storage: Arc<MerkleTreeLedger>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-        server_context: Arc<Context>,
+        server_context: Arc<Environment>,
     ) -> Self {
         Self {
             miner_address,

@@ -26,11 +26,9 @@ extern crate log;
 #[macro_use]
 extern crate snarkos_metrics;
 
-pub mod connection_manager;
-
 pub mod external;
-
 pub mod internal;
+pub mod peer_manager;
 
 pub mod request_manager;
 pub use request_manager::*;
@@ -40,3 +38,6 @@ pub use response_manager::*;
 
 pub mod server;
 pub use server::*;
+
+pub mod environment;
+pub use environment::*;

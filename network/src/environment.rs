@@ -22,9 +22,9 @@ use crate::{
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 
-/// The network context for this node.
+/// The network environment for this node.
 /// All variables are public to allow server components to acquire read/write access.
-pub struct Context {
+pub struct Environment {
     /// Frequency the server requests memory pool transactions.
     pub memory_pool_interval: u8,
 
@@ -58,7 +58,7 @@ pub struct Context {
     pub pings: Arc<RwLock<PingPongManager>>,
 }
 
-impl Context {
+impl Environment {
     /// Construct a new network `Context`.
     pub fn new(
         local_address: SocketAddr,

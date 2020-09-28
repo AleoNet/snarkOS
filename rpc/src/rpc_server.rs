@@ -26,7 +26,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::{external::SyncHandler, internal::context::Context};
+use snarkos_network::{environment::Environment, external::SyncHandler};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
@@ -40,7 +40,7 @@ pub async fn start_rpc_server(
     secondary_storage: Arc<MerkleTreeLedger>,
     storage_path: PathBuf,
     parameters: PublicParameters<Components>,
-    server_context: Arc<Context>,
+    server_context: Arc<Environment>,
     consensus: ConsensusParameters,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
     sync_handler_lock: Arc<Mutex<SyncHandler>>,
