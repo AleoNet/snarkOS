@@ -319,11 +319,9 @@ mod server_connection_handler {
 
             // 2. Add sync handler to connections
 
-            context
-                .connections
-                .write()
-                .await
-                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
+            let bootnode_channel = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+
+            context.connections.write().await.store_channel(&bootnode_channel);
 
             let channel_sync_side = accept_channel(&mut sync_node_listener, local_address).await;
 
