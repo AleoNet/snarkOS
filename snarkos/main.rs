@@ -54,7 +54,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
 
-            env_logger::init();
+            tracing_subscriber::fmt::init();
             println!("{}", render_init(&config));
         }
     }
