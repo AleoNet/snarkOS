@@ -35,6 +35,8 @@ use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::{runtime::Runtime, sync::Mutex};
+use tracing_futures::Instrument;
+use tracing_subscriber::EnvFilter;
 
 /// Builds a node from configuration parameters.
 /// 1. Creates new storage database or uses existing.
@@ -45,20 +47,6 @@ use tokio::{runtime::Runtime, sync::Mutex};
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 async fn start_server(config: Config) -> Result<(), NodeError> {
-    match config.node.verbose {
-        0 => {}
-        verbosity => {
-            match verbosity {
-                1 => std::env::set_var("RUST_LOG", "info"),
-                2 => std::env::set_var("RUST_LOG", "debug"),
-                _ => std::env::set_var("RUST_LOG", "info"),
-            };
-
-            tracing_subscriber::fmt::init();
-            println!("{}", render_init(&config));
-        }
-    }
-
     let address = format! {"{}:{}", config.node.ip, config.node.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
@@ -171,7 +159,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     }
 
     // Start the main server thread.
-    server.listen().await?;
+    server.listen().instrument(debug_span!("server")).await?;
 
     Ok(())
 }
@@ -181,7 +169,32 @@ fn main() -> Result<(), NodeError> {
 
     let config: Config = ConfigCli::parse(&arguments)?;
 
-    Runtime::new()?.block_on(start_server(config))?;
+    match config.node.verbose {
+        0 => {}
+        verbosity => {
+            match verbosity {
+                1 => std::env::set_var("RUST_LOG", "info"),
+                2 => std::env::set_var("RUST_LOG", "debug"),
+                _ => std::env::set_var("RUST_LOG", "info"),
+            };
+
+            // disable undesirable logs
+            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+
+            // initialize tracing
+            tracing_subscriber::fmt()
+                .with_env_filter(filter)
+                .with_target(false)
+                .init();
+
+            println!("{}", render_init(&config));
+        }
+    }
+
+    // create a tracing span dedicated to the entire node
+    let node_span = debug_span!("node");
+
+    Runtime::new()?.block_on(start_server(config).instrument(node_span))?;
 
     Ok(())
 }

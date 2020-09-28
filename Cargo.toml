@@ -62,6 +62,7 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.22", features = ["full"] }
 toml = { version = "0.5.6" }
 tracing = { default-features = false, features = ["log"], version = "0.1" }
+tracing-futures = { version = "0.2" }
 tracing-subscriber = { version = "0.2" }
 
 [dev-dependencies]

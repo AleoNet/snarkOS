@@ -2448,6 +2448,7 @@ dependencies = [
  "tokio 0.2.22",
  "toml",
  "tracing",
+ "tracing-futures",
  "tracing-subscriber",
 ]
 
@@ -2660,6 +2661,7 @@ dependencies = [
  "tokio 0.2.22",
  "tokio-test",
  "tracing",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -3310,6 +3312,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db63662723c316b43ca36d833707cc93dff82a02ba3d7e354f342682cc8b3545"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "tracing-futures"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab7bb6f14721aa00656086e9335d363c5c8747bae02ebe32ea2c7dece5689b4c"
+dependencies = [
+ "pin-project",
+ "tracing",
 ]
 
 [[package]]
