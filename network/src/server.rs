@@ -178,7 +178,7 @@ impl Server {
                 }
             }
         };
-        task::spawn(future.in_current_span());
+        task::spawn(future.instrument(debug_span!("new_conn_handler")));
 
         // 3. Start the connection handler.
         debug!("Starting connection handler");
@@ -210,6 +210,7 @@ impl Server {
         mut channel: Arc<Channel>,
         mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     ) {
+        let peer_address = channel.address.clone();
         let future = async move {
             // Determines the criteria for disconnecting from a peer.
             fn should_disconnect(failure_count: &u8) -> bool {
@@ -293,7 +294,7 @@ impl Server {
                 }
             }
         };
-        task::spawn(future.in_current_span());
+        task::spawn(future.instrument(debug_span!("connection", addr = %peer_address)));
     }
 
     /// Send a handshake request to a node at address without blocking the server listener.
@@ -311,7 +312,7 @@ impl Server {
                 ()
             });
         };
-        task::spawn(future.in_current_span());
+        task::spawn(future.instrument(debug_span!("handshake", addr = %remote_address)));
     }
 
     /// Send a handshake request the first bootnode and store the rest as gossipped peers

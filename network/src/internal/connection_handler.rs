@@ -99,7 +99,9 @@ impl Server {
                                             debug!("Could not connect to gossiped peer {}", remote_address);
                                         }
                                     };
-                                    task::spawn(handshake_future.in_current_span());
+                                    task::spawn(
+                                        handshake_future.instrument(debug_span!("handshake", addr = %remote_address)),
+                                    );
                                 }
                             }
 
@@ -224,6 +226,6 @@ impl Server {
                 }
             }
         };
-        task::spawn(handler_future.in_current_span());
+        task::spawn(handler_future.instrument(debug_span!("connection_handler")));
     }
 }
