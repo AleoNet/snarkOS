@@ -2403,7 +2403,6 @@ dependencies = [
  "dirs",
  "env_logger",
  "hex",
- "log",
  "rand",
  "rustc_version",
  "rusty-hook",
@@ -2421,6 +2420,7 @@ dependencies = [
  "snarkos-utilities",
  "tokio 0.2.22",
  "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -2477,7 +2477,6 @@ dependencies = [
  "chrono",
  "futures-await-test",
  "hex",
- "log",
  "rand",
  "rand_xorshift",
  "serde",
@@ -2493,6 +2492,7 @@ dependencies = [
  "snarkos-testing",
  "snarkos-utilities",
  "tokio 0.2.22",
+ "tracing",
 ]
 
 [[package]]
@@ -2616,7 +2616,6 @@ dependencies = [
  "byteorder",
  "chrono",
  "hex",
- "log",
  "rand",
  "rustc_version",
  "serde",
@@ -2632,6 +2631,7 @@ dependencies = [
  "snarkos-utilities",
  "tokio 0.2.22",
  "tokio-test",
+ "tracing",
 ]
 
 [[package]]
