@@ -21,12 +21,12 @@ use snarkos_utilities::{
     rand::UniformRand,
 };
 
+use criterion::Criterion;
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 
-#[bench]
-fn bench_fq_repr_add_nocarry(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_repr_add_nocarry(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -45,16 +45,17 @@ fn bench_fq_repr_add_nocarry(b: &mut ::test::Bencher) {
         .collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.add_nocarry(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_repr_add_nocarry", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.add_nocarry(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_repr_sub_noborrow(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_repr_sub_noborrow(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -72,16 +73,17 @@ fn bench_fq_repr_sub_noborrow(b: &mut ::test::Bencher) {
         .collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.sub_noborrow(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_repr_sub_noborrow", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.sub_noborrow(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_repr_num_bits(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_repr_num_bits(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -89,15 +91,16 @@ fn bench_fq_repr_num_bits(b: &mut ::test::Bencher) {
     let v: Vec<FqRepr> = (0..SAMPLES).map(|_| FqRepr::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let tmp = v[count].num_bits();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_repr_num_bits", |c| {
+        c.iter(|| {
+            let tmp = v[count].num_bits();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_repr_mul2(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_repr_mul2(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -105,16 +108,17 @@ fn bench_fq_repr_mul2(b: &mut ::test::Bencher) {
     let v: Vec<FqRepr> = (0..SAMPLES).map(|_| FqRepr::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp.mul2();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_repr_mul2", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp.mul2();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_repr_div2(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_repr_div2(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -122,16 +126,17 @@ fn bench_fq_repr_div2(b: &mut ::test::Bencher) {
     let v: Vec<FqRepr> = (0..SAMPLES).map(|_| FqRepr::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp.div2();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_repr_div2", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp.div2();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_add_assign(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_add_assign(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -139,16 +144,17 @@ fn bench_fq_add_assign(b: &mut ::test::Bencher) {
     let v: Vec<(Fq, Fq)> = (0..SAMPLES).map(|_| (Fq::rand(&mut rng), Fq::rand(&mut rng))).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.add_assign(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_add_assign", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.add_assign(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_sub_assign(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_sub_assign(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -156,16 +162,17 @@ fn bench_fq_sub_assign(b: &mut ::test::Bencher) {
     let v: Vec<(Fq, Fq)> = (0..SAMPLES).map(|_| (Fq::rand(&mut rng), Fq::rand(&mut rng))).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.sub_assign(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_sub_assign", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.sub_assign(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_mul_assign(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_mul_assign(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -173,16 +180,17 @@ fn bench_fq_mul_assign(b: &mut ::test::Bencher) {
     let v: Vec<(Fq, Fq)> = (0..SAMPLES).map(|_| (Fq::rand(&mut rng), Fq::rand(&mut rng))).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.mul_assign(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_mul_assign", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.mul_assign(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_double(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_double(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -190,16 +198,17 @@ fn bench_fq_double(b: &mut ::test::Bencher) {
     let v: Vec<Fq> = (0..SAMPLES).map(|_| Fq::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp.double_in_place();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_double", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp.double_in_place();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_square(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_square(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -207,16 +216,17 @@ fn bench_fq_square(b: &mut ::test::Bencher) {
     let v: Vec<Fq> = (0..SAMPLES).map(|_| Fq::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp.square_in_place();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_square", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp.square_in_place();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_inverse(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_inverse(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -224,14 +234,15 @@ fn bench_fq_inverse(b: &mut ::test::Bencher) {
     let v: Vec<Fq> = (0..SAMPLES).map(|_| Fq::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        count = (count + 1) % SAMPLES;
-        v[count].inverse()
+    c.bench_function("bls12_377: fq_inverse", |c| {
+        c.iter(|| {
+            count = (count + 1) % SAMPLES;
+            v[count].inverse()
+        })
     });
 }
 
-#[bench]
-fn bench_fq_negate(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_negate(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -239,16 +250,17 @@ fn bench_fq_negate(b: &mut ::test::Bencher) {
     let v: Vec<Fq> = (0..SAMPLES).map(|_| Fq::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp = -tmp;
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bls12_377: fq_negate", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp = -tmp;
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq_sqrt(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_sqrt(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -262,14 +274,15 @@ fn bench_fq_sqrt(b: &mut ::test::Bencher) {
         .collect();
 
     let mut count = 0;
-    b.iter(|| {
-        count = (count + 1) % SAMPLES;
-        v[count].sqrt()
+    c.bench_function("bls12_377: fq_sqrt", |c| {
+        c.iter(|| {
+            count = (count + 1) % SAMPLES;
+            v[count].sqrt()
+        })
     });
 }
 
-#[bench]
-fn bench_fq_into_repr(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_into_repr(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -277,14 +290,15 @@ fn bench_fq_into_repr(b: &mut ::test::Bencher) {
     let v: Vec<Fq> = (0..SAMPLES).map(|_| Fq::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        count = (count + 1) % SAMPLES;
-        v[count].into_repr()
+    c.bench_function("bls12_377: fq_into_repr", |c| {
+        c.iter(|| {
+            count = (count + 1) % SAMPLES;
+            v[count].into_repr()
+        })
     });
 }
 
-#[bench]
-fn bench_fq_from_repr(b: &mut ::test::Bencher) {
+pub(crate) fn bench_fq_from_repr(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -292,8 +306,10 @@ fn bench_fq_from_repr(b: &mut ::test::Bencher) {
     let v: Vec<FqRepr> = (0..SAMPLES).map(|_| Fq::rand(&mut rng).into_repr()).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        count = (count + 1) % SAMPLES;
-        Fq::from_repr(v[count])
+    c.bench_function("bls12_377: fq_from_repr", |c| {
+        c.iter(|| {
+            count = (count + 1) % SAMPLES;
+            Fq::from_repr(v[count])
+        })
     });
 }
