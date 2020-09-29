@@ -106,7 +106,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     // Generate dummy input records
 
     let old_account_private_keys = vec![dummy_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
-    let mut old_records = vec![];
+    let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
     for i in 0..Components::NUM_INPUT_RECORDS {
         let old_sn_nonce = &parameters
             .system_parameters

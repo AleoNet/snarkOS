@@ -248,20 +248,20 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
             labels.insert(label);
         }
 
-        let mut proofs = Vec::new();
+        let mut proofs = Vec::with_capacity(query_to_labels_map.len());
         for (query, labels) in query_to_labels_map.into_iter() {
-            let mut query_polys: Vec<&'a LabeledPolynomial<'a, _>> = Vec::new();
-            let mut query_rands: Vec<&'a Self::Randomness> = Vec::new();
-            let mut query_comms: Vec<&'a LabeledCommitment<Self::Commitment>> = Vec::new();
+            let mut query_polys = Vec::with_capacity(labels.len());
+            let mut query_rands = Vec::with_capacity(labels.len());
+            let mut query_comms = Vec::with_capacity(labels.len());
 
             for label in labels {
                 let (polynomial, rand, comm) = poly_rand_comm.get(label).ok_or(Error::MissingPolynomial {
                     label: label.to_string(),
                 })?;
 
-                query_polys.push(polynomial);
-                query_rands.push(rand);
-                query_comms.push(comm);
+                query_polys.push(*polynomial);
+                query_rands.push(*rand);
+                query_comms.push(*comm);
             }
 
             let proof_time = start_timer!(|| "Creating proof");
@@ -326,8 +326,8 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
 
         let mut result = true;
         for ((query, labels), proof) in query_to_labels_map.into_iter().zip(proofs) {
-            let mut comms: Vec<&'_ LabeledCommitment<_>> = Vec::new();
-            let mut values = Vec::new();
+            let mut comms: Vec<&'_ LabeledCommitment<_>> = Vec::with_capacity(labels.len());
+            let mut values = Vec::with_capacity(labels.len());
             for label in labels.into_iter() {
                 let commitment = commitments.get(label).ok_or(Error::MissingPolynomial {
                     label: label.to_string(),

@@ -147,7 +147,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
         let beta = state.second_round_msg.unwrap().beta;
         let gamma = state.gamma.unwrap();
 
-        let mut linear_combinations = Vec::new();
+        let mut linear_combinations = Vec::with_capacity(9);
 
         // Outer sumchecK:
         let z_b = LinearCombination::new("z_b", vec![(F::one(), "z_b")]);

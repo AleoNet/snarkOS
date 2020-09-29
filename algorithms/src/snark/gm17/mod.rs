@@ -176,7 +176,7 @@ impl<E: PairingEngine> VerifyingKey<E> {
         let h_gamma_g2: E::G2Affine = FromBytes::read(&mut reader)?;
 
         let query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut query: Vec<E::G1Affine> = vec![];
+        let mut query: Vec<E::G1Affine> = Vec::with_capacity(query_len as usize);
         for _ in 0..query_len {
             let query_element: E::G1Affine = FromBytes::read(&mut reader)?;
             query.push(query_element);
@@ -319,28 +319,26 @@ impl<E: PairingEngine> Parameters<E> {
 
         let vk = VerifyingKey::<E>::read(&mut reader)?;
 
-        let mut a_query: Vec<E::G1Affine> = vec![];
-        let mut b_query: Vec<E::G2Affine> = vec![];
-        let mut c_query_1: Vec<E::G1Affine> = vec![];
-        let mut c_query_2: Vec<E::G1Affine> = vec![];
-        let mut g_gamma2_z_t: Vec<E::G1Affine> = vec![];
-
         let a_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut a_query = Vec::with_capacity(a_query_len as usize);
         for _ in 0..a_query_len {
             a_query.push(read_g1_affine(&mut reader)?);
         }
 
         let b_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut b_query = Vec::with_capacity(b_query_len as usize);
         for _ in 0..b_query_len {
             b_query.push(read_g2_affine(&mut reader)?);
         }
 
         let c_query_1_len: u32 = FromBytes::read(&mut reader)?;
+        let mut c_query_1 = Vec::with_capacity(c_query_1_len as usize);
         for _ in 0..c_query_1_len {
             c_query_1.push(read_g1_affine(&mut reader)?);
         }
 
         let c_query_2_len: u32 = FromBytes::read(&mut reader)?;
+        let mut c_query_2 = Vec::with_capacity(c_query_2_len as usize);
         for _ in 0..c_query_2_len {
             c_query_2.push(read_g1_affine(&mut reader)?);
         }
@@ -351,6 +349,7 @@ impl<E: PairingEngine> Parameters<E> {
         let g_gamma2_z2: E::G1Affine = FromBytes::read(&mut reader)?;
 
         let g_gamma2_z_t_len: u32 = FromBytes::read(&mut reader)?;
+        let mut g_gamma2_z_t = Vec::with_capacity(g_gamma2_z_t_len as usize);
         for _ in 0..g_gamma2_z_t_len {
             g_gamma2_z_t.push(read_g1_affine(&mut reader)?);
         }

@@ -989,7 +989,7 @@ mod projective_impl {
                 {
                     let base_power = base_power.borrow();
                     let mut acc_power = *base_power;
-                    let mut coords = vec![];
+                    let mut coords = Vec::with_capacity(4);
                     for _ in 0..4 {
                         coords.push(acc_power);
                         acc_power += base_power;

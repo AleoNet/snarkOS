@@ -465,7 +465,7 @@ where
         let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut joint_serial_numbers = Vec::new();
-        let mut old_death_program_ids = Vec::new();
+        let mut old_death_program_ids = Vec::with_capacity(old_records.len());
 
         let mut value_balance = AleoAmount::ZERO;
 
@@ -529,7 +529,7 @@ where
         // TODO (raychu86) Add index and program register inputs + outputs to local data commitment leaves
         let local_data_merkle_tree_timer = start_timer!(|| "Compute local data merkle tree");
 
-        let mut local_data_commitment_randomizers = vec![];
+        let mut local_data_commitment_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
 
         let mut old_record_commitments = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for i in 0..Components::NUM_INPUT_RECORDS {

@@ -74,8 +74,8 @@ impl<G: Group, D: Digest> ToBytes for SchnorrParameters<G, D> {
 impl<G: Group, D: Digest> FromBytes for SchnorrParameters<G, D> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let mut generator_powers = vec![];
         let generator_powers_length: u32 = FromBytes::read(&mut reader)?;
+        let mut generator_powers = Vec::with_capacity(generator_powers_length as usize);
         for _ in 0..generator_powers_length {
             let g: G = FromBytes::read(&mut reader)?;
             generator_powers.push(g);

@@ -114,7 +114,7 @@ impl<T: Transaction> MemoryPool<T> {
 
         let mut holding_serial_numbers = vec![];
         let mut holding_commitments = vec![];
-        let mut holding_memos = vec![];
+        let mut holding_memos = Vec::with_capacity(self.transactions.len());
 
         for (_, tx) in self.transactions.iter() {
             holding_serial_numbers.extend(tx.transaction.old_serial_numbers());

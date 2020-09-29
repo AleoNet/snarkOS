@@ -399,7 +399,7 @@ impl ConsensusParameters {
 
         // Generate dummy input records having as address the genesis address.
         let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
-        let mut old_records = vec![];
+        let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
@@ -495,7 +495,7 @@ impl ConsensusParameters {
         let dpc_program =
             NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
 
-        let mut old_death_program_proofs = vec![];
+        let mut old_death_program_proofs = Vec::with_capacity(NUM_INPUT_RECORDS);
         for i in 0..NUM_INPUT_RECORDS {
             let private_input = dpc_program.execute(
                 &parameters.noop_program_snark_parameters.proving_key,
@@ -508,7 +508,7 @@ impl ConsensusParameters {
             old_death_program_proofs.push(private_input);
         }
 
-        let mut new_birth_program_proofs = vec![];
+        let mut new_birth_program_proofs = Vec::with_capacity(NUM_OUTPUT_RECORDS);
         for j in 0..NUM_OUTPUT_RECORDS {
             let private_input = dpc_program.execute(
                 &parameters.noop_program_snark_parameters.proving_key,

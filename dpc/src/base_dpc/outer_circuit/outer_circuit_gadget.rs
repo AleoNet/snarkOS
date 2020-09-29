@@ -47,7 +47,7 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
             &to_bytes![field_elements].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?])
     } else {
-        let mut fe_bytes = vec![];
+        let mut fe_bytes = Vec::with_capacity(field_elements.len());
         for (index, field_element) in field_elements.iter().enumerate() {
             fe_bytes.push(UInt8::alloc_input_vec(
                 cs.ns(|| format!("Allocate {} - index {} ", name, index)),
@@ -193,7 +193,7 @@ where
     let ledger_digest_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_digest)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let mut serial_numbers_fe = vec![];
+    let mut serial_numbers_fe = Vec::with_capacity(old_serial_numbers.len());
     for sn in old_serial_numbers {
         let serial_number_fe =
             ToConstraintField::<C::InnerField>::to_field_elements(sn).map_err(|_| SynthesisError::AssignmentMissing)?;
@@ -201,7 +201,7 @@ where
         serial_numbers_fe.push(serial_number_fe);
     }
 
-    let mut commitments_fe = vec![];
+    let mut commitments_fe = Vec::with_capacity(new_commitments.len());
     for cm in new_commitments {
         let commitment_fe =
             ToConstraintField::<C::InnerField>::to_field_elements(cm).map_err(|_| SynthesisError::AssignmentMissing)?;
@@ -209,7 +209,7 @@ where
         commitments_fe.push(commitment_fe);
     }
 
-    let mut encrypted_record_hashes_fe = vec![];
+    let mut encrypted_record_hashes_fe = Vec::with_capacity(new_encrypted_record_hashes.len());
     for encrypted_record_hash in new_encrypted_record_hashes {
         let encrypted_record_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(encrypted_record_hash)
             .map_err(|_| SynthesisError::AssignmentMissing)?;
@@ -309,7 +309,7 @@ where
 
     // Convert inner snark input bytes to bits
 
-    let mut inner_snark_input_bits = vec![];
+    let mut inner_snark_input_bits = Vec::with_capacity(inner_snark_input_bytes.len());
     for input_bytes in inner_snark_input_bytes {
         let input_bits = input_bytes
             .iter()
@@ -350,7 +350,7 @@ where
     program_input_bytes.extend(local_data_commitment_parameters_fe_bytes);
     program_input_bytes.extend(local_data_root_fe_bytes);
 
-    let mut program_input_bits = vec![];
+    let mut program_input_bits = Vec::with_capacity(program_input_bytes.len());
 
     for input_bytes in program_input_bytes {
         let input_bits = input_bytes
@@ -363,8 +363,8 @@ where
     // ************************************************************************
     // ************************************************************************
 
-    let mut old_death_program_ids = Vec::new();
-    let mut new_birth_program_ids = Vec::new();
+    let mut old_death_program_ids = Vec::with_capacity(C::NUM_INPUT_RECORDS);
+    let mut new_birth_program_ids = Vec::with_capacity(C::NUM_OUTPUT_RECORDS);
     for (i, input) in old_death_program_verification_inputs
         .iter()
         .enumerate()

@@ -216,7 +216,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         let z = Self::Randomness::read(&z_bytes[..])?;
 
         let one = Self::Randomness::one();
-        let mut plaintext = vec![];
+        let mut plaintext = Vec::with_capacity(ciphertext.len().saturating_sub(1));
         let mut i = Self::Randomness::one();
 
         for c_i in ciphertext.iter().skip(1) {

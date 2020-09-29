@@ -93,7 +93,7 @@ impl<P: MerkleParameters> MerkleTree<P> {
         // Finished computing actual tree.
         // Now, we compute the dummy nodes until we hit our DEPTH goal.
         let mut current_depth = tree_depth;
-        let mut padding_tree = vec![];
+        let mut padding_tree = Vec::with_capacity((Self::DEPTH as usize).saturating_sub(current_depth + 1));
         let mut current_hash = tree[0].clone();
         while current_depth < Self::DEPTH as usize {
             current_hash = parameters.hash_inner_node(&current_hash, &empty_hash, &mut buffer)?;

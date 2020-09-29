@@ -101,7 +101,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         if children.is_empty() {
             Ok((1, final_path))
         } else {
-            let mut paths = vec![];
+            let mut paths = Vec::with_capacity(children.len());
             for child in children {
                 paths.push(self.longest_child_path(child)?);
             }
