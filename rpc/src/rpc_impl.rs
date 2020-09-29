@@ -305,11 +305,7 @@ impl RpcFunctions for RpcImpl {
         // Create a temporary tokio runtime to make an asynchronous function call
         let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
 
-        let mut peers = vec![];
-
-        for peer in peer_book.get_connected().keys() {
-            peers.push(*peer);
-        }
+        let peers = peer_book.get_connected().keys().cloned().collect();
 
         Ok(PeerInfo { peers })
     }

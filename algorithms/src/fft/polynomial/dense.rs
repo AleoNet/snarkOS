@@ -140,10 +140,7 @@ impl<F: Field> DensePolynomial<F> {
     /// Outputs a polynomial of degree `d` where each coefficient is sampled uniformly at random
     /// from the field `F`.
     pub fn rand<R: Rng>(d: usize, rng: &mut R) -> Self {
-        let mut random_coeffs = Vec::new();
-        for _ in 0..(d + 1) {
-            random_coeffs.push(F::rand(rng));
-        }
+        let random_coeffs = (0..(d + 1)).map(|_| F::rand(rng)).collect();
         Self::from_coefficients_vec(random_coeffs)
     }
 }

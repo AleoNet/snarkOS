@@ -30,12 +30,7 @@ type TestEncryptionScheme = GroupEncryption<EdwardsProjective>;
 pub const ITERATIONS: usize = 1000;
 
 fn generate_input<G: Group + ProjectiveCurve, R: Rng>(input_size: usize, rng: &mut R) -> Vec<G> {
-    let mut input = vec![];
-    for _ in 0..input_size {
-        input.push(G::rand(rng))
-    }
-
-    input
+    (0..input_size).map(|_| G::rand(rng)).collect()
 }
 
 #[test]
