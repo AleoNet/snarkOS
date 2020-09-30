@@ -19,6 +19,7 @@ use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{MerkleParameters, CRH};
 use snarkos_utilities::ToBytes;
 
+#[derive(Default)]
 pub struct MerkleTree<P: MerkleParameters> {
     /// The computed root of the full Merkle tree.
     root: Option<MerkleTreeDigest<P>>,
@@ -180,18 +181,6 @@ impl<P: MerkleParameters> MerkleTree<P> {
                 parameters: self.parameters.clone(),
                 path,
             })
-        }
-    }
-}
-
-impl<P: MerkleParameters> Default for MerkleTree<P> {
-    fn default() -> Self {
-        MerkleTree {
-            tree: vec![],
-            padding_tree: vec![],
-            hashed_leaves: vec![],
-            root: None,
-            parameters: P::default(),
         }
     }
 }
