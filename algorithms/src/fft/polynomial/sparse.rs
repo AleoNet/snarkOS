@@ -54,7 +54,7 @@ impl<F: Field> SparsePolynomial<F> {
 
     /// Checks if the given polynomial is zero.
     pub fn is_zero(&self) -> bool {
-        self.coeffs.len() == 0 || self.coeffs.iter().all(|(_, c)| c.is_zero())
+        self.coeffs.is_empty() || self.coeffs.iter().all(|(_, c)| c.is_zero())
     }
 
     /// Constructs a new polynomial from a list of coefficients.
@@ -104,7 +104,7 @@ impl<F: Field> SparsePolynomial<F> {
             let mut result = std::collections::HashMap::new();
             for (i, self_coeff) in self.coeffs.iter() {
                 for (j, other_coeff) in other.coeffs.iter() {
-                    let cur_coeff = result.entry(i + j).or_insert(F::zero());
+                    let cur_coeff = result.entry(i + j).or_insert_with(F::zero);
                     *cur_coeff += &(*self_coeff * other_coeff);
                 }
             }

@@ -119,7 +119,7 @@ impl<P: Fp2Parameters> Field for Fp2<P> {
     }
 
     fn double(&self) -> Self {
-        let mut result = self.clone();
+        let mut result = *self;
         result.double_in_place();
         result
     }
@@ -324,7 +324,7 @@ impl<P: Fp2Parameters> Neg for Fp2<P> {
     #[inline]
     #[must_use]
     fn neg(self) -> Self {
-        let mut res = self.clone();
+        let mut res = self;
         res.c0 = res.c0.neg();
         res.c1 = res.c1.neg();
         res
@@ -400,6 +400,7 @@ impl<'a, P: Fp2Parameters> SubAssign<&'a Self> for Fp2<P> {
 
 impl<'a, P: Fp2Parameters> MulAssign<&'a Self> for Fp2<P> {
     #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn mul_assign(&mut self, other: &Self) {
         // Karatsuba multiplication;
         // Guide to Pairing-based cryprography, Algorithm 5.16.

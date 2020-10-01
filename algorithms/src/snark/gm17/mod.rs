@@ -17,7 +17,7 @@
 //! An implementation of the [Groth-Maller][GM17] simulation extractable zkSNARK.
 //! [GM17]: https://eprint.iacr.org/2017/540
 
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::gadgets::SynthesisResult;
 use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
@@ -427,64 +427,66 @@ impl<E: PairingEngine> ToBytes for PreparedVerifyingKey<E> {
     }
 }
 
+type AffinePair<'a, T> = (&'a [T], &'a [T]);
+
 impl<E: PairingEngine> Parameters<E> {
-    pub fn get_vk(&self, _: usize) -> Result<VerifyingKey<E>, SynthesisError> {
+    pub fn get_vk(&self, _: usize) -> SynthesisResult<VerifyingKey<E>> {
         Ok(self.vk.clone())
     }
 
-    pub fn get_a_query(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_a_query(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.a_query[1..num_inputs], &self.a_query[num_inputs..]))
     }
 
-    pub fn get_b_query(&self, num_inputs: usize) -> Result<(&[E::G2Affine], &[E::G2Affine]), SynthesisError> {
+    pub fn get_b_query(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G2Affine>> {
         Ok((&self.b_query[1..num_inputs], &self.b_query[num_inputs..]))
     }
 
-    pub fn get_c_query_1(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_c_query_1(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.c_query_1[0..num_inputs], &self.c_query_1[num_inputs..]))
     }
 
-    pub fn get_c_query_2(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_c_query_2(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.c_query_2[1..num_inputs], &self.c_query_2[num_inputs..]))
     }
 
-    pub fn get_g_gamma_z(&self) -> Result<E::G1Affine, SynthesisError> {
+    pub fn get_g_gamma_z(&self) -> SynthesisResult<E::G1Affine> {
         Ok(self.g_gamma_z)
     }
 
-    pub fn get_h_gamma_z(&self) -> Result<E::G2Affine, SynthesisError> {
+    pub fn get_h_gamma_z(&self) -> SynthesisResult<E::G2Affine> {
         Ok(self.h_gamma_z)
     }
 
-    pub fn get_g_ab_gamma_z(&self) -> Result<E::G1Affine, SynthesisError> {
+    pub fn get_g_ab_gamma_z(&self) -> SynthesisResult<E::G1Affine> {
         Ok(self.g_ab_gamma_z)
     }
 
-    pub fn get_g_gamma2_z2(&self) -> Result<E::G1Affine, SynthesisError> {
+    pub fn get_g_gamma2_z2(&self) -> SynthesisResult<E::G1Affine> {
         Ok(self.g_gamma2_z2)
     }
 
-    pub fn get_g_gamma2_z_t(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_g_gamma2_z_t(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.g_gamma2_z_t[0..num_inputs], &self.g_gamma2_z_t[num_inputs..]))
     }
 
-    pub fn get_a_query_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_a_query_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.a_query)
     }
 
-    pub fn get_b_query_full(&self) -> Result<&[E::G2Affine], SynthesisError> {
+    pub fn get_b_query_full(&self) -> SynthesisResult<&[E::G2Affine]> {
         Ok(&self.b_query)
     }
 
-    pub fn get_c_query_1_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_c_query_1_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.c_query_1)
     }
 
-    pub fn get_c_query_2_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_c_query_2_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.c_query_2)
     }
 
-    pub fn get_g_gamma2_z_t_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_g_gamma2_z_t_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.g_gamma2_z_t)
     }
 }

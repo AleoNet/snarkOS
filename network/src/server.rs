@@ -38,6 +38,7 @@ use tokio::{
 };
 
 /// The main networking component of a node.
+#[allow(clippy::type_complexity)]
 pub struct Server {
     pub consensus: ConsensusParameters,
     pub context: Arc<Context>,
@@ -204,6 +205,7 @@ impl Server {
     /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
     /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
     /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
+    #[allow(clippy::type_complexity)]
     fn spawn_connection_thread(
         mut channel: Arc<Channel>,
         mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
@@ -305,7 +307,6 @@ impl Server {
             let mut handshakes = context.handshakes.write().await;
             handshakes.send_request(&version).await.unwrap_or_else(|error| {
                 info!("Failed to connect to {:?}", error);
-                ()
             });
         });
     }

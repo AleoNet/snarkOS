@@ -57,10 +57,7 @@ impl<T: Transaction> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
     #[inline]
     pub fn new() -> Self {
-        Self {
-            total_size: 0,
-            transactions: HashMap::<Vec<u8>, Entry<T>>::new(),
-        }
+        Self::default()
     }
 
     /// Load the memory pool from previously stored state in storage
@@ -182,7 +179,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Removes transaction from memory pool based on the transaction id.
     #[inline]
-    pub fn remove_by_hash(&mut self, transaction_id: &Vec<u8>) -> Result<Option<Entry<T>>, ConsensusError> {
+    pub fn remove_by_hash(&mut self, transaction_id: &[u8]) -> Result<Option<Entry<T>>, ConsensusError> {
         match self.transactions.clone().get(transaction_id) {
             Some(entry) => {
                 self.total_size -= entry.size;
@@ -228,6 +225,15 @@ impl<T: Transaction> MemoryPool<T> {
         }
 
         Ok(transactions)
+    }
+}
+
+impl<T: Transaction> Default for MemoryPool<T> {
+    fn default() -> Self {
+        Self {
+            total_size: 0,
+            transactions: HashMap::<Vec<u8>, Entry<T>>::new(),
+        }
     }
 }
 

@@ -70,13 +70,13 @@ impl SyncHandler {
 
     /// Returns if the time of the block request, or None if the block was not requested.
     pub fn is_pending(&self, block_header_hash: &BlockHeaderHash) -> Option<DateTime<Utc>> {
-        self.pending_blocks.get(block_header_hash).map(|time| time.clone())
+        self.pending_blocks.get(block_header_hash).copied()
     }
 
     /// Remove the blocks that are now included in the chain.
     pub fn clear_pending<T: Transaction, P: LoadableMerkleParameters>(&mut self, storage: Arc<Ledger<T, P>>) {
-        for (block_hash, _time_sent) in &self.pending_blocks.clone() {
-            if !storage.block_hash_exists(&block_hash) {
+        for block_hash in self.pending_blocks.clone().keys() {
+            if !storage.block_hash_exists(block_hash) {
                 self.pending_blocks.remove(block_hash);
             }
         }
@@ -98,7 +98,7 @@ impl SyncHandler {
     /// Process a vector of block header hashes.
     /// Push new hashes to the sync handler so we can ask the sync node for them.
     pub fn receive_hashes(&mut self, hashes: Vec<BlockHeaderHash>, height: u32) {
-        if hashes.len() > 0 {
+        if !hashes.is_empty() {
             for block_hash in hashes {
                 if !self.block_headers.contains(&block_hash) && self.pending_blocks.get(&block_hash).is_none() {
                     self.block_headers.push(block_hash.clone());
@@ -139,7 +139,7 @@ impl SyncHandler {
                 let should_request = match self.pending_blocks.get(&block_header_hash) {
                     Some(request_time) => {
                         // Request the block again if the block was not downloaded in 5 seconds
-                        Utc::now() - request_time.clone() > ChronoDuration::seconds(5)
+                        Utc::now() - *request_time > ChronoDuration::seconds(5)
                     }
                     None => !storage.block_hash_exists(&block_header_hash),
                 };
@@ -160,7 +160,7 @@ impl SyncHandler {
                 }
             } else {
                 for (block_header_hash, request_time) in &self.pending_blocks.clone() {
-                    if Utc::now() - request_time.clone() > ChronoDuration::seconds(5) {
+                    if Utc::now() - *request_time > ChronoDuration::seconds(5) {
                         channel.write(&GetBlock::new(block_header_hash.clone())).await?;
                         self.pending_blocks.insert(block_header_hash.clone(), Utc::now());
                     }

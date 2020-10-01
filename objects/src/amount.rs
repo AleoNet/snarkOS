@@ -86,11 +86,13 @@ impl AleoAmount {
     }
 
     /// Add the values of two `AleoAmount`s
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, b: Self) -> Self {
         Self::from_bytes(self.0 + b.0)
     }
 
     /// Subtract the value of two `AleoAmounts`
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, b: AleoAmount) -> Self {
         Self::from_bytes(self.0 - b.0)
     }

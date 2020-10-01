@@ -25,7 +25,7 @@ use snarkos_errors::network::PingProtocolError;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Stores connected peers and the latest state of a ping/pong protocol.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Pings {
     addresses: HashMap<SocketAddr, PingProtocol>,
 }
@@ -33,9 +33,7 @@ pub struct Pings {
 impl Pings {
     /// Construct new store of connected peer `Pings`.
     pub fn new() -> Self {
-        Self {
-            addresses: HashMap::default(),
-        }
+        Self::default()
     }
 
     /// Send a ping request to a peer.

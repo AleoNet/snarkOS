@@ -38,13 +38,13 @@ pub fn variable_length_integer(value: u64) -> Vec<u8> {
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
 pub fn read_variable_length_integer<R: Read>(mut reader: R) -> IoResult<usize> {
     let mut flag = [0u8; 1];
-    reader.read(&mut flag)?;
+    reader.read_exact(&mut flag)?;
 
     match flag[0] {
         0..=252 => Ok(flag[0] as usize),
         0xfd => {
             let mut size = [0u8; 2];
-            reader.read(&mut size)?;
+            reader.read_exact(&mut size)?;
             match u16::from_le_bytes(size) {
                 s if s < 253 => Err(error("Invalid variable size integer")),
                 s => Ok(s as usize),
@@ -52,7 +52,7 @@ pub fn read_variable_length_integer<R: Read>(mut reader: R) -> IoResult<usize> {
         }
         0xfe => {
             let mut size = [0u8; 4];
-            reader.read(&mut size)?;
+            reader.read_exact(&mut size)?;
             match u32::from_le_bytes(size) {
                 s if s < 65536 => Err(error("Invalid variable size integer")),
                 s => Ok(s as usize),
@@ -60,7 +60,7 @@ pub fn read_variable_length_integer<R: Read>(mut reader: R) -> IoResult<usize> {
         }
         _ => {
             let mut size = [0u8; 8];
-            reader.read(&mut size)?;
+            reader.read_exact(&mut size)?;
             match u64::from_le_bytes(size) {
                 s if s < 4_294_967_296 => Err(error("Invalid variable size integer")),
                 s => Ok(s as usize),

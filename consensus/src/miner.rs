@@ -109,6 +109,7 @@ impl Miner {
     }
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
+    #[allow(clippy::type_complexity)]
     pub fn establish_block(
         &self,
         parameters: &PublicParameters<Components>,
@@ -171,13 +172,13 @@ impl Miner {
         storage: &Arc<MerkleTreeLedger>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
     ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let mut candidate_transactions =
+        let candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
 
         println!("Miner creating block");
 
         let (previous_block_header, transactions, coinbase_records) =
-            self.establish_block(parameters, storage, &mut candidate_transactions)?;
+            self.establish_block(parameters, storage, &candidate_transactions)?;
 
         println!("Miner generated coinbase transaction");
 

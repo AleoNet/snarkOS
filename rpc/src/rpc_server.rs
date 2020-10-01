@@ -35,6 +35,7 @@ use tokio::sync::Mutex;
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.
 /// This may be changed in the future to give the node more control of the rpc server.
+#[allow(clippy::too_many_arguments)]
 pub async fn start_rpc_server(
     rpc_port: u16,
     secondary_storage: Arc<MerkleTreeLedger>,

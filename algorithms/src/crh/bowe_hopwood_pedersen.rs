@@ -186,9 +186,9 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
                         cfg_chunks!(segment_bits, BOWE_HOPWOOD_CHUNK_SIZE)
                             .zip(segment_generators)
                             .map(|(chunk_bits, generator)| {
-                                let mut encoded = generator.clone();
+                                let mut encoded = *generator;
                                 if chunk_bits[0] {
-                                    encoded = encoded + generator;
+                                    encoded += generator;
                                 }
                                 if chunk_bits[1] {
                                     encoded += &generator.double();

@@ -41,6 +41,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
     /// Returns the execution context required for program snark and DPC transaction generation.
+    #[allow(clippy::too_many_arguments)]
     fn execute_offline<R: Rng>(
         parameters: &Self::SystemParameters,
         old_records: &[Self::Record],
@@ -73,7 +74,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     /// Returns true iff all the transactions in the block are valid according to the ledger.
     fn verify_transactions(
         parameters: &Self::Parameters,
-        block: &Vec<Self::Transaction>,
+        block: &[Self::Transaction],
         ledger: &L,
     ) -> Result<bool, DPCError>;
 }

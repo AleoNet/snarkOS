@@ -124,14 +124,15 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         system_parameters: &SystemParameters<C>,
 
         // Inner SNARK public inputs
         ledger_parameters: &C::MerkleParameters,
         ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
-        old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
-        new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+        old_serial_numbers: &[<C::AccountSignature as SignatureScheme>::PublicKey],
+        new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
         new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
         memo: &[u8; 32],
         value_balance: AleoAmount,
@@ -172,7 +173,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             old_serial_numbers: Some(old_serial_numbers.to_vec()),
             new_commitments: Some(new_commitments.to_vec()),
             new_encrypted_record_hashes: Some(new_encrypted_record_hashes.to_vec()),
-            memo: Some(memo.clone()),
+            memo: Some(*memo),
             value_balance: Some(value_balance),
             network_id: Some(network_id),
 

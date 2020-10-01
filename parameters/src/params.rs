@@ -150,7 +150,7 @@ macro_rules! impl_params_remote {
             }
 
             fn store_bytes(
-                buffer: &Vec<u8>,
+                buffer: &[u8],
                 relative_path: &PathBuf,
                 absolute_path: &PathBuf,
                 file_path: &PathBuf,

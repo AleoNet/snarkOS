@@ -79,6 +79,7 @@ impl<P: Bls12Parameters> G2PreparedGadget<P> {
         Ok(Self { ell_coeffs })
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn double<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         r: &mut G2Gadget<P>,
@@ -106,6 +107,7 @@ impl<P: Bls12Parameters> G2PreparedGadget<P> {
         }
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn add<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         r: &mut G2Gadget<P>,

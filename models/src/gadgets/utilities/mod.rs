@@ -44,11 +44,11 @@ pub trait ToBitsGadget<F: Field> {
 
 impl<F: Field> ToBitsGadget<F> for Boolean {
     fn to_bits<CS: ConstraintSystem<F>>(&self, _: CS) -> Result<Vec<Boolean>, SynthesisError> {
-        Ok(vec![self.clone()])
+        Ok(vec![*self])
     }
 
     fn to_bits_strict<CS: ConstraintSystem<F>>(&self, _: CS) -> Result<Vec<Boolean>, SynthesisError> {
-        Ok(vec![self.clone()])
+        Ok(vec![*self])
     }
 }
 

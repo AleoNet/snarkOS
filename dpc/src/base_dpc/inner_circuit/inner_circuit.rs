@@ -146,6 +146,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         // Parameters
         system_parameters: &SystemParameters<C>,
@@ -242,7 +243,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
             local_data_root: Some(local_data_root.clone()),
             local_data_commitment_randomizers: Some(local_data_commitment_randomizers.to_vec()),
 
-            memo: Some(memo.clone()),
+            memo: Some(*memo),
 
             value_balance: Some(value_balance),
 

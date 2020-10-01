@@ -16,7 +16,7 @@
 
 use super::{generator::KeypairAssembly, prover::ProvingAssignment};
 use crate::fft::EvaluationDomain;
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::gadgets::{SynthesisError, SynthesisResult};
 use snarkos_models::{
     curves::{Field, One, PairingEngine, Zero},
     gadgets::r1cs::Index,
@@ -28,10 +28,12 @@ pub(crate) struct R1CStoSAP;
 
 impl R1CStoSAP {
     #[inline]
+    #[allow(clippy::many_single_char_names)]
+    #[allow(clippy::type_complexity)]
     pub(crate) fn instance_map_with_evaluation<E: PairingEngine>(
         assembly: &KeypairAssembly<E>,
         t: &E::Fr,
-    ) -> Result<(Vec<E::Fr>, Vec<E::Fr>, E::Fr, usize, usize), SynthesisError> {
+    ) -> SynthesisResult<(Vec<E::Fr>, Vec<E::Fr>, E::Fr, usize, usize)> {
         let domain_size = 2 * assembly.num_constraints + 2 * (assembly.num_inputs - 1) + 1;
         let domain = EvaluationDomain::<E::Fr>::new(domain_size).ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
         let domain_size = domain.size();
@@ -111,11 +113,12 @@ impl R1CStoSAP {
     }
 
     #[inline]
+    #[allow(clippy::type_complexity)]
     pub(crate) fn witness_map<E: PairingEngine>(
         prover: &ProvingAssignment<E>,
         d1: &E::Fr,
         d2: &E::Fr,
-    ) -> Result<(Vec<E::Fr>, Vec<E::Fr>, usize), SynthesisError> {
+    ) -> SynthesisResult<(Vec<E::Fr>, Vec<E::Fr>, usize)> {
         #[inline]
         fn evaluate_constraint<E: PairingEngine>(
             terms: &[(E::Fr, Index)],

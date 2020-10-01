@@ -248,7 +248,7 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..9] != account_format::PRIVATE_KEY_PREFIX {
+        if data[0..9] != account_format::PRIVATE_KEY_PREFIX {
             return Err(AccountError::InvalidPrefixBytes(data[0..9].to_vec()));
         }
 

@@ -62,6 +62,7 @@ use snarkos_utilities::{
 use snarkos_models::gadgets::utilities::eq::NEqGadget;
 use std::ops::Mul;
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
@@ -146,6 +147,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
@@ -393,7 +395,7 @@ where
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
-                    Ok(record.commitment().clone())
+                    Ok(record.commitment())
                 })?;
             old_record_commitments_gadgets.push(given_commitment.clone());
 
@@ -945,7 +947,7 @@ where
             );
 
             let fq_high_and_payload_and_value_bits = [
-                &vec![Boolean::Constant(true)],
+                &[Boolean::Constant(true)],
                 &fq_high_bits[..],
                 &value_bits[..],
                 &payload_field_bits[..],
@@ -1228,12 +1230,12 @@ where
         let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
-        for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_program_ids_gadgets[i]);
+        for id_gadget in old_death_program_ids_gadgets.iter().take(C::NUM_INPUT_RECORDS) {
+            input.extend_from_slice(id_gadget);
         }
 
-        for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_program_ids_gadgets[j]);
+        for id_gadget in new_birth_program_ids_gadgets.iter().take(C::NUM_OUTPUT_RECORDS) {
+            input.extend_from_slice(id_gadget);
         }
 
         let given_commitment_randomness =

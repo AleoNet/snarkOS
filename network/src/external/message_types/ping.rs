@@ -28,12 +28,18 @@ pub struct Ping {
     pub nonce: u64,
 }
 
-impl Ping {
-    pub fn new() -> Self {
+impl Default for Ping {
+    fn default() -> Self {
         let mut rng = rand::thread_rng();
         Self {
             nonce: rng.gen::<u64>(),
         }
+    }
+}
+
+impl Ping {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

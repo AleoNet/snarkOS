@@ -29,11 +29,13 @@ enum NamedObject {
     Namespace,
 }
 
+type TestConstraint<T> = (LinearCombination<T>, LinearCombination<T>, LinearCombination<T>, String);
+
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     named_objects: BTreeMap<String, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: Vec<(LinearCombination<F>, LinearCombination<F>, LinearCombination<F>, String)>,
+    pub constraints: Vec<TestConstraint<F>>,
     inputs: Vec<(F, String)>,
     aux: Vec<(F, String)>,
 }
@@ -56,8 +58,8 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 }
 
-impl<F: Field> TestConstraintSystem<F> {
-    pub fn new() -> TestConstraintSystem<F> {
+impl<F: Field> Default for TestConstraintSystem<F> {
+    fn default() -> Self {
         let mut map = BTreeMap::new();
         map.insert("ONE".into(), NamedObject::Var(TestConstraintSystem::<F>::one()));
 
@@ -68,6 +70,12 @@ impl<F: Field> TestConstraintSystem<F> {
             inputs: vec![(F::one(), "ONE".into())],
             aux: vec![],
         }
+    }
+}
+
+impl<F: Field> TestConstraintSystem<F> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn print_named_objects(&self) {
@@ -215,7 +223,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn().into();
         let path = compute_path(&self.current_namespace, name.clone());
-        self.set_named_obj(path.clone(), NamedObject::Namespace);
+        self.set_named_obj(path, NamedObject::Namespace);
         self.current_namespace.push(name);
     }
 

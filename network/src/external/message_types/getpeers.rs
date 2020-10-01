@@ -27,7 +27,7 @@ impl Message for GetPeers {
     }
 
     fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 0 {
+        if !vec.is_empty() {
             return Err(MessageError::InvalidLength(vec.len(), 0));
         }
 

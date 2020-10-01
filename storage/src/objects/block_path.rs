@@ -51,7 +51,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         }
 
         // The given block header is valid on the canon chain
-        if &self.get_latest_block()?.header.get_hash() == &block_header.previous_block_hash {
+        if self.get_latest_block()?.header.get_hash() == block_header.previous_block_hash {
             return Ok(BlockPath::CanonChain(self.get_latest_block_height() + 1));
         }
 
@@ -98,7 +98,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         let mut final_path = vec![block_hash];
 
-        if children.len() == 0 {
+        if children.is_empty() {
             Ok((1, final_path))
         } else {
             let mut paths = vec![];

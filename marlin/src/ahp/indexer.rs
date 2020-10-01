@@ -150,7 +150,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
         }
 
         if !Self::num_formatted_public_inputs_is_admissible(num_formatted_input_variables) {
-            Err(Error::InvalidPublicInputLength)?
+            return Err(Error::InvalidPublicInputLength);
         }
 
         let index_info = IndexInfo {

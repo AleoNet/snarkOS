@@ -258,7 +258,7 @@ impl Server {
 
         let mut transactions = vec![];
 
-        for (_tx_id, entry) in &memory_pool.transactions {
+        for entry in memory_pool.transactions.values() {
             if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                 transactions.push(transaction_bytes);
             }
@@ -314,9 +314,9 @@ impl Server {
             if &*self.context.local_address.read().await == addr {
                 continue;
             } else if peer_book.connected_contains(addr) {
-                peer_book.update_connected(addr.clone(), time.clone());
+                peer_book.update_connected(*addr, *time);
             } else {
-                peer_book.update_gossiped(addr.clone(), time.clone());
+                peer_book.update_gossiped(*addr, *time);
             }
         }
 
@@ -491,7 +491,7 @@ impl Server {
                 // Update the sync node if the sync_handler is Idle and there are no requested block headers
                 if let Ok(mut sync_handler) = self.sync_handler_lock.try_lock() {
                     if !sync_handler.is_syncing()
-                        && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
+                        && (sync_handler.block_headers.is_empty() && sync_handler.pending_blocks.is_empty())
                     {
                         debug!("Attempting to sync with peer {}", peer_address);
                         sync_handler.sync_node = peer_address;
@@ -499,10 +499,8 @@ impl Server {
                         if let Ok(block_locator_hashes) = self.storage.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
                         }
-                    } else {
-                        if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
-                            sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
-                        }
+                    } else if let Some(channel) = self.context.connections.read().await.get(&sync_handler.sync_node) {
+                        sync_handler.increment(channel, Arc::clone(&self.storage)).await?;
                     }
                 }
             }

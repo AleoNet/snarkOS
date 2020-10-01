@@ -51,7 +51,7 @@ fn merkle_root_with_subroots_inner(
     if hashes.len() == 1 {
         // Tree was too shallow.
         let root = hashes[0].clone();
-        let subroots = if subroots.len() == 0 {
+        let subroots = if subroots.is_empty() {
             vec![root.clone()]
         } else {
             subroots.to_vec()
@@ -79,7 +79,7 @@ pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
 }
 
 /// Calculate the Merkle tree hash by concatenating the left and right children nodes.
-pub fn merkle_hash(left: &Vec<u8>, right: &Vec<u8>) -> Vec<u8> {
+pub fn merkle_hash(left: &[u8], right: &[u8]) -> Vec<u8> {
     let mut result = [0u8; 64];
     result[0..32].copy_from_slice(&left);
     result[32..64].copy_from_slice(&right);
