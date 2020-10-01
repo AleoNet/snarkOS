@@ -41,6 +41,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
     const D: P::BaseField = <P as TEModelParameters>::COEFF_D;
 
     /// Returns the encoded group element for a given base field element.
+    #[allow(clippy::many_single_char_names)]
     pub fn encode(input: &P::BaseField) -> Result<(<G as ProjectiveCurve>::Affine, bool), EncodingError> {
         // The input base field must be nonzero, otherwise inverses will fail.
         if input.is_zero() {
@@ -89,14 +90,14 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             // Let e = legendre(v^3 + Av^2 + Bv).
             let v2 = v.square();
             let v3 = v2 * &v;
-            let av2 = a.clone() * &v2;
-            let bv = b.clone() * &v;
+            let av2 = a * &v2;
+            let bv = b * &v;
             let e = (v3 + &(av2 + &bv)).legendre();
 
             // Let x = ev - ((1 - e) * A/2).
             let two = P::BaseField::one().double();
             let x = match e {
-                LegendreSymbol::Zero => -(a.clone() * &two.inverse().unwrap()),
+                LegendreSymbol::Zero => -(a * &two.inverse().unwrap()),
                 LegendreSymbol::QuadraticResidue => v,
                 LegendreSymbol::QuadraticNonResidue => (-v) - &a,
             };
@@ -104,8 +105,8 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             // Let y = -e * sqrt(x^3 + Ax^2 + Bx).
             let x2 = x.square();
             let x3 = x2 * &x;
-            let ax2 = a.clone() * &x2;
-            let bx = b.clone() * &x;
+            let ax2 = a * &x2;
+            let bx = b * &x;
             let value = (x3 + &(ax2 + &bx)).sqrt().unwrap();
             let y = match e {
                 LegendreSymbol::Zero => P::BaseField::zero(),
@@ -157,6 +158,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
         Ok((<G as ProjectiveCurve>::Affine::read(&to_bytes![x, y]?[..])?, sign_high))
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn decode(
         group_element: &<G as ProjectiveCurve>::Affine,
         sign_high: bool,
@@ -181,7 +183,7 @@ impl<P: MontgomeryModelParameters + TEModelParameters, G: Group + ProjectiveCurv
             let numerator = P::BaseField::one() + &y;
             let denominator = P::BaseField::one() - &y;
 
-            let u = numerator.clone() * &(denominator.inverse().unwrap());
+            let u = numerator * &(denominator.inverse().unwrap());
             let v = numerator * &((denominator * &x).inverse().unwrap());
 
             // Ensure (u, v) is a valid Montgomery element

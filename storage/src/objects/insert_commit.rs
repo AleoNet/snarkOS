@@ -22,6 +22,7 @@ use snarkos_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Commit a transaction to the canon chain
+    #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(
         &self,
         sn_index: &mut usize,
@@ -40,7 +41,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             ops.push(Op::Insert {
                 col: COL_SERIAL_NUMBER,
                 key: sn_bytes,
-                value: (sn_index.clone() as u32).to_le_bytes().to_vec(),
+                value: (*sn_index as u32).to_le_bytes().to_vec(),
             });
             *sn_index += 1;
         }
@@ -54,9 +55,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             ops.push(Op::Insert {
                 col: COL_COMMITMENT,
                 key: cm_bytes,
-                value: (cm_index.clone() as u32).to_le_bytes().to_vec(),
+                value: (*cm_index as u32).to_le_bytes().to_vec(),
             });
-            cms.push((cm.clone(), cm_index.clone()));
+            cms.push((cm.clone(), *cm_index));
 
             *cm_index += 1;
         }
@@ -68,7 +69,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             ops.push(Op::Insert {
                 col: COL_MEMO,
                 key: memo_bytes,
-                value: (memo_index.clone() as u32).to_le_bytes().to_vec(),
+                value: (*memo_index as u32).to_le_bytes().to_vec(),
             });
             *memo_index += 1;
         }

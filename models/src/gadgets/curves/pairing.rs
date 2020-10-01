@@ -54,7 +54,6 @@ pub trait PairingGadget<Pairing: PairingEngine, F: Field> {
     }
 
     /// Computes a product of pairings.
-    #[must_use]
     fn product_of_pairings<CS: ConstraintSystem<F>>(
         mut cs: CS,
         p: &[Self::G1PreparedGadget],

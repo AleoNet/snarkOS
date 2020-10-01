@@ -183,11 +183,11 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     }
 
     fn to_x_coordinate(&self) -> Self::BaseField {
-        self.x.clone()
+        self.x
     }
 
     fn to_y_coordinate(&self) -> Self::BaseField {
-        self.y.clone()
+        self.y
     }
 
     /// Checks that the current point is on the elliptic curve.
@@ -278,13 +278,7 @@ impl<P: Parameters> PartialEq for GroupProjective<P> {
         }
 
         // x1/z1 == x2/z2  <==> x1 * z2 == x2 * z1
-        if (self.x * &other.z) != (other.x * &self.z) {
-            false
-        } else if (self.y * &other.z) != (other.y * &self.z) {
-            false
-        } else {
-            true
-        }
+        (self.x * &other.z) == (other.x * &self.z) && (self.y * &other.z) == (other.y * &self.z)
     }
 }
 
@@ -413,6 +407,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         }
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn double_in_place(&mut self) -> &mut Self {
         if self.is_zero() {
             self
@@ -546,6 +541,7 @@ impl<'a, P: Parameters> Add<&'a Self> for GroupProjective<P> {
 }
 
 impl<'a, P: Parameters> AddAssign<&'a Self> for GroupProjective<P> {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, other: &'a Self) {
         if self.is_zero() {
             *self = *other;

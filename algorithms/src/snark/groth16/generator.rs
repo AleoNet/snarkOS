@@ -133,6 +133,7 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for KeypairAssembly<E> {
 }
 
 /// Create parameters for a circuit, given some toxic waste.
+#[allow(clippy::many_single_char_names)]
 pub fn generate_parameters<E, C, R>(
     circuit: C,
     alpha: E::Fr,

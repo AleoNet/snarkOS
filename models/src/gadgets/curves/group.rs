@@ -156,7 +156,7 @@ pub trait GroupGadget<G: Group, F: Field>:
         Err(SynthesisError::AssignmentMissing)
     }
 
-    fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, B>(
+    fn precomputed_base_3_bit_signed_digit_scalar_mul<CS, I, J, B>(
         _: CS,
         _: &[B],
         _: &[J],

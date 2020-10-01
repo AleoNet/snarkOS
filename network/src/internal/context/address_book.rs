@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
 
 /// Stores the existence of a peer and the date they were last seen.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct AddressBook {
     addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }
@@ -26,9 +26,7 @@ pub struct AddressBook {
 impl AddressBook {
     /// Construct a new `AddressBook`.
     pub fn new() -> Self {
-        Self {
-            addresses: HashMap::default(),
-        }
+        Self::default()
     }
 
     /// Insert or update a new date for an address. Returns true if the new date is stored.

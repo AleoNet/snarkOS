@@ -40,7 +40,7 @@ pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<Mes
 /// Reads bytes from an input stream to fill the buffer.
 async fn stream_read<'a, T: AsyncRead + Unpin>(stream: &'a mut T, buffer: &'a mut [u8]) -> Result<(), StreamReadError> {
     stream.read_exact(buffer).await?;
-    return Ok(());
+    Ok(())
 }
 
 #[cfg(test)]

@@ -261,7 +261,7 @@ impl<G: Group, F: Field, GG: GroupGadget<G, F>> ConditionalEqGadget<F> for Group
         condition: &Boolean,
     ) -> Result<(), SynthesisError> {
         self.public_key.conditional_enforce_equal(
-            &mut cs.ns(|| format!("conditional_enforce_equal")),
+            &mut cs.ns(|| "conditional_enforce_equal"),
             &other.public_key,
             condition,
         )?;

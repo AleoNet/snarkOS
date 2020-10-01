@@ -69,7 +69,7 @@ impl Server {
                             match connections.get(&address) {
                                 Some(channel) => {
                                     // Disconnect from the peer if the get peers message was not sent properly
-                                    if let Err(_) = channel.write(&GetPeers).await {
+                                    if channel.write(&GetPeers).await.is_err() {
                                         peer_book.disconnect_peer(address);
                                     }
                                 }
@@ -94,7 +94,7 @@ impl Server {
                                             Version::new(1u64, latest_block_height, remote_address, local_address);
 
                                         let mut handshakes = new_context.handshakes.write().await; // Acquire the handshake lock
-                                        if let Err(_) = handshakes.send_request(&version).await {
+                                        if handshakes.send_request(&version).await.is_err() {
                                             debug!("Could not connect to gossiped peer {}", remote_address);
                                         }
                                     });
@@ -115,7 +115,7 @@ impl Server {
                             match connections.get(&address) {
                                 Some(channel) => {
                                     // Disconnect from the peer if the ping message was not sent properly
-                                    if let Err(_) = pings.send_ping(channel).await {
+                                    if pings.send_ping(channel).await.is_err() {
                                         warn!("Ping message failed to send to {}", address);
                                         peer_book.disconnect_peer(address);
                                     }
@@ -132,7 +132,7 @@ impl Server {
                     let response_timeout = ChronoDuration::milliseconds((connection_frequency * 5) as i64);
 
                     for (address, last_seen) in peer_book.get_connected() {
-                        if Utc::now() - last_seen.clone() > response_timeout {
+                        if Utc::now() - last_seen > response_timeout {
                             peer_book.disconnect_peer(address);
                         }
                     }
@@ -144,7 +144,7 @@ impl Server {
                             if peer_book.disconnected_contains(&sync_handler.sync_node) {
                                 if let Some(peer) = peer_book.get_connected().iter().max_by(|a, b| a.1.cmp(&b.1)) {
                                     sync_handler.sync_state = SyncState::Idle;
-                                    sync_handler.sync_node = peer.0.clone();
+                                    sync_handler.sync_node = *peer.0;
                                 };
                             }
                         }
@@ -174,7 +174,7 @@ impl Server {
                                             local_address,
                                             handshake.nonce,
                                         );
-                                        if let Err(_) = channel.write(&version).await {
+                                        if channel.write(&version).await.is_err() {
                                             peer_book.disconnect_peer(remote_address);
                                         }
                                     }
@@ -193,7 +193,7 @@ impl Server {
                             // Ask our sync node for more transactions.
                             if local_address != sync_handler.sync_node {
                                 if let Some(channel) = connections.get(&sync_handler.sync_node) {
-                                    if let Err(_) = channel.write(&GetMemoryPool).await {
+                                    if channel.write(&GetMemoryPool).await.is_err() {
                                         peer_book.disconnect_peer(sync_handler.sync_node);
                                     }
                                 }

@@ -195,7 +195,7 @@ impl<G: Group + ProjectiveCurve, SG: Group + CanonicalSerialize + CanonicalDeser
         &self,
         public_key: &<Self as EncryptionScheme>::PublicKey,
         randomness: &Self::Randomness,
-        message: &Vec<Self::Text>,
+        message: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
         let record_view_key = public_key.0.mul(&randomness);
 
@@ -232,9 +232,9 @@ impl<G: Group + ProjectiveCurve, SG: Group + CanonicalSerialize + CanonicalDeser
     fn decrypt(
         &self,
         private_key: &<Self as EncryptionScheme>::PrivateKey,
-        ciphertext: &Vec<Self::Text>,
+        ciphertext: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
-        assert!(ciphertext.len() > 0);
+        assert!(!ciphertext.is_empty());
         let c_0 = &ciphertext[0];
 
         let record_view_key = c_0.mul(&private_key);

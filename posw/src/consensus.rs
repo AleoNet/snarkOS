@@ -110,7 +110,7 @@ where
         let mask = commit(nonce, &root.into());
 
         // Convert the leaves to Options for the SNARK
-        let leaves = leaves.into_iter().map(|l| Some(l)).collect();
+        let leaves = leaves.into_iter().map(Some).collect();
 
         POSWCircuit {
             leaves,

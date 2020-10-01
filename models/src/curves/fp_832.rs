@@ -68,6 +68,7 @@ impl<P: Fp832Parameters> Fp832<P> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn mont_reduce(
         &mut self,
         r0: u64,
@@ -385,7 +386,7 @@ impl<P: Fp832Parameters> Field for Fp832<P> {
 
     #[inline]
     fn square(&self) -> Self {
-        let mut temp = self.clone();
+        let mut temp = *self;
         temp.square_in_place();
         temp
     }
@@ -834,7 +835,7 @@ impl<P: Fp832Parameters> Neg for Fp832<P> {
     #[must_use]
     fn neg(self) -> Self {
         if !self.is_zero() {
-            let mut tmp = P::MODULUS.clone();
+            let mut tmp = P::MODULUS;
             tmp.sub_noborrow(&self.0);
             Fp832::<P>(tmp, PhantomData)
         } else {
@@ -848,7 +849,7 @@ impl<'a, P: Fp832Parameters> Add<&'a Fp832<P>> for Fp832<P> {
 
     #[inline]
     fn add(self, other: &Self) -> Self {
-        let mut result = self.clone();
+        let mut result = self;
         result.add_assign(other);
         result
     }
@@ -859,7 +860,7 @@ impl<'a, P: Fp832Parameters> Sub<&'a Fp832<P>> for Fp832<P> {
 
     #[inline]
     fn sub(self, other: &Self) -> Self {
-        let mut result = self.clone();
+        let mut result = self;
         result.sub_assign(other);
         result
     }
@@ -870,7 +871,7 @@ impl<'a, P: Fp832Parameters> Mul<&'a Fp832<P>> for Fp832<P> {
 
     #[inline]
     fn mul(self, other: &Self) -> Self {
-        let mut result = self.clone();
+        let mut result = self;
         result.mul_assign(other);
         result
     }
@@ -881,7 +882,7 @@ impl<'a, P: Fp832Parameters> Div<&'a Fp832<P>> for Fp832<P> {
 
     #[inline]
     fn div(self, other: &Self) -> Self {
-        let mut result = self.clone();
+        let mut result = self;
         result.mul_assign(&other.inverse().unwrap());
         result
     }

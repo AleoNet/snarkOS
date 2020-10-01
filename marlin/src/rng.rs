@@ -49,7 +49,8 @@ impl<D: Digest> RngCore for FiatShamirRng<D> {
 
     #[inline]
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        Ok(self.r.fill_bytes(dest))
+        self.r.fill_bytes(dest);
+        Ok(())
     }
 }
 

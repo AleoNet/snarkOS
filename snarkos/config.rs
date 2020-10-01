@@ -28,12 +28,11 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use toml;
 
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
-pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &[
+pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
+pub const TESTNET_BOOTNODES: &[&str] = &[
     "138.197.232.178:4131",
     "64.225.91.42:4131",
     "64.225.91.43:4131",
@@ -133,7 +132,7 @@ impl Default for Config {
 impl Config {
     /// The directory that snarkOS system files will be stored
     fn snarkos_dir() -> PathBuf {
-        let mut path = home_dir().unwrap_or(std::env::current_dir().unwrap());
+        let mut path = home_dir().unwrap_or_else(|| std::env::current_dir().unwrap());
         path.push(".snarkOS/");
 
         path
@@ -256,10 +255,9 @@ impl Config {
     }
 
     fn path(&mut self, argument: Option<&str>) {
-        match argument {
-            Some(path) => self.node.db = path.into(),
-            _ => (),
-        };
+        if let Some(path) = argument {
+            self.node.db = path.into();
+        }
     }
 
     fn connect(&mut self, argument: Option<&str>) {
@@ -367,12 +365,9 @@ impl CLI for ConfigCli {
             "verbose",
         ]);
 
-        match arguments.subcommand() {
-            ("update", Some(arguments)) => {
-                UpdateCLI::parse(arguments)?;
-                std::process::exit(0x0100);
-            }
-            _ => {}
+        if let ("update", Some(arguments)) = arguments.subcommand() {
+            UpdateCLI::parse(arguments)?;
+            std::process::exit(0x0100);
         }
 
         Ok(config)

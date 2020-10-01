@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
 
 /// Stores connected, disconnected, and known peers.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct PeerBook {
     /// Connected peers
     connected: AddressBook,
@@ -37,11 +37,7 @@ pub struct PeerBook {
 
 impl PeerBook {
     pub fn new() -> Self {
-        Self {
-            connected: AddressBook::new(),
-            disconnected: AddressBook::new(),
-            gossiped: AddressBook::new(),
-        }
+        Self::default()
     }
 
     /// Returns copy of connected peers.

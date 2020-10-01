@@ -19,6 +19,7 @@ use crate::external::Channel;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Stores connected peers and the channels for reading/writing messages to them.
+#[derive(Default)]
 pub struct Connections {
     channels: HashMap<SocketAddr, Arc<Channel>>,
 }
@@ -26,9 +27,7 @@ pub struct Connections {
 impl Connections {
     /// Construct new store of peer `Connections`.
     pub fn new() -> Self {
-        Connections {
-            channels: HashMap::<SocketAddr, Arc<Channel>>::new(),
-        }
+        Self::default()
     }
 
     /// Returns the channel stored at address if any.

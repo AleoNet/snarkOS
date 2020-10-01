@@ -21,6 +21,7 @@ use crate::{
 use snarkos_errors::gadgets::SynthesisError;
 
 /// Constraint counter for testing purposes.
+#[derive(Default)]
 pub struct ConstraintCounter {
     pub num_inputs: usize,
     pub num_aux: usize,
@@ -28,14 +29,6 @@ pub struct ConstraintCounter {
 }
 
 impl ConstraintCounter {
-    pub fn new() -> Self {
-        Self {
-            num_aux: 0,
-            num_inputs: 0,
-            num_constraints: 0,
-        }
-    }
-
     pub fn num_constraints(&self) -> usize {
         self.num_constraints
     }

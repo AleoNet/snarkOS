@@ -191,7 +191,7 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
     }
 
     fn double(&self) -> Self {
-        let mut result = self.clone();
+        let mut result = *self;
         result.double_in_place();
         result
     }
@@ -225,7 +225,7 @@ impl<P: Fp6Parameters> Field for Fp6<P> {
     }
 
     fn square(&self) -> Self {
-        let mut result = self.clone();
+        let mut result = *self;
         result.square_in_place();
         result
     }

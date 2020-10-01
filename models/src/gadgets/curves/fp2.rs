@@ -96,7 +96,7 @@ impl<P: Fp2Parameters<Fp = F>, F: PrimeField> FieldGadget<Fp2<P>, F> for Fp2Gadg
 
     #[inline]
     fn get_variable(&self) -> Self::Variable {
-        (self.c0.get_variable().clone(), self.c1.get_variable().clone())
+        (self.c0.get_variable(), self.c1.get_variable())
     }
 
     #[inline]

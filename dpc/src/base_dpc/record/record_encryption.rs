@@ -34,6 +34,8 @@ use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
 
+type BaseField<T> = <<T as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField;
+
 #[derive(Derivative)]
 #[derivative(
     Clone(bound = "C: BaseDPCComponents"),
@@ -44,10 +46,7 @@ pub struct RecordEncryptionGadgetComponents<C: BaseDPCComponents> {
     /// Record field element representations
     pub record_field_elements: Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>,
     /// Record group element encodings - Represented in (x,y) affine coordinates
-    pub record_group_encoding: Vec<(
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-    )>,
+    pub record_group_encoding: Vec<(BaseField<C>, BaseField<C>)>,
     /// Record ciphertext selectors - Used for ciphertext compression/decompression
     pub ciphertext_selectors: Vec<bool>,
     /// Record fq high selectors - Used for plaintext serialization/deserialization
@@ -231,7 +230,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             // Fetch the ciphertext selector bit
             let selector =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                    ciphertext_x_coordinate.clone(),
+                    ciphertext_x_coordinate,
                     true,
                 ) {
                     Some(affine) => ciphertext_element_affine == affine,
