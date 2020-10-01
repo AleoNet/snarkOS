@@ -33,13 +33,9 @@ impl MessageHeader {
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, MessageHeaderError> {
-        let mut result = vec![];
+        let mut result = Vec::with_capacity(self.name.len() + 4);
         result.extend_from_slice(&self.name.as_bytes());
-
-        let mut wtr = vec![];
-        wtr.write_u32::<BigEndian>(self.len)?;
-
-        result.extend_from_slice(&wtr);
+        result.write_u32::<BigEndian>(self.len)?;
 
         Ok(result)
     }
