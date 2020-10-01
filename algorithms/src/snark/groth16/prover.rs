@@ -156,8 +156,10 @@ where
     let h = R1CStoQAP::witness_map::<E>(&prover)?;
     end_timer!(witness_map_time);
 
-    let input_assignment = prover.input_assignment[1..]
-        .into_iter()
+    let input_assignment = prover
+        .input_assignment
+        .iter()
+        .skip(1)
         .map(|s| s.into_repr())
         .collect::<Vec<_>>();
 

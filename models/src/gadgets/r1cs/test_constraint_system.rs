@@ -29,11 +29,13 @@ enum NamedObject {
     Namespace,
 }
 
+type TestConstraint<T> = (LinearCombination<T>, LinearCombination<T>, LinearCombination<T>, String);
+
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     named_objects: BTreeMap<String, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: Vec<(LinearCombination<F>, LinearCombination<F>, LinearCombination<F>, String)>,
+    pub constraints: Vec<TestConstraint<F>>,
     inputs: Vec<(F, String)>,
     aux: Vec<(F, String)>,
 }
@@ -56,8 +58,8 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 }
 
-impl<F: Field> TestConstraintSystem<F> {
-    pub fn new() -> TestConstraintSystem<F> {
+impl<F: Field> Default for TestConstraintSystem<F> {
+    fn default() -> Self {
         let mut map = BTreeMap::new();
         map.insert("ONE".into(), NamedObject::Var(TestConstraintSystem::<F>::one()));
 
@@ -68,6 +70,12 @@ impl<F: Field> TestConstraintSystem<F> {
             inputs: vec![(F::one(), "ONE".into())],
             aux: vec![],
         }
+    }
+}
+
+impl<F: Field> TestConstraintSystem<F> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn print_named_objects(&self) {

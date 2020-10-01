@@ -82,7 +82,7 @@ impl<C: DPCComponents> FromStr for AccountViewKey<C> {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..7] != account_format::VIEW_KEY_PREFIX {
+        if data[0..7] != account_format::VIEW_KEY_PREFIX {
             return Err(AccountError::InvalidPrefixBytes(data[0..7].to_vec()));
         }
 

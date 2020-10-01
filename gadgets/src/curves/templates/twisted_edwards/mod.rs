@@ -74,14 +74,12 @@ mod montgomery_affine_impl {
         pub fn from_edwards_to_coords(p: &TEAffine<P>) -> Result<(P::BaseField, P::BaseField), SynthesisError> {
             let montgomery_point: GroupAffine<P> = if p.y == P::BaseField::one() {
                 GroupAffine::zero()
+            } else if p.x == P::BaseField::zero() {
+                GroupAffine::new(P::BaseField::zero(), P::BaseField::zero())
             } else {
-                if p.x == P::BaseField::zero() {
-                    GroupAffine::new(P::BaseField::zero(), P::BaseField::zero())
-                } else {
-                    let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
-                    let v = u * &p.x.inverse().unwrap();
-                    GroupAffine::new(u, v)
-                }
+                let u = (P::BaseField::one() + &p.y) * &(P::BaseField::one() - &p.y).inverse().unwrap();
+                let v = u * &p.x.inverse().unwrap();
+                GroupAffine::new(u, v)
             };
 
             Ok((montgomery_point.x, montgomery_point.y))
@@ -97,6 +95,7 @@ mod montgomery_affine_impl {
             Ok(Self::new(u, v))
         }
 
+        #[allow(clippy::wrong_self_convention)]
         pub fn into_edwards<CS: ConstraintSystem<F>>(
             &self,
             mut cs: CS,
@@ -119,7 +118,7 @@ mod montgomery_affine_impl {
 
             let v = FG::alloc(cs.ns(|| "v"), || {
                 let mut t0 = self.x.get_value().get()?;
-                let mut t1 = t0.clone();
+                let mut t1 = t0;
                 t0.sub_assign(&P::BaseField::one());
                 t1.add_assign(&P::BaseField::one());
 
@@ -620,7 +619,7 @@ mod projective_impl {
     /// 10 => table[1]
     /// 01 => table[2]
     /// 11 => table[3]
-    fn two_bit_lookup_helper<'a, P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>, CS>(
+    fn two_bit_lookup_helper<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>, CS>(
         mut cs: CS,
         bits: [Boolean; 2],
         mut table: [TEProjective<P>; 4],
@@ -841,7 +840,7 @@ mod projective_impl {
             B: Borrow<Boolean>,
         {
             let scalar_bits_with_base_powers: Vec<_> = scalar_bits_with_base_powers
-                .map(|(bit, base)| (bit.borrow().clone(), base.clone()))
+                .map(|(bit, base)| (*bit.borrow(), *base))
                 .collect();
             let zero = TEProjective::zero();
             for (i, bits_base_powers) in scalar_bits_with_base_powers.chunks(2).enumerate() {
@@ -874,7 +873,7 @@ mod projective_impl {
             B: Borrow<Boolean>,
         {
             let scalar_bits_with_base_powers: Vec<_> = scalar_bits_with_base_powers
-                .map(|(bit, base)| (bit.borrow().clone(), base.clone()))
+                .map(|(bit, base)| (*bit.borrow(), *base))
                 .collect();
             for (i, bits_base_powers) in scalar_bits_with_base_powers.chunks(2).enumerate() {
                 let mut cs = cs.ns(|| format!("Chunk {}", i));
@@ -981,11 +980,10 @@ mod projective_impl {
                 };
 
             // Compute ∏(h_i^{m_i}) for all i.
-            for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.into_iter().zip(bases.iter()).enumerate()
-            {
+            for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.iter().zip(bases.iter()).enumerate() {
                 for (i, (bits, base_power)) in segment_bits_chunks
                     .borrow()
-                    .into_iter()
+                    .iter()
                     .zip(segment_powers.borrow().iter())
                     .enumerate()
                 {
@@ -994,7 +992,7 @@ mod projective_impl {
                     let mut coords = vec![];
                     for _ in 0..4 {
                         coords.push(acc_power);
-                        acc_power = acc_power + base_power;
+                        acc_power += base_power;
                     }
 
                     let bits = bits

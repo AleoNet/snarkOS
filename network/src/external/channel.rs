@@ -67,7 +67,7 @@ impl Channel {
         Ok(Self {
             address,
             reader: stream.clone(),
-            writer: stream.clone(),
+            writer: stream,
         })
     }
 

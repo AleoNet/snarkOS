@@ -165,16 +165,14 @@ where
     }
 }
 
+type ConstraintPair<T> = (ConstraintVar<T>, ConstraintVar<T>);
+
 impl<P, F: PrimeField> FieldGadget<Fp6<P>, F> for Fp6Gadget<P, F>
 where
     P: Fp6Parameters,
     P::Fp2Params: Fp2Parameters<Fp = F>,
 {
-    type Variable = (
-        (ConstraintVar<F>, ConstraintVar<F>),
-        (ConstraintVar<F>, ConstraintVar<F>),
-        (ConstraintVar<F>, ConstraintVar<F>),
-    );
+    type Variable = (ConstraintPair<F>, ConstraintPair<F>, ConstraintPair<F>);
 
     #[inline]
     fn get_value(&self) -> Option<Fp6<P>> {

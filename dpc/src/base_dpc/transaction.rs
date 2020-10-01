@@ -86,6 +86,7 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> DPCTransaction<C> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         old_serial_numbers: Vec<<Self as Transaction>::SerialNumber>,
         new_commitments: Vec<<Self as Transaction>::Commitment>,

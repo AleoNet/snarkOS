@@ -20,11 +20,7 @@ use crate::{
     parameters::ParametersError,
 };
 
-use bincode;
 use std::fmt::Debug;
-
-#[cfg(feature = "librocksdb")]
-use rocksdb;
 
 #[derive(Debug, Error)]
 pub enum StorageError {

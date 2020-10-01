@@ -321,6 +321,7 @@ impl<F: Field> LinearCombination<F> {
 }
 
 impl<'a, F: Field> AddAssign<(F, &'a LinearCombination<F>)> for LinearCombination<F> {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, (coeff, other): (F, &'a LinearCombination<F>)) {
         self.terms
             .extend(other.terms.iter().map(|(c, t)| (coeff * c, t.clone())));

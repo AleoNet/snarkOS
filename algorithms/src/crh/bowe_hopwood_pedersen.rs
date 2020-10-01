@@ -188,7 +188,7 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
                             .map(|(chunk_bits, generator)| {
                                 let mut encoded = *generator;
                                 if chunk_bits[0] {
-                                    encoded = encoded + generator;
+                                    encoded += generator;
                                 }
                                 if chunk_bits[1] {
                                     encoded += &generator.double();

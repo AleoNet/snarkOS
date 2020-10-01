@@ -114,15 +114,15 @@ impl UInt for UInt128 {
                 *v <<= 1;
             }
 
-            match b {
-                &Boolean::Constant(b) => {
+            match *b {
+                Boolean::Constant(b) => {
                     if b {
                         if let Some(v) = value.as_mut() {
                             *v |= 1;
                         }
                     }
                 }
-                &Boolean::Is(ref b) => match b.get_value() {
+                Boolean::Is(ref b) => match b.get_value() {
                     Some(true) => {
                         if let Some(v) = value.as_mut() {
                             *v |= 1;
@@ -131,7 +131,7 @@ impl UInt for UInt128 {
                     Some(false) => {}
                     None => value = None,
                 },
-                &Boolean::Not(ref b) => match b.get_value() {
+                Boolean::Not(ref b) => match b.get_value() {
                     Some(false) => {
                         if let Some(v) = value.as_mut() {
                             *v |= 1;
@@ -281,11 +281,13 @@ impl UInt for UInt128 {
         // The value of the actual result is modulo 2^128
         let modular_value = big_result_value.map(|v| v.to_u128());
 
-        if all_constants && modular_value.is_some() {
-            // We can just return a constant, rather than
-            // unpacking the result into allocated bits.
+        if all_constants {
+            if let Some(val) = modular_value {
+                // We can just return a constant, rather than
+                // unpacking the result into allocated bits.
 
-            return Ok(Self::constant(modular_value.unwrap()));
+                return Ok(Self::constant(val));
+            }
         }
 
         // Storage area for the resulting bits
@@ -503,7 +505,7 @@ impl UInt for UInt128 {
 
         let self_is_zero = Boolean::Constant(self.eq(&Self::constant(0u128)));
         let mut quotient = zero.clone();
-        let mut remainder = zero.clone();
+        let mut remainder = zero;
 
         for (i, bit) in self.bits.iter().rev().enumerate() {
             // Left shift remainder by 1

@@ -134,7 +134,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
 
         let public_input = constraint_systems::ProverConstraintSystem::format_public_input(public_input);
         if !Self::formatted_public_input_is_admissible(&public_input) {
-            Err(Error::InvalidPublicInputLength)?
+            return Err(Error::InvalidPublicInputLength);
         }
         let x_domain = EvaluationDomain::new(public_input.len()).ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
 
@@ -265,7 +265,9 @@ pub trait EvaluationsProvider<F: Field> {
 impl<'a, F: Field> EvaluationsProvider<F> for snarkos_polycommit::Evaluations<'a, F> {
     fn get_lc_eval(&self, lc: &LinearCombination<F>, point: F) -> Result<F, Error> {
         let key = (lc.label.clone(), point);
-        self.get(&key).map(|v| *v).ok_or(Error::MissingEval(lc.label.clone()))
+        self.get(&key)
+            .copied()
+            .ok_or_else(|| Error::MissingEval(lc.label.clone()))
     }
 }
 
@@ -279,7 +281,7 @@ impl<'a, F: Field, T: Borrow<LabeledPolynomial<'a, F>>> EvaluationsProvider<F> f
                         let p: &LabeledPolynomial<F> = (*p).borrow();
                         p.label() == label
                     })
-                    .ok_or(Error::MissingEval(format!("Missing {} for {}", label, lc.label)))?
+                    .ok_or_else(|| Error::MissingEval(format!("Missing {} for {}", label, lc.label)))?
                     .borrow()
                     .evaluate(point)
             } else {

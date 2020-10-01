@@ -38,11 +38,11 @@ impl FixedBaseMSM {
         let mut multiples_of_g = vec![vec![T::zero(); in_window]; outerc];
 
         let mut g_outer = g;
-        for outer in 0..outerc {
+        for (outer, m) in multiples_of_g.iter_mut().enumerate().take(outerc) {
             let mut g_inner = T::zero();
             let cur_in_window = if outer == outerc - 1 { last_in_window } else { in_window };
-            for inner in 0..cur_in_window {
-                multiples_of_g[outer][inner] = g_inner;
+            for x in m.iter_mut().take(cur_in_window) {
+                *x = g_inner;
                 g_inner += &g_outer;
             }
             for _ in 0..window {

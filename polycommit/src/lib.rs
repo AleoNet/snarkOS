@@ -190,6 +190,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
     ///
     /// If for some `i`, `polynomials[i].degree_bound().is_some()`, then that
     /// polynomial will have the corresponding degree bound enforced.
+    #[allow(clippy::type_complexity)]
     fn commit<'a>(
         ck: &Self::CommitterKey,
         polynomials: impl IntoIterator<Item = &'a LabeledPolynomial<'a, F>>,
@@ -243,7 +244,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
         let mut query_to_labels_map = BTreeMap::new();
 
         for (label, point) in query_set.iter() {
-            let labels = query_to_labels_map.entry(point).or_insert(BTreeSet::new());
+            let labels = query_to_labels_map.entry(point).or_insert_with(BTreeSet::new);
             labels.insert(label);
         }
 
@@ -314,7 +315,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
         let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label(), c)).collect();
         let mut query_to_labels_map = BTreeMap::new();
         for (label, point) in query_set.iter() {
-            let labels = query_to_labels_map.entry(point).or_insert(BTreeSet::new());
+            let labels = query_to_labels_map.entry(point).or_insert_with(BTreeSet::new);
             labels.insert(label);
         }
 
@@ -352,6 +353,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
     /// On input a list of polynomials, linear combinations of those polynomials,
     /// and a query set, `open_combination` outputs a proof of evaluation of
     /// the combinations at the points in the query set.
+    #[allow(clippy::too_many_arguments)]
     fn open_combinations<'a>(
         ck: &Self::CommitterKey,
         linear_combinations: impl IntoIterator<Item = &'a LinearCombination<F>>,
@@ -387,6 +389,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
 
     /// Checks that `evaluations` are the true evaluations at `query_set` of the
     /// linear combinations of polynomials committed in `commitments`.
+    #[allow(clippy::too_many_arguments)]
     fn check_combinations<'a, R: RngCore>(
         vk: &Self::VerifierKey,
         linear_combinations: impl IntoIterator<Item = &'a LinearCombination<F>>,
@@ -421,7 +424,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
                     let eval = match label {
                         LCTerm::One => F::one(),
                         LCTerm::PolyLabel(l) => *poly_evals
-                            .get(&(l.clone().into(), point))
+                            .get(&(l.clone(), point))
                             .ok_or(Error::MissingEvaluation { label: l.clone() })?,
                     };
 

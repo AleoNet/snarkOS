@@ -20,7 +20,10 @@ use crate::{
 };
 
 use smallvec::smallvec;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub};
+use std::{
+    cmp::Ordering,
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub},
+};
 
 impl<F: Field> AsRef<[(Variable, F)]> for LinearCombination<F> {
     #[inline]
@@ -181,16 +184,20 @@ where
     while i < cur.0.len() && j < other.0.len() {
         let self_cur = &cur.0[i];
         let other_cur = &other.0[j];
-        if self_cur.0 > other_cur.0 {
-            new_vec.push((other.0[j].0, push_fn(other.0[j].1)));
-            j += 1;
-        } else if self_cur.0 < other_cur.0 {
-            new_vec.push(*self_cur);
-            i += 1;
-        } else {
-            new_vec.push((self_cur.0, combine_fn(self_cur.1, other_cur.1)));
-            i += 1;
-            j += 1;
+        match self_cur.0.cmp(&other_cur.0) {
+            Ordering::Greater => {
+                new_vec.push((other.0[j].0, push_fn(other.0[j].1)));
+                j += 1;
+            }
+            Ordering::Less => {
+                new_vec.push(*self_cur);
+                i += 1;
+            }
+            Ordering::Equal => {
+                new_vec.push((self_cur.0, combine_fn(self_cur.1, other_cur.1)));
+                i += 1;
+                j += 1;
+            }
         }
     }
     new_vec.extend_from_slice(&cur.0[i..]);

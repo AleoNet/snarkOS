@@ -72,7 +72,7 @@ impl<F: Field> DensePolynomial<F> {
 
     /// Checks if the given polynomial is zero.
     pub fn is_zero(&self) -> bool {
-        self.coeffs.len() == 0 || self.coeffs.iter().all(|coeff| coeff.is_zero())
+        self.coeffs.is_empty() || self.coeffs.iter().all(|coeff| coeff.is_zero())
     }
 
     /// Constructs a new polynomial from a list of coefficients.
@@ -178,24 +178,22 @@ impl<'a, 'b, F: Field> Add<&'a DensePolynomial<F>> for &'b DensePolynomial<F> {
             other.clone()
         } else if other.is_zero() {
             self.clone()
-        } else {
-            if self.degree() >= other.degree() {
-                let mut result = self.clone();
-                for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a += b
-                }
-                result
-            } else {
-                let mut result = other.clone();
-                for (a, b) in result.coeffs.iter_mut().zip(&self.coeffs) {
-                    *a += b
-                }
-                // If the leading coefficient ends up being zero, pop it off.
-                while result.coeffs.last().unwrap().is_zero() {
-                    result.coeffs.pop();
-                }
-                result
+        } else if self.degree() >= other.degree() {
+            let mut result = self.clone();
+            for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
+                *a += b
             }
+            result
+        } else {
+            let mut result = other.clone();
+            for (a, b) in result.coeffs.iter_mut().zip(&self.coeffs) {
+                *a += b
+            }
+            // If the leading coefficient ends up being zero, pop it off.
+            while result.coeffs.last().unwrap().is_zero() {
+                result.coeffs.pop();
+            }
+            result
         }
     }
 }
@@ -206,22 +204,20 @@ impl<'a, 'b, F: Field> AddAssign<&'a DensePolynomial<F>> for DensePolynomial<F> 
             self.coeffs.truncate(0);
             self.coeffs.extend_from_slice(&other.coeffs);
         } else if other.is_zero() {
-            return;
+            // return
+        } else if self.degree() >= other.degree() {
+            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
+                *a += b
+            }
         } else {
-            if self.degree() >= other.degree() {
-                for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a += b
-                }
-            } else {
-                // Add the necessary number of zero coefficients.
-                self.coeffs.resize(other.coeffs.len(), F::zero());
-                for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a += b
-                }
-                // If the leading coefficient ends up being zero, pop it off.
-                while self.coeffs.last().unwrap().is_zero() {
-                    self.coeffs.pop();
-                }
+            // Add the necessary number of zero coefficients.
+            self.coeffs.resize(other.coeffs.len(), F::zero());
+            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
+                *a += b
+            }
+            // If the leading coefficient ends up being zero, pop it off.
+            while self.coeffs.last().unwrap().is_zero() {
+                self.coeffs.pop();
             }
         }
     }
@@ -235,22 +231,20 @@ impl<'a, 'b, F: Field> AddAssign<(F, &'a DensePolynomial<F>)> for DensePolynomia
             self.coeffs.extend_from_slice(&other.coeffs);
             self.coeffs.iter_mut().for_each(|c| *c *= &f);
         } else if other.is_zero() {
-            return;
+            // return
+        } else if self.degree() >= other.degree() {
+            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
+                *a += &(f * b);
+            }
         } else {
-            if self.degree() >= other.degree() {
-                for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a += &(f * b);
-                }
-            } else {
-                // Add the necessary number of zero coefficients.
-                self.coeffs.resize(other.coeffs.len(), F::zero());
-                for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a += &(f * b);
-                }
-                // If the leading coefficient ends up being zero, pop it off.
-                while self.coeffs.last().unwrap().is_zero() {
-                    self.coeffs.pop();
-                }
+            // Add the necessary number of zero coefficients.
+            self.coeffs.resize(other.coeffs.len(), F::zero());
+            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
+                *a += &(f * b);
+            }
+            // If the leading coefficient ends up being zero, pop it off.
+            while self.coeffs.last().unwrap().is_zero() {
+                self.coeffs.pop();
             }
         }
     }
@@ -295,28 +289,26 @@ impl<'a, 'b, F: Field> Sub<&'a DensePolynomial<F>> for &'b DensePolynomial<F> {
             result
         } else if other.is_zero() {
             self.clone()
-        } else {
-            if self.degree() >= other.degree() {
-                let mut result = self.clone();
-                for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a -= b
-                }
-                result
-            } else {
-                let mut result = self.clone();
-                result.coeffs.resize(other.coeffs.len(), F::zero());
-                for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a -= b;
-                }
-                if !result.is_zero() {
-                    // If the leading coefficient ends up being zero, pop it off.
-                    while result.coeffs.last().unwrap().is_zero() {
-                        result.coeffs.pop();
-                    }
-                }
-
-                result
+        } else if self.degree() >= other.degree() {
+            let mut result = self.clone();
+            for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
+                *a -= b
             }
+            result
+        } else {
+            let mut result = self.clone();
+            result.coeffs.resize(other.coeffs.len(), F::zero());
+            for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
+                *a -= b;
+            }
+            if !result.is_zero() {
+                // If the leading coefficient ends up being zero, pop it off.
+                while result.coeffs.last().unwrap().is_zero() {
+                    result.coeffs.pop();
+                }
+            }
+
+            result
         }
     }
 }
@@ -330,22 +322,20 @@ impl<'a, 'b, F: Field> SubAssign<&'a DensePolynomial<F>> for DensePolynomial<F> 
                 self.coeffs[i] -= coeff;
             }
         } else if other.is_zero() {
-            return;
+            // return
+        } else if self.degree() >= other.degree() {
+            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
+                *a -= b
+            }
         } else {
-            if self.degree() >= other.degree() {
-                for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a -= b
-                }
-            } else {
-                // Add the necessary number of zero coefficients.
-                self.coeffs.resize(other.coeffs.len(), F::zero());
-                for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                    *a -= b
-                }
-                // If the leading coefficient ends up being zero, pop it off.
-                while self.coeffs.last().unwrap().is_zero() {
-                    self.coeffs.pop();
-                }
+            // Add the necessary number of zero coefficients.
+            self.coeffs.resize(other.coeffs.len(), F::zero());
+            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
+                *a -= b
+            }
+            // If the leading coefficient ends up being zero, pop it off.
+            while self.coeffs.last().unwrap().is_zero() {
+                self.coeffs.pop();
             }
         }
     }

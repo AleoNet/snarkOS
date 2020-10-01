@@ -72,6 +72,7 @@ pub struct RpcImpl {
 
 impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage: Arc<MerkleTreeLedger>,
         storage_path: PathBuf,
@@ -306,8 +307,8 @@ impl RpcFunctions for RpcImpl {
 
         let mut peers = vec![];
 
-        for (peer, _last_seen) in &peer_book.get_connected() {
-            peers.push(peer.clone());
+        for peer in peer_book.get_connected().keys() {
+            peers.push(*peer);
         }
 
         Ok(PeerInfo { peers })

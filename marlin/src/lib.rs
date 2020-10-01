@@ -123,6 +123,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
 
     /// Generate the index-specific (i.e., circuit-specific) prover and verifier
     /// keys. This is a deterministic algorithm that anyone can rerun.
+    #[allow(clippy::type_complexity)]
     pub fn index<'a, C: ConstraintSynthesizer<F>>(
         srs: UniversalSRS<F, PC>,
         c: C,
@@ -132,7 +133,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
         // TODO: Add check that c is in the correct mode.
         let index = AHPForR1CS::index(c)?;
         if srs.max_degree() < index.max_degree() {
-            Err(Error::IndexTooLarge)?;
+            return Err(Error::IndexTooLarge);
         }
 
         let coeff_support = AHPForR1CS::get_degree_bounds::<C>(&index.index_info);
@@ -278,7 +279,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             let lc = lc_s
                 .iter()
                 .find(|lc| &lc.label == label)
-                .ok_or(ahp::Error::MissingEval(label.to_string()))?;
+                .ok_or_else(|| ahp::Error::MissingEval(label.to_string()))?;
             let eval = polynomials.get_lc_eval(&lc, *point)?;
             if !AHPForR1CS::<F>::LC_WITH_ZERO_EVAL.contains(&lc.label.as_ref()) {
                 evaluations.push(eval);
@@ -382,7 +383,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             if AHPForR1CS::<F>::LC_WITH_ZERO_EVAL.contains(&q.0.as_ref()) {
                 evaluations.insert(q, F::zero());
             } else {
-                evaluations.insert(q, proof_evals.next().unwrap().clone());
+                evaluations.insert(q, *proof_evals.next().unwrap());
             }
         }
 

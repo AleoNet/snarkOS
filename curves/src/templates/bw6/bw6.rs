@@ -213,9 +213,7 @@ impl<P: BW6Parameters> BW6<P> {
         let result18 = result17.square();
         let mut tmp8_p3 = f2_4p * &f4_2p_5p * &f9p;
         tmp8_p3.conjugate();
-        let result19 = result18 * &f1_7 * &f5_7p * &f0p * &tmp8_p3;
-
-        result19
+        result18 * &f1_7 * &f5_7p * &f0p * &tmp8_p3
     }
 }
 

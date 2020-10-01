@@ -153,7 +153,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, C: ConstraintSynthesizer<F>> Pr
         let mut size_bytes_comms_without_degree_bounds = 0;
         let mut size_bytes_comms_with_degree_bounds = 0;
         let mut size_bytes_proofs = 0;
-        for c in self.commitments.iter().flat_map(|c| c) {
+        for c in self.commitments.iter().flatten() {
             if !c.has_degree_bound() {
                 num_comms_without_degree_bounds += 1;
                 size_bytes_comms_without_degree_bounds += c.serialized_size();

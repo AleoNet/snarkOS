@@ -16,7 +16,7 @@
 
 use super::{generator::KeypairAssembly, prover::ProvingAssignment, Vec};
 use crate::{cfg_iter, cfg_iter_mut, fft::EvaluationDomain};
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::gadgets::{SynthesisError, SynthesisResult};
 use snarkos_models::{
     curves::{PairingEngine, Zero},
     gadgets::r1cs::{ConstraintSystem, Index},
@@ -42,10 +42,11 @@ pub(crate) struct R1CStoQAP;
 impl R1CStoQAP {
     #[inline]
     #[allow(clippy::many_single_char_names)]
+    #[allow(clippy::type_complexity)]
     pub(crate) fn instance_map_with_evaluation<E: PairingEngine>(
         assembly: &KeypairAssembly<E>,
         t: &E::Fr,
-    ) -> Result<(Vec<E::Fr>, Vec<E::Fr>, Vec<E::Fr>, E::Fr, usize, usize), SynthesisError> {
+    ) -> SynthesisResult<(Vec<E::Fr>, Vec<E::Fr>, Vec<E::Fr>, E::Fr, usize, usize)> {
         let domain_size = assembly.num_constraints + (assembly.num_inputs - 1) + 1;
         let domain = EvaluationDomain::<E::Fr>::new(domain_size).ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
         let domain_size = domain.size();
@@ -67,14 +68,14 @@ impl R1CStoQAP {
             a[i] = u[assembly.num_constraints + i];
         }
 
-        for i in 0..assembly.num_constraints {
+        for (i, x) in u.iter().enumerate().take(assembly.num_constraints) {
             for &(ref coeff, index) in assembly.at[i].iter() {
                 let index = match index {
                     Index::Input(i) => i,
                     Index::Aux(i) => assembly.num_inputs + i,
                 };
 
-                a[index] += &(u[i] * coeff);
+                a[index] += &(*x * coeff);
             }
             for &(ref coeff, index) in assembly.bt[i].iter() {
                 let index = match index {
@@ -98,7 +99,7 @@ impl R1CStoQAP {
     }
 
     #[inline]
-    pub(crate) fn witness_map<E: PairingEngine>(prover: &ProvingAssignment<E>) -> Result<Vec<E::Fr>, SynthesisError> {
+    pub(crate) fn witness_map<E: PairingEngine>(prover: &ProvingAssignment<E>) -> SynthesisResult<Vec<E::Fr>> {
         let zero = E::Fr::zero();
         let num_inputs = prover.input_assignment.len();
         let num_constraints = prover.num_constraints();
@@ -121,9 +122,7 @@ impl R1CStoQAP {
                 *b = evaluate_constraint::<E>(&bt_i, &full_input_assignment, num_inputs);
             });
 
-        for i in 0..num_inputs {
-            a[num_constraints + i] = full_input_assignment[i];
-        }
+        a[num_constraints..(num_inputs + num_constraints)].clone_from_slice(&full_input_assignment[..num_inputs]);
 
         domain.ifft_in_place(&mut a);
         domain.ifft_in_place(&mut b);

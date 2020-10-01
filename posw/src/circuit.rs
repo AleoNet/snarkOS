@@ -58,7 +58,7 @@ impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP:
 {
     fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // Compute the mask if it exists.
-        let mask = self.mask.clone().unwrap_or(vec![0; CP::MASK_LENGTH]);
+        let mask = self.mask.clone().unwrap_or_else(|| vec![0; CP::MASK_LENGTH]);
         if mask.len() != CP::MASK_LENGTH {
             return Err(SynthesisError::Unsatisfiable);
         }

@@ -14,24 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::merkle_tree::MerklePath;
+use crate::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::algorithms::MerkleError;
 use snarkos_models::algorithms::{MerkleParameters, CRH};
 use snarkos_utilities::ToBytes;
 
 pub struct MerkleTree<P: MerkleParameters> {
     /// The computed root of the full Merkle tree.
-    root: Option<<P::H as CRH>::Output>,
+    root: Option<MerkleTreeDigest<P>>,
 
     /// The internal hashes, from root to hashed leaves, of the full Merkle tree.
-    tree: Vec<<P::H as CRH>::Output>,
+    tree: Vec<MerkleTreeDigest<P>>,
 
     /// The hash of each non-empty leaf in the Merkle tree.
-    hashed_leaves: Vec<<P::H as CRH>::Output>,
+    hashed_leaves: Vec<MerkleTreeDigest<P>>,
 
     /// For each level after a full tree has been built from the leaves,
     /// keeps both the roots the siblings that are used to get to the desired depth.
-    padding_tree: Vec<(<P::H as CRH>::Output, <P::H as CRH>::Output)>,
+    padding_tree: Vec<(MerkleTreeDigest<P>, MerkleTreeDigest<P>)>,
 
     /// The Merkle tree parameters (e.g. the hash function).
     parameters: P,

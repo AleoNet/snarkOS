@@ -287,13 +287,7 @@ impl<P: Parameters> PartialEq for GroupProjective<P> {
         let z1 = self.z.square();
         let z2 = other.z.square();
 
-        if self.x * &z2 != other.x * &z1 {
-            false
-        } else if self.y * &(z2 * &other.z) != other.y * &(z1 * &self.z) {
-            false
-        } else {
-            true
-        }
+        !(self.x * &z2 != other.x * &z1 || self.y * &(z2 * &other.z) != other.y * &(z1 * &self.z))
     }
 }
 
