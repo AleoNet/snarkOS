@@ -101,12 +101,12 @@ impl<P: BW6Parameters> BW6<P> {
         // (q^3-1)*(q+1)
 
         // elt_q3 = elt^(q^3)
-        let mut elt_q3 = elt.clone();
+        let mut elt_q3 = *elt;
         elt_q3.conjugate();
         // elt_q3_over_elt = elt^(q^3-1)
         let elt_q3_over_elt = elt_q3 * elt_inv;
         // alpha = elt^((q^3-1) * q)
-        let mut alpha = elt_q3_over_elt.clone();
+        let mut alpha = elt_q3_over_elt;
         alpha.frobenius_map(1);
         // beta = elt^((q^3-1)*(q+1)
         alpha * &elt_q3_over_elt
@@ -120,7 +120,7 @@ impl<P: BW6Parameters> BW6<P> {
         // f ^ R0(u) * (f ^ q) ^ R1(u) in a 2-NAF multi-exp fashion.
 
         // steps 1,2,3
-        let f0 = f.clone();
+        let f0 = *f;
         let mut f0p = f0;
         f0p.frobenius_map(1);
         let f1 = Self::exp_by_x(f0);

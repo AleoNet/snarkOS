@@ -149,7 +149,9 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
 
     #[inline]
     fn negate_in_place<CS: ConstraintSystem<F>>(&mut self, _cs: CS) -> Result<&mut Self, SynthesisError> {
-        self.value.as_mut().map(|val| *val = -(*val));
+        if let Some(val) = self.value.as_mut() {
+            *val = -(*val);
+        }
         self.variable.negate_in_place();
         Ok(self)
     }
@@ -181,7 +183,9 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
         _cs: CS,
         other: &F,
     ) -> Result<&mut Self, SynthesisError> {
-        self.value.as_mut().map(|val| *val += other);
+        if let Some(val) = self.value.as_mut() {
+            *val += other;
+        }
         self.variable += (*other, CS::one());
         Ok(self)
     }
@@ -199,7 +203,9 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
         mut _cs: CS,
         other: &F,
     ) -> Result<&mut Self, SynthesisError> {
-        self.value.as_mut().map(|val| *val *= other);
+        if let Some(val) = self.value.as_mut() {
+            *val *= other;
+        }
         self.variable *= *other;
         Ok(self)
     }
@@ -270,7 +276,7 @@ impl<F: PrimeField> FieldGadget<F, F> for FpGadget<F> {
 
 impl<F: PrimeField> PartialEq for FpGadget<F> {
     fn eq(&self, other: &Self) -> bool {
-        !self.value.is_none() && !other.value.is_none() && self.value == other.value
+        self.value.is_some() && other.value.is_some() && self.value == other.value
     }
 }
 
@@ -352,7 +358,7 @@ impl<F: PrimeField> ToBitsGadget<F> for FpGadget<F> {
         let mut coeff = F::one();
 
         for bit in bits.iter().rev() {
-            lc = lc + (coeff, bit.get_variable());
+            lc += (coeff, bit.get_variable());
 
             coeff.double_in_place();
         }
@@ -391,7 +397,7 @@ impl<F: PrimeField> ToBytesGadget<F> for FpGadget<F> {
         for bit in bytes.iter().flat_map(|byte_gadget| byte_gadget.bits.clone()) {
             match bit {
                 Boolean::Is(bit) => {
-                    lc = lc + (coeff, bit.get_variable());
+                    lc += (coeff, bit.get_variable());
                     coeff.double_in_place();
                 }
                 Boolean::Constant(_) | Boolean::Not(_) => unreachable!(),
@@ -540,7 +546,7 @@ impl<F: PrimeField> ThreeBitCondNegLookupGadget<F> for FpGadget<F> {
 impl<F: PrimeField> Clone for FpGadget<F> {
     fn clone(&self) -> Self {
         Self {
-            value: self.value.clone(),
+            value: self.value,
             variable: self.variable.clone(),
         }
     }

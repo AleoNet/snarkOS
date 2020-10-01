@@ -54,13 +54,13 @@ pub trait EncryptionScheme: Sized + Clone + From<<Self as EncryptionScheme>::Par
         &self,
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
-        message: &Vec<Self::Text>,
+        message: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn decrypt(
         &self,
         private_key: &Self::PrivateKey,
-        ciphertext: &Vec<Self::Text>,
+        ciphertext: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError>;
 
     fn parameters(&self) -> &Self::Parameters;

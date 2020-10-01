@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 // Compilation
+#![allow(clippy::module_inception)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts, trivial_numeric_casts)]
 #![deny(unused_qualifications, variant_size_differences, stable_features, unreachable_pub)]
 #![deny(non_shorthand_field_patterns, unused_attributes, unused_extern_crates)]

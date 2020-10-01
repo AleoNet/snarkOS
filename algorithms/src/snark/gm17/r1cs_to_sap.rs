@@ -28,6 +28,7 @@ pub(crate) struct R1CStoSAP;
 
 impl R1CStoSAP {
     #[inline]
+    #[allow(clippy::many_single_char_names)]
     pub(crate) fn instance_map_with_evaluation<E: PairingEngine>(
         assembly: &KeypairAssembly<E>,
         t: &E::Fr,

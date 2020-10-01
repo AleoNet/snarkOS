@@ -165,7 +165,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         &self,
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
-        message: &Vec<Self::Text>,
+        message: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
         let record_view_key = public_key.0.mul(&randomness);
 
@@ -202,7 +202,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     fn decrypt(
         &self,
         private_key: &Self::PrivateKey,
-        ciphertext: &Vec<Self::Text>,
+        ciphertext: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
         assert!(ciphertext.len() > 0);
         let c_0 = &ciphertext[0];

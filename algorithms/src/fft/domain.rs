@@ -328,6 +328,7 @@ fn best_fft<F: PrimeField>(a: &mut [F], worker: &Worker, omega: F, log_n: u32) {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 pub(crate) fn serial_fft<F: PrimeField>(a: &mut [F], omega: F, log_n: u32) {
     #[inline]
     fn bitreverse(mut n: u32, l: u32) -> u32 {

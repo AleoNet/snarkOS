@@ -359,7 +359,7 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
         let mut result = 0u8;
         for (i, bit) in bits.iter().enumerate() {
             let bit_value = *bit as u8;
-            result = result + (bit_value << i as u8);
+            result += bit_value << i as u8;
         }
         bytes.push(result);
     }

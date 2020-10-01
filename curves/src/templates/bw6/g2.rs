@@ -144,6 +144,7 @@ impl<P: BW6Parameters> G2Prepared<P> {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 fn doubling_step<B: BW6Parameters>(r: &mut G2HomProjective<B>) -> (B::Fp, B::Fp, B::Fp) {
     // Formula for line function when working with
     // homogeneous projective coordinates, as described in https://eprint.iacr.org/2013/722.pdf.
@@ -169,6 +170,7 @@ fn doubling_step<B: BW6Parameters>(r: &mut G2HomProjective<B>) -> (B::Fp, B::Fp,
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 fn addition_step<B: BW6Parameters>(r: &mut G2HomProjective<B>, q: &G2Affine<B>) -> (B::Fp, B::Fp, B::Fp) {
     // Formula for line function when working with
     // homogeneous projective coordinates, as described in https://eprint.iacr.org/2013/722.pdf.

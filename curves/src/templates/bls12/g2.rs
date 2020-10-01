@@ -106,6 +106,7 @@ impl<P: Bls12Parameters> G2Prepared<P> {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 fn doubling_step<B: Bls12Parameters>(
     r: &mut G2HomProjective<B>,
     two_inv: &B::Fp,
@@ -135,6 +136,7 @@ fn doubling_step<B: Bls12Parameters>(
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 fn addition_step<B: Bls12Parameters>(
     r: &mut G2HomProjective<B>,
     q: &G2Affine<B>,

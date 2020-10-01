@@ -79,7 +79,7 @@ pub trait ConstraintSystem<F: Field>: Sized {
     fn get_root(&mut self) -> &mut Self::Root;
 
     /// Begin a namespace for this constraint system.
-    fn ns<'a, NR, N>(&'a mut self, name_fn: N) -> Namespace<'a, F, Self::Root>
+    fn ns<NR, N>(&mut self, name_fn: N) -> Namespace<'_, F, Self::Root>
     where
         NR: Into<String>,
         N: FnOnce() -> NR,
