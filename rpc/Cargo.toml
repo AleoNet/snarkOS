@@ -30,7 +30,7 @@ jsonrpc-derive = { version = "14.2.2" }
 jsonrpc-http-server = { version = "14.2.0" }
 rand = { version = "0.7" }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.57" }
+serde_json = { version = "1.0.58" }
 tokio = { version = "0.2.22", features = ["full"] }
 
 [dev-dependencies]
