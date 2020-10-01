@@ -104,10 +104,16 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         // reserve the MSB of the data field element's valid bitsize and set the bit to 1.
         assert_eq!(Self::PAYLOAD_ELEMENT_BITSIZE, Self::DATA_ELEMENT_BITSIZE - 1);
 
+        // This element needs to be represented in the contraint field; its bits and the number of elements
+        // are calculated early, so that the storage vectors can be pre-allocated.
+        let payload = record.payload();
+        let payload_bits = bytes_to_bits(&to_bytes![payload]?);
+        let num_payload_elements = payload_bits.len() / Self::PAYLOAD_ELEMENT_BITSIZE;
+
         // Create the vector for storing data elements.
 
-        let mut data_elements = vec![];
-        let mut data_high_bits = vec![];
+        let mut data_elements = Vec::with_capacity(5 + num_payload_elements + 2);
+        let mut data_high_bits = Vec::with_capacity(5 + num_payload_elements);
 
         // These elements are already in the constraint field.
 
@@ -127,7 +133,6 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         let commitment_randomness = record.commitment_randomness();
         let birth_program_id = record.birth_program_id();
         let death_program_id = record.death_program_id();
-        let payload = record.payload();
         let value = record.value();
 
         // Process commitment_randomness. (Assumption 1 applies)
@@ -186,8 +191,6 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         // Process payload.
 
-        let payload_bits = bytes_to_bits(&to_bytes![payload]?);
-
         let mut payload_field_bits = Vec::with_capacity(Self::PAYLOAD_ELEMENT_BITSIZE + 1);
 
         for (i, bit) in payload_bits.iter().enumerate() {
@@ -206,7 +209,6 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             }
         }
 
-        let num_payload_elements = payload_bits.len() / Self::PAYLOAD_ELEMENT_BITSIZE;
         assert_eq!(data_elements.len(), 5 + num_payload_elements);
         assert_eq!(data_high_bits.len(), 5 + num_payload_elements);
 
