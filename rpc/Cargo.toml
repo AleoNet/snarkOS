@@ -36,7 +36,7 @@ tokio = { version = "0.2.22", features = ["full"] }
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }
 
-jsonrpc-test = { version = "14.2.0" }
+jsonrpc-test = { version = "15.1.0" }
 
 [build-dependencies]
 rustc_version = "0.2"
