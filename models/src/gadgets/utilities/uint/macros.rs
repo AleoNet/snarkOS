@@ -73,7 +73,7 @@ macro_rules! uint_impl {
             }
 
             fn to_bits_le(&self) -> Vec<Boolean> {
-                self.bits.iter().cloned().collect()
+                self.bits.clone()
             }
 
             fn from_bits_le(bits: &[Boolean]) -> Self {
