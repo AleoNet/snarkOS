@@ -101,7 +101,9 @@ impl<E: PairingEngine> MarlinKZG10<E> {
         (combined_comm, combined_shifted_comm)
     }
 
-    fn normalize_commitments(commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>) -> Vec<Commitment<E>> {
+    fn normalize_commitments(
+        commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>,
+    ) -> impl Iterator<Item = Commitment<E>> {
         let mut comms = Vec::with_capacity(commitments.len());
         let mut s_comms = Vec::with_capacity(commitments.len());
         let mut s_flags = Vec::with_capacity(commitments.len());
@@ -117,18 +119,13 @@ impl<E: PairingEngine> MarlinKZG10<E> {
         }
         let comms = E::G1Projective::batch_normalization_into_affine(&comms);
         let s_comms = E::G1Projective::batch_normalization_into_affine(&s_comms);
-        comms
-            .into_iter()
-            .zip(s_comms)
-            .zip(s_flags)
-            .map(|((c, s_c), flag)| {
-                let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
-                Commitment {
-                    comm: kzg10::Commitment(c),
-                    shifted_comm,
-                }
-            })
-            .collect()
+        comms.into_iter().zip(s_comms).zip(s_flags).map(|((c, s_c), flag)| {
+            let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
+            Commitment {
+                comm: kzg10::Commitment(c),
+                shifted_comm,
+            }
+        })
     }
 
     /// Accumulate `commitments` and `values` according to `opening_challenge`.
