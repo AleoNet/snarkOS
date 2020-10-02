@@ -28,8 +28,8 @@ impl Default for RecordPayload {
 }
 
 impl RecordPayload {
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_vec()
+    pub fn to_bytes(&self) -> &[u8] {
+        &self.0[..]
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
