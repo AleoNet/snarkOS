@@ -333,15 +333,11 @@ impl<'a, T: 'a + ToBytes> ToBytes for &'a T {
     }
 }
 
-pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = Vec::with_capacity(bytes.len() * 8);
-    for byte in bytes {
-        for i in 0..8 {
-            let bit = (*byte >> i) & 1;
-            bits.push(bit == 1);
-        }
-    }
-    bits
+pub fn bytes_to_bits(bytes: &[u8]) -> impl Iterator<Item = bool> + '_ {
+    bytes
+        .iter()
+        .map(|byte| (0..8).map(move |i| (*byte >> i) & 1 == 1))
+        .flatten()
 }
 
 pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
@@ -406,7 +402,7 @@ mod test {
         for _ in 0..ITERATIONS {
             let given_bytes: [u8; 32] = rng.gen();
 
-            let bits = bytes_to_bits(&given_bytes);
+            let bits = bytes_to_bits(&given_bytes).collect::<Vec<_>>();
             let recovered_bytes = bits_to_bytes(&bits);
 
             assert_eq!(given_bytes.to_vec(), recovered_bytes);
