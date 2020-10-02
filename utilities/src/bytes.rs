@@ -342,11 +342,11 @@ pub fn bytes_to_bits(bytes: &[u8]) -> impl Iterator<Item = bool> + '_ {
 
 pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     // Pad the bits if it not a correct size
-    let mut bits = bits.to_vec();
+    let mut bits = std::borrow::Cow::from(bits);
     if bits.len() % 8 != 0 {
         let current_length = bits.len();
         for _ in 0..(8 - (current_length % 8)) {
-            bits.push(false);
+            bits.to_mut().push(false);
         }
     }
 
