@@ -361,7 +361,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             .collect::<Vec<_>>();
 
         // Gather commitments in one vector.
-        let commitments: Vec<_> = index_vk
+        let commitments = index_vk
             .iter()
             .chain(first_comms)
             .chain(second_comms)
@@ -369,8 +369,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             .cloned()
             .zip(AHPForR1CS::<F>::polynomial_labels())
             .zip(degree_bounds)
-            .map(|((c, l), d)| LabeledCommitment::new(l, c, d))
-            .collect();
+            .map(|((c, l), d)| LabeledCommitment::new(l, c, d));
 
         let (query_set, verifier_state) = AHPForR1CS::verifier_query_set(verifier_state, &mut fs_rng);
 
@@ -392,7 +391,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
         let evaluations_are_correct = PC::check_combinations(
             &index_vk.verifier_key,
             &lc_s,
-            &commitments,
+            commitments,
             &query_set,
             &evaluations,
             &proof.pc_proof,
