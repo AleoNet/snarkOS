@@ -18,14 +18,17 @@ use crate::snark::gm17::{PreparedVerifyingKey, Proof, VerifyingKey};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::curves::{AffineCurve, One, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve};
 
-use std::ops::{AddAssign, MulAssign, Neg};
+use std::{
+    iter,
+    ops::{AddAssign, MulAssign, Neg},
+};
 
 pub fn prepare_verifying_key<E: PairingEngine>(vk: &VerifyingKey<E>) -> PreparedVerifyingKey<E> {
     PreparedVerifyingKey {
         vk: vk.clone(),
         g_alpha: vk.g_alpha_g1,
         h_beta: vk.h_beta_g2,
-        g_alpha_h_beta_ml: E::miller_loop([(&vk.g_alpha_g1.prepare(), &vk.h_beta_g2.prepare())].iter()),
+        g_alpha_h_beta_ml: E::miller_loop(iter::once((&vk.g_alpha_g1.prepare(), &vk.h_beta_g2.prepare()))),
         g_gamma_pc: vk.g_gamma_g1.prepare(),
         h_gamma_pc: vk.h_gamma_g2.prepare(),
         h_pc: vk.h_g2.prepare(),
@@ -65,7 +68,8 @@ pub fn verify_proof<E: PairingEngine>(
             (&g_psi.into_affine().prepare(), &pvk.h_gamma_pc),
             (&proof.c.prepare(), &pvk.h_pc),
         ]
-        .iter(),
+        .iter()
+        .copied(),
     );
     let mut test1_exp = test1_r2;
     test1_exp.mul_assign(&test1_r1);
@@ -79,7 +83,8 @@ pub fn verify_proof<E: PairingEngine>(
             (&proof.a.prepare(), &pvk.h_gamma_pc),
             (&pvk.g_gamma_pc, &proof.b.neg().prepare()),
         ]
-        .iter(),
+        .iter()
+        .copied(),
     );
 
     let test2 = E::final_exponentiation(&test2_exp).unwrap();

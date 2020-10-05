@@ -25,6 +25,7 @@ use snarkos_utilities::{
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
+    iter,
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
@@ -65,8 +66,8 @@ pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
     #[must_use]
     fn miller_loop<'a, I>(i: I) -> Self::Fqk
     where
-        I: IntoIterator<
-            Item = &'a (
+        I: Iterator<
+            Item = (
                 &'a <Self::G1Affine as PairingCurve>::Prepared,
                 &'a <Self::G2Affine as PairingCurve>::Prepared,
             ),
@@ -80,8 +81,8 @@ pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
     #[must_use]
     fn product_of_pairings<'a, I>(i: I) -> Self::Fqk
     where
-        I: IntoIterator<
-            Item = &'a (
+        I: Iterator<
+            Item = (
                 &'a <Self::G1Affine as PairingCurve>::Prepared,
                 &'a <Self::G2Affine as PairingCurve>::Prepared,
             ),
@@ -97,9 +98,10 @@ pub trait PairingEngine: Sized + 'static + Copy + Debug + Sync + Send {
         G1: Into<Self::G1Affine>,
         G2: Into<Self::G2Affine>,
     {
-        Self::final_exponentiation(&Self::miller_loop(
-            [(&(p.into().prepare()), &(q.into().prepare()))].iter(),
-        ))
+        Self::final_exponentiation(&Self::miller_loop(iter::once((
+            &p.into().prepare(),
+            &q.into().prepare(),
+        ))))
         .unwrap()
     }
 }

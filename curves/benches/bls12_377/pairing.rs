@@ -42,7 +42,7 @@ mod pairing {
 
         let mut count = 0;
         b.iter(|| {
-            let tmp = Bls12_377::miller_loop(&[(&v[count].0, &v[count].1)]);
+            let tmp = Bls12_377::miller_loop([(&v[count].0, &v[count].1)].iter().copied());
             count = (count + 1) % SAMPLES;
             tmp
         });
@@ -61,7 +61,7 @@ mod pairing {
                     G2Affine::from(G2::rand(&mut rng)).prepare(),
                 )
             })
-            .map(|(ref p, ref q)| Bls12_377::miller_loop(&[(p, q)]))
+            .map(|(ref p, ref q)| Bls12_377::miller_loop([(p, q)].iter().copied()))
             .collect();
 
         let mut count = 0;
