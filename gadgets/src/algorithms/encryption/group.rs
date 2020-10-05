@@ -521,7 +521,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
     ) -> Result<Self::CiphertextGadget, SynthesisError> {
         let zero = GG::zero(&mut cs.ns(|| "zero")).unwrap();
 
-        let randomness_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
+        let randomness_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.to_bits_le()).collect();
 
         let mut c_0 = zero.clone();
         c_0.precomputed_base_scalar_mul(
@@ -536,7 +536,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
 
         let z = record_view_key_gadget.to_x_coordinate();
         let z_bytes = z.to_bytes(&mut cs.ns(|| "z_to_bytes"))?;
-        let z_bits: Vec<_> = z_bytes.into_iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
+        let z_bits: Vec<_> = z_bytes.into_iter().flat_map(|byte| byte.to_bits_le()).collect();
 
         let mut ciphertext = vec![c_0];
 
@@ -545,7 +545,7 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
 
             let cs = &mut cs.ns(|| format!("c_{}", j));
 
-            let blinding_exponent_bits = blinding_exponent.iter().flat_map(|byte| byte.clone().to_bits_le());
+            let blinding_exponent_bits = blinding_exponent.iter().flat_map(|byte| byte.to_bits_le());
 
             let h = record_view_key_gadget.mul_bits(cs.ns(|| "h"), &zero, blinding_exponent_bits)?;
 
