@@ -152,7 +152,7 @@ mod test {
         scalar.reverse();
         let input = Vec::<Boolean>::alloc(cs.ns(|| "Input"), || Ok(scalar)).unwrap();
         let result = gadget_a
-            .mul_bits(cs.ns(|| "mul_bits"), &gadget_b, input.iter())
+            .mul_bits(cs.ns(|| "mul_bits"), &gadget_b, input.into_iter())
             .unwrap();
         let result_val = result.get_value().unwrap().into_affine();
         assert_eq!(

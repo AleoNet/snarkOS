@@ -532,11 +532,11 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
         let record_view_key_gadget =
             public_key
                 .public_key
-                .mul_bits(cs.ns(|| "record_view_key"), &zero, randomness_bits.iter())?;
+                .mul_bits(cs.ns(|| "record_view_key"), &zero, randomness_bits.into_iter())?;
 
         let z = record_view_key_gadget.to_x_coordinate();
         let z_bytes = z.to_bytes(&mut cs.ns(|| "z_to_bytes"))?;
-        let z_bits: Vec<_> = z_bytes.iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
+        let z_bits: Vec<_> = z_bytes.into_iter().flat_map(|byte| byte.clone().to_bits_le()).collect();
 
         let mut ciphertext = vec![c_0];
 
@@ -545,15 +545,12 @@ impl<G: Group + ProjectiveCurve, F: PrimeField, GG: CompressedGroupGadget<G, F>>
 
             let cs = &mut cs.ns(|| format!("c_{}", j));
 
-            let blinding_exponent_bits: Vec<_> = blinding_exponent
-                .iter()
-                .flat_map(|byte| byte.clone().to_bits_le())
-                .collect();
+            let blinding_exponent_bits = blinding_exponent.iter().flat_map(|byte| byte.clone().to_bits_le());
 
-            let h = record_view_key_gadget.mul_bits(cs.ns(|| "h"), &zero, blinding_exponent_bits.iter())?;
+            let h = record_view_key_gadget.mul_bits(cs.ns(|| "h"), &zero, blinding_exponent_bits)?;
 
             // z * h
-            let h_z = h.mul_bits(cs.ns(|| "z * h"), &zero, z_bits.iter())?;
+            let h_z = h.mul_bits(cs.ns(|| "z * h"), &zero, z_bits.iter().copied())?;
 
             // j * h
             let h_j = {

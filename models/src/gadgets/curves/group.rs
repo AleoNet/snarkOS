@@ -78,7 +78,7 @@ pub trait GroupGadget<G: Group, F: Field>:
         &self,
         mut cs: CS,
         result: &Self,
-        bits: impl Iterator<Item = &'a Boolean>,
+        bits: impl Iterator<Item = Boolean>,
     ) -> Result<Self, SynthesisError> {
         let mut base = self.clone();
         let mut result = result.clone();

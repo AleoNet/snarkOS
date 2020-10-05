@@ -143,7 +143,7 @@ where
             let mut input_len = 1;
             for (i, (input, b)) in public_inputs.by_ref().zip(pvk.gamma_abc_g1.iter().skip(1)).enumerate() {
                 let input_bits = input.to_bits(cs.ns(|| format!("Input {}", i)))?;
-                g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.iter())?;
+                g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.into_iter())?;
                 input_len += 1;
             }
             // Check that the input and the query in the verification are of the
