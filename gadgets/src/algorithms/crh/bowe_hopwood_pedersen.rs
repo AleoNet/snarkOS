@@ -62,7 +62,6 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<BoweH
 
         // Pad the input bits if it is not the current length.
         let mut input_in_bits: Vec<_> = padded_input_bytes
-            .to_vec()
             .into_iter()
             .flat_map(|byte| byte.to_bits_le())
             .collect();
