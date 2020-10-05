@@ -150,10 +150,10 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
             GG::precomputed_base_multiscalar_mul(cs.ns(|| "msm"), &parameters.parameters.bases, input_in_bits)?;
 
         // Compute h^r
-        let rand_bits: Vec<_> = randomness.0.iter().flat_map(|byte| byte.to_bits_le()).collect();
+        let rand_bits = randomness.0.iter().flat_map(|byte| byte.to_bits_le());
         result.precomputed_base_scalar_mul(
             cs.ns(|| "randomizer"),
-            rand_bits.iter().zip(&parameters.parameters.random_base),
+            rand_bits.zip(&parameters.parameters.random_base),
         )?;
 
         Ok(result)

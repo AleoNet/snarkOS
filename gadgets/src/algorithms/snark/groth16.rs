@@ -513,12 +513,12 @@ mod test {
             // assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());
             let mut cs = TestConstraintSystem::<Fq>::new();
 
-            let inputs: Vec<_> = inputs.into_iter().map(|input| input.unwrap()).collect();
+            let inputs = inputs.into_iter().map(|input| input.unwrap());
             let mut input_gadgets = Vec::new();
 
             {
                 let mut cs = cs.ns(|| "Allocate Input");
-                for (i, input) in inputs.into_iter().enumerate() {
+                for (i, input) in inputs.enumerate() {
                     let mut input_bits = BitIterator::new(input.into_repr()).collect::<Vec<_>>();
                     // Input must be in little-endian, but BitIterator outputs in big-endian.
                     input_bits.reverse();
