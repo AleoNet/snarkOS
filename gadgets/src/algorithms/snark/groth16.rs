@@ -444,12 +444,12 @@ mod test {
     }
 
     impl<F: Field> ConstraintSynthesizer<F> for Bench<F> {
-        fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
             assert!(self.inputs.len() >= 2);
             assert!(self.num_constraints >= self.inputs.len());
 
             let mut variables: Vec<_> = Vec::with_capacity(self.inputs.len());
-            for (i, input) in self.inputs.into_iter().enumerate() {
+            for (i, input) in self.inputs.iter().cloned().enumerate() {
                 let input_var = cs.alloc_input(
                     || format!("Input {}", i),
                     || input.ok_or(SynthesisError::AssignmentMissing),
@@ -495,7 +495,7 @@ mod test {
                 num_constraints,
             };
 
-            generate_random_parameters(c, rng).unwrap()
+            generate_random_parameters(&c, rng).unwrap()
         };
 
         {
@@ -507,7 +507,7 @@ mod test {
                     num_constraints,
                 };
                 // Create a groth16 proof with our parameters.
-                create_random_proof(c, &params, rng).unwrap()
+                create_random_proof(&c, &params, rng).unwrap()
             };
 
             // assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());
@@ -566,7 +566,7 @@ mod test {
                 num_constraints,
             };
 
-            generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap()
+            generate_random_parameters::<Bls12_377, _, _>(&c, rng).unwrap()
         };
 
         {
@@ -578,7 +578,7 @@ mod test {
                     num_constraints,
                 };
                 // Create a groth16 proof with our parameters.
-                create_random_proof(c, &params, rng).unwrap()
+                create_random_proof(&c, &params, rng).unwrap()
             };
 
             // assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());

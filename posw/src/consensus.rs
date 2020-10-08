@@ -142,7 +142,7 @@ where
         S: SNARK<Circuit = POSWCircuit<F, M, HG, CP>>,
     {
         let params = S::setup(
-            POSWCircuit {
+            &POSWCircuit {
                 // the circuit will be padded internally
                 leaves: vec![None; 0],
                 merkle_parameters: PARAMS.clone(),
@@ -169,7 +169,7 @@ where
         S: SNARK<Circuit = (POSWCircuit<F, M, HG, CP>, SRS<E>)>,
     {
         let params = S::setup(
-            (
+            &(
                 POSWCircuit {
                     // the circuit will be padded internally
                     leaves: vec![None; 0],
@@ -233,7 +233,7 @@ where
 
         // generate the proof
         let proof_timer = start_timer!(|| "POSW proof");
-        let proof = S::prove(pk, circuit, rng)?;
+        let proof = S::prove(pk, &circuit, rng)?;
         end_timer!(proof_timer);
 
         Ok(proof)

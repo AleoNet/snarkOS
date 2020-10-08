@@ -110,7 +110,11 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for ProvingAssignment<E> {
     }
 }
 
-pub fn create_random_proof<E, C, R>(circuit: C, params: &Parameters<E>, rng: &mut R) -> Result<Proof<E>, SynthesisError>
+pub fn create_random_proof<E, C, R>(
+    circuit: &C,
+    params: &Parameters<E>,
+    rng: &mut R,
+) -> Result<Proof<E>, SynthesisError>
 where
     E: PairingEngine,
     C: ConstraintSynthesizer<E::Fr>,
@@ -122,7 +126,7 @@ where
     create_proof::<E, C>(circuit, params, r, s)
 }
 
-pub fn create_proof_no_zk<E, C>(circuit: C, params: &Parameters<E>) -> Result<Proof<E>, SynthesisError>
+pub fn create_proof_no_zk<E, C>(circuit: &C, params: &Parameters<E>) -> Result<Proof<E>, SynthesisError>
 where
     E: PairingEngine,
     C: ConstraintSynthesizer<E::Fr>,
@@ -130,7 +134,7 @@ where
     create_proof::<E, C>(circuit, params, E::Fr::zero(), E::Fr::zero())
 }
 
-pub fn create_proof<E, C>(circuit: C, params: &Parameters<E>, r: E::Fr, s: E::Fr) -> Result<Proof<E>, SynthesisError>
+pub fn create_proof<E, C>(circuit: &C, params: &Parameters<E>, r: E::Fr, s: E::Fr) -> Result<Proof<E>, SynthesisError>
 where
     E: PairingEngine,
     C: ConstraintSynthesizer<E::Fr>,

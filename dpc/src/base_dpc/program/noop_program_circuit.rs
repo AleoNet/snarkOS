@@ -65,7 +65,7 @@ impl<C: BaseDPCComponents> NoopCircuit<C> {
 }
 
 impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for NoopCircuit<C> {
-    fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<C::InnerField>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_noop_gadget(
             cs,
             self.system_parameters.get()?,

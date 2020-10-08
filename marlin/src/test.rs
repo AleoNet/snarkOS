@@ -29,7 +29,7 @@ struct Circuit<F: Field> {
 }
 
 impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for Circuit<ConstraintF> {
-    fn generate_constraints<CS: ConstraintSystem<ConstraintF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<ConstraintF>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         let a = cs.alloc(|| "a", || self.a.ok_or(SynthesisError::AssignmentMissing))?;
         let b = cs.alloc(|| "b", || self.b.ok_or(SynthesisError::AssignmentMissing))?;
         let c = cs.alloc_input(
@@ -95,10 +95,10 @@ mod marlin {
                             num_variables,
                         };
 
-                        let (index_pk, index_vk) = $marlin_inst::index(universal_srs.clone(), circ.clone()).unwrap();
+                        let (index_pk, index_vk) = $marlin_inst::index(&universal_srs, &circ).unwrap();
                         println!("Called index");
 
-                        let proof = $marlin_inst::prove(&index_pk, circ, rng).unwrap();
+                        let proof = $marlin_inst::prove(&index_pk, &circ, rng).unwrap();
                         println!("Called prover");
 
                         assert!($marlin_inst::verify(&index_vk, &[c], &proof, rng).unwrap());

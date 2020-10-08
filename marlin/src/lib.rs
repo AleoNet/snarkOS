@@ -125,8 +125,8 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
     /// keys. This is a deterministic algorithm that anyone can rerun.
     #[allow(clippy::type_complexity)]
     pub fn index<'a, C: ConstraintSynthesizer<F>>(
-        srs: UniversalSRS<F, PC>,
-        c: C,
+        srs: &UniversalSRS<F, PC>,
+        c: &C,
     ) -> Result<(IndexProverKey<'a, F, PC, C>, IndexVerifierKey<F, PC, C>), Error<PC::Error>> {
         let index_time = start_timer!(|| "Marlin::Index");
 
@@ -170,7 +170,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
     /// Create a zkSNARK asserting that the constraint system is satisfied.
     pub fn prove<C: ConstraintSynthesizer<F>, R: RngCore>(
         index_pk: &IndexProverKey<F, PC, C>,
-        c: C,
+        c: &C,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC, C>, Error<PC::Error>> {
         let prover_time = start_timer!(|| "Marlin::Prover");

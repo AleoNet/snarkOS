@@ -148,7 +148,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
     /// Initialize the AHP prover.
     pub fn prover_init<'a, 'b, C: ConstraintSynthesizer<F>>(
         index: &'a Index<F, C>,
-        c: C,
+        c: &C,
     ) -> Result<ProverState<'a, 'b, F, C>, Error> {
         let init_time = start_timer!(|| "AHP::Prover::Init");
 

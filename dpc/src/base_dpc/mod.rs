@@ -260,7 +260,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         system_parameters: &SystemParameters<Components>,
         rng: &mut R,
     ) -> Result<NoopProgramSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::NoopProgramSNARK::setup(NoopCircuit::blank(system_parameters), rng)?;
+        let (pk, pvk) = Components::NoopProgramSNARK::setup(&NoopCircuit::blank(system_parameters), rng)?;
 
         Ok(NoopProgramSNARKParameters {
             proving_key: pk,
@@ -373,7 +373,7 @@ where
         let noop_program_snark_parameters = Self::generate_noop_program_snark_parameters(&system_parameters, rng)?;
         let program_snark_proof = Components::NoopProgramSNARK::prove(
             &noop_program_snark_parameters.proving_key,
-            NoopCircuit::blank(&system_parameters),
+            &NoopCircuit::blank(&system_parameters),
             rng,
         )?;
         end_timer!(program_snark_setup_time);
@@ -384,21 +384,17 @@ where
         };
 
         let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
-        let inner_snark_parameters =
-            Components::InnerSNARK::setup(InnerCircuit::blank(&system_parameters, ledger_parameters), rng)?;
+        let inner_circuit = InnerCircuit::blank(&system_parameters, ledger_parameters);
+        let inner_snark_parameters = Components::InnerSNARK::setup(&inner_circuit, rng)?;
         end_timer!(snark_setup_time);
 
         let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
         let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
             inner_snark_parameters.1.clone().into();
-        let inner_snark_proof = Components::InnerSNARK::prove(
-            &inner_snark_parameters.0,
-            InnerCircuit::blank(&system_parameters, ledger_parameters),
-            rng,
-        )?;
+        let inner_snark_proof = Components::InnerSNARK::prove(&inner_snark_parameters.0, &inner_circuit, rng)?;
 
         let outer_snark_parameters = Components::OuterSNARK::setup(
-            OuterCircuit::blank(
+            &OuterCircuit::blank(
                 &system_parameters,
                 ledger_parameters,
                 &inner_snark_vk,
@@ -786,7 +782,7 @@ where
                 None => return Err(DPCError::MissingInnerSnarkProvingParameters),
             };
 
-            Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
+            Components::InnerSNARK::prove(&inner_snark_parameters, &circuit, rng)?
         };
 
         // Verify that the inner proof passes
@@ -846,7 +842,7 @@ where
                 None => return Err(DPCError::MissingOuterSnarkProvingParameters),
             };
 
-            Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
+            Components::OuterSNARK::prove(&outer_snark_parameters, &circuit, rng)?
         };
 
         let transaction = Self::Transaction::new(

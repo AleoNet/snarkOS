@@ -219,7 +219,7 @@ where
     <<C::MerkleParameters as MerkleParameters>::H as CRH>::Parameters: ToConstraintField<C::InnerField>,
     MerkleTreeDigest<C::MerkleParameters>: ToConstraintField<C::InnerField>,
 {
-    fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<C::OuterField>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         execute_outer_proof_gadget::<C, CS>(
             cs,
             self.system_parameters.get()?,

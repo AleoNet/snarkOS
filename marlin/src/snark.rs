@@ -100,7 +100,7 @@ where
     C: ConstraintSynthesizer<E::Fr>,
 {
     /// Creates a new Parameters instance from a previously computed universal SRS
-    pub fn new(circuit: C, universal_srs: SRS<E>) -> Result<Self, SNARKError> {
+    pub fn new(circuit: &C, universal_srs: &SRS<E>) -> Result<Self, SNARKError> {
         let (prover_key, verifier_key) = Marlin::index(universal_srs, circuit)
             .map_err(|_| SNARKError::Crate("marlin", "could not index".to_owned()))?;
         Ok(Self {
@@ -136,7 +136,7 @@ where
     type VerifierInput = V;
 
     fn setup<R: RngCore>(
-        (circuit, srs): Self::Circuit,
+        (circuit, srs): &Self::Circuit,
         _rng: &mut R, // The Marlin Setup is deterministic
     ) -> Result<(Self::ProvingParameters, Self::PreparedVerificationParameters), SNARKError> {
         let setup_time = start_timer!(|| "{Marlin}::Setup");
@@ -148,7 +148,7 @@ where
 
     fn prove<R: RngCore>(
         pp: &Self::ProvingParameters,
-        circuit: Self::AssignedCircuit,
+        circuit: &Self::AssignedCircuit,
         rng: &mut R,
     ) -> Result<Self::Proof, SNARKError> {
         let proving_time = start_timer!(|| "{Marlin}::Proving");

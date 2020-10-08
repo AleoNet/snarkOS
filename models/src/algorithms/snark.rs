@@ -34,13 +34,13 @@ pub trait SNARK {
     type VerifierInput: ?Sized;
 
     fn setup<R: Rng>(
-        circuit: Self::Circuit,
+        circuit: &Self::Circuit,
         rng: &mut R,
     ) -> Result<(Self::ProvingParameters, Self::PreparedVerificationParameters), SNARKError>;
 
     fn prove<R: Rng>(
         parameter: &Self::ProvingParameters,
-        input_and_witness: Self::AssignedCircuit,
+        input_and_witness: &Self::AssignedCircuit,
         rng: &mut R,
     ) -> Result<Self::Proof, SNARKError>;
 

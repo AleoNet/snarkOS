@@ -313,7 +313,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate inner snark parameters and proof for verification in the outer snark
     let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
-        InnerCircuit::blank(&system_parameters, ledger.parameters()),
+        &InnerCircuit::blank(&system_parameters, ledger.parameters()),
         &mut rng,
     )
     .unwrap();
@@ -329,7 +329,7 @@ fn test_execute_base_dpc_constraints() {
 
     let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
         &inner_snark_parameters.0,
-        InnerCircuit::new(
+        &InnerCircuit::new(
             &system_parameters,
             ledger.parameters(),
             &ledger_digest,
