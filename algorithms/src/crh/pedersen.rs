@@ -58,9 +58,7 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
         let mut padded_input = vec![];
         if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
             padded_input.extend_from_slice(input);
-            for _ in input.len()..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
-                padded_input.push(0u8);
-            }
+            padded_input.resize((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8, 0u8);
             input = padded_input.as_slice();
         }
 
