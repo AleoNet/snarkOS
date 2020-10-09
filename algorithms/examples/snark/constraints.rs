@@ -91,7 +91,7 @@ impl<F: Field> ConstraintSynthesizer<F> for Benchmark<F> {
         for (val, var) in assignments {
             a_lc = a_lc + var;
             b_lc = b_lc + var;
-            c_val = c_val + &val;
+            c_val += &val;
         }
         c_val = c_val.square();
 
