@@ -25,8 +25,6 @@
 #![deny(renamed_and_removed_lints, stable_features, unused_allocation, unused_comparisons)]
 #![deny(unused_must_use, unused_mut, unused_unsafe, private_in_public, unsafe_code)]
 
-use csv;
-
 // For randomness (during paramgen and proof generation)
 use rand::thread_rng;
 
@@ -39,7 +37,7 @@ use std::{
 // Bring in some tools for using pairing-friendly curves
 // We're going to use the BLS12-377 pairing-friendly elliptic curve.
 use snarkos_curves::bls12_377::{Bls12_377, Fr};
-use snarkos_models::curves::Field;
+use snarkos_models::curves::One;
 
 // We're going to use the Groth-Maller 17 proving system.
 use snarkos_algorithms::snark::gm17::{
