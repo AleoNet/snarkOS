@@ -228,7 +228,7 @@ impl LCTerm {
     /// Returns `true` if `self == LCTerm::One`
     #[inline]
     pub fn is_one(&self) -> bool {
-        if let LCTerm::One = self { true } else { false }
+        matches!(self, LCTerm::One)
     }
 }
 
