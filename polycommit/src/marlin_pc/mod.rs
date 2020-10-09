@@ -216,7 +216,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
 
         let enforced_degree_bounds = enforced_degree_bounds.map(|v| {
             let mut v = v.to_vec();
-            v.sort();
+            v.sort_unstable();
             v.dedup();
             v
         });
