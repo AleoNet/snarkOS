@@ -103,7 +103,7 @@ mod test_storage {
         let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
         let peers_serialized = vec![0u8];
 
-        assert!(blockchain.store_to_peer_book(peers_serialized.clone()).is_ok());
+        assert!(blockchain.save_peer_book_to_storage(peers_serialized.clone()).is_ok());
         assert!(blockchain.get_peer_book().is_ok());
         assert_eq!(peers_serialized, blockchain.get_peer_book().unwrap());
 

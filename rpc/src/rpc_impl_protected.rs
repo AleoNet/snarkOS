@@ -348,7 +348,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let storage = self.new_secondary_storage_instance()?;
 
         // Generate transaction
-        let (records, transaction) = self.consensus.create_transaction(
+        let (records, transaction) = self.consensus_parameters.create_transaction(
             &self.parameters,
             old_records,
             old_account_private_keys,

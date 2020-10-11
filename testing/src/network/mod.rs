@@ -17,15 +17,14 @@
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
-use snarkos_network::{
-    environment::Environment,
-    external::{Channel, SyncHandler},
-    Server,
-};
+use snarkos_network::{environment::Environment, external::Channel, Server, SyncManager};
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::{
+    net::TcpListener,
+    sync::{Mutex, RwLock},
+};
 
 pub const LOCALHOST: &'static str = "0.0.0.0:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
@@ -48,25 +47,40 @@ pub async fn sleep(time: u64) {
 pub fn initialize_test_server(
     server_address: SocketAddr,
     bootnode_address: SocketAddr,
-    storage: Arc<MerkleTreeLedger>,
+    storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
     connection_frequency: u64,
 ) -> Server {
-    let consensus = TEST_CONSENSUS.clone();
+    let consensus = Arc::new(TEST_CONSENSUS.clone());
     let memory_pool = MemoryPool::new();
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-    let sync_handler = SyncHandler::new(bootnode_address);
-    let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
-    Server::new(
-        Arc::new(Environment::new(server_address, 5, 1, 10, true, vec![], false)),
-        consensus,
+    let mut environment = Environment::new(
         storage,
-        parameters,
         memory_pool_lock,
-        sync_handler_lock,
-        connection_frequency,
+        consensus,
+        Arc::new(parameters),
+        server_address,
+        1,
+        5,
+        100,
+        10,
+        vec![],
+        true,
+        false,
+    )
+    .unwrap();
+
+    // let sync_handler = SyncManager::new(bootnode_address);
+    // let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
+
+    Server::new(&mut environment
+        // consensus,
+        // storage,
+        // parameters,
+        // memory_pool_lock,
+        // sync_handler_lock,
+        // connection_frequency,
     )
 }
 

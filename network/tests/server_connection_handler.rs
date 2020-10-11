@@ -145,7 +145,7 @@ mod server_connection_handler {
             );
             let context = Arc::clone(&server.environment);
 
-            // 1. Add peer to gossiped in peer_book
+            // 1. Add peer to the disconnected peers in peer_book
 
             let mut peer_book = context.peer_book.write().await;
             peer_book.found_peer(&remote_address);
@@ -159,7 +159,7 @@ mod server_connection_handler {
 
             accept_all_messages(remote_listener);
 
-            // 4. Check that the server did not move the peer from gossiped
+            // 4. Check that the server did not move the peer from the disconnected peers
 
             let peer_book = context.peer_book.read().await;
 

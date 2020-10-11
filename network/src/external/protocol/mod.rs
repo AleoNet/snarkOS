@@ -22,6 +22,3 @@ pub use ping_pong_manager::*;
 
 pub mod ping_pong_worker;
 pub use ping_pong_worker::*;
-
-pub mod sync;
-pub use sync::*;

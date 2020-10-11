@@ -23,7 +23,7 @@ mod protected_rpc_tests {
         record::DPCRecord,
     };
     use snarkos_models::dpc::Record;
-    use snarkos_network::{environment::Environment, external::SyncHandler};
+    use snarkos_network::{environment::Environment, external::SyncManager};
     use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
@@ -63,7 +63,7 @@ mod protected_rpc_tests {
     }
 
     fn initialize_test_rpc(
-        storage: &Arc<MerkleTreeLedger>,
+        storage: &Arc<RwLock<MerkleTreeLedger>>,
         parameters: PublicParameters<Components>,
     ) -> MetaIoHandler<Meta> {
         let server_address = random_socket_address();
@@ -77,7 +77,7 @@ mod protected_rpc_tests {
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-        let sync_handler = SyncHandler::new(server_address.clone());
+        let sync_handler = SyncManager::new(server_address.clone());
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
         let context = Environment::new(server_address, 5, 1, 10, true, vec![], false);

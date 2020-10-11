@@ -25,10 +25,9 @@ mod server_listen {
         external::{
             message::Message,
             message_types::{GetPeers, GetSync, Verack},
-            protocol::SyncHandler,
+            SyncManager,
         },
-        RequestManager,
-        Server,
+        SendHandler, Server,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 
@@ -46,7 +45,7 @@ mod server_listen {
         tx: Sender<()>,
         server_address: SocketAddr,
         bootnode_address: SocketAddr,
-        storage: Arc<MerkleTreeLedger>,
+        storage: Arc<RwLock<MerkleTreeLedger>>,
         parameters: PublicParameters<Components>,
         is_bootnode: bool,
     ) {
@@ -55,7 +54,7 @@ mod server_listen {
 
         let consensus = TEST_CONSENSUS.clone();
 
-        let sync_handler = SyncHandler::new(bootnode_address);
+        let sync_handler = SyncManager::new(bootnode_address);
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
         let server = Server::new(
@@ -142,7 +141,7 @@ mod server_listen {
             let (reader, _peer) = bootnode_listener.accept().await.unwrap();
 
             // 4. Send handshake response from bootnode to server
-            let mut bootnode_manager = RequestManager::new();
+            let mut bootnode_manager = SendHandler::new();
             let (mut bootnode_handshake, _, _) = bootnode_manager
                 .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await
@@ -188,7 +187,7 @@ mod server_listen {
             let mut connected_peers = HashMap::<SocketAddr, DateTime<Utc>>::new();
             connected_peers.insert(peer_address, Utc::now());
             storage
-                .store_to_peer_book(bincode::serialize(&connected_peers).unwrap())
+                .save_peer_book_to_storage(bincode::serialize(&connected_peers).unwrap())
                 .unwrap();
 
             // 3. Start server
@@ -204,7 +203,7 @@ mod server_listen {
             sleep(1000).await;
 
             // 5. Send handshake response from remote node to local node
-            let mut peer_manager = RequestManager::new();
+            let mut peer_manager = SendHandler::new();
             peer_manager
                 .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await

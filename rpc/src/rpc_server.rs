@@ -26,7 +26,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::{environment::Environment, external::SyncHandler};
+use snarkos_network::{environment::Environment, external::SyncManager};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
@@ -37,13 +37,13 @@ use tokio::sync::Mutex;
 /// This may be changed in the future to give the node more control of the rpc server.
 pub async fn start_rpc_server(
     rpc_port: u16,
-    secondary_storage: Arc<MerkleTreeLedger>,
+    secondary_storage: Arc<RwLock<MerkleTreeLedger>>,
     storage_path: PathBuf,
     parameters: PublicParameters<Components>,
-    server_context: Arc<Environment>,
+    environment: Environment,
     consensus: ConsensusParameters,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    sync_handler_lock: Arc<Mutex<SyncHandler>>,
+    sync_handler_lock: Arc<Mutex<SyncManager>>,
     username: Option<String>,
     password: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -58,7 +58,7 @@ pub async fn start_rpc_server(
         secondary_storage,
         storage_path,
         parameters,
-        server_context,
+        environment,
         consensus,
         memory_pool_lock,
         sync_handler_lock,

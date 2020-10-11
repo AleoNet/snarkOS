@@ -14,85 +14,132 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::SyncManager;
 use crate::{
     environment::Environment,
     external::{message::MessageName, message_types::GetSync, protocol::*, Channel, GetMemoryPool},
-    peer_manager::ConnectionManager,
-    RequestManager,
-    ResponseManager,
+    peer_manager::PeerManager,
+    ReceiveHandler, SendHandler,
 };
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
+use snarkos_errors::{
+    network::{ConnectError, PingProtocolError, SendError, ServerError},
+    objects::BlockError,
+    storage::StorageError,
 };
-use snarkos_errors::network::ServerError;
 
-use std::{
-    net::{Shutdown, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
+use std::{fmt, net::Shutdown, sync::Arc};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, Mutex},
     task,
-    time::delay_for,
 };
 
-/// The main networking component of a node.
+pub type Sender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
+pub type Receiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
+
+#[derive(Debug)]
+pub enum NetworkError {
+    Bincode(Box<bincode::ErrorKind>),
+    Bincode2(bincode::ErrorKind),
+    BlockError(BlockError),
+    ConnectError(ConnectError),
+    IOError(std::io::Error),
+    PeerAlreadyConnected,
+    PeerAlreadyDisconnected,
+    PeerBookFailedToLoad,
+    PeerCountInvalid,
+    PeerIsDisconnected,
+    PingProtocolError(PingProtocolError),
+    SendError(SendError),
+    StorageError(StorageError),
+    SyncIntervalInvalid,
+    TryLockError(tokio::sync::TryLockError),
+}
+
+impl From<BlockError> for NetworkError {
+    fn from(error: BlockError) -> Self {
+        NetworkError::BlockError(error)
+    }
+}
+
+impl From<ConnectError> for NetworkError {
+    fn from(error: ConnectError) -> Self {
+        NetworkError::ConnectError(error)
+    }
+}
+
+impl From<PingProtocolError> for NetworkError {
+    fn from(error: PingProtocolError) -> Self {
+        NetworkError::PingProtocolError(error)
+    }
+}
+
+impl From<SendError> for NetworkError {
+    fn from(error: SendError) -> Self {
+        NetworkError::SendError(error)
+    }
+}
+
+impl From<StorageError> for NetworkError {
+    fn from(error: StorageError) -> Self {
+        NetworkError::StorageError(error)
+    }
+}
+
+impl From<Box<bincode::ErrorKind>> for NetworkError {
+    fn from(error: Box<bincode::ErrorKind>) -> Self {
+        NetworkError::Bincode(error)
+    }
+}
+
+impl From<bincode::ErrorKind> for NetworkError {
+    fn from(error: bincode::ErrorKind) -> Self {
+        NetworkError::Bincode2(error)
+    }
+}
+
+impl fmt::Display for NetworkError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl From<std::io::Error> for NetworkError {
+    fn from(error: std::io::Error) -> Self {
+        NetworkError::IOError(error)
+    }
+}
+
+impl From<tokio::sync::TryLockError> for NetworkError {
+    fn from(error: tokio::sync::TryLockError) -> Self {
+        NetworkError::TryLockError(error)
+    }
+}
+
+/// A core data structure for operating the networking stack of this node.
 pub struct Server {
-    pub consensus: ConsensusParameters,
-    pub environment: Arc<Environment>,
-    pub storage: Arc<MerkleTreeLedger>,
-    pub parameters: PublicParameters<Components>,
-    pub memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    pub sync_handler_lock: Arc<Mutex<SyncHandler>>,
-    pub connection_frequency: u64,
-    pub sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
-    pub receiver: mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
-    pub request_manager: RequestManager,
+    environment: Environment,
+    sender: Sender,
+    receiver: Receiver,
+    // peer_manager: PeerManager,
+    // sync_manager: Arc<Mutex<SyncManager>>,
 }
 
 impl Server {
-    /// Constructs a new `Server`.
-    pub fn new(
-        environment: Arc<Environment>,
-        consensus: ConsensusParameters,
-        storage: Arc<MerkleTreeLedger>,
-        parameters: PublicParameters<Components>,
-        memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-        sync_handler_lock: Arc<Mutex<SyncHandler>>,
-        connection_frequency: u64,
-    ) -> Self {
+    /// Creates a new instance of `Server`.
+    // pub fn new(environment: &mut Environment, sync_manager: Arc<Mutex<SyncManager>>) -> Self {
+    pub fn new(environment: &mut Environment) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
-        let request_manager = RequestManager::new();
 
-        Server {
-            consensus,
-            environment,
-            storage,
-            parameters,
-            memory_pool_lock,
+        environment.set_managers();
+
+        Self {
+            environment: environment.clone(),
             receiver,
             sender,
-            sync_handler_lock,
-            connection_frequency,
-            request_manager,
+            // peer_manager,
+            // sync_manager,
         }
-    }
-
-    /// Returns the default bootnode addresses of the network.
-    pub fn get_bootnodes(&self) -> Vec<SocketAddr> {
-        // Initialize the vector to be returned.
-        let mut bootnode_addresses = Vec::with_capacity(self.environment.bootnodes.len());
-        // Iterate through and parse the list of bootnode addresses.
-        for bootnode in self.environment.bootnodes.iter() {
-            if let Ok(bootnode_address) = bootnode.parse::<SocketAddr>() {
-                bootnode_addresses.push(bootnode_address);
-            }
-        }
-        bootnode_addresses
     }
 
     ///
@@ -103,27 +150,19 @@ impl Server {
     /// 3. Start the connection handler.
     /// 4. Start the message handler.
     ///
-    pub async fn listen(mut self) -> Result<(), ServerError> {
+    pub async fn listen(mut self) -> Result<(), NetworkError> {
         // Prepare to spawn the main loop.
-        let sender = self.sender.clone();
-        let storage = self.storage.clone();
         let environment = self.environment.clone();
-        let sync_handler_lock = self.sync_handler_lock.clone();
-        let mut request_manager = self.request_manager.clone();
+        let sender = self.sender.clone();
+        // let mut peer_manager = self.peer_manager.clone();
+        let peer_manager_og = PeerManager::new(environment.clone()).await?;
+        let mut peer_manager = PeerManager::new(environment.clone()).await?;
+        let sync_manager = self.environment.sync_manager().await.clone();
+        let sync_manager2 = sync_manager.clone();
 
-        let connection_manager = ConnectionManager::new(
-            &environment,
-            request_manager.clone(),
-            &storage,
-            self.get_bootnodes(),
-            self.connection_frequency,
-        )
-        .await;
-        let mut new_connection_manager = connection_manager.clone();
-
-        // TODO (howardwu): Find the actual address of the node.
+        // TODO (howardwu): Find the actual address of this node.
         // 1. Initialize TCP listener and accept new TCP connections.
-        let local_address = new_connection_manager.get_local_address().await;
+        let local_address = peer_manager_og.local_address();
         debug!("Starting listener at {:?}...", local_address);
         let mut listener = TcpListener::bind(&local_address).await?;
         info!("Listening at {:?}", local_address);
@@ -145,7 +184,7 @@ impl Server {
                 };
 
                 // Check if we've exceed our maximum number of allowed peers.
-                if environment.peer_book.read().await.num_connected() >= environment.max_peers {
+                if peer_manager.num_connected().await >= environment.max_peers() {
                     warn!("Rejected a connection request as this exceeds the maximum number of peers allowed");
                     if let Err(error) = reader.shutdown(Shutdown::Write) {
                         error!("Failed to shutdown peer reader ({})", error);
@@ -154,33 +193,36 @@ impl Server {
                 }
 
                 // Follow handshake protocol and drop peer connection if unsuccessful.
-                let height = storage.get_current_block_height();
+                let height = environment.current_block_height().await;
 
                 // TODO (raychu86) Establish a formal node version
-                if let Some((handshake, discovered_local_address, version_message)) = request_manager
-                    .receive_connection_request(1u64, height, remote_address, reader)
+                if let Some((handshake, discovered_local_address, version_message)) = environment
+                    .receive_handler()
+                    .receive_connection_request(&environment, 1u64, height, remote_address, reader)
                     .await
                 {
                     // Bootstrap discovery of local node IP via VERACK responses
                     {
-                        let local_address = new_connection_manager.get_local_address().await;
+                        let local_address = peer_manager.local_address();
                         if local_address != discovered_local_address {
-                            new_connection_manager.set_local_address(discovered_local_address).await;
+                            peer_manager.set_local_address(discovered_local_address).await;
                             info!("Discovered local address: {:?}", local_address);
                         }
                     }
                     // Store the channel established with the handshake
-                    new_connection_manager.add_channel(&handshake.channel);
+                    peer_manager.add_channel(&handshake.channel);
 
                     if let Some(version) = version_message {
                         // If our peer has a longer chain, send a sync message
-                        if version.height > storage.get_current_block_height() {
+                        if version.height > environment.current_block_height().await {
                             // Update the sync node if the sync_handler is Idle
-                            if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
+                            if let Ok(mut sync_handler) = sync_manager.try_lock() {
                                 if !sync_handler.is_syncing() {
                                     sync_handler.sync_node_address = handshake.channel.address;
 
-                                    if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                                    if let Ok(block_locator_hashes) =
+                                        environment.storage_read().await.get_block_locator_hashes()
+                                    {
                                         if let Err(err) =
                                             handshake.channel.write(&GetSync::new(block_locator_hashes)).await
                                         {
@@ -203,24 +245,27 @@ impl Server {
 
         // 3. Start the connection handler.
         debug!("Starting connection handler");
-        self.connection_handler(connection_manager).await;
+        let peer_manager_2 = peer_manager_og.clone();
+        task::spawn(async move {
+            sync_manager2
+                .try_lock()
+                .unwrap()
+                .connection_handler(peer_manager_2)
+                .await;
+        });
+
+        task::spawn(async move {
+            // self.peer_manager.handler().await;
+            peer_manager_og.handler().await;
+        });
+
+        self.environment
+            .receive_handler()
+            .message_handler(&self.environment, &mut self.receiver)
+            .await;
 
         // 4. Start the message handler.
         debug!("Starting message handler");
-
-        let mut response_manager = ResponseManager::new(
-            self.environment.peer_book.clone(),
-            self.consensus,
-            self.environment.clone(),
-            self.storage.clone(),
-            self.parameters.clone(),
-            self.memory_pool_lock.clone(),
-            self.sync_handler_lock.clone(),
-            self.connection_frequency.clone(),
-            self.receiver,
-            self.request_manager.clone(),
-        );
-        response_manager.message_handler().await;
         // self.message_handler().await;
 
         Ok(())
@@ -314,93 +359,6 @@ impl Server {
                 if disconnect_from_peer {
                     warn!("Disconnecting from an unreliable peer");
                     break;
-                }
-            }
-        });
-    }
-
-    // TODO (howardwu): Untangle this and find its components new homes.
-    /// Manages the number of active connections according to the connection frequency.
-    /// 1. Get more connected peers if we are under the minimum number specified by the network context.
-    ///     1.1 Ask our connected peers for their peers.
-    ///     1.2 Ask our gossiped peers to handshake and become connected.
-    /// 2. Maintain connected peers by sending ping messages.
-    /// 3. Purge peers that have not responded in connection_frequency x 5 seconds.
-    /// 4. Reselect a sync node if we purged it.
-    /// 5. Update our memory pool every connection_frequency x memory_pool_interval seconds.
-    /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
-    pub async fn connection_handler(&self, connection_manager: ConnectionManager) {
-        let context = self.environment.clone();
-        let memory_pool_lock = self.memory_pool_lock.clone();
-        let sync_handler_lock = self.sync_handler_lock.clone();
-        let storage = self.storage.clone();
-        let connection_frequency = self.connection_frequency;
-
-        // Start a separate thread for the handler.
-        task::spawn(async move {
-            let mut interval_ticker: u8 = 0;
-
-            loop {
-                // Wait for connection_frequency seconds in between each loop
-                delay_for(Duration::from_millis(connection_frequency)).await;
-
-                connection_manager.handler().await;
-
-                // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
-                {
-                    let local_address = connection_manager.get_local_address().await;
-
-                    // If we have disconnected from our sync node,
-                    // then set our sync state to idle and find a new sync node.
-                    if let Ok(mut sync_handler) = sync_handler_lock.try_lock() {
-                        let peer_book = context.peer_book.read().await;
-                        if peer_book.is_disconnected(&sync_handler.sync_node_address) {
-                            if let Some(peer) = peer_book
-                                .get_all_connected()
-                                .iter()
-                                .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
-                            {
-                                sync_handler.sync_state = SyncState::Idle;
-                                sync_handler.sync_node_address = peer.0.clone();
-                            };
-                        }
-                        drop(peer_book)
-                    }
-
-                    // Update our memory pool after memory_pool_interval frequency loops.
-                    if interval_ticker >= context.memory_pool_interval {
-                        if let Ok(sync_handler) = sync_handler_lock.try_lock() {
-                            // Ask our sync node for more transactions.
-                            if local_address != sync_handler.sync_node_address {
-                                if let Some(channel) =
-                                    connection_manager.get_channel(&sync_handler.sync_node_address).await
-                                {
-                                    if let Err(_) = channel.write(&GetMemoryPool).await {
-                                        // Acquire the peer book write lock.
-                                        let mut peer_book = context.peer_book.write().await;
-                                        peer_book.disconnected_peer(&sync_handler.sync_node_address);
-                                        drop(peer_book);
-                                    }
-                                }
-                            }
-                        }
-
-                        // Update the node's memory pool.
-                        let mut memory_pool = match memory_pool_lock.try_lock() {
-                            Ok(memory_pool) => memory_pool,
-                            _ => continue,
-                        };
-                        memory_pool.cleanse(&storage).unwrap_or_else(|error| {
-                            debug!("Failed to cleanse memory pool transactions in database {}", error)
-                        });
-                        memory_pool.store(&storage).unwrap_or_else(|error| {
-                            debug!("Failed to store memory pool transaction in database {}", error)
-                        });
-
-                        interval_ticker = 0;
-                    } else {
-                        interval_ticker += 1;
-                    }
                 }
             }
         });

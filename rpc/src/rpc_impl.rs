@@ -27,14 +27,13 @@ use snarkos_dpc::base_dpc::{
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
 use snarkos_network::{
-    external::SyncHandler,
+    external::SyncManager,
     internal::{environment::Environment, process_transaction_internal},
 };
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
-    CanonicalSerialize,
+    to_bytes, CanonicalSerialize,
 };
 
 use chrono::Utc;
@@ -46,7 +45,7 @@ use tokio::{runtime::Runtime, sync::Mutex};
 #[derive(Clone)]
 pub struct RpcImpl {
     /// Blockchain database storage.
-    pub(crate) storage: Arc<MerkleTreeLedger>,
+    pub(crate) storage: Arc<RwLock<MerkleTreeLedger>>,
 
     /// The path to the Blockchain database storage.
     pub(crate) storage_path: PathBuf,
@@ -55,7 +54,7 @@ pub struct RpcImpl {
     pub(crate) parameters: PublicParameters<Components>,
 
     /// Network context held by the server.
-    pub(crate) server_context: Arc<Environment>,
+    pub(crate) environment: Environment,
 
     /// Consensus parameters generated from node config.
     pub(crate) consensus: ConsensusParameters,
@@ -64,7 +63,7 @@ pub struct RpcImpl {
     pub(crate) memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
 
     /// Handle to access the sync state of the node
-    pub(crate) sync_handler_lock: Arc<Mutex<SyncHandler>>,
+    pub(crate) sync_handler_lock: Arc<Mutex<SyncManager>>,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
@@ -73,20 +72,20 @@ pub struct RpcImpl {
 impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
-        storage: Arc<MerkleTreeLedger>,
+        storage: Arc<RwLock<MerkleTreeLedger>>,
         storage_path: PathBuf,
         parameters: PublicParameters<Components>,
-        server_context: Arc<Environment>,
+        environment: Environment,
         consensus: ConsensusParameters,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-        sync_handler_lock: Arc<Mutex<SyncHandler>>,
+        sync_handler_lock: Arc<Mutex<SyncManager>>,
         credentials: Option<RpcCredentials>,
     ) -> Self {
         Self {
             storage,
             storage_path,
             parameters,
-            server_context,
+            environment,
             consensus,
             memory_pool_lock,
             sync_handler_lock,
@@ -265,13 +264,13 @@ impl RpcFunctions for RpcImpl {
         match !self.storage.transcation_conflicts(&transaction) {
             true => {
                 Runtime::new()?.block_on(process_transaction_internal(
-                    self.server_context.clone(),
-                    &self.consensus,
+                    self.environment.clone(),
+                    &self.consensus_parameters,
                     &self.parameters,
                     self.storage.clone(),
                     self.memory_pool_lock.clone(),
                     to_bytes![transaction]?.to_vec(),
-                    *Runtime::new()?.block_on(self.server_context.local_address.read()),
+                    *Runtime::new()?.block_on(self.environment.local_address.read()),
                 ))?;
 
                 Ok(hex::encode(transaction.transaction_id()?))
@@ -294,7 +293,7 @@ impl RpcFunctions for RpcImpl {
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
+        let peer_book = Runtime::new()?.block_on(self.environment.peer_book.read());
 
         Ok(peer_book.num_connected() as usize)
     }
@@ -302,7 +301,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
+        let peer_book = Runtime::new()?.block_on(self.environment.peer_book.read());
 
         let mut peers = vec![];
 
@@ -322,7 +321,7 @@ impl RpcFunctions for RpcImpl {
         }
 
         Ok(NodeInfo {
-            is_miner: self.server_context.is_miner,
+            is_miner: self.environment.is_miner,
             is_syncing,
         })
     }
@@ -337,7 +336,7 @@ impl RpcFunctions for RpcImpl {
         let time = Utc::now().timestamp();
 
         let memory_pool = Runtime::new()?.block_on(self.memory_pool_lock.lock());
-        let full_transactions = memory_pool.get_candidates(&self.storage, self.consensus.max_block_size)?;
+        let full_transactions = memory_pool.get_candidates(&self.storage, self.consensus_parameters.max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 
@@ -350,7 +349,7 @@ impl RpcFunctions for RpcImpl {
             previous_block_hash: hex::encode(&block.header.get_hash().0),
             block_height: block_height + 1,
             time,
-            difficulty_target: self.consensus.get_block_difficulty(&block.header, time),
+            difficulty_target: self.consensus_parameters.get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
             coinbase_value: coinbase_value.0 as u64,
         })
