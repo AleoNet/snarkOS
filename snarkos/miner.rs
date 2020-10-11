@@ -27,9 +27,9 @@ pub struct MinerInstance {
     miner_address: AccountAddress<Components>,
     consensus: ConsensusParameters,
     parameters: PublicParameters<Components>,
-    storage: Arc<MerkleTreeLedger>,
+    storage: Arc<RwLock<MerkleTreeLedger>>,
     memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    server_context: Arc<Environment>,
+    environment: Environment,
 }
 
 impl MinerInstance {
@@ -38,9 +38,9 @@ impl MinerInstance {
         miner_address: AccountAddress<Components>,
         consensus: ConsensusParameters,
         parameters: PublicParameters<Components>,
-        storage: Arc<MerkleTreeLedger>,
+        storage: Arc<RwLock<MerkleTreeLedger>>,
         memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-        server_context: Arc<Environment>,
+        environment: Environment,
     ) -> Self {
         Self {
             miner_address,
@@ -48,7 +48,7 @@ impl MinerInstance {
             parameters,
             storage,
             memory_pool_lock,
-            server_context,
+            environment,
         }
     }
 
@@ -58,10 +58,10 @@ impl MinerInstance {
     /// Miner threads are asynchronous so the only way to stop them is to kill the runtime they were started in. This may be changed in the future.
     pub fn spawn(self) {
         task::spawn(async move {
-            let context = self.server_context.clone();
-            let local_address = *self.server_context.local_address.read().await;
+            let context = self.environment.clone();
+            let local_address = *self.environment.local_address();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-            let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
+            let miner = Miner::new(self.miner_address.clone(), self.consensus_parameters.clone());
 
             let mut mining_failure_count = 0;
             let mining_failure_threshold = 10;

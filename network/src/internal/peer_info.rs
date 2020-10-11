@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::NetworkError;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -25,7 +27,7 @@ pub enum PeerStatus {
     Unknown,
 }
 
-/// A data structure that contains metadata about a peer.
+/// A data structure containing metadata about a peer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// The IP address of the peer.
@@ -34,14 +36,14 @@ pub struct PeerInfo {
     connected_count: i64,
     /// The number of times we disconnected from the peer.
     disconnected_count: i64,
+    /// The first datetime we saw the peer.
+    first_seen: DateTime<Utc>,
+    /// The last datetime we saw the peer.
+    last_seen: DateTime<Utc>,
     /// The last datetime we connected to the peer.
     last_connected: DateTime<Utc>,
     /// The last datetime we disconnected from the peer.
     last_disconnected: DateTime<Utc>,
-    /// The last datetime we saw the peer.
-    last_seen: DateTime<Utc>,
-    /// The first datetime we saw the peer.
-    first_seen: DateTime<Utc>,
 }
 
 impl PeerInfo {
@@ -53,34 +55,30 @@ impl PeerInfo {
             address,
             connected_count: 0,
             disconnected_count: 0,
+            first_seen: now,
+            last_seen: now.clone(),
             last_connected: now.clone(),
             last_disconnected: now.clone(),
-            last_seen: now.clone(),
-            first_seen: now,
         }
     }
 
     /// Updates the last seen datetime of the peer,
-    /// if the node is connected to the peer.
+    /// if this node is connected to the peer.
     #[inline]
-    pub fn set_last_seen(&mut self) {
+    pub fn set_last_seen(&mut self) -> Result<(), NetworkError> {
         // Only update the last seen datetime if the peer is connected.
         match self.status() {
-            PeerStatus::Connected => {
-                self.last_seen = Utc::now();
-            }
+            PeerStatus::Connected => Ok(self.last_seen = Utc::now()),
             PeerStatus::Disconnected | PeerStatus::NeverConnected | PeerStatus::Unknown => {
-                error!(
-                    "Attempted to set the last seen datetime for a disconnected peer ({})",
-                    self.address
-                );
+                error!("Attempting to set last seen of a disconnected peer ({})", self.address);
+                Err(NetworkError::PeerIsDisconnected)
             }
         }
     }
 
     /// Updates the connected metrics of the peer.
     #[inline]
-    pub fn set_connected(&mut self) {
+    pub fn set_connected(&mut self) -> Result<(), NetworkError> {
         // Only update the last connected metrics if the peer is new or currently disconnected.
         match self.status() {
             PeerStatus::NeverConnected | PeerStatus::Disconnected => {
@@ -88,19 +86,18 @@ impl PeerInfo {
                 self.last_seen = now.clone();
                 self.last_connected = now;
                 self.connected_count += 1;
+                Ok(())
             }
             PeerStatus::Connected | PeerStatus::Unknown => {
-                error!(
-                    "Attempted to set a connected peer to connected again ({})",
-                    self.address
-                );
+                error!("Attempting to reconnect to connected peer ({})", self.address);
+                Err(NetworkError::PeerAlreadyConnected)
             }
         }
     }
 
     /// Updates the disconnected metrics of the peer.
     #[inline]
-    pub fn set_disconnected(&mut self) {
+    pub fn set_disconnected(&mut self) -> Result<(), NetworkError> {
         // Only update the last disconnected metrics if the peer is connected.
         match self.status() {
             PeerStatus::Connected => {
@@ -108,18 +105,17 @@ impl PeerInfo {
                 self.last_seen = now.clone();
                 self.last_disconnected = now;
                 self.disconnected_count += 1;
+                Ok(())
             }
             PeerStatus::Disconnected | PeerStatus::NeverConnected | PeerStatus::Unknown => {
-                error!(
-                    "Attempted to set a disconnected peer to disconnected again ({})",
-                    self.address
-                );
+                error!("Attempting to disconnect from a disconnected peer ({})", self.address);
+                Err(NetworkError::PeerAlreadyDisconnected)
             }
         }
     }
 
     /// Returns the status of the peer connection based on the datetime
-    /// that the node connected and disconnected to the peer.
+    /// that this node connected and disconnected to the peer.
     #[inline]
     pub fn status(&self) -> PeerStatus {
         // If `first_seen`, `last_connected`, and `last_disconnected` are all equal,

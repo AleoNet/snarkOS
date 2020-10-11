@@ -31,15 +31,19 @@ extern crate snarkos_metrics;
 pub mod external;
 pub mod internal;
 pub mod peer_manager;
+pub use peer_manager::*;
 
-pub mod request_manager;
-pub use request_manager::*;
+pub mod environment;
+pub use environment::*;
 
-pub mod response_manager;
-pub use response_manager::*;
+pub mod send_handler;
+pub use send_handler::*;
+
+pub mod receive_handler;
+pub use receive_handler::*;
 
 pub mod server;
 pub use server::*;
 
-pub mod environment;
-pub use environment::*;
+pub mod sync_manager;
+pub use sync_manager::*;

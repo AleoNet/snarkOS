@@ -79,7 +79,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Store the connected peers.
-    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn save_peer_book_to_storage(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
         let op = Op::Insert {
             col: COL_META,
             key: KEY_PEER_BOOK.as_bytes().to_vec(),

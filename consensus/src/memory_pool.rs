@@ -36,7 +36,7 @@ use std::collections::HashMap;
 /// Stores a transaction and it's size in the memory pool.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Entry<T: Transaction> {
-    pub size: usize,
+    pub size_in_bytes: usize,
     pub transaction: T,
 }
 
@@ -44,10 +44,10 @@ pub struct Entry<T: Transaction> {
 /// Transaction entries will eventually be fetched by the miner and assembled into blocks.
 #[derive(Debug, Clone)]
 pub struct MemoryPool<T: Transaction> {
-    pub total_size: usize,
-
-    // Hashmap transaction_id -> Entry
+    /// The mapping of all unconfirmed transaction IDs to their corresponding transaction data.
     pub transactions: HashMap<Vec<u8>, Entry<T>>,
+    /// The total size in bytes of the current memory pool.
+    pub total_size_in_bytes: usize,
 }
 
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
@@ -69,7 +69,10 @@ impl<T: Transaction> MemoryPool<T> {
             if let Ok(transaction_bytes) = DPCTransactions::<T>::read(&serialized_transactions[..]) {
                 for transaction in transaction_bytes.0 {
                     let size = transaction.size();
-                    let entry = Entry { transaction, size };
+                    let entry = Entry {
+                        transaction,
+                        size_in_bytes: size,
+                    };
                     memory_pool.insert(storage, entry)?;
                 }
             }
@@ -140,7 +143,7 @@ impl<T: Transaction> MemoryPool<T> {
 
         let transaction_id = entry.transaction.transaction_id()?.to_vec();
 
-        self.total_size += entry.size;
+        self.total_size_in_bytes += entry.size_in_bytes;
         self.transactions.insert(transaction_id.clone(), entry);
 
         Ok(Some(transaction_id))
@@ -155,7 +158,7 @@ impl<T: Transaction> MemoryPool<T> {
             new_memory_pool.insert(&storage, entry.clone())?;
         }
 
-        self.total_size = new_memory_pool.total_size;
+        self.total_size_in_bytes = new_memory_pool.total_size_in_bytes;
         self.transactions = new_memory_pool.transactions;
 
         Ok(())
@@ -165,7 +168,7 @@ impl<T: Transaction> MemoryPool<T> {
     #[inline]
     pub fn remove(&mut self, entry: &Entry<T>) -> Result<Option<Vec<u8>>, ConsensusError> {
         if self.contains(entry) {
-            self.total_size -= entry.size;
+            self.total_size_in_bytes -= entry.size_in_bytes;
 
             let transaction_id = entry.transaction.transaction_id()?.to_vec();
 
@@ -182,7 +185,7 @@ impl<T: Transaction> MemoryPool<T> {
     pub fn remove_by_hash(&mut self, transaction_id: &[u8]) -> Result<Option<Entry<T>>, ConsensusError> {
         match self.transactions.clone().get(transaction_id) {
             Some(entry) => {
-                self.total_size -= entry.size;
+                self.total_size_in_bytes -= entry.size_in_bytes;
                 self.transactions.remove(transaction_id);
 
                 Ok(Some(entry.clone()))
@@ -214,12 +217,12 @@ impl<T: Transaction> MemoryPool<T> {
 
         // TODO Change naive transaction selection
         for (_transaction_id, entry) in self.transactions.clone() {
-            if block_size + entry.size <= max_size {
+            if block_size + entry.size_in_bytes <= max_size {
                 if storage.transcation_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
                     continue;
                 }
 
-                block_size += entry.size;
+                block_size += entry.size_in_bytes;
                 transactions.push(entry.transaction.clone());
             }
         }
@@ -231,7 +234,7 @@ impl<T: Transaction> MemoryPool<T> {
 impl<T: Transaction> Default for MemoryPool<T> {
     fn default() -> Self {
         Self {
-            total_size: 0,
+            total_size_in_bytes: 0,
             transactions: HashMap::<Vec<u8>, Entry<T>>::new(),
         }
     }
@@ -258,19 +261,24 @@ mod tests {
 
         mem_pool
             .insert(&blockchain, Entry {
-                size,
+                size_in_bytes: size,
                 transaction: transaction.clone(),
             })
             .unwrap();
 
-        assert_eq!(size, mem_pool.total_size);
+        assert_eq!(size, mem_pool.total_size_in_bytes);
         assert_eq!(1, mem_pool.transactions.len());
 
         // Duplicate pushes don't do anything
 
-        mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();
+        mem_pool
+            .insert(&blockchain, Entry {
+                size_in_bytes: size,
+                transaction,
+            })
+            .unwrap();
 
-        assert_eq!(size, mem_pool.total_size);
+        assert_eq!(size, mem_pool.total_size_in_bytes);
         assert_eq!(1, mem_pool.transactions.len());
 
         kill_storage_sync(blockchain);
@@ -284,17 +292,17 @@ mod tests {
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
-        let entry = Entry::<Tx> { size, transaction };
+        let entry = Entry::<Tx> { size_in_bytes: size, transaction };
 
         mem_pool.insert(&blockchain, entry.clone()).unwrap();
 
         assert_eq!(1, mem_pool.transactions.len());
-        assert_eq!(size, mem_pool.total_size);
+        assert_eq!(size, mem_pool.total_size_in_bytes);
 
         mem_pool.remove(&entry).unwrap();
 
         assert_eq!(0, mem_pool.transactions.len());
-        assert_eq!(0, mem_pool.total_size);
+        assert_eq!(0, mem_pool.total_size_in_bytes);
 
         kill_storage_sync(blockchain);
     }
@@ -309,20 +317,20 @@ mod tests {
 
         mem_pool
             .insert(&blockchain, Entry {
-                size,
+                size_in_bytes: size,
                 transaction: transaction.clone(),
             })
             .unwrap();
 
         assert_eq!(1, mem_pool.transactions.len());
-        assert_eq!(size, mem_pool.total_size);
+        assert_eq!(size, mem_pool.total_size_in_bytes);
 
         mem_pool
             .remove_by_hash(&transaction.transaction_id().unwrap().to_vec())
             .unwrap();
 
         assert_eq!(0, mem_pool.transactions.len());
-        assert_eq!(0, mem_pool.total_size);
+        assert_eq!(0, mem_pool.total_size_in_bytes);
 
         kill_storage_sync(blockchain);
     }
@@ -337,7 +345,12 @@ mod tests {
         let size = to_bytes![transaction].unwrap().len();
 
         let expected_transaction = transaction.clone();
-        mem_pool.insert(&blockchain, Entry { size, transaction }).unwrap();
+        mem_pool
+            .insert(&blockchain, Entry {
+                size_in_bytes: size,
+                transaction,
+            })
+            .unwrap();
 
         let max_block_size = size + BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE;
 
@@ -356,7 +369,7 @@ mod tests {
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
-                size: TRANSACTION_2.len(),
+                size_in_bytes: TRANSACTION_2.len(),
                 transaction,
             })
             .unwrap();
@@ -367,7 +380,7 @@ mod tests {
 
         let new_mem_pool = MemoryPool::from_storage(&blockchain).unwrap();
 
-        assert_eq!(mem_pool.total_size, new_mem_pool.total_size);
+        assert_eq!(mem_pool.total_size_in_bytes, new_mem_pool.total_size_in_bytes);
 
         kill_storage_sync(blockchain);
     }
@@ -380,7 +393,7 @@ mod tests {
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
-                size: TRANSACTION_2.len(),
+                size_in_bytes: TRANSACTION_2.len(),
                 transaction,
             })
             .unwrap();
@@ -398,7 +411,7 @@ mod tests {
         mem_pool.cleanse(&blockchain).unwrap();
 
         assert_eq!(0, mem_pool.transactions.len());
-        assert_eq!(0, mem_pool.total_size);
+        assert_eq!(0, mem_pool.total_size_in_bytes);
 
         kill_storage_sync(blockchain);
     }

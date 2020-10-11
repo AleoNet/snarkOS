@@ -416,7 +416,7 @@ mod server_message_handler {
 
             let memory_pool = memory_pool_lock.lock().await;
             assert!(memory_pool.contains(&Entry {
-                size: transaction_bytes.len(),
+                size_in_bytes: transaction_bytes.len(),
                 transaction: Tx::read(&transaction_bytes[..]).unwrap(),
             }));
         });
@@ -504,7 +504,7 @@ mod server_message_handler {
 
             let transaction_bytes = TRANSACTION_2.to_vec();
             let entry = Entry {
-                size: transaction_bytes.len(),
+                size_in_bytes: transaction_bytes.len(),
                 transaction: Tx::read(&transaction_bytes[..]).unwrap(),
             };
             let mut memory_pool = server.memory_pool_lock.lock().await;
@@ -600,7 +600,7 @@ mod server_message_handler {
             let memory_pool = memory_pool_lock.lock().await;
 
             assert!(memory_pool.contains(&Entry {
-                size: transaction_bytes.len(),
+                size_in_bytes: transaction_bytes.len(),
                 transaction: Tx::read(&transaction_bytes[..]).unwrap(),
             }));
         });

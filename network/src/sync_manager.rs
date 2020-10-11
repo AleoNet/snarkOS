@@ -14,9 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{
-    message_types::{GetBlock, GetSync},
-    Channel,
+use crate::external::GetMemoryPool;
+use crate::peer_manager::PeerManager;
+use crate::{
+    external::{
+        message_types::{GetBlock, GetSync},
+        Channel,
+    },
+    Environment,
 };
 use snarkos_errors::network::SendError;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
@@ -38,7 +43,11 @@ pub enum SyncState {
 /// 1. The server_node sends a GetSync message to a sync_node.
 /// 2. The sync_node responds with a Sync message with block_headers the server_node is missing.
 /// 3. The server_node sends a GetBlock message for each BlockHeaderHash in the message.
-pub struct SyncHandler {
+
+/// A stateful component for managing ledger syncing for this node.
+pub struct SyncManager {
+    environment: Environment,
+
     /// The address of the sync node
     pub sync_node_address: SocketAddr,
     /// Current state of the sync handler
@@ -49,10 +58,12 @@ pub struct SyncHandler {
     pub pending_blocks: HashMap<BlockHeaderHash, DateTime<Utc>>,
 }
 
-impl SyncHandler {
-    /// Construct a new `SyncHandler`.
-    pub fn new(sync_node_address: SocketAddr) -> Self {
+impl SyncManager {
+    /// Creates a new instance of `SyncHandler`.
+    pub fn new(environment: Environment, sync_node_address: SocketAddr) -> Self {
         Self {
+            environment,
+
             block_headers: vec![],
             pending_blocks: HashMap::new(),
             sync_node_address,
@@ -74,9 +85,9 @@ impl SyncHandler {
     }
 
     /// Remove the blocks that are now included in the chain.
-    pub fn clear_pending<T: Transaction, P: LoadableMerkleParameters>(&mut self, storage: Arc<Ledger<T, P>>) {
-        for block_hash in self.pending_blocks.clone().keys() {
-            if !storage.block_hash_exists(block_hash) {
+    pub async fn clear_pending(&mut self) {
+        for block_hash in &self.pending_blocks.clone().keys() {
+            if !self.environment.storage_read().await.block_hash_exists(block_hash) {
                 self.pending_blocks.remove(block_hash);
             }
         }
@@ -112,19 +123,16 @@ impl SyncHandler {
     }
 
     /// Finish syncing or ask for the next block from the sync node.
-    pub async fn increment<T: Transaction, P: LoadableMerkleParameters>(
-        &mut self,
-        channel: Arc<Channel>,
-        storage: Arc<Ledger<T, P>>,
-    ) -> Result<(), SendError> {
+    pub async fn increment(&mut self, channel: Arc<Channel>) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
-            if storage.get_current_block_height() > height {
+            let current_block_height = self.environment.current_block_height().await;
+            if current_block_height > height {
                 debug!(
                     "Synced {} Block(s) in {:.2} seconds",
-                    storage.get_current_block_height() - height,
+                    current_block_height - height,
                     (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
                 );
-                self.update_syncing(storage.get_current_block_height());
+                self.update_syncing(current_block_height);
             }
 
             // Sync up to 3 blocks at once
@@ -141,7 +149,11 @@ impl SyncHandler {
                         // Request the block again if the block was not downloaded in 5 seconds
                         Utc::now() - *request_time > ChronoDuration::seconds(5)
                     }
-                    None => !storage.block_hash_exists(&block_header_hash),
+                    None => !self
+                        .environment
+                        .storage_read()
+                        .await
+                        .block_hash_exists(&block_header_hash),
                 };
 
                 if should_request {
@@ -155,7 +167,7 @@ impl SyncHandler {
             if self.pending_blocks.is_empty() {
                 delay_for(Duration::from_millis(500)).await;
 
-                if let Ok(block_locator_hashes) = storage.get_block_locator_hashes() {
+                if let Ok(block_locator_hashes) = self.environment.storage_read().await.get_block_locator_hashes() {
                     channel.write(&GetSync::new(block_locator_hashes)).await?;
                 }
             } else {
@@ -167,11 +179,85 @@ impl SyncHandler {
                 }
             }
 
-            self.clear_pending(Arc::clone(&storage));
+            self.clear_pending().await;
         } else {
-            self.clear_pending(Arc::clone(&storage));
+            self.clear_pending().await;
         }
 
         Ok(())
+    }
+
+    // TODO (howardwu): Untangle this and find its components new homes.
+    /// Manages the number of active connections according to the connection frequency.
+    /// 1. Get more connected peers if we are under the minimum number specified by the network context.
+    ///     1.1 Ask our connected peers for their peers.
+    ///     1.2 Ask our disconnected peers to handshake and become connected.
+    /// 2. Maintain connected peers by sending ping messages.
+    /// 3. Purge peers that have not responded in sync_interval x 5 seconds.
+    /// 4. Reselect a sync node if we purged it.
+    /// 5. Update our memory pool every sync_interval x memory_pool_interval seconds.
+    /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
+    pub async fn connection_handler(&mut self, peer_manager: PeerManager) {
+        let environment = self.environment.clone();
+        let mut interval_ticker: u8 = 0;
+
+        loop {
+            // Wait for sync_interval seconds in between each loop
+            delay_for(Duration::from_millis(self.environment.sync_interval())).await;
+
+            // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
+            {
+                // If we have disconnected from our sync node,
+                // then set our sync state to idle and find a new sync node.
+                let peer_book = environment.peer_manager_read().await;
+                if peer_book.is_disconnected(&self.sync_node_address).await {
+                    if let Some(peer) = peer_book
+                        .get_all_connected()
+                        .await
+                        .iter()
+                        .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
+                    {
+                        self.sync_state = SyncState::Idle;
+                        self.sync_node_address = peer.0.clone();
+                    };
+                }
+                drop(peer_book);
+
+                // Update our memory pool after memory_pool_interval frequency loops.
+                if interval_ticker >= environment.memory_pool_interval() {
+                    // Ask our sync node for more transactions.
+                    if *environment.local_address() != self.sync_node_address {
+                        if let Some(channel) = peer_manager.get_channel(&self.sync_node_address).await {
+                            if let Err(_) = channel.write(&GetMemoryPool).await {
+                                // Acquire the peer book write lock.
+                                let mut peer_book = environment.peer_manager_write().await;
+                                peer_book.disconnect_from_peer(&self.sync_node_address).await;
+                                drop(peer_book);
+                            }
+                        }
+                    }
+
+                    // Update this node's memory pool.
+                    let mut memory_pool = match self.environment.memory_pool().try_lock() {
+                        Ok(memory_pool) => memory_pool,
+                        _ => continue,
+                    };
+                    memory_pool
+                        .cleanse(&*self.environment.storage_read().await)
+                        .unwrap_or_else(|error| {
+                            debug!("Failed to cleanse memory pool transactions in database {}", error)
+                        });
+                    memory_pool
+                        .store(&*self.environment.storage_read().await)
+                        .unwrap_or_else(|error| {
+                            debug!("Failed to store memory pool transaction in database {}", error)
+                        });
+
+                    interval_ticker = 0;
+                } else {
+                    interval_ticker += 1;
+                }
+            }
+        }
     }
 }

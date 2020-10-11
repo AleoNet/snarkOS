@@ -23,7 +23,7 @@ use std::{collections::HashMap, net::SocketAddr};
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Peers {
-    /// A list of gossiped peer addresses and their last seen dates
+    /// A list of peer addresses and their last seen dates
     pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
 }
 

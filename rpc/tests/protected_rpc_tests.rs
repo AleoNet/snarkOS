@@ -23,7 +23,7 @@ mod protected_rpc_tests {
         record::DPCRecord,
     };
     use snarkos_models::dpc::Record;
-    use snarkos_network::{environment::Environment, external::SyncHandler};
+    use snarkos_network::{environment::Environment, external::SyncManager};
     use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
@@ -63,7 +63,7 @@ mod protected_rpc_tests {
     }
 
     fn initialize_test_rpc(
-        storage: &Arc<MerkleTreeLedger>,
+        storage: &Arc<RwLock<MerkleTreeLedger>>,
         parameters: PublicParameters<Components>,
     ) -> MetaIoHandler<Meta> {
         let server_address = random_socket_address();

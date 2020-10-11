@@ -27,7 +27,7 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
 use snarkos_errors::node::NodeError;
 use snarkos_models::algorithms::{CRH, SNARK};
-use snarkos_network::{environment::Environment, external::protocol::SyncHandler, Server};
+use snarkos_network::{environment::Environment, Server, SyncManager};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
@@ -97,9 +97,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         _ => config.p2p.bootnodes[0].parse::<SocketAddr>()?,
     };
 
-    let sync_handler = SyncHandler::new(bootnode);
-    let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
     info!("Loading Aleo parameters...");
     let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
     info!("Loading complete.");
@@ -119,12 +116,12 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network: Network::from_network_id(config.aleo.network_id),
+        network_id: Network::from_network_id(config.aleo.network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids,
     };
 
-    let mut context = Arc::new(Environment::new(
+    let mut environment = Arc::new(Environment::new(
         socket_address,
         config.p2p.mempool_interval,
         config.p2p.min_peers,
@@ -138,7 +135,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                if let Some(mutable_context) = Arc::get_mut(&mut context) {
+                if let Some(mutable_context) = Arc::get_mut(&mut environment) {
                     mutable_context.is_miner = true;
                 }
 
@@ -148,7 +145,7 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
                     parameters.clone(),
                     storage.clone(),
                     memory_pool_lock.clone(),
-                    context.clone(),
+                    environment.clone(),
                 )
                 .spawn();
             }
@@ -158,14 +155,16 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         }
     }
 
+    let sync_manager = Arc::new(Mutex::new(SyncManager::new(environment, bootnode)));
+
     // Construct the server instance. Note this does not start the server.
     let server = Server::new(
-        context,
+        environment,
         consensus.clone(),
         storage.clone(),
         parameters,
         memory_pool_lock.clone(),
-        sync_handler_lock.clone(),
+        sync_manager.clone(),
         15000, // 15 seconds
     );
 
@@ -183,10 +182,10 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
             secondary_storage.clone(),
             path.to_path_buf(),
             proving_parameters,
-            server.environment.clone(),
+            environment,
             consensus.clone(),
             memory_pool_lock.clone(),
-            sync_handler_lock.clone(),
+            sync_manager.clone(),
             config.rpc.username,
             config.rpc.password,
         )

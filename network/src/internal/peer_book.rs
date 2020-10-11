@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::internal::PeerInfo;
-use snarkos_errors::network::ServerError;
+use crate::{internal::PeerInfo, NetworkError};
 use snarkos_metrics::Metrics;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
@@ -24,19 +23,19 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 
 /// An data structure for tracking and indexing the history of
-/// all connected and disconnected peers to the node.
+/// all connected and disconnected peers to this node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerBook {
-    /// The address of the node.
+    /// The local address of this node.
     local_address: SocketAddr,
-    /// A mapping of connected peers.
+    /// The mapping of connected peers to their metadata.
     connected_peers: HashMap<SocketAddr, PeerInfo>,
-    /// A mapping of disconnected peers.
+    /// The mapping of disconnected peers to their metadata.
     disconnected_peers: HashMap<SocketAddr, PeerInfo>,
 }
 
 impl PeerBook {
-    /// Construct a new `PeerBook`.
+    /// Creates a new instance of `PeerBook`.
     #[inline]
     pub fn new(local_address: SocketAddr) -> Self {
         Self {
@@ -46,20 +45,52 @@ impl PeerBook {
         }
     }
 
-    /// Returns the local address of the node.
+    // TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
+    //  when the PeerBook or PeerInfo struct fields change.
+    ///
+    /// Returns an instance of `PeerBook` from the given storage object.
+    ///
+    /// This function fetches a serialized peer book from the given storage object,
+    /// and attempts to deserialize it as an instance of `PeerBook`.
+    ///
+    /// If the peer book does not exist in storage or fails to deserialize properly,
+    /// returns a `NetworkError`.
+    ///
+    #[inline]
+    pub fn load<T: Transaction, P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, NetworkError> {
+        // Fetch the peer book from storage.
+        match storage.get_peer_book() {
+            // Attempt to deserialize it as a peer book.
+            Ok(serialized_peer_book) => Ok(bincode::deserialize(&serialized_peer_book)?),
+            _ => Err(NetworkError::PeerBookFailedToLoad),
+        }
+    }
+
+    /// Returns the local address of this node.
     #[inline]
     pub fn local_address(&self) -> SocketAddr {
         self.local_address
     }
 
-    /// Updates the local address stored in the `PeerBook`.
+    /// Updates the local address of this node.
     #[inline]
-    pub fn set_local_address(&mut self, local_address: SocketAddr) {
-        // Remove the local_address from the peer book
-        // in case the node found itself as a peer.
-        self.forget_peer(local_address);
+    pub fn set_local_address(&mut self, address: SocketAddr) {
+        // Check that the node does not maintain a connection to itself.
+        self.forget_peer(address);
+        // Update the local address to the given address.
+        self.local_address = address;
+    }
 
-        self.local_address = local_address;
+    /// Returns `true` if a given address is a connected peer in the `PeerBook`.
+    #[inline]
+    pub fn is_connected(&self, address: &SocketAddr) -> bool {
+        self.connected_peers.contains_key(address)
+    }
+
+    /// Returns `true` if a given address is a disconnected peer in the `PeerBook`.
+    #[inline]
+    pub fn is_disconnected(&self, address: &SocketAddr) -> bool {
+        self.disconnected_peers.contains_key(address)
     }
 
     /// Returns the number of connected peers.
@@ -74,13 +105,13 @@ impl PeerBook {
         self.disconnected_peers.len() as u16
     }
 
-    /// Returns a reference to the connected peers in the `PeerBook`.
+    /// Returns a reference to the connected peers in this peer book.
     #[inline]
     pub fn get_all_connected(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.connected_peers
     }
 
-    /// Returns a reference to the disconnected peers in the `PeerBook`.
+    /// Returns a reference to the disconnected peers in this peer book.
     #[inline]
     pub fn get_all_disconnected(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.disconnected_peers
@@ -128,23 +159,11 @@ impl PeerBook {
         }
     }
 
-    /// Returns `true` if a given address is a connected peer in the `PeerBook`.
-    #[inline]
-    pub fn is_connected(&self, address: &SocketAddr) -> bool {
-        self.connected_peers.contains_key(address)
-    }
-
-    /// Returns `true` if a given address is a disconnected peer in the `PeerBook`.
-    #[inline]
-    pub fn is_disconnected(&self, address: &SocketAddr) -> bool {
-        self.disconnected_peers.contains_key(address)
-    }
-
     /// Add the given address to the connected peers in the `PeerBook`.
     /// Returns `true` on success. Otherwise, returns `false`.
     #[inline]
     pub fn connected_peer(&mut self, address: &SocketAddr) -> bool {
-        // Check that the address is not the local address of the node.
+        // Check that the address is not the local address of this node.
         if self.local_address() == *address {
             return false;
         }
@@ -163,11 +182,11 @@ impl PeerBook {
         connected_peers_inc!(success)
     }
 
-    /// Remove the given address from the connected peers in the `PeerBook`.
+    /// Remove the given address from the connected peers in this peer book.
     /// Returns `true` on success. Otherwise, returns `false`.
     #[inline]
     pub fn disconnected_peer(&mut self, address: &SocketAddr) -> bool {
-        // Check that the address is not the local address of the node.
+        // Check that the address is not the local address of this node.
         if self.local_address() == *address {
             return false;
         }
@@ -190,7 +209,7 @@ impl PeerBook {
         }
     }
 
-    /// Add the given address to the disconnected peers in the `PeerBook`.
+    /// Add the given address to the disconnected peers in this peer book.
     /// Returns `true` on success. Otherwise, returns `false`.
     #[inline]
     pub fn found_peer(&mut self, address: &SocketAddr) -> bool {
@@ -214,54 +233,22 @@ impl PeerBook {
     }
 
     ///
-    /// Remove the given address from the `PeerBook`.
+    /// Removes the given address from the `PeerBook`.
     ///
     /// If the given address is a currently connected peer in the `PeerBook`,
-    /// the connected peer will be disconnected from the node.
+    /// the connected peer will be disconnected from this node.
     ///
     #[inline]
     pub fn forget_peer(&mut self, address: SocketAddr) {
         // Remove the address from the connected peers, if it exists.
         if let Some(mut peer_info) = self.connected_peers.remove(&address) {
-            // Update the peer info to disconnected.
+            // Set the peer info of this address to disconnected.
             peer_info.set_disconnected();
             // Decrement the connected_peer metric as the peer was not yet disconnected.
             connected_peers_dec!()
         }
 
-        // Remove the address from the disconnected peers just in case it exists.
+        // Remove the address from the disconnected peers in case it exists.
         self.disconnected_peers.remove(&address);
-    }
-
-    // TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
-    //  when the PeerBook or PeerInfo struct fields change.
-    /// Deserializes and creates the `PeerBook` from storage.
-    /// Returns `Some(peer_book)` on success. Otherwise, returns `None`.
-    #[inline]
-    pub fn load<T: Transaction, P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Option<Self> {
-        match storage.get_peer_book() {
-            Ok(serialized_peer_book) => bincode::deserialize(&serialized_peer_book).ok(),
-            _ => None,
-        }
-    }
-
-    // TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
-    //  when the PeerBook or PeerInfo struct fields change.
-    /// Serializes and writes the `PeerBook` to storage.
-    #[inline]
-    pub fn store<T: Transaction, P: LoadableMerkleParameters>(
-        &mut self,
-        storage: &Ledger<T, P>,
-    ) -> Result<(), ServerError> {
-        // [This is a redundant check for added safety]
-        // Remove the local_address from the peer book
-        // in case the node found itself as a peer.
-        let peer_book = {
-            // Forget the local address.
-            let mut peer_book = self.clone();
-            peer_book.forget_peer(self.local_address());
-            peer_book
-        };
-        Ok(storage.store_to_peer_book(bincode::serialize(&peer_book)?)?)
     }
 }
