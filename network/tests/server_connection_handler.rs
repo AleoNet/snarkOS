@@ -263,7 +263,7 @@ mod server_connection_handler {
                 .connections
                 .write()
                 .await
-                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
+                .store_channel(&Arc::new(Channel::new_writer(bootnode_address).await.unwrap()));
 
             let channel_sync_side = accept_channel(&mut sync_node_listener, local_address).await;
 

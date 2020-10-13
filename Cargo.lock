@@ -40,6 +40,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1fd36ffbb1fb7c834eac128ea8d0e310c5aeb635548f9d58861e1308d46e71c"
+
+[[package]]
 name = "arc-swap"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2738,6 +2744,7 @@ checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
 name = "snarkos"
 version = "1.1.4"
 dependencies = [
+ "anyhow",
  "clap",
  "colored",
  "dirs",
@@ -2756,7 +2763,6 @@ dependencies = [
  "snarkos-network",
  "snarkos-objects",
  "snarkos-posw",
- "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.2.22",
@@ -2888,6 +2894,7 @@ dependencies = [
 name = "snarkos-errors"
 version = "1.1.4"
 dependencies = [
+ "anyhow",
  "base58",
  "bech32",
  "bincode",
@@ -2968,6 +2975,7 @@ dependencies = [
 name = "snarkos-network"
 version = "1.1.4"
 dependencies = [
+ "anyhow",
  "bincode",
  "byteorder",
  "chrono",

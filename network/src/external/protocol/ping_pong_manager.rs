@@ -42,7 +42,7 @@ impl PingPongManager {
     /// Store the result upon success.
     pub async fn send_ping(&mut self, channel: &Arc<Channel>) -> Result<(), PingProtocolError> {
         self.addresses
-            .insert(channel.address, PingPongWorker::send(channel).await?);
+            .insert(channel.remote_address, PingPongWorker::send(channel).await?);
         Ok(())
     }
 

@@ -27,7 +27,8 @@ mod server_listen {
             message_types::{GetPeers, GetSync, Verack},
             SyncManager,
         },
-        SendHandler, Server,
+        SendHandler,
+        Server,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 

@@ -21,7 +21,6 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
     display::render_welcome,
-    miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
@@ -30,11 +29,14 @@ use snarkos_models::algorithms::{CRH, SNARK};
 use snarkos_network::{environment::Environment, Server, SyncManager};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
-use snarkos_rpc::start_rpc_server;
+// use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use tokio::{runtime::Runtime, sync::Mutex};
+use tokio::{
+    runtime::Runtime,
+    sync::{Mutex, RwLock},
+};
 
 fn initialize_logger(config: &Config) {
     match config.node.verbose {
@@ -65,7 +67,7 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config) -> Result<(), NodeError> {
+async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
 
     print_welcome(&config);
@@ -75,9 +77,10 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
+    let storage = MerkleTreeLedger::open_at_path(path.clone())?;
+    // let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
-    let memory_pool = MemoryPool::from_storage(&storage.clone())?;
+    let memory_pool = MemoryPool::from_storage(&storage)?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
     let bootnode = match config.p2p.bootnodes.len() {
@@ -109,76 +112,91 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         authorized_inner_snark_ids,
     };
 
-    let mut environment = Arc::new(Environment::new(
+    let mut environment = Environment::new(
+        Arc::new(RwLock::new(storage)),
+        memory_pool_lock.clone(),
+        Arc::new(consensus.clone()),
+        Arc::new(parameters.clone()),
         socket_address,
-        config.p2p.mempool_interval,
         config.p2p.min_peers,
         config.p2p.max_peers,
-        config.node.is_bootnode,
+        100,
+        config.p2p.mempool_interval,
         config.p2p.bootnodes.clone(),
-        false,
-    ));
+        config.node.is_bootnode,
+        config.miner.is_miner,
+    )?;
+    // let mut environment = Arc::new(Environment::new(
+    //     socket_address,
+    //     config.p2p.mempool_interval,
+    //     config.p2p.min_peers,
+    //     config.p2p.max_peers,
+    //     config.node.is_bootnode,
+    //     config.p2p.bootnodes.clone(),
+    //     false,
+    // ));
 
     // Start the miner task, if the mining configuration is enabled.
-    if config.miner.is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
-            Ok(miner_address) => {
-                if let Some(mutable_context) = Arc::get_mut(&mut environment) {
-                    mutable_context.is_miner = true;
-                }
+    // if config.miner.is_miner {
+    //     match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+    //         Ok(miner_address) => {
+    //             if let Some(mutable_context) = Arc::get_mut(&mut environment) {
+    //                 mutable_context.is_miner = true;
+    //             }
+    //
+    //             MinerInstance::new(
+    //                 miner_address,
+    //                 consensus.clone(),
+    //                 parameters.clone(),
+    //                 storage.clone(),
+    //                 memory_pool_lock.clone(),
+    //                 environment.clone(),
+    //             )
+    //             .spawn();
+    //         }
+    //         Err(_) => info!(
+    //             "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
+    //         ),
+    //     }
+    // }
 
-                MinerInstance::new(
-                    miner_address,
-                    consensus.clone(),
-                    parameters.clone(),
-                    storage.clone(),
-                    memory_pool_lock.clone(),
-                    environment.clone(),
-                )
-                .spawn();
-            }
-            Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
-            ),
-        }
-    }
-
-    let sync_manager = Arc::new(Mutex::new(SyncManager::new(environment, bootnode)));
+    // let sync_manager = Arc::new(Mutex::new(SyncManager::new(environment, bootnode)));
 
     // Construct the server instance. Note this does not start the server.
-    let server = Server::new(
-        environment,
-        consensus.clone(),
-        storage.clone(),
-        parameters,
-        memory_pool_lock.clone(),
-        sync_manager.clone(),
-        15000, // 15 seconds
-    );
+    let server = Server::new(&mut environment);
+    // let server = Server::new(
+    //     environment,
+    //     consensus.clone(),
+    //     storage.clone(),
+    //     parameters,
+    //     memory_pool_lock.clone(),
+    //     sync_manager.clone(),
+    //     15000, // 15 seconds
+    // );
 
-    // Start RPC thread, if the RPC configuration is enabled.
-    if config.rpc.json_rpc {
-        info!("Loading Aleo parameters for RPC...");
-        let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
-        info!("Loading complete.");
-
-        // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
-
-        start_rpc_server(
-            config.rpc.port,
-            secondary_storage.clone(),
-            path.to_path_buf(),
-            proving_parameters,
-            environment,
-            consensus.clone(),
-            memory_pool_lock.clone(),
-            sync_manager.clone(),
-            config.rpc.username,
-            config.rpc.password,
-        )
-        .await?;
-    }
+    // // Start RPC thread, if the RPC configuration is enabled.
+    // if config.rpc.json_rpc {
+    //     info!("Loading Aleo parameters for RPC...");
+    //     let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
+    //     info!("Loading complete.");
+    //
+    //     // Open a secondary storage instance to prevent resource sharing and bottle-necking.
+    //     let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
+    //
+    //     start_rpc_server(
+    //         config.rpc.port,
+    //         secondary_storage.clone(),
+    //         path.to_path_buf(),
+    //         proving_parameters,
+    //         environment,
+    //         consensus.clone(),
+    //         memory_pool_lock.clone(),
+    //         sync_manager.clone(),
+    //         config.rpc.username,
+    //         config.rpc.password,
+    //     )
+    //     .await?;
+    // }
 
     // Start the main server thread.
     server.listen().await?;

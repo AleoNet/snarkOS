@@ -18,7 +18,7 @@ use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/transaction.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Transaction {
     /// Serialized transaction bytes
     pub(crate) bytes: Vec<u8>,
