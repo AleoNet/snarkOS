@@ -18,7 +18,7 @@ use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_peers.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct GetPeers;
 
 impl Message for GetPeers {

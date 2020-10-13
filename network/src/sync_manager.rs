@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::GetMemoryPool;
-use crate::peer_manager::PeerManager;
 use crate::{
     external::{
         message_types::{GetBlock, GetSync},
         Channel,
+        GetMemoryPool,
     },
+    peer_manager::PeerManager,
     Environment,
+    NetworkError,
 };
 use snarkos_errors::network::SendError;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
@@ -59,7 +60,9 @@ pub struct SyncManager {
 }
 
 impl SyncManager {
+    ///
     /// Creates a new instance of `SyncHandler`.
+    ///
     pub fn new(environment: Environment, sync_node_address: SocketAddr) -> Self {
         Self {
             environment,
@@ -71,7 +74,9 @@ impl SyncManager {
         }
     }
 
-    /// Returns if the sync handler is currently syncing blocks
+    ///
+    /// Returns `true` if the manager is currently syncing blocks.
+    ///
     pub fn is_syncing(&self) -> bool {
         match self.sync_state {
             SyncState::Idle => false,
@@ -197,67 +202,72 @@ impl SyncManager {
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every sync_interval x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
-    pub async fn connection_handler(&mut self, peer_manager: PeerManager) {
+    pub async fn connection_handler(&mut self, peer_manager: PeerManager) -> Result<(), NetworkError> {
         let environment = self.environment.clone();
         let mut interval_ticker: u8 = 0;
 
-        loop {
-            // Wait for sync_interval seconds in between each loop
-            delay_for(Duration::from_millis(self.environment.sync_interval())).await;
-
-            // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
-            {
-                // If we have disconnected from our sync node,
-                // then set our sync state to idle and find a new sync node.
-                let peer_book = environment.peer_manager_read().await;
-                if peer_book.is_disconnected(&self.sync_node_address).await {
-                    if let Some(peer) = peer_book
-                        .get_all_connected()
-                        .await
-                        .iter()
-                        .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
-                    {
-                        self.sync_state = SyncState::Idle;
-                        self.sync_node_address = peer.0.clone();
-                    };
-                }
-                drop(peer_book);
-
-                // Update our memory pool after memory_pool_interval frequency loops.
-                if interval_ticker >= environment.memory_pool_interval() {
-                    // Ask our sync node for more transactions.
-                    if *environment.local_address() != self.sync_node_address {
-                        if let Some(channel) = peer_manager.get_channel(&self.sync_node_address).await {
-                            if let Err(_) = channel.write(&GetMemoryPool).await {
-                                // Acquire the peer book write lock.
-                                let mut peer_book = environment.peer_manager_write().await;
-                                peer_book.disconnect_from_peer(&self.sync_node_address).await;
-                                drop(peer_book);
-                            }
-                        }
-                    }
-
-                    // Update this node's memory pool.
-                    let mut memory_pool = match self.environment.memory_pool().try_lock() {
-                        Ok(memory_pool) => memory_pool,
-                        _ => continue,
-                    };
-                    memory_pool
-                        .cleanse(&*self.environment.storage_read().await)
-                        .unwrap_or_else(|error| {
-                            debug!("Failed to cleanse memory pool transactions in database {}", error)
-                        });
-                    memory_pool
-                        .store(&*self.environment.storage_read().await)
-                        .unwrap_or_else(|error| {
-                            debug!("Failed to store memory pool transaction in database {}", error)
-                        });
-
-                    interval_ticker = 0;
-                } else {
-                    interval_ticker += 1;
-                }
-            }
+        // TODO (howardwu): Implement this.
+        {
+            // loop {
+            //     // Wait for sync_interval seconds in between each loop
+            //     delay_for(Duration::from_millis(self.environment.sync_interval())).await;
+            //
+            //     // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
+            //     {
+            //         // If we have disconnected from our sync node,
+            //         // then set our sync state to idle and find a new sync node.
+            //         let peer_book = environment.peer_manager_read().await;
+            //         if peer_book.is_disconnected(&self.sync_node_address).await {
+            //             if let Some(peer) = peer_book
+            //                 .connected_peers()
+            //                 .await
+            //                 .iter()
+            //                 .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
+            //             {
+            //                 self.sync_state = SyncState::Idle;
+            //                 self.sync_node_address = peer.0.clone();
+            //             };
+            //         }
+            //         drop(peer_book);
+            //
+            //         // Update our memory pool after memory_pool_interval frequency loops.
+            //         if interval_ticker >= environment.memory_pool_interval() {
+            //             // Ask our sync node for more transactions.
+            //             if *environment.local_address() != self.sync_node_address {
+            //                 if let Some(channel) = peer_manager.get_channel(&self.sync_node_address) {
+            //                     if let Err(_) = channel.write(&GetMemoryPool).await {
+            //                         // Acquire the peer book write lock.
+            //                         let mut peer_book = environment.peer_manager_write().await;
+            //                         peer_book.disconnect_from_peer(&self.sync_node_address).await?;
+            //                         drop(peer_book);
+            //                     }
+            //                 }
+            //             }
+            //
+            //             // Update this node's memory pool.
+            //             let mut memory_pool = match self.environment.memory_pool().try_lock() {
+            //                 Ok(memory_pool) => memory_pool,
+            //                 _ => continue,
+            //             };
+            //             memory_pool
+            //                 .cleanse(&*self.environment.storage_read().await)
+            //                 .unwrap_or_else(|error| {
+            //                     debug!("Failed to cleanse memory pool transactions in database {}", error)
+            //                 });
+            //             memory_pool
+            //                 .store(&*self.environment.storage_read().await)
+            //                 .unwrap_or_else(|error| {
+            //                     debug!("Failed to store memory pool transaction in database {}", error)
+            //                 });
+            //
+            //             interval_ticker = 0;
+            //         } else {
+            //             interval_ticker += 1;
+            //         }
+            //     }
+            // }
         }
+
+        Ok(())
     }
 }

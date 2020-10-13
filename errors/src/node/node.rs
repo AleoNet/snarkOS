@@ -41,6 +41,9 @@ pub enum NodeError {
     Crate(&'static str, String),
 
     #[error("{}", _0)]
+    Error(anyhow::Error),
+
+    #[error("{}", _0)]
     Message(String),
 
     #[error("{}", _0)]
@@ -107,5 +110,11 @@ impl From<std::net::AddrParseError> for NodeError {
 impl From<std::boxed::Box<dyn std::error::Error>> for NodeError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         NodeError::Crate("std::boxed::Box", format!("{:?}", error))
+    }
+}
+
+impl From<anyhow::Error> for NodeError {
+    fn from(error: anyhow::Error) -> Self {
+        NodeError::Error(error)
     }
 }

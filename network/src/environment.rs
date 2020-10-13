@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::{Handshake, PingPongManager},
-    NetworkError, PeerManager, ReceiveHandler, SendHandler, SyncManager,
-};
+use crate::{external::PingPongManager, NetworkError, PeerManager, ReceiveHandler, SendHandler, SyncManager};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -55,21 +52,22 @@ pub struct Environment {
     /// The ping pong manager of this node.
     /// Ping/pongs with connected peers
     ping_pong: Arc<RwLock<PingPongManager>>,
+    // /// TODO (howardwu): Remove this.
+    // /// The handshakes with connected peers
+    // handshakes: Arc<RwLock<HashMap<SocketAddr, Handshake>>>,
     /// TODO (howardwu): Remove this.
-    /// The handshakes with connected peers
-    handshakes: Arc<RwLock<HashMap<SocketAddr, Handshake>>>,
-    /// TODO (howardwu): Remove this.
-    peer_manager: Option<Arc<RwLock<PeerManager>>>,
+    pub(crate) peer_manager: Option<Arc<RwLock<PeerManager>>>,
     /// TODO (howardwu): Remove this.
     sync_manager: Option<Arc<Mutex<SyncManager>>>,
 
     /// The local address of this node.
     local_address: SocketAddr,
 
-    /// The minimum number of peers to maintain connections with.
-    min_peers: u16,
-    /// The maximum number of peers to maintain connections with.
-    max_peers: u16,
+    /// The minimum number of peers required to maintain connections with.
+    minimum_number_of_peers: u16,
+    /// The maximum number of peers permitted to maintain connections with.
+    maximum_number_of_peers: u16,
+
     /// TODO (howardwu): Rename CONNECTION_FREQUENCY to this.
     /// The number of milliseconds this node waits to perform a periodic sync with its peers.
     sync_interval: u64,
@@ -140,7 +138,7 @@ impl Environment {
         let ping_pong = Arc::new(RwLock::new(PingPongManager::new()));
         // TODO (howardwu): Remove this.
         // Create a new handshake struct.
-        let handshakes = Arc::new(RwLock::new(HashMap::default()));
+        // let handshakes = Arc::new(RwLock::new(HashMap::default()));
 
         Ok(Self {
             storage,
@@ -152,14 +150,14 @@ impl Environment {
             receive_handler,
 
             ping_pong,
-            handshakes,
+            // handshakes,
             peer_manager: None, // TODO (howardwu): Remove this
             sync_manager: None, // TODO (howardwu): Remove this
 
             local_address,
 
-            min_peers,
-            max_peers,
+            minimum_number_of_peers: min_peers,
+            maximum_number_of_peers: max_peers,
             sync_interval,
             memory_pool_interval,
 
@@ -265,10 +263,10 @@ impl Environment {
     }
 
     /// Returns a reference to the handshakes of this node.
-    #[inline]
-    pub fn handshakes(&self) -> &Arc<RwLock<HashMap<SocketAddr, Handshake>>> {
-        &self.handshakes
-    }
+    // #[inline]
+    // pub fn handshakes(&self) -> &Arc<RwLock<HashMap<SocketAddr, Handshake>>> {
+    //     &self.handshakes
+    // }
 
     /// Returns a reference to the default bootnodes of the network.
     #[inline]
@@ -296,14 +294,14 @@ impl Environment {
 
     /// Returns the minimum number of peers this node maintains a connection with.
     #[inline]
-    pub fn min_peers(&self) -> u16 {
-        self.min_peers
+    pub fn minimum_number_of_peers(&self) -> u16 {
+        self.minimum_number_of_peers
     }
 
     /// Returns the maximum number of peers this node maintains a connection with.
     #[inline]
-    pub fn max_peers(&self) -> u16 {
-        self.min_peers
+    pub fn maximum_number_of_peers(&self) -> u16 {
+        self.minimum_number_of_peers
     }
 
     /// Returns the sync interval of this node.

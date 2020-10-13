@@ -14,12 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate tracing;
+pub enum Response {}
 
-pub mod cli;
-pub mod config;
-pub mod display;
-// pub mod miner;
-pub mod parameters;
-pub mod update;
+// impl Response {}

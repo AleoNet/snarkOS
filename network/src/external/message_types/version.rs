@@ -22,50 +22,45 @@ use rand::Rng;
 use std::net::SocketAddr;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Version {
-    /// The network version number
+    /// The version number of the sender's node server.
     pub version: u64,
-    /// Latest block number of node sending this message
+    /// The block height of the sender's node server.
     pub height: u32,
-    /// Random nonce sequence number
+    /// The random nonce of the handshake request.
     pub nonce: u64,
-    /// Message timestamp
+    /// The IP address of the sender.
+    pub sender: SocketAddr,
+    /// The IP address of the recipient.
+    pub receiver: SocketAddr,
+    /// The timestamp of this message.
     pub timestamp: i64,
-    /// Network address of message recipient
-    pub address_receiver: SocketAddr,
-    /// Network address of message sender
-    pub address_sender: SocketAddr,
 }
 
 impl Version {
-    pub fn new(version: u64, height: u32, address_receiver: SocketAddr, address_sender: SocketAddr) -> Self {
+    pub fn new(version: u64, height: u32, nonce: u64, sender: SocketAddr, receiver: SocketAddr) -> Self {
+        Self {
+            version,
+            height,
+            nonce,
+            sender,
+            receiver,
+            timestamp: Utc::now().timestamp(),
+        }
+    }
+
+    #[deprecated]
+    pub fn new_with_rng(version: u64, height: u32, sender: SocketAddr, receiver: SocketAddr) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             version,
             height,
             nonce: rng.gen::<u64>(),
+            sender,
+            receiver,
             timestamp: Utc::now().timestamp(),
-            address_receiver,
-            address_sender,
-        }
-    }
-
-    pub fn from(
-        version: u64,
-        height: u32,
-        address_receiver: SocketAddr,
-        address_sender: SocketAddr,
-        nonce: u64,
-    ) -> Self {
-        Self {
-            version,
-            height,
-            nonce,
-            timestamp: Utc::now().timestamp(),
-            address_receiver,
-            address_sender,
         }
     }
 }
@@ -85,8 +80,8 @@ impl Message for Version {
             height: bincode::deserialize(&vec[8..12])?,
             nonce: bincode::deserialize(&vec[12..20])?,
             timestamp: bincode::deserialize(&vec[20..28])?,
-            address_receiver: bincode::deserialize(&vec[28..38])?,
-            address_sender: bincode::deserialize(&vec[38..48])?,
+            receiver: bincode::deserialize(&vec[28..38])?,
+            sender: bincode::deserialize(&vec[38..48])?,
         })
     }
 
@@ -96,8 +91,8 @@ impl Message for Version {
         writer.extend_from_slice(&bincode::serialize(&self.height)?);
         writer.extend_from_slice(&bincode::serialize(&self.nonce)?);
         writer.extend_from_slice(&bincode::serialize(&self.timestamp)?);
-        writer.extend_from_slice(&bincode::serialize(&self.address_receiver)?);
-        writer.extend_from_slice(&bincode::serialize(&self.address_sender)?);
+        writer.extend_from_slice(&bincode::serialize(&self.receiver)?);
+        writer.extend_from_slice(&bincode::serialize(&self.sender)?);
         Ok(writer)
     }
 }
@@ -108,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_version() {
-        let version = Version::new(
+        let version = Version::new_with_rng(
             1u64,
             1u32,
             "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),

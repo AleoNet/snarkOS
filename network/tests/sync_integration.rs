@@ -48,10 +48,7 @@ mod sync_integration {
             let (tx, rx) = oneshot::channel();
             tokio::spawn(async move {
                 sync_handler
-                    .increment(
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
-                        storage,
-                    )
+                    .increment(Arc::new(Channel::new_writer(bootnode_address).await.unwrap()), storage)
                     .await
                     .unwrap();
 
@@ -89,10 +86,7 @@ mod sync_integration {
             let (tx, rx) = oneshot::channel();
             tokio::spawn(async move {
                 sync_handler
-                    .increment(
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
-                        storage,
-                    )
+                    .increment(Arc::new(Channel::new_writer(bootnode_address).await.unwrap()), storage)
                     .await
                     .unwrap();
                 tx.send(()).unwrap();

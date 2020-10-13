@@ -259,7 +259,7 @@ mod server_connection_handler {
 
             // 2. Add sync handler to connections
 
-            let bootnode_channel = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+            let bootnode_channel = Arc::new(Channel::new_writer(bootnode_address).await.unwrap());
 
             context.connections.write().await.store_channel(&bootnode_channel);
 

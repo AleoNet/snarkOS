@@ -22,7 +22,7 @@ use rand::Rng;
 use std::io::Cursor;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/ping.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Ping {
     /// Unique ping protocol identifier
     pub nonce: u64,

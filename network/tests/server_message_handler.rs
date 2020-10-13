@@ -71,7 +71,7 @@ mod server_message_handler {
                         tx,
                         Block::name(),
                         Block::new(BLOCK_1.to_vec()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -131,7 +131,7 @@ mod server_message_handler {
                         GetBlock::new(BlockHeaderHash::new(GENESIS_BLOCK_HEADER_HASH.to_vec()))
                             .serialize()
                             .unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -183,7 +183,7 @@ mod server_message_handler {
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
-            let channel_server_side = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_writer(bootnode_address).await.unwrap());
             accept_channel(&mut bootnode_listener, local_address).await;
 
             // 2. Send SyncBlock message to server
@@ -254,7 +254,7 @@ mod server_message_handler {
                         tx,
                         Block::name(),
                         Block::new(BLOCK_1.to_vec()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(bootnode_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -272,7 +272,7 @@ mod server_message_handler {
                         GetSync::new(vec![BlockHeaderHash::new(GENESIS_BLOCK_HEADER_HASH.to_vec())])
                             .serialize()
                             .unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -322,7 +322,7 @@ mod server_message_handler {
             let mut server_sender = server.sender.clone();
             let context = server.environment.clone();
 
-            let bootnode_channel = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+            let bootnode_channel = Arc::new(Channel::new_writer(bootnode_address).await.unwrap());
 
             context.connections.write().await.store_channel(&bootnode_channel);
 
@@ -344,7 +344,7 @@ mod server_message_handler {
                         tx,
                         Sync::name(),
                         Sync::new(vec![block_hash_clone]).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -405,7 +405,7 @@ mod server_message_handler {
                         tx,
                         Transaction::name(),
                         Transaction::new(transaction_bytes_clone).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -463,7 +463,7 @@ mod server_message_handler {
                         tx,
                         GetMemoryPool::name(),
                         GetMemoryPool.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -527,7 +527,7 @@ mod server_message_handler {
                         tx,
                         GetMemoryPool::name(),
                         GetMemoryPool.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -587,7 +587,7 @@ mod server_message_handler {
                         tx,
                         MemoryPool::name(),
                         MemoryPool::new(vec![TRANSACTION_2.to_vec()]).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -648,7 +648,7 @@ mod server_message_handler {
                         tx,
                         GetPeers::name(),
                         GetPeers.serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap();
@@ -713,7 +713,7 @@ mod server_message_handler {
                         tx,
                         Peers::name(),
                         Peers::new(addresses).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(bootnode_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -769,7 +769,7 @@ mod server_message_handler {
                         tx,
                         Ping::name(),
                         ping_bytes,
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -826,7 +826,7 @@ mod server_message_handler {
                         tx,
                         Pong::name(),
                         Pong::new(Ping::new()).serialize().unwrap(),
-                        Arc::new(Channel::new_write_only(remote_address).await.unwrap()),
+                        Arc::new(Channel::new_writer(remote_address).await.unwrap()),
                     ))
                     .await
                     .unwrap()
@@ -873,7 +873,7 @@ mod server_message_handler {
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
-            let channel_server_side = Arc::new(Channel::new_write_only(remote_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_writer(remote_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut remote_listener, local_address).await;
 
             // 2. Add peer to pings
@@ -954,7 +954,7 @@ mod server_message_handler {
             start_test_server(server);
             sleep(WAIT_PERIOD).await; // Sleep to give testing server time to spin up on a new thread
 
-            let channel_server_side = Arc::new(Channel::new_write_only(remote_address).await.unwrap());
+            let channel_server_side = Arc::new(Channel::new_writer(remote_address).await.unwrap());
             let channel_peer_side = accept_channel(&mut remote_listener, local_address).await;
 
             // 2. Add peer to pings

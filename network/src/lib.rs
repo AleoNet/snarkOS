@@ -29,7 +29,10 @@ extern crate log;
 extern crate snarkos_metrics;
 
 pub mod external;
-pub mod internal;
+pub mod peers;
+pub mod request;
+pub mod response;
+
 pub mod peer_manager;
 pub use peer_manager::*;
 

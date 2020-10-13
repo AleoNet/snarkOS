@@ -26,7 +26,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::{environment::Environment, external::SyncManager};
+use snarkos_network::{Environment, SyncManager};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};

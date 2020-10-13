@@ -14,39 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    environment::Environment,
-    external::{Block, HandshakeStatus, Transaction, Verack},
-};
-use snarkos_consensus::{
-    memory_pool::{Entry, MemoryPool},
-    ConsensusParameters, MerkleTreeLedger,
-};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
-use snarkos_errors::network::SendError;
-use snarkos_utilities::bytes::FromBytes;
+use crate::{external::Channel, request::Request, NetworkError};
 
 use std::{
+    collections::{HashMap, HashSet},
     net::SocketAddr,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
-use tokio::{
-    net::TcpStream,
-    sync::{Mutex, RwLock},
-    task,
-};
+use tokio::sync::RwLock;
 
-/// A stateless component for handling outbound network traffic.
+/// The map of remote addresses to their active write channels.
+pub type Channels = HashMap<SocketAddr, Arc<Channel>>;
+
+/// The set of requests for a single peer.
+pub type Requests = Arc<RwLock<HashSet<Request>>>;
+
+/// The map of remote addresses to their pending requests.
+pub type PendingRequests = HashMap<SocketAddr, Requests>;
+
+/// A core data structure for handling outbound network traffic.
 #[derive(Debug, Clone)]
 pub struct SendHandler {
-    /// A counter for the number of send requests the handler processes.
+    /// The map of remote addresses to their active write channels.
+    channels: Arc<RwLock<Channels>>,
+    /// The map of remote addresses to their pending requests.
+    pending: Arc<RwLock<PendingRequests>>,
+    /// The map of remote addresses to their completed requests.
+    complete: HashMap<SocketAddr, Requests>,
+    /// The counter for the number of send requests the handler processes.
     send_request_count: Arc<AtomicU64>,
-    /// A counter for the number of send requests that succeeded.
+    /// The counter for the number of send requests that succeeded.
     send_success_count: Arc<AtomicU64>,
-    /// A counter for the number of send requests that failed.
+    /// The counter for the number of send requests that failed.
     send_failure_count: Arc<AtomicU64>,
 }
 
@@ -55,6 +57,9 @@ impl SendHandler {
     #[inline]
     pub fn new() -> Self {
         Self {
+            channels: Arc::new(RwLock::new(HashMap::new())),
+            pending: Arc::new(RwLock::new(HashMap::new())),
+            complete: HashMap::new(),
             send_request_count: Arc::new(AtomicU64::new(0)),
             send_success_count: Arc::new(AtomicU64::new(0)),
             send_failure_count: Arc::new(AtomicU64::new(0)),
@@ -69,131 +74,186 @@ impl SendHandler {
     //     counter.clone().into_inner()
     // }
 
-    /// Returns the nonce for a handshake with the given remote address, if it exists.
+    async fn authorize(&self, request: &Request) -> Result<(Arc<Channel>, Requests), NetworkError> {
+        // Fetch the request receiver.
+        let receiver = request.receiver();
+        trace!("Authorizing `{}` request to {}", request.name(), receiver);
+
+        // Acquire the channels write lock.
+        let mut channels = self.channels.write().await;
+        // Fetch or initialize the channel for broadcasting the request.
+        let channel = match channels.get(&receiver) {
+            // Case 1 - The channel exists, retrieves the channel.
+            Some(channel) => channel.clone(),
+            // Case 2 - The channel does not exist, creates a new channel and stores it.
+            None => {
+                // Create a new channel for the given remote address.
+                let channel = Arc::new(Channel::new_writer(receiver.clone()).await?);
+                // Store the new channel in the channel map.
+                channels.insert(receiver, channel.clone());
+                channel
+            }
+        };
+        // Drop the channels write lock.
+        drop(channels);
+
+        // Acquire the pending write lock.
+        let mut pending = self.pending.write().await;
+        // Fetch or initialize the pending requests for the request receiver.
+        let requests = match pending.get(&receiver) {
+            // Case 1 - The receiver exists, retrieves the requests.
+            Some(requests) => requests.clone(),
+            // Case 2 - The receiver does not exist, initializes requests and stores it.
+            None => {
+                // Creates a new instance of `Requests` and stores it.
+                let requests = Arc::new(RwLock::new(HashSet::new()));
+                // Store the new requests in the pending map.
+                pending.insert(receiver, requests.clone());
+                requests
+            }
+        };
+        // Drop the pending write lock.
+        drop(pending);
+
+        // Acquire the requests write lock.
+        let mut requests_writer = requests.write().await;
+        // Add the request to the pending requests.
+        requests_writer.insert(request.clone());
+        // Drop the requests write lock.
+        drop(requests_writer);
+
+        // Increment the request counter.
+        self.send_request_count.fetch_add(1, Ordering::SeqCst);
+
+        trace!("Authorized `{}` request to {}", request.name(), receiver);
+        Ok((channel, requests.clone()))
+    }
+
+    /// TODO (howardwu): Check if this method needs to be async.
+    ///
+    /// Broadcasts the given request.
+    ///
+    /// Broadcasts a handshake request with a given version message.
+    ///
+    /// Creates a new handshake with a remote address,
+    /// and attempts to send a handshake request to them.
+    ///
+    /// Upon success, the handshake is stored in the manager.
+    ///
     #[inline]
-    pub async fn get_handshake_nonce(&self, environment: &Environment, remote_address: &SocketAddr) -> Option<u64> {
-        // Acquire the handshakes read lock.
-        let handshakes = environment.handshakes().read().await;
-        match handshakes.get(remote_address) {
-            Some(handshake) => Some(handshake.nonce),
-            _ => None,
-        }
-    }
-
-    /// Returns the state of the handshake at a peer address.
-    pub async fn get_state(&self, environment: &Environment, address: SocketAddr) -> Option<HandshakeStatus> {
-        // Acquire the handshake read lock.
-        let handshakes = environment.handshakes().read().await;
-        match handshakes.get(&address) {
-            Some(handshake) => Some(handshake.get_state()),
-            None => None,
-        }
-    }
-
-    /// Broadcast block to connected peers
-    pub async fn propagate_block(
-        &self,
-        environment: Environment,
-        block_bytes: Vec<u8>,
-        block_miner: SocketAddr,
-    ) -> Result<(), SendError> {
-        debug!("Propagating a block to peers");
-
-        let peer_manager = environment.peer_manager_read().await;
-        let local_address = environment.local_address();
-        let mut num_peers = 0u16;
-
-        for (socket, _) in peer_manager.get_all_connected().await {
-            if socket != block_miner && socket != *local_address {
-                if let Some(channel) = peer_manager.get_channel(&socket).await {
-                    match channel.write(&Block::new(block_bytes.clone())).await {
-                        Ok(_) => num_peers += 1,
-                        Err(error) => warn!(
-                            "Failed to propagate block to peer {}. (error message: {})",
-                            channel.address, error
-                        ),
-                    }
-                }
+    pub async fn broadcast(&self, request: &Request) -> Result<(), NetworkError> {
+        // Wait for authorization to send the request.
+        let (channel, pending_requests) = match self.authorize(request).await {
+            Ok((channel, pending_requests)) => (channel, pending_requests),
+            Err(error) => {
+                error!(
+                    "Unauthorized to send `{}` request to {}\n{}",
+                    request.name(),
+                    request.receiver(),
+                    error
+                );
+                return Err(NetworkError::SendRequestAuthorized);
             }
-        }
+        };
 
-        debug!("Block propagated to {} peers", num_peers);
+        info!("Sending request to {:?}", request.receiver());
 
-        Ok(())
-    }
+        // Clone these variables for use in the thread.
+        let request = request.clone();
+        let send_success_count = self.send_success_count.clone();
+        let send_failure_count = self.send_failure_count.clone();
 
-    /// Verify a transaction, add it to the memory pool, propagate it to peers.
-    pub async fn process_transaction_internal(
-        &self,
-        environment: &Environment,
-        consensus: &ConsensusParameters,
-        parameters: &PublicParameters<Components>,
-        storage: &Arc<RwLock<MerkleTreeLedger>>,
-        memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-        transaction_bytes: Vec<u8>,
-        transaction_sender: SocketAddr,
-    ) -> Result<(), SendError> {
-        if let Ok(transaction) = Tx::read(&transaction_bytes[..]) {
-            let mut memory_pool = memory_pool.lock().await;
+        // Spawn a thread to handle sending the request.
+        tokio::task::spawn(async move {
+            // Fetch the request receiver.
+            let receiver = request.receiver();
 
-            if !consensus.verify_transaction(parameters, &transaction, &*storage.read().await)? {
-                error!("Received a transaction that was invalid");
-                return Ok(());
-            }
+            // Attempt a handshake with the remote address.
+            debug!("Requesting handshake with {:?}", receiver);
 
-            if transaction.value_balance.is_negative() {
-                error!("Received a transaction that was a coinbase transaction");
-                return Ok(());
-            }
-
-            let entry = Entry::<Tx> {
-                size_in_bytes: transaction_bytes.len(),
-                transaction,
+            // TODO (howardwu): Abstract this with a trait object or generic.
+            let result = match &request {
+                Request::Block(_, payload) => channel.write(payload).await,
+                Request::GetPeers(_, payload) => channel.write(payload).await,
+                Request::Ping(_, payload) => channel.write(payload).await,
+                Request::Transaction(_, payload) => channel.write(payload).await,
+                Request::Verack(payload) => channel.write(payload).await,
+                Request::Version(payload) => channel.write(payload).await,
             };
 
-            if let Ok(inserted) = memory_pool.insert(&*storage.read().await, entry) {
-                if inserted.is_some() {
-                    info!("Transaction added to memory pool.");
-                    self.propagate_transaction(environment, transaction_bytes, transaction_sender)
-                        .await?;
+            // Write the version message to the channel.
+            match result {
+                Ok(_) => {
+                    // // Store the handshake.
+                    // handshakes.insert(remote_address, {
+                    //     channel,
+                    //     state: HandshakeStatus::Waiting,
+                    //     height: version.height,
+                    //     nonce: version.nonce,
+                    // });
+
+                    // Increment the success counter.
+                    send_success_count.fetch_add(1, Ordering::SeqCst);
+                    debug!("Sent handshake to {:?}", receiver);
+                }
+                Err(error) => {
+                    // Increment the failed counter.
+                    send_failure_count.fetch_add(1, Ordering::SeqCst);
+                    info!("Unsuccessful connection with {:?}", receiver);
+
+                    // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
+                    // // Disconnect from the peer if the version request fails to send.
+                    // if let Err(_) = channel.write(&version).await {
+                    //     self.disconnect_from_peer(&remote_address).await?;
+                    // }
                 }
             }
-        }
+
+            // Acquire the pending requests write lock.
+            let mut writer = pending_requests.write().await;
+            // Remove the request from the pending requests.
+            writer.remove(&request);
+        });
 
         Ok(())
     }
 
-    /// Broadcast transaction to connected peers
-    pub async fn propagate_transaction(
-        &self,
-        environment: &Environment,
-        transaction_bytes: Vec<u8>,
-        transaction_sender: SocketAddr,
-    ) -> Result<(), SendError> {
-        debug!("Propagating a transaction to peers");
+    // ///
+    // /// Attempts to fetch the channel for a given address.
+    // ///
+    // /// Returns `Some(channel)` if the address is a connected peer.
+    // /// Otherwise, returns `None`.
+    // ///
+    // #[inline]
+    // pub fn get_channel(&self, remote_address: &SocketAddr) -> Option<&Arc<Channel>> {
+    //     self.channels.get(remote_address)
+    // }
 
-        let peer_manager = environment.peer_manager_read().await;
-        let local_address = *environment.local_address();
-        let connections = environment.peer_manager_read().await;
-        let mut num_peers = 0u16;
+    // /// Stores a new channel at the peer address it is connected to.
+    // pub fn add_channel(&mut self, channel: &Arc<Channel>) {
+    //     self.channels.insert(channel.address, channel.clone());
+    // }
 
-        for (socket, _) in peer_manager.get_all_connected().await {
-            if socket != transaction_sender && socket != local_address {
-                if let Some(channel) = connections.get_channel(&socket).await {
-                    match channel.write(&Transaction::new(transaction_bytes.clone())).await {
-                        Ok(_) => num_peers += 1,
-                        Err(error) => warn!(
-                            "Failed to propagate transaction to peer {}. (error message: {})",
-                            channel.address, error
-                        ),
-                    }
-                }
-            }
-        }
+    // /// Returns the nonce for a handshake with the given remote address, if it exists.
+    // #[inline]
+    // pub async fn get_handshake_nonce(&self, environment: &Environment, remote_address: &SocketAddr) -> Option<u64> {
+    //     // Acquire the handshakes read lock.
+    //     let handshakes = environment.handshakes().read().await;
+    //     match handshakes.get(remote_address) {
+    //         Some(handshake) => Some(handshake.nonce),
+    //         _ => None,
+    //     }
+    // }
 
-        debug!("Transaction propagated to {} peers", num_peers);
-        Ok(())
-    }
+    // /// Returns the state of the handshake at a peer address.
+    // pub async fn get_state(&self, environment: &Environment, address: SocketAddr) -> Option<HandshakeStatus> {
+    //     // Acquire the handshake read lock.
+    //     let handshakes = environment.handshakes().read().await;
+    //     match handshakes.get(&address) {
+    //         Some(handshake) => Some(handshake.get_state()),
+    //         None => None,
+    //     }
+    // }
 }
 
 #[cfg(test)]
@@ -220,12 +280,12 @@ mod tests {
             let mut local_manager = SendHandler::new();
 
             // 2. Local node sends handshake request
-            let local_version = Version::new(1u64, 0u32, remote_address, local_address);
-            local_manager.send_connection_request(&local_version).await;
+            let local_version = Version::new_with_rng(1u64, 0u32, local_address, remote_address);
+            local_manager.broadcast(&local_version).await;
 
             // 5. Check local node handshake state
             let (reader, _) = local_listener.accept().await.unwrap();
-            let channel = Channel::new_read_only(reader).unwrap();
+            let channel = Channel::new_reader(reader).unwrap();
             assert_eq!(
                 HandshakeStatus::Waiting,
                 local_manager.get_state(remote_address).await.unwrap()

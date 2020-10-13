@@ -30,51 +30,51 @@ use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 /// Each stream is protected by an Arc + Mutex to allow for channel cloning.
 #[derive(Clone, Debug)]
 pub struct Channel {
-    pub address: SocketAddr,
+    pub remote_address: SocketAddr,
     pub reader: Arc<Mutex<TcpStream>>,
     pub writer: Arc<Mutex<TcpStream>>,
 }
 
 impl Channel {
     pub async fn new(
-        address: SocketAddr,
+        remote_address: SocketAddr,
         reader: Arc<Mutex<TcpStream>>,
         writer: Arc<Mutex<TcpStream>>,
     ) -> Result<Self, ConnectError> {
         Ok(Self {
-            address,
+            remote_address,
             reader,
             writer,
         })
     }
 
     /// Returns a new channel with a writer only stream.
-    pub async fn new_write_only(address: SocketAddr) -> Result<Self, ConnectError> {
-        let stream = Arc::new(Mutex::new(TcpStream::connect(address).await?));
+    pub async fn new_writer(remote_address: SocketAddr) -> Result<Self, ConnectError> {
+        let stream = Arc::new(Mutex::new(TcpStream::connect(remote_address).await?));
 
         Ok(Self {
-            address,
+            remote_address,
             reader: stream.clone(),
             writer: stream,
         })
     }
 
     /// Returns a new channel with a reader only stream.
-    pub fn new_read_only(reader: TcpStream) -> Result<Self, ConnectError> {
-        let address = reader.peer_addr()?;
+    pub fn new_reader(reader: TcpStream) -> Result<Self, ConnectError> {
+        let remote_address = reader.peer_addr()?;
         let stream = Arc::new(Mutex::new(reader));
 
         Ok(Self {
-            address,
+            remote_address,
             reader: stream.clone(),
             writer: stream,
         })
     }
 
     /// Returns a new channel with the specified address.
-    pub fn update_address(&self, address: SocketAddr) -> Self {
+    pub fn update_address(&self, remote_address: SocketAddr) -> Self {
         Self {
-            address,
+            remote_address,
             reader: self.reader.clone(),
             writer: self.writer.clone(),
         }
@@ -83,24 +83,24 @@ impl Channel {
     /// Returns a new channel with the specified reader stream.
     pub fn update_reader(&self, reader: Arc<Mutex<TcpStream>>) -> Self {
         Self {
-            address: self.address,
+            remote_address: self.remote_address,
             reader,
             writer: self.writer.clone(),
         }
     }
 
     /// Returns a new channel with the specified address and new writer stream.
-    pub async fn update_writer(&self, address: SocketAddr) -> Result<Self, ConnectError> {
+    pub async fn update_writer(&self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
         Ok(Self {
-            address,
+            remote_address,
             reader: self.reader.clone(),
-            writer: Arc::new(Mutex::new(TcpStream::connect(address).await?)),
+            writer: Arc::new(Mutex::new(TcpStream::connect(remote_address).await?)),
         })
     }
 
     /// Writes a message header + message.
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
-        debug!("Message {:?}, Sent to {:?}", M::name().to_string(), self.address);
+        debug!("Message {:?}, Sent to {:?}", M::name().to_string(), self.remote_address);
 
         let serialized = message.serialize()?;
         let header = MessageHeader::new(M::name(), serialized.len() as u32);
@@ -119,7 +119,7 @@ impl Channel {
         debug!(
             "Message {:?}, Received from {:?}",
             header.name.to_string(),
-            self.address
+            self.remote_address
         );
 
         Ok((
@@ -146,7 +146,7 @@ mod tests {
         simulate_active_node(remote_address).await;
 
         // 2. Server connect to peer
-        let server_channel = Channel::new_write_only(remote_address).await.unwrap();
+        let server_channel = Channel::new_writer(remote_address).await.unwrap();
 
         // 3. Server write message to peer
         server_channel.write(&Ping::new()).await.unwrap();
@@ -160,7 +160,7 @@ mod tests {
 
         tokio::spawn(async move {
             // 1. Server connects to peer
-            let server_channel = Channel::new_write_only(remote_address).await.unwrap();
+            let server_channel = Channel::new_writer(remote_address).await.unwrap();
 
             // 2. Server writes ping message
             server_channel.write(&Ping::new()).await.unwrap();
@@ -168,7 +168,7 @@ mod tests {
 
         // 2. Peer accepts server connection
         let (reader, _address) = remote_listener.accept().await.unwrap();
-        let peer_channel = Channel::new_read_only(reader).unwrap();
+        let peer_channel = Channel::new_reader(reader).unwrap();
 
         // 4. Peer reads ping message
         let (name, bytes) = peer_channel.read().await.unwrap();
@@ -195,7 +195,7 @@ mod tests {
 
             // 1. Local node connects to Remote node
 
-            let mut channel = Channel::new_write_only(remote_address).await.unwrap();
+            let mut channel = Channel::new_writer(remote_address).await.unwrap();
 
             // 4. Local node accepts Remote node connection
 
@@ -225,7 +225,7 @@ mod tests {
         // 2. Remote node accepts Local node connection
 
         let (reader, _address) = remote_listener.accept().await.unwrap();
-        let mut channel = Channel::new_read_only(reader).unwrap();
+        let mut channel = Channel::new_reader(reader).unwrap();
 
         // 3. Remote node connects to Local node
 

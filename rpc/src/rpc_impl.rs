@@ -26,19 +26,17 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
-use snarkos_network::{
-    external::SyncManager,
-    internal::{environment::Environment, process_transaction_internal},
-};
+use snarkos_network::{Environment, SyncManager};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes, CanonicalSerialize,
+    to_bytes,
+    CanonicalSerialize,
 };
 
 use chrono::Utc;
 use std::{path::PathBuf, sync::Arc};
-use tokio::{runtime::Runtime, sync::Mutex};
+use tokio::{runtime::Runtime, sync::RwLock};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -264,7 +262,7 @@ impl RpcFunctions for RpcImpl {
 
         match !self.storage.transcation_conflicts(&transaction) {
             true => {
-                Runtime::new()?.block_on(process_transaction_internal(
+                Runtime::new()?.block_on(self.environment.send_handler().process_transaction_internal(
                     self.environment.clone(),
                     &self.consensus_parameters,
                     &self.parameters,
