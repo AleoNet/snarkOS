@@ -104,7 +104,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         // reserve the MSB of the data field element's valid bitsize and set the bit to 1.
         assert_eq!(Self::PAYLOAD_ELEMENT_BITSIZE, Self::DATA_ELEMENT_BITSIZE - 1);
 
-        // This element needs to be represented in the contraint field; its bits and the number of elements
+        // This element needs to be represented in the constraint field; its bits and the number of elements
         // are calculated early, so that the storage vectors can be pre-allocated.
         let payload = record.payload();
         let payload_bits = bytes_to_bits(&to_bytes![payload]?);
