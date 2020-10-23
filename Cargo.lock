@@ -2528,6 +2528,7 @@ dependencies = [
 name = "snarkos-curves"
 version = "1.1.4"
 dependencies = [
+ "criterion",
  "derivative",
  "rand",
  "rand_xorshift",

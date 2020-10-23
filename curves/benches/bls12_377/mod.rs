@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod ec;
-mod fq;
-mod fq12;
-mod fq2;
-mod fr;
-mod pairing;
+pub(crate) mod ec;
+pub(crate) mod fq;
+pub(crate) mod fq12;
+pub(crate) mod fq2;
+pub(crate) mod fr;
+pub(crate) mod pairing;

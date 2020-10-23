@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod pairing {
+pub(crate) mod pairing {
     use snarkos_curves::{
         bls12_377::{Bls12_377, Bls12_377Parameters, Fq12, G1Affine, G1Projective as G1, G2Affine, G2Projective as G2},
         templates::bls12::{G1Prepared, G2Prepared},
@@ -22,11 +22,11 @@ mod pairing {
     use snarkos_models::curves::{PairingCurve, PairingEngine};
     use snarkos_utilities::rand::UniformRand;
 
+    use criterion::Criterion;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
-    #[bench]
-    fn bench_pairing_miller_loop(b: &mut ::test::Bencher) {
+    pub fn bench_pairing_miller_loop(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -41,15 +41,16 @@ mod pairing {
             .collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let tmp = Bls12_377::miller_loop(&[(&v[count].0, &v[count].1)]);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: pairing_miller_loop", |c| {
+            c.iter(|| {
+                let tmp = Bls12_377::miller_loop(&[(&v[count].0, &v[count].1)]);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_pairing_final_exponentiation(b: &mut ::test::Bencher) {
+    pub fn bench_pairing_final_exponentiation(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -65,15 +66,16 @@ mod pairing {
             .collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let tmp = Bls12_377::final_exponentiation(&v[count]);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: pairing_final_exponentiation", |c| {
+            c.iter(|| {
+                let tmp = Bls12_377::final_exponentiation(&v[count]);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_pairing_full(b: &mut ::test::Bencher) {
+    pub fn bench_pairing_full(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -81,10 +83,12 @@ mod pairing {
         let v: Vec<(G1, G2)> = (0..SAMPLES).map(|_| (G1::rand(&mut rng), G2::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let tmp = Bls12_377::pairing(v[count].0, v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: pairing_full", |c| {
+            c.iter(|| {
+                let tmp = Bls12_377::pairing(v[count].0, v[count].1);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 }
