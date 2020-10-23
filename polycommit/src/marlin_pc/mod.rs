@@ -469,7 +469,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
                     label: label.to_string(),
                 })?;
 
-                comms_to_combine.push(*commitment);
+                comms_to_combine.push(commitment);
                 values_to_combine.push(*v_i);
             }
             let (c, v) =
