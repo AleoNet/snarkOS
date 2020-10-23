@@ -20,7 +20,7 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 
 #[derive(Debug)]
 enum NamedObject {
@@ -137,11 +137,15 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     fn set_named_obj(&mut self, path: String, to: NamedObject) {
-        if self.named_objects.get(&path).is_some() {
-            panic!("tried to create object at existing path: {}", path);
+        match self.named_objects.entry(path) {
+            Entry::Vacant(e) => {
+                e.insert(to);
+            }
+            Entry::Occupied(e) => {
+                let (path, _) = e.remove_entry();
+                panic!("tried to create object at existing path: {}", path);
+            }
         }
-
-        self.named_objects.insert(path, to);
     }
 }
 
