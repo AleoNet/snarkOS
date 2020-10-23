@@ -185,7 +185,11 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for ProvingAssignment<E> {
     }
 }
 
-pub fn create_random_proof<E, C, R>(circuit: C, params: &Parameters<E>, rng: &mut R) -> Result<Proof<E>, SynthesisError>
+pub fn create_random_proof<E, C, R>(
+    circuit: &C,
+    params: &Parameters<E>,
+    rng: &mut R,
+) -> Result<Proof<E>, SynthesisError>
 where
     E: PairingEngine,
     C: ConstraintSynthesizer<E::Fr>,
@@ -199,7 +203,7 @@ where
 }
 
 pub fn create_proof<E, C>(
-    circuit: C,
+    circuit: &C,
     params: &Parameters<E>,
     d1: E::Fr,
     d2: E::Fr,

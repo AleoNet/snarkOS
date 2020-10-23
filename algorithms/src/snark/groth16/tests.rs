@@ -26,7 +26,7 @@ struct MySillyCircuit<F: Field> {
 }
 
 impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for MySillyCircuit<ConstraintF> {
-    fn generate_constraints<CS: ConstraintSystem<ConstraintF>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<ConstraintF>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         let a = cs.alloc(|| "a", || self.a.ok_or(SynthesisError::AssignmentMissing))?;
         let b = cs.alloc(|| "b", || self.b.ok_or(SynthesisError::AssignmentMissing))?;
         let c = cs.alloc_input(
@@ -62,7 +62,7 @@ mod bls12_377 {
     fn prove_and_verify() {
         let rng = &mut test_rng();
 
-        let params = generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        let params = generate_random_parameters::<Bls12_377, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
         let pvk = prepare_verifying_key::<Bls12_377>(&params.vk);
 
@@ -72,7 +72,7 @@ mod bls12_377 {
             let mut c = a;
             c.mul_assign(&b);
 
-            let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
+            let proof = create_random_proof(&MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
 
             assert!(verify_proof(&pvk, &proof, &[c]).unwrap());
             assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());
@@ -91,7 +91,7 @@ mod bw6_761 {
     fn prove_and_verify() {
         let rng = &mut test_rng();
 
-        let params = generate_random_parameters::<BW6_761, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        let params = generate_random_parameters::<BW6_761, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
         let pvk = prepare_verifying_key::<BW6_761>(&params.vk);
 
@@ -99,7 +99,7 @@ mod bw6_761 {
         let b = Fr::rand(rng);
         let c = a * &b;
 
-        let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
+        let proof = create_random_proof(&MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
 
         assert!(verify_proof(&pvk, &proof, &[c]).unwrap());
         assert!(!verify_proof(&pvk, &proof, &[Fr::zero()]).unwrap());

@@ -48,7 +48,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     let system_parameters = SystemParameters::<C>::load()?;
     let inner_snark_parameters = C::InnerSNARK::setup(
-        InnerCircuit::blank(&system_parameters, &ledger_merkle_tree_parameters),
+        &InnerCircuit::blank(&system_parameters, &ledger_merkle_tree_parameters),
         rng,
     )?;
     let inner_snark_pk = to_bytes![inner_snark_parameters.0]?;

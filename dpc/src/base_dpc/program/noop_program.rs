@@ -82,7 +82,7 @@ where
 
         let circuit = NoopCircuit::<C>::new(&local_data.system_parameters, &local_data_root, position);
 
-        let proof = S::prove(proving_key, circuit, rng)?;
+        let proof = S::prove(proving_key, &circuit, rng)?;
 
         {
             let program_snark_pvk: <S as SNARK>::PreparedVerificationParameters = verification_key.clone().into();

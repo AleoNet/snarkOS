@@ -44,12 +44,12 @@ struct Bench<F: Field> {
 }
 
 impl<F: Field> ConstraintSynthesizer<F> for Bench<F> {
-    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         assert!(self.inputs.len() >= 2);
         assert!(self.num_constraints >= self.inputs.len());
 
         let mut variables: Vec<_> = Vec::with_capacity(self.inputs.len());
-        for (i, input) in self.inputs.into_iter().enumerate() {
+        for (i, input) in self.inputs.iter().cloned().enumerate() {
             let input_var = cs.alloc_input(
                 || format!("Input {}", i),
                 || input.ok_or(SynthesisError::AssignmentMissing),
@@ -90,7 +90,7 @@ fn gm17_verifier_test() {
         inputs.push(Some(rng.gen()));
     }
     let params = generate_random_parameters(
-        Bench::<Fr> {
+        &Bench::<Fr> {
             inputs: vec![None; num_inputs],
             num_constraints,
         },
@@ -103,7 +103,7 @@ fn gm17_verifier_test() {
             // Create an instance of our circuit (with the witness).
             // Create a gm17 proof with our parameters.
             create_random_proof(
-                Bench {
+                &Bench {
                     inputs: inputs.clone(),
                     num_constraints,
                 },
@@ -163,7 +163,7 @@ fn gm17_verifier_bytes_test() {
         inputs.push(Some(rng.gen()));
     }
     let params = generate_random_parameters::<Bls12_377, _, _>(
-        Bench::<Fr> {
+        &Bench::<Fr> {
             inputs: vec![None; num_inputs],
             num_constraints,
         },
@@ -176,7 +176,7 @@ fn gm17_verifier_bytes_test() {
             // Create an instance of our circuit (with the witness).
             // Create a gm17 proof with our parameters.
             create_random_proof(
-                Bench {
+                &Bench {
                     inputs: inputs.clone(),
                     num_constraints,
                 },

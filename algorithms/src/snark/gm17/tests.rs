@@ -26,7 +26,7 @@ struct MySillyCircuit<F: Field> {
 }
 
 impl<F: Field> ConstraintSynthesizer<F> for MySillyCircuit<F> {
-    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         let a = cs.alloc(|| "a", || self.a.ok_or(SynthesisError::AssignmentMissing))?;
         let b = cs.alloc(|| "b", || self.b.ok_or(SynthesisError::AssignmentMissing))?;
         let c = cs.alloc_input(
@@ -58,7 +58,7 @@ mod bls12_377 {
     fn prove_and_verify() {
         let rng = &mut test_rng();
 
-        let params = generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        let params = generate_random_parameters::<Bls12_377, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
         let pvk = prepare_verifying_key::<Bls12_377>(&params.vk);
 
@@ -68,7 +68,7 @@ mod bls12_377 {
             let mut c = a;
             c.mul_assign(&b);
 
-            let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
+            let proof = create_random_proof(&MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
 
             assert!(verify_proof(&pvk, &proof, &[c]).unwrap());
             assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());
@@ -86,7 +86,7 @@ mod bw6 {
     fn prove_and_verify() {
         let rng = &mut test_rng();
 
-        let params = generate_random_parameters::<BW6_761, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+        let params = generate_random_parameters::<BW6_761, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
         let pvk = prepare_verifying_key::<BW6_761>(&params.vk);
 
@@ -94,7 +94,7 @@ mod bw6 {
         let b = BW6Fr::rand(rng);
         let c = a * &b;
 
-        let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
+        let proof = create_random_proof(&MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
 
         assert!(verify_proof(&pvk, &proof, &[c]).unwrap());
         assert!(!verify_proof(&pvk, &proof, &[BW6Fr::zero()]).unwrap());
@@ -132,7 +132,7 @@ mod gm17 {
         }
 
         impl ConstraintSynthesizer<Fr> for R1CSCircuit {
-            fn generate_constraints<CS: ConstraintSystem<Fr>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+            fn generate_constraints<CS: ConstraintSystem<Fr>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
                 let input = cs.alloc_input(|| "x", || Ok(self.x.unwrap()))?;
                 let sum = cs.alloc_input(|| "sum", || Ok(self.sum.unwrap()))?;
                 let witness = cs.alloc(|| "w", || Ok(self.w.unwrap()))?;
@@ -153,9 +153,9 @@ mod gm17 {
 
         let rng = &mut thread_rng();
 
-        let parameters = GM17::<Bls12_377, R1CSCircuit, [Fr]>::setup(circuit, rng).unwrap();
+        let parameters = GM17::<Bls12_377, R1CSCircuit, [Fr]>::setup(&circuit, rng).unwrap();
 
-        let proof = GM17::<Bls12_377, R1CSCircuit, [Fr]>::prove(&parameters.0, circuit, rng).unwrap();
+        let proof = GM17::<Bls12_377, R1CSCircuit, [Fr]>::prove(&parameters.0, &circuit, rng).unwrap();
 
         let result = GM17::<Bls12_377, R1CSCircuit, [Fr]>::verify(&parameters.1, &[Fr::one(), sum], &proof).unwrap();
         assert!(result);
@@ -181,12 +181,12 @@ mod serialization {
         let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
 
         let parameters =
-            generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+            generate_random_parameters::<Bls12_377, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
         let a = Fr::rand(rng);
         let b = Fr::rand(rng);
 
-        let proof = create_random_proof(MySillyCircuit { a: Some(a), b: Some(b) }, &parameters, rng).unwrap();
+        let proof = create_random_proof(&MySillyCircuit { a: Some(a), b: Some(b) }, &parameters, rng).unwrap();
 
         let proof_bytes = to_bytes![proof].unwrap();
         let recovered_proof: Proof<Bls12_377> = FromBytes::read(&proof_bytes[..]).unwrap();
@@ -199,7 +199,7 @@ mod serialization {
         let rng = &mut XorShiftRng::seed_from_u64(1231275789u64);
 
         let parameters =
-            generate_random_parameters::<Bls12_377, _, _>(MySillyCircuit { a: None, b: None }, rng).unwrap();
+            generate_random_parameters::<Bls12_377, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
         let vk = parameters.vk.clone();
 
         let parameter_bytes = to_bytes![&parameters].unwrap();

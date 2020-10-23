@@ -85,7 +85,7 @@ struct MiMCDemo<'a, F: Field> {
 /// is used during paramgen and proving in order to
 /// synthesize the constraint system.
 impl<'a, F: Field> ConstraintSynthesizer<F> for MiMCDemo<'a, F> {
-    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         assert_eq!(self.constants.len(), MIMC_ROUNDS);
 
         // Allocate the first component of the preimage.
@@ -180,7 +180,7 @@ fn test_mimc_groth_16() {
             constants: &constants,
         };
 
-        generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap()
+        generate_random_parameters::<Bls12_377, _, _>(&c, rng).unwrap()
     };
 
     // Prepare the verification key (for proof verification)
@@ -216,7 +216,7 @@ fn test_mimc_groth_16() {
             };
 
             // Create a groth16 proof with our parameters.
-            let proof = create_random_proof(c, &params, rng).unwrap();
+            let proof = create_random_proof(&c, &params, rng).unwrap();
             assert!(verify_proof(&pvk, &proof, &[image]).unwrap());
 
             // proof.write(&mut proof_vec).unwrap();
@@ -267,7 +267,7 @@ fn test_mimc_groth_maller_17() {
             constants: &constants,
         };
 
-        generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap()
+        generate_random_parameters::<Bls12_377, _, _>(&c, rng).unwrap()
     };
 
     // Prepare the verification key (for proof verification)
@@ -303,7 +303,7 @@ fn test_mimc_groth_maller_17() {
             };
 
             // Create a groth16 proof with our parameters.
-            let proof = create_random_proof(c, &params, rng).unwrap();
+            let proof = create_random_proof(&c, &params, rng).unwrap();
             assert!(verify_proof(&pvk, &proof, &[image]).unwrap());
 
             // proof.write(&mut proof_vec).unwrap();

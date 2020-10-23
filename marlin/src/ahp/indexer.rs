@@ -121,7 +121,7 @@ impl<'a, F: PrimeField, C: ConstraintSynthesizer<F>> Index<'a, F, C> {
 
 impl<F: PrimeField> AHPForR1CS<F> {
     /// Generate the index for this constraint system.
-    pub fn index<'a, C: ConstraintSynthesizer<F>>(c: C) -> Result<Index<'a, F, C>, Error> {
+    pub fn index<'a, C: ConstraintSynthesizer<F>>(c: &C) -> Result<Index<'a, F, C>, Error> {
         let index_time = start_timer!(|| "AHP::Index");
 
         let constraint_time = start_timer!(|| "Generating constraints");
