@@ -76,7 +76,7 @@ impl<T: Transaction> DPCTransactions<T> {
     pub fn conflicts(&self, transaction: &T) -> bool {
         let mut holding_serial_numbers = vec![];
         let mut holding_commitments = vec![];
-        let mut holding_memos = vec![];
+        let mut holding_memos = Vec::with_capacity(self.0.len());
 
         for tx in &self.0 {
             if tx.network_id() != transaction.network_id() {
@@ -139,7 +139,7 @@ impl<T: Transaction> FromBytes for DPCTransactions<T> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_transactions = read_variable_length_integer(&mut reader)?;
-        let mut transactions = vec![];
+        let mut transactions = Vec::with_capacity(num_transactions);
         for _ in 0..num_transactions {
             let transaction: T = FromBytes::read(&mut reader)?;
             transactions.push(transaction);

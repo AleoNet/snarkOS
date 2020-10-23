@@ -407,7 +407,7 @@ impl Boolean {
 
     /// Construct a boolean vector from a vector of u8
     pub fn constant_u8_vec<F: Field, CS: ConstraintSystem<F>>(cs: &mut CS, values: &[u8]) -> Vec<Self> {
-        let mut input_bits = vec![];
+        let mut input_bits = Vec::with_capacity(values.len() * 8);
         for (byte_i, input_byte) in values.iter().enumerate() {
             for bit_i in (0..8).rev() {
                 let cs = cs.ns(|| format!("input_bit_gadget {} {}", byte_i, bit_i));

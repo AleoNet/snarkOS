@@ -30,9 +30,13 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         memo_index: &mut usize,
         transaction: &T,
     ) -> Result<(Vec<Op>, Vec<(T::Commitment, usize)>), StorageError> {
-        let mut ops = vec![];
-        let mut cms = vec![];
-        for sn in transaction.old_serial_numbers() {
+        let old_serial_numbers = transaction.old_serial_numbers();
+        let new_commitments = transaction.new_commitments();
+
+        let mut ops = Vec::with_capacity(old_serial_numbers.len() + new_commitments.len());
+        let mut cms = Vec::with_capacity(new_commitments.len());
+
+        for sn in old_serial_numbers {
             let sn_bytes = to_bytes![sn]?;
             if self.get_sn_index(&sn_bytes)?.is_some() {
                 return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
@@ -46,7 +50,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             *sn_index += 1;
         }
 
-        for cm in transaction.new_commitments() {
+        for cm in new_commitments {
             let cm_bytes = to_bytes![cm]?;
             if self.get_cm_index(&cm_bytes)?.is_some() {
                 return Err(StorageError::ExistingCm(cm_bytes.to_vec()));
@@ -90,9 +94,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         let mut database_transaction = DatabaseTransaction::new();
 
-        let mut transaction_serial_numbers = vec![];
-        let mut transaction_commitments = vec![];
-        let mut transaction_memos = vec![];
+        let mut transaction_serial_numbers = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
             transaction_serial_numbers.push(transaction.transaction_id()?);
@@ -174,9 +178,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         let mut database_transaction = DatabaseTransaction::new();
 
-        let mut transaction_serial_numbers = vec![];
-        let mut transaction_commitments = vec![];
-        let mut transaction_memos = vec![];
+        let mut transaction_serial_numbers = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
             transaction_serial_numbers.push(transaction.transaction_id()?);

@@ -40,7 +40,7 @@ pub struct EncryptedRecord<C: BaseDPCComponents> {
 impl<C: BaseDPCComponents> ToBytes for EncryptedRecord<C> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        let mut ciphertext_selectors = vec![];
+        let mut ciphertext_selectors = Vec::with_capacity(self.encrypted_record.len() + 1);
 
         // Write the encrypted record
         variable_length_integer(self.encrypted_record.len() as u64).write(&mut writer)?;
@@ -78,8 +78,8 @@ impl<C: BaseDPCComponents> FromBytes for EncryptedRecord<C> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the ciphertext x coordinates
-        let mut ciphertext_x_coordinates = vec![];
         let num_ciphertext_elements = read_variable_length_integer(&mut reader)?;
+        let mut ciphertext_x_coordinates = Vec::with_capacity(num_ciphertext_elements);
         for _ in 0..num_ciphertext_elements {
             let ciphertext_element_x_coordinate: <<<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine as AffineCurve>::BaseField =
                 FromBytes::read(&mut reader)?;
@@ -97,7 +97,7 @@ impl<C: BaseDPCComponents> FromBytes for EncryptedRecord<C> {
         let final_fq_high_selector = selector_bits[num_ciphertext_elements];
 
         // Recover the ciphertext
-        let mut ciphertext = vec![];
+        let mut ciphertext = Vec::with_capacity(ciphertext_x_coordinates.len());
         for (x_coordinate, ciphertext_selector_bit) in ciphertext_x_coordinates.iter().zip_eq(ciphertext_selectors) {
             let ciphertext_element_affine =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(

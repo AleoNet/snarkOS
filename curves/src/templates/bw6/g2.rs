@@ -90,14 +90,16 @@ impl<P: BW6Parameters> From<G2Affine<P>> for G2Prepared<P> {
         }
 
         // f_{u+1,Q}(P)
-        let mut ell_coeffs_1 = vec![];
         let mut r = G2HomProjective {
             x: q.x,
             y: q.y,
             z: P::Fp::one(),
         };
 
-        for i in BitIterator::new(P::ATE_LOOP_COUNT_1).skip(1) {
+        let bit_iterator = BitIterator::new(P::ATE_LOOP_COUNT_1);
+        let mut ell_coeffs_1 = Vec::with_capacity(bit_iterator.len());
+
+        for i in bit_iterator.skip(1) {
             ell_coeffs_1.push(doubling_step::<P>(&mut r));
 
             if i {
@@ -106,7 +108,7 @@ impl<P: BW6Parameters> From<G2Affine<P>> for G2Prepared<P> {
         }
 
         // f_{u^3-u^2-u,Q}(P)
-        let mut ell_coeffs_2 = vec![];
+        let mut ell_coeffs_2 = Vec::with_capacity(P::ATE_LOOP_COUNT_2.len());
         let mut r = G2HomProjective {
             x: q.x,
             y: q.y,

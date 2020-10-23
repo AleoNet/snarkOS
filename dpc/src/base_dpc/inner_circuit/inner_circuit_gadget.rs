@@ -845,7 +845,7 @@ where
                 given_death_program_id.to_bits(&mut encryption_cs.ns(|| "Convert given_death_program_id to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
-            let mut fq_high_bits = vec![];
+            let mut fq_high_bits = Vec::with_capacity(fq_high_selectors.len() - 1);
 
             for (i, fq_high_bit) in fq_high_selectors[0..(fq_high_selectors.len() - 1)].iter().enumerate() {
                 let boolean = Boolean::alloc(

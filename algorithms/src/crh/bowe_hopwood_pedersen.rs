@@ -65,9 +65,9 @@ pub struct BoweHopwoodPedersenCRH<G: Group, S: PedersenSize> {
 
 impl<G: Group, S: PedersenSize> BoweHopwoodPedersenCRH<G, S> {
     pub fn create_generators<R: Rng>(rng: &mut R) -> Vec<Vec<G>> {
-        let mut generators = Vec::new();
+        let mut generators = Vec::with_capacity(S::NUM_WINDOWS);
         for _ in 0..S::NUM_WINDOWS {
-            let mut generators_for_segment = Vec::new();
+            let mut generators_for_segment = Vec::with_capacity(S::WINDOW_SIZE);
             let mut base = G::rand(rng);
             for _ in 0..S::WINDOW_SIZE {
                 generators_for_segment.push(base);

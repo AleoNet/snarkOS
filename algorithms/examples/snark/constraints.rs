@@ -38,7 +38,7 @@ impl<F: Field> Benchmark<F> {
 
 impl<F: Field> ConstraintSynthesizer<F> for Benchmark<F> {
     fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        let mut assignments = Vec::new();
+        let mut assignments = Vec::with_capacity(2 + self.num_constraints - 1);
 
         let mut a_val = F::one();
         let mut a_var = cs.alloc_input(|| "a", || Ok(a_val))?;

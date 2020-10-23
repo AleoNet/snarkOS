@@ -258,13 +258,13 @@ impl ProtectedRpcFunctions for RpcImpl {
         let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode old records
-        let mut old_records = vec![];
+        let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
         for record_string in transaction_input.old_records {
             let record_bytes = hex::decode(record_string)?;
             old_records.push(DPCRecord::<Components>::read(&record_bytes[..])?);
         }
 
-        let mut old_account_private_keys = vec![];
+        let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
         for private_key_string in transaction_input.old_account_private_keys {
             old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
         }
@@ -306,9 +306,9 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_record_owners = vec![];
-        let mut new_is_dummy_flags = vec![];
-        let mut new_values = vec![];
+        let mut new_record_owners = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_is_dummy_flags = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_values = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for recipient in transaction_input.recipients {
             new_record_owners.push(AccountAddress::<Components>::from_str(&recipient.address)?);
             new_is_dummy_flags.push(false);
@@ -363,7 +363,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         )?;
 
         let encoded_transaction = hex::encode(to_bytes![transaction]?);
-        let mut encoded_records = vec![];
+        let mut encoded_records = Vec::with_capacity(records.len());
         for record in records {
             encoded_records.push(hex::encode(to_bytes![record]?));
         }

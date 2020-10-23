@@ -79,8 +79,9 @@ impl<I, F: Field, A: AllocGadget<I, F>> AllocGadget<[I], F> for Vec<A> {
         mut cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
-        let mut vec = vec![];
-        for (i, value) in f()?.borrow().iter().enumerate() {
+        let f = f()?;
+        let mut vec = Vec::with_capacity(f.borrow().len());
+        for (i, value) in f.borrow().iter().enumerate() {
             vec.push(A::alloc(&mut cs.ns(|| format!("alloc_{}", i)), || Ok(value))?);
         }
         Ok(vec)
@@ -90,8 +91,9 @@ impl<I, F: Field, A: AllocGadget<I, F>> AllocGadget<[I], F> for Vec<A> {
         mut cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
-        let mut vec = vec![];
-        for (i, value) in f()?.borrow().iter().enumerate() {
+        let f = f()?;
+        let mut vec = Vec::with_capacity(f.borrow().len());
+        for (i, value) in f.borrow().iter().enumerate() {
             vec.push(A::alloc_checked(&mut cs.ns(|| format!("alloc_checked_{}", i)), || {
                 Ok(value)
             })?);
@@ -103,8 +105,9 @@ impl<I, F: Field, A: AllocGadget<I, F>> AllocGadget<[I], F> for Vec<A> {
         mut cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
-        let mut vec = vec![];
-        for (i, value) in f()?.borrow().iter().enumerate() {
+        let f = f()?;
+        let mut vec = Vec::with_capacity(f.borrow().len());
+        for (i, value) in f.borrow().iter().enumerate() {
             vec.push(A::alloc_input(&mut cs.ns(|| format!("alloc_input_{}", i)), || {
                 Ok(value)
             })?);
@@ -116,8 +119,9 @@ impl<I, F: Field, A: AllocGadget<I, F>> AllocGadget<[I], F> for Vec<A> {
         mut cs: CS,
         f: Fn,
     ) -> Result<Self, SynthesisError> {
-        let mut vec = vec![];
-        for (i, value) in f()?.borrow().iter().enumerate() {
+        let f = f()?;
+        let mut vec = Vec::with_capacity(f.borrow().len());
+        for (i, value) in f.borrow().iter().enumerate() {
             vec.push(A::alloc_input_checked(
                 &mut cs.ns(|| format!("alloc_input_checked_{}", i)),
                 || Ok(value),

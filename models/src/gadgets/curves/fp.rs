@@ -349,7 +349,7 @@ impl<F: PrimeField> ToBitsGadget<F> for FpGadget<F> {
             None => vec![None; num_bits as usize],
         };
 
-        let mut bits = vec![];
+        let mut bits = Vec::with_capacity(bit_values.len());
         for (i, b) in bit_values.into_iter().enumerate() {
             bits.push(AllocatedBit::alloc(cs.ns(|| format!("bit {}", i)), || b.get())?);
         }

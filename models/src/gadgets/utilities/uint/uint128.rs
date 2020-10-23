@@ -357,7 +357,7 @@ impl UInt for UInt128 {
                         let modular_value = result_value.map(|v| v as u128);
 
                         // Storage area for the resulting bits
-                        let mut result_bits = vec![];
+                        let mut result_bits = Vec::with_capacity(128);
 
                         // This is a linear combination that we will enforce to be "zero"
                         let mut lc = LinearCombination::zero();

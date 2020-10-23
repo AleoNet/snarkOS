@@ -318,7 +318,7 @@ macro_rules! uint_impl {
                                 let modular_value = result_value.map(|v| v as $_type);
 
                                 // Storage area for the resulting bits
-                                let mut result_bits = vec![];
+                                let mut result_bits = Vec::with_capacity($size);
 
                                 // This is a linear combination that we will enforce to be "zero"
                                 let mut lc = LinearCombination::zero();

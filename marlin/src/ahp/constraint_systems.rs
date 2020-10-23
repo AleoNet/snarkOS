@@ -281,9 +281,10 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
 
     let elems: Vec<_> = output_domain.elements().collect();
 
-    let mut row_vec = Vec::new();
-    let mut col_vec = Vec::new();
-    let mut val_vec = Vec::new();
+    let vec_len: usize = matrix.iter().map(|row| row.len()).sum();
+    let mut row_vec = Vec::with_capacity(vec_len);
+    let mut col_vec = Vec::with_capacity(vec_len);
+    let mut val_vec = Vec::with_capacity(vec_len);
 
     let eq_poly_vals_time = start_timer!(|| "Precomputing eq_poly_vals");
     let eq_poly_vals: BTreeMap<F, F> = output_domain
@@ -293,7 +294,7 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
     end_timer!(eq_poly_vals_time);
 
     let lde_evals_time = start_timer!(|| "Computing row, col and val evals");
-    let mut inverses = Vec::new();
+    let mut inverses = Vec::with_capacity(vec_len);
 
     let mut count = 0;
 

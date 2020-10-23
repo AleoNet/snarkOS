@@ -124,7 +124,7 @@ impl RpcFunctions for RpcImpl {
         };
 
         if let Ok(block) = self.storage.get_block(&block_header_hash) {
-            let mut transactions = vec![];
+            let mut transactions = Vec::with_capacity(block.transactions.len());
 
             for transaction in block.transactions.iter() {
                 transactions.push(hex::encode(&transaction.transaction_id()?));
@@ -191,7 +191,7 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
-        let mut old_serial_numbers = vec![];
+        let mut old_serial_numbers = Vec::with_capacity(transaction.old_serial_numbers().len());
 
         for sn in transaction.old_serial_numbers() {
             let mut serial_number: Vec<u8> = vec![];
@@ -199,7 +199,7 @@ impl RpcFunctions for RpcImpl {
             old_serial_numbers.push(hex::encode(serial_number));
         }
 
-        let mut new_commitments = vec![];
+        let mut new_commitments = Vec::with_capacity(transaction.new_commitments().len());
 
         for cm in transaction.new_commitments() {
             new_commitments.push(hex::encode(to_bytes![cm]?));
@@ -207,12 +207,12 @@ impl RpcFunctions for RpcImpl {
 
         let memo = hex::encode(to_bytes![transaction.memorandum()]?);
 
-        let mut signatures = vec![];
+        let mut signatures = Vec::with_capacity(transaction.signatures.len());
         for sig in &transaction.signatures {
             signatures.push(hex::encode(to_bytes![sig]?));
         }
 
-        let mut encrypted_records = vec![];
+        let mut encrypted_records = Vec::with_capacity(transaction.encrypted_records.len());
 
         for encrypted_record in &transaction.encrypted_records {
             encrypted_records.push(hex::encode(to_bytes![encrypted_record]?));
@@ -305,11 +305,7 @@ impl RpcFunctions for RpcImpl {
         // Create a temporary tokio runtime to make an asynchronous function call
         let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
 
-        let mut peers = vec![];
-
-        for peer in peer_book.get_connected().keys() {
-            peers.push(*peer);
-        }
+        let peers = peer_book.get_connected().keys().cloned().collect();
 
         Ok(PeerInfo { peers })
     }

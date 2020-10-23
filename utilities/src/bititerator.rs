@@ -26,6 +26,10 @@ impl<E: AsRef<[u64]>> BitIterator<E> {
 
         BitIterator { t, n }
     }
+
+    pub fn len(&self) -> usize {
+        self.n
+    }
 }
 
 impl<E: AsRef<[u64]>> Iterator for BitIterator<E> {

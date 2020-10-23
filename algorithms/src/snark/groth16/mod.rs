@@ -177,7 +177,7 @@ impl<E: PairingEngine> VerifyingKey<E> {
         let delta_g2: E::G2Affine = FromBytes::read(&mut reader)?;
 
         let gamma_abc_g1_len: u32 = FromBytes::read(&mut reader)?;
-        let mut gamma_abc_g1: Vec<E::G1Affine> = vec![];
+        let mut gamma_abc_g1: Vec<E::G1Affine> = Vec::with_capacity(gamma_abc_g1_len as usize);
         for _ in 0..gamma_abc_g1_len {
             let gamma_abc_g1_element: E::G1Affine = FromBytes::read(&mut reader)?;
             gamma_abc_g1.push(gamma_abc_g1_element);
@@ -290,33 +290,32 @@ impl<E: PairingEngine> Parameters<E> {
 
         let delta_g1: E::G1Affine = FromBytes::read(&mut reader)?;
 
-        let mut a_query: Vec<E::G1Affine> = vec![];
-        let mut b_g1_query: Vec<E::G1Affine> = vec![];
-        let mut b_g2_query: Vec<E::G2Affine> = vec![];
-        let mut h_query: Vec<E::G1Affine> = vec![];
-        let mut l_query: Vec<E::G1Affine> = vec![];
-
         let a_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut a_query = Vec::with_capacity(a_query_len as usize);
         for _ in 0..a_query_len {
             a_query.push(read_g1_affine(&mut reader)?);
         }
 
         let b_g1_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut b_g1_query = Vec::with_capacity(b_g1_query_len as usize);
         for _ in 0..b_g1_query_len {
             b_g1_query.push(read_g1_affine(&mut reader)?);
         }
 
         let b_g2_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut b_g2_query = Vec::with_capacity(b_g2_query_len as usize);
         for _ in 0..b_g2_query_len {
             b_g2_query.push(read_g2_affine(&mut reader)?);
         }
 
         let h_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut h_query = Vec::with_capacity(h_query_len as usize);
         for _ in 0..h_query_len {
             h_query.push(read_g1_affine(&mut reader)?);
         }
 
         let l_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut l_query = Vec::with_capacity(l_query_len as usize);
         for _ in 0..l_query_len {
             l_query.push(read_g1_affine(&mut reader)?);
         }

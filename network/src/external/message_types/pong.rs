@@ -54,7 +54,7 @@ impl Message for Pong {
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = vec![];
+        let mut writer = Vec::with_capacity(8);
         writer.write_u64::<BigEndian>(self.nonce)?;
 
         Ok(writer)
