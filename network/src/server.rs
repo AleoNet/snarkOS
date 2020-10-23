@@ -172,7 +172,9 @@ impl Server {
     pub fn new(environment: &mut Environment) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
 
-        environment.set_managers();
+        let peer_manager = PeerManager::new(environment).unwrap();
+
+        environment.set_managers(peer_manager);
 
         Self {
             environment: environment.clone(),
@@ -192,8 +194,21 @@ impl Server {
     /// 4. Start the message handler.
     ///
     pub async fn listen(mut self) -> Result<(), NetworkError> {
+        let environment = self.environment.clone();
+
+        task::spawn(async move {
+            info!("initializing the peer manager");
+            environment.peer_manager_read().await.initialize().await;
+        });
+
         let receive_handler = self.environment.receive_handler().clone();
-        receive_handler.listen(self.environment.clone()).await;
+
+        let environment = self.environment.clone();
+
+        task::spawn(async move {
+            info!("Hello?");
+            receive_handler.listen(environment).await;
+        });
 
         // TODO (howardwu): Delete this.
         // Prepare to spawn the main loop.

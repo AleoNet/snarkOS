@@ -168,12 +168,15 @@ impl Environment {
     }
 
     /// TODO (howardwu): Remove this.
-    pub fn set_managers(&mut self) {
+    pub fn set_managers(&mut self, peer_manager: PeerManager) {
         // TODO (howardwu): Remove this.
-        let peer_manager = Runtime::new()
-            .unwrap()
-            .block_on(PeerManager::new(self.clone()))
-            .unwrap();
+        // let peer_manager = Runtime::new()
+        //     .unwrap()
+        //     .block_on(PeerManager::new(self.clone()))
+        //     .unwrap();
+
+        // let peer_manager = PeerManager::new(self.clone()).unwrap();
+
         self.peer_manager = Some(Arc::new(RwLock::new(peer_manager)));
 
         self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(
@@ -254,6 +257,13 @@ impl Environment {
     #[inline]
     pub fn receive_handler(&self) -> &ReceiveHandler {
         &self.receive_handler
+    }
+
+    // TODO (howardwu): Remove this.
+    /// Returns a reference to the receive handler of this node.
+    #[inline]
+    pub fn receive_handler_mut(&mut self) -> &mut ReceiveHandler {
+        &mut self.receive_handler
     }
 
     /// Returns a reference to the ping pong manager of this node.
