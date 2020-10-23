@@ -2628,6 +2628,7 @@ name = "snarkos-models"
 version = "1.1.4"
 dependencies = [
  "bincode",
+ "criterion",
  "derivative",
  "itertools",
  "rand",
