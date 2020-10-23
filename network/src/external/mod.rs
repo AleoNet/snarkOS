@@ -25,8 +25,5 @@ pub mod message_types;
 #[doc(inline)]
 pub use message_types::*;
 
-pub mod propagate;
-pub use propagate::*;
-
 pub mod protocol;
 pub use protocol::*;
