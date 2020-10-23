@@ -43,7 +43,7 @@ fn initialize_logger(config: &Config) {
         0 => {}
         verbosity => {
             match verbosity {
-                1 => std::env::set_var("RUST_LOG", "info"),
+                1 => std::env::set_var("RUST_LOG", "trace"),
                 2 => std::env::set_var("RUST_LOG", "debug"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
@@ -101,6 +101,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         .hash(&to_bytes![inner_snark_vk]?)?;
 
     let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
+    info!("Hello?");
 
     // Set the initial consensus parameters.
     let consensus = ConsensusParameters {
@@ -126,6 +127,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.node.is_bootnode,
         config.miner.is_miner,
     )?;
+    info!("Hello?");
+
     // let mut environment = Arc::new(Environment::new(
     //     socket_address,
     //     config.p2p.mempool_interval,
@@ -199,6 +202,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // }
 
     // Start the main server thread.
+
+    info!("Hello?");
     server.listen().await?;
 
     Ok(())

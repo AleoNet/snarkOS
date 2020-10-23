@@ -60,8 +60,8 @@ pub struct PeerManager {
     peer_receiver: PeerReceiver,
     /// The handler for sending outbound requests.
     send_handler: SendHandler,
-    /// The handler for receiving inbound requests.
-    receive_handler: ReceiveHandler,
+    // /// The handler for receiving inbound requests.
+    // receive_handler: ReceiveHandler,
 }
 
 impl PeerManager {
@@ -73,10 +73,11 @@ impl PeerManager {
     /// 2. Attempt to connect to all disconnected peers from the stored peer book.
     ///
     #[inline]
-    pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
+    // pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
+    pub fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
         // Fetch the send handler and receive handler.
         let send_handler = environment.send_handler().clone();
-        let mut receive_handler = environment.receive_handler().clone();
+        let mut receive_handler = environment.receive_handler_mut();
 
         // Initialize the peer sender and peer receiver.
         let (sender, receiver) = mpsc::channel(1024);
@@ -86,26 +87,27 @@ impl PeerManager {
         receive_handler.initialize_peer_sender(peer_sender.clone());
 
         // Load the peer book from storage, or create a new peer book.
-        let peer_book = match PeerBook::load(&*environment.storage_read().await) {
-            // Case 1 - The peer book was found in storage.
-            Ok(peer_book) => peer_book,
-            // Case 2 - Either the peer book does not exist in storage, or could not be deserialized.
-            // Create a new instance of the peer book.
-            _ => PeerBook::new(*environment.local_address()),
-        };
+        let peer_book = PeerBook::new(*environment.local_address());
+        // let peer_book = match PeerBook::load(&*environment.storage_read().await) {
+        //     // Case 1 - The peer book was found in storage.
+        //     Ok(peer_book) => peer_book,
+        //     // Case 2 - Either the peer book does not exist in storage, or could not be deserialized.
+        //     // Create a new instance of the peer book.
+        //     _ => PeerBook::new(*environment.local_address()),
+        // };
 
         // Instantiate the peer manager.
         let peer_manager = Self {
-            environment,
+            environment: environment.clone(),
             peer_book: Arc::new(RwLock::new(peer_book)),
             peer_sender,
             peer_receiver,
             send_handler,
-            receive_handler,
+            // receive_handler,
         };
 
         // Save the peer book to storage.
-        peer_manager.save_peer_book_to_storage().await?;
+        // peer_manager.save_peer_book_to_storage().await?;
 
         Ok(peer_manager)
     }
@@ -219,7 +221,7 @@ impl PeerManager {
     /// Broadcasts connection requests to the default bootnodes of the network
     /// and each disconnected peer saved in the peer book.
     #[inline]
-    async fn initialize(&self) {
+    pub async fn initialize(&self) {
         debug!("Initializing peer manager");
 
         // Attempt to connect to the default bootnodes of the network.
@@ -281,6 +283,8 @@ impl PeerManager {
     /// Broadcasts a connection request to all default bootnodes of the network.
     #[inline]
     async fn connect_to_bootnodes(&self) {
+        trace!("Connecting to bootnodes");
+
         // Fetch the local address of this node.
         let local_address = self.local_address();
         // Fetch the current connected peers of this node.
