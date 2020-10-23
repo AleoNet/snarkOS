@@ -138,13 +138,11 @@ fn impl_deserialize_field(ty: &Type) -> (TokenStream, TokenStream) {
     // Check if type is a tuple.
     match ty {
         Type::Tuple(tuple) => {
-            let mut compressed_fields = Vec::new();
-            let mut uncompressed_fields = Vec::new();
-            for elem_ty in tuple.elems.iter() {
-                let (compressed, uncompressed) = impl_deserialize_field(elem_ty);
-                compressed_fields.push(compressed);
-                uncompressed_fields.push(uncompressed);
-            }
+            let (compressed_fields, uncompressed_fields): (Vec<_>, Vec<_>) = tuple
+                .elems
+                .iter()
+                .map(|elem_ty| impl_deserialize_field(elem_ty))
+                .unzip();
             (
                 quote! { (#(#compressed_fields)*), },
                 quote! { (#(#uncompressed_fields)*), },

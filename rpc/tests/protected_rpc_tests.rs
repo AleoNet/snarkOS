@@ -77,7 +77,7 @@ mod protected_rpc_tests {
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-        let sync_handler = SyncHandler::new(server_address.clone());
+        let sync_handler = SyncHandler::new(server_address);
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
         let context = Context::new(server_address, 5, 1, 10, true, vec![], false);
@@ -280,7 +280,7 @@ mod protected_rpc_tests {
 
             let extracted: Value = serde_json::from_str(&response).unwrap();
 
-            let expected_result = Value::String(format!("{}", hex::encode(to_bytes![record].unwrap())));
+            let expected_result = Value::String(hex::encode(to_bytes![record].unwrap()).to_string());
             assert_eq!(extracted["result"], expected_result);
         }
 

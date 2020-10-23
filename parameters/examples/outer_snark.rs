@@ -34,7 +34,6 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use hex;
 use rand::thread_rng;
 use std::path::PathBuf;
 
@@ -49,13 +48,11 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
         From::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
-    let inner_snark_pk: <C::InnerSNARK as SNARK>::ProvingParameters = From::from(
-        <C::InnerSNARK as SNARK>::ProvingParameters::read(InnerSNARKPKParameters::load_bytes()?.as_slice())?,
-    );
+    let inner_snark_pk: <C::InnerSNARK as SNARK>::ProvingParameters =
+        <C::InnerSNARK as SNARK>::ProvingParameters::read(InnerSNARKPKParameters::load_bytes()?.as_slice())?;
 
-    let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters = From::from(
-        <C::InnerSNARK as SNARK>::VerificationParameters::read(InnerSNARKVKParameters::load_bytes()?.as_slice())?,
-    );
+    let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
+        <C::InnerSNARK as SNARK>::VerificationParameters::read(InnerSNARKVKParameters::load_bytes()?.as_slice())?;
 
     let inner_snark_proof = C::InnerSNARK::prove(
         &inner_snark_pk,
@@ -99,7 +96,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 fn versioned_filename(checksum: &str) -> String {
     match checksum.get(0..7) {
         Some(sum) => format!("outer_snark_pk-{}.params", sum),
-        _ => format!("outer_snark_pk.params"),
+        _ => "outer_snark_pk.params".to_string(),
     }
 }
 

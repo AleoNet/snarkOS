@@ -27,3 +27,10 @@ sw6 = []
 
 [build-dependencies]
 rustc_version = "0.2"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "curve_and_field_benches"
+harness = false

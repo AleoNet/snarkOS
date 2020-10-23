@@ -85,14 +85,16 @@ impl<P: Bls12Parameters> G2Prepared<P> {
             };
         }
 
-        let mut ell_coeffs = vec![];
         let mut r = G2HomProjective {
             x: q.x,
             y: q.y,
             z: Fp2::one(),
         };
 
-        for i in BitIterator::new(P::X).skip(1) {
+        let bit_iterator = BitIterator::new(P::X);
+        let mut ell_coeffs = Vec::with_capacity(bit_iterator.len());
+
+        for i in bit_iterator.skip(1) {
             ell_coeffs.push(doubling_step::<P>(&mut r, &two_inv));
 
             if i {

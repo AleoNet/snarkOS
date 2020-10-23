@@ -425,7 +425,7 @@ fn test_fq_legendre() {
 #[test]
 fn test_fq2_ordering() {
     let mut a = Fq2::new(Fq::zero(), Fq::zero());
-    let mut b = a.clone();
+    let mut b = a;
 
     assert!(a.cmp(&b) == Ordering::Equal);
     b.c0.add_assign(&Fq::one());

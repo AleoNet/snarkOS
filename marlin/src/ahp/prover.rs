@@ -81,7 +81,7 @@ impl<'a, 'b, F: PrimeField, C> ProverState<'a, 'b, F, C> {
 
 /// Each prover message that is not a list of oracles is a list of field elements.
 #[repr(transparent)]
-#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone, Debug, Default, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ProverMsg<F: Field> {
     /// The field elements that make up the message
     pub field_elements: Vec<F>,
@@ -297,7 +297,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
         mask_poly[0] -= &scaled_sigma_1;
         end_timer!(mask_poly_time);
 
-        let msg = ProverMsg { field_elements: vec![] };
+        let msg = ProverMsg::default();
 
         assert!(w_poly.degree() < domain_h.size() - domain_x.size() + zk_bound);
         assert!(z_a_poly.degree() < domain_h.size() + zk_bound);
@@ -613,7 +613,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
             .0;
         end_timer!(h_2_poly_time);
 
-        let msg = ProverMsg { field_elements: vec![] };
+        let msg = ProverMsg::default();
 
         assert!(g_2.degree() <= domain_k.size() - 2);
         let oracles = ProverThirdOracles {

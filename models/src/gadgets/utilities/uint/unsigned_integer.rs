@@ -100,11 +100,7 @@ pub trait UInt: Debug + Clone + PartialOrd + Eq + PartialEq {
 impl UInt8 {
     /// Construct a constant vector of `UInt8` from a vector of `u8`
     pub fn constant_vec(values: &[u8]) -> Vec<Self> {
-        let mut result = Vec::new();
-        for value in values {
-            result.push(UInt8::constant(*value));
-        }
-        result
+        values.iter().copied().map(UInt8::constant).collect()
     }
 
     pub fn alloc_vec<F, CS, T>(mut cs: CS, values: &[T]) -> Result<Vec<Self>, SynthesisError>

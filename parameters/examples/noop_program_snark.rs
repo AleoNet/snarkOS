@@ -32,7 +32,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let noop_program_snark_parameters = DPC::<C>::generate_noop_program_snark_parameters(&system_parameters, rng)?;
     let noop_program_snark_pk = to_bytes![noop_program_snark_parameters.proving_key]?;
     let noop_program_snark_vk: <C::NoopProgramSNARK as SNARK>::VerificationParameters =
-        noop_program_snark_parameters.verification_key.into();
+        noop_program_snark_parameters.verification_key;
     let noop_program_snark_vk = to_bytes![noop_program_snark_vk]?;
 
     println!("noop_program_snark_pk.params\n\tsize - {}", noop_program_snark_pk.len());

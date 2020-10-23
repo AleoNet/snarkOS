@@ -55,14 +55,15 @@ snarkos-utilities = { path = "./utilities", version = "1.1.4"}
 clap = { version = "2.33.3" }
 colored = { version = "2.0" }
 dirs = { version = "3.0.1" }
-env_logger = { version = "0.7.1" }
 hex = { version = "0.4.1" }
-log = { version = "0.4.11" }
 rand = { version = "0.7" }
 self_update = { version = "0.20.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.22", features = ["full"] }
 toml = { version = "0.5.6" }
+tracing = { default-features = false, features = ["log"], version = "0.1" }
+tracing-futures = { version = "0.2" }
+tracing-subscriber = { version = "0.2" }
 
 [dev-dependencies]
 rusty-hook = { version = "0.11.2" }

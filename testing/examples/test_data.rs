@@ -112,6 +112,7 @@ fn mine_block(
 
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
+#[allow(clippy::too_many_arguments)]
 fn send<R: Rng>(
     ledger: &MerkleTreeLedger,
     parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,

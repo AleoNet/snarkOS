@@ -107,8 +107,8 @@ impl<E: PairingEngine> SonicKZG10<E> {
         vk: &VerifierKey<E>,
     ) -> Result<bool, Error> {
         let check_time = start_timer!(|| "Checking elems");
-        let mut g1_projective_elems: Vec<E::G1Projective> = Vec::new();
-        let mut g2_prepared_elems: Vec<<E::G2Affine as PairingCurve>::Prepared> = Vec::new();
+        let mut g1_projective_elems = Vec::with_capacity(combined_comms.len() + 2);
+        let mut g2_prepared_elems = Vec::with_capacity(combined_comms.len() + 2);
 
         for (degree_bound, comm) in combined_comms.into_iter() {
             let shift_power = if let Some(degree_bound) = degree_bound {
@@ -197,7 +197,8 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
                     let _max_gamma_g = pp.powers_of_gamma_g.keys().last().unwrap();
                     for degree_bound in enforced_degree_bounds {
                         let shift_degree = max_degree - degree_bound;
-                        let mut powers_for_degree_bound = vec![];
+                        let mut powers_for_degree_bound =
+                            Vec::with_capacity((max_degree + 2).saturating_sub(shift_degree));
                         for i in 0..=supported_hiding_bound + 1 {
                             // We have an additional degree in `powers_of_gamma_g` beyond `powers_of_g`.
                             if shift_degree + i < max_degree + 2 {

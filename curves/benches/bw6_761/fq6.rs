@@ -22,8 +22,8 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 
-#[bench]
-fn bench_fq6_add_assign(b: &mut ::test::Bencher) {
+use criterion::Criterion;
+pub fn bench_fq6_add_assign(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -33,16 +33,17 @@ fn bench_fq6_add_assign(b: &mut ::test::Bencher) {
         .collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.add_assign(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bw6_761: fq6_add_assign", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.add_assign(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq6_sub_assign(b: &mut ::test::Bencher) {
+pub fn bench_fq6_sub_assign(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -52,16 +53,17 @@ fn bench_fq6_sub_assign(b: &mut ::test::Bencher) {
         .collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.sub_assign(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bw6_761: fq6_sub_assign", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.sub_assign(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq6_mul_assign(b: &mut ::test::Bencher) {
+pub fn bench_fq6_mul_assign(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -71,16 +73,17 @@ fn bench_fq6_mul_assign(b: &mut ::test::Bencher) {
         .collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count].0;
-        tmp.mul_assign(&v[count].1);
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bw6_761: fq6_mul_assign", |c| {
+        c.iter(|| {
+            let mut tmp = v[count].0;
+            tmp.mul_assign(&v[count].1);
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq6_double(b: &mut ::test::Bencher) {
+pub fn bench_fq6_double(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -88,16 +91,17 @@ fn bench_fq6_double(b: &mut ::test::Bencher) {
     let v: Vec<Fq6> = (0..SAMPLES).map(|_| Fq6::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp.double_in_place();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bw6_761: fq6_double", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp.double_in_place();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq6_square(b: &mut ::test::Bencher) {
+pub fn bench_fq6_square(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -105,16 +109,17 @@ fn bench_fq6_square(b: &mut ::test::Bencher) {
     let v: Vec<Fq6> = (0..SAMPLES).map(|_| Fq6::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let mut tmp = v[count];
-        tmp.square_in_place();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bw6_761: fq6_square", |c| {
+        c.iter(|| {
+            let mut tmp = v[count];
+            tmp.square_in_place();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }
 
-#[bench]
-fn bench_fq6_inverse(b: &mut ::test::Bencher) {
+pub fn bench_fq6_inverse(c: &mut Criterion) {
     const SAMPLES: usize = 1000;
 
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -122,9 +127,11 @@ fn bench_fq6_inverse(b: &mut ::test::Bencher) {
     let v: Vec<Fq6> = (0..SAMPLES).map(|_| Fq6::rand(&mut rng)).collect();
 
     let mut count = 0;
-    b.iter(|| {
-        let tmp = v[count].inverse();
-        count = (count + 1) % SAMPLES;
-        tmp
+    c.bench_function("bw6_761: fq6_inverse", |c| {
+        c.iter(|| {
+            let tmp = v[count].inverse();
+            count = (count + 1) % SAMPLES;
+            tmp
+        })
     });
 }

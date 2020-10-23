@@ -58,7 +58,7 @@ impl<G: Group, S: PedersenSize> PedersenCRHParameters<G, S> {
     }
 
     fn base<R: Rng>(num_powers: usize, rng: &mut R) -> Vec<G> {
-        let mut powers = vec![];
+        let mut powers = Vec::with_capacity(num_powers);
         let mut base = G::rand(rng);
         for _ in 0..num_powers {
             powers.push(base);
@@ -85,13 +85,13 @@ impl<G: Group, S: PedersenSize> ToBytes for PedersenCRHParameters<G, S> {
 impl<G: Group, S: PedersenSize> FromBytes for PedersenCRHParameters<G, S> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let mut bases = vec![];
-
         let num_bases: u32 = FromBytes::read(&mut reader)?;
-        for _ in 0..num_bases {
-            let mut base = vec![];
+        let mut bases = Vec::with_capacity(num_bases as usize);
 
+        for _ in 0..num_bases {
             let base_len: u32 = FromBytes::read(&mut reader)?;
+            let mut base = Vec::with_capacity(base_len as usize);
+
             for _ in 0..base_len {
                 let g: G = FromBytes::read(&mut reader)?;
                 base.push(g);

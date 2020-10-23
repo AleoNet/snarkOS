@@ -20,7 +20,7 @@ use snarkos_algorithms::crh::double_sha256;
 pub struct MerkleTreeRootHash([u8; 32]);
 
 fn merkle_round(hashes: &[Vec<u8>]) -> Vec<Vec<u8>> {
-    let mut pairs = vec![];
+    let mut pairs = Vec::with_capacity(hashes.len() / 2);
 
     for i in (0..hashes.len() - 1).step_by(2) {
         pairs.push((&hashes[i], &hashes[i + 1]));

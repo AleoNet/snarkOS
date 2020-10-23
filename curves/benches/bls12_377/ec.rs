@@ -14,23 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod g1 {
+pub(crate) mod g1 {
     use snarkos_curves::bls12_377::{Fr, G1Affine, G1Projective as G1};
     use snarkos_models::curves::ProjectiveCurve;
     use snarkos_utilities::rand::UniformRand;
 
+    use criterion::Criterion;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
     use std::ops::AddAssign;
 
-    #[bench]
-    fn bench_g1_rand(b: &mut ::test::Bencher) {
+    pub fn bench_g1_rand(c: &mut Criterion) {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-        b.iter(|| G1::rand(&mut rng));
+        c.bench_function("bls12_377: g1_rand", |c| c.iter(|| G1::rand(&mut rng)));
     }
 
-    #[bench]
-    fn bench_g1_mul_assign(b: &mut ::test::Bencher) {
+    pub fn bench_g1_mul_assign(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -38,16 +37,16 @@ mod g1 {
         let v: Vec<(G1, Fr)> = (0..SAMPLES).map(|_| (G1::rand(&mut rng), Fr::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.mul_assign(v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g1_mul_assign", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.mul_assign(v[count].1);
+                count = (count + 1) % SAMPLES;
+            })
         });
     }
 
-    #[bench]
-    fn bench_g1_add_assign(b: &mut ::test::Bencher) {
+    pub fn bench_g1_add_assign(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -55,16 +54,17 @@ mod g1 {
         let v: Vec<(G1, G1)> = (0..SAMPLES).map(|_| (G1::rand(&mut rng), G1::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.add_assign(&v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g1_add_assign", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.add_assign(&v[count].1);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_g1_add_assign_mixed(b: &mut ::test::Bencher) {
+    pub fn bench_g1_add_assign_mixed(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -74,16 +74,17 @@ mod g1 {
             .collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.add_assign_mixed(&v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g1_add_assign_mixed", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.add_assign_mixed(&v[count].1);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_g1_double(b: &mut ::test::Bencher) {
+    pub fn bench_g1_double(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -91,32 +92,33 @@ mod g1 {
         let v: Vec<(G1, G1)> = (0..SAMPLES).map(|_| (G1::rand(&mut rng), G1::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.double_in_place();
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g1_double", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.double_in_place();
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 }
 
-mod g2 {
+pub(crate) mod g2 {
     use snarkos_curves::bls12_377::{Fr, G2Affine, G2Projective as G2};
     use snarkos_models::curves::ProjectiveCurve;
     use snarkos_utilities::rand::UniformRand;
 
+    use criterion::Criterion;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
     use std::ops::AddAssign;
 
-    #[bench]
-    fn bench_g2_rand(b: &mut ::test::Bencher) {
+    pub fn bench_g2_rand(c: &mut Criterion) {
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
-        b.iter(|| G2::rand(&mut rng));
+        c.bench_function("bls12_377: g2_rand", |c| c.iter(|| G2::rand(&mut rng)));
     }
 
-    #[bench]
-    fn bench_g2_mul_assign(b: &mut ::test::Bencher) {
+    pub fn bench_g2_mul_assign(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -124,16 +126,17 @@ mod g2 {
         let v: Vec<(G2, Fr)> = (0..SAMPLES).map(|_| (G2::rand(&mut rng), Fr::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.mul_assign(v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g2_mul_assign", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.mul_assign(v[count].1);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_g2_add_assign(b: &mut ::test::Bencher) {
+    pub fn bench_g2_add_assign(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -141,16 +144,17 @@ mod g2 {
         let v: Vec<(G2, G2)> = (0..SAMPLES).map(|_| (G2::rand(&mut rng), G2::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.add_assign(&v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g2_add_assign", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.add_assign(&v[count].1);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_g2_add_assign_mixed(b: &mut ::test::Bencher) {
+    pub fn bench_g2_add_assign_mixed(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -160,16 +164,17 @@ mod g2 {
             .collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.add_assign_mixed(&v[count].1);
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g2_add_assign_mixed", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.add_assign_mixed(&v[count].1);
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 
-    #[bench]
-    fn bench_g2_double(b: &mut ::test::Bencher) {
+    pub fn bench_g2_double(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
         let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
@@ -177,11 +182,13 @@ mod g2 {
         let v: Vec<(G2, G2)> = (0..SAMPLES).map(|_| (G2::rand(&mut rng), G2::rand(&mut rng))).collect();
 
         let mut count = 0;
-        b.iter(|| {
-            let mut tmp = v[count].0;
-            tmp.double_in_place();
-            count = (count + 1) % SAMPLES;
-            tmp
+        c.bench_function("bls12_377: g2_double", |c| {
+            c.iter(|| {
+                let mut tmp = v[count].0;
+                tmp.double_in_place();
+                count = (count + 1) % SAMPLES;
+                tmp
+            })
         });
     }
 }

@@ -454,13 +454,13 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         }
         assert_eq!(proof.len(), query_to_labels_map.len());
 
-        let mut combined_comms = Vec::new();
-        let mut combined_queries = Vec::new();
-        let mut combined_evals = Vec::new();
+        let mut combined_comms = Vec::with_capacity(query_to_labels_map.len());
+        let mut combined_queries = Vec::with_capacity(query_to_labels_map.len());
+        let mut combined_evals = Vec::with_capacity(query_to_labels_map.len());
         for (query, labels) in query_to_labels_map.into_iter() {
             let lc_time = start_timer!(|| format!("Randomly combining {} commitments", labels.len()));
-            let mut comms_to_combine: Vec<&'_ LabeledCommitment<_>> = Vec::new();
-            let mut values_to_combine = Vec::new();
+            let mut comms_to_combine = Vec::with_capacity(labels.len());
+            let mut values_to_combine = Vec::with_capacity(labels.len());
             for label in labels.into_iter() {
                 let commitment = commitments.get(label).ok_or(Error::MissingPolynomial {
                     label: label.to_string(),
@@ -472,7 +472,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
                     label: label.to_string(),
                 })?;
 
-                comms_to_combine.push(commitment);
+                comms_to_combine.push(*commitment);
                 values_to_combine.push(*v_i);
             }
             let (c, v) =

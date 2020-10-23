@@ -29,7 +29,7 @@ use crate::{
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_errors::network::ServerError;
-use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
+use snarkos_objects::Block as BlockStruct;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -284,7 +284,7 @@ impl Server {
 
             if let Ok(inserted) = memory_pool.insert(&self.storage, entry) {
                 if let Some(txid) = inserted {
-                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
+                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(&txid));
                 }
             }
         }
@@ -381,7 +381,7 @@ impl Server {
                     max_height = height + 4000;
                 }
 
-                let mut block_hashes: Vec<BlockHeaderHash> = vec![];
+                let mut block_hashes = Vec::with_capacity(max_height.saturating_sub(height + 1) as usize);
 
                 for block_num in height + 1..=max_height {
                     block_hashes.push(self.storage.get_block_hash(block_num)?);
@@ -454,10 +454,10 @@ impl Server {
                 channel.write(&GetPeers).await?;
             }
             Err(error) => {
+                let error = ServerError::HandshakeError(error);
                 debug!(
                     "Invalid Verack message from: {:?} Full error: {:?}",
-                    channel.address,
-                    ServerError::HandshakeError(error)
+                    channel.address, &error
                 );
             }
         }

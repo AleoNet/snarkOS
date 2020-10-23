@@ -87,7 +87,7 @@ mod consensus_sidechain {
         // 2. Receive sidechain block 1.
 
         consensus
-            .receive_block(&parameters, &blockchain, &mut memory_pool, &block_1_side.clone())
+            .receive_block(&parameters, &blockchain, &mut memory_pool, &block_1_side)
             .unwrap();
 
         let new_block_height = blockchain.get_latest_block_height();

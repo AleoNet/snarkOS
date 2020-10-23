@@ -27,7 +27,7 @@ use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::Mutex};
 
-pub const LOCALHOST: &'static str = "0.0.0.0:";
+pub const LOCALHOST: &str = "0.0.0.0:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
 pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
