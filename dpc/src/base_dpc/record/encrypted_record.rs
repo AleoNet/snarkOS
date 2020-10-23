@@ -92,9 +92,8 @@ impl<C: BaseDPCComponents> FromBytes for EncryptedRecord<C> {
         let mut selector_bytes = vec![0u8; num_selector_bytes];
         reader.read_exact(&mut selector_bytes)?;
 
-        let selector_bits = bytes_to_bits(&selector_bytes);
-        let ciphertext_selectors = &selector_bits[0..num_ciphertext_elements];
-        let final_fq_high_selector = selector_bits[num_ciphertext_elements];
+        let mut selector_bits = bytes_to_bits(&selector_bytes);
+        let ciphertext_selectors = selector_bits.by_ref().take(num_ciphertext_elements);
 
         // Recover the ciphertext
         let mut ciphertext = Vec::with_capacity(ciphertext_x_coordinates.len());
@@ -102,7 +101,7 @@ impl<C: BaseDPCComponents> FromBytes for EncryptedRecord<C> {
             let ciphertext_element_affine =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
                     *x_coordinate,
-                    *ciphertext_selector_bit,
+                    ciphertext_selector_bit,
                 ) {
                     Some(affine) => affine,
                     None => return Err(Error::new(ErrorKind::Other, "Could not read ciphertext")),
@@ -113,6 +112,8 @@ impl<C: BaseDPCComponents> FromBytes for EncryptedRecord<C> {
 
             ciphertext.push(ciphertext_element);
         }
+
+        let final_fq_high_selector = selector_bits.next().unwrap();
 
         Ok(Self {
             encrypted_record: ciphertext,

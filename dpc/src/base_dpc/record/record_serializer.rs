@@ -107,8 +107,10 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         // This element needs to be represented in the constraint field; its bits and the number of elements
         // are calculated early, so that the storage vectors can be pre-allocated.
         let payload = record.payload();
-        let payload_bits = bytes_to_bits(&to_bytes![payload]?);
-        let num_payload_elements = payload_bits.len() / Self::PAYLOAD_ELEMENT_BITSIZE;
+        let payload_bytes = to_bytes![payload]?;
+        let payload_bits_count = payload_bytes.len() * 8;
+        let payload_bits = bytes_to_bits(&payload_bytes);
+        let num_payload_elements = payload_bits_count / Self::PAYLOAD_ELEMENT_BITSIZE;
 
         // Create the vector for storing data elements.
 
@@ -193,8 +195,8 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
 
         let mut payload_field_bits = Vec::with_capacity(Self::PAYLOAD_ELEMENT_BITSIZE + 1);
 
-        for (i, bit) in payload_bits.iter().enumerate() {
-            payload_field_bits.push(*bit);
+        for (i, bit) in payload_bits.enumerate() {
+            payload_field_bits.push(bit);
 
             if (i > 0) && ((i + 1) % Self::PAYLOAD_ELEMENT_BITSIZE == 0) {
                 // (Assumption 4)
@@ -238,7 +240,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         );
 
         // Append the value bits and create the final base element.
-        let value_bits = bytes_to_bits(&to_bytes![value]?);
+        let value_bits = bytes_to_bits(&to_bytes![value]?).collect();
 
         // (Assumption 4)
         let final_element = [vec![true], data_high_bits, value_bits, payload_field_bits].concat();
@@ -273,7 +275,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
         let final_element = &serialized_record[serialized_record.len() - 1];
         let final_element_bytes =
             decode_from_group::<Self::Parameters, Self::Group>(final_element.into_affine(), final_sign_high)?;
-        let final_element_bits = bytes_to_bits(&final_element_bytes);
+        let final_element_bits = bytes_to_bits(&final_element_bytes).collect::<Vec<_>>();
 
         let fq_high_bits = &final_element_bits[1..serialized_record.len()];
 
@@ -290,7 +292,9 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             commitment_randomness.into_affine(),
             *commitment_randomness_fq_high,
         )?;
-        let commitment_randomness_bits = &bytes_to_bits(&commitment_randomness_bytes)[0..Self::DATA_ELEMENT_BITSIZE];
+        let commitment_randomness_bits = &bytes_to_bits(&commitment_randomness_bytes)
+            .take(Self::DATA_ELEMENT_BITSIZE)
+            .collect::<Vec<_>>();
         let commitment_randomness = <C::RecordCommitment as CommitmentScheme>::Randomness::read(
             &bits_to_bytes(commitment_randomness_bits)[..],
         )?;
@@ -315,12 +319,16 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             *program_id_sign_high,
         )?;
 
-        let mut birth_program_id_bits = bytes_to_bits(&birth_program_id_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
-        let mut death_program_id_bits = bytes_to_bits(&death_program_id_bytes)[0..Self::DATA_ELEMENT_BITSIZE].to_vec();
+        let mut birth_program_id_bits = bytes_to_bits(&birth_program_id_bytes)
+            .take(Self::DATA_ELEMENT_BITSIZE)
+            .collect::<Vec<_>>();
+        let mut death_program_id_bits = bytes_to_bits(&death_program_id_bytes)
+            .take(Self::DATA_ELEMENT_BITSIZE)
+            .collect::<Vec<_>>();
 
-        let program_id_remainder_bits = bytes_to_bits(&program_id_remainder_bytes);
-        birth_program_id_bits.extend(&program_id_remainder_bits[0..remainder_size]);
-        death_program_id_bits.extend(&program_id_remainder_bits[remainder_size..remainder_size * 2]);
+        let mut program_id_remainder_bits = bytes_to_bits(&program_id_remainder_bytes);
+        birth_program_id_bits.extend(program_id_remainder_bits.by_ref().take(remainder_size));
+        death_program_id_bits.extend(program_id_remainder_bits.take(remainder_size));
 
         let birth_program_id = bits_to_bytes(&birth_program_id_bits);
         let death_program_id = bits_to_bytes(&death_program_id_bits);
@@ -340,7 +348,7 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             .zip_eq(&fq_high_bits[5..])
         {
             let element_bytes = decode_from_group::<Self::Parameters, Self::Group>(element.into_affine(), *fq_high)?;
-            payload_bits.extend_from_slice(&bytes_to_bits(&element_bytes)[..Self::PAYLOAD_ELEMENT_BITSIZE]);
+            payload_bits.extend(bytes_to_bits(&element_bytes).take(Self::PAYLOAD_ELEMENT_BITSIZE));
         }
         payload_bits.extend_from_slice(&final_element_bits[value_end..]);
 

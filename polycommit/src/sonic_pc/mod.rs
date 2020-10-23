@@ -400,7 +400,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
 
     fn batch_check<'a, R: RngCore>(
         vk: &Self::VerifierKey,
-        commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
+        commitments: impl Iterator<Item = LabeledCommitment<Self::Commitment>>,
         query_set: &QuerySet<E::Fr>,
         values: &Evaluations<E::Fr>,
         proof: &Self::BatchProof,
@@ -410,7 +410,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
     where
         Self::Commitment: 'a,
     {
-        let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label(), c)).collect();
+        let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label().to_owned(), c)).collect();
         let mut query_to_labels_map = BTreeMap::new();
 
         for (label, point) in query_set.iter() {
@@ -552,7 +552,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
     fn check_combinations<'a, R: RngCore>(
         vk: &Self::VerifierKey,
         lc_s: impl IntoIterator<Item = &'a LinearCombination<E::Fr>>,
-        commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
+        commitments: impl Iterator<Item = LabeledCommitment<Self::Commitment>>,
         query_set: &QuerySet<E::Fr>,
         evaluations: &Evaluations<E::Fr>,
         proof: &BatchLCProof<E::Fr, Self>,
@@ -565,7 +565,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
         let BatchLCProof { proof, .. } = proof;
         let label_comm_map = commitments
             .into_iter()
-            .map(|c| (c.label(), c))
+            .map(|c| (c.label().to_owned(), c))
             .collect::<BTreeMap<_, _>>();
 
         let mut lc_commitments = Vec::new();
@@ -586,8 +586,8 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
                         }
                     }
                 } else {
-                    let label: &String = label.try_into().unwrap();
-                    let &cur_comm = label_comm_map.get(label).ok_or(Error::MissingPolynomial {
+                    let label: String = label.to_owned().try_into().unwrap();
+                    let cur_comm = label_comm_map.get(&label).ok_or(Error::MissingPolynomial {
                         label: label.to_string(),
                     })?;
 
@@ -613,12 +613,11 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
         let lc_commitments = lc_info
             .into_iter()
             .zip(comms)
-            .map(|((label, d), c)| LabeledCommitment::new(label, c, d))
-            .collect::<Vec<_>>();
+            .map(|((label, d), c)| LabeledCommitment::new(label, c, d));
 
         Self::batch_check(
             vk,
-            &lc_commitments,
+            lc_commitments,
             &query_set,
             &evaluations,
             proof,

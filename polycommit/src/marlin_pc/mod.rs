@@ -101,7 +101,9 @@ impl<E: PairingEngine> MarlinKZG10<E> {
         (combined_comm, combined_shifted_comm)
     }
 
-    fn normalize_commitments(commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>) -> Vec<Commitment<E>> {
+    fn normalize_commitments(
+        commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>,
+    ) -> impl Iterator<Item = Commitment<E>> {
         let mut comms = Vec::with_capacity(commitments.len());
         let mut s_comms = Vec::with_capacity(commitments.len());
         let mut s_flags = Vec::with_capacity(commitments.len());
@@ -117,18 +119,13 @@ impl<E: PairingEngine> MarlinKZG10<E> {
         }
         let comms = E::G1Projective::batch_normalization_into_affine(&comms);
         let s_comms = E::G1Projective::batch_normalization_into_affine(&s_comms);
-        comms
-            .into_iter()
-            .zip(s_comms)
-            .zip(s_flags)
-            .map(|((c, s_c), flag)| {
-                let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
-                Commitment {
-                    comm: kzg10::Commitment(c),
-                    shifted_comm,
-                }
-            })
-            .collect()
+        comms.into_iter().zip(s_comms).zip(s_flags).map(|((c, s_c), flag)| {
+            let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
+            Commitment {
+                comm: kzg10::Commitment(c),
+                shifted_comm,
+            }
+        })
     }
 
     /// Accumulate `commitments` and `values` according to `opening_challenge`.
@@ -435,7 +432,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
 
     fn batch_check<'a, R: RngCore>(
         vk: &Self::VerifierKey,
-        commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
+        commitments: impl Iterator<Item = LabeledCommitment<Self::Commitment>>,
         query_set: &QuerySet<E::Fr>,
         values: &Evaluations<E::Fr>,
         proof: &Self::BatchProof,
@@ -445,7 +442,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
     where
         Self::Commitment: 'a,
     {
-        let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label(), c)).collect();
+        let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label().to_owned(), c)).collect();
         let mut query_to_labels_map = BTreeMap::new();
 
         for (label, point) in query_set.iter() {
@@ -472,7 +469,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
                     label: label.to_string(),
                 })?;
 
-                comms_to_combine.push(*commitment);
+                comms_to_combine.push(commitment);
                 values_to_combine.push(*v_i);
             }
             let (c, v) =
@@ -484,14 +481,11 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         }
         let norm_time = start_timer!(|| "Normalizaing combined commitments");
         E::G1Projective::batch_normalization(&mut combined_comms);
-        let combined_comms = combined_comms
-            .into_iter()
-            .map(|c| kzg10::Commitment(c.into()))
-            .collect::<Vec<_>>();
+        let combined_comms = combined_comms.into_iter().map(|c| kzg10::Commitment(c.into()));
         end_timer!(norm_time);
         let proof_time = start_timer!(|| "Checking KZG10::Proof");
         let result =
-            kzg10::KZG10::batch_check(&vk.vk, &combined_comms, &combined_queries, &combined_evals, &proof, rng)?;
+            kzg10::KZG10::batch_check(&vk.vk, combined_comms, &combined_queries, &combined_evals, &proof, rng)?;
         end_timer!(proof_time);
         Ok(result)
     }
@@ -591,7 +585,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
     fn check_combinations<'a, R: RngCore>(
         vk: &Self::VerifierKey,
         lc_s: impl IntoIterator<Item = &'a LinearCombination<E::Fr>>,
-        commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
+        commitments: impl Iterator<Item = LabeledCommitment<Self::Commitment>>,
         query_set: &QuerySet<E::Fr>,
         evaluations: &Evaluations<E::Fr>,
         proof: &BatchLCProof<E::Fr, Self>,
@@ -604,7 +598,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let BatchLCProof { proof, .. } = proof;
         let label_comm_map = commitments
             .into_iter()
-            .map(|c| (c.label(), c))
+            .map(|c| (c.label().to_owned(), c))
             .collect::<BTreeMap<_, _>>();
 
         let mut lc_commitments = Vec::new();
@@ -627,8 +621,8 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
                         }
                     }
                 } else {
-                    let label: &String = label.try_into().unwrap();
-                    let &cur_comm = label_comm_map.get(label).ok_or(Error::MissingPolynomial {
+                    let label: String = label.to_owned().try_into().unwrap();
+                    let cur_comm = label_comm_map.get(&label).ok_or(Error::MissingPolynomial {
                         label: label.to_string(),
                     })?;
 
@@ -652,13 +646,12 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let lc_commitments = lc_info
             .into_iter()
             .zip(comms)
-            .map(|((label, d), c)| LabeledCommitment::new(label, c, d))
-            .collect::<Vec<_>>();
+            .map(|((label, d), c)| LabeledCommitment::new(label, c, d));
         end_timer!(combined_comms_norm_time);
 
         Self::batch_check(
             vk,
-            &lc_commitments,
+            lc_commitments,
             &query_set,
             &evaluations,
             proof,

@@ -275,7 +275,10 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             )?;
             let final_element_bits = bytes_to_bits(&final_element_bytes);
             [
-                &final_element_bits[1..serialized_record.len()],
+                &final_element_bits
+                    .skip(1)
+                    .take(serialized_record.len().saturating_sub(1))
+                    .collect::<Vec<_>>(),
                 &[final_fq_high_selector][..],
             ]
             .concat()

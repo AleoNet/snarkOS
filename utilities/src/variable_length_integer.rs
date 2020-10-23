@@ -26,11 +26,11 @@ pub fn variable_length_integer(value: u64) -> Vec<u8> {
         // bounded by u8::max_value()
         0..=252 => vec![value as u8],
         // bounded by u16::max_value()
-        253..=65535 => [vec![0xfd], (value as u16).to_le_bytes().to_vec()].concat(),
+        253..=65535 => [&[0xfd], &(value as u16).to_le_bytes()[..]].concat(),
         // bounded by u32::max_value()
-        65536..=4_294_967_295 => [vec![0xfe], (value as u32).to_le_bytes().to_vec()].concat(),
+        65536..=4_294_967_295 => [&[0xfe], &(value as u32).to_le_bytes()[..]].concat(),
         // bounded by u64::max_value()
-        _ => [vec![0xff], value.to_le_bytes().to_vec()].concat(),
+        _ => [&[0xff], &value.to_le_bytes()[..]].concat(),
     }
 }
 

@@ -308,7 +308,7 @@ impl<E: PairingEngine> KZG10<E> {
     /// `commitment_i` at `point_i`.
     pub fn batch_check<R: RngCore>(
         vk: &VerifierKey<E>,
-        commitments: &[Commitment<E>],
+        commitments: impl ExactSizeIterator<Item = Commitment<E>>,
         points: &[E::Fr],
         values: &[E::Fr],
         proofs: &[Proof<E>],
@@ -327,7 +327,7 @@ impl<E: PairingEngine> KZG10<E> {
         // their coefficients and perform a final multiplication at the end.
         let mut g_multiplier = E::Fr::zero();
         let mut gamma_g_multiplier = E::Fr::zero();
-        for (((c, z), v), proof) in commitments.iter().zip(points).zip(values).zip(proofs) {
+        for (((c, z), v), proof) in commitments.zip(points).zip(values).zip(proofs) {
             let w = proof.w;
             let mut temp = w.mul(*z);
             temp.add_assign_mixed(&c.0);
@@ -583,7 +583,14 @@ mod tests {
                 points.push(point);
                 proofs.push(proof);
             }
-            assert!(KZG10::<E>::batch_check(&vk, &comms, &points, &values, &proofs, rng)?);
+            assert!(KZG10::<E>::batch_check(
+                &vk,
+                comms.into_iter(),
+                &points,
+                &values,
+                &proofs,
+                rng
+            )?);
         }
         Ok(())
     }
