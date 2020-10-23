@@ -63,7 +63,7 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 fn versioned_filename(checksum: &str) -> String {
     match checksum.get(0..7) {
         Some(sum) => format!("inner_snark_pk-{}.params", sum),
-        _ => format!("inner_snark_pk.params"),
+        _ => "inner_snark_pk.params".to_string(),
     }
 }
 

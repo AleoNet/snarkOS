@@ -273,7 +273,7 @@ mod test {
         for _ in 0..1000 {
             let mut a = Fq2::rand(&mut rng);
             let mut b = a;
-            a = a * &Fq6Parameters::NONRESIDUE;
+            a *= &Fq6Parameters::NONRESIDUE;
             b *= &nqr;
 
             assert_eq!(a, b);

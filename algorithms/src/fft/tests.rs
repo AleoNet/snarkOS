@@ -19,7 +19,6 @@ use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_models::curves::PairingEngine;
 use snarkos_utilities::rand::UniformRand;
 
-use rand;
 use std::cmp::min;
 
 // Test multiplying various (low degree) polynomials together and

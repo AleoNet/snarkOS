@@ -321,11 +321,10 @@ mod server_message_handler {
             );
             let mut server_sender = server.sender.clone();
             let context = server.context.clone();
-            context
-                .connections
-                .write()
-                .await
-                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
+
+            let bootnode_channel = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
+
+            context.connections.write().await.store_channel(&bootnode_channel);
 
             let block_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
             let block_hash_clone = block_hash.clone();

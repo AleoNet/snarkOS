@@ -131,8 +131,8 @@ fn test_execute_base_dpc_constraints() {
     .unwrap();
 
     // Set the input records for our transaction to be the initial dummy records.
-    let old_records = vec![old_record.clone(); NUM_INPUT_RECORDS];
-    let old_account_private_keys = vec![dummy_account.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_records = vec![old_record; NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![dummy_account.private_key; NUM_INPUT_RECORDS];
 
     // Construct new records.
 
@@ -148,7 +148,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Set the new record's program to be the "always-accept" program.
 
-    let new_record_owners = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![new_account.address; NUM_OUTPUT_RECORDS];
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];

@@ -33,7 +33,6 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use hex;
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use std::{
@@ -68,7 +67,7 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     })
 }
 
-pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &String) -> Result<Vec<u8>, DPCError> {
+pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
     let consensus = ConsensusParameters {
@@ -128,10 +127,10 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
 
     // Construct new records
 
-    let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
     let new_birth_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
-    let new_death_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![noop_program_id; Components::NUM_OUTPUT_RECORDS];
 
     let mut new_is_dummy_flags = vec![false];
     new_is_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
@@ -184,7 +183,7 @@ pub fn generate(recipient: &String, value: u64, network_id: u8, file_name: &Stri
     Ok(transaction_bytes)
 }
 
-pub fn store(path: &PathBuf, bytes: &Vec<u8>) -> IoResult<()> {
+pub fn store(path: &PathBuf, bytes: &[u8]) -> IoResult<()> {
     let mut file = File::create(path)?;
     file.write_all(&bytes)?;
     drop(file);
@@ -195,11 +194,7 @@ pub fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 5 {
-        println!(
-            "Invalid number of arguments.  Given: {} - Required: {}",
-            args.len() - 1,
-            4
-        );
+        println!("Invalid number of arguments.  Given: {} - Required: 4", args.len() - 1);
         return;
     }
 

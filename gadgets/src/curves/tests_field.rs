@@ -167,9 +167,7 @@ fn field_test<NativeF: Field, F: Field, FG: FieldGadget<NativeF, F>, CS: Constra
     assert_eq!(a_inv.get_value().unwrap(), a.get_value().unwrap().inverse().unwrap());
     assert_eq!(a_inv.get_value().unwrap(), a_native.inverse().unwrap());
     // a * a * a = a^3
-    let bits = BitIterator::new([0x3])
-        .map(|bit| Boolean::constant(bit))
-        .collect::<Vec<_>>();
+    let bits = BitIterator::new([0x3]).map(Boolean::constant).collect::<Vec<_>>();
     assert_eq!(
         a_native * &(a_native * &a_native),
         a.pow(cs.ns(|| "test_pow"), &bits).unwrap().get_value().unwrap()

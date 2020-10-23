@@ -31,10 +31,10 @@ use rand_xorshift::XorShiftRng;
 
 fn check_all_constant_bits(mut expected: u8, actual: UInt8) {
     for b in actual.bits.iter() {
-        match b {
-            &Boolean::Is(_) => panic!(),
-            &Boolean::Not(_) => panic!(),
-            &Boolean::Constant(b) => {
+        match *b {
+            Boolean::Is(_) => panic!(),
+            Boolean::Not(_) => panic!(),
+            Boolean::Constant(b) => {
                 assert!(b == (expected & 1 == 1));
             }
         }
@@ -45,14 +45,14 @@ fn check_all_constant_bits(mut expected: u8, actual: UInt8) {
 
 fn check_all_allocated_bits(mut expected: u8, actual: UInt8) {
     for b in actual.bits.iter() {
-        match b {
-            &Boolean::Is(ref b) => {
+        match *b {
+            Boolean::Is(ref b) => {
                 assert!(b.get_value().unwrap() == (expected & 1 == 1));
             }
-            &Boolean::Not(ref b) => {
-                assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+            Boolean::Not(ref b) => {
+                assert!(b.get_value().unwrap() != (expected & 1 == 1));
             }
-            &Boolean::Constant(_) => unreachable!(),
+            Boolean::Constant(_) => unreachable!(),
         }
 
         expected >>= 1;
@@ -73,7 +73,7 @@ fn test_uint8_from_bits_to_bits() {
 #[test]
 fn test_uint8_alloc_input_vec() {
     let mut cs = TestConstraintSystem::<Fr>::new();
-    let byte_vals = (64u8..128u8).into_iter().collect::<Vec<_>>();
+    let byte_vals = (64u8..128u8).collect::<Vec<_>>();
     let bytes = UInt8::alloc_input_vec(cs.ns(|| "alloc value"), &byte_vals).unwrap();
     for (native_byte, gadget_byte) in byte_vals.into_iter().zip(bytes) {
         let bits = gadget_byte.to_bits_le();
@@ -93,8 +93,8 @@ fn test_uint8_from_bits() {
         let b = UInt8::from_bits_le(&v);
 
         for (i, bit_gadget) in b.bits.iter().enumerate() {
-            match bit_gadget {
-                &Boolean::Constant(bit_gadget) => {
+            match *bit_gadget {
+                Boolean::Constant(bit_gadget) => {
                     assert!(bit_gadget == ((b.value.unwrap() >> i) & 1 == 1));
                 }
                 _ => unreachable!(),
@@ -128,8 +128,8 @@ fn test_uint8_rotr() {
 
         let mut tmp = num;
         for b in &b.bits {
-            match b {
-                &Boolean::Constant(b) => {
+            match *b {
+                Boolean::Constant(b) => {
                     assert_eq!(b, tmp & 1 == 1);
                 }
                 _ => unreachable!(),
@@ -167,14 +167,14 @@ fn test_uint8_xor() {
         assert!(r.value == Some(expected));
 
         for b in r.bits.iter() {
-            match b {
-                &Boolean::Is(ref b) => {
+            match *b {
+                Boolean::Is(ref b) => {
                     assert!(b.get_value().unwrap() == (expected & 1 == 1));
                 }
-                &Boolean::Not(ref b) => {
-                    assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+                Boolean::Not(ref b) => {
+                    assert!(b.get_value().unwrap() != (expected & 1 == 1));
                 }
-                &Boolean::Constant(b) => {
+                Boolean::Constant(b) => {
                     assert!(b == (expected & 1 == 1));
                 }
             }
@@ -210,6 +210,7 @@ fn test_uint8_addmany_constants() {
 }
 
 #[test]
+#[allow(clippy::many_single_char_names)]
 fn test_uint8_addmany() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 

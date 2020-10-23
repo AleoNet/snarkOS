@@ -32,10 +32,10 @@ use std::convert::TryInto;
 
 fn check_all_constant_bits(mut expected: u128, actual: UInt128) {
     for b in actual.bits.iter() {
-        match b {
-            &Boolean::Is(_) => panic!(),
-            &Boolean::Not(_) => panic!(),
-            &Boolean::Constant(b) => {
+        match *b {
+            Boolean::Is(_) => panic!(),
+            Boolean::Not(_) => panic!(),
+            Boolean::Constant(b) => {
                 assert!(b == (expected & 1 == 1));
             }
         }
@@ -46,14 +46,14 @@ fn check_all_constant_bits(mut expected: u128, actual: UInt128) {
 
 fn check_all_allocated_bits(mut expected: u128, actual: UInt128) {
     for b in actual.bits.iter() {
-        match b {
-            &Boolean::Is(ref b) => {
+        match *b {
+            Boolean::Is(ref b) => {
                 assert!(b.get_value().unwrap() == (expected & 1 == 1));
             }
-            &Boolean::Not(ref b) => {
-                assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+            Boolean::Not(ref b) => {
+                assert!(b.get_value().unwrap() != (expected & 1 == 1));
             }
-            &Boolean::Constant(_) => unreachable!(),
+            Boolean::Constant(_) => unreachable!(),
         }
 
         expected >>= 1;
@@ -70,8 +70,8 @@ fn test_uint128_from_bits() {
         let b = UInt128::from_bits_le(&v);
 
         for (i, bit_gadget) in b.bits.iter().enumerate() {
-            match bit_gadget {
-                &Boolean::Constant(bit_gadget) => {
+            match *bit_gadget {
+                Boolean::Constant(bit_gadget) => {
                     assert!(bit_gadget == ((b.value.unwrap() >> i) & 1 == 1));
                 }
                 _ => unreachable!(),
@@ -105,8 +105,8 @@ fn test_uint128_rotr() {
 
         let mut tmp = num;
         for b in &b.bits {
-            match b {
-                &Boolean::Constant(b) => {
+            match *b {
+                Boolean::Constant(b) => {
                     assert_eq!(b, tmp & 1 == 1);
                 }
                 _ => unreachable!(),
@@ -144,14 +144,14 @@ fn test_uint128_xor() {
         assert!(r.value == Some(expected));
 
         for b in r.bits.iter() {
-            match b {
-                &Boolean::Is(ref b) => {
+            match *b {
+                Boolean::Is(ref b) => {
                     assert!(b.get_value().unwrap() == (expected & 1 == 1));
                 }
-                &Boolean::Not(ref b) => {
-                    assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+                Boolean::Not(ref b) => {
+                    assert!(b.get_value().unwrap() != (expected & 1 == 1));
                 }
-                &Boolean::Constant(b) => {
+                Boolean::Constant(b) => {
                     assert!(b == (expected & 1 == 1));
                 }
             }

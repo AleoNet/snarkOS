@@ -589,12 +589,12 @@ pub mod tests {
         } = info;
 
         let rng = &mut test_rng();
-        let max_degree = max_degree.unwrap_or(rand::distributions::Uniform::from(2..=64).sample(rng));
+        let max_degree = max_degree.unwrap_or_else(|| rand::distributions::Uniform::from(2..=64).sample(rng));
         let pp = PC::setup(max_degree, rng)?;
 
         for _ in 0..num_iters {
             let supported_degree =
-                supported_degree.unwrap_or(rand::distributions::Uniform::from(1..=max_degree).sample(rng));
+                supported_degree.unwrap_or_else(|| rand::distributions::Uniform::from(1..=max_degree).sample(rng));
             assert!(max_degree >= supported_degree, "max_degree < supported_degree");
             let mut polynomials = Vec::new();
             let mut degree_bounds = if enforce_degree_bounds { Some(Vec::new()) } else { None };
@@ -639,12 +639,7 @@ pub mod tests {
             println!("supported degree: {:?}", supported_degree);
             println!("supported hiding bound: {:?}", supported_hiding_bound);
             println!("num_points_in_query_set: {:?}", num_points_in_query_set);
-            let (ck, vk) = PC::trim(
-                &pp,
-                supported_degree,
-                supported_hiding_bound,
-                degree_bounds.as_ref().map(|s| s.as_slice()),
-            )?;
+            let (ck, vk) = PC::trim(&pp, supported_degree, supported_hiding_bound, degree_bounds.as_deref())?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;
@@ -705,12 +700,12 @@ pub mod tests {
         } = info;
 
         let rng = &mut test_rng();
-        let max_degree = max_degree.unwrap_or(rand::distributions::Uniform::from(2..=64).sample(rng));
+        let max_degree = max_degree.unwrap_or_else(|| rand::distributions::Uniform::from(2..=64).sample(rng));
         let pp = PC::setup(max_degree, rng)?;
 
         for _ in 0..num_iters {
             let supported_degree =
-                supported_degree.unwrap_or(rand::distributions::Uniform::from(1..=max_degree).sample(rng));
+                supported_degree.unwrap_or_else(|| rand::distributions::Uniform::from(1..=max_degree).sample(rng));
             assert!(max_degree >= supported_degree, "max_degree < supported_degree");
             let mut polynomials = Vec::new();
             let mut degree_bounds = if enforce_degree_bounds { Some(Vec::new()) } else { None };
@@ -763,12 +758,7 @@ pub mod tests {
             println!("{}", num_polynomials);
             println!("{}", enforce_degree_bounds);
 
-            let (ck, vk) = PC::trim(
-                &pp,
-                supported_degree,
-                supported_hiding_bound,
-                degree_bounds.as_ref().map(|s| s.as_slice()),
-            )?;
+            let (ck, vk) = PC::trim(&pp, supported_degree, supported_hiding_bound, degree_bounds.as_deref())?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;

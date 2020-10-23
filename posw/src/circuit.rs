@@ -186,7 +186,7 @@ mod test {
         let proof = create_random_proof(
             POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
                 leaves: snark_leaves,
-                merkle_parameters: parameters.clone(),
+                merkle_parameters: parameters,
                 mask: Some(mask.clone()),
                 root: Some(root),
                 field_type: PhantomData,
