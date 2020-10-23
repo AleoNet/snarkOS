@@ -143,7 +143,7 @@ where
             let mut input_len = 1;
             for (i, (input, b)) in public_inputs.by_ref().zip(pvk.gamma_abc_g1.iter().skip(1)).enumerate() {
                 let input_bits = input.to_bits(cs.ns(|| format!("Input {}", i)))?;
-                g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.iter())?;
+                g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.into_iter())?;
                 input_len += 1;
             }
             // Check that the input and the query in the verification are of the
@@ -513,12 +513,12 @@ mod test {
             // assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());
             let mut cs = TestConstraintSystem::<Fq>::new();
 
-            let inputs: Vec<_> = inputs.into_iter().map(|input| input.unwrap()).collect();
+            let inputs = inputs.into_iter().map(|input| input.unwrap());
             let mut input_gadgets = Vec::new();
 
             {
                 let mut cs = cs.ns(|| "Allocate Input");
-                for (i, input) in inputs.into_iter().enumerate() {
+                for (i, input) in inputs.enumerate() {
                     let mut input_bits = BitIterator::new(input.into_repr()).collect::<Vec<_>>();
                     // Input must be in little-endian, but BitIterator outputs in big-endian.
                     input_bits.reverse();

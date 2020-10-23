@@ -133,11 +133,8 @@ impl<E: PairingEngine> SonicKZG10<E> {
             .map(|a| a.prepare())
             .collect::<Vec<_>>();
 
-        let g1_g2_prepared: Vec<(
-            &<E::G1Affine as PairingCurve>::Prepared,
-            &<E::G2Affine as PairingCurve>::Prepared,
-        )> = g1_prepared_elems_iter.iter().zip(g2_prepared_elems.iter()).collect();
-        let is_one: bool = E::product_of_pairings(g1_g2_prepared.iter()).is_one();
+        let g1_g2_prepared = g1_prepared_elems_iter.iter().zip(g2_prepared_elems.iter());
+        let is_one: bool = E::product_of_pairings(g1_g2_prepared).is_one();
         end_timer!(check_time);
         Ok(is_one)
     }

@@ -123,15 +123,15 @@ where
 
     fn miller_loop<'a, I>(i: I) -> Self::Fqk
     where
-        I: IntoIterator<
-            Item = &'a (
+        I: Iterator<
+            Item = (
                 &'a <Self::G1Affine as PairingCurve>::Prepared,
                 &'a <Self::G2Affine as PairingCurve>::Prepared,
             ),
         >,
     {
         let mut pairs = vec![];
-        for &(p, q) in i {
+        for (p, q) in i {
             if !p.is_zero() && !q.is_zero() {
                 pairs.push((p, q.ell_coeffs.iter()));
             }

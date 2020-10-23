@@ -250,7 +250,7 @@ where
 
     // Compute the C_1-query
     let c1_time = start_timer!(|| "Calculate C1");
-    let result = FixedBaseMSM::multi_scalar_mul::<E::G1Projective>(
+    let mut result = FixedBaseMSM::multi_scalar_mul::<E::G1Projective>(
         scalar_bits,
         g_window,
         &g_table,
@@ -258,7 +258,7 @@ where
             .map(|i| c[i] * &gamma + &(a[i] * &alpha_beta))
             .collect::<Vec<_>>(),
     );
-    let (verifier_query, c_query_1) = result.split_at(assembly.num_inputs);
+    let (verifier_query, c_query_1) = result.split_at_mut(assembly.num_inputs);
     end_timer!(c1_time);
 
     // Compute the C_2-query
@@ -304,12 +304,10 @@ where
         query: cfg_into_iter!(verifier_query).map(|e| e.into_affine()).collect(),
     };
 
-    let mut c_query_1 = c_query_1.to_vec();
-
     let batch_normalization_time = start_timer!(|| "Convert proving key elements to affine");
     E::G1Projective::batch_normalization(a_query.as_mut_slice());
     E::G2Projective::batch_normalization(b_query.as_mut_slice());
-    E::G1Projective::batch_normalization(c_query_1.as_mut_slice());
+    E::G1Projective::batch_normalization(c_query_1);
     E::G1Projective::batch_normalization(c_query_2.as_mut_slice());
     E::G1Projective::batch_normalization(g_gamma2_z_t.as_mut_slice());
     end_timer!(batch_normalization_time);
@@ -318,7 +316,7 @@ where
         vk,
         a_query: a_query.into_iter().map(Into::into).collect(),
         b_query: b_query.into_iter().map(Into::into).collect(),
-        c_query_1: c_query_1.into_iter().map(Into::into).collect(),
+        c_query_1: c_query_1.iter().copied().map(Into::into).collect(),
         c_query_2: c_query_2.into_iter().map(Into::into).collect(),
         g_gamma_z: g_gamma_z.into_affine(),
         h_gamma_z: h_gamma_z.into_affine(),

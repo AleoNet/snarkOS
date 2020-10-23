@@ -244,9 +244,9 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
         // Gather commitments in one vector.
         #[rustfmt::skip]
         let commitments = vec![
-            first_comms.iter().map(|p| p.commitment().clone()).collect(),
-            second_comms.iter().map(|p| p.commitment().clone()).collect(),
-            third_comms.iter().map(|p| p.commitment().clone()).collect(),
+            first_comms.iter().map(|p| p.commitment()).cloned().collect(),
+            second_comms.iter().map(|p| p.commitment()).cloned().collect(),
+            third_comms.iter().map(|p| p.commitment()).cloned().collect(),
         ];
         let labeled_comms: Vec<_> = index_pk
             .index_vk
@@ -254,9 +254,9 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             .cloned()
             .zip(&AHPForR1CS::<F>::INDEXER_POLYNOMIALS)
             .map(|(c, l)| LabeledCommitment::new(l.to_string(), c, None))
-            .chain(first_comms.iter().cloned())
-            .chain(second_comms.iter().cloned())
-            .chain(third_comms.iter().cloned())
+            .chain(first_comms.into_iter())
+            .chain(second_comms.into_iter())
+            .chain(third_comms.into_iter())
             .collect();
 
         // Gather commitment randomness together.

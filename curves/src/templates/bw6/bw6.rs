@@ -247,8 +247,8 @@ where
 
     fn miller_loop<'a, I>(i: I) -> Self::Fqk
     where
-        I: IntoIterator<
-            Item = &'a (
+        I: Iterator<
+            Item = (
                 &'a <Self::G1Affine as PairingCurve>::Prepared,
                 &'a <Self::G2Affine as PairingCurve>::Prepared,
             ),

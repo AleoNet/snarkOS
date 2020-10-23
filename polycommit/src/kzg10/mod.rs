@@ -352,10 +352,14 @@ impl<E: PairingEngine> KZG10<E> {
         end_timer!(to_affine_time);
 
         let pairing_time = start_timer!(|| "Performing product of pairings");
-        let result = E::product_of_pairings(&[
-            (&total_w.prepare(), &vk.prepared_beta_h),
-            (&total_c.prepare(), &vk.prepared_h),
-        ])
+        let result = E::product_of_pairings(
+            [
+                (&total_w.prepare(), &vk.prepared_beta_h),
+                (&total_c.prepare(), &vk.prepared_h),
+            ]
+            .iter()
+            .copied(),
+        )
         .is_one();
         end_timer!(pairing_time);
         end_timer!(check_time, || format!("Result: {}", result));

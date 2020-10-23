@@ -62,7 +62,7 @@ pub(crate) mod pairing {
                     G2Affine::from(G2::rand(&mut rng)).prepare(),
                 )
             })
-            .map(|(ref p, ref q)| Bls12_377::miller_loop(&[(p, q)]))
+            .map(|(ref p, ref q)| Bls12_377::miller_loop([(p, q)].iter().copied()))
             .collect();
 
         let mut count = 0;
