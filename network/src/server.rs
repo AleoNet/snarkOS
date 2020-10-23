@@ -36,6 +36,7 @@ use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task,
 };
+use tracing_futures::Instrument;
 
 /// The main networking component of a node.
 #[allow(clippy::type_complexity)]
@@ -101,7 +102,7 @@ impl Server {
         let sync_handler_lock = self.sync_handler_lock.clone();
 
         // 2. Spawn a new thread to handle new connections.
-        task::spawn(async move {
+        let future = async move {
             debug!("Spawning a new thread to handle new connections");
 
             loop {
@@ -177,7 +178,8 @@ impl Server {
                     Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
                 }
             }
-        });
+        };
+        task::spawn(future.instrument(debug_span!("new_conn_handler")));
 
         // 3. Start the connection handler.
         debug!("Starting connection handler");
@@ -210,7 +212,8 @@ impl Server {
         mut channel: Arc<Channel>,
         mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     ) {
-        task::spawn(async move {
+        let peer_address = channel.address.clone();
+        let future = async move {
             // Determines the criteria for disconnecting from a peer.
             fn should_disconnect(failure_count: &u8) -> bool {
                 // Tolerate up to 10 failed communications.
@@ -292,7 +295,8 @@ impl Server {
                     break;
                 }
             }
-        });
+        };
+        task::spawn(future.instrument(debug_span!("connection", addr = %peer_address)));
     }
 
     /// Send a handshake request to a node at address without blocking the server listener.
@@ -300,7 +304,7 @@ impl Server {
         let context = self.context.clone();
         let storage = self.storage.clone();
 
-        task::spawn(async move {
+        let future = async move {
             let height = storage.get_latest_block_height();
             let version = Version::new(1u64, height, remote_address, *context.local_address.read().await);
 
@@ -308,7 +312,8 @@ impl Server {
             handshakes.send_request(&version).await.unwrap_or_else(|error| {
                 info!("Failed to connect to {:?}", error);
             });
-        });
+        };
+        task::spawn(future.instrument(debug_span!("handshake", addr = %remote_address)));
     }
 
     /// Send a handshake request the first bootnode and store the rest as gossipped peers

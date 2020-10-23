@@ -23,7 +23,7 @@
 #![cfg_attr(nightly, doc(include = "../documentation/concepts/network_server.md"))]
 
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 pub mod external;
 

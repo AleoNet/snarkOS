@@ -35,7 +35,7 @@
 #![forbid(unsafe_code)]
 
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 pub mod consensus;
 pub use consensus::*;

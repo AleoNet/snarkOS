@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 pub mod cli;
 pub mod config;

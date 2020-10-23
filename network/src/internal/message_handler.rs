@@ -284,7 +284,7 @@ impl Server {
 
             if let Ok(inserted) = memory_pool.insert(&self.storage, entry) {
                 if let Some(txid) = inserted {
-                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
+                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(&txid));
                 }
             }
         }
@@ -454,10 +454,10 @@ impl Server {
                 channel.write(&GetPeers).await?;
             }
             Err(error) => {
+                let error = ServerError::HandshakeError(error);
                 debug!(
                     "Invalid Verack message from: {:?} Full error: {:?}",
-                    channel.address,
-                    ServerError::HandshakeError(error)
+                    channel.address, &error
                 );
             }
         }

@@ -25,6 +25,7 @@ use crate::{
 use chrono::{Duration as ChronoDuration, Utc};
 use std::time::Duration;
 use tokio::{task, time::delay_for};
+use tracing_futures::Instrument;
 
 impl Server {
     /// Manages the number of active connections according to the connection frequency.
@@ -44,7 +45,7 @@ impl Server {
         let connection_frequency = self.connection_frequency;
 
         // Start a separate thread for the handler.
-        task::spawn(async move {
+        let handler_future = async move {
             let mut interval_ticker: u8 = 0;
 
             loop {
@@ -88,7 +89,7 @@ impl Server {
                                     let new_context = context.clone();
                                     let latest_block_height = storage.get_latest_block_height();
 
-                                    task::spawn(async move {
+                                    let handshake_future = async move {
                                         // TODO (raychu86) Establish a formal node version
                                         let version =
                                             Version::new(1u64, latest_block_height, remote_address, local_address);
@@ -97,7 +98,10 @@ impl Server {
                                         if handshakes.send_request(&version).await.is_err() {
                                             debug!("Could not connect to gossiped peer {}", remote_address);
                                         }
-                                    });
+                                    };
+                                    task::spawn(
+                                        handshake_future.instrument(debug_span!("handshake", addr = %remote_address)),
+                                    );
                                 }
                             }
 
@@ -221,6 +225,7 @@ impl Server {
                     }
                 }
             }
-        });
+        };
+        task::spawn(handler_future.instrument(debug_span!("connection_handler")));
     }
 }
