@@ -17,6 +17,7 @@
 use crate::curves::{Field, Fp2, Fp2Parameters, One, PrimeField, Zero};
 use snarkos_errors::serialization::SerializationError;
 use snarkos_utilities::{
+    bititerator::BitIterator,
     bytes::{FromBytes, ToBytes},
     div_ceil,
     rand::UniformRand,
@@ -161,6 +162,65 @@ impl<P: Fp6Parameters> Fp6<P> {
         self.c0 = t1;
         self.c1 = t2;
         self.c2 = t3;
+    }
+
+    pub fn cyclotomic_square(&self) -> Self {
+        // https://eprint.iacr.org/2009/565.pdf, 3.2
+
+        let mut result = Self::zero();
+        let z0 = self.c0;
+        let z1 = self.c1;
+        let z2 = self.c2;
+
+        // A
+        let tmp1 = z0.square();
+        let mut tmp2 = z0;
+        tmp2.c1 = tmp2.c1.neg();
+        tmp2.double_in_place();
+        tmp2.neg();
+        let a = tmp1.double() + &tmp1 + &tmp2;
+
+        // B
+        let mut tmp3 = z1;
+        tmp3.c1 = tmp3.c1.neg();
+        let tmp4 = &P::mul_fp2_by_nonresidue(&z2.square());
+        let b = tmp4.double() + &tmp4 + &tmp3;
+
+        // C
+        let tmp5 = z1.square();
+        let mut tmp6 = z2;
+        tmp6.c1 = tmp6.c1.neg();
+        tmp6.double_in_place().neg();
+        let c = tmp5.double() + &tmp5 + &tmp6;
+
+        result.c0 = a;
+        result.c1 = b;
+        result.c2 = c;
+
+        result
+    }
+
+    pub fn cyclotomic_exp<S: AsRef<[u64]>>(&self, exp: S) -> Self {
+        let mut res = Self::one();
+
+        let mut found_one = false;
+
+        for i in BitIterator::new(exp) {
+            if !found_one {
+                if i {
+                    found_one = true;
+                } else {
+                    continue;
+                }
+            }
+
+            res = res.cyclotomic_square();
+
+            if i {
+                res *= self;
+            }
+        }
+        res
     }
 }
 

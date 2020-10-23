@@ -91,6 +91,10 @@ impl<P: Fp2Parameters> Fp2<P> {
         self.c0.mul_assign(&element);
         self.c1.mul_assign(&element);
     }
+
+    pub fn conjugate(&mut self) {
+        self.c1 = self.c1.neg();
+    }
 }
 
 impl<P: Fp2Parameters> Zero for Fp2<P> {
