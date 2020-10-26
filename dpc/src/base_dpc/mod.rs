@@ -642,8 +642,8 @@ where
     fn execute_online<R: Rng>(
         parameters: &Self::Parameters,
         context: Self::ExecuteContext,
-        old_death_program_proofs: &[Self::PrivateProgramInput],
-        new_birth_program_proofs: &[Self::PrivateProgramInput],
+        old_death_program_proofs: Vec<Self::PrivateProgramInput>,
+        new_birth_program_proofs: Vec<Self::PrivateProgramInput>,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
@@ -827,8 +827,8 @@ where
                 network_id,
                 inner_snark_vk,
                 inner_proof,
-                old_death_program_attributes.to_vec(),
-                new_birth_program_attributes.to_vec(),
+                old_death_program_attributes,
+                new_birth_program_attributes,
                 program_commitment.clone(),
                 program_randomness,
                 local_data_root.clone(),

@@ -525,8 +525,8 @@ impl ConsensusParameters {
         let (new_records, transaction) = InstantiatedDPC::execute_online(
             &parameters,
             execute_context,
-            &old_death_program_proofs,
-            &new_birth_program_proofs,
+            old_death_program_proofs,
+            new_birth_program_proofs,
             ledger,
             rng,
         )?;
