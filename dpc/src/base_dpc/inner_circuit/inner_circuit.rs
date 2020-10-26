@@ -149,35 +149,35 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         // Parameters
-        system_parameters: &SystemParameters<C>,
-        ledger_parameters: &C::MerkleParameters,
+        system_parameters: SystemParameters<C>,
+        ledger_parameters: C::MerkleParameters,
 
         // Digest
-        ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
+        ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
         // Old records
-        old_records: &[DPCRecord<C>],
-        old_witnesses: &[MerklePath<C::MerkleParameters>],
-        old_account_private_keys: &[AccountPrivateKey<C>],
-        old_serial_numbers: &[<C::AccountSignature as SignatureScheme>::PublicKey],
+        old_records: Vec<DPCRecord<C>>,
+        old_witnesses: Vec<MerklePath<C::MerkleParameters>>,
+        old_account_private_keys: Vec<AccountPrivateKey<C>>,
+        old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
 
         // New records
-        new_records: &[DPCRecord<C>],
-        new_serial_number_nonce_randomness: &[[u8; 32]],
-        new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
+        new_records: Vec<DPCRecord<C>>,
+        new_serial_number_nonce_randomness: Vec<[u8; 32]>,
+        new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
-        new_records_encryption_randomness: &[<C::AccountEncryption as EncryptionScheme>::Randomness],
-        new_records_encryption_gadget_components: &[RecordEncryptionGadgetComponents<C>],
-        new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
+        new_records_encryption_randomness: Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>,
+        new_records_encryption_gadget_components: Vec<RecordEncryptionGadgetComponents<C>>,
+        new_encrypted_record_hashes: Vec<<C::EncryptedRecordCRH as CRH>::Output>,
 
         // Other stuff
-        program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
-        program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
+        program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+        program_randomness: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-        local_data_root: &<C::LocalDataCRH as CRH>::Output,
-        local_data_commitment_randomizers: &[<C::LocalDataCommitment as CommitmentScheme>::Randomness],
+        local_data_root: <C::LocalDataCRH as CRH>::Output,
+        local_data_commitment_randomizers: Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
-        memo: &[u8; 32],
+        memo: [u8; 32],
 
         value_balance: AleoAmount,
 
@@ -202,7 +202,7 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
         // TODO (raychu86) Fix the lengths to be generic
         let record_encoding_length = 7;
 
-        for gadget_components in new_records_encryption_gadget_components {
+        for gadget_components in &new_records_encryption_gadget_components {
             assert_eq!(gadget_components.record_field_elements.len(), record_encoding_length);
             assert_eq!(gadget_components.record_group_encoding.len(), record_encoding_length);
             assert_eq!(gadget_components.ciphertext_selectors.len(), record_encoding_length + 1);
@@ -215,35 +215,35 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            system_parameters: Some(system_parameters.clone()),
-            ledger_parameters: Some(ledger_parameters.clone()),
+            system_parameters: Some(system_parameters),
+            ledger_parameters: Some(ledger_parameters),
 
             // Digest
-            ledger_digest: Some(ledger_digest.clone()),
+            ledger_digest: Some(ledger_digest),
 
             // Input records
-            old_records: Some(old_records.to_vec()),
-            old_witnesses: Some(old_witnesses.to_vec()),
-            old_account_private_keys: Some(old_account_private_keys.to_vec()),
-            old_serial_numbers: Some(old_serial_numbers.to_vec()),
+            old_records: Some(old_records),
+            old_witnesses: Some(old_witnesses),
+            old_account_private_keys: Some(old_account_private_keys),
+            old_serial_numbers: Some(old_serial_numbers),
 
             // Output records
-            new_records: Some(new_records.to_vec()),
-            new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness.to_vec()),
-            new_commitments: Some(new_commitments.to_vec()),
+            new_records: Some(new_records),
+            new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness),
+            new_commitments: Some(new_commitments),
 
-            new_records_encryption_randomness: Some(new_records_encryption_randomness.to_vec()),
-            new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components.to_vec()),
-            new_encrypted_record_hashes: Some(new_encrypted_record_hashes.to_vec()),
+            new_records_encryption_randomness: Some(new_records_encryption_randomness),
+            new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components),
+            new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
 
             // Other stuff
-            program_commitment: Some(program_commitment.clone()),
-            program_randomness: Some(program_randomness.clone()),
+            program_commitment: Some(program_commitment),
+            program_randomness: Some(program_randomness),
 
-            local_data_root: Some(local_data_root.clone()),
-            local_data_commitment_randomizers: Some(local_data_commitment_randomizers.to_vec()),
+            local_data_root: Some(local_data_root),
+            local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
 
-            memo: Some(*memo),
+            memo: Some(memo),
 
             value_balance: Some(value_balance),
 
