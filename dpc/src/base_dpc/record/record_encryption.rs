@@ -100,7 +100,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
     > {
         // Serialize the record into group elements and fq_high bits
         let (serialized_record, final_fq_high_selector) =
-            RecordSerializer::<C, C::EncryptionModelParameters, C::EncryptionGroup>::serialize(&record)?;
+            RecordSerializer::<C, C::EncryptionModelParameters, C::EncryptionGroup>::serialize(record)?;
 
         let mut record_plaintexts = Vec::with_capacity(serialized_record.len());
         for element in serialized_record.iter() {
