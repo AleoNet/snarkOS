@@ -815,26 +815,24 @@ where
         )?;
 
         let transaction_proof = {
-            let ledger_parameters = ledger.parameters();
-
             let circuit = OuterCircuit::new(
-                &parameters.system_parameters,
-                ledger_parameters,
-                &ledger_digest,
-                &old_serial_numbers,
-                &new_commitments,
-                &new_encrypted_record_hashes,
-                &memorandum,
+                parameters.system_parameters.clone(),
+                ledger.parameters().clone(),
+                ledger_digest.clone(),
+                old_serial_numbers.clone(),
+                new_commitments.clone(),
+                new_encrypted_record_hashes,
+                memorandum,
                 value_balance,
                 network_id,
-                &inner_snark_vk,
-                &inner_proof,
-                &old_death_program_attributes,
-                &new_birth_program_attributes,
-                &program_commitment,
-                &program_randomness,
-                &local_data_root,
-                &inner_snark_id,
+                inner_snark_vk,
+                inner_proof,
+                old_death_program_attributes.to_vec(),
+                new_birth_program_attributes.to_vec(),
+                program_commitment.clone(),
+                program_randomness,
+                local_data_root.clone(),
+                inner_snark_id.clone(),
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {

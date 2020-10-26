@@ -126,36 +126,36 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
 
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        system_parameters: &SystemParameters<C>,
+        system_parameters: SystemParameters<C>,
 
         // Inner SNARK public inputs
-        ledger_parameters: &C::MerkleParameters,
-        ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
-        old_serial_numbers: &[<C::AccountSignature as SignatureScheme>::PublicKey],
-        new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
-        new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
-        memo: &[u8; 32],
+        ledger_parameters: C::MerkleParameters,
+        ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
+        old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
+        new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
+        new_encrypted_record_hashes: Vec<<C::EncryptedRecordCRH as CRH>::Output>,
+        memo: [u8; 32],
         value_balance: AleoAmount,
         network_id: u8,
 
         // Inner SNARK private inputs
-        inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
-        inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
+        inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters,
+        inner_snark_proof: <C::InnerSNARK as SNARK>::Proof,
 
         // Private program input = Verification key and input
         // Commitment contains commitment to hash of death program vk.
-        old_private_program_inputs: &[PrivateProgramInput],
+        old_private_program_inputs: Vec<PrivateProgramInput>,
 
         // Private program input = Verification key and input
         // Commitment contains commitment to hash of birth program vk.
-        new_private_program_inputs: &[PrivateProgramInput],
+        new_private_program_inputs: Vec<PrivateProgramInput>,
 
-        program_commitment: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
-        program_randomness: &<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
-        local_data_root: &<C::LocalDataCRH as CRH>::Output,
+        program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+        program_randomness: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
+        local_data_root: <C::LocalDataCRH as CRH>::Output,
 
         // Inner SNARK ID
-        inner_snark_id: &<C::InnerSNARKVerificationKeyCRH as CRH>::Output,
+        inner_snark_id: <C::InnerSNARKVerificationKeyCRH as CRH>::Output,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -166,28 +166,28 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         assert_eq!(num_output_records, new_encrypted_record_hashes.len());
 
         Self {
-            system_parameters: Some(system_parameters.clone()),
+            system_parameters: Some(system_parameters),
 
-            ledger_parameters: Some(ledger_parameters.clone()),
-            ledger_digest: Some(ledger_digest.clone()),
-            old_serial_numbers: Some(old_serial_numbers.to_vec()),
-            new_commitments: Some(new_commitments.to_vec()),
-            new_encrypted_record_hashes: Some(new_encrypted_record_hashes.to_vec()),
-            memo: Some(*memo),
+            ledger_parameters: Some(ledger_parameters),
+            ledger_digest: Some(ledger_digest),
+            old_serial_numbers: Some(old_serial_numbers),
+            new_commitments: Some(new_commitments),
+            new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
+            memo: Some(memo),
             value_balance: Some(value_balance),
             network_id: Some(network_id),
 
-            inner_snark_vk: Some(inner_snark_vk.clone()),
-            inner_snark_proof: Some(inner_snark_proof.clone()),
+            inner_snark_vk: Some(inner_snark_vk),
+            inner_snark_proof: Some(inner_snark_proof),
 
-            old_private_program_inputs: Some(old_private_program_inputs.to_vec()),
-            new_private_program_inputs: Some(new_private_program_inputs.to_vec()),
+            old_private_program_inputs: Some(old_private_program_inputs),
+            new_private_program_inputs: Some(new_private_program_inputs),
 
-            program_commitment: Some(program_commitment.clone()),
-            program_randomness: Some(program_randomness.clone()),
-            local_data_root: Some(local_data_root.clone()),
+            program_commitment: Some(program_commitment),
+            program_randomness: Some(program_randomness),
+            local_data_root: Some(local_data_root),
 
-            inner_snark_id: Some(inner_snark_id.clone()),
+            inner_snark_id: Some(inner_snark_id),
         }
     }
 }
