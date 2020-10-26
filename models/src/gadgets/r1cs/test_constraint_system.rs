@@ -149,7 +149,7 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 }
 
-fn compute_path(ns: &[String], this: String) -> String {
+fn compute_path(ns: &[String], this: &str) -> String {
     if this.chars().any(|a| a == '/') {
         panic!("'/' is not allowed in names");
     }
@@ -157,7 +157,7 @@ fn compute_path(ns: &[String], this: String) -> String {
     let mut name = String::new();
 
     let mut needs_separation = false;
-    for ns in ns.iter().chain(Some(&this).into_iter()) {
+    for ns in ns.iter().map(|s| s.as_str()).chain(Some(this)) {
         if needs_separation {
             name += "/";
         }
@@ -179,7 +179,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         AR: Into<String>,
     {
         let index = self.aux.len();
-        let path = compute_path(&self.current_namespace, annotation().into());
+        let path = compute_path(&self.current_namespace, &annotation().into());
         self.aux.push((f()?, path.clone()));
         let var = Variable::new_unchecked(Index::Aux(index));
         self.set_named_obj(path, NamedObject::Var(var));
@@ -194,7 +194,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         AR: Into<String>,
     {
         let index = self.inputs.len();
-        let path = compute_path(&self.current_namespace, annotation().into());
+        let path = compute_path(&self.current_namespace, &annotation().into());
         self.inputs.push((f()?, path.clone()));
         let var = Variable::new_unchecked(Index::Input(index));
         self.set_named_obj(path, NamedObject::Var(var));
@@ -210,7 +210,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         LB: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
     {
-        let path = compute_path(&self.current_namespace, annotation().into());
+        let path = compute_path(&self.current_namespace, &annotation().into());
         let index = self.constraints.len();
         self.set_named_obj(path.clone(), NamedObject::Constraint(index));
 
@@ -226,7 +226,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
 
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn().into();
-        let path = compute_path(&self.current_namespace, name.clone());
+        let path = compute_path(&self.current_namespace, &name);
         self.set_named_obj(path, NamedObject::Namespace);
         self.current_namespace.push(name);
     }
