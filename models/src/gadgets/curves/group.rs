@@ -74,7 +74,7 @@ pub trait GroupGadget<G: Group, F: Field>:
     /// Inputs must be specified in *little-endian* form.
     /// If the addition law is incomplete for the identity element,
     /// `result` must not be the identity element.
-    fn mul_bits<'a, CS: ConstraintSystem<F>>(
+    fn mul_bits<CS: ConstraintSystem<F>>(
         &self,
         mut cs: CS,
         result: &Self,

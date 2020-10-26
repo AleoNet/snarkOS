@@ -345,7 +345,7 @@ pub fn bits_to_bytes(bits: &[bool]) -> Vec<u8> {
     let mut bits = std::borrow::Cow::from(bits);
     if bits.len() % 8 != 0 {
         let current_length = bits.len();
-        bits.resize(current_length + 8 - (current_length % 8), false);
+        bits.to_mut().resize(current_length + 8 - (current_length % 8), false);
     }
 
     let mut bytes = Vec::with_capacity(bits.len() / 8);

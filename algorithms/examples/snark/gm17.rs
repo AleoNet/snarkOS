@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let start = Instant::now();
         let params = {
             let c = Benchmark::<Fr>::new(num_constraints);
-            generate_random_parameters::<Bls12_377, _, _>(c, rng)?
+            generate_random_parameters::<Bls12_377, _, _>(&c, rng)?
         };
 
         // Prepare the verification key (for proof verification)
@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Create an instance of our circuit (with the witness)
             let c = Benchmark::new(num_constraints);
             // Create a proof with our parameters.
-            create_random_proof(c, &params, rng)?
+            create_random_proof(&c, &params, rng)?
         };
 
         total_proving += start.elapsed();
