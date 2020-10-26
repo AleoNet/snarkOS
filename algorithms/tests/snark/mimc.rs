@@ -203,7 +203,7 @@ fn test_mimc_groth_16() {
         let xr = rng.gen();
         let image = mimc(xl, xr, &constants);
 
-        // proof_vec.truncate(0);
+        // proof_vec.clear();
 
         let start = Instant::now();
         {
@@ -290,7 +290,7 @@ fn test_mimc_groth_maller_17() {
         let xr = rng.gen();
         let image = mimc(xl, xr, &constants);
 
-        // proof_vec.truncate(0);
+        // proof_vec.clear();
 
         let start = Instant::now();
         {
