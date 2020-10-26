@@ -43,16 +43,16 @@ pub trait DPCScheme<L: LedgerScheme> {
     /// Returns the execution context required for program snark and DPC transaction generation.
     #[allow(clippy::too_many_arguments)]
     fn execute_offline<R: Rng>(
-        parameters: &Self::SystemParameters,
-        old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
+        parameters: Self::SystemParameters,
+        old_records: Vec<Self::Record>,
+        old_account_private_keys: Vec<<Self::Account as AccountScheme>::AccountPrivateKey>,
+        new_record_owners: Vec<<Self::Account as AccountScheme>::AccountAddress>,
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
-        new_payloads: &[Self::Payload],
-        new_birth_program_ids: &[Vec<u8>],
-        new_death_program_ids: &[Vec<u8>],
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        new_payloads: Vec<Self::Payload>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
+        memorandum: <Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self::ExecuteContext, DPCError>;

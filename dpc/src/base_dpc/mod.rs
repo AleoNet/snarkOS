@@ -44,7 +44,7 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 use rand::Rng;
 use std::marker::PhantomData;
 
@@ -292,14 +292,14 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
     #[allow(clippy::too_many_arguments)]
     pub fn generate_record<R: Rng>(
-        system_parameters: &SystemParameters<Components>,
-        sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        owner: &AccountAddress<Components>,
+        system_parameters: SystemParameters<Components>,
+        sn_nonce: <Components::SerialNumberNonceCRH as CRH>::Output,
+        owner: AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
-        payload: &RecordPayload,
-        birth_program_id: &[u8],
-        death_program_id: &[u8],
+        payload: RecordPayload,
+        birth_program_id: Vec<u8>,
+        death_program_id: Vec<u8>,
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
@@ -324,13 +324,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         )?;
 
         let record = DPCRecord {
-            owner: owner.clone(),
+            owner,
             is_dummy,
             value,
-            payload: payload.clone(),
-            birth_program_id: birth_program_id.to_vec(),
-            death_program_id: death_program_id.to_vec(),
-            serial_number_nonce: sn_nonce.clone(),
+            payload,
+            birth_program_id,
+            death_program_id,
+            serial_number_nonce: sn_nonce,
             commitment,
             commitment_randomness,
             _components: PhantomData,
@@ -436,16 +436,16 @@ where
     }
 
     fn execute_offline<R: Rng>(
-        parameters: &Self::SystemParameters,
-        old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
+        parameters: Self::SystemParameters,
+        old_records: Vec<Self::Record>,
+        old_account_private_keys: Vec<<Self::Account as AccountScheme>::AccountPrivateKey>,
+        new_record_owners: Vec<<Self::Account as AccountScheme>::AccountAddress>,
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
-        new_payloads: &[Self::Payload],
-        new_birth_program_ids: &[Vec<u8>],
-        new_death_program_ids: &[Vec<u8>],
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        new_payloads: Vec<Self::Payload>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
+        memorandum: <Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self::ExecuteContext, DPCError> {
@@ -487,7 +487,13 @@ where
         let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
         // Generate new records and commitments for them.
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
+        for (j, (new_record_owner, new_payload, new_death_program_id)) in
+            izip!(new_record_owners, new_payloads, new_death_program_ids).enumerate()
+        {
+            if j == Components::NUM_OUTPUT_RECORDS {
+                break;
+            }
+
             let output_record_time = start_timer!(|| format!("Process output record {}", j));
             let sn_nonce_time = start_timer!(|| "Generate serial number nonce");
 
@@ -500,14 +506,14 @@ where
             end_timer!(sn_nonce_time);
 
             let record = Self::generate_record(
-                parameters,
-                &sn_nonce,
-                &new_record_owners[j],
+                parameters.clone(),
+                sn_nonce,
+                new_record_owner,
                 new_is_dummy_flags[j],
                 new_values[j],
-                &new_payloads[j],
-                &new_birth_program_ids[j],
-                &new_death_program_ids[j],
+                new_payload,
+                new_birth_program_ids[j].clone(),
+                new_death_program_id,
                 rng,
             )?;
 
@@ -612,10 +618,10 @@ where
         }
 
         let context = ExecuteContext {
-            system_parameters: parameters.clone(),
+            system_parameters: parameters,
 
-            old_records: old_records.to_vec(),
-            old_account_private_keys: old_account_private_keys.to_vec(),
+            old_records,
+            old_account_private_keys,
             old_serial_numbers,
             old_randomizers,
 
@@ -633,7 +639,7 @@ where
             local_data_commitment_randomizers,
 
             value_balance,
-            memorandum: *memorandum,
+            memorandum,
             network_id,
         };
         Ok(context)

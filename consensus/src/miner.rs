@@ -96,7 +96,7 @@ impl Miner {
             storage.get_latest_block_height() + 1,
             transactions,
             parameters,
-            &program_vk_hash,
+            program_vk_hash,
             new_birth_programs,
             new_death_programs,
             self.address.clone(),
