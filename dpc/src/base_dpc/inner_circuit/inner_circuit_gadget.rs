@@ -1268,10 +1268,10 @@ where
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
 
         let mut old_record_commitment_bytes = vec![];
+        let mut input_bytes = vec![];
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
 
-            let mut input_bytes = vec![];
             input_bytes.extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
             input_bytes.extend_from_slice(
                 &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
@@ -1293,13 +1293,16 @@ where
 
             old_record_commitment_bytes
                 .extend_from_slice(&commitment.to_bytes(&mut cs.ns(|| "old_record_local_data"))?);
+
+            input_bytes.clear();
         }
+        drop(input_bytes);
 
         let mut new_record_commitment_bytes = Vec::new();
+        let mut input_bytes = vec![];
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
 
-            let mut input_bytes = vec![];
             input_bytes
                 .extend_from_slice(&new_record_commitments_gadgets[j].to_bytes(&mut cs.ns(|| "record_commitment"))?);
             input_bytes.extend_from_slice(&memo);
@@ -1319,7 +1322,10 @@ where
 
             new_record_commitment_bytes
                 .extend_from_slice(&commitment.to_bytes(&mut cs.ns(|| "new_record_local_data"))?);
+
+            input_bytes.clear();
         }
+        drop(input_bytes);
 
         let inner1_commitment_hash = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment inner1 hash"),
