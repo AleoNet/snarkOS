@@ -244,14 +244,6 @@ where
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
     PGadget: PRFGadget<P, C::InnerField>,
 {
-    let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
-    let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
-
-    let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
-
     // Order for allocation of input:
     // 1. account_commitment_parameters
     // 2. account_encryption_parameters
@@ -355,6 +347,11 @@ where
         &mut cs.ns(|| "Declare ledger digest"),
         || Ok(ledger_digest),
     )?;
+
+    let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
+    let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
 
     for (i, (((record, witness), account_private_key), given_serial_number)) in old_records
         .iter()
@@ -639,6 +636,9 @@ where
             )?;
         }
     }
+
+    let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
 
     for (
         j,
