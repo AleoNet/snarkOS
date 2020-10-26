@@ -63,11 +63,11 @@ pub struct OuterCircuit<C: BaseDPCComponents> {
 
 impl<C: BaseDPCComponents> OuterCircuit<C> {
     pub fn blank(
-        system_parameters: &SystemParameters<C>,
-        ledger_parameters: &C::MerkleParameters,
-        inner_snark_vk: &<C::InnerSNARK as SNARK>::VerificationParameters,
-        inner_snark_proof: &<C::InnerSNARK as SNARK>::Proof,
-        program_snark_vk_and_proof: &PrivateProgramInput,
+        system_parameters: SystemParameters<C>,
+        ledger_parameters: C::MerkleParameters,
+        inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters,
+        inner_snark_proof: <C::InnerSNARK as SNARK>::Proof,
+        program_snark_vk_and_proof: PrivateProgramInput,
     ) -> Self {
         let num_input_records = C::NUM_INPUT_RECORDS;
         let num_output_records = C::NUM_OUTPUT_RECORDS;
@@ -90,7 +90,7 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let network_id = Some(0);
 
         let old_private_program_inputs = Some(vec![program_snark_vk_and_proof.clone(); num_input_records]);
-        let new_private_program_inputs = Some(vec![program_snark_vk_and_proof.clone(); num_output_records]);
+        let new_private_program_inputs = Some(vec![program_snark_vk_and_proof; num_output_records]);
 
         let program_commitment = Some(<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output::default());
         let program_randomness = Some(<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness::default());
@@ -99,9 +99,9 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
         let inner_snark_id = Some(<C::InnerSNARKVerificationKeyCRH as CRH>::Output::default());
 
         Self {
-            system_parameters: Some(system_parameters.clone()),
+            system_parameters: Some(system_parameters),
 
-            ledger_parameters: Some(ledger_parameters.clone()),
+            ledger_parameters: Some(ledger_parameters),
             ledger_digest,
             old_serial_numbers,
             new_commitments,
@@ -110,8 +110,8 @@ impl<C: BaseDPCComponents> OuterCircuit<C> {
             value_balance,
             network_id,
 
-            inner_snark_vk: Some(inner_snark_vk.clone()),
-            inner_snark_proof: Some(inner_snark_proof.clone()),
+            inner_snark_vk: Some(inner_snark_vk),
+            inner_snark_proof: Some(inner_snark_proof),
 
             old_private_program_inputs,
             new_private_program_inputs,

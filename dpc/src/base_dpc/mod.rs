@@ -395,11 +395,11 @@ where
 
         let outer_snark_parameters = Components::OuterSNARK::setup(
             &OuterCircuit::blank(
-                &system_parameters,
-                ledger_parameters,
-                &inner_snark_vk,
-                &inner_snark_proof,
-                &program_snark_vk_and_proof,
+                system_parameters.clone(),
+                ledger_parameters.clone(),
+                inner_snark_vk,
+                inner_snark_proof,
+                program_snark_vk_and_proof,
             ),
             rng,
         )?;
