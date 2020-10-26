@@ -589,14 +589,12 @@ where
                 &given_serial_number_gadget,
             )?;
 
-            old_serial_numbers_gadgets.push(candidate_serial_number_gadget.clone());
-
             // Convert input serial numbers to bytes
-            {
-                let bytes = candidate_serial_number_gadget
-                    .to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
-                old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
-            }
+            let bytes = candidate_serial_number_gadget
+                .to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
+            old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
+
+            old_serial_numbers_gadgets.push(candidate_serial_number_gadget);
 
             serial_number_nonce_bytes
         };
