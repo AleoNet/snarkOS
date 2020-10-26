@@ -20,7 +20,7 @@ hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.2.0" }
 rocksdb = { version = "0.15.0", optional = true }
 thiserror = { version = "1.0" }
-toml = { version = "0.5.6" }
+toml = { version = "0.5.7" }
 
 [dev-dependencies]
 curl = { version = "0.4.33" }
