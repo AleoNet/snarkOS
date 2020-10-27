@@ -14,15 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    base_dpc::{
-        inner_circuit_gadget::execute_inner_proof_gadget,
-        parameters::SystemParameters,
-        record::DPCRecord,
-        record_encryption::RecordEncryptionGadgetComponents,
-        BaseDPCComponents,
-    },
-    Assignment,
+use crate::base_dpc::{
+    inner_circuit_gadget::execute_inner_proof_gadget,
+    parameters::SystemParameters,
+    record::DPCRecord,
+    record_encryption::RecordEncryptionGadgetComponents,
+    BaseDPCComponents,
 };
 use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
@@ -36,39 +33,39 @@ use snarkos_objects::{AccountPrivateKey, AleoAmount};
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]
 pub struct InnerCircuit<C: BaseDPCComponents> {
     // Parameters
-    system_parameters: Option<SystemParameters<C>>,
-    ledger_parameters: Option<C::MerkleParameters>,
+    system_parameters: SystemParameters<C>,
+    ledger_parameters: C::MerkleParameters,
 
-    ledger_digest: Option<MerkleTreeDigest<C::MerkleParameters>>,
+    ledger_digest: MerkleTreeDigest<C::MerkleParameters>,
 
     // Inputs for old records.
-    old_records: Option<Vec<DPCRecord<C>>>,
-    old_witnesses: Option<Vec<MerklePath<C::MerkleParameters>>>,
-    old_account_private_keys: Option<Vec<AccountPrivateKey<C>>>,
-    old_serial_numbers: Option<Vec<<C::AccountSignature as SignatureScheme>::PublicKey>>,
+    old_records: Vec<DPCRecord<C>>,
+    old_witnesses: Vec<MerklePath<C::MerkleParameters>>,
+    old_account_private_keys: Vec<AccountPrivateKey<C>>,
+    old_serial_numbers: Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
 
     // Inputs for new records.
-    new_records: Option<Vec<DPCRecord<C>>>,
-    new_serial_number_nonce_randomness: Option<Vec<[u8; 32]>>,
-    new_commitments: Option<Vec<<C::RecordCommitment as CommitmentScheme>::Output>>,
+    new_records: Vec<DPCRecord<C>>,
+    new_serial_number_nonce_randomness: Vec<[u8; 32]>,
+    new_commitments: Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
 
     // Inputs for encryption of new records.
-    new_records_encryption_randomness: Option<Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>>,
-    new_records_encryption_gadget_components: Option<Vec<RecordEncryptionGadgetComponents<C>>>,
-    new_encrypted_record_hashes: Option<Vec<<C::EncryptedRecordCRH as CRH>::Output>>,
+    new_records_encryption_randomness: Vec<<C::AccountEncryption as EncryptionScheme>::Randomness>,
+    new_records_encryption_gadget_components: Vec<RecordEncryptionGadgetComponents<C>>,
+    new_encrypted_record_hashes: Vec<<C::EncryptedRecordCRH as CRH>::Output>,
 
     // Commitment to Programs and to local data.
-    program_commitment: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output>,
-    program_randomness: Option<<C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness>,
+    program_commitment: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Output,
+    program_randomness: <C::ProgramVerificationKeyCommitment as CommitmentScheme>::Randomness,
 
-    local_data_root: Option<<C::LocalDataCRH as CRH>::Output>,
-    local_data_commitment_randomizers: Option<Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>>,
+    local_data_root: <C::LocalDataCRH as CRH>::Output,
+    local_data_commitment_randomizers: Vec<<C::LocalDataCommitment as CommitmentScheme>::Randomness>,
 
-    memo: Option<[u8; 32]>,
+    memo: [u8; 32],
 
-    value_balance: Option<AleoAmount>,
+    value_balance: AleoAmount,
 
-    network_id: Option<u8>,
+    network_id: u8,
 }
 
 impl<C: BaseDPCComponents> InnerCircuit<C> {
@@ -112,37 +109,35 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            system_parameters: Some(system_parameters.clone()),
-            ledger_parameters: Some(ledger_parameters.clone()),
+            system_parameters: system_parameters.clone(),
+            ledger_parameters: ledger_parameters.clone(),
 
             // Digest
-            ledger_digest: Some(digest),
+            ledger_digest: digest,
 
             // Input records
-            old_records: Some(old_records),
-            old_witnesses: Some(old_witnesses),
-            old_account_private_keys: Some(old_account_private_keys),
-            old_serial_numbers: Some(old_serial_numbers),
+            old_records,
+            old_witnesses,
+            old_account_private_keys,
+            old_serial_numbers,
 
             // Output records
-            new_records: Some(new_records),
-            new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness),
-            new_commitments: Some(new_commitments),
+            new_records,
+            new_serial_number_nonce_randomness,
+            new_commitments,
 
-            new_records_encryption_randomness: Some(new_records_encryption_randomness),
-            new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components),
-            new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
+            new_records_encryption_randomness,
+            new_records_encryption_gadget_components,
+            new_encrypted_record_hashes,
 
             // Other stuff
-            program_commitment: Some(program_commitment),
-            program_randomness: Some(program_randomness),
-            local_data_root: Some(local_data_root),
-            local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
-            memo: Some(memo),
-
-            value_balance: Some(value_balance),
-
-            network_id: Some(network_id),
+            program_commitment,
+            program_randomness,
+            local_data_root,
+            local_data_commitment_randomizers,
+            memo,
+            value_balance,
+            network_id,
         }
     }
 
@@ -215,39 +210,35 @@ impl<C: BaseDPCComponents> InnerCircuit<C> {
 
         Self {
             // Parameters
-            system_parameters: Some(system_parameters),
-            ledger_parameters: Some(ledger_parameters),
+            system_parameters,
+            ledger_parameters,
 
             // Digest
-            ledger_digest: Some(ledger_digest),
+            ledger_digest,
 
             // Input records
-            old_records: Some(old_records),
-            old_witnesses: Some(old_witnesses),
-            old_account_private_keys: Some(old_account_private_keys),
-            old_serial_numbers: Some(old_serial_numbers),
+            old_records,
+            old_witnesses,
+            old_account_private_keys,
+            old_serial_numbers,
 
             // Output records
-            new_records: Some(new_records),
-            new_serial_number_nonce_randomness: Some(new_serial_number_nonce_randomness),
-            new_commitments: Some(new_commitments),
+            new_records,
+            new_serial_number_nonce_randomness,
+            new_commitments,
 
-            new_records_encryption_randomness: Some(new_records_encryption_randomness),
-            new_records_encryption_gadget_components: Some(new_records_encryption_gadget_components),
-            new_encrypted_record_hashes: Some(new_encrypted_record_hashes),
+            new_records_encryption_randomness,
+            new_records_encryption_gadget_components,
+            new_encrypted_record_hashes,
 
             // Other stuff
-            program_commitment: Some(program_commitment),
-            program_randomness: Some(program_randomness),
-
-            local_data_root: Some(local_data_root),
-            local_data_commitment_randomizers: Some(local_data_commitment_randomizers),
-
-            memo: Some(memo),
-
-            value_balance: Some(value_balance),
-
-            network_id: Some(network_id),
+            program_commitment,
+            program_randomness,
+            local_data_root,
+            local_data_commitment_randomizers,
+            memo,
+            value_balance,
+            network_id,
         }
     }
 }
@@ -257,30 +248,30 @@ impl<C: BaseDPCComponents> ConstraintSynthesizer<C::InnerField> for InnerCircuit
         execute_inner_proof_gadget::<C, CS>(
             cs,
             // Parameters
-            self.system_parameters.get()?,
-            self.ledger_parameters.get()?,
+            &self.system_parameters,
+            &self.ledger_parameters,
             // Digest
-            self.ledger_digest.get()?,
+            &self.ledger_digest,
             // Old records
-            self.old_records.get()?,
-            self.old_witnesses.get()?,
-            self.old_account_private_keys.get()?,
-            self.old_serial_numbers.get()?,
+            &self.old_records,
+            &self.old_witnesses,
+            &self.old_account_private_keys,
+            &self.old_serial_numbers,
             // New records
-            self.new_records.get()?,
-            self.new_serial_number_nonce_randomness.get()?,
-            self.new_commitments.get()?,
-            self.new_records_encryption_randomness.get()?,
-            self.new_records_encryption_gadget_components.get()?,
-            self.new_encrypted_record_hashes.get()?,
+            &self.new_records,
+            &self.new_serial_number_nonce_randomness,
+            &self.new_commitments,
+            &self.new_records_encryption_randomness,
+            &self.new_records_encryption_gadget_components,
+            &self.new_encrypted_record_hashes,
             // Other stuff
-            self.program_commitment.get()?,
-            self.program_randomness.get()?,
-            self.local_data_root.get()?,
-            self.local_data_commitment_randomizers.get()?,
-            self.memo.get()?,
-            *self.value_balance.get()?,
-            *self.network_id.get()?,
+            &self.program_commitment,
+            &self.program_randomness,
+            &self.local_data_root,
+            &self.local_data_commitment_randomizers,
+            &self.memo,
+            self.value_balance,
+            self.network_id,
         )?;
         Ok(())
     }
