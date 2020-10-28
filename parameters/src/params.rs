@@ -84,10 +84,10 @@ macro_rules! impl_params_remote {
 
                 let buffer = if relative_path.exists() {
                     // Attempts to load the parameter file locally with a relative path.
-                    fs::read(relative_path)?.to_vec()
+                    fs::read(relative_path)?
                 } else if absolute_path.exists() {
                     // Attempts to load the parameter file locally with an absolute path.
-                    fs::read(absolute_path)?.to_vec()
+                    fs::read(absolute_path)?
                 } else {
                     // Downloads the missing parameters and stores it in the local directory for use.
                     eprintln!(
