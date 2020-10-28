@@ -19,7 +19,7 @@ use snarkos_algorithms::crh::double_sha256;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MerkleTreeRootHash([u8; 32]);
 
-fn merkle_round(hashes: &[Vec<u8>]) -> Vec<Vec<u8>> {
+fn merkle_round(hashes: &[[u8; 32]]) -> Vec<[u8; 32]> {
     let mut ret_len = hashes.len() / 2;
     if hashes.len() % 2 == 1 {
         ret_len += 1;
@@ -29,8 +29,8 @@ fn merkle_round(hashes: &[Vec<u8>]) -> Vec<Vec<u8>> {
     // Duplicates the last element if there are an odd number of leaves
     for arr in hashes.chunks(2) {
         match arr {
-            [h1, h2] => ret.push(merkle_hash(&h1, &h2)),
-            [h] => ret.push(merkle_hash(&h, &h)),
+            [h1, h2] => ret.push(merkle_hash(&h1[..], &h2[..])),
+            [h] => ret.push(merkle_hash(&h[..], &h[..])),
             _ => unreachable!(),
         }
     }
@@ -40,20 +40,20 @@ fn merkle_round(hashes: &[Vec<u8>]) -> Vec<Vec<u8>> {
 
 /// Calculates a Merkle root and also returns the subroots at a desired depth. If the tree is too
 /// shallow to have subroots at that depth, returns the root as a single subroot.
-pub fn merkle_root_with_subroots(hashes: &[Vec<u8>], subroots_depth: usize) -> (Vec<u8>, Vec<Vec<u8>>) {
+pub fn merkle_root_with_subroots(hashes: &[[u8; 32]], subroots_depth: usize) -> ([u8; 32], Vec<[u8; 32]>) {
     merkle_root_with_subroots_inner(hashes, &[], subroots_depth)
 }
 
 fn merkle_root_with_subroots_inner(
-    hashes: &[Vec<u8>],
-    subroots: &[Vec<u8>],
+    hashes: &[[u8; 32]],
+    subroots: &[[u8; 32]],
     subroots_depth: usize,
-) -> (Vec<u8>, Vec<Vec<u8>>) {
+) -> ([u8; 32], Vec<[u8; 32]>) {
     if hashes.len() == 1 {
         // Tree was too shallow.
-        let root = hashes[0].clone();
+        let root = hashes[0];
         let subroots = if subroots.is_empty() {
-            vec![root.clone()]
+            vec![root]
         } else {
             subroots.to_vec()
         };
@@ -69,9 +69,9 @@ fn merkle_root_with_subroots_inner(
 }
 
 /// Calculates the root of the Merkle tree
-pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
+pub fn merkle_root(hashes: &[[u8; 32]]) -> [u8; 32] {
     if hashes.len() == 1 {
-        return hashes[0].clone();
+        return hashes[0];
     }
 
     let result = merkle_round(hashes);
@@ -80,7 +80,7 @@ pub fn merkle_root(hashes: &[Vec<u8>]) -> Vec<u8> {
 }
 
 /// Calculate the Merkle tree hash by concatenating the left and right children nodes.
-pub fn merkle_hash(left: &[u8], right: &[u8]) -> Vec<u8> {
+pub fn merkle_hash(left: &[u8], right: &[u8]) -> [u8; 32] {
     let mut result = [0u8; 64];
     result[0..32].copy_from_slice(&left);
     result[32..64].copy_from_slice(&right);
@@ -90,6 +90,7 @@ pub fn merkle_hash(left: &[u8], right: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::merkle_root;
+    use std::convert::TryInto;
 
     // block 80_000
     // https://blockchain.info/block/000000000043a8c0fd1d6f726790caa2a406010d19efd2780db27bdbbd93baf6
@@ -101,12 +102,12 @@ mod tests {
         tx1.reverse();
         tx2.reverse();
 
-        let result = merkle_root(&[tx1, tx2]);
+        let result = merkle_root(&[tx1.as_slice().try_into().unwrap(), tx2.as_slice().try_into().unwrap()]);
 
         let mut expected = hex::decode("8fb300e3fdb6f30a4c67233b997f99fdd518b968b9a3fd65857bfe78b2600719").unwrap();
         expected.reverse();
 
-        assert_eq!(result, expected);
+        assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
@@ -117,12 +118,11 @@ mod tests {
         let tx4 = hex::decode("6bf5d2e02b8432d825c5dff692d435b6c5f685d94efa6b3d8fb818f2ecdcfb66").unwrap();
         let tx5 = hex::decode("8a5ad423bc54fb7c76718371fd5a73b8c42bf27beaf2ad448761b13bcafb8895").unwrap();
 
-        let vec: Vec<Vec<u8>> = vec![tx1, tx2, tx3, tx4, tx5]
-            .iter()
+        let vec: Vec<_> = vec![tx1, tx2, tx3, tx4, tx5]
+            .iter_mut()
             .map(|tx| {
-                let mut tx = tx.clone();
                 tx.reverse();
-                tx
+                tx.as_slice().try_into().unwrap()
             })
             .collect();
 
@@ -131,6 +131,6 @@ mod tests {
         let mut expected = hex::decode("3a432cd416ea05b1be4ec1e72d7952d08670eaa5505b6794a186ddb253aa62e6").unwrap();
         expected.reverse();
 
-        assert_eq!(result, expected);
+        assert_eq!(&result[..], &expected[..]);
     }
 }
