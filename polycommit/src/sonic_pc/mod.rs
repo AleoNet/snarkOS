@@ -602,10 +602,9 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
             lc_info.push((lc_label, degree_bound));
         }
 
-        let comms: Vec<Self::Commitment> = E::G1Projective::batch_normalization_into_affine(lc_commitments)
+        let comms = E::G1Projective::batch_normalization_into_affine(lc_commitments)
             .into_iter()
-            .map(kzg10::Commitment)
-            .collect();
+            .map(kzg10::Commitment);
 
         let lc_commitments = lc_info
             .into_iter()
