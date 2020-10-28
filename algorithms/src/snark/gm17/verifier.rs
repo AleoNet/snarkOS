@@ -32,7 +32,6 @@ pub fn prepare_verifying_key<E: PairingEngine>(vk: &VerifyingKey<E>) -> Prepared
         g_gamma_pc: vk.g_gamma_g1.prepare(),
         h_gamma_pc: vk.h_gamma_g2.prepare(),
         h_pc: vk.h_g2.prepare(),
-        query: vk.query.clone(),
     }
 }
 
@@ -41,15 +40,15 @@ pub fn verify_proof<E: PairingEngine>(
     proof: &Proof<E>,
     public_inputs: &[E::Fr],
 ) -> Result<bool, SynthesisError> {
-    if (public_inputs.len() + 1) != pvk.query.len() {
+    if (public_inputs.len() + 1) != pvk.query().len() {
         return Err(SynthesisError::MalformedVerifyingKey);
     }
 
     // e(A*G^{alpha}, B*H^{beta}) = e(G^{alpha}, H^{beta}) * e(G^{psi}, H^{gamma}) *
     // e(C, H) where psi = \sum_{i=0}^l input_i pvk.query[i]
 
-    let mut g_psi = pvk.query[0].into_projective();
-    for (i, b) in public_inputs.iter().zip(pvk.query.iter().skip(1)) {
+    let mut g_psi = pvk.query()[0].into_projective();
+    for (i, b) in public_inputs.iter().zip(pvk.query().iter().skip(1)) {
         g_psi.add_assign(&b.mul(i.into_repr()));
     }
 
