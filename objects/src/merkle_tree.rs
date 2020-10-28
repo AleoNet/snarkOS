@@ -20,21 +20,22 @@ use snarkos_algorithms::crh::double_sha256;
 pub struct MerkleTreeRootHash([u8; 32]);
 
 fn merkle_round(hashes: &[Vec<u8>]) -> Vec<Vec<u8>> {
-    let mut pairs = Vec::with_capacity(hashes.len() / 2);
-
-    for i in (0..hashes.len() - 1).step_by(2) {
-        pairs.push((&hashes[i], &hashes[i + 1]));
-    }
-
-    // Duplicate the last element if there are an odd number of leaves
+    let mut ret_len = hashes.len() / 2;
     if hashes.len() % 2 == 1 {
-        let last = &hashes[hashes.len() - 1];
-        pairs.push((last, last));
+        ret_len += 1;
+    };
+    let mut ret = Vec::with_capacity(ret_len);
+
+    // Duplicates the last element if there are an odd number of leaves
+    for arr in hashes.chunks(2) {
+        match arr {
+            [h1, h2] => ret.push(merkle_hash(&h1, &h2)),
+            [h] => ret.push(merkle_hash(&h, &h)),
+            _ => unreachable!(),
+        }
     }
 
-    let result: Vec<Vec<u8>> = pairs.iter().map(|x| merkle_hash(x.0, x.1)).collect();
-
-    result
+    ret
 }
 
 /// Calculates a Merkle root and also returns the subroots at a desired depth. If the tree is too
