@@ -21,7 +21,7 @@ use snarkos_models::parameters::Parameters;
 use std::{
     fs::{self, File},
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 #[cfg(any(test, feature = "remote"))]
@@ -76,7 +76,7 @@ macro_rules! impl_params_remote {
                 file_path.push(&filename);
 
                 // Compute the relative path.
-                let relative_path = file_path.strip_prefix("parameters")?.to_path_buf();
+                let relative_path = file_path.strip_prefix("parameters")?;
 
                 // Compute the absolute path.
                 let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -151,9 +151,9 @@ macro_rules! impl_params_remote {
 
             fn store_bytes(
                 buffer: &[u8],
-                relative_path: &PathBuf,
-                absolute_path: &PathBuf,
-                file_path: &PathBuf,
+                relative_path: &Path,
+                absolute_path: &Path,
+                file_path: &Path,
             ) -> Result<(), ParametersError> {
                 println!("{} - Storing parameters ({:?})", module_path!(), file_path);
                 // Attempt to write the parameter buffer to a file.
