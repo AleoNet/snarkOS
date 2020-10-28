@@ -159,10 +159,8 @@ macro_rules! impl_params_remote {
                 // Attempt to write the parameter buffer to a file.
                 if let Ok(mut file) = File::create(relative_path) {
                     file.write_all(&buffer)?;
-                    drop(file);
                 } else if let Ok(mut file) = File::create(absolute_path) {
                     file.write_all(&buffer)?;
-                    drop(file);
                 }
                 Ok(())
             }
