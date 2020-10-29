@@ -65,6 +65,7 @@ pub enum NetworkError {
     PeerWasNotSetToConnecting,
     PingProtocolError(PingProtocolError),
     ReceiveHandlerAlreadySetPeerSender,
+    ReceiveHandlerMissingPeerManager,
     ReceiveHandlerMissingPeerSender,
     SendError(SendError),
     SendHandlerPendingRequestsMissing,
@@ -174,7 +175,7 @@ pub struct Server {
 impl Server {
     /// Creates a new instance of `Server`.
     // pub fn new(environment: &mut Environment, sync_manager: Arc<Mutex<SyncManager>>) -> Self {
-    pub fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
+    pub async fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
         // Create a send handler.
         let send_handler = SendHandler::new();
         // Create a receive handler.
@@ -183,7 +184,7 @@ impl Server {
         let (sender, receiver) = mpsc::channel(1024);
 
         let peer_manager = PeerManager::new(environment, send_handler.clone(), receive_handler.clone())?;
-        peer_manager.initialize();
+        peer_manager.initialize().await?;
 
         environment.set_managers(peer_manager.clone());
 

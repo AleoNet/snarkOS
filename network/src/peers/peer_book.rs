@@ -298,7 +298,7 @@ impl PeerBook {
         // Check if the peer is a connecting peer.
         if self.is_connecting(address) {
             // Fetch the peer info of the given address.
-            let mut peer_info = self
+            let peer_info = self
                 .connecting_peers
                 .get_mut(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?;
@@ -312,7 +312,7 @@ impl PeerBook {
         // Check if the peer is a connected peer.
         if self.is_connected(address) {
             // Fetch the peer info of the given address.
-            let mut peer_info = self
+            let peer_info = self
                 .connected_peers
                 .get_mut(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?;
@@ -326,7 +326,7 @@ impl PeerBook {
         // Check if the peer is a known disconnected peer.
         if self.is_disconnected(address) {
             // Fetch the peer info of the given address.
-            let mut peer_info = self
+            let peer_info = self
                 .disconnected_peers
                 .get_mut(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?;
