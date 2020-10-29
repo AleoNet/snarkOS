@@ -204,6 +204,6 @@ mod test {
         ]]
         .concat();
 
-        assert!(verify_proof(&prepare_verifying_key(&params.vk), &proof, &inputs,).unwrap());
+        assert!(verify_proof(&prepare_verifying_key(params.vk), &proof, &inputs,).unwrap());
     }
 }
