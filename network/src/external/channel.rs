@@ -100,7 +100,7 @@ impl Channel {
 
     /// Writes a message header + message.
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
-        debug!("Message {:?}, Sent to {:?}", M::name().to_string(), self.remote_address);
+        debug!("Send {:?} message to {:?}", M::name().to_string(), self.remote_address);
 
         let serialized = message.serialize()?;
         let header = MessageHeader::new(M::name(), serialized.len() as u32);
@@ -116,11 +116,7 @@ impl Channel {
     pub async fn read(&self) -> Result<(MessageName, Vec<u8>), ConnectError> {
         let header = read_header(&mut *self.reader.lock().await).await?;
 
-        debug!(
-            "Message {:?}, Received from {:?}",
-            header.name.to_string(),
-            self.remote_address
-        );
+        debug!("Received {} message from {:?}", header.name, self.remote_address);
 
         Ok((
             header.name,

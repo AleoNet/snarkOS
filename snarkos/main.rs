@@ -44,6 +44,7 @@ fn initialize_logger(config: &Config) {
             match verbosity {
                 1 => std::env::set_var("RUST_LOG", "trace"),
                 2 => std::env::set_var("RUST_LOG", "debug"),
+                3 => std::env::set_var("RUST_LOG", "trace"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
 
@@ -101,7 +102,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
     info!("Loading complete.");
 
-    // Fetch the valid inner snark ids
+    // Fetch the set of valid inner circuit IDs.
     let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
         parameters.inner_snark_parameters.1.clone().into();
     let inner_snark_id = parameters
@@ -110,7 +111,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         .hash(&to_bytes![inner_snark_vk]?)?;
 
     let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
-    info!("Hello?");
 
     // Set the initial consensus parameters.
     let consensus = ConsensusParameters {
@@ -136,7 +136,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.node.is_bootnode,
         config.miner.is_miner,
     )?;
-    info!("Hello?");
 
     // let mut environment = Arc::new(Environment::new(
     //     socket_address,
@@ -175,7 +174,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // let sync_manager = Arc::new(Mutex::new(SyncManager::new(environment, bootnode)));
 
     // Construct the server instance. Note this does not start the server.
-    let server = Server::new(&mut environment);
+    let server = Server::new(&mut environment)?;
     // let server = Server::new(
     //     environment,
     //     consensus.clone(),
