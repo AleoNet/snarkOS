@@ -92,8 +92,9 @@ fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
 
     match ast.data {
         Data::Struct(ref data_struct) => {
+            let mut idents = Vec::<IdentOrIndex>::new();
+
             for (i, field) in data_struct.fields.iter().enumerate() {
-                let mut idents = Vec::<IdentOrIndex>::new();
                 match field.ident {
                     None => {
                         let index = Index::from(i);
@@ -112,6 +113,8 @@ fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
                     &mut idents,
                     &field.ty,
                 );
+
+                idents.clear();
             }
         }
         _ => panic!("Serialize can only be derived for structs, {} is not a struct", name),
