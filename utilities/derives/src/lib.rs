@@ -25,12 +25,26 @@ pub fn derive_canonical_serialize(input: proc_macro::TokenStream) -> proc_macro:
     proc_macro::TokenStream::from(impl_canonical_serialize(&ast))
 }
 
+enum IdentOrIndex {
+    Ident(proc_macro2::Ident),
+    Index(Index),
+}
+
+impl ToTokens for IdentOrIndex {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Ident(ident) => ident.to_tokens(tokens),
+            Self::Index(index) => index.to_tokens(tokens),
+        }
+    }
+}
+
 fn impl_serialize_field(
     serialize_body: &mut Vec<TokenStream>,
     serialized_size_body: &mut Vec<TokenStream>,
     serialize_uncompressed_body: &mut Vec<TokenStream>,
     uncompressed_size_body: &mut Vec<TokenStream>,
-    idents: &mut Vec<Box<dyn ToTokens>>,
+    idents: &mut Vec<IdentOrIndex>,
     ty: &Type,
 ) {
     // Check if type is a tuple.
@@ -38,7 +52,7 @@ fn impl_serialize_field(
         Type::Tuple(tuple) => {
             for (i, elem_ty) in tuple.elems.iter().enumerate() {
                 let index = Index::from(i);
-                idents.push(Box::new(index));
+                idents.push(IdentOrIndex::Index(index));
                 impl_serialize_field(
                     serialize_body,
                     serialized_size_body,
@@ -79,14 +93,14 @@ fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
     match ast.data {
         Data::Struct(ref data_struct) => {
             for (i, field) in data_struct.fields.iter().enumerate() {
-                let mut idents = Vec::<Box<dyn ToTokens>>::new();
+                let mut idents = Vec::<IdentOrIndex>::new();
                 match field.ident {
                     None => {
                         let index = Index::from(i);
-                        idents.push(Box::new(index));
+                        idents.push(IdentOrIndex::Index(index));
                     }
                     Some(ref ident) => {
-                        idents.push(Box::new(ident.clone()));
+                        idents.push(IdentOrIndex::Ident(ident.clone()));
                     }
                 }
 
