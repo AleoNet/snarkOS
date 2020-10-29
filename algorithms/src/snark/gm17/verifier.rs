@@ -23,15 +23,22 @@ use std::{
     ops::{AddAssign, MulAssign, Neg},
 };
 
-pub fn prepare_verifying_key<E: PairingEngine>(vk: &VerifyingKey<E>) -> PreparedVerifyingKey<E> {
+pub fn prepare_verifying_key<E: PairingEngine>(vk: VerifyingKey<E>) -> PreparedVerifyingKey<E> {
+    let g_alpha = vk.g_alpha_g1;
+    let h_beta = vk.h_beta_g2;
+    let g_alpha_h_beta_ml = E::miller_loop(iter::once((&g_alpha.prepare(), &h_beta.prepare())));
+    let g_gamma_pc = vk.g_gamma_g1.prepare();
+    let h_gamma_pc = vk.h_gamma_g2.prepare();
+    let h_pc = vk.h_g2.prepare();
+
     PreparedVerifyingKey {
-        vk: vk.clone(),
-        g_alpha: vk.g_alpha_g1,
-        h_beta: vk.h_beta_g2,
-        g_alpha_h_beta_ml: E::miller_loop(iter::once((&vk.g_alpha_g1.prepare(), &vk.h_beta_g2.prepare()))),
-        g_gamma_pc: vk.g_gamma_g1.prepare(),
-        h_gamma_pc: vk.h_gamma_g2.prepare(),
-        h_pc: vk.h_g2.prepare(),
+        vk,
+        g_alpha,
+        h_beta,
+        g_alpha_h_beta_ml,
+        g_gamma_pc,
+        h_gamma_pc,
+        h_pc,
     }
 }
 
