@@ -86,7 +86,7 @@ impl PeerManager {
         let (peer_sender, peer_receiver) = (Arc::new(RwLock::new(sender)), Arc::new(receiver));
 
         // Initialize the peer sender with the receive handler.
-        receive_handler.initialize(peer_sender.clone());
+        receive_handler.initialize(peer_sender.clone())?;
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());

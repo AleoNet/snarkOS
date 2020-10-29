@@ -118,16 +118,18 @@ impl ReceiveHandler {
     ///
     #[inline]
     pub fn initialize(&mut self, peer_sender: Arc<RwLock<PeerSender>>) -> Result<(), NetworkError> {
+        debug!("Initializing receive handler with a peer sender");
+
         // Check that the peer sender has not already been initialized.
         if self.peer_sender.is_some() {
-            trace!("Peer sender was already set with the receive handler");
+            error!("Peer sender was already set with the receive handler");
             return Err(NetworkError::ReceiveHandlerAlreadySetPeerSender);
         }
 
         // Set the peer sender in this receive handler.
         self.peer_sender = Some(peer_sender);
 
-        trace!("Initialized the peer sender with the receive handler");
+        debug!("Initialized receive handler with a peer sender {:?}", self.peer_sender);
         Ok(())
     }
 
@@ -146,7 +148,7 @@ impl ReceiveHandler {
         // TODO (howardwu): Remove this peer manager instance for this function.
         let peer_manager = match environment.peer_manager {
             Some(ref peer_manager) => peer_manager.clone(),
-            _ => return Err(NetworkError::ReceiveHandlerMissingPeerSender),
+            _ => return Err(NetworkError::ReceiveHandlerMissingPeerManager),
         };
 
         // TODO (howardwu): Find the actual address of this node.
@@ -247,7 +249,7 @@ impl ReceiveHandler {
                 // TODO (raychu86) Establish a formal node version
                 if let Some((channel, discovered_local_address, version_message)) = self
                     // if let Some((handshake, discovered_local_address, version_message)) = self
-                        .receive_connection_request(&environment, 1u64, height, remote_address, channel)
+                        .receive_connection_request(1u64, height, remote_address, channel)
                         .await.unwrap()
                 {
                     // TODO (howardwu): Enable this peer address discovery again.
@@ -967,7 +969,7 @@ impl ReceiveHandler {
 
         if *environment.local_address() != peer_address {
             if peer_manager.number_of_connected_peers().await < environment.maximum_number_of_peers() {
-                self.receive_request(environment, message.clone(), peer_address).await;
+                self.receive_request(message.clone(), peer_address).await;
             }
 
             // If our peer has a longer chain, send a sync message
@@ -1027,7 +1029,6 @@ impl ReceiveHandler {
     #[inline]
     pub async fn receive_connection_request(
         &self,
-        environment: &Environment,
         version: u64,
         block_height: u32,
         remote_address: SocketAddr,
@@ -1169,12 +1170,7 @@ impl ReceiveHandler {
     /// Receives a handshake request from a connected peer.
     /// Updates the handshake channel address, if needed.
     /// Sends a handshake response back to the connected peer.
-    pub async fn receive_request(
-        &self,
-        environment: &Environment,
-        message: Version,
-        remote_address: SocketAddr,
-    ) -> bool {
+    pub async fn receive_request(&self, message: Version, remote_address: SocketAddr) -> bool {
         // ORIGINAL CODE
 
         // match environment.handshakes().write().await.get_mut(&remote_address) {

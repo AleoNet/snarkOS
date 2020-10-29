@@ -174,7 +174,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // let sync_manager = Arc::new(Mutex::new(SyncManager::new(environment, bootnode)));
 
     // Construct the server instance. Note this does not start the server.
-    let server = Server::new(&mut environment)?;
+    let server = Server::new(&mut environment).await?;
     // let server = Server::new(
     //     environment,
     //     consensus.clone(),

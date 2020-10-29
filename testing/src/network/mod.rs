@@ -43,8 +43,8 @@ pub async fn sleep(time: u64) {
     tokio::time::delay_for(std::time::Duration::from_millis(time)).await;
 }
 
-/// Returns a server struct with given argumnets
-pub fn initialize_test_server(
+/// Returns a server struct with given arguments
+pub async fn initialize_test_server(
     server_address: SocketAddr,
     bootnode_address: SocketAddr,
     storage: Arc<RwLock<MerkleTreeLedger>>,
@@ -82,6 +82,7 @@ pub fn initialize_test_server(
         // sync_handler_lock,
         // connection_frequency,
     )
+    .await?
 }
 
 /// Starts a server on a new thread. Takes full ownership of server.
