@@ -20,12 +20,16 @@ use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeFiel
 
 use core::ops::{AddAssign, Neg};
 
-pub fn prepare_verifying_key<E: PairingEngine>(vk: &VerifyingKey<E>) -> PreparedVerifyingKey<E> {
+pub fn prepare_verifying_key<E: PairingEngine>(vk: VerifyingKey<E>) -> PreparedVerifyingKey<E> {
+    let alpha_g1_beta_g2 = E::pairing(vk.alpha_g1, vk.beta_g2);
+    let gamma_g2_neg_pc = vk.gamma_g2.neg().prepare();
+    let delta_g2_neg_pc = vk.delta_g2.neg().prepare();
+
     PreparedVerifyingKey {
-        vk: vk.clone(),
-        alpha_g1_beta_g2: E::pairing(vk.alpha_g1, vk.beta_g2),
-        gamma_g2_neg_pc: vk.gamma_g2.neg().prepare(),
-        delta_g2_neg_pc: vk.delta_g2.neg().prepare(),
+        vk,
+        alpha_g1_beta_g2,
+        gamma_g2_neg_pc,
+        delta_g2_neg_pc,
     }
 }
 

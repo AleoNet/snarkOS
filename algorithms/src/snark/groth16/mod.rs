@@ -351,13 +351,13 @@ impl<E: PairingEngine> PreparedVerifyingKey<E> {
 
 impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
     fn from(other: Parameters<E>) -> Self {
-        prepare_verifying_key(&other.vk)
+        prepare_verifying_key(other.vk)
     }
 }
 
 impl<E: PairingEngine> From<VerifyingKey<E>> for PreparedVerifyingKey<E> {
     fn from(other: VerifyingKey<E>) -> Self {
-        prepare_verifying_key(&other)
+        prepare_verifying_key(other)
     }
 }
 
