@@ -30,7 +30,7 @@ hex = { version = "0.4.2" }
 log = { version = "0.4.11" }
 rand = { version = "0.7.3" }
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "0.2.22", features = ["full"] }
+tokio = { version = "0.3", features = ["full"] }
 tracing = { version = "0.1.19" }
 
 [dev-dependencies]

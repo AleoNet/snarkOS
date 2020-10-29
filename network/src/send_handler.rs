@@ -43,7 +43,7 @@ pub struct SendHandler {
     /// The map of remote addresses to their pending requests.
     pending: Arc<RwLock<PendingRequests>>,
     /// The map of remote addresses to their completed requests.
-    complete: HashMap<SocketAddr, Requests>,
+    complete: Arc<RwLock<HashMap<SocketAddr, Requests>>>,
     /// The counter for the number of send requests the handler processes.
     send_request_count: Arc<AtomicU64>,
     /// The counter for the number of send requests that succeeded.
@@ -59,7 +59,7 @@ impl SendHandler {
         Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
             pending: Arc::new(RwLock::new(HashMap::new())),
-            complete: HashMap::new(),
+            complete: Arc::new(RwLock::new(HashMap::new())),
             send_request_count: Arc::new(AtomicU64::new(0)),
             send_success_count: Arc::new(AtomicU64::new(0)),
             send_failure_count: Arc::new(AtomicU64::new(0)),
@@ -152,7 +152,7 @@ impl SendHandler {
                     request.receiver(),
                     error
                 );
-                return Err(NetworkError::SendRequestAuthorized);
+                return Err(NetworkError::SendRequestUnauthorized);
             }
         };
 

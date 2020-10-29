@@ -31,7 +31,7 @@ use snarkos_storage::Ledger;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 #[derive(Clone, PartialEq)]
 pub enum SyncState {
@@ -170,7 +170,7 @@ impl SyncManager {
             // Request more block headers
 
             if self.pending_blocks.is_empty() {
-                delay_for(Duration::from_millis(500)).await;
+                sleep(Duration::from_millis(500)).await;
 
                 if let Ok(block_locator_hashes) = self.environment.storage_read().await.get_block_locator_hashes() {
                     channel.write(&GetSync::new(block_locator_hashes)).await?;
@@ -210,7 +210,7 @@ impl SyncManager {
         {
             // loop {
             //     // Wait for sync_interval seconds in between each loop
-            //     delay_for(Duration::from_millis(self.environment.sync_interval())).await;
+            //     sleep(Duration::from_millis(self.environment.sync_interval())).await;
             //
             //     // TODO (howardwu): Rewrite this into a dedicated manager for syncing.
             //     {

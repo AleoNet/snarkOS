@@ -34,7 +34,9 @@ use toml;
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &'static [&str] = &[
-    "138.197.232.178:4131",
+        "0.0.0.0:4141"
+        // "50.18.246.201:4131"
+    // "138.197.232.178:4131",
     // "64.225.91.42:4131",
     // "64.225.91.43:4131",
     // "46.101.144.133:4131",
@@ -104,7 +106,7 @@ impl Default for Config {
                 is_bootnode: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
-                verbose: 1,
+                verbose: 3,
             },
             miner: Miner {
                 is_miner: false,

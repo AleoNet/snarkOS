@@ -43,10 +43,6 @@ pub struct Environment {
     dpc_parameters: Arc<PublicParameters<Components>>,
     /// The network ID of this node.
     network_id: Network,
-    /// The send handler of this node.
-    send_handler: SendHandler,
-    /// The receive handler of this node.
-    receive_handler: ReceiveHandler,
 
     /// TODO (howardwu): Remove this.
     /// The ping pong manager of this node.
@@ -127,12 +123,6 @@ impl Environment {
         // Derive the network ID.
         let network_id = consensus_parameters.network_id;
 
-        // Create a new send handler.
-        let send_handler = SendHandler::new();
-
-        // Create a new receive handler.
-        let receive_handler = ReceiveHandler::new();
-
         // TODO (howardwu): Remove this.
         // Create the ping pong manager.
         let ping_pong = Arc::new(RwLock::new(PingPongManager::new()));
@@ -146,8 +136,6 @@ impl Environment {
             consensus_parameters,
             dpc_parameters,
             network_id,
-            send_handler,
-            receive_handler,
 
             ping_pong,
             // handshakes,
@@ -179,10 +167,11 @@ impl Environment {
 
         self.peer_manager = Some(Arc::new(RwLock::new(peer_manager)));
 
-        self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(
-            self.clone(),
-            *self.bootnodes.first().unwrap(),
-        ))));
+        // Check if this node is configured as a bootnode.
+        // Skips instantiating the sync manager if this is a bootnode.
+        if let Some(bootnode_address) = self.bootnodes.first() {
+            self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(self.clone(), *bootnode_address))));
+        }
     }
 
     // /// TODO (howardwu): Remove this.
@@ -245,25 +234,6 @@ impl Environment {
     #[inline]
     pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
         &self.dpc_parameters
-    }
-
-    /// Returns a reference to the send handler of this node.
-    #[inline]
-    pub fn send_handler(&self) -> &SendHandler {
-        &self.send_handler
-    }
-
-    /// Returns a reference to the receive handler of this node.
-    #[inline]
-    pub fn receive_handler(&self) -> &ReceiveHandler {
-        &self.receive_handler
-    }
-
-    // TODO (howardwu): Remove this.
-    /// Returns a reference to the receive handler of this node.
-    #[inline]
-    pub fn receive_handler_mut(&mut self) -> &mut ReceiveHandler {
-        &mut self.receive_handler
     }
 
     /// Returns a reference to the ping pong manager of this node.

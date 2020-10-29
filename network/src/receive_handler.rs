@@ -75,18 +75,21 @@ pub struct ReceiveHandler {
     receive_success_count: Arc<AtomicU64>,
     /// A counter for the number of received responses that failed.
     receive_failure_count: Arc<AtomicU64>,
+    /// TODO (howardwu): Temporary. Remove this. See 1 usage in impl.
+    send_handler: crate::SendHandler,
 }
 
 impl ReceiveHandler {
     /// Creates a new instance of a `ReceiveHandler`.
     #[inline]
-    pub fn new() -> Self {
+    pub fn new(send_handler: crate::SendHandler) -> Self {
         Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
             peer_sender: None,
             receive_response_count: Arc::new(AtomicU64::new(0)),
             receive_success_count: Arc::new(AtomicU64::new(0)),
             receive_failure_count: Arc::new(AtomicU64::new(0)),
+            send_handler,
         }
     }
 
@@ -114,7 +117,7 @@ impl ReceiveHandler {
     /// Sets the peer sender in this receive handler.
     ///
     #[inline]
-    pub fn initialize_peer_sender(&mut self, peer_sender: Arc<RwLock<PeerSender>>) -> Result<(), NetworkError> {
+    pub fn initialize(&mut self, peer_sender: Arc<RwLock<PeerSender>>) -> Result<(), NetworkError> {
         // Check that the peer sender has not already been initialized.
         if self.peer_sender.is_some() {
             trace!("Peer sender was already set with the receive handler");
@@ -192,7 +195,7 @@ impl ReceiveHandler {
             }
 
             // Sleep for 10 seconds
-            tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
 
         let mut failure_count = 0u8;
@@ -1193,8 +1196,8 @@ impl ReceiveHandler {
         //     .write(&)
         //     .await
         //     .is_ok()
-        environment
-            .send_handler()
+        // TODO (howardwu): Move this logic into a flow to server, then to send handler.
+        self.send_handler
             .broadcast(&Request::Verack(Verack::new(
                 message.nonce,
                 address_sender,

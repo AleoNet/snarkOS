@@ -48,20 +48,20 @@ pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, Messag
 pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 
 /// A stateful component for managing the peer connections of this node.
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct PeerManager {
     /// The parameters and settings of this node server.
     environment: Environment,
+    /// The send handler of this node server.
+    send_handler: SendHandler,
+    /// The receive handler of this node server.
+    receive_handler: ReceiveHandler,
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
     /// The sender for the receive handler to send responses to this manager.
     peer_sender: Arc<RwLock<PeerSender>>,
     /// The receiver for this peer manager to receive responses from the receive handler.
-    peer_receiver: PeerReceiver,
-    /// The handler for sending outbound requests.
-    send_handler: SendHandler,
-    // /// The handler for receiving inbound requests.
-    // receive_handler: ReceiveHandler,
+    peer_receiver: Arc<PeerReceiver>,
 }
 
 impl PeerManager {
@@ -74,17 +74,19 @@ impl PeerManager {
     ///
     #[inline]
     // pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
-    pub fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
-        // Fetch the send handler and receive handler.
-        let send_handler = environment.send_handler().clone();
-        let mut receive_handler = environment.receive_handler_mut();
+    pub fn new(
+        environment: &mut Environment,
+        send_handler: SendHandler,
+        mut receive_handler: ReceiveHandler,
+    ) -> Result<Self, NetworkError> {
+        trace!("Instantiating peer manager");
 
         // Initialize the peer sender and peer receiver.
         let (sender, receiver) = mpsc::channel(1024);
-        let (peer_sender, peer_receiver) = (Arc::new(RwLock::new(sender)), receiver);
+        let (peer_sender, peer_receiver) = (Arc::new(RwLock::new(sender)), Arc::new(receiver));
 
         // Initialize the peer sender with the receive handler.
-        receive_handler.initialize_peer_sender(peer_sender.clone());
+        receive_handler.initialize(peer_sender.clone());
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());
@@ -99,20 +101,88 @@ impl PeerManager {
         // Instantiate the peer manager.
         let peer_manager = Self {
             environment: environment.clone(),
+            send_handler,
+            receive_handler,
             peer_book: Arc::new(RwLock::new(peer_book)),
             peer_sender,
             peer_receiver,
-            send_handler,
-            // receive_handler,
         };
 
         // Save the peer book to storage.
         // peer_manager.save_peer_book_to_storage().await?;
 
+        trace!("Instantiated peer manager");
         Ok(peer_manager)
     }
 
-    /// Returns `true` if a given address is connecting with this node.
+    ///
+    /// Broadcasts a connection request to each default bootnode of the network
+    /// and each disconnected peer saved in the peer book.
+    ///
+    #[inline]
+    pub async fn initialize(&self) -> Result<(), NetworkError> {
+        debug!("Initializing peer manager");
+
+        // Attempt to connect to the default bootnodes of the network.
+        trace!("Broadcasting connection requests to the default bootnodes");
+        self.connect_to_bootnodes().await?;
+
+        // Check that this node is not a bootnode.
+        if !self.environment.is_bootnode() {
+            // Attempt to connect to each disconnected peer saved in the peer book.
+            trace!("Broadcasting connection requests to disconnected peers");
+            self.connect_to_disconnected_peers().await?;
+        }
+
+        debug!("Initialized peer manager");
+        Ok(())
+    }
+
+    ///
+    /// Updates the current peer connections and broadcasts new connection requests
+    /// to maintain an acceptable number of peers.
+    ///
+    #[inline]
+    pub async fn update(&self) -> Result<(), NetworkError> {
+        debug!("Updating peer manager");
+
+        // If this node is connected to less peers than the minimum required,
+        // ask every peer this node is connected to for more peers.
+        if self.number_of_connected_peers().await < self.environment.minimum_number_of_peers() {
+            trace!("Attempting to connect to more peers");
+
+            // Broadcast a `GetPeers` message to request for more peers.
+            self.broadcast_getpeers_requests().await?;
+
+            // Attempt a connection request with every disconnected peer.
+            self.connect_to_disconnected_peers().await?;
+
+            // Attempt a connection request with each bootnode peer again.
+            // The goal here is to reconnect with any bootnode peer this node
+            // may have failed to connect to. The manager filters all attempts
+            // to connect to itself, and to any already-connected bootnode peers.
+            self.connect_to_bootnodes().await?;
+        }
+
+        // TODO (howardwu): Unify `Ping` and `Version` requests.
+        //  This is a remnant and these currently do not need to be distinct.
+
+        // Broadcast a `Ping` request to each connected peer.
+        self.broadcast_ping_requests().await?;
+
+        // Broadcast a `Version` request to each connected peer.
+        self.broadcast_version_requests().await?;
+
+        // Store the internal state of the peer book.
+        self.save_peer_book_to_storage().await?;
+
+        debug!("Updated peer manager");
+        Ok(())
+    }
+
+    ///
+    /// Returns `true` if the given address is connecting with this node.
+    ///
     #[inline]
     pub async fn is_connecting(&self, address: &SocketAddr) -> bool {
         // Acquire a peer book read lock.
@@ -121,7 +191,9 @@ impl PeerManager {
         peer_book.is_connecting(address)
     }
 
-    /// Returns `true` if a given address is connected with this node.
+    ///
+    /// Returns `true` if the given address is connected with this node.
+    ///
     #[inline]
     pub async fn is_connected(&self, address: &SocketAddr) -> bool {
         // Acquire a peer book read lock.
@@ -130,7 +202,9 @@ impl PeerManager {
         peer_book.is_connected(address)
     }
 
-    /// Returns `true` if a given address is a disconnected peer of this node.
+    ///
+    /// Returns `true` if the given address is a disconnected peer of this node.
+    ///
     #[inline]
     pub async fn is_disconnected(&self, address: &SocketAddr) -> bool {
         // Acquire a peer book read lock.
@@ -139,7 +213,20 @@ impl PeerManager {
         peer_book.is_disconnected(address)
     }
 
-    /// Returns a mapping of all connected peers for this node.
+    ///
+    /// Returns the number of peers connected to this node.
+    ///
+    #[inline]
+    pub async fn number_of_connected_peers(&self) -> u16 {
+        // Acquire a peer book read lock.
+        let peer_book = self.peer_book.read().await;
+        // Fetch the number of connected peers.
+        peer_book.number_of_connected_peers()
+    }
+
+    ///
+    /// Returns a map of all connected peers with their peer-specific information.
+    ///
     #[inline]
     pub async fn connected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
         // Acquire a peer book read lock.
@@ -148,22 +235,15 @@ impl PeerManager {
         peer_book.connected_peers().clone()
     }
 
-    /// Returns a mapping of all disconnected peers for this node.
+    ///
+    /// Returns a map of all disconnected peers with their peer-specific information.
+    ///
     #[inline]
     pub async fn disconnected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
         // Acquire a peer book read lock.
         let peer_book = self.peer_book.read().await;
         // Fetch the disconnected peers of this node.
         peer_book.disconnected_peers().clone()
-    }
-
-    /// Returns the number of peers connected to this node.
-    #[inline]
-    pub async fn number_of_connected_peers(&self) -> u16 {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
-        // Fetch the number of connected peers.
-        peer_book.number_of_connected_peers()
     }
 
     /// Returns the local address of this node.
@@ -218,60 +298,6 @@ impl PeerManager {
         peer_book.add_peer(address)
     }
 
-    /// Broadcasts connection requests to the default bootnodes of the network
-    /// and each disconnected peer saved in the peer book.
-    #[inline]
-    pub async fn initialize(&self) {
-        debug!("Initializing peer manager");
-
-        // Attempt to connect to the default bootnodes of the network.
-        trace!("Broadcasting connection requests to the default bootnodes");
-        self.connect_to_bootnodes().await;
-
-        // Check that this node is not a bootnode.
-        if !self.environment.is_bootnode() {
-            // Attempt to connect to each disconnected peer saved in the peer book.
-            trace!("Broadcasting connection requests to disconnected peers");
-            self.connect_to_disconnected_peers().await;
-        }
-
-        debug!("Initialized peer manager");
-    }
-
-    /// Manages all peer connections and processes updates with all connected peers.
-    #[inline]
-    pub async fn handler(&self) {
-        // If this node is connected to less peers than the minimum required,
-        // ask every peer this node is connected to for more peers.
-        if self.number_of_connected_peers().await < self.environment.minimum_number_of_peers() {
-            trace!("Attempting to connect to more peers");
-
-            // Broadcast a `GetPeers` message to request for more peers.
-            self.broadcast_getpeers_requests().await;
-
-            // Attempt a connection request with every disconnected peer.
-            self.connect_to_disconnected_peers().await;
-
-            // Attempt a connection request with every bootnode peer again.
-            // The goal here is to reconnect with any bootnode peers we might
-            // have failed to connect to. The manager will filter attempts
-            // to connect with itself or already connected bootnode peers.
-            self.connect_to_bootnodes().await;
-        }
-
-        // TODO (howardwu): Unify `Ping` and `Version` requests.
-        //  This is a remnant and these currently do not need to be distinct.
-
-        // Broadcast a `Ping` request to each connected peer.
-        self.broadcast_ping_requests().await;
-
-        // Broadcast a `Version` request to each connected peer.
-        self.broadcast_version_requests().await;
-
-        // Store the internal state of the peer book.
-        self.save_peer_book_to_storage().await;
-    }
-
     // TODO (howardwu): Implement this peer receiver from receive handler.
     // #[inline]
     // pub async fn listener(&self) {
@@ -282,7 +308,7 @@ impl PeerManager {
 
     /// Broadcasts a connection request to all default bootnodes of the network.
     #[inline]
-    async fn connect_to_bootnodes(&self) {
+    async fn connect_to_bootnodes(&self) -> Result<(), NetworkError> {
         trace!("Connecting to bootnodes");
 
         // Fetch the local address of this node.
@@ -312,14 +338,16 @@ impl PeerManager {
                     .set_connecting(bootnode_address, version.nonce);
 
                 // Send a connection request with the send handler.
-                self.send_handler.broadcast(&request).await;
+                self.send_handler.broadcast(&request).await?;
             }
         }
+
+        Ok(())
     }
 
     /// Broadcasts a connection request to all disconnected peers.
     #[inline]
-    async fn connect_to_disconnected_peers(&self) {
+    async fn connect_to_disconnected_peers(&self) -> Result<(), NetworkError> {
         // Fetch the local address of this node.
         let local_address = self.local_address();
         // Fetch the current block height of this node.
@@ -339,8 +367,10 @@ impl PeerManager {
                 .set_connecting(&remote_address, version.nonce);
 
             // Send a connection request with the send handler.
-            self.send_handler.broadcast(&request).await;
+            self.send_handler.broadcast(&request).await?;
         }
+
+        Ok(())
     }
 
     /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
