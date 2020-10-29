@@ -65,10 +65,16 @@ fn impl_canonical_serialize(ast: &syn::DeriveInput) -> TokenStream {
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
 
-    let mut serialize_body = Vec::<TokenStream>::new();
-    let mut serialized_size_body = Vec::<TokenStream>::new();
-    let mut serialize_uncompressed_body = Vec::<TokenStream>::new();
-    let mut uncompressed_size_body = Vec::<TokenStream>::new();
+    let len = if let Data::Struct(ref data_struct) = ast.data {
+        data_struct.fields.len()
+    } else {
+        panic!("Serialize can only be derived for structs, {} is not a struct", name);
+    };
+
+    let mut serialize_body = Vec::<TokenStream>::with_capacity(len);
+    let mut serialized_size_body = Vec::<TokenStream>::with_capacity(len);
+    let mut serialize_uncompressed_body = Vec::<TokenStream>::with_capacity(len);
+    let mut uncompressed_size_body = Vec::<TokenStream>::with_capacity(len);
 
     match ast.data {
         Data::Struct(ref data_struct) => {
@@ -166,8 +172,8 @@ fn impl_canonical_deserialize(ast: &syn::DeriveInput) -> TokenStream {
     match ast.data {
         Data::Struct(ref data_struct) => {
             let mut tuple = false;
-            let mut compressed_field_cases = Vec::<TokenStream>::new();
-            let mut uncompressed_field_cases = Vec::<TokenStream>::new();
+            let mut compressed_field_cases = Vec::<TokenStream>::with_capacity(data_struct.fields.len());
+            let mut uncompressed_field_cases = Vec::<TokenStream>::with_capacity(data_struct.fields.len());
             for field in data_struct.fields.iter() {
                 match &field.ident {
                     None => {
