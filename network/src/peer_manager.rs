@@ -17,7 +17,7 @@
 use crate::{
     external::{
         message::MessageName,
-        message_types::{Block, GetPeers, Ping, Transaction, Verack, Version},
+        message_types::{Block, GetPeers, Transaction, Verack, Version},
         Channel,
     },
     peers::{PeerBook, PeerInfo},
@@ -201,8 +201,9 @@ impl PeerManager {
 
         // If this node is connected to less peers than the minimum required,
         // ask every peer this node is connected to for more peers.
-        if self.number_of_connected_peers().await < self.environment.minimum_number_of_connected_peers() {
-            trace!("Attempting to connect to more peers");
+        let number_of_connected_peers = self.number_of_connected_peers().await;
+        if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
+            trace!("Connected to {} peers and requesting more", number_of_connected_peers);
 
             // Broadcast a `GetPeers` message to request for more peers.
             self.broadcast_getpeers_requests().await?;
@@ -211,17 +212,13 @@ impl PeerManager {
             self.connect_to_disconnected_peers().await?;
 
             // Attempt a connection request with each bootnode peer again.
-            // The goal here is to reconnect with any bootnode peer this node
-            // may have failed to connect to. The manager filters all attempts
-            // to connect to itself, and to any already-connected bootnode peers.
+            // Reconnect with any bootnode peer this node may have failed to connect to.
+            // Filters attempts to connect to itself and already-connected bootnode peers.
             self.connect_to_bootnodes().await?;
         }
 
         // TODO (howardwu): Unify `Ping` and `Version` requests.
         //  This is a remnant and these currently do not need to be distinct.
-
-        // Broadcast a `Ping` request to each connected peer.
-        self.broadcast_ping_requests().await?;
 
         // Broadcast a `Version` request to each connected peer.
         self.broadcast_version_requests().await?;
@@ -535,41 +532,6 @@ impl PeerManager {
                         self.disconnect_from_peer(&remote_address).await?;
                     }
                 };
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Broadcasts a `Ping` message to all connected peers.
-    #[inline]
-    async fn broadcast_ping_requests(&self) -> Result<(), NetworkError> {
-        // Broadcast a `Ping` request to every connected peers
-        // that this node hasn't heard from in a while.
-        for (remote_address, peer_info) in self.connected_peers().await {
-            // Calculate the time since we last saw the peer.
-            let elapsed_in_millis = (Utc::now() - *peer_info.last_seen()).num_milliseconds();
-            if elapsed_in_millis.is_positive() && elapsed_in_millis as u64 > (self.environment.sync_interval() * 3) {
-                // Broadcast a `Ping` message to the connected peer.
-                self.send_handler
-                    .broadcast(&Request::Ping(remote_address, Ping::new()))
-                    .await?;
-
-                // if let Some(channel) = self.get_channel(&remote_address) {
-                //     // Acquire the ping pong manager write lock.
-                //     let mut ping_pong = self.environment.ping_pong().write().await;
-                //     // Send a ping to the remote address.
-                //     if let Err(_) = ping_pong.send_ping(&channel).await {
-                //         warn!("Ping message failed to send to {}", remote_address);
-                //         // Disconnect from the peer if the ping request fails to send.
-                //         self.disconnect_from_peer(&remote_address).await?;
-                //     }
-                //     // Drop the ping pong manager write lock.
-                //     drop(ping_pong);
-                // } else {
-                //     // Disconnect from the peer if the channel is not active.
-                //     self.disconnect_from_peer(&remote_address).await?;
-                // }
             }
         }
 
