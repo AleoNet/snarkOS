@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::PingPongManager, NetworkError, PeerManager, ReceiveHandler, SendHandler, SyncManager};
+use crate::{NetworkError, PeerManager, ReceiveHandler, SendHandler, SyncManager};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -44,13 +44,6 @@ pub struct Environment {
     /// The network ID of this node.
     network_id: Network,
 
-    /// TODO (howardwu): Remove this.
-    /// The ping pong manager of this node.
-    /// Ping/pongs with connected peers
-    ping_pong: Arc<RwLock<PingPongManager>>,
-    // /// TODO (howardwu): Remove this.
-    // /// The handshakes with connected peers
-    // handshakes: Arc<RwLock<HashMap<SocketAddr, Handshake>>>,
     /// TODO (howardwu): Remove this.
     pub(crate) peer_manager: Option<Arc<RwLock<PeerManager>>>,
     /// TODO (howardwu): Remove this.
@@ -123,13 +116,6 @@ impl Environment {
         // Derive the network ID.
         let network_id = consensus_parameters.network_id;
 
-        // TODO (howardwu): Remove this.
-        // Create the ping pong manager.
-        let ping_pong = Arc::new(RwLock::new(PingPongManager::new()));
-        // TODO (howardwu): Remove this.
-        // Create a new handshake struct.
-        // let handshakes = Arc::new(RwLock::new(HashMap::default()));
-
         Ok(Self {
             storage,
             memory_pool,
@@ -137,8 +123,6 @@ impl Environment {
             dpc_parameters,
             network_id,
 
-            ping_pong,
-            // handshakes,
             peer_manager: None, // TODO (howardwu): Remove this
             sync_manager: None, // TODO (howardwu): Remove this
 
@@ -157,14 +141,6 @@ impl Environment {
 
     /// TODO (howardwu): Remove this.
     pub fn set_managers(&mut self, peer_manager: PeerManager) {
-        // TODO (howardwu): Remove this.
-        // let peer_manager = Runtime::new()
-        //     .unwrap()
-        //     .block_on(PeerManager::new(self.clone()))
-        //     .unwrap();
-
-        // let peer_manager = PeerManager::new(self.clone()).unwrap();
-
         self.peer_manager = Some(Arc::new(RwLock::new(peer_manager)));
 
         // Check if this node is configured as a bootnode.
@@ -173,12 +149,6 @@ impl Environment {
             self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(self.clone(), *bootnode_address))));
         }
     }
-
-    // /// TODO (howardwu): Remove this.
-    // #[inline]
-    // pub async fn peer_manager(&self) -> &Option<Arc<RwLock<PeerManager>>> {
-    //     &self.peer_manager
-    // }
 
     /// TODO (howardwu): Remove this.
     #[inline]
@@ -197,20 +167,6 @@ impl Environment {
     pub async fn sync_manager(&self) -> &Arc<Mutex<SyncManager>> {
         self.sync_manager.as_ref().unwrap()
     }
-
-    // /// TODO (howardwu): Remove this.
-    // #[inline]
-    // pub async fn peer_manager_read(&self) -> RwLockReadGuard<'_, PeerManager> {
-    //     let peer_manager = self.peer_manager.unwrap().clone();
-    //     peer_manager.read().await
-    // }
-    //
-    // /// TODO (howardwu): Remove this.
-    // #[inline]
-    // pub async fn peer_manager_write(&self) -> RwLockWriteGuard<'_, PeerManager> {
-    //     let peer_manager = self.peer_manager.unwrap().clone();
-    //     peer_manager.unwrap().write().await
-    // }
 
     /// Returns a reference to the storage system of this node.
     #[inline]
@@ -235,18 +191,6 @@ impl Environment {
     pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
         &self.dpc_parameters
     }
-
-    /// Returns a reference to the ping pong manager of this node.
-    #[inline]
-    pub fn ping_pong(&self) -> &Arc<RwLock<PingPongManager>> {
-        &self.ping_pong
-    }
-
-    /// Returns a reference to the handshakes of this node.
-    // #[inline]
-    // pub fn handshakes(&self) -> &Arc<RwLock<HashMap<SocketAddr, Handshake>>> {
-    //     &self.handshakes
-    // }
 
     /// Returns a reference to the default bootnodes of the network.
     #[inline]
