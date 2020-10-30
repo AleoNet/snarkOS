@@ -32,8 +32,7 @@ use snarkos_errors::{
 use std::{fmt, net::Shutdown, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, oneshot, Mutex, RwLock},
-    task,
+    sync::{mpsc, oneshot},
     time::sleep,
 };
 use tracing_futures::Instrument;
@@ -159,45 +158,21 @@ impl From<NetworkError> for anyhow::Error {
 pub struct Server {
     /// The parameters and settings of this node server.
     environment: Environment,
-    /// The send handler of this node server.
-    send_handler: SendHandler,
-    /// The receive handler of this node server.
-    receive_handler: ReceiveHandler,
 
-    // TODO (howardwu): Uncomment this.
     peer_manager: PeerManager,
     // sync_manager: Arc<Mutex<SyncManager>>,
-
-    // TODO (howardwu): Remove this.
-    sender: Sender,
-    receiver: Receiver,
 }
 
 impl Server {
     /// Creates a new instance of `Server`.
     // pub fn new(environment: &mut Environment, sync_manager: Arc<Mutex<SyncManager>>) -> Self {
     pub async fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
-        // Create a send handler.
-        let send_handler = SendHandler::new();
-        // Create a receive handler.
-        let receive_handler = ReceiveHandler::new(send_handler.clone());
-
-        let (sender, receiver) = mpsc::channel(1024);
-
-        let peer_manager = PeerManager::new(environment, send_handler.clone(), receive_handler.clone())?;
-        peer_manager.initialize().await?;
-
+        let peer_manager = PeerManager::new(&mut environment.clone())?;
         environment.set_managers(peer_manager.clone());
 
         Ok(Self {
             environment: environment.clone(),
-            send_handler,
-            receive_handler,
             peer_manager,
-            sender,
-            receiver,
-            // peer_manager,
-            // sync_manager,
         })
     }
 
@@ -210,20 +185,7 @@ impl Server {
     /// 4. Start the message handler.
     ///
     pub async fn listen(mut self) -> Result<(), NetworkError> {
-        let environment = self.environment.clone();
-        let receive_handler = self.receive_handler.clone();
-
-        task::spawn(async move {
-            loop {
-                info!("Hello a?");
-                if let Err(error) = receive_handler.clone().listen(environment.clone()).await {
-                    // TODO: Handle receiver error appropriately with tracing and server state updates.
-                    error!("Receive handler errored with {}", error);
-                    sleep(Duration::from_secs(10)).await;
-                }
-            }
-        });
-
+        self.peer_manager.initialize().await?;
         loop {
             info!("Hello b?");
             self.peer_manager.clone().update().await?;

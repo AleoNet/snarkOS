@@ -24,6 +24,8 @@ use crate::{
         MessageName,
         PingPongManager,
     },
+    peer_manager::PeerMessage,
+    peers::PeerBook,
     request::Request,
     Environment,
     NetworkError,
@@ -135,7 +137,7 @@ impl ReceiveHandler {
 
     // TODO (howardwu): Remove environment from function inputs.
     #[inline]
-    pub async fn listen(self, environment: Environment) -> Result<(), NetworkError> {
+    pub async fn listen(self, environment: Environment, peer_book: Arc<RwLock<PeerBook>>) -> Result<(), NetworkError> {
         info!("a {:?}", self.peer_sender);
 
         let peer_sender = match self.peer_sender {
@@ -145,15 +147,9 @@ impl ReceiveHandler {
 
         info!("b");
 
-        // TODO (howardwu): Remove this peer manager instance for this function.
-        let peer_manager = match environment.peer_manager {
-            Some(ref peer_manager) => peer_manager.clone(),
-            _ => return Err(NetworkError::ReceiveHandlerMissingPeerManager),
-        };
-
         // TODO (howardwu): Find the actual address of this node.
         // 1. Initialize TCP listener and accept new TCP connections.
-        let local_address = peer_manager.clone().read().await.local_address();
+        let local_address = environment.local_address();
         debug!("Starting listener at {:?}...", local_address);
         let mut listener = TcpListener::bind(&local_address).await?;
         info!("Listening at {:?}", local_address);
@@ -221,7 +217,7 @@ impl ReceiveHandler {
             // TODO (howardwu): Move to peer manager.
             {
                 // Fetch the current number of connected peers.
-                let number_of_connected_peers = peer_manager.read().await.number_of_connected_peers().await;
+                let number_of_connected_peers = peer_book.read().await.number_of_connected_peers();
                 trace!("Connected with {} peers", number_of_connected_peers);
 
                 // Check that the maximum number of peers has not been reached.
@@ -484,10 +480,9 @@ impl ReceiveHandler {
                                 }
                             } else if name == MessageName::from("disconnect") {
                                 info!("Disconnected from peer {:?}", remote_address);
-                                {
-                                    let mut peer_manager = environment.peer_manager_write().await;
-                                    peer_manager.disconnect_from_peer(&remote_address).await.unwrap();
-                                }
+                                // TODO (howardwu): Call `PeerManager::disconnect_from_peer` instead.
+                                let mut peer_book = peer_book.write().await;
+                                peer_book.set_disconnected(&remote_address);
                             } else {
                                 debug!("Message name not recognized {:?}", name.to_string());
                             }
