@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    network::{message::MessageError, ConnectError, HandshakeError, PingProtocolError, SendError},
+    network::{message::MessageError, ConnectError, SendError},
     objects::{BlockError, TransactionError},
     storage::StorageError,
 };
@@ -32,16 +32,10 @@ pub enum ServerError {
     ConnectError(ConnectError),
 
     #[error("{}", _0)]
-    HandshakeError(HandshakeError),
-
-    #[error("{}", _0)]
     Message(String),
 
     #[error("{}", _0)]
     MessageError(MessageError),
-
-    #[error("{}", _0)]
-    PingProtocolError(PingProtocolError),
 
     #[error("{}", _0)]
     SendError(SendError),
@@ -65,21 +59,9 @@ impl From<ConnectError> for ServerError {
     }
 }
 
-impl From<HandshakeError> for ServerError {
-    fn from(error: HandshakeError) -> Self {
-        ServerError::HandshakeError(error)
-    }
-}
-
 impl From<MessageError> for ServerError {
     fn from(error: MessageError) -> Self {
         ServerError::MessageError(error)
-    }
-}
-
-impl From<PingProtocolError> for ServerError {
-    fn from(error: PingProtocolError) -> Self {
-        ServerError::PingProtocolError(error)
     }
 }
 

@@ -22,13 +22,11 @@ use std::net::SocketAddr;
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/verack.md"))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Verack {
-    /// Random nonce sequence number
+    /// The random nonce of the connection request.
     pub nonce: u64,
-
-    /// Network address of sending node
+    /// The IP address of the sender.
     pub sender: SocketAddr,
-
-    /// Network address of sending node
+    /// The IP address of the recipient.
     pub receiver: SocketAddr,
 }
 
@@ -54,16 +52,16 @@ impl Message for Verack {
 
         Ok(Self {
             nonce: bincode::deserialize(&vec[0..8])?,
-            receiver: bincode::deserialize(&vec[8..18])?,
-            sender: bincode::deserialize(&vec[18..28])?,
+            sender: bincode::deserialize(&vec[8..18])?,
+            receiver: bincode::deserialize(&vec[18..28])?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = vec![];
+        let mut writer = Vec::with_capacity(28);
         writer.extend_from_slice(&bincode::serialize(&self.nonce)?);
-        writer.extend_from_slice(&bincode::serialize(&self.receiver)?);
         writer.extend_from_slice(&bincode::serialize(&self.sender)?);
+        writer.extend_from_slice(&bincode::serialize(&self.receiver)?);
         Ok(writer)
     }
 }

@@ -28,7 +28,7 @@ pub struct Version {
     pub version: u64,
     /// The block height of the sender's node server.
     pub height: u32,
-    /// The random nonce of the handshake request.
+    /// The random nonce of the connection request.
     pub nonce: u64,
     /// The IP address of the sender.
     pub sender: SocketAddr,
@@ -79,20 +79,20 @@ impl Message for Version {
             version: bincode::deserialize(&vec[..8])?,
             height: bincode::deserialize(&vec[8..12])?,
             nonce: bincode::deserialize(&vec[12..20])?,
-            timestamp: bincode::deserialize(&vec[20..28])?,
-            receiver: bincode::deserialize(&vec[28..38])?,
-            sender: bincode::deserialize(&vec[38..48])?,
+            sender: bincode::deserialize(&vec[20..30])?,
+            receiver: bincode::deserialize(&vec[30..40])?,
+            timestamp: bincode::deserialize(&vec[40..48])?,
         })
     }
 
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = vec![];
+        let mut writer = Vec::with_capacity(48);
         writer.extend_from_slice(&bincode::serialize(&self.version)?);
         writer.extend_from_slice(&bincode::serialize(&self.height)?);
         writer.extend_from_slice(&bincode::serialize(&self.nonce)?);
-        writer.extend_from_slice(&bincode::serialize(&self.timestamp)?);
-        writer.extend_from_slice(&bincode::serialize(&self.receiver)?);
         writer.extend_from_slice(&bincode::serialize(&self.sender)?);
+        writer.extend_from_slice(&bincode::serialize(&self.receiver)?);
+        writer.extend_from_slice(&bincode::serialize(&self.timestamp)?);
         Ok(writer)
     }
 }
@@ -111,7 +111,6 @@ mod tests {
         );
 
         let serialized = version.serialize().unwrap();
-
         let deserialized = Version::deserialize(serialized).unwrap();
 
         assert_eq!(version, deserialized);

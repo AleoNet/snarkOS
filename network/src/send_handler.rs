@@ -85,32 +85,32 @@ impl SendHandler {
         let mut pending = self.pending.write().await;
 
         // Fetch or initialize the channel for broadcasting the request.
-        let channel = match channels.get(&receiver) {
+        let channel = if let Some(channel) = channels.get(&receiver) {
             // Case 1 - The channel exists, retrieves the channel.
-            Some(channel) => {
-                trace!("Using the existing channel with {}", receiver);
-                channel.clone()
-            }
+            trace!("Using the existing channel with {}", receiver);
+            channel.clone()
+        } else {
             // Case 2 - The channel does not exist, creates and returns a new channel.
-            None => {
-                trace!("Creating a new channel with {}", receiver);
-                Arc::new(Channel::new_writer(receiver.clone()).await?)
+            trace!("Creating a new channel with {}", receiver);
+            if let Ok(channel) = Channel::new_writer(receiver.clone()).await {
+                trace!("Created a new channel with {}", receiver);
+                Arc::new(channel)
+            } else {
+                error!("Failed to create a new channel with {}", receiver);
+                return Err(NetworkError::SendHandlerFailedToCreateChannel);
             }
         };
 
         // Fetch or initialize the pending requests for the request receiver.
-        let pending_requests = match pending.get(&receiver) {
+        let pending_requests = if let Some(requests) = pending.get(&receiver) {
             // Case 1 - The receiver exists, retrieves the requests.
-            Some(requests) => {
-                trace!("Using the existing instance of pending requests {:?}", requests);
-                requests.clone()
-            }
+            trace!("Using the existing instance of pending requests");
+            requests.clone()
+        } else {
             // Case 2 - The receiver does not exist, initializes requests and stores it.
-            None => {
-                trace!("Creating a new instance of pending requests");
-                // Creates a new instance of `Requests` and stores it.
-                Arc::new(RwLock::new(HashSet::new()))
-            }
+            trace!("Creating a new instance of pending requests");
+            // Creates a new instance of `Requests` and stores it.
+            Arc::new(RwLock::new(HashSet::new()))
         };
 
         // Acquire the pending requests write lock.
@@ -156,7 +156,7 @@ impl SendHandler {
             }
         };
 
-        info!("Sending request to {:?}", request.receiver());
+        debug!("Sending request to {:?}", request.receiver());
 
         // Clone these variables for use in the thread.
         let request = request.clone();
@@ -168,8 +168,7 @@ impl SendHandler {
             // Fetch the request receiver.
             let receiver = request.receiver();
 
-            // Attempt a handshake with the remote address.
-            debug!("Requesting handshake with {:?}", receiver);
+            trace!("Sending request to {:?}", receiver);
 
             // TODO (howardwu): Abstract this with a trait object or generic.
             let result = match &request {
@@ -183,22 +182,14 @@ impl SendHandler {
             // Write the version message to the channel.
             match result {
                 Ok(_) => {
-                    // // Store the handshake.
-                    // handshakes.insert(remote_address, {
-                    //     channel,
-                    //     state: HandshakeStatus::Waiting,
-                    //     height: version.height,
-                    //     nonce: version.nonce,
-                    // });
-
                     // Increment the success counter.
                     send_success_count.fetch_add(1, Ordering::SeqCst);
-                    debug!("Sent handshake to {:?}", receiver);
+                    trace!("Sent request to {:?}", receiver);
                 }
                 Err(error) => {
                     // Increment the failed counter.
                     send_failure_count.fetch_add(1, Ordering::SeqCst);
-                    info!("Unsuccessful connection with {:?}", receiver);
+                    error!("Failed to send request to {:?}", receiver);
 
                     // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
                     // // Disconnect from the peer if the version request fails to send.
@@ -231,27 +222,6 @@ impl SendHandler {
     // /// Stores a new channel at the peer address it is connected to.
     // pub fn add_channel(&mut self, channel: &Arc<Channel>) {
     //     self.channels.insert(channel.address, channel.clone());
-    // }
-
-    // /// Returns the nonce for a handshake with the given remote address, if it exists.
-    // #[inline]
-    // pub async fn get_handshake_nonce(&self, environment: &Environment, remote_address: &SocketAddr) -> Option<u64> {
-    //     // Acquire the handshakes read lock.
-    //     let handshakes = environment.handshakes().read().await;
-    //     match handshakes.get(remote_address) {
-    //         Some(handshake) => Some(handshake.nonce),
-    //         _ => None,
-    //     }
-    // }
-
-    // /// Returns the state of the handshake at a peer address.
-    // pub async fn get_state(&self, environment: &Environment, address: SocketAddr) -> Option<HandshakeStatus> {
-    //     // Acquire the handshake read lock.
-    //     let handshakes = environment.handshakes().read().await;
-    //     match handshakes.get(&address) {
-    //         Some(handshake) => Some(handshake.get_state()),
-    //         None => None,
-    //     }
     // }
 }
 
