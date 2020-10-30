@@ -60,9 +60,9 @@ pub struct Environment {
     local_address: SocketAddr,
 
     /// The minimum number of peers required to maintain connections with.
-    minimum_number_of_peers: u16,
+    minimum_number_of_connected_peers: u16,
     /// The maximum number of peers permitted to maintain connections with.
-    maximum_number_of_peers: u16,
+    maximum_number_of_connected_peers: u16,
 
     /// TODO (howardwu): Rename CONNECTION_FREQUENCY to this.
     /// The number of milliseconds this node waits to perform a periodic sync with its peers.
@@ -144,8 +144,8 @@ impl Environment {
 
             local_address,
 
-            minimum_number_of_peers: min_peers,
-            maximum_number_of_peers: max_peers,
+            minimum_number_of_connected_peers: min_peers,
+            maximum_number_of_connected_peers: max_peers,
             sync_interval,
             memory_pool_interval,
 
@@ -274,14 +274,14 @@ impl Environment {
 
     /// Returns the minimum number of peers this node maintains a connection with.
     #[inline]
-    pub fn minimum_number_of_peers(&self) -> u16 {
-        self.minimum_number_of_peers
+    pub fn minimum_number_of_connected_peers(&self) -> u16 {
+        self.minimum_number_of_connected_peers
     }
 
     /// Returns the maximum number of peers this node maintains a connection with.
     #[inline]
-    pub fn maximum_number_of_peers(&self) -> u16 {
-        self.minimum_number_of_peers
+    pub fn maximum_number_of_connected_peers(&self) -> u16 {
+        self.maximum_number_of_connected_peers
     }
 
     /// Returns the sync interval of this node.
