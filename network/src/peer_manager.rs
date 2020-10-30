@@ -53,7 +53,9 @@ pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, Messag
 pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 
 pub enum PeerMessage {
+    /// Received a version message and preparing to send a verack message back.
     VersionToVerack(SocketAddr, Version),
+    /// Receive handler has signaled to drop the connection with the specified peer.
     DisconnectFrom(SocketAddr),
 }
 

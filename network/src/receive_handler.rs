@@ -15,15 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{
-        handshake::HandshakeStatus,
-        message::Message,
-        message_types::*,
-        Channel,
-        Handshake,
-        MessageName,
-        PingPongManager,
-    },
+    external::{message::Message, message_types::*, Channel, MessageName, PingPongManager},
     peer_manager::PeerMessage,
     peers::PeerBook,
     request::Request,
