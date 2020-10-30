@@ -49,16 +49,6 @@ pub mod peers;
 #[doc(inline)]
 pub use peers::*;
 
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/ping.md"))]
-pub mod ping;
-#[doc(inline)]
-pub use ping::*;
-
-#[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/pong.md"))]
-pub mod pong;
-#[doc(inline)]
-pub use pong::*;
-
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync.md"))]
 pub mod sync;
 #[doc(inline)]
