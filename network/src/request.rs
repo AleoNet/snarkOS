@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{message::Message, message_types::*};
+use crate::external::message_types::*;
 
 use std::{fmt, net::SocketAddr};
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{NetworkError, PeerManager, ReceiveHandler, SendHandler, SyncManager};
+use crate::{NetworkError, PeerManager, SyncManager};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -22,11 +22,8 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_objects::Network;
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio::{
-    runtime::Runtime,
-    sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// TODO (howardwu): Remove pub from each field and add getters only.
 /// A core data structure containing the networking parameters for this node.

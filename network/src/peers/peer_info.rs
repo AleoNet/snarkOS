@@ -36,7 +36,7 @@ pub struct PeerInfo {
     /// The current status of this peer.
     status: PeerStatus,
     /// The current nonce used to connect with this peer.
-    handshake: Option<u64>,
+    nonce: Option<u64>,
     /// The set of every handshake nonce used with this peer.
     handshakes: HashSet<u64>,
     /// The timestamp of the first seen instance of this peer.
@@ -63,7 +63,7 @@ impl PeerInfo {
         Self {
             address,
             status: PeerStatus::NeverConnected,
-            handshake: None,
+            nonce: None,
             handshakes: HashSet::new(),
             first_seen: now,
             last_seen: now.clone(),
@@ -94,8 +94,8 @@ impl PeerInfo {
     /// Returns the current handshake nonce with this peer, if connected.
     ///
     #[inline]
-    pub fn handshake(&self) -> &Option<u64> {
-        &self.handshake
+    pub fn nonce(&self) -> &Option<u64> {
+        &self.nonce
     }
 
     ///
@@ -157,7 +157,7 @@ impl PeerInfo {
         }
 
         // Check that the handshake nonce is already set.
-        if self.handshake.is_none() {
+        if self.nonce.is_none() {
             return Err(NetworkError::PeerIsMissingNonce);
         }
 
@@ -187,12 +187,12 @@ impl PeerInfo {
     #[inline]
     pub fn set_connecting(&mut self, nonce: u64) -> Result<(), NetworkError> {
         // Check that the handshake is not already set.
-        if self.handshake.is_some() {
+        if self.nonce.is_some() {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
         // Check that the nonce has not been used before.
-        if self.handshakes.contains(&nonce) || self.handshake == Some(nonce) {
+        if self.handshakes.contains(&nonce) || self.nonce == Some(nonce) {
             return Err(NetworkError::PeerIsReusingNonce);
         }
 
@@ -202,10 +202,10 @@ impl PeerInfo {
                 // Set the status of this peer to connecting.
                 self.status = PeerStatus::Connecting;
 
-                // Set the given nonce as the current handshake.
-                self.handshake = Some(nonce);
+                // Set the given nonce as the current nonce.
+                self.nonce = Some(nonce);
 
-                // Add the given nonce to the set of all handshakes.
+                // Add the given nonce to the set of all handshake nonces.
                 self.handshakes.insert(nonce);
 
                 // Set the last seen timestamp of this peer.
@@ -222,16 +222,16 @@ impl PeerInfo {
     }
 
     ///
-    /// Updates the peer to connected.
+    /// Updates the peer to connected, if the given nonce matches the stored nonce.
     ///
     /// If the peer is not transitioning from `PeerStatus::Connecting`,
     /// this function returns a `NetworkError`.
     ///
     #[inline]
-    pub(crate) fn set_connected(&mut self) -> Result<(), NetworkError> {
-        // Check that the handshake nonce is already set.
-        if self.handshake.is_none() {
-            return Err(NetworkError::PeerIsMissingNonce);
+    pub(crate) fn set_connected(&mut self, nonce: u64) -> Result<(), NetworkError> {
+        // Check that the handshake nonce is already set and matches the given nonce.
+        if nonce != self.nonce.ok_or(NetworkError::PeerIsMissingNonce)? {
+            return Err(NetworkError::PeerNonceMismatch);
         }
 
         // Fetch the current status of the peer.
@@ -242,6 +242,7 @@ impl PeerInfo {
 
                 // Set the state of this peer to connected.
                 self.status = PeerStatus::Connected;
+
                 self.last_seen = now.clone();
                 self.last_connected = now;
                 self.connected_count += 1;
@@ -265,7 +266,7 @@ impl PeerInfo {
     #[inline]
     pub(crate) fn set_disconnected(&mut self) -> Result<(), NetworkError> {
         // Check that the handshake nonce is already set.
-        if self.handshake.is_none() {
+        if self.nonce.is_none() {
             return Err(NetworkError::PeerIsMissingNonce);
         }
 
@@ -275,7 +276,9 @@ impl PeerInfo {
                 let now = Utc::now();
 
                 // Set the state of this peer to disconnected.
-                self.handshake = None;
+                self.status = PeerStatus::Disconnected;
+
+                self.nonce = None;
                 self.last_seen = now.clone();
                 self.last_disconnected = now;
                 self.disconnected_count += 1;
@@ -299,7 +302,7 @@ mod tests {
         let peer_info = PeerInfo::new(format!("0.0.0.0:4130").parse()?);
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(&None, peer_info.handshake());
+        assert_eq!(&None, peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
     }
@@ -315,7 +318,7 @@ mod tests {
         peer_info.set_connecting(&address, 0).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
     }
@@ -328,14 +331,14 @@ mod tests {
         peer_info.set_connecting(&address, 0).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
 
         peer_info.set_connected(&address).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(1, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
     }
@@ -348,14 +351,14 @@ mod tests {
         peer_info.set_connecting(&address, 0).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
 
         peer_info.set_disconnected(&address).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.handshake());
+        assert_eq!(&None, peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(1, peer_info.disconnected_count().len());
     }
@@ -368,21 +371,21 @@ mod tests {
         peer_info.set_connecting(&address, 0).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
 
         peer_info.set_connected(&address).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(1, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
 
         peer_info.set_disconnected(&address).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.handshake());
+        assert_eq!(&None, peer_info.nonce());
         assert_eq!(1, peer_info.connected_count().len());
         assert_eq!(1, peer_info.disconnected_count().len());
     }
@@ -397,7 +400,7 @@ mod tests {
 
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
     }
@@ -412,7 +415,7 @@ mod tests {
 
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.handshake());
+        assert_eq!(&Some(0), peer_info.nonce());
         assert_eq!(0, peer_info.connected_count().len());
         assert_eq!(0, peer_info.disconnected_count().len());
     }
@@ -427,7 +430,7 @@ mod tests {
         peer_info.set_disconnected(&address).unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.handshake());
+        assert_eq!(&None, peer_info.nonce());
         assert_eq!(1, peer_info.connected_count().len());
         assert_eq!(1, peer_info.disconnected_count().len());
 
@@ -435,7 +438,7 @@ mod tests {
 
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.handshake());
+        assert_eq!(&None, peer_info.nonce());
         assert_eq!(1, peer_info.connected_count().len());
         assert_eq!(1, peer_info.disconnected_count().len());
     }

@@ -40,13 +40,11 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_utilities::FromBytes;
 
-use chrono::Utc;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, Mutex, RwLock},
     task,
-    time::sleep,
 };
 
 pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
@@ -55,8 +53,14 @@ pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, Me
 pub enum PeerMessage {
     /// Received a version message and preparing to send a verack message back.
     VersionToVerack(SocketAddr, Version),
-    /// Receive handler has signaled to drop the connection with the specified peer.
+    /// Receive handler is connecting to the given peer with the given nonce.
+    ConnectingTo(SocketAddr, u64),
+    /// Receive handler has connected to the given peer with the given nonce.
+    ConnectedTo(SocketAddr, u64),
+    /// Receive handler has signaled to drop the connection with the given peer.
     DisconnectFrom(SocketAddr),
+    /// Receive handler received a new transaction from the given peer.
+    Transaction(SocketAddr, Transaction),
 }
 
 /// A stateful component for managing the peer connections of this node.
@@ -145,87 +149,77 @@ impl PeerManager {
     #[inline]
     pub async fn initialize(&self) -> Result<(), NetworkError> {
         debug!("Initializing peer manager");
-
-        // Attempt to connect to the default bootnodes of the network.
-        trace!("Broadcasting connection requests to the default bootnodes");
-        self.connect_to_bootnodes().await?;
-
-        // Check that this node is not a bootnode.
-        if !self.environment.is_bootnode() {
-            // Attempt to connect to each disconnected peer saved in the peer book.
-            trace!("Broadcasting connection requests to disconnected peers");
-            self.connect_to_disconnected_peers().await?;
-        }
-
+        if let Err(error) = self
+            .receive_handler
+            .clone()
+            .listen(self.environment.clone(), self.peer_book.clone())
+            .await
         {
-            let environment = self.environment.clone();
-            let receive_handler = self.receive_handler.clone();
-            let peer_book = self.peer_book.clone();
-
-            task::spawn(async move {
-                loop {
-                    info!("PEER_MANAGER: START NEXT RECEIVER LISTENER");
-                    if let Err(error) = receive_handler
-                        .clone()
-                        .listen(environment.clone(), peer_book.clone())
-                        .await
-                    {
-                        // TODO: Handle receiver error appropriately with tracing and server state updates.
-                        error!("Receive handler errored with {}", error);
-                        sleep(Duration::from_secs(10)).await;
-                    }
-
-                    info!("PEER_MANAGER: END LISTEN");
-                }
-            });
-
-            let mut peer_manager = self.clone();
-            task::spawn(async move {
-                loop {
-                    peer_manager.receive_handler().await;
-                }
-            });
+            // TODO: Handle receiver error appropriately with tracing and server state updates.
+            error!("Receive handler errored with {}", error);
         }
 
+        let mut peer_manager = self.clone();
+        task::spawn(async move {
+            loop {
+                peer_manager.receive_handler().await;
+            }
+        });
         debug!("Initialized peer manager");
         Ok(())
     }
 
     ///
-    /// Updates the current peer connections and broadcasts new connection requests
-    /// to maintain an acceptable number of peers.
+    /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
     #[inline]
     pub async fn update(&self) -> Result<(), NetworkError> {
         debug!("Updating peer manager");
 
-        // If this node is connected to less peers than the minimum required,
-        // ask every peer this node is connected to for more peers.
-        let number_of_connected_peers = self.number_of_connected_peers().await;
-        if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
-            trace!("Connected to {} peers and requesting more", number_of_connected_peers);
-
-            // Broadcast a `GetPeers` message to request for more peers.
-            self.broadcast_getpeers_requests().await?;
-
-            // Attempt a connection request with every disconnected peer.
-            self.connect_to_disconnected_peers().await?;
-
-            // Attempt a connection request with each bootnode peer again.
-            // Reconnect with any bootnode peer this node may have failed to connect to.
-            // Filters attempts to connect to itself and already-connected bootnode peers.
-            self.connect_to_bootnodes().await?;
-        }
-
-        // TODO (howardwu): Unify `Ping` and `Version` requests.
-        //  This is a remnant and these currently do not need to be distinct.
-
         // Broadcast a `Version` request to each connected peer.
+        trace!("Broadcasting version requests to all connected peers");
         self.broadcast_version_requests().await?;
 
-        // Store the internal state of the peer book.
-        self.save_peer_book_to_storage().await?;
+        // Fetch the number of connected peers.
+        let number_of_connected_peers = self.number_of_connected_peers().await;
+        trace!("Connected with {} peers", number_of_connected_peers);
 
+        // Check that this node is not a bootnode.
+        if !self.environment.is_bootnode() {
+            // Check if this node server is below the permitted number of connected peers.
+            if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
+                // Broadcast a `GetPeers` message to request for more peers.
+                trace!("Broadcasting getpeers requests to all connected peers");
+                self.broadcast_getpeers_requests().await?;
+
+                // Attempt to connect to the default bootnodes of the network.
+                trace!("Broadcasting connection requests to the default bootnodes");
+                self.connect_to_bootnodes().await?;
+
+                // Attempt to connect to each disconnected peer saved in the peer book.
+                trace!("Broadcasting connection requests to disconnected peers");
+                self.connect_to_disconnected_peers().await?;
+            }
+        }
+
+        // Check if this node server is above the permitted number of connected peers.
+        if number_of_connected_peers > self.environment.maximum_number_of_connected_peers() {
+            // Attempt to connect to the default bootnodes of the network.
+            trace!("Disconnect from connected peers to maintain the permitted number");
+            // TODO (howardwu): Implement channel closure in the receive handler,
+            //  send channel disconnect messages to those peers from send handler,
+            //  and close the channels in send handler.
+            // self.disconnect_from_connected_peers(number_of_connected_peers).await?;
+
+            // v LOGIC TO IMPLEMENT v
+            // // Check that the maximum number of peers has not been reached.
+            //     warn!("Maximum number of peers is reached, this connection request is being dropped");
+            //     match channel.shutdown(Shutdown::Write) {
+            // }
+        }
+
+        // Store the peer book to storage.
+        self.save_peer_book_to_storage().await?;
         debug!("Updated peer manager");
         Ok(())
     }
@@ -236,8 +230,8 @@ impl PeerManager {
 
         if let Some(message) = self.receiver.write().await.recv().await {
             match message {
-                PeerMessage::VersionToVerack(remote_address, version) => {
-                    debug!("Receiving version message from {}", remote_address);
+                PeerMessage::VersionToVerack(remote_address, remote_version) => {
+                    debug!("Received a version message from {}", remote_version.receiver);
                     // TODO (howardwu): Move to its own function.
                     /// Receives a handshake request from a connected peer.
                     /// Updates the handshake channel address, if needed.
@@ -254,25 +248,48 @@ impl PeerManager {
                     let number_of_connected_peers = self.number_of_connected_peers().await;
                     let maximum_number_of_connected_peers = self.environment.maximum_number_of_connected_peers();
                     if number_of_connected_peers < maximum_number_of_connected_peers {
+                        debug!("Sending verack message from {}", remote_address);
+
                         /// Receives the version message from a connected peer,
                         /// and sends a verack message to acknowledge back.
                         // You are the new sender and your peer is the receiver.
                         let address_receiver = remote_address;
-                        let address_sender = version.receiver;
+                        let address_sender = remote_version.receiver;
                         self.send_handler
                             .broadcast(&Request::Verack(Verack::new(
-                                version.nonce,
+                                remote_version.nonce,
                                 address_sender,
                                 address_receiver,
                             )))
-                            .await;
+                            .await
+                            .unwrap();
+                        self.connecting_to_peer(&address_receiver, remote_version.nonce)
+                            .await
+                            .unwrap();
+                        debug!("Sending verack message from {}", remote_address);
                     }
-                    debug!("Received version message from {}", remote_address);
+                }
+                PeerMessage::ConnectingTo(remote_address, nonce) => {
+                    self.connecting_to_peer(&remote_address, nonce).await.unwrap();
+                    debug!("Connecting to {}", remote_address);
+                }
+                PeerMessage::ConnectedTo(remote_address, nonce) => {
+                    if self.is_connecting(&remote_address).await {
+                        self.connected_to_peer(&remote_address, nonce).await.unwrap();
+                        debug!("Connected to {}", remote_address);
+                    } else {
+                        // TODO (howardwu): Handle the unsafe case.
+                    }
                 }
                 PeerMessage::DisconnectFrom(remote_address) => {
                     debug!("Disconnecting from {}", remote_address);
-                    self.disconnect_from_peer(&remote_address).await.unwrap();
+                    self.disconnected_from_peer(&remote_address).await.unwrap();
                     debug!("Disconnected from {}", remote_address);
+                }
+                PeerMessage::Transaction(source, transaction) => {
+                    debug!("Found transaction for memory pool from {}", source);
+                    self.process_transaction_internal(source, transaction).await.unwrap();
+                    debug!("Propagated transaction to {}", source);
                 }
             }
         }
@@ -376,14 +393,32 @@ impl PeerManager {
         peer_book.handshake(remote_address)
     }
 
-    /// TODO (howardwu): Add logic to remove the active channels
-    ///  and handshakes of the peer from this struct.
-    /// Attempts to disconnect the given address from this node.
+    /// Sets the given remote address and nonce in the peer book as connecting to this node server.
     #[inline]
-    pub async fn disconnect_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
+    async fn connecting_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
-        // Set the peer as disconnected in the peer book.
+        // Set the peer as connecting with this node server.
+        peer_book.set_connecting(remote_address, nonce)
+    }
+
+    /// Sets the given remote address in the peer book as connected to this node server.
+    #[inline]
+    async fn connected_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Set the peer as connected with this node server.
+        peer_book.set_connected(remote_address, nonce)
+    }
+
+    /// TODO (howardwu): Add logic to remove the active channels
+    ///  and handshakes of the peer from this struct.
+    /// Sets the given remote address in the peer book as disconnected from this node server.
+    #[inline]
+    async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Set the peer as disconnected with this node server.
         peer_book.set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
@@ -398,7 +433,15 @@ impl PeerManager {
         peer_book.add_peer(address)
     }
 
+    ///
     /// Broadcasts a connection request to all default bootnodes of the network.
+    ///
+    /// This function attempts to reconnect this node server with any bootnode peer
+    /// that this node may have failed to connect to.
+    ///
+    /// This function filters attempts to connect to itself, and any bootnode peers
+    /// this node server is already connected to.
+    ///
     #[inline]
     async fn connect_to_bootnodes(&self) -> Result<(), NetworkError> {
         trace!("Connecting to bootnodes");
@@ -424,10 +467,7 @@ impl PeerManager {
                 let request = Request::Version(version.clone());
 
                 // Set the bootnode as a connecting peer in the peer book.
-                self.peer_book
-                    .write()
-                    .await
-                    .set_connecting(bootnode_address, version.nonce);
+                self.connecting_to_peer(bootnode_address, version.nonce).await?;
 
                 // Send a connection request with the send handler.
                 self.send_handler.broadcast(&request).await?;
@@ -453,10 +493,7 @@ impl PeerManager {
             let request = Request::Version(version.clone());
 
             // Set the disconnected peer as a connecting peer in the peer book.
-            self.peer_book
-                .write()
-                .await
-                .set_connecting(&remote_address, version.nonce);
+            self.connecting_to_peer(&remote_address, version.nonce).await?;
 
             // Send a connection request with the send handler.
             self.send_handler.broadcast(&request).await?;
@@ -503,36 +540,32 @@ impl PeerManager {
         // Fetch the current block height of this node.
         let block_height = self.environment.current_block_height().await;
 
-        // Broadcast a `Version` message to each connected peer for a periodic sync.
-        if self.number_of_connected_peers().await > 0 {
-            debug!("Sending out periodic version message to peers");
+        // Broadcast a `Version` message to each connected peer of this node server.
+        for (remote_address, _) in self.connected_peers().await {
+            debug!("Broadcasting version message to {}", remote_address);
 
-            // Send a `Version` message to every connected peer of this node.
-            for (remote_address, _) in self.connected_peers().await {
-                // Get the handshake nonce.
-                match self.handshake(&remote_address).await {
-                    // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
-                    Ok(nonce) => {
-                        // TODO (raychu86): Establish a formal node version.
-                        // Broadcast a `Version` message to the connected peer.
-                        self.send_handler
-                            .broadcast(&Request::Version(Version::new(
-                                1u64,
-                                block_height,
-                                nonce,
-                                local_address,
-                                remote_address,
-                            )))
-                            .await?;
-                    }
-                    // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
-                    Err(error) => {
-                        // Disconnect from the peer if there is no active connection channel
-                        // TODO (howardwu): Inform SendHandler to also disconnect, by dropping any channels held with this peer.
-                        self.disconnect_from_peer(&remote_address).await?;
-                    }
-                };
-            }
+            // Get the handshake nonce.
+            if let Ok(nonce) = self.handshake(&remote_address).await {
+                // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
+
+                // TODO (raychu86): Establish a formal node version.
+                // Broadcast a `Version` message to the connected peer.
+                self.send_handler
+                    .broadcast(&Request::Version(Version::new(
+                        1u64,
+                        block_height,
+                        nonce,
+                        local_address,
+                        remote_address,
+                    )))
+                    .await?;
+            } else {
+                // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
+
+                // Disconnect from the peer if there is no active connection channel
+                // TODO (howardwu): Inform SendHandler to also disconnect, by dropping any channels held with this peer.
+                self.disconnected_from_peer(&remote_address).await?;
+            };
         }
 
         Ok(())
@@ -552,11 +585,11 @@ impl PeerManager {
             //     // Broadcast the message over the channel.
             //     if let Err(_) = channel.write(&GetPeers).await {
             //         // Disconnect from the peer if the message fails to send.
-            //         self.disconnect_from_peer(&remote_address).await?;
+            //         self.disconnected_from_peer(&remote_address).await?;
             //     }
             // } else {
             //     // Disconnect from the peer if the channel is not active.
-            //     self.disconnect_from_peer(&remote_address).await?;
+            //     self.disconnected_from_peer(&remote_address).await?;
             // }
         }
 
@@ -595,7 +628,6 @@ impl PeerManager {
     /// Broadcast transaction to connected peers
     pub async fn propagate_transaction(
         &self,
-        environment: &Environment,
         transaction_bytes: Vec<u8>,
         transaction_sender: SocketAddr,
     ) -> Result<(), NetworkError> {
@@ -632,37 +664,34 @@ impl PeerManager {
     /// Verify a transaction, add it to the memory pool, propagate it to peers.
     pub async fn process_transaction_internal(
         &self,
-        environment: &Environment,
-        consensus: &ConsensusParameters,
-        parameters: &PublicParameters<Components>,
-        storage: &Arc<RwLock<MerkleTreeLedger>>,
-        memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-        transaction_bytes: Vec<u8>,
-        transaction_sender: SocketAddr,
+        source: SocketAddr,
+        transaction: Transaction,
     ) -> Result<(), NetworkError> {
-        if let Ok(transaction) = Tx::read(&transaction_bytes[..]) {
-            let mut memory_pool = memory_pool.lock().await;
+        if let Ok(tx) = Tx::read(&transaction.bytes[..]) {
+            let mut memory_pool = self.environment.memory_pool().lock().await;
+            let parameters = self.environment.dpc_parameters();
+            let storage = self.environment.storage();
+            let consensus = self.environment.consensus_parameters();
 
-            if !consensus.verify_transaction(parameters, &transaction, &*storage.read().await)? {
+            if !consensus.verify_transaction(parameters, &tx, &*storage.read().await)? {
                 error!("Received a transaction that was invalid");
                 return Ok(());
             }
 
-            if transaction.value_balance.is_negative() {
+            if tx.value_balance.is_negative() {
                 error!("Received a transaction that was a coinbase transaction");
                 return Ok(());
             }
 
             let entry = Entry::<Tx> {
-                size_in_bytes: transaction_bytes.len(),
-                transaction,
+                size_in_bytes: transaction.bytes.len(),
+                transaction: tx,
             };
 
             if let Ok(inserted) = memory_pool.insert(&*storage.read().await, entry) {
                 if inserted.is_some() {
                     info!("Transaction added to memory pool.");
-                    self.propagate_transaction(environment, transaction_bytes, transaction_sender)
-                        .await?;
+                    self.propagate_transaction(transaction.bytes, source).await?;
                 }
             }
         }

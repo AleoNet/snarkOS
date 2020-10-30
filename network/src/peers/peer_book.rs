@@ -22,8 +22,9 @@ use snarkos_storage::Ledger;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 
-/// An data structure for tracking and indexing the history of
-/// all connected and disconnected peers to this node.
+///
+/// A data structure for storing the history of all peers with this node server.
+///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerBook {
     /// The map of connecting peers to their metadata.
@@ -37,7 +38,9 @@ pub struct PeerBook {
 }
 
 impl PeerBook {
+    ///
     /// Creates a new instance of `PeerBook`.
+    ///
     #[inline]
     pub fn new(local_address: SocketAddr) -> Self {
         Self {
@@ -69,67 +72,89 @@ impl PeerBook {
         }
     }
 
+    ///
     /// Returns `true` if a given address is a connecting peer in the `PeerBook`.
+    ///
     #[inline]
     pub fn is_connecting(&self, address: &SocketAddr) -> bool {
         self.connecting_peers.contains_key(address)
     }
 
+    ///
     /// Returns `true` if a given address is a connected peer in the `PeerBook`.
+    ///
     #[inline]
     pub fn is_connected(&self, address: &SocketAddr) -> bool {
         self.connected_peers.contains_key(address)
     }
 
+    ///
     /// Returns `true` if a given address is a disconnected peer in the `PeerBook`.
+    ///
     #[inline]
     pub fn is_disconnected(&self, address: &SocketAddr) -> bool {
         self.disconnected_peers.contains_key(address)
     }
 
+    ///
     /// Returns the number of connecting peers.
+    ///
     #[inline]
     pub fn number_of_connecting_peers(&self) -> u16 {
         self.connecting_peers.len() as u16
     }
 
+    ///
     /// Returns the number of connected peers.
+    ///
     #[inline]
     pub fn number_of_connected_peers(&self) -> u16 {
         self.connected_peers.len() as u16
     }
 
+    ///
     /// Returns the number of disconnected peers.
+    ///
     #[inline]
     pub fn number_of_disconnected_peers(&self) -> u16 {
         self.disconnected_peers.len() as u16
     }
 
+    ///
     /// Returns a reference to the connecting peers in this peer book.
+    ///
     #[inline]
     pub fn connecting_peers(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.connecting_peers
     }
 
+    ///
     /// Returns a reference to the connected peers in this peer book.
+    ///
     #[inline]
     pub fn connected_peers(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.connected_peers
     }
 
+    ///
     /// Returns a reference to the disconnected peers in this peer book.
+    ///
     #[inline]
     pub fn disconnected_peers(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.disconnected_peers
     }
 
+    ///
     /// Returns the local address of this node.
+    ///
     #[inline]
     pub fn local_address(&self) -> SocketAddr {
         self.local_address
     }
 
+    ///
     /// Updates the local address of this node.
+    ///
     #[inline]
     pub fn set_local_address(&mut self, address: SocketAddr) {
         // Check that the node does not maintain a connection to itself.
@@ -156,7 +181,7 @@ impl PeerBook {
                 .connecting_peers
                 .get(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?
-                .handshake()
+                .nonce()
             {
                 Some(nonce) => Ok(*nonce),
                 None => Err(NetworkError::PeerIsDisconnected),
@@ -170,7 +195,7 @@ impl PeerBook {
                 .connected_peers
                 .get(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?
-                .handshake()
+                .nonce()
             {
                 Some(nonce) => Ok(*nonce),
                 None => Err(NetworkError::PeerIsDisconnected),
@@ -180,8 +205,9 @@ impl PeerBook {
         Err(NetworkError::PeerIsDisconnected)
     }
 
-    /// Add the given address to the connecting peers in the `PeerBook`.
-    /// Returns `true` on success. Otherwise, returns `false`.
+    ///
+    /// Adds the given address to the connecting peers for the given nonce in the `PeerBook`.
+    ///
     #[inline]
     pub fn set_connecting(&mut self, address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Check that the given address is not the node server address.
@@ -207,10 +233,12 @@ impl PeerBook {
         Ok(())
     }
 
-    /// Add the given address to the connected peers in the `PeerBook`.
-    /// Returns `true` on success. Otherwise, returns `false`.
+    ///
+    /// Adds the given address to the connected peers in the `PeerBook`,
+    /// if the given nonce matches the stored nonce from `Self::set_connecting`.
+    ///
     #[inline]
-    pub fn set_connected(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
+    pub fn set_connected(&mut self, address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Check that the given address is not the node server address.
         if self.local_address() == *address {
             error!("Attempting to connect to the local address - {}", address);
@@ -225,7 +253,7 @@ impl PeerBook {
             _ => return Err(NetworkError::PeerWasNotSetToConnecting),
         };
         // Update the peer info to connected.
-        peer_info.set_connected()?;
+        peer_info.set_connected(nonce)?;
 
         // Add the address into the connected peers.
         let success = self.connected_peers.insert(*address, peer_info).is_none();
@@ -235,9 +263,10 @@ impl PeerBook {
         Ok(())
     }
 
-    /// Removes the given address from the connected peers in this `PeerBook`,
+    ///
+    /// Removes the given address from the connecting and connected peers in this `PeerBook`,
     /// and adds the given address to the disconnected peers in this `PeerBook`.
-    /// On success, returns `true`. Otherwise, returns `false`.
+    ///
     #[inline]
     pub fn set_disconnected(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Check that the given address is not the node server address.
@@ -274,7 +303,7 @@ impl PeerBook {
             if !self.disconnected_peers.contains_key(address) {
                 // If not, add the address into the disconnected peers.
                 trace!("Adding an undiscovered peer to the peer book - {}", address);
-                self.add_peer(address);
+                self.add_peer(address)?;
             }
         }
 
@@ -317,7 +346,7 @@ impl PeerBook {
                 .get_mut(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?;
             // Update the `last_seen` timestamp in the peer info.
-            peer_info.set_last_seen();
+            peer_info.set_last_seen()?;
 
             error!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);
@@ -331,7 +360,7 @@ impl PeerBook {
                 .get_mut(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?;
             // Update the `last_seen` timestamp in the peer info.
-            peer_info.set_last_seen();
+            peer_info.set_last_seen()?;
 
             error!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);

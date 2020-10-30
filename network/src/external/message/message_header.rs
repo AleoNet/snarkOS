@@ -38,7 +38,6 @@ impl MessageHeader {
 
         let mut wtr = vec![];
         wtr.write_u32::<BigEndian>(self.len)?;
-
         result.extend_from_slice(&wtr);
 
         Ok(result)

@@ -24,7 +24,7 @@ use crate::{
 };
 use snarkos_errors::{
     consensus::ConsensusError,
-    network::{ConnectError, PingProtocolError, SendError, ServerError},
+    network::{ConnectError, SendError, ServerError},
     objects::BlockError,
     storage::StorageError,
 };
@@ -60,13 +60,13 @@ pub enum NetworkError {
     PeerIsDisconnected,
     PeerIsMissingNonce,
     PeerIsReusingNonce,
+    PeerNonceMismatch,
     PeerUnauthorized,
     PeerWasNotSetToConnecting,
-    PingProtocolError(PingProtocolError),
     ReceiveHandlerAlreadySetPeerSender,
-    ReceiveHandlerMissingPeerManager,
     ReceiveHandlerMissingPeerSender,
     SendError(SendError),
+    SendHandlerFailedToCreateChannel,
     SendHandlerPendingRequestsMissing,
     SendRequestUnauthorized,
     StorageError(StorageError),
@@ -89,12 +89,6 @@ impl From<ConnectError> for NetworkError {
 impl From<ConsensusError> for NetworkError {
     fn from(error: ConsensusError) -> Self {
         NetworkError::ConsensusError(error)
-    }
-}
-
-impl From<PingProtocolError> for NetworkError {
-    fn from(error: PingProtocolError) -> Self {
-        NetworkError::PingProtocolError(error)
     }
 }
 
@@ -155,9 +149,6 @@ impl From<NetworkError> for anyhow::Error {
 
 /// A core data structure for operating the networking stack of this node.
 pub struct Server {
-    /// The parameters and settings of this node server.
-    environment: Environment,
-
     peer_manager: PeerManager,
     // sync_manager: Arc<Mutex<SyncManager>>,
 }
@@ -169,10 +160,7 @@ impl Server {
         let peer_manager = PeerManager::new(&mut environment.clone())?;
         environment.set_managers(peer_manager.clone());
 
-        Ok(Self {
-            environment: environment.clone(),
-            peer_manager,
-        })
+        Ok(Self { peer_manager })
     }
 
     ///
@@ -183,32 +171,13 @@ impl Server {
     /// 3. Start the connection handler.
     /// 4. Start the message handler.
     ///
-    pub async fn listen(mut self) -> Result<(), NetworkError> {
+    pub async fn listen(self) -> Result<(), NetworkError> {
         self.peer_manager.initialize().await?;
         loop {
             info!("Hello b?");
             self.peer_manager.clone().update().await?;
-
             sleep(Duration::from_secs(10)).await;
         }
-
-        // TODO (howardwu): Delete this.
-        // Prepare to spawn the main loop.
-        // let environment = self.environment.clone();
-        // let sender = self.sender.clone();
-        // let mut peer_manager = self.peer_manager.clone();
-        // let peer_manager_og = PeerManager::new(environment.clone()).await?;
-        // let mut peer_manager = PeerManager::new(environment.clone()).await?;
-        // let sync_manager = self.environment.sync_manager().await.clone();
-        // let sync_manager2 = sync_manager.clone();
-
-        // TODO (howardwu): Delete this.
-        // // TODO (howardwu): Find the actual address of this node.
-        // // 1. Initialize TCP listener and accept new TCP connections.
-        // let local_address = peer_manager_og.local_address();
-        // debug!("Starting listener at {:?}...", local_address);
-        // let mut listener = TcpListener::bind(&local_address).await?;
-        // info!("Listening at {:?}", local_address);
 
         // TODO (howardwu): Delete this.
         // // 2. Spawn a new thread to handle new connections.
