@@ -41,11 +41,20 @@ use snarkos_dpc::base_dpc::{
 use snarkos_utilities::FromBytes;
 
 use chrono::Utc;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, oneshot, Mutex, RwLock},
+    task,
+    time::sleep,
+};
 
 pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
+
+pub enum PeerMessage {
+    Disconnect(SocketAddr),
+}
 
 /// A stateful component for managing the peer connections of this node.
 #[derive(Clone)]
@@ -74,12 +83,13 @@ impl PeerManager {
     ///
     #[inline]
     // pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
-    pub fn new(
-        environment: &mut Environment,
-        send_handler: SendHandler,
-        mut receive_handler: ReceiveHandler,
-    ) -> Result<Self, NetworkError> {
+    pub fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
+
+        // Create a send handler.
+        let send_handler = SendHandler::new();
+        // Create a receive handler.
+        let mut receive_handler = ReceiveHandler::new(send_handler.clone());
 
         // Initialize the peer sender and peer receiver.
         let (sender, receiver) = mpsc::channel(1024);
@@ -134,6 +144,29 @@ impl PeerManager {
             self.connect_to_disconnected_peers().await?;
         }
 
+        {
+            let environment = self.environment.clone();
+            let receive_handler = self.receive_handler.clone();
+            let peer_book = self.peer_book.clone();
+
+            task::spawn(async move {
+                loop {
+                    info!("PEER_MANAGER: START NEXT RECEIVER LISTENER");
+                    if let Err(error) = receive_handler
+                        .clone()
+                        .listen(environment.clone(), peer_book.clone())
+                        .await
+                    {
+                        // TODO: Handle receiver error appropriately with tracing and server state updates.
+                        error!("Receive handler errored with {}", error);
+                        sleep(Duration::from_secs(10)).await;
+                    }
+
+                    info!("PEER_MANAGER: END LISTEN");
+                }
+            });
+        }
+
         debug!("Initialized peer manager");
         Ok(())
     }
@@ -179,6 +212,21 @@ impl PeerManager {
         debug!("Updated peer manager");
         Ok(())
     }
+
+    // pub async fn tmp_listener(&self) {
+    //     // Acquire the peer receiver write lock.
+    //     // let mut peer_receiver = self.peer_receiver.write().await;
+    //
+    //     loop {
+    //         if let Some(message) = self.peer_receiver.recv().await {
+    //             match message {
+    //                 PeerMessage::Disconnect(remote_address) => {
+    //                     self.disconnect_from_peer(&remote_address).await.unwrap();
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     ///
     /// Returns `true` if the given address is connecting with this node.
