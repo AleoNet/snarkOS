@@ -16,7 +16,7 @@
 
 use crate::{
     environment::Environment,
-    external::{message::MessageName, message_types::GetSync, protocol::*, Channel, GetMemoryPool},
+    external::{message::MessageName, message_types::GetSync, Channel, GetMemoryPool},
     peer_manager::PeerManager,
     ReceiveHandler,
     SendHandler,

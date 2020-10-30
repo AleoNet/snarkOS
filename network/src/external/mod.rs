@@ -24,6 +24,3 @@ pub use message::*;
 pub mod message_types;
 #[doc(inline)]
 pub use message_types::*;
-
-pub mod protocol;
-pub use protocol::*;

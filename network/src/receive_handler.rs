@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::Message, message_types::*, Channel, MessageName, PingPongManager},
+    external::{message::Message, message_types::*, Channel, MessageName},
     peer_manager::PeerMessage,
     peers::PeerBook,
     request::Request,
@@ -414,24 +414,6 @@ impl ReceiveHandler {
                                         );
                                     }
                                 }
-                            } else if name == Ping::name() {
-                                if let Ok(ping) = Ping::deserialize(bytes) {
-                                    if let Err(err) = self.receive_ping(environment, ping, channel.clone()).await {
-                                        error!(
-                                            "Receive handler errored when receiving a {} message from {}. {}",
-                                            name, remote_address, err
-                                        );
-                                    }
-                                }
-                            } else if name == Pong::name() {
-                                if let Ok(pong) = Pong::deserialize(bytes) {
-                                    if let Err(err) = self.receive_pong(environment, pong, channel.clone()).await {
-                                        error!(
-                                            "Receive handler errored when receiving a {} message from {}. {}",
-                                            name, remote_address, err
-                                        );
-                                    }
-                                }
                             } else if name == Sync::name() {
                                 if let Ok(sync) = Sync::deserialize(bytes) {
                                     if let Err(err) = self.receive_sync(environment, sync).await {
@@ -728,60 +710,6 @@ impl ReceiveHandler {
             else if !peer_manager.is_connected(&channel.remote_address).await {
                 peer_manager.found_peer(&channel.remote_address);
             }
-        }
-
-        Ok(())
-    }
-
-    /// A peer has sent us a ping message.
-    /// Reply with a pong message.
-    async fn receive_ping(
-        &self,
-        environment: &Environment,
-        message: Ping,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        // If we received a ping, but aren't connected to the peer,
-        // inform the peer book that we found a peer.
-        // The peer book will determine if we have seen the peer before,
-        // and include the peer if it is new.
-        let peer_manager = environment.peer_manager_write().await;
-        if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address).await;
-        }
-
-        PingPongManager::send_pong(message, channel).await?;
-        Ok(())
-    }
-
-    /// A peer has sent us a pong message.
-    /// Check if it matches a ping we sent out.
-    async fn receive_pong(
-        &self,
-        environment: &Environment,
-        message: Pong,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        // If we received a pong, but aren't connected to the peer,
-        // inform the peer book that we found a peer.
-        // The peer book will determine if we have seen the peer before,
-        // and include the peer if it is new.
-        let peer_manager = environment.peer_manager_write().await;
-        if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address).await;
-        }
-
-        if let Err(error) = environment
-            .ping_pong()
-            .write()
-            .await
-            .accept_pong(channel.remote_address, message)
-            .await
-        {
-            debug!(
-                "Invalid pong message from: {:?}, Full error: {:?}",
-                channel.remote_address, error
-            )
         }
 
         Ok(())
