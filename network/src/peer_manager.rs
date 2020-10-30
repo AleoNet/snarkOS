@@ -17,7 +17,7 @@
 use crate::{
     external::{
         message::MessageName,
-        message_types::{Block, GetPeers, Ping, Transaction, Version},
+        message_types::{Block, GetPeers, Ping, Transaction, Verack, Version},
         Channel,
     },
     peers::{PeerBook, PeerInfo},
@@ -53,7 +53,8 @@ pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, Messag
 pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 
 pub enum PeerMessage {
-    Disconnect(SocketAddr),
+    VersionToVerack(SocketAddr, Version),
+    DisconnectFrom(SocketAddr),
 }
 
 /// A stateful component for managing the peer connections of this node.
@@ -71,6 +72,9 @@ pub struct PeerManager {
     peer_sender: Arc<RwLock<PeerSender>>,
     /// The receiver for this peer manager to receive responses from the receive handler.
     peer_receiver: Arc<PeerReceiver>,
+
+    sender: Arc<mpsc::Sender<PeerMessage>>,
+    receiver: Arc<RwLock<mpsc::Receiver<PeerMessage>>>,
 }
 
 impl PeerManager {
@@ -95,9 +99,6 @@ impl PeerManager {
         let (sender, receiver) = mpsc::channel(1024);
         let (peer_sender, peer_receiver) = (Arc::new(RwLock::new(sender)), Arc::new(receiver));
 
-        // Initialize the peer sender with the receive handler.
-        receive_handler.initialize(peer_sender.clone())?;
-
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());
         // let peer_book = match PeerBook::load(&*environment.storage_read().await) {
@@ -108,6 +109,13 @@ impl PeerManager {
         //     _ => PeerBook::new(*environment.local_address()),
         // };
 
+        // Initialize the sender and receiver.
+        let (sender, receiver) = mpsc::channel(1024);
+        let (sender, receiver) = (Arc::new(sender), Arc::new(RwLock::new(receiver)));
+
+        // Initialize the peer sender with the receive handler.
+        receive_handler.initialize(peer_sender.clone(), sender.clone())?;
+
         // Instantiate the peer manager.
         let peer_manager = Self {
             environment: environment.clone(),
@@ -116,6 +124,9 @@ impl PeerManager {
             peer_book: Arc::new(RwLock::new(peer_book)),
             peer_sender,
             peer_receiver,
+
+            sender,
+            receiver,
         };
 
         // Save the peer book to storage.
@@ -165,6 +176,13 @@ impl PeerManager {
                     info!("PEER_MANAGER: END LISTEN");
                 }
             });
+
+            let mut peer_manager = self.clone();
+            task::spawn(async move {
+                loop {
+                    peer_manager.receive_handler().await;
+                }
+            });
         }
 
         debug!("Initialized peer manager");
@@ -181,7 +199,7 @@ impl PeerManager {
 
         // If this node is connected to less peers than the minimum required,
         // ask every peer this node is connected to for more peers.
-        if self.number_of_connected_peers().await < self.environment.minimum_number_of_peers() {
+        if self.number_of_connected_peers().await < self.environment.minimum_number_of_connected_peers() {
             trace!("Attempting to connect to more peers");
 
             // Broadcast a `GetPeers` message to request for more peers.
@@ -213,20 +231,55 @@ impl PeerManager {
         Ok(())
     }
 
-    // pub async fn tmp_listener(&self) {
-    //     // Acquire the peer receiver write lock.
-    //     // let mut peer_receiver = self.peer_receiver.write().await;
-    //
-    //     loop {
-    //         if let Some(message) = self.peer_receiver.recv().await {
-    //             match message {
-    //                 PeerMessage::Disconnect(remote_address) => {
-    //                     self.disconnect_from_peer(&remote_address).await.unwrap();
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+    #[inline]
+    pub async fn receive_handler(&mut self) {
+        warn!("PEER_MANAGER: START NEXT RECEIVER HANDLER");
+
+        if let Some(message) = self.receiver.write().await.recv().await {
+            match message {
+                PeerMessage::VersionToVerack(remote_address, version) => {
+                    debug!("Receiving version message from {}", remote_address);
+                    // TODO (howardwu): Move to its own function.
+                    /// Receives a handshake request from a connected peer.
+                    /// Updates the handshake channel address, if needed.
+                    /// Sends a handshake response back to the connected peer.
+                    // ORIGINAL CODE
+
+                    // match environment.handshakes().write().await.get_mut(&remote_address) {
+                    //     Some(handshake) => {
+                    //         handshake.update_address(remote_address);
+                    //         handshake.receive(message).await.is_ok()
+                    //     }
+                    //     None => false,
+                    // }
+                    let number_of_connected_peers = self.number_of_connected_peers().await;
+                    let maximum_number_of_connected_peers = self.environment.maximum_number_of_connected_peers();
+                    if number_of_connected_peers < maximum_number_of_connected_peers {
+                        /// Receives the version message from a connected peer,
+                        /// and sends a verack message to acknowledge back.
+                        // You are the new sender and your peer is the receiver.
+                        let address_receiver = remote_address;
+                        let address_sender = version.receiver;
+                        self.send_handler
+                            .broadcast(&Request::Verack(Verack::new(
+                                version.nonce,
+                                address_sender,
+                                address_receiver,
+                            )))
+                            .await;
+                    }
+                    debug!("Received version message from {}", remote_address);
+                }
+                PeerMessage::DisconnectFrom(remote_address) => {
+                    debug!("Disconnecting from {}", remote_address);
+                    self.disconnect_from_peer(&remote_address).await.unwrap();
+                    debug!("Disconnected from {}", remote_address);
+                }
+            }
+        }
+
+        warn!("PEER_MANAGER: END HANDLER");
+    }
 
     ///
     /// Returns `true` if the given address is connecting with this node.
@@ -345,14 +398,6 @@ impl PeerManager {
         // Add the given address to the peer book.
         peer_book.add_peer(address)
     }
-
-    // TODO (howardwu): Implement this peer receiver from receive handler.
-    // #[inline]
-    // pub async fn listener(&self) {
-    //     loop {
-    //         if let Some((tx, name, bytes, mut channel)) = self.peer_receiver.recv().await {}
-    //     }
-    // }
 
     /// Broadcasts a connection request to all default bootnodes of the network.
     #[inline]

@@ -81,55 +81,55 @@ impl SendHandler {
 
         // Acquire the channels write lock.
         let mut channels = self.channels.write().await;
+        // Acquire the pending write lock.
+        let mut pending = self.pending.write().await;
+
         // Fetch or initialize the channel for broadcasting the request.
         let channel = match channels.get(&receiver) {
             // Case 1 - The channel exists, retrieves the channel.
-            Some(channel) => channel.clone(),
-            // Case 2 - The channel does not exist, creates a new channel and stores it.
+            Some(channel) => {
+                trace!("Using the existing channel with {}", receiver);
+                channel.clone()
+            }
+            // Case 2 - The channel does not exist, creates and returns a new channel.
             None => {
-                // Create a new channel for the given remote address.
-                let channel = Arc::new(Channel::new_writer(receiver.clone()).await?);
-                // Store the new channel in the channel map.
-                channels.insert(receiver, channel.clone());
-                channel
+                trace!("Creating a new channel with {}", receiver);
+                Arc::new(Channel::new_writer(receiver.clone()).await?)
             }
         };
-        // Drop the channels write lock.
-        drop(channels);
 
-        // Acquire the pending write lock.
-        let mut pending = self.pending.write().await;
         // Fetch or initialize the pending requests for the request receiver.
-        let requests = match pending.get(&receiver) {
+        let pending_requests = match pending.get(&receiver) {
             // Case 1 - The receiver exists, retrieves the requests.
-            Some(requests) => requests.clone(),
+            Some(requests) => {
+                trace!("Using the existing instance of pending requests {:?}", requests);
+                requests.clone()
+            }
             // Case 2 - The receiver does not exist, initializes requests and stores it.
             None => {
+                trace!("Creating a new instance of pending requests");
                 // Creates a new instance of `Requests` and stores it.
-                let requests = Arc::new(RwLock::new(HashSet::new()));
-                // Store the new requests in the pending map.
-                pending.insert(receiver, requests.clone());
-                requests
+                Arc::new(RwLock::new(HashSet::new()))
             }
         };
-        // Drop the pending write lock.
-        drop(pending);
 
-        // Acquire the requests write lock.
-        let mut requests_writer = requests.write().await;
-        // Add the request to the pending requests.
-        requests_writer.insert(request.clone());
-        // Drop the requests write lock.
-        drop(requests_writer);
+        // Acquire the pending requests write lock.
+        let mut pending_inner = pending_requests.write().await;
+
+        // Store the channel in the channel map.
+        channels.insert(receiver, channel.clone());
+        // Store the pending requests in the pending map.
+        pending.insert(receiver, pending_requests.clone());
+        // Store the request to the pending requests.
+        pending_inner.insert(request.clone());
 
         // Increment the request counter.
         self.send_request_count.fetch_add(1, Ordering::SeqCst);
 
         trace!("Authorized `{}` request to {}", request.name(), receiver);
-        Ok((channel, requests.clone()))
+        Ok((channel, pending_requests.clone()))
     }
 
-    /// TODO (howardwu): Check if this method needs to be async.
     ///
     /// Broadcasts the given request.
     ///

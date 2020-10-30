@@ -79,6 +79,8 @@ pub struct ReceiveHandler {
     receive_failure_count: Arc<AtomicU64>,
     /// TODO (howardwu): Temporary. Remove this. See 1 usage in impl.
     send_handler: crate::SendHandler,
+
+    sender: Option<Arc<mpsc::Sender<PeerMessage>>>,
 }
 
 impl ReceiveHandler {
@@ -92,6 +94,8 @@ impl ReceiveHandler {
             receive_success_count: Arc::new(AtomicU64::new(0)),
             receive_failure_count: Arc::new(AtomicU64::new(0)),
             send_handler,
+
+            sender: None,
         }
     }
 
@@ -119,7 +123,11 @@ impl ReceiveHandler {
     /// Sets the peer sender in this receive handler.
     ///
     #[inline]
-    pub fn initialize(&mut self, peer_sender: Arc<RwLock<PeerSender>>) -> Result<(), NetworkError> {
+    pub fn initialize(
+        &mut self,
+        peer_sender: Arc<RwLock<PeerSender>>,
+        sender: Arc<mpsc::Sender<PeerMessage>>,
+    ) -> Result<(), NetworkError> {
         debug!("Initializing receive handler with a peer sender");
 
         // Check that the peer sender has not already been initialized.
@@ -130,6 +138,8 @@ impl ReceiveHandler {
 
         // Set the peer sender in this receive handler.
         self.peer_sender = Some(peer_sender);
+
+        self.sender = Some(sender);
 
         debug!("Initialized receive handler with a peer sender {:?}", self.peer_sender);
         Ok(())
@@ -142,6 +152,11 @@ impl ReceiveHandler {
 
         let peer_sender = match self.peer_sender {
             Some(ref peer_sender) => peer_sender.clone(),
+            None => return Err(NetworkError::ReceiveHandlerMissingPeerSender),
+        };
+
+        let sender = match self.sender {
+            Some(ref sender) => sender.clone(),
             None => return Err(NetworkError::ReceiveHandlerMissingPeerSender),
         };
 
@@ -221,7 +236,7 @@ impl ReceiveHandler {
                 trace!("Connected with {} peers", number_of_connected_peers);
 
                 // Check that the maximum number of peers has not been reached.
-                if number_of_connected_peers >= environment.maximum_number_of_peers() {
+                if number_of_connected_peers >= environment.maximum_number_of_connected_peers() {
                     warn!("Maximum number of peers is reached, this connection request is being dropped");
                     match channel.shutdown(Shutdown::Write) {
                         Ok(_) => {
@@ -480,9 +495,7 @@ impl ReceiveHandler {
                                 }
                             } else if name == MessageName::from("disconnect") {
                                 info!("Disconnected from peer {:?}", remote_address);
-                                // TODO (howardwu): Call `PeerManager::disconnect_from_peer` instead.
-                                let mut peer_book = peer_book.write().await;
-                                peer_book.set_disconnected(&remote_address);
+                                sender.send(PeerMessage::DisconnectFrom(remote_address)).await;
                             } else {
                                 debug!("Message name not recognized {:?}", name.to_string());
                             }
@@ -668,7 +681,7 @@ impl ReceiveHandler {
         // and include the peer if it is new.
         let peer_manager = environment.peer_manager_write().await;
         if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address);
+            peer_manager.found_peer(&channel.remote_address).await;
         }
 
         // Broadcast the sanitized list of connected peers back to requesting peer.
@@ -701,7 +714,7 @@ impl ReceiveHandler {
         // and include the peer if it is new.
         let peer_manager = environment.peer_manager_write().await;
         if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address);
+            peer_manager.found_peer(&channel.remote_address).await;
         }
 
         // Process all of the peers sent in the message,
@@ -742,7 +755,7 @@ impl ReceiveHandler {
         // and include the peer if it is new.
         let peer_manager = environment.peer_manager_write().await;
         if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address);
+            peer_manager.found_peer(&channel.remote_address).await;
         }
 
         PingPongManager::send_pong(message, channel).await?;
@@ -763,7 +776,7 @@ impl ReceiveHandler {
         // and include the peer if it is new.
         let peer_manager = environment.peer_manager_write().await;
         if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address);
+            peer_manager.found_peer(&channel.remote_address).await;
         }
 
         if let Err(error) = environment
@@ -958,14 +971,18 @@ impl ReceiveHandler {
         message: Version,
         channel: Arc<Channel>,
     ) -> Result<Arc<Channel>, NetworkError> {
-        let peer_address = SocketAddr::new(channel.remote_address.ip(), message.sender.port());
+        let remote_address = SocketAddr::new(channel.remote_address.ip(), message.sender.port());
 
-        let peer_manager = environment.peer_manager_read().await;
+        let sender = match self.sender {
+            Some(ref sender) => sender.clone(),
+            None => return Err(NetworkError::ReceiveHandlerMissingPeerSender),
+        };
 
-        if *environment.local_address() != peer_address {
-            if peer_manager.number_of_connected_peers().await < environment.maximum_number_of_peers() {
-                self.receive_request(message.clone(), peer_address).await;
-            }
+        if *environment.local_address() != remote_address {
+            // Route version message to peer manager.
+            sender
+                .send(PeerMessage::VersionToVerack(remote_address, message.clone()))
+                .await;
 
             // If our peer has a longer chain, send a sync message
             if message.height > environment.storage_read().await.get_current_block_height() {
@@ -975,8 +992,8 @@ impl ReceiveHandler {
                     if !sync_handler.is_syncing()
                         && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
                     {
-                        debug!("Attempting to sync with peer {}", peer_address);
-                        sync_handler.sync_node_address = peer_address;
+                        debug!("Attempting to sync with peer {}", remote_address);
+                        sync_handler.sync_node_address = remote_address;
 
                         if let Ok(block_locator_hashes) = environment.storage_read().await.get_block_locator_hashes() {
                             channel.write(&GetSync::new(block_locator_hashes)).await?;
@@ -1030,10 +1047,10 @@ impl ReceiveHandler {
         reader: TcpStream,
         // ) -> Result<Option<(Handshake, SocketAddr, Option<Version>)>, NetworkError> {
     ) -> Result<Option<(Arc<Channel>, SocketAddr, Option<Version>)>, NetworkError> {
-        // Read the first message or return `None`.
-        let channel = Channel::new_reader(reader);
+        trace!("Received connection request from {}", remote_address);
+
         // Parse the inbound message into the message name and message bytes.
-        let (channel, (message_name, message_bytes)) = match channel {
+        let (channel, (message_name, message_bytes)) = match Channel::new_reader(reader) {
             // Read the next message from the channel.
             // Note this is a blocking operation.
             Ok(channel) => match channel.read().await {
@@ -1042,6 +1059,8 @@ impl ReceiveHandler {
             },
             _ => return Ok(None),
         };
+
+        trace!("Received a {} message", message_name);
 
         // Handles a version message request.
         // Create and store a new handshake in the manager.
@@ -1159,43 +1178,6 @@ impl ReceiveHandler {
         }
 
         Ok(None)
-    }
-
-    // TODO (howardwu): Quarantined code. Inspect and integrate.
-    /// Receives a handshake request from a connected peer.
-    /// Updates the handshake channel address, if needed.
-    /// Sends a handshake response back to the connected peer.
-    pub async fn receive_request(&self, message: Version, remote_address: SocketAddr) -> bool {
-        // ORIGINAL CODE
-
-        // match environment.handshakes().write().await.get_mut(&remote_address) {
-        //     Some(handshake) => {
-        //         handshake.update_address(remote_address);
-        //         handshake.receive(message).await.is_ok()
-        //     }
-        //     None => false,
-        // }
-
-        // RENDERED CODE
-
-        /// Receives the version message from a connected peer,
-        /// and sends a verack message to acknowledge back.
-        // You are the new sender and your peer is the receiver
-        let address_receiver = remote_address;
-        let address_sender = message.receiver;
-        // self.channel
-        //     .write(&)
-        //     .await
-        //     .is_ok()
-        // TODO (howardwu): Move this logic into a flow to server, then to send handler.
-        self.send_handler
-            .broadcast(&Request::Verack(Verack::new(
-                message.nonce,
-                address_sender,
-                address_receiver,
-            )))
-            .await
-            .is_ok()
     }
 
     // #[inline]
