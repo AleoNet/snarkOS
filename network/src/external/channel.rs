@@ -128,7 +128,7 @@ impl Channel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::message_types::{Ping, Pong};
+    use crate::external::message_types::{GetPeers, Peers};
     use snarkos_testing::network::{random_socket_address, simulate_active_node};
 
     use serial_test::serial;
@@ -145,7 +145,7 @@ mod tests {
         let server_channel = Channel::new_writer(remote_address).await.unwrap();
 
         // 3. Server write message to peer
-        server_channel.write(&Ping::new()).await.unwrap();
+        server_channel.write(&GetPeers).await.unwrap();
     }
 
     #[tokio::test]
@@ -155,22 +155,22 @@ mod tests {
         let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         tokio::spawn(async move {
-            // 1. Server connects to peer
+            // 1. Server connects to peer.
             let server_channel = Channel::new_writer(remote_address).await.unwrap();
 
-            // 2. Server writes ping message
-            server_channel.write(&Ping::new()).await.unwrap();
+            // 2. Server writes GetPeers message.
+            server_channel.write(&GetPeers).await.unwrap();
         });
 
-        // 2. Peer accepts server connection
+        // 2. Peer accepts server connection.
         let (reader, _address) = remote_listener.accept().await.unwrap();
         let peer_channel = Channel::new_reader(reader).unwrap();
 
-        // 4. Peer reads ping message
-        let (name, bytes) = peer_channel.read().await.unwrap();
+        // 4. Peer reads GetPeers message.
+        let (name, buffer) = peer_channel.read().await.unwrap();
 
-        assert_eq!(Ping::name(), name);
-        assert!(Ping::deserialize(bytes).is_ok());
+        assert_eq!(GetPeers::name(), name);
+        assert!(GetPeers::deserialize(buffer).is_ok());
     }
 
     #[tokio::test]
@@ -190,59 +190,39 @@ mod tests {
             tx.send(()).unwrap();
 
             // 1. Local node connects to Remote node
-
             let mut channel = Channel::new_writer(remote_address).await.unwrap();
 
             // 4. Local node accepts Remote node connection
-
             let (reader, _socket) = server_listener.accept().await.unwrap();
-
             channel = channel.update_reader(Arc::new(Mutex::new(reader)));
 
-            // 5. Local node writes ping
+            // 5. Local node writes GetPeers message
+            channel.write(&GetPeers).await.unwrap();
 
-            let server_ping = Ping {
-                nonce: 18446744073709551615u64,
-            };
+            // 6. Local node reads Peers message
+            let (name, buffer) = channel.read().await.unwrap();
+            assert_eq!(Peers::name(), name);
+            assert_eq!(Peers::new(vec![]), Peers::deserialize(buffer).unwrap());
 
-            channel.write(&server_ping).await.unwrap();
-
-            // 6. Local node reads pong
-
-            let (name, bytes) = channel.read().await.unwrap();
-            let peer_pong = Pong::deserialize(bytes).unwrap();
-
-            assert_eq!(Pong::name(), name);
-            assert_eq!(Pong::new(server_ping), peer_pong);
             ty.send(()).unwrap();
         });
+
         rx.await.unwrap();
 
-        // 2. Remote node accepts Local node connection
-
+        // 2. Remote node accepts Local node connection.
         let (reader, _address) = remote_listener.accept().await.unwrap();
         let mut channel = Channel::new_reader(reader).unwrap();
 
-        // 3. Remote node connects to Local node
-
+        // 3. Remote node connects to Local node.
         channel = channel.update_writer(local_address).await.unwrap();
 
-        // 6. Remote node reads ping message
+        // 6. Remote node reads GetPeers message.
+        let (name, buffer) = channel.read().await.unwrap();
+        assert_eq!(GetPeers::name(), name);
+        assert_eq!(GetPeers, GetPeers::deserialize(buffer).unwrap());
 
-        let (name, bytes) = channel.read().await.unwrap();
-        let server_ping = Ping::deserialize(bytes).unwrap();
-
-        assert_eq!(Ping::name(), name);
-        assert_eq!(
-            Ping {
-                nonce: 18446744073709551615u64
-            },
-            server_ping
-        );
-
-        // 7. Remote node writes pong message
-
-        channel.write(&Pong::new(server_ping)).await.unwrap();
+        // 7. Remote node writes Peers message.
+        channel.write(&Peers::new(vec![])).await.unwrap();
 
         ry.await.unwrap();
     }

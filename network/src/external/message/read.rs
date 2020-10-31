@@ -48,7 +48,7 @@ mod tests {
     use super::*;
     use crate::external::{
         message::{message::Message, MessageHeader},
-        message_types::Ping,
+        message_types::{GetPeers, Version},
     };
     use snarkos_testing::network::random_socket_address;
 
@@ -59,7 +59,7 @@ mod tests {
     #[serial]
     async fn read_multiple_headers() {
         let address = random_socket_address();
-        let mut listener = TcpListener::bind(address).await.unwrap();
+        let listener = TcpListener::bind(address).await.unwrap();
 
         tokio::spawn(async move {
             let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
@@ -100,9 +100,7 @@ mod tests {
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
-
         let header = read_header(&mut stream).await.unwrap();
-
         assert_eq!(
             MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
             header
@@ -113,20 +111,25 @@ mod tests {
     #[serial]
     async fn test_read_message() {
         let address = random_socket_address();
-        let mut listener = TcpListener::bind(address).await.unwrap();
-        let message = Ping::new();
-        let message_copy = message.clone();
+        let listener = TcpListener::bind(address).await.unwrap();
+        let expected = Version::new(
+            1u64,
+            0u32,
+            1u64,
+            "0.0.0.0:4131".parse().unwrap(),
+            "0.0.0.0:4141".parse().unwrap(),
+        );
+        let version = expected.clone();
 
         tokio::spawn(async move {
             let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&message.serialize().unwrap()).await.unwrap();
+            stream.write_all(&version.serialize().unwrap()).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
 
-        let bytes = read_message(&mut stream, 8usize).await.unwrap();
-        let actual = Ping::deserialize(bytes).unwrap();
-
-        assert_eq!(message_copy, actual);
+        let buffer = read_message(&mut stream, 48usize).await.unwrap();
+        let candidate = Version::deserialize(buffer).unwrap();
+        assert_eq!(expected, candidate);
     }
 }

@@ -3300,7 +3300,7 @@ dependencies = [
  "snarkos-posw",
  "snarkos-storage",
  "snarkos-utilities",
- "tokio 0.2.22",
+ "tokio 0.3.2",
 ]
 
 [[package]]

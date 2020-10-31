@@ -40,7 +40,7 @@ pub fn random_socket_address() -> SocketAddr {
 
 /// Puts the current tokio thread to sleep for given milliseconds
 pub async fn sleep(time: u64) {
-    tokio::time::delay_for(std::time::Duration::from_millis(time)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(time)).await;
 }
 
 /// Returns a server struct with given arguments
@@ -82,7 +82,8 @@ pub async fn initialize_test_server(
         // sync_handler_lock,
         // connection_frequency,
     )
-    .await?
+    .await
+    .unwrap()
 }
 
 /// Starts a server on a new thread. Takes full ownership of server.
