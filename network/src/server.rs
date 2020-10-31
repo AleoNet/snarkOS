@@ -24,7 +24,7 @@ use crate::{
 };
 use snarkos_errors::{
     consensus::ConsensusError,
-    network::{ConnectError, SendError, ServerError},
+    network::{ConnectError, SendError},
     objects::BlockError,
     storage::StorageError,
 };
