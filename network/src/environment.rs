@@ -79,8 +79,8 @@ impl Environment {
 
         local_address: SocketAddr,
 
-        min_peers: u16,
-        max_peers: u16,
+        minimum_number_of_connected_peers: u16,
+        maximum_number_of_connected_peers: u16,
         sync_interval: u64,
         memory_pool_interval: u8,
 
@@ -89,7 +89,7 @@ impl Environment {
         is_miner: bool,
     ) -> Result<Self, NetworkError> {
         // Check that the minimum and maximum number of peers is valid.
-        if min_peers == 0 || max_peers == 0 {
+        if minimum_number_of_connected_peers == 0 || maximum_number_of_connected_peers == 0 {
             return Err(NetworkError::PeerCountInvalid);
         }
 
@@ -122,8 +122,8 @@ impl Environment {
 
             local_address,
 
-            minimum_number_of_connected_peers: min_peers,
-            maximum_number_of_connected_peers: max_peers,
+            minimum_number_of_connected_peers,
+            maximum_number_of_connected_peers,
             sync_interval,
             memory_pool_interval,
 
