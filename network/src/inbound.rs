@@ -16,7 +16,7 @@
 
 use crate::{
     external::{message::Message, message_types::*, Channel, MessageName},
-    peer_manager::{PeerMessage, PeerSender},
+    manager::{PeerMessage, PeerSender},
     Environment,
     NetworkError,
     SyncManager,
@@ -50,7 +50,7 @@ pub type Channels = HashMap<SocketAddr, Arc<Channel>>;
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug, Clone)]
-pub struct ReceiveHandler {
+pub struct Inbound {
     /// The map of remote addresses to their active read channels.
     channels: Arc<RwLock<Channels>>,
     /// The producer for sending inbound messages to the peer manager.
@@ -63,8 +63,8 @@ pub struct ReceiveHandler {
     receive_failure_count: Arc<AtomicU64>,
 }
 
-impl ReceiveHandler {
-    /// Creates a new instance of a `ReceiveHandler`.
+impl Inbound {
+    /// Creates a new instance of a `Inbound`.
     #[inline]
     pub fn new(peer_sender: PeerSender) -> Self {
         Self {
@@ -78,10 +78,10 @@ impl ReceiveHandler {
 
     /**
     [1 invocation per peer manager] Add initialize_peer_sender() which sets the `PeerSender`.
-        - Save the peer_sender into receive handler.
+        - Save the peer_sender into inbound handler.
 
     [1 instance per peer manager] Add listen() which detects new peer. (for `channel`)
-        - Save channel into receive handler.
+        - Save channel into inbound handler.
         - For each new peer, call the handler().
 
     [1 instance per peer] Add handler() which initializes new handler. (for `channel`)
@@ -106,7 +106,7 @@ impl ReceiveHandler {
 
         let environment = environment.clone();
         let sender = self.peer_sender.clone();
-        let receive_handler = self.clone();
+        let inbound = self.clone();
 
         task::spawn(async move {
             loop {
@@ -275,7 +275,7 @@ impl ReceiveHandler {
                             }
                         } else if name == GetBlock::name() {
                             if let Ok(getblock) = GetBlock::deserialize(bytes) {
-                                if let Err(err) = receive_handler
+                                if let Err(err) = inbound
                                     .clone()
                                     .receive_get_block(environment, getblock, channel.clone())
                                     .await
@@ -288,7 +288,7 @@ impl ReceiveHandler {
                             }
                         } else if name == GetMemoryPool::name() {
                             if let Ok(getmemorypool) = GetMemoryPool::deserialize(bytes) {
-                                if let Err(err) = receive_handler
+                                if let Err(err) = inbound
                                     .clone()
                                     .receive_get_memory_pool(environment, getmemorypool, channel.clone())
                                     .await
@@ -319,7 +319,7 @@ impl ReceiveHandler {
                             }
                         } else if name == GetSync::name() {
                             if let Ok(getsync) = GetSync::deserialize(bytes) {
-                                if let Err(err) = receive_handler
+                                if let Err(err) = inbound
                                     .clone()
                                     .receive_get_sync(environment, getsync, channel.clone())
                                     .await
@@ -332,9 +332,7 @@ impl ReceiveHandler {
                             }
                         } else if name == MemoryPool::name() {
                             if let Ok(mempool) = MemoryPool::deserialize(bytes) {
-                                if let Err(err) =
-                                    receive_handler.clone().receive_memory_pool(environment, mempool).await
-                                {
+                                if let Err(err) = inbound.clone().receive_memory_pool(environment, mempool).await {
                                     error!(
                                         "Receive handler errored on a {} message from {}. {}",
                                         name, remote_address, err
@@ -343,7 +341,7 @@ impl ReceiveHandler {
                             }
                         } else if name == Sync::name() {
                             if let Ok(sync) = Sync::deserialize(bytes) {
-                                if let Err(err) = receive_handler.clone().receive_sync(environment, sync).await {
+                                if let Err(err) = inbound.clone().receive_sync(environment, sync).await {
                                     error!(
                                         "Receive handler errored on a {} message from {}. {}",
                                         name, remote_address, err
@@ -365,7 +363,7 @@ impl ReceiveHandler {
                         } else if name == Version::name() {
                             if let Ok(version) = Version::deserialize(bytes) {
                                 // TODO (raychu86) Does `receive_version` need to return a channel?
-                                match receive_handler
+                                match inbound
                                     .clone()
                                     .receive_version(environment, version, channel.clone())
                                     .await
@@ -525,7 +523,7 @@ impl ReceiveHandler {
 
         sync_handler.receive_hashes(message.block_hashes, height);
 
-        // TODO (howardwu): Implement this using the sync manager and send handler.
+        // TODO (howardwu): Implement this using the sync manager and outbound handler.
         {
             // // Received block headers
             // if let Some(channel) = environment

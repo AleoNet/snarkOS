@@ -32,17 +32,17 @@ pub mod external;
 pub mod peers;
 pub mod request;
 
-pub mod peer_manager;
-pub use peer_manager::*;
+pub mod manager;
+pub use manager::*;
 
 pub mod environment;
 pub use environment::*;
 
-pub mod send_handler;
-pub use send_handler::*;
+pub mod outbound;
+pub use outbound::*;
 
-pub mod receive_handler;
-pub use receive_handler::*;
+pub mod inbound;
+pub use inbound::*;
 
 pub mod server;
 pub use server::*;

@@ -37,7 +37,7 @@ pub type PendingRequests = HashMap<SocketAddr, Requests>;
 
 /// A core data structure for handling outbound network traffic.
 #[derive(Debug, Clone)]
-pub struct SendHandler {
+pub struct Outbound {
     /// The map of remote addresses to their active write channels.
     channels: Arc<RwLock<Channels>>,
     /// The map of remote addresses to their pending requests.
@@ -52,8 +52,8 @@ pub struct SendHandler {
     send_failure_count: Arc<AtomicU64>,
 }
 
-impl SendHandler {
-    /// Creates a new instance of a `SendHandler`.
+impl Outbound {
+    /// Creates a new instance of a `Outbound`.
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -97,7 +97,7 @@ impl SendHandler {
                 Arc::new(channel)
             } else {
                 error!("Failed to create a new channel with {}", receiver);
-                return Err(NetworkError::SendHandlerFailedToCreateChannel);
+                return Err(NetworkError::OutboundFailedToCreateChannel);
             }
         };
 
@@ -227,11 +227,11 @@ impl SendHandler {
 //
 //         // 1. Bind to remote address.
 //         let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
-//         let mut remote_manager = SendHandler::new();
+//         let mut remote_manager = Outbound::new();
 //
 //         tokio::spawn(async move {
 //             let mut local_listener = TcpListener::bind(local_address).await.unwrap();
-//             let mut local_manager = SendHandler::new();
+//             let mut local_manager = Outbound::new();
 //
 //             // 2. Local node sends handshake request
 //             let local_version = Version::new_with_rng(1u64, 0u32, local_address, remote_address);

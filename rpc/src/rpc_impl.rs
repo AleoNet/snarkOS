@@ -262,7 +262,7 @@ impl RpcFunctions for RpcImpl {
 
         match !self.storage.transcation_conflicts(&transaction) {
             true => {
-                Runtime::new()?.block_on(self.environment.send_handler().process_transaction_internal(
+                Runtime::new()?.block_on(self.environment.outbound().process_transaction_internal(
                     self.environment.clone(),
                     &self.consensus_parameters,
                     &self.parameters,

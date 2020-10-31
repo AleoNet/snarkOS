@@ -16,9 +16,9 @@
 
 use crate::{
     environment::Environment,
-    peer_manager::{PeerManager, PeerMessage},
-    ReceiveHandler,
-    SendHandler,
+    manager::{PeerManager, PeerMessage},
+    Inbound,
+    Outbound,
     SyncManager,
 };
 use snarkos_errors::{
@@ -56,12 +56,12 @@ pub enum NetworkError {
     PeerNonceMismatch,
     PeerUnauthorized,
     PeerWasNotSetToConnecting,
-    ReceiveHandlerAlreadySetPeerSender,
-    ReceiveHandlerMissingPeerSender,
+    InboundAlreadySetPeerSender,
+    InboundMissingPeerSender,
     SendError(SendError),
     SenderError(tokio::sync::mpsc::error::SendError<PeerMessage>),
-    SendHandlerFailedToCreateChannel,
-    SendHandlerPendingRequestsMissing,
+    OutboundFailedToCreateChannel,
+    OutboundPendingRequestsMissing,
     SendRequestUnauthorized,
     StorageError(StorageError),
     SyncIntervalInvalid,
