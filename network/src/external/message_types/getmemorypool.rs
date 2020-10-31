@@ -22,18 +22,20 @@ use snarkos_errors::network::message::MessageError;
 pub struct GetMemoryPool;
 
 impl Message for GetMemoryPool {
+    #[inline]
     fn name() -> MessageName {
         MessageName::from("getmempool")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 0 {
-            return Err(MessageError::InvalidLength(vec.len(), 0));
+    #[inline]
+    fn deserialize(buffer: Vec<u8>) -> Result<Self, MessageError> {
+        match buffer.is_empty() {
+            true => Ok(Self),
+            false => return Err(MessageError::InvalidLength(buffer.len(), 0)),
         }
-
-        Ok(Self)
     }
 
+    #[inline]
     fn serialize(&self) -> Result<Vec<u8>, MessageError> {
         Ok(vec![])
     }

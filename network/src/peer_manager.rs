@@ -381,6 +381,17 @@ impl PeerManager {
     }
 
     ///
+    /// Adds the given address to the disconnected peers in this peer book.
+    ///
+    #[inline]
+    pub async fn found_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Add the given address to the peer book.
+        peer_book.add_peer(address)
+    }
+
+    ///
     /// Returns the local address of this node.
     ///
     #[inline]
@@ -392,17 +403,6 @@ impl PeerManager {
         // peer_book.local_address()
 
         *self.environment.local_address()
-    }
-
-    ///
-    /// Adds the given address to the disconnected peers in this peer book.
-    ///
-    #[inline]
-    pub async fn found_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Add the given address to the peer book.
-        peer_book.add_peer(address)
     }
 
     ///
