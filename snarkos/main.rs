@@ -26,13 +26,13 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
 use snarkos_errors::node::NodeError;
 use snarkos_models::algorithms::{CRH, SNARK};
-use snarkos_network::{environment::Environment, Server, SyncManager};
+use snarkos_network::{environment::Environment, Server};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 // use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::{to_bytes, ToBytes};
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::{runtime::Builder, sync::{Mutex, RwLock};
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
@@ -171,19 +171,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     //     }
     // }
 
-    // let sync_manager = Arc::new(Mutex::new(SyncManager::new(environment, bootnode)));
-
     // Construct the server instance. Note this does not start the server.
     let server = Server::new(&mut environment).await?;
-    // let server = Server::new(
-    //     environment,
-    //     consensus.clone(),
-    //     storage.clone(),
-    //     parameters,
-    //     memory_pool_lock.clone(),
-    //     sync_manager.clone(),
-    //     15000, // 15 seconds
-    // );
 
     // // Start RPC thread, if the RPC configuration is enabled.
     // if config.rpc.json_rpc {

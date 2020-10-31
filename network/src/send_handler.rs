@@ -208,22 +208,6 @@ impl SendHandler {
 
         Ok(())
     }
-
-    // ///
-    // /// Attempts to fetch the channel for a given address.
-    // ///
-    // /// Returns `Some(channel)` if the address is a connected peer.
-    // /// Otherwise, returns `None`.
-    // ///
-    // #[inline]
-    // pub fn get_channel(&self, remote_address: &SocketAddr) -> Option<&Arc<Channel>> {
-    //     self.channels.get(remote_address)
-    // }
-
-    // /// Stores a new channel at the peer address it is connected to.
-    // pub fn add_channel(&mut self, channel: &Arc<Channel>) {
-    //     self.channels.insert(channel.address, channel.clone());
-    // }
 }
 
 #[cfg(test)]

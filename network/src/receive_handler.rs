@@ -17,10 +17,8 @@
 use crate::{
     external::{message::Message, message_types::*, Channel, MessageName},
     peer_manager::{PeerMessage, PeerSender},
-    peers::PeerBook,
     Environment,
     NetworkError,
-    Receiver,
     SyncManager,
     SyncState,
 };
