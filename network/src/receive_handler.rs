@@ -18,10 +18,8 @@ use crate::{
     external::{message::Message, message_types::*, Channel, MessageName},
     peer_manager::PeerMessage,
     peers::PeerBook,
-    request::Request,
     Environment,
     NetworkError,
-    PeerSender,
     Receiver,
     SyncManager,
     SyncState,
@@ -40,15 +38,12 @@ use snarkos_utilities::{
 use std::{
     collections::HashMap,
     fmt::Display,
-    net::{IpAddr, Shutdown, SocketAddr},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    net::SocketAddr,
+    sync::{atomic::AtomicU64, Arc},
 };
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::{mpsc, oneshot, Mutex, RwLock},
+    sync::{mpsc, RwLock},
     task,
 };
 
@@ -61,7 +56,7 @@ pub struct ReceiveHandler {
     /// The map of remote addresses to their active read channels.
     channels: Arc<RwLock<Channels>>,
     /// The sender for this handler to send responses to the peer manager.
-    peer_sender: Option<Arc<RwLock<PeerSender>>>,
+    sender: Option<Arc<mpsc::Sender<PeerMessage>>>,
     /// A counter for the number of received responses the handler processes.
     receive_response_count: Arc<AtomicU64>,
     /// A counter for the number of received responses that succeeded.
@@ -70,8 +65,6 @@ pub struct ReceiveHandler {
     receive_failure_count: Arc<AtomicU64>,
     /// TODO (howardwu): Temporary. Remove this. See 1 usage in impl.
     send_handler: crate::SendHandler,
-
-    sender: Option<Arc<mpsc::Sender<PeerMessage>>>,
 }
 
 impl ReceiveHandler {
@@ -80,13 +73,11 @@ impl ReceiveHandler {
     pub fn new(send_handler: crate::SendHandler) -> Self {
         Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
-            peer_sender: None,
+            sender: None,
             receive_response_count: Arc::new(AtomicU64::new(0)),
             receive_success_count: Arc::new(AtomicU64::new(0)),
             receive_failure_count: Arc::new(AtomicU64::new(0)),
             send_handler,
-
-            sender: None,
         }
     }
 
@@ -114,38 +105,24 @@ impl ReceiveHandler {
     /// Sets the peer sender in this receive handler.
     ///
     #[inline]
-    pub fn initialize(
-        &mut self,
-        peer_sender: Arc<RwLock<PeerSender>>,
-        sender: Arc<mpsc::Sender<PeerMessage>>,
-    ) -> Result<(), NetworkError> {
+    pub fn initialize(&mut self, sender: Arc<mpsc::Sender<PeerMessage>>) -> Result<(), NetworkError> {
         debug!("Initializing receive handler with a peer sender");
 
         // Check that the peer sender has not already been initialized.
-        if self.peer_sender.is_some() {
+        if self.sender.is_some() {
             error!("Peer sender was already set with the receive handler");
             return Err(NetworkError::ReceiveHandlerAlreadySetPeerSender);
         }
 
-        // Set the peer sender in this receive handler.
-        self.peer_sender = Some(peer_sender);
-
         self.sender = Some(sender);
 
-        debug!("Initialized receive handler with a peer sender {:?}", self.peer_sender);
+        debug!("Initialized receive handler with a peer sender {:?}", self.sender);
         Ok(())
     }
 
     // TODO (howardwu): Remove environment from function inputs.
     #[inline]
-    pub async fn listen(self, environment: Environment, peer_book: Arc<RwLock<PeerBook>>) -> Result<(), NetworkError> {
-        info!("a {:?}", self.peer_sender);
-
-        let peer_sender = match self.peer_sender {
-            Some(ref peer_sender) => peer_sender.clone(),
-            None => return Err(NetworkError::ReceiveHandlerMissingPeerSender),
-        };
-
+    pub async fn listen(self, environment: Environment) -> Result<(), NetworkError> {
         let sender = match self.sender {
             Some(ref sender) => sender.clone(),
             None => return Err(NetworkError::ReceiveHandlerMissingPeerSender),
@@ -155,17 +132,14 @@ impl ReceiveHandler {
         // 1. Initialize TCP listener and accept new TCP connections.
         let local_address = environment.local_address();
         debug!("Starting listener at {:?}...", local_address);
-        let mut listener = TcpListener::bind(&local_address).await?;
+        let listener = TcpListener::bind(&local_address).await?;
         info!("Listening at {:?}", local_address);
 
         let environment = environment.clone();
         let receive_handler = self.clone();
-        let peer_book = peer_book.clone();
 
         task::spawn(async move {
             loop {
-                info!("RECEIVE HANDLER: START NEXT RECEIVER LISTENER");
-
                 trace!("Starting listener");
 
                 // Start listener for handling connection requests.
@@ -202,10 +176,6 @@ impl ReceiveHandler {
                         // }
                         // // Store the channel established with the handshake
                         // peer_manager.add_channel(&handshake.channel);
-
-                        // TODO (howardwu): Delete me.
-                        // // Inner loop spawns one thread per connection to read messages
-                        // Self::spawn_connection_thread(handshake.channel.clone(), sender.clone());
 
                         debug!("Starting thread for handling connection requests");
                         /// Spawns one thread per peer tcp connection to read messages.
@@ -338,9 +308,20 @@ impl ReceiveHandler {
                                         }
                                     }
                                 } else if name == GetPeers::name() {
-                                    if let Ok(getpeers) = GetPeers::deserialize(bytes) {
+                                    if let Ok(_) = GetPeers::deserialize(bytes) {
                                         if let Err(err) =
                                             sender.send(PeerMessage::GetPeers(channel.remote_address)).await
+                                        {
+                                            error!(
+                                                "Receive handler errored on a {} message from {}. {}",
+                                                name, remote_address, err
+                                            );
+                                        }
+                                    }
+                                } else if name == Peers::name() {
+                                    if let Ok(peers) = Peers::deserialize(bytes) {
+                                        if let Err(err) =
+                                            sender.send(PeerMessage::Peers(channel.remote_address, peers)).await
                                         {
                                             error!(
                                                 "Receive handler errored on a {} message from {}. {}",
@@ -365,19 +346,6 @@ impl ReceiveHandler {
                                     if let Ok(mempool) = MemoryPool::deserialize(bytes) {
                                         if let Err(err) =
                                             receive_handler.clone().receive_memory_pool(environment, mempool).await
-                                        {
-                                            error!(
-                                                "Receive handler errored on a {} message from {}. {}",
-                                                name, remote_address, err
-                                            );
-                                        }
-                                    }
-                                } else if name == Peers::name() {
-                                    if let Ok(peers) = Peers::deserialize(bytes) {
-                                        if let Err(err) = receive_handler
-                                            .clone()
-                                            .receive_peers(environment, peers, channel.clone())
-                                            .await
                                         {
                                             error!(
                                                 "Receive handler errored on a {} message from {}. {}",
@@ -458,32 +426,7 @@ impl ReceiveHandler {
                                 } else {
                                     debug!("Message name not recognized {:?}", name.to_string());
                                 }
-
-                                // if let Err(error) = tx.send(channel) {
-                                //     warn!("Error resetting connection thread ({:?})", error);
-                                // }
                             }
-
-                            // // Use a oneshot channel to give the channel control
-                            // // to the message handler after reading from the channel.
-                            // let (tx, rx) = oneshot::channel();
-
-                            // // Send the successful read data to the message handler.
-                            // if let Err(error) = peer_sender
-                            //     .send((tx, message_name, message_bytes, channel.clone())) // TODO (howardwu): Remove this `tx` here
-                            //     .await
-                            // {
-                            //     handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
-                            //     continue;
-                            // };
-
-                            // // Wait for the message handler to give back channel control.
-                            // match rx.await {
-                            //     Ok(peer_channel) => channel = peer_channel,
-                            //     Err(error) => {
-                            //         handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await
-                            //     }
-                            // };
 
                             // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
@@ -621,80 +564,6 @@ impl ReceiveHandler {
                 if let Some(txid) = inserted {
                     debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
                 }
-            }
-        }
-
-        Ok(())
-    }
-
-    // /// A node has requested our list of peer addresses.
-    // /// Send an Address message with our current peer list.
-    // async fn receive_get_peers(
-    //     &self,
-    //     environment: &Environment,
-    //     _message: GetPeers,
-    //     channel: Arc<Channel>,
-    // ) -> Result<(), NetworkError> {
-    //     // If we received a message, but aren't connected to the peer,
-    //     // inform the peer book that we found a peer.
-    //     // The peer book will determine if we have seen the peer before,
-    //     // and include the peer if it is new.
-    //     let peer_manager = environment.peer_manager_write().await;
-    //     if !peer_manager.is_connected(&channel.remote_address).await {
-    //         peer_manager.found_peer(&channel.remote_address).await;
-    //     }
-    //
-    //     // Broadcast the sanitized list of connected peers back to requesting peer.
-    //     let mut peers = HashMap::new();
-    //     for (remote_address, peer_info) in peer_manager.connected_peers().await {
-    //         // Skip the iteration if the requesting peer that we're sending the response to
-    //         // appears in the list of peers.
-    //         if remote_address == channel.remote_address {
-    //             continue;
-    //         }
-    //         peers.insert(remote_address, *peer_info.last_seen());
-    //     }
-    //     channel.write(&Peers::new(peers)).await?;
-    //
-    //     Ok(())
-    // }
-
-    /// A miner has sent their list of peer addresses.
-    /// Add all new/updated addresses to our disconnected.
-    /// The connection handler will be responsible for sending out handshake requests to them.
-    async fn receive_peers(
-        &self,
-        environment: &Environment,
-        message: Peers,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        // If we received a message, but aren't connected to the peer,
-        // inform the peer book that we found a peer.
-        // The peer book will determine if we have seen the peer before,
-        // and include the peer if it is new.
-        let peer_manager = environment.peer_manager_write().await;
-        if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address).await;
-        }
-
-        // Process all of the peers sent in the message,
-        // by informing the peer book of that we found peers.
-        let local_address = *environment.local_address();
-
-        for (peer_address, _) in message.addresses.iter() {
-            // Skip if the peer address is this node's local address.
-            let is_zero_address = match "0.0.0.0".to_string().parse::<IpAddr>() {
-                Ok(zero_ip) => (*peer_address).ip() == zero_ip,
-                _ => false,
-            };
-            if *peer_address == local_address || is_zero_address {
-                continue;
-            }
-            // Inform the peer book that we found a peer.
-            // The peer book will determine if we have seen the peer before,
-            // and include the peer if it is new.
-            else if !peer_manager.is_connected(&channel.remote_address).await {
-                peer_manager.found_peer(&channel.remote_address);
             }
         }
 
@@ -872,7 +741,7 @@ impl ReceiveHandler {
         // Handles a version message request.
         // Create and store a new handshake in the manager.
         if message_name == Version::name() {
-            error!("IN VERSION CASE");
+            warn!("IN VERSION CASE");
 
             // Deserialize the message bytes into a version message.
             let remote_version = match Version::deserialize(message_bytes) {
@@ -916,7 +785,7 @@ impl ReceiveHandler {
             let channel = channel.update_writer(remote_address).await?;
             // Write a verack response to the remote peer.
             let local_address = local_version.sender;
-            error!("RECEIVEHANDLERNUMBER {}", channel.remote_address);
+            warn!("RECEIVEHANDLERNUMBER {}", channel.remote_address);
             channel
                 .write(&Verack::new(remote_version.nonce, local_address, remote_address))
                 .await?;
@@ -945,7 +814,7 @@ impl ReceiveHandler {
 
                 trace!("Received a {} message", message_name);
 
-                error!("IN VERACK CASE {}", channel.remote_address);
+                warn!("IN VERACK CASE {}", channel.remote_address);
 
                 // Deserialize the message bytes into a verack message.
                 let verack = match Verack::deserialize(message_bytes) {
@@ -979,7 +848,7 @@ impl ReceiveHandler {
         // Handles a verack message request.
         // Establish the channel with the remote peer.
         if message_name == Verack::name() {
-            error!("IN VERACK CASE {}", channel.remote_address);
+            warn!("IN VERACK CASE {}", channel.remote_address);
 
             // Deserialize the message bytes into a verack message.
             let verack = match Verack::deserialize(message_bytes) {

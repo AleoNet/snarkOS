@@ -332,7 +332,7 @@ impl PeerBook {
                 .get_mut(address)
                 .ok_or(NetworkError::PeerBookMissingPeer)?;
             // Update the `last_seen` timestamp in the peer info.
-            peer_info.set_last_seen();
+            peer_info.set_last_seen()?;
 
             error!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);

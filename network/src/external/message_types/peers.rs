@@ -18,7 +18,7 @@ use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 use chrono::{DateTime, Utc};
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
