@@ -365,16 +365,7 @@ impl ReceiveHandler {
                                     }
                                 } else if name == GetPeers::name() {
                                     if let Ok(getpeers) = GetPeers::deserialize(bytes) {
-                                        if let Err(err) = receive_handler
-                                            .clone()
-                                            .receive_get_peers(environment, getpeers, channel.clone())
-                                            .await
-                                        {
-                                            error!(
-                                                "Receive handler errored on a {} message from {}. {}",
-                                                name, remote_address, err
-                                            );
-                                        }
+                                        sender.send(PeerMessage::GetPeers(channel.remote_address)).await;
                                     }
                                 } else if name == GetSync::name() {
                                     if let Ok(getsync) = GetSync::deserialize(bytes) {
@@ -638,37 +629,37 @@ impl ReceiveHandler {
         Ok(())
     }
 
-    /// A node has requested our list of peer addresses.
-    /// Send an Address message with our current peer list.
-    async fn receive_get_peers(
-        &self,
-        environment: &Environment,
-        _message: GetPeers,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        // If we received a message, but aren't connected to the peer,
-        // inform the peer book that we found a peer.
-        // The peer book will determine if we have seen the peer before,
-        // and include the peer if it is new.
-        let peer_manager = environment.peer_manager_write().await;
-        if !peer_manager.is_connected(&channel.remote_address).await {
-            peer_manager.found_peer(&channel.remote_address).await;
-        }
-
-        // Broadcast the sanitized list of connected peers back to requesting peer.
-        let mut peers = HashMap::new();
-        for (remote_address, peer_info) in peer_manager.connected_peers().await {
-            // Skip the iteration if the requesting peer that we're sending the response to
-            // appears in the list of peers.
-            if remote_address == channel.remote_address {
-                continue;
-            }
-            peers.insert(remote_address, *peer_info.last_seen());
-        }
-        channel.write(&Peers::new(peers)).await?;
-
-        Ok(())
-    }
+    // /// A node has requested our list of peer addresses.
+    // /// Send an Address message with our current peer list.
+    // async fn receive_get_peers(
+    //     &self,
+    //     environment: &Environment,
+    //     _message: GetPeers,
+    //     channel: Arc<Channel>,
+    // ) -> Result<(), NetworkError> {
+    //     // If we received a message, but aren't connected to the peer,
+    //     // inform the peer book that we found a peer.
+    //     // The peer book will determine if we have seen the peer before,
+    //     // and include the peer if it is new.
+    //     let peer_manager = environment.peer_manager_write().await;
+    //     if !peer_manager.is_connected(&channel.remote_address).await {
+    //         peer_manager.found_peer(&channel.remote_address).await;
+    //     }
+    //
+    //     // Broadcast the sanitized list of connected peers back to requesting peer.
+    //     let mut peers = HashMap::new();
+    //     for (remote_address, peer_info) in peer_manager.connected_peers().await {
+    //         // Skip the iteration if the requesting peer that we're sending the response to
+    //         // appears in the list of peers.
+    //         if remote_address == channel.remote_address {
+    //             continue;
+    //         }
+    //         peers.insert(remote_address, *peer_info.last_seen());
+    //     }
+    //     channel.write(&Peers::new(peers)).await?;
+    //
+    //     Ok(())
+    // }
 
     /// A miner has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
@@ -902,9 +893,8 @@ impl ReceiveHandler {
             let channel = channel.update_writer(remote_address).await?;
             // Write a verack response to the remote peer.
             let local_address = local_version.sender;
-            let remote_nonce = remote_version.nonce;
             channel
-                .write(&Verack::new(remote_nonce, local_address, remote_address))
+                .write(&Verack::new(remote_version.nonce, local_address, remote_address))
                 .await?;
             // Write version request to the remote peer.
             channel.write(&local_version).await?;

@@ -174,6 +174,7 @@ impl SendHandler {
             let result = match &request {
                 Request::Block(_, payload) => channel.write(payload).await,
                 Request::GetPeers(_, payload) => channel.write(payload).await,
+                Request::Peers(_, payload) => channel.write(payload).await,
                 Request::Transaction(_, payload) => channel.write(payload).await,
                 Request::Verack(payload) => channel.write(payload).await,
                 Request::Version(payload) => channel.write(payload).await,

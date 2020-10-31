@@ -21,14 +21,14 @@ use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Peers {
     /// A list of peer addresses and their last seen dates
-    pub addresses: HashMap<SocketAddr, DateTime<Utc>>,
+    pub addresses: Vec<(SocketAddr, DateTime<Utc>)>,
 }
 
 impl Peers {
-    pub fn new(addresses: HashMap<SocketAddr, DateTime<Utc>>) -> Self {
+    pub fn new(addresses: Vec<(SocketAddr, DateTime<Utc>)>) -> Self {
         Self { addresses }
     }
 }
@@ -55,9 +55,7 @@ mod tests {
 
     #[test]
     fn test_peers() {
-        let message = Peers {
-            addresses: HashMap::<SocketAddr, DateTime<Utc>>::new(),
-        };
+        let message = Peers { addresses: Vec::new() };
 
         let serialized = message.serialize().unwrap();
         let deserialized = Peers::deserialize(serialized).unwrap();

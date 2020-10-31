@@ -15,11 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{
-        message::MessageName,
-        message_types::{Block, GetPeers, Transaction, Verack, Version},
-        Channel,
-    },
+    external::{message::MessageName, message_types::*, Channel},
     peers::{PeerBook, PeerInfo},
     request::Request,
     Environment,
@@ -61,6 +57,8 @@ pub enum PeerMessage {
     DisconnectFrom(SocketAddr),
     /// Receive handler received a new transaction from the given peer.
     Transaction(SocketAddr, Transaction),
+    /// Receive handler received a getpeers request.
+    GetPeers(SocketAddr),
 }
 
 /// A stateful component for managing the peer connections of this node.
@@ -290,6 +288,32 @@ impl PeerManager {
                     debug!("Found transaction for memory pool from {}", source);
                     self.process_transaction_internal(source, transaction).await.unwrap();
                     debug!("Propagated transaction to {}", source);
+                }
+                PeerMessage::GetPeers(remote_address) => {
+                    if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {
+                        // If we received a message, but aren't connected to the peer,
+                        // inform the peer book that we found a peer.
+                        // The peer book will determine if we have seen the peer before,
+                        // and include the peer if it is new.
+                        self.found_peer(&remote_address).await;
+                        debug!("Connected to {}", remote_address);
+                    }
+
+                    // TODO (howardwu): Simplify this and parallelize this with Rayon.
+                    // Broadcast the sanitized list of connected peers back to requesting peer.
+                    let mut peers = Vec::new();
+                    for (peer_address, peer_info) in self.connected_peers().await {
+                        // Skip the iteration if the requesting peer that we're sending the response to
+                        // appears in the list of peers.
+                        if peer_address == remote_address {
+                            continue;
+                        }
+                        peers.push((peer_address, *peer_info.last_seen()));
+                    }
+                    self.send_handler
+                        .broadcast(&Request::Peers(remote_address, Peers::new(peers)))
+                        .await
+                        .unwrap();
                 }
             }
         }
