@@ -27,7 +27,7 @@ mod server_listen {
             message_types::{GetPeers, GetSync, Verack},
             SyncManager,
         },
-        SendHandler,
+        Outbound,
         Server,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
@@ -142,7 +142,7 @@ mod server_listen {
             let (reader, _peer) = bootnode_listener.accept().await.unwrap();
 
             // 4. Send handshake response from bootnode to server
-            let mut bootnode_manager = SendHandler::new();
+            let mut bootnode_manager = Outbound::new();
             let (mut bootnode_handshake, _, _) = bootnode_manager
                 .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await
@@ -204,7 +204,7 @@ mod server_listen {
             sleep(1000).await;
 
             // 5. Send handshake response from remote node to local node
-            let mut peer_manager = SendHandler::new();
+            let mut peer_manager = Outbound::new();
             peer_manager
                 .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await

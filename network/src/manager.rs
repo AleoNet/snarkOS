@@ -19,9 +19,9 @@ use crate::{
     peers::{PeerBook, PeerInfo},
     request::Request,
     Environment,
+    Inbound,
     NetworkError,
-    ReceiveHandler,
-    SendHandler,
+    Outbound,
 };
 
 // TODO (howardwu): Move these imports to SyncManager.
@@ -72,13 +72,13 @@ pub enum PeerMessage {
 pub struct PeerManager {
     /// The parameters and settings of this node server.
     environment: Environment,
-    /// The send handler of this node server.
-    send_handler: SendHandler,
-    /// The receive handler of this node server.
-    receive_handler: ReceiveHandler,
+    /// The outbound handler of this node server.
+    outbound: Outbound,
+    /// The inbound handler of this node server.
+    inbound: Inbound,
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
-    /// The receiver for this peer manager to receive responses from the receive handler.
+    /// The receiver for this peer manager to receive responses from the inbound handler.
     peer_receiver: Arc<RwLock<PeerReceiver>>,
 }
 
@@ -95,8 +95,8 @@ impl PeerManager {
     pub fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
 
-        // Create a send handler.
-        let send_handler = SendHandler::new();
+        // Create a outbound handler.
+        let outbound = Outbound::new();
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());
@@ -111,14 +111,14 @@ impl PeerManager {
         // Initialize the peer sender and peer receiver.
         let (peer_sender, peer_receiver) = tokio::sync::mpsc::channel(1024);
 
-        // Create a receive handler.
-        let receive_handler = ReceiveHandler::new(peer_sender);
+        // Create a inbound handler.
+        let inbound = Inbound::new(peer_sender);
 
         // Instantiate the peer manager.
         let peer_manager = Self {
             environment: environment.clone(),
-            send_handler,
-            receive_handler,
+            outbound,
+            inbound,
             peer_book: Arc::new(RwLock::new(peer_book)),
 
             peer_receiver: Arc::new(RwLock::new(peer_receiver)),
@@ -138,7 +138,7 @@ impl PeerManager {
     #[inline]
     pub async fn initialize(&self) -> Result<(), NetworkError> {
         debug!("Initializing peer manager");
-        if let Err(error) = self.receive_handler.clone().listen(self.environment.clone()).await {
+        if let Err(error) = self.inbound.clone().listen(self.environment.clone()).await {
             // TODO: Handle receiver error appropriately with tracing and server state updates.
             error!("Receive handler errored with {}", error);
         }
@@ -146,7 +146,7 @@ impl PeerManager {
         let mut peer_manager = self.clone();
         task::spawn(async move {
             loop {
-                peer_manager.receive_handler().await.unwrap();
+                peer_manager.inbound().await.unwrap();
             }
         });
         debug!("Initialized peer manager");
@@ -190,9 +190,9 @@ impl PeerManager {
         if number_of_connected_peers > self.environment.maximum_number_of_connected_peers() {
             // Attempt to connect to the default bootnodes of the network.
             trace!("Disconnect from connected peers to maintain the permitted number");
-            // TODO (howardwu): Implement channel closure in the receive handler,
-            //  send channel disconnect messages to those peers from send handler,
-            //  and close the channels in send handler.
+            // TODO (howardwu): Implement channel closure in the inbound handler,
+            //  send channel disconnect messages to those peers from outbound handler,
+            //  and close the channels in outbound handler.
             // self.disconnect_from_connected_peers(number_of_connected_peers).await?;
 
             // v LOGIC TO IMPLEMENT v
@@ -209,7 +209,7 @@ impl PeerManager {
     }
 
     #[inline]
-    pub async fn receive_handler(&mut self) -> Result<(), NetworkError> {
+    pub async fn inbound(&mut self) -> Result<(), NetworkError> {
         warn!("PEER_MANAGER: START NEXT RECEIVER HANDLER");
 
         if let Some(message) = self.peer_receiver.write().await.recv().await {
@@ -219,7 +219,7 @@ impl PeerManager {
                     // TODO (howardwu): Move to its own function.
                     if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
                         debug!("Sending `Verack` request to {}", remote_address);
-                        self.send_handler
+                        self.outbound
                             .broadcast(&Request::Verack(Verack::new(
                                 remote_version.nonce,
                                 remote_version.receiver, /* local_address */
@@ -263,7 +263,7 @@ impl PeerManager {
                         }
                         peers.push((peer_address, *peer_info.last_seen()));
                     }
-                    self.send_handler
+                    self.outbound
                         .broadcast(&Request::Peers(remote_address, Peers::new(peers)))
                         .await?;
                 }
@@ -494,8 +494,8 @@ impl PeerManager {
                 // Set the bootnode as a connecting peer in the peer book.
                 self.connecting_to_peer(bootnode_address, version.nonce).await?;
 
-                // Send a connection request with the send handler.
-                self.send_handler.broadcast(&request).await?;
+                // Send a connection request with the outbound handler.
+                self.outbound.broadcast(&request).await?;
             }
         }
 
@@ -520,8 +520,8 @@ impl PeerManager {
             // Set the disconnected peer as a connecting peer in the peer book.
             self.connecting_to_peer(&remote_address, version.nonce).await?;
 
-            // Send a connection request with the send handler.
-            self.send_handler.broadcast(&request).await?;
+            // Send a connection request with the outbound handler.
+            self.outbound.broadcast(&request).await?;
         }
 
         Ok(())
@@ -545,7 +545,7 @@ impl PeerManager {
 
                 // TODO (raychu86): Establish a formal node version.
                 // Broadcast a `Version` message to the connected peer.
-                self.send_handler
+                self.outbound
                     .broadcast(&Request::Version(Version::new(
                         1u64,
                         block_height,
@@ -558,7 +558,7 @@ impl PeerManager {
                 // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
 
                 // Disconnect from the peer if there is no active connection channel
-                // TODO (howardwu): Inform SendHandler to also disconnect, by dropping any channels held with this peer.
+                // TODO (howardwu): Inform Outbound to also disconnect, by dropping any channels held with this peer.
                 self.disconnected_from_peer(&remote_address).await?;
             };
         }
@@ -571,7 +571,7 @@ impl PeerManager {
     async fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
         for (remote_address, _) in self.connected_peers().await {
             // Broadcast a `GetPeers` message to the connected peer.
-            self.send_handler
+            self.outbound
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
                 .await?;
 
@@ -600,7 +600,7 @@ impl PeerManager {
         for (remote_address, _) in self.connected_peers().await {
             if remote_address != block_miner && remote_address != local_address {
                 // Broadcast a `Block` message to the connected peer.
-                self.send_handler
+                self.outbound
                     .broadcast(&Request::Block(remote_address, Block::new(block_bytes.clone())))
                     .await?;
 
@@ -633,7 +633,7 @@ impl PeerManager {
         for (remote_address, _) in self.connected_peers().await {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Broadcast a `Block` message to the connected peer.
-                self.send_handler
+                self.outbound
                     .broadcast(&Request::Transaction(
                         remote_address,
                         Transaction::new(transaction_bytes.clone()),

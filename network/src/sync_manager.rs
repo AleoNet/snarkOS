@@ -20,7 +20,7 @@ use crate::{
         Channel,
         GetMemoryPool,
     },
-    peer_manager::PeerManager,
+    manager::PeerManager,
     Environment,
     NetworkError,
 };
