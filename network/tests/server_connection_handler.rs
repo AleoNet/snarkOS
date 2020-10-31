@@ -48,23 +48,18 @@ mod server_connection_handler {
             let context = Arc::clone(&server.environment);
 
             // 1. Add peer to connected in peer_book
-
             let mut peer_book = context.peer_book.write().await;
             peer_book.connected_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start server
-
             start_test_server(server);
 
             // 3. Check that peer received server connect
-
             accept_all_messages(remote_listener);
 
             // 4. Check that the server did not move the peer
-
             let peer_book = context.peer_book.read().await;
-
             assert!(peer_book.is_connected(&remote_address));
             assert!(!peer_book.is_disconnected(&remote_address));
         });
@@ -96,21 +91,17 @@ mod server_connection_handler {
             let context = Arc::clone(&server.environment);
 
             // 1. Add peer with old date to connected in peer_book
-
             let mut peer_book = context.peer_book.write().await;
             peer_book.connected_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start server
-
             start_test_server(server);
 
             // 3. Wait for connection handler loop
-
             sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT * 5).await;
 
             // 4. Check that the server moved peer from connected to disconnected
-
             let peer_book = context.peer_book.read().await;
 
             assert!(!peer_book.is_connected(&remote_address));
@@ -146,23 +137,18 @@ mod server_connection_handler {
             let context = Arc::clone(&server.environment);
 
             // 1. Add peer to the disconnected peers in peer_book
-
             let mut peer_book = context.peer_book.write().await;
             peer_book.found_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start server
-
             start_test_server(server);
 
             // 3. Check that peer received server connect
-
             accept_all_messages(remote_listener);
 
             // 4. Check that the server did not move the peer from the disconnected peers
-
             let peer_book = context.peer_book.read().await;
-
             assert!(!peer_book.is_connected(&remote_address));
             assert!(peer_book.is_disconnected(&remote_address));
         });
@@ -197,31 +183,25 @@ mod server_connection_handler {
             let sync_handler_lock = Arc::clone(&server.sync_handler_lock);
 
             // 1. Add peer to peers
-
             let mut peer_book = context.peer_book.write().await;
             peer_book.connected_peer(&remote_address);
             drop(peer_book);
 
             // 2. Start remote_listener
-
             accept_all_messages(remote_listener);
 
             // 2. Start server
-
             start_test_server(server);
 
             // 4. Add sync_handler to disconnected
-
             peer_book = context.peer_book.write().await;
             peer_book.disconnected_peer(&bootnode_address);
             drop(peer_book);
 
             // 5. Wait for connection handler loop
-
             sleep(CONNECTION_FREQUENCY_SHORT_TIMEOUT).await;
 
             // 6. Check that the server set sync_node to peer
-
             assert_eq!(sync_handler_lock.lock().await.sync_node_address, remote_address);
         });
 
@@ -253,12 +233,10 @@ mod server_connection_handler {
             let context = server.environment.clone();
 
             // 1. Start server
-
             start_test_server(server);
             sleep(1000).await; // Sleep to give testing server time to spin up on a new thread
 
             // 2. Add sync handler to connections
-
             context
                 .connections
                 .write()
@@ -268,9 +246,7 @@ mod server_connection_handler {
             let channel_sync_side = accept_channel(&mut sync_node_listener, local_address).await;
 
             // 3. Wait for memory pool interval
-
             let (name, bytes) = channel_sync_side.read().await.unwrap();
-
             assert_eq!(GetMemoryPool::name(), name);
             assert!(GetMemoryPool::deserialize(bytes).is_ok());
         });

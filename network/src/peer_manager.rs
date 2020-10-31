@@ -45,7 +45,7 @@ use std::{
 use tokio::{sync::RwLock, task};
 
 pub(crate) type PeerSender = tokio::sync::mpsc::Sender<PeerMessage>;
-// pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
+pub(crate) type PeerReceiver = tokio::sync::mpsc::Receiver<PeerMessage>;
 
 #[derive(Debug)]
 pub enum PeerMessage {
@@ -67,7 +67,7 @@ pub enum PeerMessage {
     Block(SocketAddr, Block, bool),
 }
 
-/// A stateful component for managing the peer connections of this node.
+/// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
 pub struct PeerManager {
     /// The parameters and settings of this node server.
@@ -79,7 +79,7 @@ pub struct PeerManager {
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
     /// The receiver for this peer manager to receive responses from the receive handler.
-    receiver: Arc<RwLock<tokio::sync::mpsc::Receiver<PeerMessage>>>,
+    peer_receiver: Arc<RwLock<PeerReceiver>>,
 }
 
 impl PeerManager {
@@ -121,7 +121,7 @@ impl PeerManager {
             receive_handler,
             peer_book: Arc::new(RwLock::new(peer_book)),
 
-            receiver: Arc::new(RwLock::new(peer_receiver)),
+            peer_receiver: Arc::new(RwLock::new(peer_receiver)),
         };
 
         // Save the peer book to storage.
@@ -212,7 +212,7 @@ impl PeerManager {
     pub async fn receive_handler(&mut self) -> Result<(), NetworkError> {
         warn!("PEER_MANAGER: START NEXT RECEIVER HANDLER");
 
-        if let Some(message) = self.receiver.write().await.recv().await {
+        if let Some(message) = self.peer_receiver.write().await.recv().await {
             match message {
                 PeerMessage::VersionToVerack(remote_address, remote_version) => {
                     debug!("Received `Version` request from {}", remote_version.receiver);
@@ -265,8 +265,7 @@ impl PeerManager {
                     }
                     self.send_handler
                         .broadcast(&Request::Peers(remote_address, Peers::new(peers)))
-                        .await
-                        .unwrap();
+                        .await?;
                 }
                 PeerMessage::Peers(remote_address, peers) => {
                     /// A miner has sent their list of peer addresses.
