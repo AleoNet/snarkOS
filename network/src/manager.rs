@@ -16,8 +16,8 @@
 
 use crate::{
     external::message_types::*,
+    outbound::Request,
     peers::{PeerBook, PeerInfo},
-    request::Request,
     Environment,
     Inbound,
     NetworkError,

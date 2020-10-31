@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::Channel, request::Request, NetworkError};
+use crate::{external::Channel, outbound::Request, NetworkError};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -27,13 +27,19 @@ use std::{
 use tokio::sync::RwLock;
 
 /// The map of remote addresses to their active write channels.
-pub type Channels = HashMap<SocketAddr, Arc<Channel>>;
+type Channels = HashMap<SocketAddr, Arc<Channel>>;
 
 /// The set of requests for a single peer.
-pub type Requests = Arc<RwLock<HashSet<Request>>>;
+type Requests = Arc<RwLock<HashSet<Request>>>;
 
 /// The map of remote addresses to their pending requests.
-pub type PendingRequests = HashMap<SocketAddr, Requests>;
+type Pending = HashMap<SocketAddr, Requests>;
+
+/// The map of remote addresses to their successful requests.
+type Success = HashMap<SocketAddr, Requests>;
+
+/// The map of remote addresses to their failed requests.
+type Failure = HashMap<SocketAddr, Requests>;
 
 /// A core data structure for handling outbound network traffic.
 #[derive(Debug, Clone)]
@@ -41,9 +47,11 @@ pub struct Outbound {
     /// The map of remote addresses to their active write channels.
     channels: Arc<RwLock<Channels>>,
     /// The map of remote addresses to their pending requests.
-    pending: Arc<RwLock<PendingRequests>>,
-    /// The map of remote addresses to their completed requests.
-    complete: Arc<RwLock<HashMap<SocketAddr, Requests>>>,
+    pending: Arc<RwLock<Pending>>,
+    /// The map of remote addresses to their successful requests.
+    success: Arc<RwLock<Success>>,
+    /// The map of remote addresses to their failed requests.
+    failure: Arc<RwLock<Failure>>,
     /// The counter for the number of send requests the handler processes.
     send_request_count: Arc<AtomicU64>,
     /// The counter for the number of send requests that succeeded.
@@ -58,76 +66,58 @@ impl Outbound {
     pub fn new() -> Self {
         Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
-            pending: Arc::new(RwLock::new(HashMap::new())),
-            complete: Arc::new(RwLock::new(HashMap::new())),
+            pending: Arc::new(RwLock::new(Pending::new())),
+            success: Arc::new(RwLock::new(Success::new())),
+            failure: Arc::new(RwLock::new(Failure::new())),
             send_request_count: Arc::new(AtomicU64::new(0)),
             send_success_count: Arc::new(AtomicU64::new(0)),
             send_failure_count: Arc::new(AtomicU64::new(0)),
         }
     }
 
-    // TODO (howardwu): Implement getters to all counters.
-    // /// Returns the number of requests the manager has processed.
-    // #[inline]
-    // pub async fn get_request_count(&self) -> u64 {
-    //     let counter = self.send_request_count.clone();
-    //     counter.clone().into_inner()
-    // }
+    ///
+    /// Returns `true` if the given request is a pending request.
+    ///
+    pub async fn is_pending(&self, request: &Request) -> bool {
+        // Acquire the pending read lock.
+        let pending = self.pending.read().await;
+        // Fetch the pending requests of the given receiver.
+        match pending.get(&request.receiver()) {
+            // Check if the set of pending requests contains the given request.
+            Some(requests) => requests.read().await.contains(&request),
+            // Return `false` as the receiver does not exist in this map.
+            None => false,
+        }
+    }
 
-    async fn authorize(&self, request: &Request) -> Result<(Arc<Channel>, Requests), NetworkError> {
-        // Fetch the request receiver.
-        let receiver = request.receiver();
-        trace!("Authorizing `{}` request to {}", request.name(), receiver);
+    ///
+    /// Returns `true` if the given request was a successful request.
+    ///
+    pub async fn is_success(&self, request: &Request) -> bool {
+        // Acquire the success read lock.
+        let success = self.success.read().await;
+        // Fetch the successful requests of the given receiver.
+        match success.get(&request.receiver()) {
+            // Check if the set of successful requests contains the given request.
+            Some(requests) => requests.read().await.contains(&request),
+            // Return `false` as the receiver does not exist in this map.
+            None => false,
+        }
+    }
 
-        // Acquire the channels write lock.
-        let mut channels = self.channels.write().await;
-        // Acquire the pending write lock.
-        let mut pending = self.pending.write().await;
-
-        // Fetch or initialize the channel for broadcasting the request.
-        let channel = if let Some(channel) = channels.get(&receiver) {
-            // Case 1 - The channel exists, retrieves the channel.
-            trace!("Using the existing channel with {}", receiver);
-            channel.clone()
-        } else {
-            // Case 2 - The channel does not exist, creates and returns a new channel.
-            trace!("Creating a new channel with {}", receiver);
-            if let Ok(channel) = Channel::new_writer(receiver.clone()).await {
-                trace!("Created a new channel with {}", receiver);
-                Arc::new(channel)
-            } else {
-                error!("Failed to create a new channel with {}", receiver);
-                return Err(NetworkError::OutboundFailedToCreateChannel);
-            }
-        };
-
-        // Fetch or initialize the pending requests for the request receiver.
-        let pending_requests = if let Some(requests) = pending.get(&receiver) {
-            // Case 1 - The receiver exists, retrieves the requests.
-            trace!("Using the existing instance of pending requests");
-            requests.clone()
-        } else {
-            // Case 2 - The receiver does not exist, initializes requests and stores it.
-            trace!("Creating a new instance of pending requests");
-            // Creates a new instance of `Requests` and stores it.
-            Arc::new(RwLock::new(HashSet::new()))
-        };
-
-        // Acquire the pending requests write lock.
-        let mut pending_inner = pending_requests.write().await;
-
-        // Store the channel in the channel map.
-        channels.insert(receiver, channel.clone());
-        // Store the pending requests in the pending map.
-        pending.insert(receiver, pending_requests.clone());
-        // Store the request to the pending requests.
-        pending_inner.insert(request.clone());
-
-        // Increment the request counter.
-        self.send_request_count.fetch_add(1, Ordering::SeqCst);
-
-        trace!("Authorized `{}` request to {}", request.name(), receiver);
-        Ok((channel, pending_requests.clone()))
+    ///
+    /// Returns `true` if the given request was a failed request.
+    ///
+    pub async fn is_failure(&self, request: &Request) -> bool {
+        // Acquire the failure read lock.
+        let failure = self.failure.read().await;
+        // Fetch the failed requests of the given receiver.
+        match failure.get(&request.receiver()) {
+            // Check if the set of failed requests contains the given request.
+            Some(requests) => requests.read().await.contains(&request),
+            // Return `false` as the receiver does not exist in this map.
+            None => false,
+        }
     }
 
     ///
@@ -207,6 +197,70 @@ impl Outbound {
         });
 
         Ok(())
+    }
+
+    // TODO (howardwu): Implement getters to all counters.
+    // /// Returns the number of requests the manager has processed.
+    // #[inline]
+    // pub async fn get_request_count(&self) -> u64 {
+    //     let counter = self.send_request_count.clone();
+    //     counter.clone().into_inner()
+    // }
+
+    async fn authorize(&self, request: &Request) -> Result<(Arc<Channel>, Requests), NetworkError> {
+        // Fetch the request receiver.
+        let receiver = request.receiver();
+        trace!("Authorizing `{}` request to {}", request.name(), receiver);
+
+        // Acquire the channels write lock.
+        let mut channels = self.channels.write().await;
+        // Acquire the pending write lock.
+        let mut pending = self.pending.write().await;
+
+        // Fetch or initialize the channel for broadcasting the request.
+        let channel = if let Some(channel) = channels.get(&receiver) {
+            // Case 1 - The channel exists, retrieves the channel.
+            trace!("Using the existing channel with {}", receiver);
+            channel.clone()
+        } else {
+            // Case 2 - The channel does not exist, creates and returns a new channel.
+            trace!("Creating a new channel with {}", receiver);
+            if let Ok(channel) = Channel::new_writer(receiver.clone()).await {
+                trace!("Created a new channel with {}", receiver);
+                Arc::new(channel)
+            } else {
+                error!("Failed to create a new channel with {}", receiver);
+                return Err(NetworkError::OutboundFailedToCreateChannel);
+            }
+        };
+
+        // Fetch or initialize the pending requests for the request receiver.
+        let pending_requests = if let Some(requests) = pending.get(&receiver) {
+            // Case 1 - The receiver exists, retrieves the requests.
+            trace!("Using the existing instance of pending requests");
+            requests.clone()
+        } else {
+            // Case 2 - The receiver does not exist, initializes requests and stores it.
+            trace!("Creating a new instance of pending requests");
+            // Creates a new instance of `Requests` and stores it.
+            Arc::new(RwLock::new(HashSet::new()))
+        };
+
+        // Acquire the pending requests write lock.
+        let mut pending_inner = pending_requests.write().await;
+
+        // Store the channel in the channel map.
+        channels.insert(receiver, channel.clone());
+        // Store the pending requests in the pending map.
+        pending.insert(receiver, pending_requests.clone());
+        // Store the request to the pending requests.
+        pending_inner.insert(request.clone());
+
+        // Increment the request counter.
+        self.send_request_count.fetch_add(1, Ordering::SeqCst);
+
+        trace!("Authorized `{}` request to {}", request.name(), receiver);
+        Ok((channel, pending_requests.clone()))
     }
 }
 
