@@ -42,10 +42,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
-use tokio::{
-    sync::{oneshot, RwLock},
-    task,
-};
+use tokio::{sync::RwLock, task};
 
 pub(crate) type PeerSender = tokio::sync::mpsc::Sender<PeerMessage>;
 // pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
