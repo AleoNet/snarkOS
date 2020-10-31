@@ -17,7 +17,7 @@
 use crate::{
     environment::Environment,
     external::{message::MessageName, message_types::GetSync, Channel, GetMemoryPool},
-    peer_manager::PeerManager,
+    peer_manager::{PeerManager, PeerMessage},
     ReceiveHandler,
     SendHandler,
     SyncManager,
@@ -66,6 +66,7 @@ pub enum NetworkError {
     ReceiveHandlerAlreadySetPeerSender,
     ReceiveHandlerMissingPeerSender,
     SendError(SendError),
+    SenderError(tokio::sync::mpsc::error::SendError<PeerMessage>),
     SendHandlerFailedToCreateChannel,
     SendHandlerPendingRequestsMissing,
     SendRequestUnauthorized,
@@ -131,6 +132,12 @@ impl From<std::io::Error> for NetworkError {
 impl From<tokio::sync::TryLockError> for NetworkError {
     fn from(error: tokio::sync::TryLockError) -> Self {
         NetworkError::TryLockError(error)
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<PeerMessage>> for NetworkError {
+    fn from(error: tokio::sync::mpsc::error::SendError<PeerMessage>) -> Self {
+        NetworkError::SenderError(error)
     }
 }
 

@@ -186,7 +186,7 @@ impl ReceiveHandler {
                     let height = environment.current_block_height().await;
 
                     // TODO (raychu86) Establish a formal node version
-                    if let Some((channel, discovered_local_address, version_message)) = self
+                    if let Some((channel, discovered_local_address)) = self
                         .receive_connection_request(sender.clone(), 1u64, height, remote_address, channel)
                         .await
                         .unwrap()
@@ -202,32 +202,6 @@ impl ReceiveHandler {
                         // }
                         // // Store the channel established with the handshake
                         // peer_manager.add_channel(&handshake.channel);
-
-                        // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
-                        // if let Some(version) = version_message {
-                        //     // If our peer has a longer chain, send a sync message
-                        //     if version.height > environment.current_block_height().await {
-                        //         // Update the sync node if the sync_handler is Idle
-                        //         if let Ok(mut sync_handler) = sync_manager.try_lock() {
-                        //             if !sync_handler.is_syncing() {
-                        //                 sync_handler.sync_node_address = handshake.channel.address;
-                        //
-                        //                 if let Ok(block_locator_hashes) =
-                        //                     environment.storage_read().await.get_block_locator_hashes()
-                        //                 {
-                        //                     if let Err(err) =
-                        //                         handshake.channel.write(&GetSync::new(block_locator_hashes)).await
-                        //                     {
-                        //                         error!(
-                        //                             "Error sending GetSync message to {}, {}",
-                        //                             handshake.channel.address, err
-                        //                         );
-                        //                     }
-                        //                 }
-                        //             }
-                        //         }
-                        //     }
-                        // }
 
                         // TODO (howardwu): Delete me.
                         // // Inner loop spawns one thread per connection to read messages
@@ -365,7 +339,14 @@ impl ReceiveHandler {
                                     }
                                 } else if name == GetPeers::name() {
                                     if let Ok(getpeers) = GetPeers::deserialize(bytes) {
-                                        sender.send(PeerMessage::GetPeers(channel.remote_address)).await;
+                                        if let Err(err) =
+                                            sender.send(PeerMessage::GetPeers(channel.remote_address)).await
+                                        {
+                                            error!(
+                                                "Receive handler errored on a {} message from {}. {}",
+                                                name, remote_address, err
+                                            );
+                                        }
                                     }
                                 } else if name == GetSync::name() {
                                     if let Ok(getsync) = GetSync::deserialize(bytes) {
@@ -429,9 +410,15 @@ impl ReceiveHandler {
                                     }
                                 } else if name == Transaction::name() {
                                     if let Ok(transaction) = Transaction::deserialize(bytes) {
-                                        sender
+                                        if let Err(err) = sender
                                             .send(PeerMessage::Transaction(channel.remote_address, transaction))
-                                            .await;
+                                            .await
+                                        {
+                                            error!(
+                                                "Receive handler errored on a {} message from {}. {}",
+                                                name, remote_address, err
+                                            );
+                                        }
                                     }
                                 } else if name == Version::name() {
                                     if let Ok(version) = Version::deserialize(bytes) {
@@ -450,13 +437,24 @@ impl ReceiveHandler {
                                     }
                                 } else if name == Verack::name() {
                                     if let Ok(verack) = Verack::deserialize(bytes) {
-                                        sender
+                                        if let Err(err) = sender
                                             .send(PeerMessage::ConnectedTo(channel.remote_address, verack.nonce))
-                                            .await;
+                                            .await
+                                        {
+                                            error!(
+                                                "Receive handler errored on a {} message from {}. {}",
+                                                name, remote_address, err
+                                            );
+                                        }
                                     }
                                 } else if name == MessageName::from("disconnect") {
                                     info!("Disconnected from peer {:?}", remote_address);
-                                    sender.send(PeerMessage::DisconnectFrom(remote_address)).await;
+                                    if let Err(err) = sender.send(PeerMessage::DisconnectFrom(remote_address)).await {
+                                        error!(
+                                            "Receive handler errored on a {} message from {}. {}",
+                                            name, remote_address, err
+                                        );
+                                    }
                                 } else {
                                     debug!("Message name not recognized {:?}", name.to_string());
                                 }
@@ -787,9 +785,10 @@ impl ReceiveHandler {
 
         if *environment.local_address() != remote_address {
             // Route version message to peer manager.
+            error!("RECEIVEVERSIONCOMPARE {} {}", channel.remote_address, remote_address);
             sender
                 .send(PeerMessage::VersionToVerack(remote_address, version.clone()))
-                .await;
+                .await?;
 
             // TODO (howardwu): Implement this.
             {
@@ -854,8 +853,7 @@ impl ReceiveHandler {
         block_height: u32,
         remote_address: SocketAddr,
         reader: TcpStream,
-        // ) -> Result<Option<(Handshake, SocketAddr, Option<Version>)>, NetworkError> {
-    ) -> Result<Option<(Arc<Channel>, SocketAddr, Option<Version>)>, NetworkError> {
+    ) -> Result<Option<(Arc<Channel>, SocketAddr)>, NetworkError> {
         trace!("Received connection request from {}", remote_address);
 
         // Parse the inbound message into the message name and message bytes.
@@ -874,6 +872,8 @@ impl ReceiveHandler {
         // Handles a version message request.
         // Create and store a new handshake in the manager.
         if message_name == Version::name() {
+            error!("IN VERSION CASE");
+
             // Deserialize the message bytes into a version message.
             let remote_version = match Version::deserialize(message_bytes) {
                 Ok(remote_version) => remote_version,
@@ -885,14 +885,38 @@ impl ReceiveHandler {
             // Create the local version message.
             let local_version = Version::new_with_rng(version, block_height, local_address, remote_address);
 
-            // Acquire the channels write lock.
-            let mut channels = self.channels.write().await;
+            // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
+            // if let Some(version) = version_message {
+            //     // If our peer has a longer chain, send a sync message
+            //     if version.height > environment.current_block_height().await {
+            //         // Update the sync node if the sync_handler is Idle
+            //         if let Ok(mut sync_handler) = sync_manager.try_lock() {
+            //             if !sync_handler.is_syncing() {
+            //                 sync_handler.sync_node_address = handshake.channel.address;
+            //
+            //                 if let Ok(block_locator_hashes) =
+            //                     environment.storage_read().await.get_block_locator_hashes()
+            //                 {
+            //                     if let Err(err) =
+            //                         handshake.channel.write(&GetSync::new(block_locator_hashes)).await
+            //                     {
+            //                         error!(
+            //                             "Error sending GetSync message to {}, {}",
+            //                             handshake.channel.address, err
+            //                         );
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
             // Connect to the remote address.
             let remote_address = local_version.receiver;
             let channel = channel.update_writer(remote_address).await?;
             // Write a verack response to the remote peer.
             let local_address = local_version.sender;
+            error!("RECEIVEHANDLERNUMBER {}", channel.remote_address);
             channel
                 .write(&Verack::new(remote_version.nonce, local_address, remote_address))
                 .await?;
@@ -900,20 +924,63 @@ impl ReceiveHandler {
             channel.write(&local_version).await?;
             sender
                 .send(PeerMessage::ConnectingTo(local_version.receiver, local_version.nonce))
-                .await;
+                .await?;
 
             trace!("Received handshake from {}", remote_address);
 
-            // Store the new channel.
-            let channel = Arc::new(channel);
-            channels.insert(local_address, channel.clone());
+            {
+                // Acquire the channels write lock.
+                let mut channels = self.channels.write().await;
+                // Store the new channel.
+                let channel = Arc::new(channel.clone());
+                channels.insert(local_address, channel.clone());
+            }
 
-            return Ok(Some((channel, local_address, Some(local_version))));
+            {
+                // Parse the inbound message into the message name and message bytes.
+                let (channel, (message_name, message_bytes)) = match channel.read().await {
+                    Ok(inbound_message) => (channel, inbound_message),
+                    _ => return Ok(None),
+                };
+
+                trace!("Received a {} message", message_name);
+
+                error!("IN VERACK CASE {}", channel.remote_address);
+
+                // Deserialize the message bytes into a verack message.
+                let verack = match Verack::deserialize(message_bytes) {
+                    Ok(verack) => verack,
+                    _ => return Ok(None),
+                };
+
+                let local_address = verack.receiver;
+
+                // TODO (howardwu): Check whether this remote address needs to
+                //   be derive the same way as the version message case above
+                //  (using a remote_address.ip() and address_sender.port()).
+                let remote_address = verack.sender;
+
+                // Acquire the channels write lock.
+                let mut channels = self.channels.write().await;
+                // Store the new channel.
+                let channel = Arc::new(channel);
+                channels.insert(remote_address, channel.clone());
+
+                sender
+                    .send(PeerMessage::ConnectedTo(remote_address, verack.nonce))
+                    .await?;
+
+                trace!("Established connection with {}", remote_address);
+
+                return Ok(Some((channel, local_address)));
+            }
         }
 
         // Handles a verack message request.
         // Establish the channel with the remote peer.
         if message_name == Verack::name() {
+            error!("IN VERACK CASE {}", channel.remote_address);
+
             // Deserialize the message bytes into a verack message.
             let verack = match Verack::deserialize(message_bytes) {
                 Ok(verack) => verack,
@@ -935,11 +1002,11 @@ impl ReceiveHandler {
 
             sender
                 .send(PeerMessage::ConnectedTo(remote_address, verack.nonce))
-                .await;
+                .await?;
 
             trace!("Established connection with {}", remote_address);
 
-            return Ok(Some((channel, local_address, None)));
+            return Ok(Some((channel, local_address)));
         }
 
         Ok(None)
