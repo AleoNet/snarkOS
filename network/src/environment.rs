@@ -42,8 +42,6 @@ pub struct Environment {
     network_id: Network,
 
     /// TODO (howardwu): Remove this.
-    pub(crate) peer_manager: Option<Arc<RwLock<PeerManager>>>,
-    /// TODO (howardwu): Remove this.
     sync_manager: Option<Arc<Mutex<SyncManager>>>,
 
     /// The local address of this node.
@@ -120,7 +118,6 @@ impl Environment {
             dpc_parameters,
             network_id,
 
-            peer_manager: None, // TODO (howardwu): Remove this
             sync_manager: None, // TODO (howardwu): Remove this
 
             local_address,
@@ -138,25 +135,11 @@ impl Environment {
 
     /// TODO (howardwu): Remove this.
     pub fn set_managers(&mut self, peer_manager: PeerManager) {
-        self.peer_manager = Some(Arc::new(RwLock::new(peer_manager)));
-
         // Check if this node is configured as a bootnode.
         // Skips instantiating the sync manager if this is a bootnode.
         if let Some(bootnode_address) = self.bootnodes.first() {
             self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(self.clone(), *bootnode_address))));
         }
-    }
-
-    /// TODO (howardwu): Remove this.
-    #[inline]
-    pub async fn peer_manager_read(&self) -> RwLockReadGuard<'_, PeerManager> {
-        self.peer_manager.as_ref().unwrap().read().await
-    }
-
-    /// TODO (howardwu): Remove this.
-    #[inline]
-    pub async fn peer_manager_write(&self) -> RwLockWriteGuard<'_, PeerManager> {
-        self.peer_manager.as_ref().unwrap().write().await
     }
 
     /// TODO (howardwu): Remove this.
