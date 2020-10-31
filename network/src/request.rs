@@ -24,6 +24,7 @@ pub type Receiver = SocketAddr;
 pub enum Request {
     Block(Receiver, Block),
     GetPeers(Receiver, GetPeers),
+    Peers(Receiver, Peers),
     Transaction(Receiver, Transaction),
     Verack(Verack),
     Version(Version),
@@ -34,6 +35,7 @@ impl Request {
         match self {
             Request::Block(_, _) => "Block",
             Request::GetPeers(_, _) => "GetPeers",
+            Request::Peers(_, _) => "Peers",
             Request::Transaction(_, _) => "Transaction",
             Request::Verack(_) => "Verack",
             Request::Version(_) => "Version",
@@ -44,6 +46,7 @@ impl Request {
         match self {
             Request::Block(receiver, _) => *receiver,
             Request::GetPeers(receiver, _) => *receiver,
+            Request::Peers(receiver, _) => *receiver,
             Request::Transaction(receiver, _) => *receiver,
             Request::Verack(verack) => verack.receiver,
             Request::Version(version) => version.receiver,
