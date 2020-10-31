@@ -24,21 +24,25 @@ use std::{fmt, str};
 pub struct MessageName(HASH96);
 
 impl MessageName {
+    #[inline]
     pub fn len(&self) -> usize {
         let trailing_zeros = self.0.iter().rev().take_while(|&x| x == &0).count();
         self.0.len() - trailing_zeros
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_zero()
     }
 
+    #[inline]
     pub fn as_bytes(&self) -> [u8; 12] {
         let mut result = [0u8; 12];
         result[..12].copy_from_slice(&self.0[..12]);
         result
     }
 
+    #[inline]
     fn as_string(&self) -> String {
         String::from_utf8_lossy(&self.0[..self.len()]).to_ascii_lowercase()
     }
@@ -47,6 +51,7 @@ impl MessageName {
 impl str::FromStr for MessageName {
     type Err = MessageNameError;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.is_ascii() || s.len() > 12 {
             return Err(MessageNameError::InvalidLength(s.len()));
@@ -59,30 +64,35 @@ impl str::FromStr for MessageName {
 }
 
 impl From<&'static str> for MessageName {
+    #[inline]
     fn from(s: &'static str) -> Self {
         s.parse().unwrap()
     }
 }
 
 impl From<MessageName> for String {
+    #[inline]
     fn from(c: MessageName) -> Self {
         c.as_string()
     }
 }
 
 impl From<[u8; 12]> for MessageName {
+    #[inline]
     fn from(bytes: [u8; 12]) -> Self {
         Self { 0: HASH96::from(bytes) }
     }
 }
 
 impl fmt::Display for MessageName {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.as_string())
     }
 }
 
 impl<'a> PartialEq<&'a str> for MessageName {
+    #[inline]
     fn eq(&self, other: &&'a str) -> bool {
         self.len() == other.len() && &self.0[..other.len()] == other.as_ref() as &[u8]
     }
