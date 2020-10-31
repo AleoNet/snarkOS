@@ -36,14 +36,17 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_utilities::FromBytes;
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use tokio::{
-    net::TcpListener,
-    sync::{mpsc, oneshot, Mutex, RwLock},
+    sync::{mpsc, oneshot, RwLock},
     task,
 };
 
-pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
+// pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 
 #[derive(Debug)]
@@ -60,6 +63,8 @@ pub enum PeerMessage {
     Transaction(SocketAddr, Transaction),
     /// Receive handler received a getpeers request.
     GetPeers(SocketAddr),
+    /// Receive handler received a peers response.
+    Peers(SocketAddr, Peers),
 }
 
 /// A stateful component for managing the peer connections of this node.
@@ -73,11 +78,9 @@ pub struct PeerManager {
     receive_handler: ReceiveHandler,
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
-    /// The sender for the receive handler to send responses to this manager.
-    peer_sender: Arc<RwLock<PeerSender>>,
     /// The receiver for this peer manager to receive responses from the receive handler.
     peer_receiver: Arc<PeerReceiver>,
-
+    /// The sender for the receive handler to send responses to this manager.
     sender: Arc<mpsc::Sender<PeerMessage>>,
     receiver: Arc<RwLock<mpsc::Receiver<PeerMessage>>>,
 }
@@ -102,7 +105,7 @@ impl PeerManager {
 
         // Initialize the peer sender and peer receiver.
         let (sender, receiver) = mpsc::channel(1024);
-        let (peer_sender, peer_receiver) = (Arc::new(RwLock::new(sender)), Arc::new(receiver));
+        let (_, peer_receiver) = (Arc::new(RwLock::new(sender)), Arc::new(receiver));
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());
@@ -119,7 +122,7 @@ impl PeerManager {
         let (sender, receiver) = (Arc::new(sender), Arc::new(RwLock::new(receiver)));
 
         // Initialize the peer sender with the receive handler.
-        receive_handler.initialize(peer_sender.clone(), sender.clone())?;
+        receive_handler.initialize(sender.clone())?;
 
         // Instantiate the peer manager.
         let peer_manager = Self {
@@ -127,7 +130,6 @@ impl PeerManager {
             send_handler,
             receive_handler,
             peer_book: Arc::new(RwLock::new(peer_book)),
-            peer_sender,
             peer_receiver,
 
             sender,
@@ -148,12 +150,7 @@ impl PeerManager {
     #[inline]
     pub async fn initialize(&self) -> Result<(), NetworkError> {
         debug!("Initializing peer manager");
-        if let Err(error) = self
-            .receive_handler
-            .clone()
-            .listen(self.environment.clone(), self.peer_book.clone())
-            .await
-        {
+        if let Err(error) = self.receive_handler.clone().listen(self.environment.clone()).await {
             // TODO: Handle receiver error appropriately with tracing and server state updates.
             error!("Receive handler errored with {}", error);
         }
@@ -161,7 +158,7 @@ impl PeerManager {
         let mut peer_manager = self.clone();
         task::spawn(async move {
             loop {
-                peer_manager.receive_handler().await;
+                peer_manager.receive_handler().await.unwrap();
             }
         });
         debug!("Initialized peer manager");
@@ -224,84 +221,48 @@ impl PeerManager {
     }
 
     #[inline]
-    pub async fn receive_handler(&mut self) {
+    pub async fn receive_handler(&mut self) -> Result<(), NetworkError> {
         warn!("PEER_MANAGER: START NEXT RECEIVER HANDLER");
 
         if let Some(message) = self.receiver.write().await.recv().await {
             match message {
                 PeerMessage::VersionToVerack(remote_address, remote_version) => {
-                    debug!("Received a version message from {}", remote_version.receiver);
+                    debug!("Received `Version` request from {}", remote_version.receiver);
                     // TODO (howardwu): Move to its own function.
-                    /// Receives a handshake request from a connected peer.
-                    /// Updates the handshake channel address, if needed.
-                    /// Sends a handshake response back to the connected peer.
-                    // ORIGINAL CODE
-
-                    // match environment.handshakes().write().await.get_mut(&remote_address) {
-                    //     Some(handshake) => {
-                    //         handshake.update_address(remote_address);
-                    //         handshake.receive(message).await.is_ok()
-                    //     }
-                    //     None => false,
-                    // }
-                    let number_of_connected_peers = self.number_of_connected_peers().await;
-                    let maximum_number_of_connected_peers = self.environment.maximum_number_of_connected_peers();
-                    if number_of_connected_peers < maximum_number_of_connected_peers {
+                    if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
                         debug!("Sending `Verack` request to {}", remote_address);
-
-                        /// Receives the version message from a connected peer,
-                        /// and sends a verack message to acknowledge back.
-                        // You are the new sender and your peer is the receiver.
-                        let address_receiver = remote_address;
-                        let address_sender = remote_version.receiver;
                         self.send_handler
                             .broadcast(&Request::Verack(Verack::new(
                                 remote_version.nonce,
-                                address_sender,
-                                address_receiver,
+                                remote_version.receiver, /* local_address */
+                                remote_address,
                             )))
-                            .await
-                            .unwrap();
-                        self.connecting_to_peer(&address_receiver, remote_version.nonce)
-                            .await
-                            .unwrap();
+                            .await?;
+                        self.connecting_to_peer(&remote_address, remote_version.nonce).await?;
                         debug!("Sent `Verack` request to {}", remote_address);
                     }
                 }
                 PeerMessage::ConnectingTo(remote_address, nonce) => {
-                    self.connecting_to_peer(&remote_address, nonce).await.unwrap();
+                    self.connecting_to_peer(&remote_address, nonce).await?;
                     debug!("Connecting to {}", remote_address);
                 }
                 PeerMessage::ConnectedTo(remote_address, nonce) => {
                     trace!("RESOLVING CONNECTED TO FROM {}", remote_address);
-
-                    if self.is_connecting(&remote_address).await {
-                        self.connected_to_peer(&remote_address, nonce).await.unwrap();
-                        debug!("Connected to {}", remote_address);
-                    } else {
-                        // TODO (howardwu): Handle the unsafe case.
-                        error!("Attempting to set {} as connected without a nonce", remote_address);
-                    }
+                    self.connected_to_peer(&remote_address, nonce).await?;
+                    debug!("Connected to {}", remote_address);
                 }
                 PeerMessage::DisconnectFrom(remote_address) => {
                     debug!("Disconnecting from {}", remote_address);
-                    self.disconnected_from_peer(&remote_address).await.unwrap();
+                    self.disconnected_from_peer(&remote_address).await?;
                     debug!("Disconnected from {}", remote_address);
                 }
                 PeerMessage::Transaction(source, transaction) => {
-                    debug!("Found transaction for memory pool from {}", source);
-                    self.process_transaction_internal(source, transaction).await.unwrap();
-                    debug!("Propagated transaction to {}", source);
+                    debug!("Received transaction from {} for memory pool", source);
+                    self.process_transaction_internal(source, transaction).await?;
                 }
                 PeerMessage::GetPeers(remote_address) => {
-                    if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {
-                        // If we received a message, but aren't connected to the peer,
-                        // inform the peer book that we found a peer.
-                        // The peer book will determine if we have seen the peer before,
-                        // and include the peer if it is new.
-                        self.found_peer(&remote_address).await;
-                        debug!("Connected to {}", remote_address);
-                    }
+                    // Add the remote address to the peer book.
+                    self.found_peer(&remote_address).await?;
 
                     // TODO (howardwu): Simplify this and parallelize this with Rayon.
                     // Broadcast the sanitized list of connected peers back to requesting peer.
@@ -319,10 +280,42 @@ impl PeerManager {
                         .await
                         .unwrap();
                 }
+                PeerMessage::Peers(remote_address, peers) => {
+                    /// A miner has sent their list of peer addresses.
+                    /// Add all new/updated addresses to our disconnected.
+                    /// The connection handler will be responsible for sending out handshake requests to them.
+                    ///
+                    // Add the remote address to the peer book.
+                    self.found_peer(&remote_address).await?;
+
+                    // TODO (howardwu): Simplify this and parallelize this with Rayon.
+                    // Process all of the peers sent in the message,
+                    // by informing the peer book of that we found peers.
+                    let local_address = *self.environment.local_address();
+
+                    for (peer_address, _) in peers.addresses.iter() {
+                        // Skip if the peer address is this node's local address.
+                        let is_zero_address = match "0.0.0.0".to_string().parse::<IpAddr>() {
+                            Ok(zero_ip) => (*peer_address).ip() == zero_ip,
+                            _ => false,
+                        };
+                        if *peer_address == local_address || is_zero_address {
+                            continue;
+                        }
+                        // Inform the peer book that we found a peer.
+                        // The peer book will determine if we have seen the peer before,
+                        // and include the peer if it is new.
+                        else if !self.is_connected(peer_address).await {
+                            self.found_peer(peer_address).await?;
+                        }
+                    }
+                }
             }
         }
 
         warn!("PEER_MANAGER: END HANDLER");
+
+        Ok(())
     }
 
     ///
