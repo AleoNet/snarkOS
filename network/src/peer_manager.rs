@@ -46,6 +46,7 @@ use tokio::{
 pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 
+#[derive(Debug)]
 pub enum PeerMessage {
     /// Received a version message and preparing to send a verack message back.
     VersionToVerack(SocketAddr, Version),
@@ -246,7 +247,7 @@ impl PeerManager {
                     let number_of_connected_peers = self.number_of_connected_peers().await;
                     let maximum_number_of_connected_peers = self.environment.maximum_number_of_connected_peers();
                     if number_of_connected_peers < maximum_number_of_connected_peers {
-                        debug!("Sending verack message from {}", remote_address);
+                        debug!("Sending `Verack` request to {}", remote_address);
 
                         /// Receives the version message from a connected peer,
                         /// and sends a verack message to acknowledge back.
@@ -264,7 +265,7 @@ impl PeerManager {
                         self.connecting_to_peer(&address_receiver, remote_version.nonce)
                             .await
                             .unwrap();
-                        debug!("Sending verack message from {}", remote_address);
+                        debug!("Sent `Verack` request to {}", remote_address);
                     }
                 }
                 PeerMessage::ConnectingTo(remote_address, nonce) => {
@@ -272,11 +273,14 @@ impl PeerManager {
                     debug!("Connecting to {}", remote_address);
                 }
                 PeerMessage::ConnectedTo(remote_address, nonce) => {
+                    trace!("RESOLVING CONNECTED TO FROM {}", remote_address);
+
                     if self.is_connecting(&remote_address).await {
                         self.connected_to_peer(&remote_address, nonce).await.unwrap();
                         debug!("Connected to {}", remote_address);
                     } else {
                         // TODO (howardwu): Handle the unsafe case.
+                        error!("Attempting to set {} as connected without a nonce", remote_address);
                     }
                 }
                 PeerMessage::DisconnectFrom(remote_address) => {
