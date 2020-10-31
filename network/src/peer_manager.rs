@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::MessageName, message_types::*, Channel},
+    external::message_types::*,
     peers::{PeerBook, PeerInfo},
     request::Request,
     Environment,
@@ -34,6 +34,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
+use snarkos_objects::Block as BlockStruct;
 use snarkos_utilities::FromBytes;
 
 use std::{
@@ -42,12 +43,12 @@ use std::{
     sync::Arc,
 };
 use tokio::{
-    sync::{mpsc, oneshot, RwLock},
+    sync::{oneshot, RwLock},
     task,
 };
 
-// pub(crate) type PeerSender = mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
-pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
+pub(crate) type PeerSender = tokio::sync::mpsc::Sender<PeerMessage>;
+// pub(crate) type PeerReceiver = mpsc::Receiver<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>;
 
 #[derive(Debug)]
 pub enum PeerMessage {
@@ -65,6 +66,8 @@ pub enum PeerMessage {
     GetPeers(SocketAddr),
     /// Receive handler received a peers response.
     Peers(SocketAddr, Peers),
+    /// Receive handler received a block.
+    Block(SocketAddr, Block, bool),
 }
 
 /// A stateful component for managing the peer connections of this node.
@@ -79,10 +82,7 @@ pub struct PeerManager {
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
     /// The receiver for this peer manager to receive responses from the receive handler.
-    peer_receiver: Arc<PeerReceiver>,
-    /// The sender for the receive handler to send responses to this manager.
-    sender: Arc<mpsc::Sender<PeerMessage>>,
-    receiver: Arc<RwLock<mpsc::Receiver<PeerMessage>>>,
+    receiver: Arc<RwLock<tokio::sync::mpsc::Receiver<PeerMessage>>>,
 }
 
 impl PeerManager {
@@ -100,12 +100,6 @@ impl PeerManager {
 
         // Create a send handler.
         let send_handler = SendHandler::new();
-        // Create a receive handler.
-        let mut receive_handler = ReceiveHandler::new(send_handler.clone());
-
-        // Initialize the peer sender and peer receiver.
-        let (sender, receiver) = mpsc::channel(1024);
-        let (_, peer_receiver) = (Arc::new(RwLock::new(sender)), Arc::new(receiver));
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());
@@ -117,12 +111,11 @@ impl PeerManager {
         //     _ => PeerBook::new(*environment.local_address()),
         // };
 
-        // Initialize the sender and receiver.
-        let (sender, receiver) = mpsc::channel(1024);
-        let (sender, receiver) = (Arc::new(sender), Arc::new(RwLock::new(receiver)));
+        // Initialize the peer sender and peer receiver.
+        let (peer_sender, peer_receiver) = tokio::sync::mpsc::channel(1024);
 
-        // Initialize the peer sender with the receive handler.
-        receive_handler.initialize(sender.clone())?;
+        // Create a receive handler.
+        let receive_handler = ReceiveHandler::new(peer_sender);
 
         // Instantiate the peer manager.
         let peer_manager = Self {
@@ -130,10 +123,8 @@ impl PeerManager {
             send_handler,
             receive_handler,
             peer_book: Arc::new(RwLock::new(peer_book)),
-            peer_receiver,
 
-            sender,
-            receiver,
+            receiver: Arc::new(RwLock::new(peer_receiver)),
         };
 
         // Save the peer book to storage.
@@ -310,6 +301,11 @@ impl PeerManager {
                         }
                     }
                 }
+                PeerMessage::Block(remote_address, block, propagate) => {
+                    debug!("Receiving a block from {}", remote_address);
+                    self.received_block(remote_address, block, propagate).await?;
+                    debug!("Received a block from {}", remote_address);
+                }
             }
         }
 
@@ -384,7 +380,9 @@ impl PeerManager {
         peer_book.disconnected_peers().clone()
     }
 
+    ///
     /// Returns the local address of this node.
+    ///
     #[inline]
     pub fn local_address(&self) -> SocketAddr {
         // TODO (howardwu): Check that env addr and peer book addr match.
@@ -396,25 +394,42 @@ impl PeerManager {
         *self.environment.local_address()
     }
 
-    /// Updates the local address stored in the `PeerBook`.
+    ///
+    /// Adds the given address to the disconnected peers in this peer book.
+    ///
     #[inline]
-    pub async fn set_local_address(&mut self, local_address: SocketAddr) {
+    pub async fn found_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Add the given address to the peer book.
+        peer_book.add_peer(address)
+    }
+
+    ///
+    /// Updates the local address stored in the `PeerBook`.
+    ///
+    #[inline]
+    async fn set_local_address(&mut self, local_address: SocketAddr) {
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
         // Update the local address stored in the peer book.
         peer_book.set_local_address(local_address);
     }
 
+    ///
     /// Returns the current handshake nonce for the given connected peer.
+    ///
     #[inline]
-    pub async fn handshake(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
+    async fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
         // Acquire a peer book read lock.
         let peer_book = self.peer_book.read().await;
         // Fetch the handshake of connected peer.
         peer_book.handshake(remote_address)
     }
 
+    ///
     /// Sets the given remote address and nonce in the peer book as connecting to this node server.
+    ///
     #[inline]
     async fn connecting_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
@@ -423,7 +438,9 @@ impl PeerManager {
         peer_book.set_connecting(remote_address, nonce)
     }
 
+    ///
     /// Sets the given remote address in the peer book as connected to this node server.
+    ///
     #[inline]
     async fn connected_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
@@ -435,6 +452,7 @@ impl PeerManager {
     /// TODO (howardwu): Add logic to remove the active channels
     ///  and handshakes of the peer from this struct.
     /// Sets the given remote address in the peer book as disconnected from this node server.
+    ///
     #[inline]
     async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
@@ -442,16 +460,6 @@ impl PeerManager {
         // Set the peer as disconnected with this node server.
         peer_book.set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
-    }
-
-    /// Adds the given address to the disconnected peers in this peer book.
-    /// Returns `true` on success. Otherwise, returns `false`.
-    #[inline]
-    pub async fn found_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Add the given address to the peer book.
-        peer_book.add_peer(address)
     }
 
     ///
@@ -523,36 +531,6 @@ impl PeerManager {
         Ok(())
     }
 
-    /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
-    ///  when the PeerBook or PeerInfo struct fields change.
-    ///
-    /// Stores the current peer book to the given storage object.
-    ///
-    /// This function checks that this node is not connected to itself,
-    /// and proceeds to serialize the peer book into a byte vector for storage.
-    ///
-    #[inline]
-    async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-        trace!("Peer manager is saving peer book to storage");
-
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Acquire the storage write lock.
-        let storage = self.environment.storage_mut().await;
-
-        // Serialize the peer book.
-        let serialized_peer_book = bincode::serialize(&*peer_book)?;
-
-        // Check that the node does not maintain a connection to itself.
-        peer_book.remove_peer(&self.local_address());
-
-        // Save the serialized peer book to storage.
-        storage.save_peer_book_to_storage(serialized_peer_book)?;
-
-        trace!("Peer manager saved peer book to storage");
-        Ok(())
-    }
-
     /// Broadcasts a `Version` message to all connected peers.
     #[inline]
     async fn broadcast_version_requests(&self) -> Result<(), NetworkError> {
@@ -566,7 +544,7 @@ impl PeerManager {
             debug!("Broadcasting version message to {}", remote_address);
 
             // Get the handshake nonce.
-            if let Ok(nonce) = self.handshake(&remote_address).await {
+            if let Ok(nonce) = self.nonce(&remote_address).await {
                 // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
 
                 // TODO (raychu86): Establish a formal node version.
@@ -619,7 +597,7 @@ impl PeerManager {
 
     /// TODO (howardwu): Move this to the SyncManager.
     /// Broadcast block to connected peers
-    pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) -> Result<(), NetworkError> {
+    async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) -> Result<(), NetworkError> {
         debug!("Propagating a block to peers");
 
         let local_address = self.local_address();
@@ -647,7 +625,7 @@ impl PeerManager {
 
     /// TODO (howardwu): Move this to the SyncManager.
     /// Broadcast transaction to connected peers
-    pub async fn propagate_transaction(
+    async fn propagate_transaction(
         &self,
         transaction_bytes: Vec<u8>,
         transaction_sender: SocketAddr,
@@ -683,7 +661,7 @@ impl PeerManager {
 
     /// TODO (howardwu): Move this to the SyncManager.
     /// Verify a transaction, add it to the memory pool, propagate it to peers.
-    pub async fn process_transaction_internal(
+    async fn process_transaction_internal(
         &self,
         source: SocketAddr,
         transaction: Transaction,
@@ -717,6 +695,96 @@ impl PeerManager {
             }
         }
 
+        Ok(())
+    }
+
+    /// A peer has sent us a new block to process.
+    #[inline]
+    async fn received_block(
+        &self,
+        remote_address: SocketAddr,
+        block: Block,
+        propagate: bool,
+    ) -> Result<(), NetworkError> {
+        let block_struct = BlockStruct::deserialize(&block.data)?;
+        info!(
+            "Received block from epoch {} with hash {:?}",
+            block_struct.header.time,
+            hex::encode(block_struct.header.get_hash().0)
+        );
+
+        // Verify the block and insert it into the storage.
+        if !self
+            .environment
+            .storage_read()
+            .await
+            .block_hash_exists(&block_struct.header.get_hash())
+        {
+            let inserted = self
+                .environment
+                .consensus_parameters()
+                .receive_block(
+                    self.environment.dpc_parameters(),
+                    &*self.environment.storage_read().await,
+                    &mut *self.environment.memory_pool().lock().await,
+                    &block_struct,
+                )
+                .is_ok();
+
+            // This is a new block, send it to our peers.
+            if inserted && propagate {
+                self.propagate_block(block.data, remote_address).await?;
+            } else if !propagate {
+                // if let Ok(mut sync_manager) = self.environment.sync_manager().await.try_lock() {
+                //     // TODO (howardwu): Implement this.
+                //     {
+                //         // sync_manager.clear_pending().await;
+                //         //
+                //         // if sync_manager.sync_state != SyncState::Idle {
+                //         //     // We are currently syncing with a node, ask for the next block.
+                //         //     if let Some(channel) = environment
+                //         //         .peer_manager_read()
+                //         //         .await
+                //         //         .get_channel(&sync_manager.sync_node_address)
+                //         //     {
+                //         //         sync_manager.increment(channel.clone()).await?;
+                //         //     }
+                //         // }
+                //     }
+                // }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
+    ///  when the PeerBook or PeerInfo struct fields change.
+    ///
+    /// Stores the current peer book to the given storage object.
+    ///
+    /// This function checks that this node is not connected to itself,
+    /// and proceeds to serialize the peer book into a byte vector for storage.
+    ///
+    #[inline]
+    async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
+        trace!("Peer manager is saving peer book to storage");
+
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Acquire the storage write lock.
+        let storage = self.environment.storage_mut().await;
+
+        // Serialize the peer book.
+        let serialized_peer_book = bincode::serialize(&*peer_book)?;
+
+        // Check that the node does not maintain a connection to itself.
+        peer_book.remove_peer(&self.local_address());
+
+        // Save the serialized peer book to storage.
+        storage.save_peer_book_to_storage(serialized_peer_book)?;
+
+        trace!("Peer manager saved peer book to storage");
         Ok(())
     }
 }
