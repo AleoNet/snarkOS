@@ -516,15 +516,15 @@ impl PeerManager {
 
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
-        // Check that the node does not maintain a connection to itself.
-        peer_book.remove_peer(&self.local_address());
-        // Serialize the peer book.
-        let serialized_peer_book = bincode::serialize(&*peer_book)?;
-        // Drop the peer book write lock.
-        drop(peer_book);
-
         // Acquire the storage write lock.
         let storage = self.environment.storage_mut().await;
+
+        // Serialize the peer book.
+        let serialized_peer_book = bincode::serialize(&*peer_book)?;
+
+        // Check that the node does not maintain a connection to itself.
+        peer_book.remove_peer(&self.local_address());
+
         // Save the serialized peer book to storage.
         storage.save_peer_book_to_storage(serialized_peer_book)?;
 
