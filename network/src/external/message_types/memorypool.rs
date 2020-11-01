@@ -18,7 +18,7 @@ use crate::external::message::{Message, MessageName};
 use snarkos_errors::network::message::MessageError;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/memory_pool.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct MemoryPool {
     /// Vector of memory pool transactions
     pub transactions: Vec<Vec<u8>>,
