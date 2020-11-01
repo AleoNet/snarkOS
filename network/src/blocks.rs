@@ -306,4 +306,25 @@ impl Blocks {
 
         Ok(())
     }
+
+    /// A peer has sent us their memory pool transactions.
+    pub(crate) async fn receive_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
+        let mut memory_pool = self.environment.memory_pool().lock().await;
+
+        for transaction_bytes in message.transactions {
+            let transaction: Tx = Tx::read(&transaction_bytes[..])?;
+            let entry = Entry::<Tx> {
+                size_in_bytes: transaction_bytes.len(),
+                transaction,
+            };
+
+            if let Ok(inserted) = memory_pool.insert(&*self.environment.storage_read().await, entry) {
+                if let Some(txid) = inserted {
+                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
+                }
+            }
+        }
+
+        Ok(())
+    }
 }

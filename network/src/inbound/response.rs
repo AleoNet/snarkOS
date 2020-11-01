@@ -41,4 +41,6 @@ pub enum Response {
     GetBlock(SocketAddr, GetBlock),
     /// Receive handler received a getmemorypool message.
     GetMemoryPool(SocketAddr),
+    /// Receive handler received a memory pool.
+    MemoryPool(MemoryPool),
 }

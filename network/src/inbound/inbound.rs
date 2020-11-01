@@ -241,18 +241,9 @@ impl Inbound {
                             );
                         }
                     }
-                } else if name == GetPeers::name() {
-                    if let Ok(_) = GetPeers::deserialize(bytes) {
-                        if let Err(err) = self.sender.send(Response::GetPeers(channel.remote_address)).await {
-                            error!(
-                                "Receive handler errored on a {} message from {}. {}",
-                                name, remote_address, err
-                            );
-                        }
-                    }
-                } else if name == Peers::name() {
-                    if let Ok(peers) = Peers::deserialize(bytes) {
-                        if let Err(err) = self.sender.send(Response::Peers(channel.remote_address, peers)).await {
+                } else if name == MemoryPool::name() {
+                    if let Ok(mempool) = MemoryPool::deserialize(bytes) {
+                        if let Err(err) = self.sender.send(Response::MemoryPool(mempool)).await {
                             error!(
                                 "Receive handler errored on a {} message from {}. {}",
                                 name, remote_address, err
@@ -266,15 +257,6 @@ impl Inbound {
                             .receive_get_sync(environment, getsync, channel.clone())
                             .await
                         {
-                            error!(
-                                "Receive handler errored on a {} message from {}. {}",
-                                name, remote_address, err
-                            );
-                        }
-                    }
-                } else if name == MemoryPool::name() {
-                    if let Ok(mempool) = MemoryPool::deserialize(bytes) {
-                        if let Err(err) = self.clone().receive_memory_pool(environment, mempool).await {
                             error!(
                                 "Receive handler errored on a {} message from {}. {}",
                                 name, remote_address, err
@@ -297,6 +279,24 @@ impl Inbound {
                             .send(Response::Transaction(channel.remote_address, transaction))
                             .await
                         {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == GetPeers::name() {
+                    if let Ok(_) = GetPeers::deserialize(bytes) {
+                        if let Err(err) = self.sender.send(Response::GetPeers(channel.remote_address)).await {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == Peers::name() {
+                    if let Ok(peers) = Peers::deserialize(bytes) {
+                        if let Err(err) = self.sender.send(Response::Peers(channel.remote_address, peers)).await {
                             error!(
                                 "Receive handler errored on a {} message from {}. {}",
                                 name, remote_address, err
@@ -357,27 +357,6 @@ impl Inbound {
 
     pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
         self.receiver.clone()
-    }
-
-    /// A peer has sent us their memory pool transactions.
-    async fn receive_memory_pool(&self, environment: &Environment, message: MemoryPool) -> Result<(), NetworkError> {
-        let mut memory_pool = environment.memory_pool().lock().await;
-
-        for transaction_bytes in message.transactions {
-            let transaction: Tx = Tx::read(&transaction_bytes[..])?;
-            let entry = Entry::<Tx> {
-                size_in_bytes: transaction_bytes.len(),
-                transaction,
-            };
-
-            if let Ok(inserted) = memory_pool.insert(&*environment.storage_read().await, entry) {
-                if let Some(txid) = inserted {
-                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
-                }
-            }
-        }
-
-        Ok(())
     }
 
     /// A peer has requested our chain state to sync with.
