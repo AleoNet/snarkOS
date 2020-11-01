@@ -18,6 +18,7 @@ use crate::{outbound::Request, NetworkError};
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     net::SocketAddr,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -243,16 +244,16 @@ impl Outbound {
         let channel = match self.outbound_channel(&request.receiver()).await {
             Ok(channel) => channel,
             Err(error) => {
-                self.failure(&request).await;
+                self.failure(&request, error).await;
                 return;
             }
         };
 
-        trace!("Acquired outbound channel to {}", request.receiver());
+        trace!("Broadcasting `{}` request to {}", request.name(), request.receiver());
 
         match request.broadcast(&channel).await {
             Ok(_) => self.success(&request).await,
-            Err(error) => self.failure(&request).await,
+            Err(error) => self.failure(&request, error).await,
             // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
             // // Disconnect from the peer if the version request fails to send.
             // if let Err(_) = channel.write(&version).await {
@@ -292,7 +293,9 @@ impl Outbound {
     }
 
     #[inline]
-    async fn failure(&self, request: &Request) {
+    async fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
+        error!("{}", error);
+
         // Acquire the pending write lock.
         let mut pending = self.pending.write().await;
 

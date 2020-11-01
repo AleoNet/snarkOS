@@ -19,30 +19,16 @@ use crate::{
     outbound::Request,
     peers::{PeerBook, PeerInfo},
     Environment,
-    Inbound,
     NetworkError,
     Outbound,
 };
-
-// TODO (howardwu): Move these imports to SyncManager.
-use snarkos_consensus::{
-    memory_pool::{Entry, MemoryPool},
-    ConsensusParameters,
-    MerkleTreeLedger,
-};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
-use snarkos_objects::Block as BlockStruct;
-use snarkos_utilities::FromBytes;
 
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
-use tokio::{sync::RwLock, task};
+use tokio::sync::RwLock;
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]

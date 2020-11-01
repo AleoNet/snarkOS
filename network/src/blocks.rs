@@ -356,4 +356,26 @@ impl Blocks {
 
         Ok(())
     }
+
+    /// A peer has sent us their chain state.
+    pub(crate) async fn received_sync(&self, message: Sync) -> Result<(), NetworkError> {
+        let height = self.environment.storage_read().await.get_current_block_height();
+        let mut sync_handler = self.environment.sync_manager().await.lock().await;
+
+        sync_handler.receive_hashes(message.block_hashes, height);
+
+        // TODO (howardwu): Implement this using the sync manager and outbound handler.
+        {
+            // // Received block headers
+            // if let Some(channel) = environment
+            //     .peers_read()
+            //     .await
+            //     .get_channel(&sync_handler.sync_node_address)
+            // {
+            //     sync_handler.increment(channel.clone()).await?;
+            // }
+        }
+
+        Ok(())
+    }
 }
