@@ -16,7 +16,8 @@
 
 use crate::{
     external::{message::Message, message_types::*, Channel, MessageName},
-    manager::{PeerMessage, PeerSender},
+    inbound::Response,
+    manager::PeerSender,
     Environment,
     NetworkError,
     SyncManager,
@@ -251,9 +252,8 @@ impl Inbound {
 
                         if name == Block::name() {
                             if let Ok(block) = Block::deserialize(bytes) {
-                                if let Err(err) = sender
-                                    .send(PeerMessage::Block(channel.remote_address, block, true))
-                                    .await
+                                if let Err(err) =
+                                    sender.send(Response::Block(channel.remote_address, block, true)).await
                                 {
                                     error!(
                                         "Receive handler errored on a {} message from {}. {}",
@@ -263,9 +263,8 @@ impl Inbound {
                             }
                         } else if name == SyncBlock::name() {
                             if let Ok(block) = Block::deserialize(bytes) {
-                                if let Err(err) = sender
-                                    .send(PeerMessage::Block(channel.remote_address, block, false))
-                                    .await
+                                if let Err(err) =
+                                    sender.send(Response::Block(channel.remote_address, block, false)).await
                                 {
                                     error!(
                                         "Receive handler errored on a {} message from {}. {}",
@@ -301,7 +300,7 @@ impl Inbound {
                             }
                         } else if name == GetPeers::name() {
                             if let Ok(_) = GetPeers::deserialize(bytes) {
-                                if let Err(err) = sender.send(PeerMessage::GetPeers(channel.remote_address)).await {
+                                if let Err(err) = sender.send(Response::GetPeers(channel.remote_address)).await {
                                     error!(
                                         "Receive handler errored on a {} message from {}. {}",
                                         name, remote_address, err
@@ -310,7 +309,7 @@ impl Inbound {
                             }
                         } else if name == Peers::name() {
                             if let Ok(peers) = Peers::deserialize(bytes) {
-                                if let Err(err) = sender.send(PeerMessage::Peers(channel.remote_address, peers)).await {
+                                if let Err(err) = sender.send(Response::Peers(channel.remote_address, peers)).await {
                                     error!(
                                         "Receive handler errored on a {} message from {}. {}",
                                         name, remote_address, err
@@ -351,7 +350,7 @@ impl Inbound {
                         } else if name == Transaction::name() {
                             if let Ok(transaction) = Transaction::deserialize(bytes) {
                                 if let Err(err) = sender
-                                    .send(PeerMessage::Transaction(channel.remote_address, transaction))
+                                    .send(Response::Transaction(channel.remote_address, transaction))
                                     .await
                                 {
                                     error!(
@@ -378,7 +377,7 @@ impl Inbound {
                         } else if name == Verack::name() {
                             if let Ok(verack) = Verack::deserialize(bytes) {
                                 if let Err(err) = sender
-                                    .send(PeerMessage::ConnectedTo(channel.remote_address, verack.nonce))
+                                    .send(Response::ConnectedTo(channel.remote_address, verack.nonce))
                                     .await
                                 {
                                     error!(
@@ -389,7 +388,7 @@ impl Inbound {
                             }
                         } else if name == MessageName::from("disconnect") {
                             info!("Disconnected from peer {:?}", remote_address);
-                            if let Err(err) = sender.send(PeerMessage::DisconnectFrom(remote_address)).await {
+                            if let Err(err) = sender.send(Response::DisconnectFrom(remote_address)).await {
                                 error!(
                                     "Receive handler errored on a {} message from {}. {}",
                                     name, remote_address, err
@@ -558,7 +557,7 @@ impl Inbound {
             // Route version message to peer manager.
             warn!("RECEIVEVERSIONCOMPARE {} {}", channel.remote_address, remote_address);
             sender
-                .send(PeerMessage::VersionToVerack(remote_address, version.clone()))
+                .send(Response::VersionToVerack(remote_address, version.clone()))
                 .await?;
 
             // TODO (howardwu): Implement this.
@@ -694,7 +693,7 @@ impl Inbound {
             // Write version request to the remote peer.
             channel.write(&local_version).await?;
             sender
-                .send(PeerMessage::ConnectingTo(local_version.receiver, local_version.nonce))
+                .send(Response::ConnectingTo(local_version.receiver, local_version.nonce))
                 .await?;
 
             trace!("Received handshake from {}", remote_address);
@@ -737,9 +736,7 @@ impl Inbound {
                 let channel = Arc::new(channel);
                 channels.insert(remote_address, channel.clone());
 
-                sender
-                    .send(PeerMessage::ConnectedTo(remote_address, verack.nonce))
-                    .await?;
+                sender.send(Response::ConnectedTo(remote_address, verack.nonce)).await?;
 
                 trace!("Established connection with {}", remote_address);
 
@@ -771,9 +768,7 @@ impl Inbound {
             let channel = Arc::new(channel);
             channels.insert(remote_address, channel.clone());
 
-            sender
-                .send(PeerMessage::ConnectedTo(remote_address, verack.nonce))
-                .await?;
+            sender.send(Response::ConnectedTo(remote_address, verack.nonce)).await?;
 
             trace!("Established connection with {}", remote_address);
 

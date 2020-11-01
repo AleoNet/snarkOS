@@ -16,6 +16,7 @@
 
 use crate::{
     external::message_types::*,
+    inbound::Response,
     outbound::Request,
     peers::{PeerBook, PeerInfo},
     Environment,
@@ -44,28 +45,8 @@ use std::{
 };
 use tokio::{sync::RwLock, task};
 
-pub(crate) type PeerSender = tokio::sync::mpsc::Sender<PeerMessage>;
-pub(crate) type PeerReceiver = tokio::sync::mpsc::Receiver<PeerMessage>;
-
-#[derive(Debug)]
-pub enum PeerMessage {
-    /// Received a version message and preparing to send a verack message back.
-    VersionToVerack(SocketAddr, Version),
-    /// Receive handler is connecting to the given peer with the given nonce.
-    ConnectingTo(SocketAddr, u64),
-    /// Receive handler has connected to the given peer with the given nonce.
-    ConnectedTo(SocketAddr, u64),
-    /// Receive handler has signaled to drop the connection with the given peer.
-    DisconnectFrom(SocketAddr),
-    /// Receive handler received a new transaction from the given peer.
-    Transaction(SocketAddr, Transaction),
-    /// Receive handler received a getpeers request.
-    GetPeers(SocketAddr),
-    /// Receive handler received a peers response.
-    Peers(SocketAddr, Peers),
-    /// Receive handler received a block.
-    Block(SocketAddr, Block, bool),
-}
+pub(crate) type PeerSender = tokio::sync::mpsc::Sender<Response>;
+pub(crate) type PeerReceiver = tokio::sync::mpsc::Receiver<Response>;
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
@@ -214,7 +195,7 @@ impl PeerManager {
 
         if let Some(message) = self.peer_receiver.write().await.recv().await {
             match message {
-                PeerMessage::VersionToVerack(remote_address, remote_version) => {
+                Response::VersionToVerack(remote_address, remote_version) => {
                     debug!("Received `Version` request from {}", remote_version.receiver);
                     // TODO (howardwu): Move to its own function.
                     if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
@@ -230,25 +211,25 @@ impl PeerManager {
                         debug!("Sent `Verack` request to {}", remote_address);
                     }
                 }
-                PeerMessage::ConnectingTo(remote_address, nonce) => {
+                Response::ConnectingTo(remote_address, nonce) => {
                     self.connecting_to_peer(&remote_address, nonce).await?;
                     debug!("Connecting to {}", remote_address);
                 }
-                PeerMessage::ConnectedTo(remote_address, nonce) => {
+                Response::ConnectedTo(remote_address, nonce) => {
                     trace!("RESOLVING CONNECTED TO FROM {}", remote_address);
                     self.connected_to_peer(&remote_address, nonce).await?;
                     debug!("Connected to {}", remote_address);
                 }
-                PeerMessage::DisconnectFrom(remote_address) => {
+                Response::DisconnectFrom(remote_address) => {
                     debug!("Disconnecting from {}", remote_address);
                     self.disconnected_from_peer(&remote_address).await?;
                     debug!("Disconnected from {}", remote_address);
                 }
-                PeerMessage::Transaction(source, transaction) => {
+                Response::Transaction(source, transaction) => {
                     debug!("Received transaction from {} for memory pool", source);
                     self.process_transaction_internal(source, transaction).await?;
                 }
-                PeerMessage::GetPeers(remote_address) => {
+                Response::GetPeers(remote_address) => {
                     // Add the remote address to the peer book.
                     self.found_peer(&remote_address).await?;
 
@@ -267,7 +248,7 @@ impl PeerManager {
                         .broadcast(&Request::Peers(remote_address, Peers::new(peers)))
                         .await;
                 }
-                PeerMessage::Peers(remote_address, peers) => {
+                Response::Peers(remote_address, peers) => {
                     /// A miner has sent their list of peer addresses.
                     /// Add all new/updated addresses to our disconnected.
                     /// The connection handler will be responsible for sending out handshake requests to them.
@@ -297,7 +278,7 @@ impl PeerManager {
                         }
                     }
                 }
-                PeerMessage::Block(remote_address, block, propagate) => {
+                Response::Block(remote_address, block, propagate) => {
                     debug!("Receiving a block from {}", remote_address);
                     self.received_block(remote_address, block, propagate).await?;
                     debug!("Received a block from {}", remote_address);
