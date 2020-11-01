@@ -78,24 +78,6 @@ impl Inbound {
         }
     }
 
-    /**
-    [1 invocation per peer manager] Add initialize_peer_sender() which sets the `PeerSender`.
-        - Save the peer_sender into inbound handler.
-
-    [1 instance per peer manager] Add listen() which detects new peer. (for `channel`)
-        - Save channel into inbound handler.
-        - For each new peer, call the handler().
-
-    [1 instance per peer] Add handler() which initializes new handler. (for `channel`)
-        - Calls authorize() to obtain a (channel, peer_sender)
-        - Runs handler logic for peer.
-
-    [1 invocation per peer] Add authorize() which authorizes the receiver for a peer.
-        - Clones 1 instance of peer_sender per authorization.
-        - Clone 1 instance of the channel (okay to clone as it is a read-only channel) per authorization
-        - Returns a (channel, peer_sender) per authorization
-     */
-
     // TODO (howardwu): Remove environment from function inputs.
     #[inline]
     pub async fn listen(
@@ -251,12 +233,8 @@ impl Inbound {
                         }
                     }
                 } else if name == GetMemoryPool::name() {
-                    if let Ok(getmemorypool) = GetMemoryPool::deserialize(bytes) {
-                        if let Err(err) = self
-                            .clone()
-                            .receive_get_memory_pool(environment, getmemorypool, channel.clone())
-                            .await
-                        {
+                    if let Ok(_) = GetMemoryPool::deserialize(bytes) {
+                        if let Err(err) = self.sender.send(Response::GetMemoryPool(channel.remote_address)).await {
                             error!(
                                 "Receive handler errored on a {} message from {}. {}",
                                 name, remote_address, err
@@ -379,30 +357,6 @@ impl Inbound {
 
     pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
         self.receiver.clone()
-    }
-
-    /// A peer has requested our memory pool transactions.
-    async fn receive_get_memory_pool(
-        &self,
-        environment: &Environment,
-        _message: GetMemoryPool,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        let memory_pool = environment.memory_pool().lock().await;
-
-        let mut transactions = vec![];
-
-        for (_tx_id, entry) in &memory_pool.transactions {
-            if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
-                transactions.push(transaction_bytes);
-            }
-        }
-
-        if !transactions.is_empty() {
-            channel.write(&MemoryPool::new(transactions)).await?;
-        }
-
-        Ok(())
     }
 
     /// A peer has sent us their memory pool transactions.

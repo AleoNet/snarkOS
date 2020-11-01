@@ -25,17 +25,16 @@ use crate::{
 };
 
 // TODO (howardwu): Move these imports to SyncManager.
-use snarkos_consensus::{
-    memory_pool::{Entry, MemoryPool},
-    ConsensusParameters,
-    MerkleTreeLedger,
-};
+use snarkos_consensus::{memory_pool::Entry, ConsensusParameters, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
 use snarkos_objects::Block as BlockStruct;
-use snarkos_utilities::FromBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use std::{
     collections::HashMap,
@@ -280,6 +279,31 @@ impl Blocks {
                 .broadcast(&Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)))
                 .await;
         }
+        Ok(())
+    }
+
+    /// A peer has requested our memory pool transactions.
+    pub(crate) async fn received_get_memory_pool(
+        &self,
+        remote_address: SocketAddr,
+        message: GetBlock,
+    ) -> Result<(), NetworkError> {
+        // TODO (howardwu): This should have been written with Rayon - it is easily parallelizable.
+        let mut transactions = vec![];
+        let memory_pool = self.environment.memory_pool().lock().await;
+        for (_tx_id, entry) in &memory_pool.transactions {
+            if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
+                transactions.push(transaction_bytes);
+            }
+        }
+
+        if !transactions.is_empty() {
+            // Broadcast a `MemoryPool` message to the connected peer.
+            self.outbound
+                .broadcast(&Request::MemoryPool(remote_address, MemoryPool::new(transactions)))
+                .await;
+        }
+
         Ok(())
     }
 }

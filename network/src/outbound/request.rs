@@ -28,6 +28,7 @@ pub type Receiver = SocketAddr;
 pub enum Request {
     Block(Receiver, Block),
     SyncBlock(Receiver, SyncBlock),
+    MemoryPool(Receiver, MemoryPool),
     GetPeers(Receiver, GetPeers),
     Peers(Receiver, Peers),
     Transaction(Receiver, Transaction),
@@ -41,6 +42,7 @@ impl Request {
         match self {
             Request::Block(_, _) => "Block",
             Request::SyncBlock(_, _) => "SyncBlock",
+            Request::MemoryPool(_, _) => "MemoryPool",
             Request::GetPeers(_, _) => "GetPeers",
             Request::Peers(_, _) => "Peers",
             Request::Transaction(_, _) => "Transaction",
@@ -54,6 +56,7 @@ impl Request {
         match self {
             Request::Block(receiver, _) => *receiver,
             Request::SyncBlock(receiver, _) => *receiver,
+            Request::MemoryPool(receiver, _) => *receiver,
             Request::GetPeers(receiver, _) => *receiver,
             Request::Peers(receiver, _) => *receiver,
             Request::Transaction(receiver, _) => *receiver,
@@ -73,6 +76,7 @@ impl Request {
         let (name, data) = match self {
             Request::Block(_, message) => (Block::name(), message.serialize()?),
             Request::SyncBlock(_, message) => (SyncBlock::name(), message.serialize()?),
+            Request::MemoryPool(_, message) => (MemoryPool::name(), message.serialize()?),
             Request::GetPeers(_, message) => (GetPeers::name(), message.serialize()?),
             Request::Peers(_, message) => (Peers::name(), message.serialize()?),
             Request::Transaction(_, message) => (Transaction::name(), message.serialize()?),
