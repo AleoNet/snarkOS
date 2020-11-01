@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::message_types::*,
+    external::message_types::{Peers as PeersStruct, *},
     inbound::Response,
     outbound::Request,
     peers::{PeerBook, PeerInfo},
@@ -50,7 +50,7 @@ pub(crate) type PeerReceiver = tokio::sync::mpsc::Receiver<Response>;
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
-pub struct PeerManager {
+pub struct Peers {
     /// The parameters and settings of this node server.
     environment: Environment,
     /// The outbound handler of this node server.
@@ -63,7 +63,7 @@ pub struct PeerManager {
     peer_receiver: Arc<RwLock<PeerReceiver>>,
 }
 
-impl PeerManager {
+impl Peers {
     ///
     /// Creates a new instance of `PeerManager`.
     ///
@@ -245,7 +245,7 @@ impl PeerManager {
                         peers.push((peer_address, *peer_info.last_seen()));
                     }
                     self.outbound
-                        .broadcast(&Request::Peers(remote_address, Peers::new(peers)))
+                        .broadcast(&Request::Peers(remote_address, PeersStruct::new(peers)))
                         .await;
                 }
                 Response::Peers(remote_address, peers) => {

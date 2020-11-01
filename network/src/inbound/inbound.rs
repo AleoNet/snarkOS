@@ -17,7 +17,7 @@
 use crate::{
     external::{message::Message, message_types::*, Channel, MessageName},
     inbound::Response,
-    manager::PeerSender,
+    peers::PeerSender,
     Environment,
     NetworkError,
     SyncManager,
