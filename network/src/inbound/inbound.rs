@@ -21,14 +21,9 @@ use crate::{
     NetworkError,
     Receiver,
     Sender,
-    SyncManager,
-    SyncState,
 };
 use snarkos_consensus::memory_pool::Entry;
-use snarkos_dpc::{
-    instantiated::{Components, Tx},
-    PublicParameters,
-};
+use snarkos_dpc::instantiated::Tx;
 use snarkos_objects::BlockHeaderHash;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -42,9 +37,8 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
 };
 use tokio::{
-    net::{TcpListener, TcpStream},
+    net::TcpStream,
     sync::{Mutex, RwLock},
-    task,
 };
 
 /// The map of remote addresses to their active read channels.
@@ -246,8 +240,8 @@ impl Inbound {
                 } else if name == GetBlock::name() {
                     if let Ok(getblock) = GetBlock::deserialize(bytes) {
                         if let Err(err) = self
-                            .clone()
-                            .receive_get_block(environment, getblock, channel.clone())
+                            .sender
+                            .send(Response::GetBlock(channel.remote_address, getblock))
                             .await
                         {
                             error!(
@@ -385,20 +379,6 @@ impl Inbound {
 
     pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
         self.receiver.clone()
-    }
-
-    /// A peer has requested a block.
-    async fn receive_get_block(
-        &self,
-        environment: &Environment,
-        message: GetBlock,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        if let Ok(block) = environment.storage_read().await.get_block(&message.block_hash) {
-            channel.write(&SyncBlock::new(block.serialize()?)).await?;
-        }
-
-        Ok(())
     }
 
     /// A peer has requested our memory pool transactions.

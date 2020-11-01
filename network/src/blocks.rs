@@ -267,4 +267,19 @@ impl Blocks {
 
         Ok(())
     }
+
+    /// A peer has requested a block.
+    pub(crate) async fn received_get_block(
+        &self,
+        remote_address: SocketAddr,
+        message: GetBlock,
+    ) -> Result<(), NetworkError> {
+        if let Ok(block) = self.environment.storage_read().await.get_block(&message.block_hash) {
+            // Broadcast a `SyncBlock` message to the connected peer.
+            self.outbound
+                .broadcast(&Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)))
+                .await;
+        }
+        Ok(())
+    }
 }

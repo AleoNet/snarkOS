@@ -118,10 +118,12 @@ impl Server {
         debug!("Initializing server");
         self.listener().await?;
         let peers = self.peers.clone();
+        let blocks = self.blocks.clone();
         task::spawn(async move {
             loop {
                 info!("Hello b?");
                 peers.update().await.unwrap();
+                blocks.update().await.unwrap();
                 sleep(Duration::from_secs(10)).await;
             }
         });
