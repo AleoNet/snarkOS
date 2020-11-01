@@ -25,7 +25,7 @@ pub enum Response {
     /// Receive handler is connecting to the given peer with the given nonce.
     ConnectingTo(SocketAddr, u64),
     /// Receive handler has connected to the given peer with the given nonce.
-    ConnectedTo(SocketAddr, u64),
+    Verack(SocketAddr, Verack),
     /// Receive handler has signaled to drop the connection with the given peer.
     DisconnectFrom(SocketAddr),
     /// Receive handler received a new transaction from the given peer.

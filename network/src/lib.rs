@@ -216,9 +216,9 @@ impl Server {
                 self.peers.connecting_to_peer(&remote_address, nonce).await?;
                 debug!("Connecting to {}", remote_address);
             }
-            Response::ConnectedTo(remote_address, nonce) => {
+            Response::Verack(remote_address, verack) => {
                 trace!("RESOLVING CONNECTED TO FROM {}", remote_address);
-                self.peers.connected_to_peer(&remote_address, nonce).await?;
+                self.peers.connected_to_peer(&remote_address, verack.nonce).await?;
                 debug!("Connected to {}", remote_address);
             }
             Response::DisconnectFrom(remote_address) => {
