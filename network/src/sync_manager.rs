@@ -20,7 +20,7 @@ use crate::{
         Channel,
         GetMemoryPool,
     },
-    manager::PeerManager,
+    peers::peers::Peers,
     Environment,
     NetworkError,
 };
@@ -202,7 +202,7 @@ impl SyncManager {
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every sync_interval x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
-    pub async fn connection_handler(&mut self, peer_manager: PeerManager) -> Result<(), NetworkError> {
+    pub async fn connection_handler(&mut self, peer_manager: Peers) -> Result<(), NetworkError> {
         let environment = self.environment.clone();
         let mut interval_ticker: u8 = 0;
 

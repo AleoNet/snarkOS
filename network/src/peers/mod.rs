@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod peers;
+pub use peers::*;
+
 pub mod peer_book;
 pub use peer_book::*;
 

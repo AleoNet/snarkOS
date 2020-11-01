@@ -29,7 +29,6 @@ extern crate log;
 extern crate snarkos_metrics;
 
 pub mod external;
-pub mod peers;
 
 pub mod environment;
 pub use environment::*;
@@ -43,21 +42,13 @@ pub use inbound::*;
 pub mod outbound;
 pub use outbound::*;
 
-pub mod manager;
-pub use manager::*;
+pub mod peers;
+pub use peers::*;
 
 pub mod sync_manager;
 pub use sync_manager::*;
 
-use crate::{
-    environment::Environment,
-    inbound::Response,
-    manager::PeerManager,
-    Inbound,
-    NetworkError,
-    Outbound,
-    SyncManager,
-};
+use crate::{environment::Environment, inbound::Response, peers::peers::Peers, Inbound, NetworkError, Outbound};
 use snarkos_errors::{
     consensus::ConsensusError,
     network::{ConnectError, SendError},
@@ -70,14 +61,14 @@ use tokio::time::sleep;
 
 /// A core data structure for operating the networking stack of this node.
 pub struct Server {
-    peer_manager: PeerManager,
+    peer_manager: Peers,
     // sync_manager: Arc<Mutex<SyncManager>>,
 }
 
 impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
-        let peer_manager = PeerManager::new(&mut environment.clone())?;
+        let peer_manager = Peers::new(&mut environment.clone())?;
         environment.set_managers();
         Ok(Self { peer_manager })
     }
