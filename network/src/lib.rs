@@ -194,6 +194,26 @@ impl Server {
                     .await?;
                 debug!("Received a block from {}", remote_address);
             }
+            Response::GetBlock(remote_address, getblock) => {
+                debug!("Receiving a getblock from {}", remote_address);
+                self.blocks.received_get_block(remote_address, getblock).await?;
+                debug!("Received a getblock from {}", remote_address);
+            }
+            Response::GetMemoryPool(remote_address) => {
+                debug!("Receiving a getmemorypool from {}", remote_address);
+                self.blocks.received_get_memory_pool(remote_address).await?;
+                debug!("Received a getmemorypool from {}", remote_address);
+            }
+            Response::MemoryPool(mempool) => {
+                debug!("Receiving a memorypool");
+                self.blocks.received_memory_pool(mempool).await?;
+                debug!("Received a memorypool");
+            }
+            Response::GetSync(remote_address, getsync) => {
+                debug!("Receiving a getsync from {}", remote_address);
+                self.blocks.received_get_sync(remote_address, getsync).await?;
+                debug!("Received a getsync from {}", remote_address);
+            }
             Response::VersionToVerack(remote_address, remote_version) => {
                 debug!("Received `Version` request from {}", remote_version.receiver);
                 self.peers.version_to_verack(remote_address, &remote_version).await?;
