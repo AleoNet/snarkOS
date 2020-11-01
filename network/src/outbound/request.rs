@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message_types::*, Message, MessageHeader, MessageName},
+    external::{message_types::*, Message, MessageHeader},
     outbound::Channel,
 };
 

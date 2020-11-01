@@ -22,7 +22,6 @@ use crate::{
     Receiver,
     Sender,
 };
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::{
     collections::HashMap,
@@ -151,10 +150,8 @@ impl Inbound {
             loop {
                 /// TODO (howardwu): Evaluate this.
                 ///
-                ///
                 /// POTENTIALLY ADD A `LOOP` in a `TASK::SPAWN`. See `spawn_connection_thread`.
                 /// If you add, add it until the very end of this function.
-                ///
                 ///
                 // Initialize the failure indicator.
                 let mut failure = false;
@@ -259,7 +256,7 @@ impl Inbound {
                     }
                 } else if name == Sync::name() {
                     if let Ok(sync) = Sync::deserialize(bytes) {
-                        if let Err(err) = self.clone().receive_sync(environment, sync).await {
+                        if let Err(err) = self.sender.send(Response::Sync(channel.remote_address, sync)).await {
                             error!(
                                 "Receive handler errored on a {} message from {}. {}",
                                 name, remote_address, err
@@ -351,28 +348,6 @@ impl Inbound {
 
     pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
         self.receiver.clone()
-    }
-
-    /// A peer has sent us their chain state.
-    async fn receive_sync(&self, environment: &Environment, message: Sync) -> Result<(), NetworkError> {
-        let height = environment.storage_read().await.get_current_block_height();
-        let mut sync_handler = environment.sync_manager().await.lock().await;
-
-        sync_handler.receive_hashes(message.block_hashes, height);
-
-        // TODO (howardwu): Implement this using the sync manager and outbound handler.
-        {
-            // // Received block headers
-            // if let Some(channel) = environment
-            //     .peers_read()
-            //     .await
-            //     .get_channel(&sync_handler.sync_node_address)
-            // {
-            //     sync_handler.increment(channel.clone()).await?;
-            // }
-        }
-
-        Ok(())
     }
 
     /// A connected peer has sent handshake request.

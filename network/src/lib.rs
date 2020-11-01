@@ -58,20 +58,9 @@ use crate::{
     NetworkError,
     Outbound,
 };
-use snarkos_errors::{
-    consensus::ConsensusError,
-    network::{ConnectError, SendError},
-    objects::BlockError,
-    storage::StorageError,
-};
 
-use std::{fmt, net::Shutdown, sync::Arc, time::Duration};
-use tokio::{
-    net::{TcpListener, TcpStream},
-    sync::{Mutex, RwLock},
-    task,
-    time::sleep,
-};
+use std::{sync::Arc, time::Duration};
+use tokio::{net::TcpListener, task, time::sleep};
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Response>;
 
@@ -214,6 +203,11 @@ impl Server {
                 self.blocks.received_get_sync(remote_address, getsync).await?;
                 debug!("Received a getsync from {}", remote_address);
             }
+            Response::Sync(remote_address, sync) => {
+                debug!("Receiving a sync from {}", remote_address);
+                self.blocks.received_sync(sync).await?;
+                debug!("Received a sync from {}", remote_address);
+            }
             Response::VersionToVerack(remote_address, remote_version) => {
                 debug!("Received `Version` request from {}", remote_version.receiver);
                 self.peers.version_to_verack(remote_address, &remote_version).await?;
@@ -238,8 +232,6 @@ impl Server {
             Response::Peers(remote_address, peers) => {
                 self.peers.inbound_peers(remote_address, peers).await?;
             }
-            // TODO (howardwu): Update this so we handle this properly.
-            _ => panic!("// TODO (howardwu): Update this so we handle this properly."),
         }
         warn!("END RECEIVER INBOUND");
         Ok(())

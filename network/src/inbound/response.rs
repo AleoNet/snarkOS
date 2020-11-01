@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{message_types::*, Channel, Message, MessageHeader, MessageName};
+use crate::external::message_types::*;
 
-use std::{fmt, net::SocketAddr};
-use tokio::io::AsyncWriteExt;
+use std::net::SocketAddr;
 
 #[derive(Debug)]
 pub enum Response {
@@ -45,4 +44,6 @@ pub enum Response {
     MemoryPool(MemoryPool),
     /// Receive handler received a getsync message.
     GetSync(SocketAddr, GetSync),
+    /// Receive handler received a sync message.
+    Sync(SocketAddr, Sync),
 }
