@@ -14,34 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::message_types::{Peers as PeersStruct, *},
-    outbound::Request,
-    peers::{PeerBook, PeerInfo},
-    Environment,
-    Inbound,
-    NetworkError,
-    Outbound,
-};
+use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
 
 // TODO (howardwu): Move these imports to SyncManager.
-use snarkos_consensus::{memory_pool::Entry, ConsensusParameters, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
-use snarkos_objects::Block as BlockStruct;
+use snarkos_consensus::memory_pool::Entry;
+use snarkos_dpc::base_dpc::instantiated::Tx;
+use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-};
-use tokio::{sync::RwLock, task};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// A stateful component for managing the blocks for the ledger on this node server.
 #[derive(Clone)]
@@ -283,11 +267,7 @@ impl Blocks {
     }
 
     /// A peer has requested our memory pool transactions.
-    pub(crate) async fn received_get_memory_pool(
-        &self,
-        remote_address: SocketAddr,
-        message: GetBlock,
-    ) -> Result<(), NetworkError> {
+    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // TODO (howardwu): This should have been written with Rayon - it is easily parallelizable.
         let mut transactions = vec![];
         let memory_pool = self.environment.memory_pool().lock().await;
@@ -308,7 +288,7 @@ impl Blocks {
     }
 
     /// A peer has sent us their memory pool transactions.
-    pub(crate) async fn receive_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
+    pub(crate) async fn received_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
         let mut memory_pool = self.environment.memory_pool().lock().await;
 
         for transaction_bytes in message.transactions {
@@ -324,6 +304,55 @@ impl Blocks {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// A peer has requested our chain state to sync with.
+    pub(crate) async fn received_get_sync(
+        &self,
+        remote_address: SocketAddr,
+        message: GetSync,
+    ) -> Result<(), NetworkError> {
+        let latest_shared_hash = self
+            .environment
+            .storage_read()
+            .await
+            .get_latest_shared_hash(message.block_locator_hashes)?;
+        let current_height = self.environment.storage_read().await.get_current_block_height();
+
+        let sync = if let Ok(height) = self
+            .environment
+            .storage_read()
+            .await
+            .get_block_number(&latest_shared_hash)
+        {
+            if height < current_height {
+                let mut max_height = current_height;
+
+                // if the requester is behind more than 4000 blocks
+                if height + 4000 < current_height {
+                    // send the max 4000 blocks
+                    max_height = height + 4000;
+                }
+
+                let mut block_hashes: Vec<BlockHeaderHash> = vec![];
+
+                for block_num in height + 1..=max_height {
+                    block_hashes.push(self.environment.storage_read().await.get_block_hash(block_num)?);
+                }
+
+                // send block hashes to requester
+                Sync::new(block_hashes)
+            } else {
+                Sync::new(vec![])
+            }
+        } else {
+            Sync::new(vec![])
+        };
+
+        // Broadcast a `Sync` message to the connected peer.
+        self.outbound.broadcast(&Request::Sync(remote_address, sync)).await;
 
         Ok(())
     }

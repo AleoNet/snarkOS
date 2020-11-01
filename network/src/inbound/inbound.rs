@@ -22,13 +22,7 @@ use crate::{
     Receiver,
     Sender,
 };
-use snarkos_consensus::memory_pool::Entry;
-use snarkos_dpc::instantiated::Tx;
-use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use std::{
     collections::HashMap,
@@ -253,8 +247,8 @@ impl Inbound {
                 } else if name == GetSync::name() {
                     if let Ok(getsync) = GetSync::deserialize(bytes) {
                         if let Err(err) = self
-                            .clone()
-                            .receive_get_sync(environment, getsync, channel.clone())
+                            .sender
+                            .send(Response::GetSync(channel.remote_address, getsync))
                             .await
                         {
                             error!(
@@ -357,47 +351,6 @@ impl Inbound {
 
     pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
         self.receiver.clone()
-    }
-
-    /// A peer has requested our chain state to sync with.
-    async fn receive_get_sync(
-        &self,
-        environment: &Environment,
-        message: GetSync,
-        channel: Arc<Channel>,
-    ) -> Result<(), NetworkError> {
-        let latest_shared_hash = environment
-            .storage_read()
-            .await
-            .get_latest_shared_hash(message.block_locator_hashes)?;
-        let current_height = environment.storage_read().await.get_current_block_height();
-
-        if let Ok(height) = environment.storage_read().await.get_block_number(&latest_shared_hash) {
-            if height < current_height {
-                let mut max_height = current_height;
-
-                // if the requester is behind more than 4000 blocks
-                if height + 4000 < current_height {
-                    // send the max 4000 blocks
-                    max_height = height + 4000;
-                }
-
-                let mut block_hashes: Vec<BlockHeaderHash> = vec![];
-
-                for block_num in height + 1..=max_height {
-                    block_hashes.push(environment.storage_read().await.get_block_hash(block_num)?);
-                }
-
-                // send block hashes to requester
-                channel.write(&Sync::new(block_hashes)).await?;
-            } else {
-                channel.write(&Sync::new(vec![])).await?;
-            }
-        } else {
-            channel.write(&Sync::new(vec![])).await?;
-        }
-
-        Ok(())
     }
 
     /// A peer has sent us their chain state.
