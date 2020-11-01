@@ -14,29 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod tcp;
+pub use tcp::*;
+
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{environment::Environment, external::Channel, Server, SyncManager};
 
-use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     net::TcpListener,
     sync::{Mutex, RwLock},
 };
 
-pub const LOCALHOST: &'static str = "0.0.0.0:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
 pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
-
-/// Returns a random tcp socket address
-pub fn random_socket_address() -> SocketAddr {
-    let mut rng = rand::thread_rng();
-    let string = format!("{}{}", LOCALHOST, rng.gen_range(1023, 9999));
-    string.parse::<SocketAddr>().unwrap()
-}
 
 /// Puts the current tokio thread to sleep for given milliseconds
 pub async fn sleep(time: u64) {

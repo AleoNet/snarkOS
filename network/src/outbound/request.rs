@@ -14,9 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::message_types::*;
+use crate::{
+    external::{message_types::*, Message, MessageHeader, MessageName},
+    outbound::Channel,
+};
 
 use std::{fmt, net::SocketAddr};
+use tokio::io::AsyncWriteExt;
 
 pub type Receiver = SocketAddr;
 
@@ -31,6 +35,7 @@ pub enum Request {
 }
 
 impl Request {
+    #[inline]
     pub fn name(&self) -> &str {
         match self {
             Request::Block(_, _) => "Block",
@@ -42,6 +47,7 @@ impl Request {
         }
     }
 
+    #[inline]
     pub fn receiver(&self) -> Receiver {
         match self {
             Request::Block(receiver, _) => *receiver,
@@ -53,15 +59,27 @@ impl Request {
         }
     }
 
-    // pub fn payload(&self) -> Box<&dyn Message> {
-    //     match self {
-    //         Request::Block(_, payload) => payload,
-    //         Request::GetPeers(_, payload) => payload,
-    //         Request::Transaction(_, payload) => payload,
-    //         Request::Verack(payload) => payload,
-    //         Request::Version(payload) => payload,
-    //     }
-    // }
+    /// Locks the given channel and broadcasts the request.
+    #[inline]
+    pub async fn broadcast(&self, channel: &Channel) -> anyhow::Result<()> {
+        Ok(channel.lock().await.write_all(&self.serialize()?).await?)
+    }
+
+    #[inline]
+    pub fn serialize(&self) -> anyhow::Result<Vec<u8>> {
+        let (name, data) = match self {
+            Request::Block(_, message) => (Block::name(), message.serialize()?),
+            Request::GetPeers(_, message) => (GetPeers::name(), message.serialize()?),
+            Request::Peers(_, message) => (Peers::name(), message.serialize()?),
+            Request::Transaction(_, message) => (Transaction::name(), message.serialize()?),
+            Request::Verack(verack) => (Verack::name(), verack.serialize()?),
+            Request::Version(version) => (Version::name(), version.serialize()?),
+        };
+
+        let mut buffer = MessageHeader::new(name, data.len() as u32).serialize()?;
+        buffer.extend_from_slice(&data);
+        Ok(buffer)
+    }
 }
 
 impl fmt::Display for Request {

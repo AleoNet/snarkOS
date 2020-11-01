@@ -3171,6 +3171,7 @@ dependencies = [
 name = "snarkos-testing"
 version = "1.1.4"
 dependencies = [
+ "anyhow",
  "once_cell",
  "rand 0.7.3",
  "rand_xorshift 0.2.0",
@@ -3187,6 +3188,8 @@ dependencies = [
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.3.2",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]

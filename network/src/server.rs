@@ -18,6 +18,7 @@ use crate::{
     environment::Environment,
     manager::{PeerManager, PeerMessage},
     Inbound,
+    NetworkError,
     Outbound,
     SyncManager,
 };
@@ -30,121 +31,6 @@ use snarkos_errors::{
 
 use std::{fmt, net::Shutdown, time::Duration};
 use tokio::time::sleep;
-
-#[derive(Debug)]
-pub enum NetworkError {
-    Bincode(Box<bincode::ErrorKind>),
-    Bincode2(bincode::ErrorKind),
-    BlockError(BlockError),
-    ConnectError(ConnectError),
-    ConsensusError(ConsensusError),
-    IOError(std::io::Error),
-    Error(anyhow::Error),
-    PeerAddressIsLocalAddress,
-    PeerAlreadyConnected,
-    PeerAlreadyDisconnected,
-    PeerAlreadyExists,
-    PeerBookFailedToLoad,
-    PeerBookIsCorrupt,
-    PeerBookMissingPeer,
-    PeerCountInvalid,
-    PeerHasNeverConnected,
-    PeerIsDisconnected,
-    PeerIsMissingNonce,
-    PeerIsReusingNonce,
-    PeerNonceMismatch,
-    PeerUnauthorized,
-    PeerWasNotSetToConnecting,
-    InboundAlreadySetPeerSender,
-    InboundMissingPeerSender,
-    SendError(SendError),
-    SenderError(tokio::sync::mpsc::error::SendError<PeerMessage>),
-    OutboundFailedToCreateChannel,
-    OutboundPendingRequestsMissing,
-    SendRequestUnauthorized,
-    StorageError(StorageError),
-    SyncIntervalInvalid,
-    TryLockError(tokio::sync::TryLockError),
-}
-
-impl From<BlockError> for NetworkError {
-    fn from(error: BlockError) -> Self {
-        NetworkError::BlockError(error)
-    }
-}
-
-impl From<ConnectError> for NetworkError {
-    fn from(error: ConnectError) -> Self {
-        NetworkError::ConnectError(error)
-    }
-}
-
-impl From<ConsensusError> for NetworkError {
-    fn from(error: ConsensusError) -> Self {
-        NetworkError::ConsensusError(error)
-    }
-}
-
-impl From<SendError> for NetworkError {
-    fn from(error: SendError) -> Self {
-        NetworkError::SendError(error)
-    }
-}
-
-impl From<StorageError> for NetworkError {
-    fn from(error: StorageError) -> Self {
-        NetworkError::StorageError(error)
-    }
-}
-
-impl From<Box<bincode::ErrorKind>> for NetworkError {
-    fn from(error: Box<bincode::ErrorKind>) -> Self {
-        NetworkError::Bincode(error)
-    }
-}
-
-impl From<bincode::ErrorKind> for NetworkError {
-    fn from(error: bincode::ErrorKind) -> Self {
-        NetworkError::Bincode2(error)
-    }
-}
-
-impl fmt::Display for NetworkError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl From<std::io::Error> for NetworkError {
-    fn from(error: std::io::Error) -> Self {
-        NetworkError::IOError(error)
-    }
-}
-
-impl From<tokio::sync::TryLockError> for NetworkError {
-    fn from(error: tokio::sync::TryLockError) -> Self {
-        NetworkError::TryLockError(error)
-    }
-}
-
-impl From<tokio::sync::mpsc::error::SendError<PeerMessage>> for NetworkError {
-    fn from(error: tokio::sync::mpsc::error::SendError<PeerMessage>) -> Self {
-        NetworkError::SenderError(error)
-    }
-}
-
-impl From<anyhow::Error> for NetworkError {
-    fn from(error: anyhow::Error) -> Self {
-        NetworkError::Error(error)
-    }
-}
-
-impl From<NetworkError> for anyhow::Error {
-    fn from(error: NetworkError) -> Self {
-        error!("{}", error);
-        Self::msg(error.to_string())
-    }
-}
 
 /// A core data structure for operating the networking stack of this node.
 pub struct Server {
