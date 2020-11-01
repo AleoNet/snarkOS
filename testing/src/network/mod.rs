@@ -82,7 +82,7 @@ pub async fn initialize_test_server(
 
 /// Starts a server on a new thread. Takes full ownership of server.
 pub fn start_test_server(server: Server) {
-    tokio::spawn(async move { server.listen().await.unwrap() });
+    tokio::spawn(async move { server.start().await.unwrap() });
 }
 
 /// Returns a tcp channel connected to the address

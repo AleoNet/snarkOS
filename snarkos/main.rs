@@ -200,7 +200,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start the main server thread.
     info!("Hello?");    
-    server.listen().instrument(debug_span!("server")).await?;
+    server.start().instrument(debug_span!("server")).await?;
 
     Ok(())
 }

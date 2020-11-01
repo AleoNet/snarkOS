@@ -17,9 +17,10 @@
 use crate::{
     external::{message::Message, message_types::*, Channel, MessageName},
     inbound::Response,
-    peers::PeerSender,
     Environment,
     NetworkError,
+    Receiver,
+    Sender,
     SyncManager,
     SyncState,
 };
@@ -42,7 +43,7 @@ use std::{
 };
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::RwLock,
+    sync::{Mutex, RwLock},
     task,
 };
 
@@ -52,10 +53,12 @@ pub type Channels = HashMap<SocketAddr, Arc<Channel>>;
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug, Clone)]
 pub struct Inbound {
+    /// The producer for sending inbound messages to the server.
+    sender: Arc<Sender>,
+    /// The consumer for receiving inbound messages to the server.
+    receiver: Arc<Mutex<Receiver>>,
     /// The map of remote addresses to their active read channels.
     channels: Arc<RwLock<Channels>>,
-    /// The producer for sending inbound messages to the peer manager.
-    peer_sender: Arc<PeerSender>,
     /// A counter for the number of received responses the handler processes.
     receive_response_count: Arc<AtomicU64>,
     /// A counter for the number of received responses that succeeded.
@@ -67,10 +70,14 @@ pub struct Inbound {
 impl Inbound {
     /// Creates a new instance of a `Inbound`.
     #[inline]
-    pub fn new(peer_sender: PeerSender) -> Self {
+    pub fn new() -> Self {
+        // Initialize the sender and receiver.
+        let (sender, receiver) = tokio::sync::mpsc::channel(1024);
+
         Self {
+            sender: Arc::new(sender),
+            receiver: Arc::new(Mutex::new(receiver)),
             channels: Arc::new(RwLock::new(HashMap::new())),
-            peer_sender: Arc::new(peer_sender),
             receive_response_count: Arc::new(AtomicU64::new(0)),
             receive_success_count: Arc::new(AtomicU64::new(0)),
             receive_failure_count: Arc::new(AtomicU64::new(0)),
@@ -97,322 +104,287 @@ impl Inbound {
 
     // TODO (howardwu): Remove environment from function inputs.
     #[inline]
-    pub async fn listen(self, environment: Environment) -> Result<(), NetworkError> {
-        // TODO (howardwu): Find the actual address of this node.
-        // 1. Initialize TCP listener and accept new TCP connections.
-        let local_address = environment.local_address();
-        debug!("Starting listener at {:?}...", local_address);
-        let listener = TcpListener::bind(&local_address).await?;
-        info!("Listening at {:?}", local_address);
+    pub async fn listen(
+        &self,
+        environment: Environment,
+        channel: TcpStream,
+        remote_address: SocketAddr,
+    ) -> Result<(), NetworkError> {
+        // Follow handshake protocol and drop peer connection if unsuccessful.
+        let height = environment.current_block_height().await;
 
-        let environment = environment.clone();
-        let sender = self.peer_sender.clone();
-        let inbound = self.clone();
+        // TODO (raychu86) Establish a formal node version
+        if let Some((channel, discovered_local_address)) = self
+            .receive_connection_request(1u64, height, remote_address, channel)
+            .await
+            .unwrap()
+        {
+            // TODO (howardwu): Enable this peer address discovery again.
+            // // Bootstrap discovery of local node IP via VERACK responses
+            // {
+            //     let local_address = peers.local_address();
+            //     if local_address != discovered_local_address {
+            //         peers.set_local_address(discovered_local_address).await;
+            //         info!("Discovered local address: {:?}", local_address);
+            //     }
+            // }
+            // // Store the channel established with the handshake
+            // peers.add_channel(&handshake.channel);
 
-        task::spawn(async move {
+            debug!("Starting thread for handling connection requests");
+            /// Spawns one thread per peer tcp connection to read messages.
+            /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
+            /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
+            /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
+
+            // TODO (howardwu): Move this to an outer scope controlled by a manager.
+            // Determines the criteria for disconnecting from a peer.
+            fn should_disconnect(failure_count: &u8) -> bool {
+                // Tolerate up to 10 failed communications.
+                *failure_count >= 10
+            }
+
+            // TODO (howardwu): Move this to an outer scope controlled by a manager.
+            // Logs the failure and determines whether to disconnect from a peer.
+            async fn handle_failure<T: Display>(
+                failure: &mut bool,
+                failure_count: &mut u8,
+                disconnect_from_peer: &mut bool,
+                error: T,
+            ) {
+                // Only increment failure_count if we haven't seen a failure yet.
+                if !*failure {
+                    // Update the state to reflect a new failure.
+                    *failure = true;
+                    *failure_count += 1;
+                    warn!(
+                        "Connection errored {} time(s) (error message: {})",
+                        failure_count, error
+                    );
+
+                    // Determine if we should disconnect.
+                    *disconnect_from_peer = should_disconnect(failure_count);
+                } else {
+                    debug!("Connection errored again in the same loop (error message: {})", error);
+                }
+
+                // Sleep for 10 seconds
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+
+            let mut failure_count = 0u8;
+            let mut disconnect_from_peer = false;
+
+            // TODO (howardwu): Attention to this.
+            let mut channel = channel;
+
             loop {
-                trace!("Starting listener");
+                /// TODO (howardwu): Evaluate this.
+                ///
+                ///
+                /// POTENTIALLY ADD A `LOOP` in a `TASK::SPAWN`. See `spawn_connection_thread`.
+                /// If you add, add it until the very end of this function.
+                ///
+                ///
+                // Initialize the failure indicator.
+                let mut failure = false;
 
-                // Start listener for handling connection requests.
-                let (channel, remote_address) = match listener.accept().await {
-                    Ok((channel, remote_address)) => {
-                        info!("Received connection request from {}", remote_address);
-                        (channel, remote_address)
+                // Read the next message from the channel. This is a blocking operation.
+                let (message_name, message_bytes) = match channel.read().await {
+                    Ok((message_name, message_bytes)) => {
+                        trace!("Received a {} message from channel", message_name);
+                        (message_name, message_bytes)
                     }
                     Err(error) => {
-                        error!("Failed to accept connection request\n{}", error);
-                        continue;
+                        error!("Failed to read message from channel\n{}", error);
+                        handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
+                        // Determine if we should send a disconnect message.
+                        match disconnect_from_peer {
+                            true => (MessageName::from("disconnect"), vec![]),
+                            false => continue,
+                        }
                     }
                 };
 
-                // Follow handshake protocol and drop peer connection if unsuccessful.
-                let height = environment.current_block_height().await;
+                /// This method handles all messages sent from connected peers.
+                ///
+                /// Messages are received by a single tokio MPSC receiver with
+                /// the message name, bytes, associated channel, and a tokio oneshot sender.
+                ///
+                /// The oneshot sender lets the connection thread know when the message is handled.
+                ///
+                let name = message_name;
+                let bytes = message_bytes;
+                let environment = &environment;
 
-                // TODO (raychu86) Establish a formal node version
-                if let Some((channel, discovered_local_address)) = self
-                    .receive_connection_request(sender.clone(), 1u64, height, remote_address, channel)
-                    .await
-                    .unwrap()
-                {
-                    // TODO (howardwu): Enable this peer address discovery again.
-                    // // Bootstrap discovery of local node IP via VERACK responses
-                    // {
-                    //     let local_address = peer_manager.local_address();
-                    //     if local_address != discovered_local_address {
-                    //         peer_manager.set_local_address(discovered_local_address).await;
-                    //         info!("Discovered local address: {:?}", local_address);
-                    //     }
-                    // }
-                    // // Store the channel established with the handshake
-                    // peer_manager.add_channel(&handshake.channel);
-
-                    debug!("Starting thread for handling connection requests");
-                    /// Spawns one thread per peer tcp connection to read messages.
-                    /// Each thread is given a handle to the channel and a handle to the server mpsc sender.
-                    /// To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
-                    /// The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
-
-                    // TODO (howardwu): Move this to an outer scope controlled by a manager.
-                    // Determines the criteria for disconnecting from a peer.
-                    fn should_disconnect(failure_count: &u8) -> bool {
-                        // Tolerate up to 10 failed communications.
-                        *failure_count >= 10
-                    }
-
-                    // TODO (howardwu): Move this to an outer scope controlled by a manager.
-                    // Logs the failure and determines whether to disconnect from a peer.
-                    async fn handle_failure<T: Display>(
-                        failure: &mut bool,
-                        failure_count: &mut u8,
-                        disconnect_from_peer: &mut bool,
-                        error: T,
-                    ) {
-                        // Only increment failure_count if we haven't seen a failure yet.
-                        if !*failure {
-                            // Update the state to reflect a new failure.
-                            *failure = true;
-                            *failure_count += 1;
-                            warn!(
-                                "Connection errored {} time(s) (error message: {})",
-                                failure_count, error
+                if name == Block::name() {
+                    if let Ok(block) = Block::deserialize(bytes) {
+                        if let Err(err) = self
+                            .sender
+                            .send(Response::Block(channel.remote_address, block, true))
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
                             );
-
-                            // Determine if we should disconnect.
-                            *disconnect_from_peer = should_disconnect(failure_count);
-                        } else {
-                            debug!("Connection errored again in the same loop (error message: {})", error);
-                        }
-
-                        // Sleep for 10 seconds
-                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                    }
-
-                    let mut failure_count = 0u8;
-                    let mut disconnect_from_peer = false;
-
-                    // TODO (howardwu): Attention to this.
-                    let mut channel = channel;
-
-                    loop {
-                        /// TODO (howardwu): Evaluate this.
-                        ///
-                        ///
-                        /// POTENTIALLY ADD A `LOOP` in a `TASK::SPAWN`. See `spawn_connection_thread`.
-                        /// If you add, add it until the very end of this function.
-                        ///
-                        ///
-                        // Initialize the failure indicator.
-                        let mut failure = false;
-
-                        // Read the next message from the channel. This is a blocking operation.
-                        let (message_name, message_bytes) = match channel.read().await {
-                            Ok((message_name, message_bytes)) => {
-                                trace!("Received a {} message from channel", message_name);
-                                (message_name, message_bytes)
-                            }
-                            Err(error) => {
-                                error!("Failed to read message from channel\n{}", error);
-                                handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error)
-                                    .await;
-                                // Determine if we should send a disconnect message.
-                                match disconnect_from_peer {
-                                    true => (MessageName::from("disconnect"), vec![]),
-                                    false => continue,
-                                }
-                            }
-                        };
-
-                        /// This method handles all messages sent from connected peers.
-                        ///
-                        /// Messages are received by a single tokio MPSC receiver with
-                        /// the message name, bytes, associated channel, and a tokio oneshot sender.
-                        ///
-                        /// The oneshot sender lets the connection thread know when the message is handled.
-                        ///
-                        let name = message_name;
-                        let bytes = message_bytes;
-                        let environment = &environment;
-
-                        // match name {
-                        //     Block::name() => {
-                        //         if let Ok(block) = Block::deserialize(bytes) {
-                        //             if let Err(err) = sender
-                        //                 .send(PeerMessage::Block(channel.remote_address, block, true))
-                        //                 .await
-                        //             {
-                        //                 error!(
-                        //                     "Receive handler errored on a {} message from {}. {}",
-                        //                     name, remote_address, err
-                        //                 );
-                        //             }
-                        //         }
-                        //     }
-                        //     _ => (),
-                        // };
-
-                        if name == Block::name() {
-                            if let Ok(block) = Block::deserialize(bytes) {
-                                if let Err(err) =
-                                    sender.send(Response::Block(channel.remote_address, block, true)).await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == SyncBlock::name() {
-                            if let Ok(block) = Block::deserialize(bytes) {
-                                if let Err(err) =
-                                    sender.send(Response::Block(channel.remote_address, block, false)).await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == GetBlock::name() {
-                            if let Ok(getblock) = GetBlock::deserialize(bytes) {
-                                if let Err(err) = inbound
-                                    .clone()
-                                    .receive_get_block(environment, getblock, channel.clone())
-                                    .await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == GetMemoryPool::name() {
-                            if let Ok(getmemorypool) = GetMemoryPool::deserialize(bytes) {
-                                if let Err(err) = inbound
-                                    .clone()
-                                    .receive_get_memory_pool(environment, getmemorypool, channel.clone())
-                                    .await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == GetPeers::name() {
-                            if let Ok(_) = GetPeers::deserialize(bytes) {
-                                if let Err(err) = sender.send(Response::GetPeers(channel.remote_address)).await {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == Peers::name() {
-                            if let Ok(peers) = Peers::deserialize(bytes) {
-                                if let Err(err) = sender.send(Response::Peers(channel.remote_address, peers)).await {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == GetSync::name() {
-                            if let Ok(getsync) = GetSync::deserialize(bytes) {
-                                if let Err(err) = inbound
-                                    .clone()
-                                    .receive_get_sync(environment, getsync, channel.clone())
-                                    .await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == MemoryPool::name() {
-                            if let Ok(mempool) = MemoryPool::deserialize(bytes) {
-                                if let Err(err) = inbound.clone().receive_memory_pool(environment, mempool).await {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == Sync::name() {
-                            if let Ok(sync) = Sync::deserialize(bytes) {
-                                if let Err(err) = inbound.clone().receive_sync(environment, sync).await {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == Transaction::name() {
-                            if let Ok(transaction) = Transaction::deserialize(bytes) {
-                                if let Err(err) = sender
-                                    .send(Response::Transaction(channel.remote_address, transaction))
-                                    .await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == Version::name() {
-                            if let Ok(version) = Version::deserialize(bytes) {
-                                // TODO (raychu86) Does `receive_version` need to return a channel?
-                                match inbound
-                                    .clone()
-                                    .receive_version(environment, version, channel.clone())
-                                    .await
-                                {
-                                    Ok(returned_channel) => channel = returned_channel,
-                                    Err(err) => error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    ),
-                                }
-                            }
-                        } else if name == Verack::name() {
-                            if let Ok(verack) = Verack::deserialize(bytes) {
-                                if let Err(err) = sender
-                                    .send(Response::ConnectedTo(channel.remote_address, verack.nonce))
-                                    .await
-                                {
-                                    error!(
-                                        "Receive handler errored on a {} message from {}. {}",
-                                        name, remote_address, err
-                                    );
-                                }
-                            }
-                        } else if name == MessageName::from("disconnect") {
-                            info!("Disconnected from peer {:?}", remote_address);
-                            if let Err(err) = sender.send(Response::DisconnectFrom(remote_address)).await {
-                                error!(
-                                    "Receive handler errored on a {} message from {}. {}",
-                                    name, remote_address, err
-                                );
-                            }
-                        } else {
-                            debug!("Message name not recognized {:?}", name.to_string());
                         }
                     }
-
-                    // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
-                    // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-                    // Break out of the loop if the peer disconnects.
-                    if disconnect_from_peer {
-                        warn!("Disconnecting from an unreliable peer");
-                        break;
+                } else if name == SyncBlock::name() {
+                    if let Ok(block) = Block::deserialize(bytes) {
+                        if let Err(err) = self
+                            .sender
+                            .send(Response::Block(channel.remote_address, block, false))
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
                     }
+                } else if name == GetBlock::name() {
+                    if let Ok(getblock) = GetBlock::deserialize(bytes) {
+                        if let Err(err) = self
+                            .clone()
+                            .receive_get_block(environment, getblock, channel.clone())
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == GetMemoryPool::name() {
+                    if let Ok(getmemorypool) = GetMemoryPool::deserialize(bytes) {
+                        if let Err(err) = self
+                            .clone()
+                            .receive_get_memory_pool(environment, getmemorypool, channel.clone())
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == GetPeers::name() {
+                    if let Ok(_) = GetPeers::deserialize(bytes) {
+                        if let Err(err) = self.sender.send(Response::GetPeers(channel.remote_address)).await {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == Peers::name() {
+                    if let Ok(peers) = Peers::deserialize(bytes) {
+                        if let Err(err) = self.sender.send(Response::Peers(channel.remote_address, peers)).await {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == GetSync::name() {
+                    if let Ok(getsync) = GetSync::deserialize(bytes) {
+                        if let Err(err) = self
+                            .clone()
+                            .receive_get_sync(environment, getsync, channel.clone())
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == MemoryPool::name() {
+                    if let Ok(mempool) = MemoryPool::deserialize(bytes) {
+                        if let Err(err) = self.clone().receive_memory_pool(environment, mempool).await {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == Sync::name() {
+                    if let Ok(sync) = Sync::deserialize(bytes) {
+                        if let Err(err) = self.clone().receive_sync(environment, sync).await {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == Transaction::name() {
+                    if let Ok(transaction) = Transaction::deserialize(bytes) {
+                        if let Err(err) = self
+                            .sender
+                            .send(Response::Transaction(channel.remote_address, transaction))
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == Version::name() {
+                    if let Ok(version) = Version::deserialize(bytes) {
+                        // TODO (raychu86) Does `receive_version` need to return a channel?
+                        match self
+                            .clone()
+                            .receive_version(environment, version, channel.clone())
+                            .await
+                        {
+                            Ok(returned_channel) => channel = returned_channel,
+                            Err(err) => error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            ),
+                        }
+                    }
+                } else if name == Verack::name() {
+                    if let Ok(verack) = Verack::deserialize(bytes) {
+                        if let Err(err) = self
+                            .sender
+                            .send(Response::ConnectedTo(channel.remote_address, verack.nonce))
+                            .await
+                        {
+                            error!(
+                                "Receive handler errored on a {} message from {}. {}",
+                                name, remote_address, err
+                            );
+                        }
+                    }
+                } else if name == MessageName::from("disconnect") {
+                    info!("Disconnected from peer {:?}", remote_address);
+                    if let Err(err) = self.sender.send(Response::DisconnectFrom(remote_address)).await {
+                        error!(
+                            "Receive handler errored on a {} message from {}. {}",
+                            name, remote_address, err
+                        );
+                    }
+                } else {
+                    debug!("Message name not recognized {:?}", name.to_string());
                 }
-
-                warn!("RECEIVE HANDLER: END LISTEN");
+                // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
+                // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
+                // Break out of the loop if the peer disconnects.
+                if disconnect_from_peer {
+                    warn!("Disconnecting from an unreliable peer");
+                    break;
+                }
             }
-        });
-
+        }
+        warn!("RECEIVE HANDLER: END LISTEN");
         Ok(())
+    }
+
+    pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
+        self.receiver.clone()
     }
 
     /// A peer has requested a block.
@@ -526,7 +498,7 @@ impl Inbound {
         {
             // // Received block headers
             // if let Some(channel) = environment
-            //     .peer_manager_read()
+            //     .peers_read()
             //     .await
             //     .get_channel(&sync_handler.sync_node_address)
             // {
@@ -551,12 +523,10 @@ impl Inbound {
     ) -> Result<Arc<Channel>, NetworkError> {
         let remote_address = SocketAddr::new(channel.remote_address.ip(), version.sender.port());
 
-        let sender = self.peer_sender.clone();
-
         if *environment.local_address() != remote_address {
             // Route version message to peer manager.
             warn!("RECEIVEVERSIONCOMPARE {} {}", channel.remote_address, remote_address);
-            sender
+            self.sender
                 .send(Response::VersionToVerack(remote_address, version.clone()))
                 .await?;
 
@@ -580,7 +550,7 @@ impl Inbound {
                 //             // TODO (howardwu): Implement this.
                 //             {
                 //                 // if let Some(channel) = environment
-                //                 //     .peer_manager_read()
+                //                 //     .peers_read()
                 //                 //     .await
                 //                 //     .get_channel(&sync_handler.sync_node_address)
                 //                 // {
@@ -618,7 +588,6 @@ impl Inbound {
     #[inline]
     pub async fn receive_connection_request(
         &self,
-        sender: Arc<PeerSender>,
         version: u64,
         block_height: u32,
         remote_address: SocketAddr,
@@ -692,7 +661,7 @@ impl Inbound {
                 .await?;
             // Write version request to the remote peer.
             channel.write(&local_version).await?;
-            sender
+            self.sender
                 .send(Response::ConnectingTo(local_version.receiver, local_version.nonce))
                 .await?;
 
@@ -736,7 +705,9 @@ impl Inbound {
                 let channel = Arc::new(channel);
                 channels.insert(remote_address, channel.clone());
 
-                sender.send(Response::ConnectedTo(remote_address, verack.nonce)).await?;
+                self.sender
+                    .send(Response::ConnectedTo(remote_address, verack.nonce))
+                    .await?;
 
                 trace!("Established connection with {}", remote_address);
 
@@ -768,7 +739,9 @@ impl Inbound {
             let channel = Arc::new(channel);
             channels.insert(remote_address, channel.clone());
 
-            sender.send(Response::ConnectedTo(remote_address, verack.nonce)).await?;
+            self.sender
+                .send(Response::ConnectedTo(remote_address, verack.nonce))
+                .await?;
 
             trace!("Established connection with {}", remote_address);
 
