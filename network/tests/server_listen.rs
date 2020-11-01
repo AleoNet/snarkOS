@@ -204,8 +204,8 @@ mod server_listen {
             sleep(1000).await;
 
             // 5. Send handshake response from remote node to local node
-            let mut peer_manager = Outbound::new();
-            peer_manager
+            let mut peers = Outbound::new();
+            peers
                 .receive_connection_request(1u64, 1u32, server_address, reader)
                 .await
                 .unwrap();

@@ -202,7 +202,7 @@ impl SyncManager {
     /// 4. Reselect a sync node if we purged it.
     /// 5. Update our memory pool every sync_interval x memory_pool_interval seconds.
     /// All errors encountered by the connection handler will be logged to the console but will not stop the thread.
-    pub async fn connection_handler(&mut self, peer_manager: Peers) -> Result<(), NetworkError> {
+    pub async fn connection_handler(&mut self, peers: Peers) -> Result<(), NetworkError> {
         let environment = self.environment.clone();
         let mut interval_ticker: u8 = 0;
 
@@ -216,7 +216,7 @@ impl SyncManager {
             //     {
             //         // If we have disconnected from our sync node,
             //         // then set our sync state to idle and find a new sync node.
-            //         let peer_book = environment.peer_manager_read().await;
+            //         let peer_book = environment.peers_read().await;
             //         if peer_book.is_disconnected(&self.sync_node_address).await {
             //             if let Some(peer) = peer_book
             //                 .connected_peers()
@@ -234,10 +234,10 @@ impl SyncManager {
             //         if interval_ticker >= environment.memory_pool_interval() {
             //             // Ask our sync node for more transactions.
             //             if *environment.local_address() != self.sync_node_address {
-            //                 if let Some(channel) = peer_manager.get_channel(&self.sync_node_address) {
+            //                 if let Some(channel) = peers.get_channel(&self.sync_node_address) {
             //                     if let Err(_) = channel.write(&GetMemoryPool).await {
             //                         // Acquire the peer book write lock.
-            //                         let mut peer_book = environment.peer_manager_write().await;
+            //                         let mut peer_book = environment.peers_write().await;
             //                         peer_book.disconnect_from_peer(&self.sync_node_address).await?;
             //                         drop(peer_book);
             //                     }

@@ -192,7 +192,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the main server thread.
 
     info!("Hello?");
-    server.listen().await?;
+    server.start().await?;
 
     Ok(())
 }

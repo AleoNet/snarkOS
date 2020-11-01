@@ -16,7 +16,6 @@
 
 use crate::{
     external::message_types::{Peers as PeersStruct, *},
-    inbound::Response,
     outbound::Request,
     peers::{PeerBook, PeerInfo},
     Environment,
@@ -45,39 +44,25 @@ use std::{
 };
 use tokio::{sync::RwLock, task};
 
-pub(crate) type PeerSender = tokio::sync::mpsc::Sender<Response>;
-pub(crate) type PeerReceiver = tokio::sync::mpsc::Receiver<Response>;
-
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
 pub struct Peers {
     /// The parameters and settings of this node server.
     environment: Environment,
-    /// The outbound handler of this node server.
-    outbound: Outbound,
-    /// The inbound handler of this node server.
-    inbound: Inbound,
+    /// The outbound service of this node server.
+    outbound: Arc<Outbound>,
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
-    /// The receiver for this peer manager to receive responses from the inbound handler.
-    peer_receiver: Arc<RwLock<PeerReceiver>>,
 }
 
 impl Peers {
     ///
-    /// Creates a new instance of `PeerManager`.
-    ///
-    /// Initializes the `PeerManager` with the following steps.
-    /// 1. Attempt to connect to all default bootnodes on the network.
-    /// 2. Attempt to connect to all disconnected peers from the stored peer book.
+    /// Creates a new instance of `Peers`.
     ///
     #[inline]
     // pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
-    pub fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
+    pub fn new(environment: &mut Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
-
-        // Create a outbound handler.
-        let outbound = Outbound::new();
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::new(*environment.local_address());
@@ -89,49 +74,18 @@ impl Peers {
         //     _ => PeerBook::new(*environment.local_address()),
         // };
 
-        // Initialize the peer sender and peer receiver.
-        let (peer_sender, peer_receiver) = tokio::sync::mpsc::channel(1024);
-
-        // Create a inbound handler.
-        let inbound = Inbound::new(peer_sender);
-
         // Instantiate the peer manager.
-        let peer_manager = Self {
+        let peers = Self {
             environment: environment.clone(),
             outbound,
-            inbound,
             peer_book: Arc::new(RwLock::new(peer_book)),
-
-            peer_receiver: Arc::new(RwLock::new(peer_receiver)),
         };
 
         // Save the peer book to storage.
-        // peer_manager.save_peer_book_to_storage().await?;
+        // peers.save_peer_book_to_storage().await?;
 
         trace!("Instantiated peer manager");
-        Ok(peer_manager)
-    }
-
-    ///
-    /// Broadcasts a connection request to each default bootnode of the network
-    /// and each disconnected peer saved in the peer book.
-    ///
-    #[inline]
-    pub async fn initialize(&self) -> Result<(), NetworkError> {
-        debug!("Initializing peer manager");
-        if let Err(error) = self.inbound.clone().listen(self.environment.clone()).await {
-            // TODO: Handle receiver error appropriately with tracing and server state updates.
-            error!("Receive handler errored with {}", error);
-        }
-
-        let mut peer_manager = self.clone();
-        task::spawn(async move {
-            loop {
-                peer_manager.inbound().await.unwrap();
-            }
-        });
-        debug!("Initialized peer manager");
-        Ok(())
+        Ok(peers)
     }
 
     ///
@@ -186,108 +140,6 @@ impl Peers {
         // Store the peer book to storage.
         self.save_peer_book_to_storage().await?;
         debug!("Updated peer manager");
-        Ok(())
-    }
-
-    #[inline]
-    pub async fn inbound(&mut self) -> Result<(), NetworkError> {
-        warn!("PEER_MANAGER: START NEXT RECEIVER HANDLER");
-
-        if let Some(message) = self.peer_receiver.write().await.recv().await {
-            match message {
-                Response::VersionToVerack(remote_address, remote_version) => {
-                    debug!("Received `Version` request from {}", remote_version.receiver);
-                    // TODO (howardwu): Move to its own function.
-                    if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
-                        debug!("Sending `Verack` request to {}", remote_address);
-                        self.outbound
-                            .broadcast(&Request::Verack(Verack::new(
-                                remote_version.nonce,
-                                remote_version.receiver, /* local_address */
-                                remote_address,
-                            )))
-                            .await;
-                        self.connecting_to_peer(&remote_address, remote_version.nonce).await?;
-                        debug!("Sent `Verack` request to {}", remote_address);
-                    }
-                }
-                Response::ConnectingTo(remote_address, nonce) => {
-                    self.connecting_to_peer(&remote_address, nonce).await?;
-                    debug!("Connecting to {}", remote_address);
-                }
-                Response::ConnectedTo(remote_address, nonce) => {
-                    trace!("RESOLVING CONNECTED TO FROM {}", remote_address);
-                    self.connected_to_peer(&remote_address, nonce).await?;
-                    debug!("Connected to {}", remote_address);
-                }
-                Response::DisconnectFrom(remote_address) => {
-                    debug!("Disconnecting from {}", remote_address);
-                    self.disconnected_from_peer(&remote_address).await?;
-                    debug!("Disconnected from {}", remote_address);
-                }
-                Response::Transaction(source, transaction) => {
-                    debug!("Received transaction from {} for memory pool", source);
-                    self.process_transaction_internal(source, transaction).await?;
-                }
-                Response::GetPeers(remote_address) => {
-                    // Add the remote address to the peer book.
-                    self.found_peer(&remote_address).await?;
-
-                    // TODO (howardwu): Simplify this and parallelize this with Rayon.
-                    // Broadcast the sanitized list of connected peers back to requesting peer.
-                    let mut peers = Vec::new();
-                    for (peer_address, peer_info) in self.connected_peers().await {
-                        // Skip the iteration if the requesting peer that we're sending the response to
-                        // appears in the list of peers.
-                        if peer_address == remote_address {
-                            continue;
-                        }
-                        peers.push((peer_address, *peer_info.last_seen()));
-                    }
-                    self.outbound
-                        .broadcast(&Request::Peers(remote_address, PeersStruct::new(peers)))
-                        .await;
-                }
-                Response::Peers(remote_address, peers) => {
-                    /// A miner has sent their list of peer addresses.
-                    /// Add all new/updated addresses to our disconnected.
-                    /// The connection handler will be responsible for sending out handshake requests to them.
-                    ///
-                    // Add the remote address to the peer book.
-                    self.found_peer(&remote_address).await?;
-
-                    // TODO (howardwu): Simplify this and parallelize this with Rayon.
-                    // Process all of the peers sent in the message,
-                    // by informing the peer book of that we found peers.
-                    let local_address = *self.environment.local_address();
-
-                    for (peer_address, _) in peers.addresses.iter() {
-                        // Skip if the peer address is this node's local address.
-                        let is_zero_address = match "0.0.0.0".to_string().parse::<IpAddr>() {
-                            Ok(zero_ip) => (*peer_address).ip() == zero_ip,
-                            _ => false,
-                        };
-                        if *peer_address == local_address || is_zero_address {
-                            continue;
-                        }
-                        // Inform the peer book that we found a peer.
-                        // The peer book will determine if we have seen the peer before,
-                        // and include the peer if it is new.
-                        else if !self.is_connected(peer_address).await {
-                            self.found_peer(peer_address).await?;
-                        }
-                    }
-                }
-                Response::Block(remote_address, block, propagate) => {
-                    debug!("Receiving a block from {}", remote_address);
-                    self.received_block(remote_address, block, propagate).await?;
-                    debug!("Received a block from {}", remote_address);
-                }
-            }
-        }
-
-        warn!("PEER_MANAGER: END HANDLER");
-
         Ok(())
     }
 
@@ -402,41 +254,6 @@ impl Peers {
         let peer_book = self.peer_book.read().await;
         // Fetch the handshake of connected peer.
         peer_book.handshake(remote_address)
-    }
-
-    ///
-    /// Sets the given remote address and nonce in the peer book as connecting to this node server.
-    ///
-    #[inline]
-    async fn connecting_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Set the peer as connecting with this node server.
-        peer_book.set_connecting(remote_address, nonce)
-    }
-
-    ///
-    /// Sets the given remote address in the peer book as connected to this node server.
-    ///
-    #[inline]
-    async fn connected_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Set the peer as connected with this node server.
-        peer_book.set_connected(remote_address, nonce)
-    }
-
-    /// TODO (howardwu): Add logic to remove the active channels
-    ///  and handshakes of the peer from this struct.
-    /// Sets the given remote address in the peer book as disconnected from this node server.
-    ///
-    #[inline]
-    async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Set the peer as disconnected with this node server.
-        peer_book.set_disconnected(remote_address)
-        // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
     ///
@@ -572,169 +389,6 @@ impl Peers {
         Ok(())
     }
 
-    /// TODO (howardwu): Move this to the SyncManager.
-    /// Broadcast block to connected peers
-    async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) -> Result<(), NetworkError> {
-        debug!("Propagating a block to peers");
-
-        let local_address = self.local_address();
-        for (remote_address, _) in self.connected_peers().await {
-            if remote_address != block_miner && remote_address != local_address {
-                // Broadcast a `Block` message to the connected peer.
-                self.outbound
-                    .broadcast(&Request::Block(remote_address, Block::new(block_bytes.clone())))
-                    .await;
-
-                // if let Some(channel) = peer_manager.get_channel(&remote_address) {
-                //     match channel.write(&).await {
-                //         Ok(_) => num_peers += 1,
-                //         Err(error) => warn!(
-                //             "Failed to propagate block to peer {}. (error message: {})",
-                //             channel.address, error
-                //         ),
-                //     }
-                // }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// TODO (howardwu): Move this to the SyncManager.
-    /// Broadcast transaction to connected peers
-    async fn propagate_transaction(
-        &self,
-        transaction_bytes: Vec<u8>,
-        transaction_sender: SocketAddr,
-    ) -> Result<(), NetworkError> {
-        debug!("Propagating a transaction to peers");
-
-        let local_address = self.local_address();
-
-        for (remote_address, _) in self.connected_peers().await {
-            if remote_address != transaction_sender && remote_address != local_address {
-                // Broadcast a `Block` message to the connected peer.
-                self.outbound
-                    .broadcast(&Request::Transaction(
-                        remote_address,
-                        Transaction::new(transaction_bytes.clone()),
-                    ))
-                    .await;
-
-                // if let Some(channel) = connections.get_channel(&socket) {
-                //     match channel.write(&Transaction::new(transaction_bytes.clone())).await {
-                //         Ok(_) => num_peers += 1,
-                //         Err(error) => warn!(
-                //             "Failed to propagate transaction to peer {}. (error message: {})",
-                //             channel.address, error
-                //         ),
-                //     }
-                // }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// TODO (howardwu): Move this to the SyncManager.
-    /// Verify a transaction, add it to the memory pool, propagate it to peers.
-    async fn process_transaction_internal(
-        &self,
-        source: SocketAddr,
-        transaction: Transaction,
-    ) -> Result<(), NetworkError> {
-        if let Ok(tx) = Tx::read(&transaction.bytes[..]) {
-            let mut memory_pool = self.environment.memory_pool().lock().await;
-            let parameters = self.environment.dpc_parameters();
-            let storage = self.environment.storage();
-            let consensus = self.environment.consensus_parameters();
-
-            if !consensus.verify_transaction(parameters, &tx, &*storage.read().await)? {
-                error!("Received a transaction that was invalid");
-                return Ok(());
-            }
-
-            if tx.value_balance.is_negative() {
-                error!("Received a transaction that was a coinbase transaction");
-                return Ok(());
-            }
-
-            let entry = Entry::<Tx> {
-                size_in_bytes: transaction.bytes.len(),
-                transaction: tx,
-            };
-
-            if let Ok(inserted) = memory_pool.insert(&*storage.read().await, entry) {
-                if inserted.is_some() {
-                    info!("Transaction added to memory pool.");
-                    self.propagate_transaction(transaction.bytes, source).await?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// A peer has sent us a new block to process.
-    #[inline]
-    async fn received_block(
-        &self,
-        remote_address: SocketAddr,
-        block: Block,
-        propagate: bool,
-    ) -> Result<(), NetworkError> {
-        let block_struct = BlockStruct::deserialize(&block.data)?;
-        info!(
-            "Received block from epoch {} with hash {:?}",
-            block_struct.header.time,
-            hex::encode(block_struct.header.get_hash().0)
-        );
-
-        // Verify the block and insert it into the storage.
-        if !self
-            .environment
-            .storage_read()
-            .await
-            .block_hash_exists(&block_struct.header.get_hash())
-        {
-            let inserted = self
-                .environment
-                .consensus_parameters()
-                .receive_block(
-                    self.environment.dpc_parameters(),
-                    &*self.environment.storage_read().await,
-                    &mut *self.environment.memory_pool().lock().await,
-                    &block_struct,
-                )
-                .is_ok();
-
-            // This is a new block, send it to our peers.
-            if inserted && propagate {
-                self.propagate_block(block.data, remote_address).await?;
-            } else if !propagate {
-                // if let Ok(mut sync_manager) = self.environment.sync_manager().await.try_lock() {
-                //     // TODO (howardwu): Implement this.
-                //     {
-                //         // sync_manager.clear_pending().await;
-                //         //
-                //         // if sync_manager.sync_state != SyncState::Idle {
-                //         //     // We are currently syncing with a node, ask for the next block.
-                //         //     if let Some(channel) = environment
-                //         //         .peer_manager_read()
-                //         //         .await
-                //         //         .get_channel(&sync_manager.sync_node_address)
-                //         //     {
-                //         //         sync_manager.increment(channel.clone()).await?;
-                //         //     }
-                //         // }
-                //     }
-                // }
-            }
-        }
-
-        Ok(())
-    }
-
     /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
     ///  when the PeerBook or PeerInfo struct fields change.
     ///
@@ -762,6 +416,125 @@ impl Peers {
         storage.save_peer_book_to_storage(serialized_peer_book)?;
 
         trace!("Peer manager saved peer book to storage");
+        Ok(())
+    }
+}
+
+impl Peers {
+    ///
+    /// Sets the given remote address and nonce in the peer book as connecting to this node server.
+    ///
+    #[inline]
+    pub(crate) async fn connecting_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Set the peer as connecting with this node server.
+        peer_book.set_connecting(remote_address, nonce)
+    }
+
+    ///
+    /// Sets the given remote address in the peer book as connected to this node server.
+    ///
+    #[inline]
+    pub(crate) async fn connected_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Set the peer as connected with this node server.
+        peer_book.set_connected(remote_address, nonce)
+    }
+
+    /// TODO (howardwu): Add logic to remove the active channels
+    ///  and handshakes of the peer from this struct.
+    /// Sets the given remote address in the peer book as disconnected from this node server.
+    ///
+    #[inline]
+    pub(crate) async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
+        // Acquire the peer book write lock.
+        let mut peer_book = self.peer_book.write().await;
+        // Set the peer as disconnected with this node server.
+        peer_book.set_disconnected(remote_address)
+        // TODO (howardwu): Attempt to blindly send disconnect message to peer.
+    }
+
+    #[inline]
+    pub(crate) async fn version_to_verack(
+        &self,
+        remote_address: SocketAddr,
+        remote_version: &Version,
+    ) -> Result<(), NetworkError> {
+        if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
+            debug!("Sending `Verack` request to {}", remote_address);
+            self.outbound
+                .broadcast(&Request::Verack(Verack::new(
+                    remote_version.nonce,
+                    remote_version.receiver, /* local_address */
+                    remote_address,
+                )))
+                .await;
+            self.connecting_to_peer(&remote_address, remote_version.nonce).await?;
+            debug!("Sent `Verack` request to {}", remote_address);
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    pub(crate) async fn get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+        // Add the remote address to the peer book.
+        self.found_peer(&remote_address).await?;
+
+        // TODO (howardwu): Simplify this and parallelize this with Rayon.
+        // Broadcast the sanitized list of connected peers back to requesting peer.
+        let mut peers = Vec::new();
+        for (peer_address, peer_info) in self.connected_peers().await {
+            // Skip the iteration if the requesting peer that we're sending the response to
+            // appears in the list of peers.
+            if peer_address == remote_address {
+                continue;
+            }
+            peers.push((peer_address, *peer_info.last_seen()));
+        }
+        self.outbound
+            .broadcast(&Request::Peers(remote_address, PeersStruct::new(peers)))
+            .await;
+
+        Ok(())
+    }
+
+    /// A miner has sent their list of peer addresses.
+    /// Add all new/updated addresses to our disconnected.
+    /// The connection handler will be responsible for sending out handshake requests to them.
+    #[inline]
+    pub(crate) async fn inbound_peers(
+        &self,
+        remote_address: SocketAddr,
+        peers: PeersStruct,
+    ) -> Result<(), NetworkError> {
+        // Add the remote address to the peer book.
+        self.found_peer(&remote_address).await?;
+
+        // TODO (howardwu): Simplify this and parallelize this with Rayon.
+        // Process all of the peers sent in the message,
+        // by informing the peer book of that we found peers.
+        let local_address = *self.environment.local_address();
+
+        for (peer_address, _) in peers.addresses.iter() {
+            // Skip if the peer address is this node's local address.
+            let is_zero_address = match "0.0.0.0".to_string().parse::<IpAddr>() {
+                Ok(zero_ip) => (*peer_address).ip() == zero_ip,
+                _ => false,
+            };
+            if *peer_address == local_address || is_zero_address {
+                continue;
+            }
+            // Inform the peer book that we found a peer.
+            // The peer book will determine if we have seen the peer before,
+            // and include the peer if it is new.
+            else if !self.is_connected(peer_address).await {
+                self.found_peer(peer_address).await?;
+            }
+        }
+
         Ok(())
     }
 }
