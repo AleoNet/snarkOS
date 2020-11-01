@@ -48,7 +48,7 @@ mod tests {
     use super::*;
     use crate::external::{
         message::{message::Message, MessageHeader},
-        message_types::{GetPeers, Version},
+        message_types::Version,
     };
     use snarkos_testing::network::random_socket_address;
 

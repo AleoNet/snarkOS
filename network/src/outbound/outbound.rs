@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::Channel, outbound::Request, NetworkError};
+use crate::{outbound::Request, NetworkError};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -24,12 +24,20 @@ use std::{
         Arc,
     },
 };
-use tokio::sync::RwLock;
+use tokio::{
+    net::TcpStream,
+    sync::{Mutex, RwLock},
+    task,
+    task::JoinHandle,
+};
+
+/// The TCP stream for sending outbound requests to a single remote address.
+pub(super) type Channel = Arc<Mutex<TcpStream>>;
 
 /// The map of remote addresses to their active write channels.
-type Channels = HashMap<SocketAddr, Arc<Channel>>;
+type Channels = HashMap<SocketAddr, Channel>;
 
-/// The set of requests for a single peer.
+/// The set of requests for a single remote address.
 type Requests = Arc<RwLock<HashSet<Request>>>;
 
 /// The map of remote addresses to their pending requests.
@@ -53,7 +61,7 @@ pub struct Outbound {
     /// The map of remote addresses to their failed requests.
     failure: Arc<RwLock<Failure>>,
     /// The counter for the number of send requests the handler processes.
-    send_request_count: Arc<AtomicU64>,
+    send_pending_count: Arc<AtomicU64>,
     /// The counter for the number of send requests that succeeded.
     send_success_count: Arc<AtomicU64>,
     /// The counter for the number of send requests that failed.
@@ -69,7 +77,7 @@ impl Outbound {
             pending: Arc::new(RwLock::new(Pending::new())),
             success: Arc::new(RwLock::new(Success::new())),
             failure: Arc::new(RwLock::new(Failure::new())),
-            send_request_count: Arc::new(AtomicU64::new(0)),
+            send_pending_count: Arc::new(AtomicU64::new(0)),
             send_success_count: Arc::new(AtomicU64::new(0)),
             send_failure_count: Arc::new(AtomicU64::new(0)),
         }
@@ -78,6 +86,7 @@ impl Outbound {
     ///
     /// Returns `true` if the given request is a pending request.
     ///
+    #[inline]
     pub async fn is_pending(&self, request: &Request) -> bool {
         // Acquire the pending read lock.
         let pending = self.pending.read().await;
@@ -93,6 +102,7 @@ impl Outbound {
     ///
     /// Returns `true` if the given request was a successful request.
     ///
+    #[inline]
     pub async fn is_success(&self, request: &Request) -> bool {
         // Acquire the success read lock.
         let success = self.success.read().await;
@@ -108,6 +118,7 @@ impl Outbound {
     ///
     /// Returns `true` if the given request was a failed request.
     ///
+    #[inline]
     pub async fn is_failure(&self, request: &Request) -> bool {
         // Acquire the failure read lock.
         let failure = self.failure.read().await;
@@ -123,203 +134,378 @@ impl Outbound {
     ///
     /// Broadcasts the given request.
     ///
-    /// Broadcasts a handshake request with a given version message.
-    ///
-    /// Creates a new handshake with a remote address,
-    /// and attempts to send a handshake request to them.
-    ///
-    /// Upon success, the handshake is stored in the manager.
+    /// Creates or fetches an existing channel with the remote address,
+    /// and attempts to send the given request to them.
     ///
     #[inline]
-    pub async fn broadcast(&self, request: &Request) -> Result<(), NetworkError> {
-        // Wait for authorization to send the request.
-        let (channel, pending_requests) = match self.authorize(request).await {
-            Ok((channel, pending_requests)) => (channel, pending_requests),
+    pub async fn broadcast(&self, request: &Request) -> JoinHandle<()> {
+        let outbound = self.clone();
+        let request = request.clone();
+        // Spawn a thread to send the request.
+        task::spawn(async move {
+            // Wait for authorization.
+            outbound.authorize(&request).await;
+            // Send the request.
+            outbound.send(&request).await;
+        })
+    }
+}
+
+impl Outbound {
+    ///
+    /// Adds a new requests map for the given remote address to each state map,
+    /// if it does not exist.
+    ///
+    #[inline]
+    async fn initialize_state(&self, remote_address: &SocketAddr) {
+        let pending_exists = self.pending.read().await.contains_key(remote_address);
+        if !pending_exists {
+            trace!("Adding a pending requests map for {}", remote_address);
+            self.pending
+                .write()
+                .await
+                .insert(*remote_address, Arc::new(RwLock::new(HashSet::new())));
+        }
+
+        let success_exists = self.success.read().await.contains_key(remote_address);
+        if !success_exists {
+            trace!("Adding a success requests map for {}", remote_address);
+            self.success
+                .write()
+                .await
+                .insert(*remote_address, Arc::new(RwLock::new(HashSet::new())));
+        }
+
+        let failure_exists = self.failure.read().await.contains_key(remote_address);
+        if !failure_exists {
+            trace!("Adding a failure requests map for {}", remote_address);
+            self.failure
+                .write()
+                .await
+                .insert(*remote_address, Arc::new(RwLock::new(HashSet::new())));
+        }
+    }
+
+    ///
+    /// Establishes an outbound channel to the given remote address, if it does not exist.
+    ///
+    #[inline]
+    async fn outbound_channel(&self, remote_address: &SocketAddr) -> Result<Channel, NetworkError> {
+        let channel_exists = self.channels.read().await.contains_key(remote_address);
+        if !channel_exists {
+            debug!("Establishing an outbound channel to {}", remote_address);
+            self.channels.write().await.insert(
+                *remote_address,
+                Arc::new(Mutex::new(TcpStream::connect(remote_address).await?)),
+            );
+        }
+        Ok(self
+            .channels
+            .read()
+            .await
+            .get(remote_address)
+            .ok_or(NetworkError::OutboundChannelMissing)?
+            .clone())
+    }
+
+    ///
+    /// Authorizes the given request for broadcast to the corresponding outbound channel.
+    ///
+    #[inline]
+    async fn authorize(&self, request: &Request) {
+        trace!("Authorizing `{}` request to {}", request.name(), request.receiver());
+        self.initialize_state(&request.receiver()).await;
+
+        // Acquire the pending requests write lock.
+        let mut pending = self.pending.write().await;
+
+        match pending.get_mut(&request.receiver()) {
+            Some(requests) => {
+                // Store the request to the pending requests.
+                requests.write().await.insert(request.clone());
+                // Increment the request counter.
+                self.send_pending_count.fetch_add(1, Ordering::SeqCst);
+                trace!("Authorized `{}` request to {}", request.name(), request.receiver());
+            }
+            None => trace!(
+                "Unauthorized to send `{}` request to {}",
+                request.name(),
+                request.receiver()
+            ),
+        };
+    }
+
+    #[inline]
+    async fn send(&self, request: &Request) {
+        debug!("Sending `{}` request to {}", request.name(), request.receiver());
+
+        // Fetch the outbound channel.
+        let channel = match self.outbound_channel(&request.receiver()).await {
+            Ok(channel) => channel,
             Err(error) => {
-                error!(
-                    "Unauthorized to send `{}` request to {}\n{}",
-                    request.name(),
-                    request.receiver(),
-                    error
-                );
-                return Err(NetworkError::SendRequestUnauthorized);
+                self.failure(&request).await;
+                return;
             }
         };
 
-        debug!("Sending request to {:?}", request.receiver());
+        trace!("Acquired outbound channel to {}", request.receiver());
 
-        // Clone these variables for use in the thread.
-        let request = request.clone();
-        let send_success_count = self.send_success_count.clone();
-        let send_failure_count = self.send_failure_count.clone();
+        match request.broadcast(&channel).await {
+            Ok(_) => self.success(&request).await,
+            Err(error) => self.failure(&request).await,
+            // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
+            // // Disconnect from the peer if the version request fails to send.
+            // if let Err(_) = channel.write(&version).await {
+            //     self.disconnect_from_peer(&remote_address).await?;
+            // }
+        };
+    }
 
-        // Spawn a thread to handle sending the request.
+    #[inline]
+    async fn success(&self, request: &Request) {
+        // Acquire the pending write lock.
+        let mut pending = self.pending.write().await;
+
+        // Acquire the pending requests write lock.
+        let mut pending_requests = pending
+            .get_mut(&request.receiver())
+            .ok_or(NetworkError::OutboundPendingRequestsMissing)
+            .unwrap()
+            .write()
+            .await;
+
+        // Remove the request from the pending requests.
+        pending_requests.remove(&request);
+
+        // Acquire the success requests write lock.
+        let mut success = self.success.write().await;
+
+        if let Some(requests) = success.get_mut(&request.receiver()) {
+            // Store the request to the successful requests.
+            requests.write().await.insert(request.clone());
+
+            // Increment the success counter.
+            self.send_success_count.fetch_add(1, Ordering::SeqCst);
+
+            debug!("Sent `{}` request to {}", request.name(), request.receiver());
+        }
+    }
+
+    #[inline]
+    async fn failure(&self, request: &Request) {
+        // Acquire the pending write lock.
+        let mut pending = self.pending.write().await;
+
+        // Acquire the pending requests write lock.
+        let mut pending_requests = pending
+            .get_mut(&request.receiver())
+            .ok_or(NetworkError::OutboundPendingRequestsMissing)
+            .unwrap()
+            .write()
+            .await;
+
+        // Remove the request from the pending requests.
+        pending_requests.remove(&request);
+
+        // Acquire the failed requests write lock.
+        let mut failure = self.failure.write().await;
+
+        if let Some(requests) = failure.get_mut(&request.receiver()) {
+            // Store the request to the failed requests.
+            requests.write().await.insert(request.clone());
+
+            // Increment the failure counter.
+            self.send_failure_count.fetch_add(1, Ordering::SeqCst);
+
+            error!("Failed to send `{}` request to {}", request.name(), request.receiver());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{external::GetPeers, outbound::*};
+    use snarkos_testing::network::{random_socket_address, TcpServer};
+
+    use serial_test::serial;
+    use std::{net::SocketAddr, sync::Arc, time::Duration};
+    use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex, time::sleep};
+
+    ///
+    /// Returns a `Request` for testing.
+    ///
+    #[inline]
+    fn request(remote_address: SocketAddr) -> Request {
+        Request::GetPeers(remote_address, GetPeers)
+    }
+
+    ///
+    /// Creates a new `TcpServer` and rejects requests if the given reject boolean is set to `true`.
+    ///
+    #[inline]
+    async fn test_server_with_behavior(remote_address: SocketAddr, should_reject: bool) -> anyhow::Result<()> {
+        // Start a TcpServer.
         tokio::task::spawn(async move {
-            // Fetch the request receiver.
-            let receiver = request.receiver();
-
-            trace!("Sending request to {:?}", receiver);
-
-            // TODO (howardwu): Abstract this with a trait object or generic.
-            let result = match &request {
-                Request::Block(_, payload) => channel.write(payload).await,
-                Request::GetPeers(_, payload) => channel.write(payload).await,
-                Request::Peers(_, payload) => channel.write(payload).await,
-                Request::Transaction(_, payload) => channel.write(payload).await,
-                Request::Verack(payload) => channel.write(payload).await,
-                Request::Version(payload) => channel.write(payload).await,
-            };
-
-            // Write the version message to the channel.
-            match result {
-                Ok(_) => {
-                    // Increment the success counter.
-                    send_success_count.fetch_add(1, Ordering::SeqCst);
-                    trace!("Sent request to {:?}", receiver);
-                }
-                Err(error) => {
-                    // Increment the failed counter.
-                    send_failure_count.fetch_add(1, Ordering::SeqCst);
-                    error!("Failed to send request to {:?}", receiver);
-
-                    // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
-                    // // Disconnect from the peer if the version request fails to send.
-                    // if let Err(_) = channel.write(&version).await {
-                    //     self.disconnect_from_peer(&remote_address).await?;
-                    // }
-                }
-            }
-
-            // Acquire the pending requests write lock.
-            let mut writer = pending_requests.write().await;
-            // Remove the request from the pending requests.
-            writer.remove(&request);
+            let server = TcpServer::new(remote_address);
+            server.listen(should_reject).await.unwrap();
         });
+        sleep(Duration::from_secs(2)).await;
+
+        if !should_reject {
+            // Check that the TcpServer is working.
+            let mut channel = TcpStream::connect(remote_address).await?;
+            let result = channel.write_all(b"hello").await;
+            assert!(result.is_ok());
+        }
 
         Ok(())
     }
 
-    // TODO (howardwu): Implement getters to all counters.
-    // /// Returns the number of requests the manager has processed.
-    // #[inline]
-    // pub async fn get_request_count(&self) -> u64 {
-    //     let counter = self.send_request_count.clone();
-    //     counter.clone().into_inner()
-    // }
-
-    async fn authorize(&self, request: &Request) -> Result<(Arc<Channel>, Requests), NetworkError> {
-        // Fetch the request receiver.
-        let receiver = request.receiver();
-        trace!("Authorizing `{}` request to {}", request.name(), receiver);
-
-        // Acquire the channels write lock.
-        let mut channels = self.channels.write().await;
-        // Acquire the pending write lock.
-        let mut pending = self.pending.write().await;
-
-        // Fetch or initialize the channel for broadcasting the request.
-        let channel = if let Some(channel) = channels.get(&receiver) {
-            // Case 1 - The channel exists, retrieves the channel.
-            trace!("Using the existing channel with {}", receiver);
-            channel.clone()
-        } else {
-            // Case 2 - The channel does not exist, creates and returns a new channel.
-            trace!("Creating a new channel with {}", receiver);
-            if let Ok(channel) = Channel::new_writer(receiver.clone()).await {
-                trace!("Created a new channel with {}", receiver);
-                Arc::new(channel)
-            } else {
-                error!("Failed to create a new channel with {}", receiver);
-                return Err(NetworkError::OutboundFailedToCreateChannel);
-            }
-        };
-
-        // Fetch or initialize the pending requests for the request receiver.
-        let pending_requests = if let Some(requests) = pending.get(&receiver) {
-            // Case 1 - The receiver exists, retrieves the requests.
-            trace!("Using the existing instance of pending requests");
-            requests.clone()
-        } else {
-            // Case 2 - The receiver does not exist, initializes requests and stores it.
-            trace!("Creating a new instance of pending requests");
-            // Creates a new instance of `Requests` and stores it.
-            Arc::new(RwLock::new(HashSet::new()))
-        };
-
-        // Acquire the pending requests write lock.
-        let mut pending_inner = pending_requests.write().await;
-
-        // Store the channel in the channel map.
-        channels.insert(receiver, channel.clone());
-        // Store the pending requests in the pending map.
-        pending.insert(receiver, pending_requests.clone());
-        // Store the request to the pending requests.
-        pending_inner.insert(request.clone());
-
-        // Increment the request counter.
-        self.send_request_count.fetch_add(1, Ordering::SeqCst);
-
-        trace!("Authorized `{}` request to {}", request.name(), receiver);
-        Ok((channel, pending_requests.clone()))
+    ///
+    /// Creates a new `TcpServer`.
+    ///
+    #[inline]
+    pub async fn test_server(remote_address: SocketAddr) -> anyhow::Result<()> {
+        test_server_with_behavior(remote_address, false).await
     }
-}
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::external::{Channel, Message, Verack, Version};
-//     use snarkos_testing::network::random_socket_address;
-//
-//     use serial_test::serial;
-//     use tokio::net::TcpListener;
-//
-//     #[tokio::test]
-//     #[serial]
-//     async fn test_send_and_receive_handshake() {
-//         let local_address = random_socket_address();
-//         let remote_address = random_socket_address();
-//
-//         // 1. Bind to remote address.
-//         let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
-//         let mut remote_manager = Outbound::new();
-//
-//         tokio::spawn(async move {
-//             let mut local_listener = TcpListener::bind(local_address).await.unwrap();
-//             let mut local_manager = Outbound::new();
-//
-//             // 2. Local node sends handshake request
-//             let local_version = Version::new_with_rng(1u64, 0u32, local_address, remote_address);
-//             local_manager.broadcast(&Request::Version(local_version)).await;
-//
-//             // 5. Check local node handshake state
-//             let (reader, _) = local_listener.accept().await.unwrap();
-//             let channel = Channel::new_reader(reader).unwrap();
-//
-//             // 6. Local node accepts handshake response
-//             let (_name, bytes) = channel.read().await.unwrap();
-//             let verack = Verack::deserialize(bytes).unwrap();
-//             local_manager.accept_response(remote_address, verack).await;
-//
-//             // 7. Local node receives handshake request
-//             let (_name, bytes) = channel.read().await.unwrap();
-//             let remote_version = Version::deserialize(bytes).unwrap();
-//
-//             // 8. Local node sends handshake response
-//             local_manager.receive_request(remote_version, remote_address).await;
-//         });
-//
-//         // 3. Remote node accepts Local node connection
-//         let (reader, _) = remote_listener.accept().await.unwrap();
-//
-//         // 4. Remote node sends handshake response, handshake request
-//         let (handshake, _, _) = remote_manager
-//             .receive_connection_request(1u64, 0u32, local_address, reader)
-//             .await
-//             .unwrap();
-//
-//         // 9. Local node accepts handshake response
-//         let (_, bytes) = handshake.channel.read().await.unwrap();
-//         let verack = Verack::deserialize(bytes).unwrap();
-//         remote_manager.accept_response(local_address, verack).await;
-//     }
-// }
+    ///
+    /// Creates a new `TcpServer` that rejects all requests.
+    ///
+    #[inline]
+    pub async fn test_server_that_rejects(remote_address: SocketAddr) -> anyhow::Result<()> {
+        test_server_with_behavior(remote_address, true).await
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_is_pending() {
+        let remote_address = random_socket_address();
+        let request = request(remote_address);
+
+        // Create a new instance.
+        let outbound = Outbound::new();
+        assert!(!outbound.is_pending(&request).await);
+        assert!(!outbound.is_success(&request).await);
+        assert!(!outbound.is_failure(&request).await);
+
+        // Send the request to a non-existent server.
+        let outbound_ = outbound.clone();
+        let request_ = request.clone();
+        tokio::task::spawn(async move {
+            outbound_.broadcast(&request_).await;
+        })
+        .await
+        .unwrap();
+
+        // Check that the request failed.
+        assert!(outbound.is_pending(&request).await);
+        assert!(!outbound.is_success(&request).await);
+        assert!(!outbound.is_failure(&request).await);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_is_success() {
+        // Create a test server.
+        let remote_address = random_socket_address();
+        test_server(remote_address).await.unwrap();
+
+        let request = request(remote_address);
+
+        // Create a new instance.
+        let outbound = Outbound::new();
+        assert!(!outbound.is_pending(&request).await);
+        assert!(!outbound.is_success(&request).await);
+        assert!(!outbound.is_failure(&request).await);
+
+        // Send the request to the server.
+        outbound.broadcast(&request).await.await.unwrap();
+
+        // Check that the request succeeded.
+        assert!(!outbound.is_pending(&request).await);
+        assert!(outbound.is_success(&request).await);
+        assert!(!outbound.is_failure(&request).await);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_is_failure() {
+        // Create a test server that refuses connections.
+        let remote_address = random_socket_address();
+        test_server_that_rejects(remote_address).await.unwrap();
+
+        let request = request(remote_address);
+
+        // Create a new instance.
+        let outbound = Outbound::new();
+        assert!(!outbound.is_pending(&request).await);
+        assert!(!outbound.is_success(&request).await);
+        assert!(!outbound.is_failure(&request).await);
+
+        // Send the request to the server.
+        outbound.broadcast(&request).await.await.unwrap();
+
+        // Check that the request succeeded.
+        assert!(!outbound.is_pending(&request).await);
+        assert!(!outbound.is_success(&request).await);
+        assert!(outbound.is_failure(&request).await);
+    }
+
+    //     use super::*;
+    //     use crate::external::{Channel, Message, Verack, Version};
+    //     use snarkos_testing::network::random_socket_address;
+    //
+    //     use serial_test::serial;
+    //     use tokio::net::TcpListener;
+    //
+    //     #[tokio::test]
+    //     #[serial]
+    //     async fn test_send_and_receive_handshake() {
+    //         let local_address = random_socket_address();
+    //         let remote_address = random_socket_address();
+    //
+    //         // 1. Bind to remote address.
+    //         let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
+    //         let mut remote_manager = Outbound::new();
+    //
+    //         tokio::spawn(async move {
+    //             let mut local_listener = TcpListener::bind(local_address).await.unwrap();
+    //             let mut local_manager = Outbound::new();
+    //
+    //             // 2. Local node sends handshake request
+    //             let local_version = Version::new_with_rng(1u64, 0u32, local_address, remote_address);
+    //             local_manager.broadcast(&Request::Version(local_version)).await;
+    //
+    //             // 5. Check local node handshake state
+    //             let (reader, _) = local_listener.accept().await.unwrap();
+    //             let channel = Channel::new_reader(reader).unwrap();
+    //
+    //             // 6. Local node accepts handshake response
+    //             let (_name, bytes) = channel.read().await.unwrap();
+    //             let verack = Verack::deserialize(bytes).unwrap();
+    //             local_manager.accept_response(remote_address, verack).await;
+    //
+    //             // 7. Local node receives handshake request
+    //             let (_name, bytes) = channel.read().await.unwrap();
+    //             let remote_version = Version::deserialize(bytes).unwrap();
+    //
+    //             // 8. Local node sends handshake response
+    //             local_manager.receive_request(remote_version, remote_address).await;
+    //         });
+    //
+    //         // 3. Remote node accepts Local node connection
+    //         let (reader, _) = remote_listener.accept().await.unwrap();
+    //
+    //         // 4. Remote node sends handshake response, handshake request
+    //         let (handshake, _, _) = remote_manager
+    //             .receive_connection_request(1u64, 0u32, local_address, reader)
+    //             .await
+    //             .unwrap();
+    //
+    //         // 9. Local node accepts handshake response
+    //         let (_, bytes) = handshake.channel.read().await.unwrap();
+    //         let verack = Verack::deserialize(bytes).unwrap();
+    //         remote_manager.accept_response(local_address, verack).await;
+    //     }
+}

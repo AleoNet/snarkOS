@@ -225,7 +225,7 @@ impl PeerManager {
                                 remote_version.receiver, /* local_address */
                                 remote_address,
                             )))
-                            .await?;
+                            .await;
                         self.connecting_to_peer(&remote_address, remote_version.nonce).await?;
                         debug!("Sent `Verack` request to {}", remote_address);
                     }
@@ -265,7 +265,7 @@ impl PeerManager {
                     }
                     self.outbound
                         .broadcast(&Request::Peers(remote_address, Peers::new(peers)))
-                        .await?;
+                        .await;
                 }
                 PeerMessage::Peers(remote_address, peers) => {
                     /// A miner has sent their list of peer addresses.
@@ -495,7 +495,7 @@ impl PeerManager {
                 self.connecting_to_peer(bootnode_address, version.nonce).await?;
 
                 // Send a connection request with the outbound handler.
-                self.outbound.broadcast(&request).await?;
+                self.outbound.broadcast(&request).await;
             }
         }
 
@@ -521,7 +521,7 @@ impl PeerManager {
             self.connecting_to_peer(&remote_address, version.nonce).await?;
 
             // Send a connection request with the outbound handler.
-            self.outbound.broadcast(&request).await?;
+            self.outbound.broadcast(&request).await;
         }
 
         Ok(())
@@ -553,7 +553,7 @@ impl PeerManager {
                         local_address,
                         remote_address,
                     )))
-                    .await?;
+                    .await;
             } else {
                 // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
 
@@ -573,7 +573,7 @@ impl PeerManager {
             // Broadcast a `GetPeers` message to the connected peer.
             self.outbound
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
-                .await?;
+                .await;
 
             // // Fetch the connection channel.
             // if let Some(channel) = self.get_channel(&remote_address) {
@@ -602,7 +602,7 @@ impl PeerManager {
                 // Broadcast a `Block` message to the connected peer.
                 self.outbound
                     .broadcast(&Request::Block(remote_address, Block::new(block_bytes.clone())))
-                    .await?;
+                    .await;
 
                 // if let Some(channel) = peer_manager.get_channel(&remote_address) {
                 //     match channel.write(&).await {
@@ -638,7 +638,7 @@ impl PeerManager {
                         remote_address,
                         Transaction::new(transaction_bytes.clone()),
                     ))
-                    .await?;
+                    .await;
 
                 // if let Some(channel) = connections.get_channel(&socket) {
                 //     match channel.write(&Transaction::new(transaction_bytes.clone())).await {

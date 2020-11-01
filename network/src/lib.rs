@@ -31,6 +31,9 @@ extern crate snarkos_metrics;
 pub mod external;
 pub mod peers;
 
+pub mod errors;
+pub use errors::*;
+
 pub mod manager;
 pub use manager::*;
 

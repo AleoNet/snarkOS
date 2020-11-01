@@ -3285,6 +3285,7 @@ dependencies = [
 name = "snarkos-testing"
 version = "1.1.4"
 dependencies = [
+ "anyhow",
  "once_cell",
  "rand 0.7.3",
  "rand_xorshift 0.2.0",
@@ -3301,6 +3302,8 @@ dependencies = [
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.3.2",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]
@@ -3563,7 +3566,7 @@ dependencies = [
  "mio 0.7.4",
  "num_cpus",
  "parking_lot 0.11.1",
- "pin-project-lite",
+ "pin-project-lite 0.1.7",
  "signal-hook-registry",
  "slab",
  "tokio-macros 0.3.1",
@@ -3833,7 +3836,19 @@ dependencies = [
  "cfg-if 1.0.0",
  "log",
  "pin-project-lite 0.2.0",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80e0ccfc3378da0cce270c946b676a376943f5cd16aeba64568e7939806f4ada"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
