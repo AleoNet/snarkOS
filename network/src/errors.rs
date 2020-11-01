@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::manager::PeerMessage;
 use snarkos_errors::{
     consensus::ConsensusError,
     network::{ConnectError, SendError},
@@ -51,7 +50,7 @@ pub enum NetworkError {
     InboundAlreadySetPeerSender,
     InboundMissingPeerSender,
     SendError(SendError),
-    SenderError(tokio::sync::mpsc::error::SendError<PeerMessage>),
+    SenderError(tokio::sync::mpsc::error::SendError<crate::inbound::Response>),
     OutboundChannelMissing,
     OutboundPendingRequestsMissing,
     SendRequestUnauthorized,
@@ -120,8 +119,8 @@ impl From<tokio::sync::TryLockError> for NetworkError {
     }
 }
 
-impl From<tokio::sync::mpsc::error::SendError<PeerMessage>> for NetworkError {
-    fn from(error: tokio::sync::mpsc::error::SendError<PeerMessage>) -> Self {
+impl From<tokio::sync::mpsc::error::SendError<crate::inbound::Response>> for NetworkError {
+    fn from(error: tokio::sync::mpsc::error::SendError<crate::inbound::Response>) -> Self {
         NetworkError::SenderError(error)
     }
 }
