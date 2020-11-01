@@ -27,6 +27,7 @@ pub type Receiver = SocketAddr;
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Request {
     Block(Receiver, Block),
+    SyncBlock(Receiver, SyncBlock),
     GetPeers(Receiver, GetPeers),
     Peers(Receiver, Peers),
     Transaction(Receiver, Transaction),
@@ -39,6 +40,7 @@ impl Request {
     pub fn name(&self) -> &str {
         match self {
             Request::Block(_, _) => "Block",
+            Request::SyncBlock(_, _) => "SyncBlock",
             Request::GetPeers(_, _) => "GetPeers",
             Request::Peers(_, _) => "Peers",
             Request::Transaction(_, _) => "Transaction",
@@ -51,6 +53,7 @@ impl Request {
     pub fn receiver(&self) -> Receiver {
         match self {
             Request::Block(receiver, _) => *receiver,
+            Request::SyncBlock(receiver, _) => *receiver,
             Request::GetPeers(receiver, _) => *receiver,
             Request::Peers(receiver, _) => *receiver,
             Request::Transaction(receiver, _) => *receiver,
@@ -69,6 +72,7 @@ impl Request {
     pub fn serialize(&self) -> anyhow::Result<Vec<u8>> {
         let (name, data) = match self {
             Request::Block(_, message) => (Block::name(), message.serialize()?),
+            Request::SyncBlock(_, message) => (SyncBlock::name(), message.serialize()?),
             Request::GetPeers(_, message) => (GetPeers::name(), message.serialize()?),
             Request::Peers(_, message) => (Peers::name(), message.serialize()?),
             Request::Transaction(_, message) => (Transaction::name(), message.serialize()?),

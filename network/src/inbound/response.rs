@@ -31,10 +31,12 @@ pub enum Response {
     DisconnectFrom(SocketAddr),
     /// Receive handler received a new transaction from the given peer.
     Transaction(SocketAddr, Transaction),
-    /// Receive handler received a getpeers request.
+    /// Receive handler received a getpeers message.
     GetPeers(SocketAddr),
     /// Receive handler received a peers response.
     Peers(SocketAddr, Peers),
     /// Receive handler received a block.
     Block(SocketAddr, Block, bool),
+    /// Receive handler received a getblock message.
+    GetBlock(SocketAddr, GetBlock),
 }
