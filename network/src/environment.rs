@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{NetworkError, SyncManager};
+use crate::{NetworkError, Outbound, SyncManager};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -134,11 +134,15 @@ impl Environment {
     }
 
     /// TODO (howardwu): Remove this.
-    pub fn set_managers(&mut self) {
+    pub fn set_managers(&mut self, outbound: Arc<Outbound>) {
         // Check if this node is configured as a bootnode.
         // Skips instantiating the sync manager if this is a bootnode.
         if let Some(bootnode_address) = self.bootnodes.first() {
-            self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(self.clone(), *bootnode_address))));
+            self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(
+                self.clone(),
+                *bootnode_address,
+                outbound,
+            ))));
         }
     }
 

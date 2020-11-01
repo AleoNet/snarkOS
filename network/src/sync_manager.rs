@@ -20,9 +20,11 @@ use crate::{
         Channel,
         GetMemoryPool,
     },
+    outbound::Request,
     peers::peers::Peers,
     Environment,
     NetworkError,
+    Outbound,
 };
 use snarkos_errors::network::SendError;
 use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
@@ -57,13 +59,16 @@ pub struct SyncManager {
     pub block_headers: Vec<BlockHeaderHash>,
     /// Pending blocks - Blocks that have been requested and the time of the request
     pub pending_blocks: HashMap<BlockHeaderHash, DateTime<Utc>>,
+
+    /// The outbound service of this node server.
+    outbound: Arc<Outbound>,
 }
 
 impl SyncManager {
     ///
     /// Creates a new instance of `SyncHandler`.
     ///
-    pub fn new(environment: Environment, sync_node_address: SocketAddr) -> Self {
+    pub fn new(environment: Environment, sync_node_address: SocketAddr, outbound: Arc<Outbound>) -> Self {
         Self {
             environment,
 
@@ -71,6 +76,8 @@ impl SyncManager {
             pending_blocks: HashMap::new(),
             sync_node_address,
             sync_state: SyncState::Idle,
+
+            outbound,
         }
     }
 
@@ -128,7 +135,7 @@ impl SyncManager {
     }
 
     /// Finish syncing or ask for the next block from the sync node.
-    pub async fn increment(&mut self, channel: Arc<Channel>) -> Result<(), SendError> {
+    pub async fn increment(&mut self) -> Result<(), SendError> {
         if let SyncState::Syncing(date_time, height) = self.sync_state {
             let current_block_height = self.environment.current_block_height().await;
             if current_block_height > height {
@@ -162,7 +169,13 @@ impl SyncManager {
                 };
 
                 if should_request {
-                    channel.write(&GetBlock::new(block_header_hash.clone())).await?;
+                    // Broadcast a `GetBlock` message to the connected peer.
+                    self.outbound
+                        .broadcast(&Request::GetBlock(
+                            self.sync_node_address,
+                            GetBlock::new(block_header_hash.clone()),
+                        ))
+                        .await;
                     self.pending_blocks.insert(block_header_hash, Utc::now());
                 }
             }
@@ -173,12 +186,24 @@ impl SyncManager {
                 sleep(Duration::from_millis(500)).await;
 
                 if let Ok(block_locator_hashes) = self.environment.storage_read().await.get_block_locator_hashes() {
-                    channel.write(&GetSync::new(block_locator_hashes)).await?;
+                    // Broadcast a `GetSync` message to the connected peer.
+                    self.outbound
+                        .broadcast(&Request::GetSync(
+                            self.sync_node_address,
+                            GetSync::new(block_locator_hashes),
+                        ))
+                        .await;
                 }
             } else {
                 for (block_header_hash, request_time) in &self.pending_blocks.clone() {
                     if Utc::now() - request_time.clone() > ChronoDuration::seconds(5) {
-                        channel.write(&GetBlock::new(block_header_hash.clone())).await?;
+                        // Broadcast a `GetBlock` message to the connected peer.
+                        self.outbound
+                            .broadcast(&Request::GetBlock(
+                                self.sync_node_address,
+                                GetBlock::new(block_header_hash.clone()),
+                            ))
+                            .await;
                         self.pending_blocks.insert(block_header_hash.clone(), Utc::now());
                     }
                 }
