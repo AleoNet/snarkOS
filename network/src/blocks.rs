@@ -14,9 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
-
-// TODO (howardwu): Move these imports to SyncManager.
+use crate::{
+    external::message_types::*,
+    outbound::Request,
+    peers::PeerInfo,
+    sync_manager::SyncState,
+    Environment,
+    NetworkError,
+    Outbound,
+};
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
@@ -77,7 +83,6 @@ impl Blocks {
         *self.environment.local_address()
     }
 
-    /// TODO (howardwu): Move this to the SyncManager.
     /// Broadcast block to connected peers
     pub(crate) async fn propagate_block(
         &self,
@@ -94,23 +99,12 @@ impl Blocks {
                 self.outbound
                     .broadcast(&Request::Block(*remote_address, Block::new(block_bytes.clone())))
                     .await;
-
-                // if let Some(channel) = peers.get_channel(&remote_address) {
-                //     match channel.write(&).await {
-                //         Ok(_) => num_peers += 1,
-                //         Err(error) => warn!(
-                //             "Failed to propagate block to peer {}. (error message: {})",
-                //             channel.address, error
-                //         ),
-                //     }
-                // }
             }
         }
 
         Ok(())
     }
 
-    /// TODO (howardwu): Move this to the SyncManager.
     /// Broadcast transaction to connected peers
     pub(crate) async fn propagate_transaction(
         &self,
@@ -124,30 +118,19 @@ impl Blocks {
 
         for (remote_address, _) in connected_peers {
             if *remote_address != transaction_sender && *remote_address != local_address {
-                // Broadcast a `Block` message to the connected peer.
+                // Broadcast a `Transaction` message to the connected peer.
                 self.outbound
                     .broadcast(&Request::Transaction(
                         *remote_address,
                         Transaction::new(transaction_bytes.clone()),
                     ))
                     .await;
-
-                // if let Some(channel) = connections.get_channel(&socket) {
-                //     match channel.write(&Transaction::new(transaction_bytes.clone())).await {
-                //         Ok(_) => num_peers += 1,
-                //         Err(error) => warn!(
-                //             "Failed to propagate transaction to peer {}. (error message: {})",
-                //             channel.address, error
-                //         ),
-                //     }
-                // }
             }
         }
 
         Ok(())
     }
 
-    /// TODO (howardwu): Move this to the SyncManager.
     /// Verify a transaction, add it to the memory pool, propagate it to peers.
     pub(crate) async fn received_transaction(
         &self,
@@ -228,23 +211,17 @@ impl Blocks {
                         .await?;
                 }
             } else {
-                // if let Ok(mut sync_manager) = self.environment.sync_manager().await.try_lock() {
-                //     // TODO (howardwu): Implement this.
-                //     {
-                //         // sync_manager.clear_pending().await;
-                //         //
-                //         // if sync_manager.sync_state != SyncState::Idle {
-                //         //     // We are currently syncing with a node, ask for the next block.
-                //         //     if let Some(channel) = environment
-                //         //         .peers_read()
-                //         //         .await
-                //         //         .get_channel(&sync_manager.sync_node_address)
-                //         //     {
-                //         //         sync_manager.increment(channel.clone()).await?;
-                //         //     }
-                //         // }
-                //     }
-                // }
+                if let Ok(mut sync_manager) = self.environment.sync_manager().await.try_lock() {
+                    // TODO (howardwu): Implement this.
+                    {
+                        sync_manager.clear_pending().await;
+
+                        if sync_manager.sync_state != SyncState::Idle {
+                            // We are currently syncing with a node, ask for the next block.
+                            sync_manager.increment().await?;
+                        }
+                    }
+                }
             }
         }
 
@@ -366,14 +343,8 @@ impl Blocks {
 
         // TODO (howardwu): Implement this using the sync manager and outbound handler.
         {
-            // // Received block headers
-            // if let Some(channel) = environment
-            //     .peers_read()
-            //     .await
-            //     .get_channel(&sync_handler.sync_node_address)
-            // {
-            //     sync_handler.increment(channel.clone()).await?;
-            // }
+            // Received block headers
+            sync_handler.increment().await?;
         }
 
         Ok(())

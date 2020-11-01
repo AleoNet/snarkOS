@@ -19,7 +19,7 @@ use snarkos_errors::network::message::MessageError;
 use snarkos_objects::BlockHeaderHash;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_sync.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct GetSync {
     /// hashes of blocks requested
     pub block_locator_hashes: Vec<BlockHeaderHash>,

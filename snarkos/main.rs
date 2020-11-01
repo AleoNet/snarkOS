@@ -33,7 +33,10 @@ use snarkos_posw::PoswMarlin;
 use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{runtime::Builder, sync::{Mutex, RwLock};
+use tokio::{
+    runtime::Builder,
+    sync::{Mutex, RwLock},
+};
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
@@ -48,16 +51,16 @@ fn initialize_logger(config: &Config) {
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
 
-             // disable undesirable logs
-             let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+            // disable undesirable logs
+            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
 
-             // initialize tracing
-             tracing_subscriber::fmt()
-                 .with_env_filter(filter)
-                 .with_target(false)
-                 .init();
- 
-             println!("{}", render_welcome(&config));
+            // initialize tracing
+            tracing_subscriber::fmt()
+                .with_env_filter(filter)
+                .with_target(false)
+                .init();
+
+            println!("{}", render_welcome(&config));
         }
     }
 }
@@ -199,7 +202,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // }
 
     // Start the main server thread.
-    info!("Hello?");    
+    info!("Hello?");
     server.start().instrument(debug_span!("server")).await?;
 
     Ok(())

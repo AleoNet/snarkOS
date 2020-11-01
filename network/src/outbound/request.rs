@@ -26,9 +26,11 @@ pub type Receiver = SocketAddr;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Request {
+    GetBlock(Receiver, GetBlock),
     Block(Receiver, Block),
     SyncBlock(Receiver, SyncBlock),
     MemoryPool(Receiver, MemoryPool),
+    GetSync(Receiver, GetSync),
     Sync(Receiver, Sync),
     GetPeers(Receiver, GetPeers),
     Peers(Receiver, Peers),
@@ -41,9 +43,11 @@ impl Request {
     #[inline]
     pub fn name(&self) -> &str {
         match self {
+            Request::GetBlock(_, _) => "GetBlock",
             Request::Block(_, _) => "Block",
             Request::SyncBlock(_, _) => "SyncBlock",
             Request::MemoryPool(_, _) => "MemoryPool",
+            Request::GetSync(_, _) => "GetSync",
             Request::Sync(_, _) => "Sync",
             Request::GetPeers(_, _) => "GetPeers",
             Request::Peers(_, _) => "Peers",
@@ -56,9 +60,11 @@ impl Request {
     #[inline]
     pub fn receiver(&self) -> Receiver {
         match self {
+            Request::GetBlock(receiver, _) => *receiver,
             Request::Block(receiver, _) => *receiver,
             Request::SyncBlock(receiver, _) => *receiver,
             Request::MemoryPool(receiver, _) => *receiver,
+            Request::GetSync(receiver, _) => *receiver,
             Request::Sync(receiver, _) => *receiver,
             Request::GetPeers(receiver, _) => *receiver,
             Request::Peers(receiver, _) => *receiver,
@@ -77,9 +83,11 @@ impl Request {
     #[inline]
     pub fn serialize(&self) -> anyhow::Result<Vec<u8>> {
         let (name, data) = match self {
+            Request::GetBlock(_, message) => (GetBlock::name(), message.serialize()?),
             Request::Block(_, message) => (Block::name(), message.serialize()?),
             Request::SyncBlock(_, message) => (SyncBlock::name(), message.serialize()?),
             Request::MemoryPool(_, message) => (MemoryPool::name(), message.serialize()?),
+            Request::GetSync(_, message) => (GetSync::name(), message.serialize()?),
             Request::Sync(_, message) => (Sync::name(), message.serialize()?),
             Request::GetPeers(_, message) => (GetPeers::name(), message.serialize()?),
             Request::Peers(_, message) => (Peers::name(), message.serialize()?),

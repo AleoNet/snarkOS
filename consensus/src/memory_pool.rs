@@ -292,7 +292,10 @@ mod tests {
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
-        let entry = Entry::<Tx> { size_in_bytes: size, transaction };
+        let entry = Entry::<Tx> {
+            size_in_bytes: size,
+            transaction,
+        };
 
         mem_pool.insert(&blockchain, entry.clone()).unwrap();
 

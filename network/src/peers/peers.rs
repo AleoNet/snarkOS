@@ -46,7 +46,6 @@ impl Peers {
     /// Creates a new instance of `Peers`.
     ///
     #[inline]
-    // pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
     pub fn new(environment: &mut Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
 
