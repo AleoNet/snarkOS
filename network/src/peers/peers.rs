@@ -384,7 +384,7 @@ impl Peers {
     ///
     #[inline]
     async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-        trace!("Peer manager is saving peer book to storage");
+        trace!("Saving peer book to storage");
 
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
@@ -400,7 +400,7 @@ impl Peers {
         // Save the serialized peer book to storage.
         storage.save_peer_book_to_storage(serialized_peer_book)?;
 
-        trace!("Peer manager saved peer book to storage");
+        trace!("Saved peer book to storage");
         Ok(())
     }
 }
@@ -466,7 +466,9 @@ impl Peers {
     #[inline]
     pub(crate) async fn get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // Add the remote address to the peer book.
-        self.found_peer(&remote_address).await?;
+        if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {
+            self.found_peer(&remote_address).await?;
+        }
 
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
@@ -496,7 +498,9 @@ impl Peers {
         peers: PeersStruct,
     ) -> Result<(), NetworkError> {
         // Add the remote address to the peer book.
-        self.found_peer(&remote_address).await?;
+        if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {
+            self.found_peer(&remote_address).await?;
+        }
 
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
@@ -515,7 +519,7 @@ impl Peers {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            else if !self.is_connected(peer_address).await {
+            else if !self.is_connecting(peer_address).await && !self.is_connected(peer_address).await {
                 self.found_peer(peer_address).await?;
             }
         }

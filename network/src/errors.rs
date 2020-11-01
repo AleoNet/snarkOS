@@ -32,6 +32,7 @@ pub enum NetworkError {
     ConsensusError(ConsensusError),
     IOError(std::io::Error),
     Error(anyhow::Error),
+    InboundDeserializationFailed,
     PeerAddressIsLocalAddress,
     PeerAlreadyConnected,
     PeerAlreadyDisconnected,
