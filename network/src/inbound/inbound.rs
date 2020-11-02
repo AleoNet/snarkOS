@@ -30,8 +30,9 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
 };
 use tokio::{
-    net::TcpStream,
+    net::{TcpListener, TcpStream},
     sync::{Mutex, RwLock},
+    task,
 };
 
 /// The map of remote addresses to their active read channels.
@@ -71,51 +72,72 @@ impl Inbound {
         }
     }
 
-    // TODO (howardwu): Remove environment from function inputs.
     #[inline]
-    pub async fn listen(
-        &self,
-        environment: Environment,
-        channel: TcpStream,
-        remote_address: SocketAddr,
-    ) -> Result<(), NetworkError> {
-        // Follow handshake protocol and drop peer connection if unsuccessful.
-        let height = environment.current_block_height().await;
+    pub async fn listen(&self, environment: &Environment) -> Result<(), NetworkError> {
+        // TODO (howardwu): Find the actual address of this node.
+        let local_address = environment.local_address();
+        debug!("Starting listener at {:?}...", local_address);
 
-        // TODO (raychu86) Establish a formal node version
-        if let Some((channel, discovered_local_address)) =
-            self.connection_request(1u64, height, remote_address, channel).await?
-        {
-            error!("FINISHED CONNECTION REQUEST");
-            // TODO (howardwu): Enable this peer address discovery again.
-            // // Bootstrap discovery of local node IP via VERACK responses
-            //     let local_address = peers.local_address();
-            //     if local_address != discovered_local_address {
-            //         peers.set_local_address(discovered_local_address).await;
-            //         info!("Discovered local address: {:?}", local_address);
-            //     }
+        let listener = TcpListener::bind(&local_address).await?;
+        info!("Listening at {:?}", local_address);
 
-            // TODO (howardwu): Consider adding a `task::spawn`.
-            self.inbound(*environment.local_address(), channel).await?;
-            // self.inbound(&discovered_local_address, channel).await?;
-        }
-        warn!("RECEIVE HANDLER: END LISTEN");
+        let inbound = self.clone();
+        let environment = environment.clone();
+        task::spawn(async move {
+            loop {
+                match listener.accept().await {
+                    Ok((channel, remote_address)) => {
+                        info!("Connection request from {}", remote_address);
+
+                        let height = environment.current_block_height().await;
+                        if let Some((channel, discovered_local_address)) = inbound
+                            .connection_request(height, remote_address, channel)
+                            .await
+                            .unwrap()
+                        {
+                            error!("FINISHED CONNECTION REQUEST");
+                            // TODO (howardwu): Enable this peer address discovery again.
+                            // // Bootstrap discovery of local node IP via VERACK responses
+                            //     let local_address = peers.local_address();
+                            //     if local_address != discovered_local_address {
+                            //         peers.set_local_address(discovered_local_address).await;
+                            //         info!("Discovered local address: {:?}", local_address);
+                            //     }
+
+                            // TODO (howardwu): Consider adding a `task::spawn`.
+                            let inbound = inbound.clone();
+                            let channel = channel.clone();
+                            let environment = environment.clone();
+                            tokio::spawn(async move {
+                                debug!("Starting thread for handling connection requests");
+                                inbound.inbound(*environment.local_address(), channel).await.unwrap();
+                                // inbound.inbound(&discovered_local_address, channel).await?;
+                            });
+                        }
+                        warn!("RECEIVE HANDLER: END LISTEN");
+                    }
+                    Err(error) => error!("Failed to accept connection request\n{}", error),
+                }
+            }
+        });
+
         Ok(())
     }
 
     async fn inbound(&self, local_address: SocketAddr, channel: Arc<Channel>) -> Result<(), NetworkError> {
-        debug!("Starting thread for handling connection requests");
-        // Spawns one thread per peer tcp connection to read messages.
-        // Each thread is given a handle to the channel and a handle to the server mpsc sender.
-        // To ensure concurrency, each connection thread sends a tokio oneshot sender handle with every message to the server mpsc receiver.
-        // The thread then waits for the oneshot receiver to receive a signal from the server before reading again.
-
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut channel = channel;
         loop {
             // Initialize the failure indicator.
             let mut failure = false;
+
+            // warn!(
+            //     "LISTENING AT {} {:?} {:?}",
+            //     channel.remote_address,
+            //     channel.reader.lock().await,
+            //     channel.writer.lock().await
+            // );
 
             // Read the next message from the channel. This is a blocking operation.
             let (message_name, message_bytes) = match channel.read().await {
@@ -335,7 +357,6 @@ impl Inbound {
     #[inline]
     pub async fn connection_request(
         &self,
-        version: u64,
         block_height: u32,
         remote_address: SocketAddr,
         reader: TcpStream,
@@ -369,7 +390,8 @@ impl Inbound {
             // Create the remote address from the given peer address, and specified port from the version message.
             let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
             // Create the local version message.
-            let local_version = Version::new_with_rng(version, block_height, local_address, remote_address);
+            // TODO (raychu86): Establish a formal node version.
+            let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
 
             // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
             // if let Some(version) = version_message {
@@ -493,4 +515,10 @@ impl Inbound {
 
         Ok(None)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_basic() {}
 }

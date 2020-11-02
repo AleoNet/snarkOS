@@ -33,7 +33,7 @@ use snarkos_storage::Ledger;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::time::sleep;
+use tokio::{sync::RwLock, time::sleep};
 
 #[derive(Clone, PartialEq)]
 pub enum SyncState {
@@ -61,14 +61,14 @@ pub struct SyncManager {
     pub pending_blocks: HashMap<BlockHeaderHash, DateTime<Utc>>,
 
     /// The outbound service of this node server.
-    outbound: Arc<Outbound>,
+    outbound: Arc<RwLock<Outbound>>,
 }
 
 impl SyncManager {
     ///
     /// Creates a new instance of `SyncHandler`.
     ///
-    pub fn new(environment: Environment, sync_node_address: SocketAddr, outbound: Arc<Outbound>) -> Self {
+    pub fn new(environment: Environment, sync_node_address: SocketAddr, outbound: Arc<RwLock<Outbound>>) -> Self {
         Self {
             environment,
 
@@ -171,6 +171,8 @@ impl SyncManager {
                 if should_request {
                     // Broadcast a `GetBlock` message to the connected peer.
                     self.outbound
+                        .write()
+                        .await
                         .broadcast(&Request::GetBlock(
                             self.sync_node_address,
                             GetBlock::new(block_header_hash.clone()),
@@ -188,6 +190,8 @@ impl SyncManager {
                 if let Ok(block_locator_hashes) = self.environment.storage_read().await.get_block_locator_hashes() {
                     // Broadcast a `GetSync` message to the connected peer.
                     self.outbound
+                        .write()
+                        .await
                         .broadcast(&Request::GetSync(
                             self.sync_node_address,
                             GetSync::new(block_locator_hashes),
@@ -199,6 +203,8 @@ impl SyncManager {
                     if Utc::now() - *request_time > ChronoDuration::seconds(5) {
                         // Broadcast a `GetBlock` message to the connected peer.
                         self.outbound
+                            .write()
+                            .await
                             .broadcast(&Request::GetBlock(
                                 self.sync_node_address,
                                 GetBlock::new(block_header_hash.clone()),

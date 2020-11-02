@@ -134,7 +134,7 @@ impl Environment {
     }
 
     /// TODO (howardwu): Remove this.
-    pub fn set_managers(&mut self, outbound: Arc<Outbound>) {
+    pub fn set_managers(&mut self, outbound: Arc<RwLock<Outbound>>) {
         // Check if this node is configured as a bootnode.
         // Skips instantiating the sync manager if this is a bootnode.
         if let Some(bootnode_address) = self.bootnodes.first() {

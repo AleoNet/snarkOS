@@ -61,11 +61,11 @@ pub struct Outbound {
     success: Arc<RwLock<Success>>,
     /// The map of remote addresses to their failed requests.
     failure: Arc<RwLock<Failure>>,
-    /// The counter for the number of send requests the handler processes.
+    /// The monotonic counter for the number of send requests the handler processes.
     send_pending_count: Arc<AtomicU64>,
-    /// The counter for the number of send requests that succeeded.
+    /// The monotonic counter for the number of send requests that succeeded.
     send_success_count: Arc<AtomicU64>,
-    /// The counter for the number of send requests that failed.
+    /// The monotonic counter for the number of send requests that failed.
     send_failure_count: Arc<AtomicU64>,
 }
 
@@ -194,11 +194,12 @@ impl Outbound {
     async fn outbound_channel(&self, remote_address: &SocketAddr) -> Result<Channel, NetworkError> {
         let channel_exists = self.channels.read().await.contains_key(remote_address);
         if !channel_exists {
-            debug!("Establishing an outbound channel to {}", remote_address);
-            self.channels.write().await.insert(
-                *remote_address,
-                Arc::new(Mutex::new(TcpStream::connect(remote_address).await?)),
-            );
+            trace!("Establishing an outbound channel to {}", remote_address);
+            let channel = TcpStream::connect(remote_address).await?;
+            self.channels
+                .write()
+                .await
+                .insert(*remote_address, Arc::new(Mutex::new(channel)));
         }
         Ok(self
             .channels
@@ -220,16 +221,18 @@ impl Outbound {
         // Acquire the pending requests write lock.
         let mut pending = self.pending.write().await;
 
+        // Store the request to the pending requests.
         match pending.get_mut(&request.receiver()) {
             Some(requests) => {
-                // Store the request to the pending requests.
                 requests.write().await.insert(request.clone());
+
                 // Increment the request counter.
                 self.send_pending_count.fetch_add(1, Ordering::SeqCst);
+
                 trace!("Authorized `{}` request to {}", request.name(), request.receiver());
             }
             None => trace!(
-                "Unauthorized to send `{}` request to {}",
+                "Failed to authorize `{}` request to {}",
                 request.name(),
                 request.receiver()
             ),
@@ -251,77 +254,67 @@ impl Outbound {
 
         trace!("Broadcasting `{}` request to {}", request.name(), request.receiver());
 
+        // Broadcast the request on the outbound channel.
         match request.broadcast(&channel).await {
             Ok(_) => self.success(&request).await,
             Err(error) => self.failure(&request, error).await,
-            // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
-            // // Disconnect from the peer if the version request fails to send.
-            // if let Err(_) = channel.write(&version).await {
-            //     self.disconnect_from_peer(&remote_address).await?;
-            // }
         };
+
+        // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
+        // // Disconnect from the peer if the version request fails to send.
+        // if let Err(_) = channel.write(&version).await {
+        //     self.disconnect_from_peer(&remote_address).await?;
+        // }
     }
 
     #[inline]
     async fn success(&self, request: &Request) {
-        // Acquire the pending write lock.
-        let mut pending = self.pending.write().await;
+        debug!("Sent `{}` request to {}", request.name(), request.receiver());
 
         // Acquire the pending requests write lock.
-        let mut pending_requests = pending
-            .get_mut(&request.receiver())
-            .ok_or(NetworkError::OutboundPendingRequestsMissing)
-            .unwrap()
-            .write()
-            .await;
+        let mut pending = self.pending.write().await;
 
         // Remove the request from the pending requests.
-        pending_requests.remove(&request);
+        if let Some(requests) = pending.get_mut(&request.receiver()) {
+            requests.write().await.remove(&request);
+        };
 
         // Acquire the success requests write lock.
         let mut success = self.success.write().await;
 
+        // Store the request in the successful requests.
         if let Some(requests) = success.get_mut(&request.receiver()) {
-            // Store the request to the successful requests.
             requests.write().await.insert(request.clone());
 
             // Increment the success counter.
             self.send_success_count.fetch_add(1, Ordering::SeqCst);
-
-            debug!("Sent `{}` request to {}", request.name(), request.receiver());
         }
     }
 
     #[inline]
     async fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
-        error!("{}", error);
-
-        // Acquire the pending write lock.
-        let mut pending = self.pending.write().await;
+        debug!("Failed to send `{}` request to {}", request.name(), request.receiver());
 
         // Acquire the pending requests write lock.
-        let mut pending_requests = pending
-            .get_mut(&request.receiver())
-            .ok_or(NetworkError::OutboundPendingRequestsMissing)
-            .unwrap()
-            .write()
-            .await;
+        let mut pending = self.pending.write().await;
 
         // Remove the request from the pending requests.
-        pending_requests.remove(&request);
+        if let Some(requests) = pending.get_mut(&request.receiver()) {
+            requests.write().await.remove(&request);
+        };
 
         // Acquire the failed requests write lock.
         let mut failure = self.failure.write().await;
 
+        // Store the request in the failed requests.
         if let Some(requests) = failure.get_mut(&request.receiver()) {
-            // Store the request to the failed requests.
             requests.write().await.insert(request.clone());
 
             // Increment the failure counter.
             self.send_failure_count.fetch_add(1, Ordering::SeqCst);
-
-            error!("Failed to send `{}` request to {}", request.name(), request.receiver());
         }
+
+        trace!("{}", error);
     }
 }
 
