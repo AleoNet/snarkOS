@@ -78,8 +78,6 @@ impl Peers {
     ///
     #[inline]
     pub async fn update(&self) -> Result<(), NetworkError> {
-        debug!("Updating peer manager");
-
         // Broadcast a `Version` request to each connected peer.
         trace!("Broadcasting version requests to all connected peers");
         self.broadcast_version_requests().await?;
@@ -92,12 +90,12 @@ impl Peers {
         if !self.environment.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
             if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
-                // Broadcast a `GetPeers` message to request for more peers.
-                trace!("Broadcasting getpeers requests to all connected peers");
-                self.broadcast_getpeers_requests().await?;
+                // // Broadcast a `GetPeers` message to request for more peers.
+                // trace!("Broadcasting getpeers requests to all connected peers");
+                // self.broadcast_getpeers_requests().await?;
 
                 // Attempt to connect to the default bootnodes of the network.
-                trace!("Broadcasting connection requests to the default bootnodes");
+                trace!("Broadcasting connection requests to default bootnodes");
                 self.connect_to_bootnodes().await?;
 
                 // Attempt to connect to each disconnected peer saved in the peer book.
@@ -124,7 +122,6 @@ impl Peers {
 
         // Store the peer book to storage.
         self.save_peer_book_to_storage().await?;
-        debug!("Updated peer manager");
         Ok(())
     }
 
