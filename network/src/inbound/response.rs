@@ -20,10 +20,12 @@ use std::net::SocketAddr;
 
 #[derive(Debug)]
 pub enum Response {
-    /// Received a version message and preparing to send a verack message back.
-    VersionToVerack(SocketAddr, Version),
     /// Receive handler is connecting to the given peer with the given nonce.
     ConnectingTo(SocketAddr, u64),
+    /// Receive handler has connected to the given peer with the given nonce.
+    ConnectedTo(SocketAddr, u64),
+    /// Received a version message and preparing to send a verack message back.
+    VersionToVerack(SocketAddr, Version),
     /// Receive handler has connected to the given peer with the given nonce.
     Verack(SocketAddr, Verack),
     /// Receive handler has signaled to drop the connection with the given peer.

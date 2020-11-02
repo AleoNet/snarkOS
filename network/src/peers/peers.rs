@@ -467,6 +467,11 @@ impl Peers {
     }
 
     #[inline]
+    pub(crate) async fn verack(&self, remote_address: &SocketAddr, remote_verack: &Verack) -> Result<(), NetworkError> {
+        Ok(())
+    }
+
+    #[inline]
     pub(crate) async fn get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // Add the remote address to the peer book.
         if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {

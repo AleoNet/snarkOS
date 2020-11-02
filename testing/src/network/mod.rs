@@ -20,7 +20,7 @@ pub use tcp::*;
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
-use snarkos_network::{environment::Environment, external::Channel, Server, SyncManager};
+use snarkos_network::{environment::Environment, external::Channel, Server};
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -37,19 +37,19 @@ pub async fn sleep(time: u64) {
     tokio::time::sleep(std::time::Duration::from_millis(time)).await;
 }
 
-/// Returns a server struct with given arguments
-pub async fn initialize_test_server(
+/// Returns an `Environment` struct with given arguments
+pub fn initialize_test_environment(
     server_address: SocketAddr,
     bootnode_address: SocketAddr,
     storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
     connection_frequency: u64,
-) -> Server {
+) -> anyhow::Result<Environment> {
     let consensus = Arc::new(TEST_CONSENSUS.clone());
     let memory_pool = MemoryPool::new();
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-    let mut environment = Environment::new(
+    Ok(Environment::new(
         storage,
         memory_pool_lock,
         consensus,
@@ -62,6 +62,23 @@ pub async fn initialize_test_server(
         vec![],
         true,
         false,
+    )?)
+}
+
+/// Returns a server struct with given arguments
+pub async fn initialize_test_server(
+    server_address: SocketAddr,
+    bootnode_address: SocketAddr,
+    storage: Arc<RwLock<MerkleTreeLedger>>,
+    parameters: PublicParameters<Components>,
+    connection_frequency: u64,
+) -> Server {
+    let mut environment = initialize_test_environment(
+        server_address,
+        bootnode_address,
+        storage,
+        parameters,
+        connection_frequency,
     )
     .unwrap();
 

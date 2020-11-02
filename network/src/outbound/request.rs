@@ -26,6 +26,8 @@ pub type Receiver = SocketAddr;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Request {
+    Version(Version),
+    Verack(Verack),
     GetBlock(Receiver, GetBlock),
     Block(Receiver, Block),
     SyncBlock(Receiver, SyncBlock),
@@ -35,14 +37,14 @@ pub enum Request {
     GetPeers(Receiver, GetPeers),
     Peers(Receiver, Peers),
     Transaction(Receiver, Transaction),
-    Verack(Verack),
-    Version(Version),
 }
 
 impl Request {
     #[inline]
     pub fn name(&self) -> &str {
         match self {
+            Request::Version(_) => "Version",
+            Request::Verack(_) => "Verack",
             Request::GetBlock(_, _) => "GetBlock",
             Request::Block(_, _) => "Block",
             Request::SyncBlock(_, _) => "SyncBlock",
@@ -52,14 +54,14 @@ impl Request {
             Request::GetPeers(_, _) => "GetPeers",
             Request::Peers(_, _) => "Peers",
             Request::Transaction(_, _) => "Transaction",
-            Request::Verack(_) => "Verack",
-            Request::Version(_) => "Version",
         }
     }
 
     #[inline]
     pub fn receiver(&self) -> Receiver {
         match self {
+            Request::Version(version) => version.receiver,
+            Request::Verack(verack) => verack.receiver,
             Request::GetBlock(receiver, _) => *receiver,
             Request::Block(receiver, _) => *receiver,
             Request::SyncBlock(receiver, _) => *receiver,
@@ -69,8 +71,6 @@ impl Request {
             Request::GetPeers(receiver, _) => *receiver,
             Request::Peers(receiver, _) => *receiver,
             Request::Transaction(receiver, _) => *receiver,
-            Request::Verack(verack) => verack.receiver,
-            Request::Version(version) => version.receiver,
         }
     }
 
@@ -83,6 +83,8 @@ impl Request {
     #[inline]
     pub fn serialize(&self) -> anyhow::Result<Vec<u8>> {
         let (name, data) = match self {
+            Request::Version(version) => (Version::name(), version.serialize()?),
+            Request::Verack(verack) => (Verack::name(), verack.serialize()?),
             Request::GetBlock(_, message) => (GetBlock::name(), message.serialize()?),
             Request::Block(_, message) => (Block::name(), message.serialize()?),
             Request::SyncBlock(_, message) => (SyncBlock::name(), message.serialize()?),
@@ -92,8 +94,6 @@ impl Request {
             Request::GetPeers(_, message) => (GetPeers::name(), message.serialize()?),
             Request::Peers(_, message) => (Peers::name(), message.serialize()?),
             Request::Transaction(_, message) => (Transaction::name(), message.serialize()?),
-            Request::Verack(verack) => (Verack::name(), verack.serialize()?),
-            Request::Version(version) => (Version::name(), version.serialize()?),
         };
 
         let mut buffer = MessageHeader::new(name, data.len() as u32).serialize()?;
