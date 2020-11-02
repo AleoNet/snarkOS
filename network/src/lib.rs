@@ -46,9 +46,6 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
-pub mod sync_manager;
-pub use sync_manager::*;
-
 use crate::{
     blocks::Blocks,
     environment::Environment,
@@ -60,7 +57,7 @@ use crate::{
 };
 
 use std::{sync::Arc, time::Duration};
-use tokio::{net::TcpListener, task, time::sleep};
+use tokio::{sync::RwLock, task, time::sleep};
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Response>;
 
@@ -72,9 +69,9 @@ pub struct Server {
     /// The parameters and settings of this node server.
     environment: Environment,
     /// The inbound handler of this node server.
-    inbound: Arc<Inbound>,
+    inbound: Arc<RwLock<Inbound>>,
     /// The outbound handler of this node server.
-    outbound: Arc<Outbound>,
+    outbound: Arc<RwLock<Outbound>>,
 
     peers: Peers,
     blocks: Blocks,
@@ -85,8 +82,8 @@ impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
         // Create the inbound and outbound service.
-        let inbound = Arc::new(Inbound::new());
-        let outbound = Arc::new(Outbound::new());
+        let inbound = Arc::new(RwLock::new(Inbound::new()));
+        let outbound = Arc::new(RwLock::new(Outbound::new()));
 
         let peers = Peers::new(&mut environment.clone(), outbound.clone())?;
         let blocks = Blocks::new(&mut environment.clone(), outbound.clone())?;
@@ -105,7 +102,7 @@ impl Server {
     #[inline]
     pub async fn start(self) -> Result<(), NetworkError> {
         debug!("Initializing server");
-        self.listener().await?;
+        self.inbound.write().await.listen(&self.environment).await?;
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
         task::spawn(async move {
@@ -118,45 +115,16 @@ impl Server {
         });
         debug!("Initialized server");
         loop {
-            self.inbound().await?;
+            self.receiver().await?;
         }
     }
 
-    pub async fn listener(&self) -> Result<(), NetworkError> {
-        // TODO (howardwu): Find the actual address of this node.
-        // 1. Initialize TCP listener and accept new TCP connections.
-        let local_address = self.environment.local_address();
-        debug!("Starting listener at {:?}...", local_address);
-        let listener = TcpListener::bind(&local_address).await.unwrap();
-        info!("Listening at {:?}", local_address);
-
-        let inbound = self.inbound.clone();
-        let environment = self.environment.clone();
-        task::spawn(async move {
-            loop {
-                // Start listener for handling connection requests.
-                trace!("Starting listener");
-                match listener.accept().await {
-                    Ok((channel, remote_address)) => {
-                        info!("Received connection request from {}", remote_address);
-                        inbound
-                            .clone()
-                            .listen(environment.clone(), channel, remote_address)
-                            .await
-                            .unwrap();
-                    }
-                    Err(error) => error!("Failed to accept a connection request\n{}", error),
-                }
-            }
-        });
-
-        Ok(())
-    }
-
-    pub async fn inbound(&self) -> Result<(), NetworkError> {
+    pub async fn receiver(&self) -> Result<(), NetworkError> {
         warn!("START NEXT RECEIVER INBOUND");
         let response = self
             .inbound
+            .write()
+            .await
             .receiver()
             .lock()
             .await

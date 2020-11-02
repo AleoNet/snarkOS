@@ -36,7 +36,7 @@ pub struct Peers {
     /// The parameters and settings of this node server.
     environment: Environment,
     /// The outbound service of this node server.
-    outbound: Arc<Outbound>,
+    outbound: Arc<RwLock<Outbound>>,
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
 }
@@ -46,7 +46,7 @@ impl Peers {
     /// Creates a new instance of `Peers`.
     ///
     #[inline]
-    pub fn new(environment: &mut Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
+    pub fn new(environment: &mut Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
 
         // Load the peer book from storage, or create a new peer book.
@@ -275,7 +275,7 @@ impl Peers {
                 self.connecting_to_peer(bootnode_address, version.nonce).await?;
 
                 // Send a connection request with the outbound handler.
-                self.outbound.broadcast(&request).await;
+                self.outbound.write().await.broadcast(&request).await;
             }
         }
 
@@ -301,7 +301,7 @@ impl Peers {
             self.connecting_to_peer(&remote_address, version.nonce).await?;
 
             // Send a connection request with the outbound handler.
-            self.outbound.broadcast(&request).await;
+            self.outbound.write().await.broadcast(&request).await;
         }
 
         Ok(())
@@ -326,6 +326,8 @@ impl Peers {
                 // TODO (raychu86): Establish a formal node version.
                 // Broadcast a `Version` message to the connected peer.
                 self.outbound
+                    .write()
+                    .await
                     .broadcast(&Request::Version(Version::new(
                         1u64,
                         block_height,
@@ -352,6 +354,8 @@ impl Peers {
         for (remote_address, _) in self.connected_peers().await {
             // Broadcast a `GetPeers` message to the connected peer.
             self.outbound
+                .write()
+                .await
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
                 .await;
 
@@ -447,6 +451,8 @@ impl Peers {
         if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
             debug!("Sending `Verack` request to {}", remote_address);
             self.outbound
+                .write()
+                .await
                 .broadcast(&Request::Verack(Verack::new(
                     remote_version.nonce,
                     remote_version.receiver, /* local_address */
@@ -479,6 +485,8 @@ impl Peers {
             peers.push((peer_address, *peer_info.last_seen()));
         }
         self.outbound
+            .write()
+            .await
             .broadcast(&Request::Peers(remote_address, PeersStruct::new(peers)))
             .await;
 
