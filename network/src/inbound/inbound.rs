@@ -361,8 +361,6 @@ impl Inbound {
         remote_address: SocketAddr,
         reader: TcpStream,
     ) -> Result<Option<(Arc<Channel>, SocketAddr)>, NetworkError> {
-        trace!("Received connection request from {}", remote_address);
-
         // Parse the inbound message into the message name and message bytes.
         let (channel, (message_name, message_bytes)) = match Channel::new_reader(reader) {
             // Read the next message from the channel.
@@ -474,7 +472,9 @@ impl Inbound {
                 let channel = Arc::new(channel);
                 channels.insert(remote_address, channel.clone());
 
-                self.sender.send(Response::Verack(remote_address, verack)).await?;
+                self.sender
+                    .send(Response::ConnectedTo(remote_address, verack.nonce))
+                    .await?;
 
                 trace!("Established connection with {}", remote_address);
 
@@ -506,7 +506,9 @@ impl Inbound {
             let channel = Arc::new(channel);
             channels.insert(remote_address, channel.clone());
 
-            self.sender.send(Response::Verack(remote_address, verack)).await?;
+            self.sender
+                .send(Response::ConnectedTo(remote_address, verack.nonce))
+                .await?;
 
             trace!("Established connection with {}", remote_address);
 
@@ -519,6 +521,85 @@ impl Inbound {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_basic() {}
+    use crate::{
+        environment::Environment,
+        external::message_types::{Verack, Version},
+        inbound::Inbound,
+        outbound::{Outbound, Request},
+    };
+    use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
+    use snarkos_testing::{
+        consensus::*,
+        dpc::load_verifying_parameters,
+        network::{initialize_test_environment, *},
+        storage::*,
+    };
+
+    use serial_test::serial;
+    use std::{net::SocketAddr, sync::Arc};
+    use tokio::sync::{Mutex, RwLock};
+    use tracing::*;
+
+    #[inline]
+    fn test_logger() {
+        use tracing_subscriber::{fmt::format::Format, FmtSubscriber};
+
+        let subscriber = FmtSubscriber::builder()
+            .with_max_level(tracing::Level::TRACE)
+            .with_target(false)
+            .event_format(Format::default())
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    }
+
+    #[inline]
+    fn environment(local_address: SocketAddr) -> Environment {
+        let bootnode_address = random_socket_address();
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let parameters = load_verifying_parameters();
+        let consensus = Arc::new(TEST_CONSENSUS.clone());
+        let memory_pool = MemoryPool::new();
+        let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
+
+        Environment::new(
+            storage,
+            memory_pool_lock,
+            consensus,
+            Arc::new(parameters),
+            local_address,
+            1,
+            5,
+            100,
+            10,
+            vec![bootnode_address.to_string()],
+            true,
+            false,
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    #[serial]
+    #[ignore]
+    async fn test_inbound_basic() {
+        test_logger();
+
+        let local_address = random_socket_address();
+        let remote_address = random_socket_address();
+        let remote_environment = environment(remote_address);
+
+        let inbound = Inbound::new();
+        inbound.listen(&remote_environment).await.unwrap();
+
+        let outbound = Outbound::new();
+        outbound
+            .broadcast(&Request::Version(Version::new_with_rng(
+                1u64,
+                1,
+                local_address,
+                remote_address,
+            )))
+            .await;
+    }
 }
