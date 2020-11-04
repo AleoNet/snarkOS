@@ -103,3 +103,6 @@ macro_rules! unwrap_option_or_error {
         }
     };
 }
+
+use std::sync::atomic::AtomicBool;
+pub static PROCESSING_SNARK_PARAMS: AtomicBool = AtomicBool::new(false);

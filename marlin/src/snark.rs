@@ -18,7 +18,7 @@
 use snarkos_errors::{algorithms::SNARKError, serialization::SerializationError};
 use snarkos_models::{
     algorithms::SNARK,
-    curves::{to_field_vec::ToConstraintField, PairingEngine},
+    curves::{to_field_vec::ToConstraintField, AffineCurve, PairingEngine},
     gadgets::r1cs::ConstraintSynthesizer,
 };
 use snarkos_profiler::{end_timer, start_timer};
@@ -29,11 +29,12 @@ use snarkos_utilities::{
     serialize::*,
 };
 
-pub use snarkos_polycommit::marlin_pc::MarlinKZG10 as MultiPC;
+pub use snarkos_polycommit::{marlin_pc::MarlinKZG10 as MultiPC, PCCommitment};
 
 use blake2::Blake2s;
 use derivative::Derivative;
 use rand_core::RngCore;
+use rayon::prelude::*;
 use std::{
     io::{Read, Write},
     marker::PhantomData,
@@ -84,7 +85,74 @@ where
 
 impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parameters<'a, E, C> {
     fn read<R: Read>(mut r: R) -> io::Result<Self> {
-        CanonicalDeserialize::deserialize(&mut r).map_err(|_| error("could not deserialize parameters"))
+        use snarkos_utilities::PROCESSING_SNARK_PARAMS;
+
+        PROCESSING_SNARK_PARAMS.store(true, std::sync::atomic::Ordering::Relaxed);
+        let ret: Self =
+            CanonicalDeserialize::deserialize(&mut r).map_err(|_| error("could not deserialize parameters"))?;
+        PROCESSING_SNARK_PARAMS.store(false, std::sync::atomic::Ordering::Relaxed);
+
+        // check the affine values for the CommitterKey
+        let ck = &ret.prover_key.committer_key;
+
+        ck.powers.par_iter().try_for_each(|p| {
+            if !p.is_in_correct_subgroup_assuming_on_curve() {
+                Err(error("invalid parameter data"))
+            } else {
+                Ok(())
+            }
+        })?;
+
+        if let Some(shifted_powers) = &ck.shifted_powers {
+            shifted_powers.par_iter().try_for_each(|p| {
+                if !p.is_in_correct_subgroup_assuming_on_curve() {
+                    Err(error("invalid parameter data"))
+                } else {
+                    Ok(())
+                }
+            })?;
+        }
+
+        ck.powers_of_gamma_g.par_iter().try_for_each(|p| {
+            if !p.is_in_correct_subgroup_assuming_on_curve() {
+                Err(error("invalid parameter data"))
+            } else {
+                Ok(())
+            }
+        })?;
+
+        // there are 2 IndexVerifierKeys in the Parameters
+        for vk in &[&ret.prover_key.index_vk, &ret.verifier_key] {
+            // check the affine values for marlin::IndexVerifierKey
+            for comm in &vk.index_comms {
+                if !comm.is_in_correct_subgroup_assuming_on_curve() {
+                    return Err(error("invalid parameter data"));
+                }
+            }
+
+            // check the affine values for marlin_pc::VerifierKey
+            if let Some(dbasp) = &vk.verifier_key.degree_bounds_and_shift_powers {
+                for (_, p) in dbasp {
+                    if !p.is_in_correct_subgroup_assuming_on_curve() {
+                        return Err(error("invalid parameter data"));
+                    }
+                }
+            }
+
+            // check the affine values for kzg10::VerifierKey
+            for g in &[vk.verifier_key.vk.g, vk.verifier_key.vk.gamma_g] {
+                if !g.is_in_correct_subgroup_assuming_on_curve() {
+                    return Err(error("invalid parameter data"));
+                }
+            }
+            for h in &[vk.verifier_key.vk.h, vk.verifier_key.vk.beta_h] {
+                if !h.is_in_correct_subgroup_assuming_on_curve() {
+                    return Err(error("invalid parameter data"));
+                }
+            }
+        }
+
+        Ok(ret)
     }
 }
 

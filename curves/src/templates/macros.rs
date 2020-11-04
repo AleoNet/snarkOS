@@ -134,7 +134,9 @@ macro_rules! impl_sw_curve_serializer {
                 } else {
                     let p = GroupAffine::<P>::from_x_coordinate(x, flags.is_positive().unwrap())
                         .ok_or(snarkos_errors::serialization::SerializationError::InvalidData)?;
-                    if !p.is_in_correct_subgroup_assuming_on_curve() {
+                    if !snarkos_utilities::PROCESSING_SNARK_PARAMS.load(std::sync::atomic::Ordering::Relaxed)
+                        && !p.is_in_correct_subgroup_assuming_on_curve()
+                    {
                         return Err(snarkos_errors::serialization::SerializationError::InvalidData);
                     }
                     Ok(p)
