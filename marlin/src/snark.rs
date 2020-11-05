@@ -86,17 +86,21 @@ where
 impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parameters<'a, E, C> {
     fn read<R: Read>(mut r: R) -> io::Result<Self> {
         use snarkos_utilities::{PROCESSING_SNARK_PARAMS, SNARK_PARAMS_AFFINE_COUNT};
+        use std::sync::atomic::{self, AtomicU64};
 
-        PROCESSING_SNARK_PARAMS.store(true, std::sync::atomic::Ordering::Relaxed);
+        PROCESSING_SNARK_PARAMS.with(|p| p.store(true, atomic::Ordering::Relaxed));
         let ret: Self =
             CanonicalDeserialize::deserialize(&mut r).map_err(|_| error("could not deserialize parameters"))?;
-        PROCESSING_SNARK_PARAMS.store(false, std::sync::atomic::Ordering::Relaxed);
+        PROCESSING_SNARK_PARAMS.with(|p| p.store(false, atomic::Ordering::Relaxed));
+
+        let num_affines_to_verify =
+            AtomicU64::new(SNARK_PARAMS_AFFINE_COUNT.with(|p| p.load(atomic::Ordering::Relaxed)));
 
         // check the affine values for the CommitterKey
         let ck = &ret.prover_key.committer_key;
 
         ck.powers.par_iter().try_for_each(|p| {
-            SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
             if !p.is_in_correct_subgroup_assuming_on_curve() {
                 Err(error("invalid parameter data"))
             } else {
@@ -106,7 +110,7 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parame
 
         if let Some(shifted_powers) = &ck.shifted_powers {
             shifted_powers.par_iter().try_for_each(|p| {
-                SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
                 if !p.is_in_correct_subgroup_assuming_on_curve() {
                     Err(error("invalid parameter data"))
                 } else {
@@ -116,7 +120,7 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parame
         }
 
         ck.powers_of_gamma_g.par_iter().try_for_each(|p| {
-            SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
             if !p.is_in_correct_subgroup_assuming_on_curve() {
                 Err(error("invalid parameter data"))
             } else {
@@ -128,20 +132,20 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parame
         for vk in &[&ret.prover_key.index_vk, &ret.verifier_key] {
             // check the affine values for marlin::IndexVerifierKey
             for comm in &vk.index_comms {
-                SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
                 if !comm.is_in_correct_subgroup_assuming_on_curve() {
                     return Err(error("invalid parameter data"));
                 }
 
                 if comm.has_degree_bound() {
-                    SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                    num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
                 }
             }
 
             // check the affine values for marlin_pc::VerifierKey
             if let Some(dbasp) = &vk.verifier_key.degree_bounds_and_shift_powers {
                 for (_, p) in dbasp {
-                    SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                    num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
                     if !p.is_in_correct_subgroup_assuming_on_curve() {
                         return Err(error("invalid parameter data"));
                     }
@@ -150,20 +154,20 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parame
 
             // check the affine values for kzg10::VerifierKey
             for g in &[vk.verifier_key.vk.g, vk.verifier_key.vk.gamma_g] {
-                SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
                 if !g.is_in_correct_subgroup_assuming_on_curve() {
                     return Err(error("invalid parameter data"));
                 }
             }
             for h in &[vk.verifier_key.vk.h, vk.verifier_key.vk.beta_h] {
-                SNARK_PARAMS_AFFINE_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
                 if !h.is_in_correct_subgroup_assuming_on_curve() {
                     return Err(error("invalid parameter data"));
                 }
             }
         }
 
-        debug_assert_eq!(SNARK_PARAMS_AFFINE_COUNT.load(std::sync::atomic::Ordering::Relaxed), 0);
+        debug_assert_eq!(num_affines_to_verify.load(atomic::Ordering::Relaxed), 0);
 
         Ok(ret)
     }
