@@ -153,6 +153,7 @@ mod test {
     type EdwardsMaskedMerkleTree = MerkleTree<EdwardsMaskedMerkleParameters>;
 
     #[test]
+    #[serial_test::serial]
     fn test_tree_proof() {
         let mut rng = thread_rng();
 

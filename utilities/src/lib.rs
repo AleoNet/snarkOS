@@ -104,5 +104,18 @@ macro_rules! unwrap_option_or_error {
     };
 }
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
+/// A flag used for performance purposes in the process of loading SNARK parameters; it allows the
+/// PairingEngine::GXAffine values contained in them to be verified using the computationally-heavy
+/// AffineCurve::is_in_correct_subgroup_assuming_on_curve method in parallel after the deserialization
+/// is complete; the other instances of PairingEngine::GXAffine are verified during deserialization.
+#[doc(hide)]
 pub static PROCESSING_SNARK_PARAMS: AtomicBool = AtomicBool::new(false);
+
+/// A value used in tandem with the optimization strategy enabled by PROCESSING_SNARK_PARAMS; its
+/// purpose is to verify that all the PairingEngine::GXAffine values that had not been validated
+/// using the AffineCurve::is_in_correct_subgroup_assuming_on_curve method during deserialization
+/// were indeed accounted for afterwards; this also future-proofs the codebase against possible
+/// changes to the affected objects, i.e. marlin::snark::Parameters and all of its members.
+#[doc(hide)]
+pub static SNARK_PARAMS_AFFINE_COUNT: AtomicU64 = AtomicU64::new(0);

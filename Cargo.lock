@@ -2791,6 +2791,7 @@ dependencies = [
  "blake2",
  "rand",
  "rand_xorshift",
+ "serial_test",
  "snarkos-algorithms",
  "snarkos-curves",
  "snarkos-errors",

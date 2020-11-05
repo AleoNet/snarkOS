@@ -29,6 +29,7 @@ rand = { version = "0.7" }
 thiserror = "1.0.21"
 
 [dev-dependencies]
+serial_test = { version = "0.5.0" }
 snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 rand_xorshift = { version = "0.2" }
 

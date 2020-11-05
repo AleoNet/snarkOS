@@ -84,6 +84,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn load_params() {
         let _params = PoswMarlin::load().unwrap();
     }
