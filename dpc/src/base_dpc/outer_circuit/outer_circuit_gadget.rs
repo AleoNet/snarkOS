@@ -345,7 +345,9 @@ where
             .iter()
             .flat_map(|byte| byte.to_bits_le())
             .collect::<Vec<_>>();
-        program_input_bits.push(input_bits);
+        if !input_bits.is_empty() {
+            program_input_bits.push(input_bits);
+        }
     }
 
     // ************************************************************************
@@ -389,9 +391,7 @@ where
         C::ProgramSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &death_program_vk,
-            ([position].iter())
-                .chain(program_input_bits.iter())
-                .filter(|inp| !inp.is_empty()),
+            ([position].iter()).chain(program_input_bits.iter()),
             &death_program_proof,
         )?;
     }
@@ -432,9 +432,7 @@ where
         C::ProgramSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &birth_program_vk,
-            ([position].iter())
-                .chain(program_input_bits.iter())
-                .filter(|inp| !inp.is_empty()),
+            ([position].iter()).chain(program_input_bits.iter()),
             &birth_program_proof,
         )?;
     }
