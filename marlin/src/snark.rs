@@ -88,11 +88,21 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parame
         use snarkos_utilities::{PROCESSING_SNARK_PARAMS, SNARK_PARAMS_AFFINE_COUNT};
         use std::sync::atomic::{self, AtomicU64};
 
-        PROCESSING_SNARK_PARAMS.with(|p| p.store(true, atomic::Ordering::Relaxed));
+        // signal that the SNARK params are being processed in order for the validation of affine values to be
+        // deferred, while ensuring that this method is not called recursively; the expected number of entries is
+        // counted with a thread-local SNARK_PARAMS_AFFINE_COUNT, which does not support recursion in its current form
+        let only_entry = PROCESSING_SNARK_PARAMS
+            .with(|p| p.compare_exchange(false, true, atomic::Ordering::Relaxed, atomic::Ordering::Relaxed));
+        debug_assert_eq!(only_entry, Ok(false), "recursive deserialization of Parameters");
+
+        // perform the deserialization which will initially omit the validation of affine values
         let ret: Self =
             CanonicalDeserialize::deserialize(&mut r).map_err(|_| error("could not deserialize parameters"))?;
+
+        // signal that all the other affine validation should be performed eagerly back again
         PROCESSING_SNARK_PARAMS.with(|p| p.store(false, atomic::Ordering::Relaxed));
 
+        // retrieve the thread-local SNARK_PARAMS_AFFINE_COUNT and make it rayon-friendly
         let num_affines_to_verify =
             AtomicU64::new(SNARK_PARAMS_AFFINE_COUNT.with(|p| p.load(atomic::Ordering::Relaxed)));
 
@@ -167,6 +177,8 @@ impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parame
             }
         }
 
+        // this check ensures that all the deferred validation has been accounted for, i.e. that
+        // there were no affine values belonging to the Parameters object that were not validated
         debug_assert_eq!(num_affines_to_verify.load(atomic::Ordering::Relaxed), 0);
 
         Ok(ret)
