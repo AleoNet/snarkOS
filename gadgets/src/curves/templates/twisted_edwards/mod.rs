@@ -945,15 +945,16 @@ mod projective_impl {
             Ok(())
         }
 
-        fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, B>(
+        fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, K, B>(
             mut cs: CS,
             bases: &[B],
-            scalars: &[J],
+            scalars: K,
         ) -> Result<Self, SynthesisError>
         where
             CS: ConstraintSystem<F>,
             I: Borrow<[Boolean]>,
             J: Borrow<[I]>,
+            K: Iterator<Item = J>,
             B: Borrow<[TEProjective<P>]>,
         {
             const CHUNK_SIZE: usize = 3;
@@ -984,7 +985,7 @@ mod projective_impl {
             let mut coords2 = Vec::with_capacity(4);
             let mut x_coeffs = Vec::with_capacity(4);
             let mut y_coeffs = Vec::with_capacity(4);
-            for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.iter().zip(bases.iter()).enumerate() {
+            for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.zip(bases.iter()).enumerate() {
                 for (i, (bits, base_power)) in segment_bits_chunks
                     .borrow()
                     .iter()

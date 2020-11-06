@@ -156,15 +156,16 @@ pub trait GroupGadget<G: Group, F: Field>:
         Err(SynthesisError::AssignmentMissing)
     }
 
-    fn precomputed_base_3_bit_signed_digit_scalar_mul<CS, I, J, B>(
+    fn precomputed_base_3_bit_signed_digit_scalar_mul<CS, I, J, K, B>(
         _: CS,
         _: &[B],
-        _: &[J],
+        _: K,
     ) -> Result<Self, SynthesisError>
     where
         CS: ConstraintSystem<F>,
         I: Borrow<[Boolean]>,
         J: Borrow<[I]>,
+        K: Iterator<Item = J>,
         B: Borrow<[G]>,
     {
         Err(SynthesisError::AssignmentMissing)

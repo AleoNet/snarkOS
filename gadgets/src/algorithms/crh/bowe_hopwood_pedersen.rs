@@ -79,10 +79,10 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<BoweH
         // Allocate new variable for the result.
         let input_in_bits = input_in_bits
             .chunks(S::WINDOW_SIZE * BOWE_HOPWOOD_CHUNK_SIZE)
-            .map(|x| x.chunks(BOWE_HOPWOOD_CHUNK_SIZE).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
+            .map(|x| x.chunks(BOWE_HOPWOOD_CHUNK_SIZE).collect::<Vec<_>>());
+
         let result =
-            GG::precomputed_base_3_bit_signed_digit_scalar_mul(cs, &parameters.parameters.bases, &input_in_bits)?;
+            GG::precomputed_base_3_bit_signed_digit_scalar_mul(cs, &parameters.parameters.bases, input_in_bits)?;
 
         Ok(result)
     }
