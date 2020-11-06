@@ -137,18 +137,27 @@ where
     {
         let pvk = vk.prepare(&mut cs.ns(|| "Prepare vk"))?;
 
+        let PreparedVerifyingKeyGadget {
+            alpha_g1_beta_g2,
+            gamma_g2_neg_pc,
+            delta_g2_neg_pc,
+            mut gamma_abc_g1,
+        } = pvk;
+
+        let mut gamma_abc_g1_iter = gamma_abc_g1.iter_mut();
+
         let g_ic = {
             let mut cs = cs.ns(|| "Process input");
-            let mut g_ic = pvk.gamma_abc_g1[0].clone();
+            let mut g_ic = gamma_abc_g1_iter.next().cloned().unwrap();
             let mut input_len = 1;
-            for (i, (input, b)) in public_inputs.by_ref().zip(pvk.gamma_abc_g1.iter().skip(1)).enumerate() {
+            for (i, (input, b)) in public_inputs.by_ref().zip(gamma_abc_g1_iter).enumerate() {
                 let input_bits = input.to_bits(cs.ns(|| format!("Input {}", i)))?;
                 g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.into_iter())?;
                 input_len += 1;
             }
             // Check that the input and the query in the verification are of the
             // same length.
-            assert!(input_len == pvk.gamma_abc_g1.len() && public_inputs.next().is_none());
+            assert!(input_len == gamma_abc_g1.len() && public_inputs.next().is_none());
             g_ic
         };
 
@@ -161,14 +170,14 @@ where
 
             P::miller_loop(cs.ns(|| "Miller loop 1"), &[proof_a_prep, g_ic_prep, proof_c_prep], &[
                 proof_b_prep,
-                pvk.gamma_g2_neg_pc.clone(),
-                pvk.delta_g2_neg_pc.clone(),
+                gamma_g2_neg_pc,
+                delta_g2_neg_pc,
             ])?
         };
 
         let test = P::final_exponentiation(cs.ns(|| "Final Exp"), &test_exp).unwrap();
 
-        test.enforce_equal(cs.ns(|| "Test 1"), &pvk.alpha_g1_beta_g2)?;
+        test.enforce_equal(cs.ns(|| "Test 1"), &alpha_g1_beta_g2)?;
         Ok(())
     }
 }
