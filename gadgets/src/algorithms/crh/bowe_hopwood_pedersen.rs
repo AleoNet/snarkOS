@@ -67,9 +67,8 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<BoweH
             .collect();
         if (input_in_bits.len()) % BOWE_HOPWOOD_CHUNK_SIZE != 0 {
             let current_length = input_in_bits.len();
-            for _ in 0..(BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE) {
-                input_in_bits.push(Boolean::constant(false));
-            }
+            let target_length = current_length + BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE;
+            input_in_bits.resize(target_length, Boolean::constant(false));
         }
         assert!(input_in_bits.len() % BOWE_HOPWOOD_CHUNK_SIZE == 0);
         assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);

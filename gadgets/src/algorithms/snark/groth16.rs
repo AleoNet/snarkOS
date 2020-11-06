@@ -247,8 +247,6 @@ where
                         Ok(gamma_abc_i.into_projective())
                     })
                 })
-                .collect::<Vec<_>>()
-                .into_iter()
                 .collect::<Result<_, _>>()?;
 
             Ok(Self {
