@@ -953,7 +953,7 @@ mod projective_impl {
         where
             CS: ConstraintSystem<F>,
             I: Borrow<[Boolean]>,
-            J: Borrow<[I]>,
+            J: Iterator<Item = I>,
             K: Iterator<Item = J>,
             B: Borrow<[TEProjective<P>]>,
         {
@@ -986,12 +986,7 @@ mod projective_impl {
             let mut x_coeffs = Vec::with_capacity(4);
             let mut y_coeffs = Vec::with_capacity(4);
             for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.zip(bases.iter()).enumerate() {
-                for (i, (bits, base_power)) in segment_bits_chunks
-                    .borrow()
-                    .iter()
-                    .zip(segment_powers.borrow().iter())
-                    .enumerate()
-                {
+                for (i, (bits, base_power)) in segment_bits_chunks.zip(segment_powers.borrow().iter()).enumerate() {
                     let base_power = base_power.borrow();
                     let mut acc_power = *base_power;
                     coords1.clear();

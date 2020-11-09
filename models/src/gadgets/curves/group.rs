@@ -164,7 +164,7 @@ pub trait GroupGadget<G: Group, F: Field>:
     where
         CS: ConstraintSystem<F>,
         I: Borrow<[Boolean]>,
-        J: Borrow<[I]>,
+        J: Iterator<Item = I>,
         K: Iterator<Item = J>,
         B: Borrow<[G]>,
     {
