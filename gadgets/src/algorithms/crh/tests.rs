@@ -108,7 +108,7 @@ fn primitive_crh_gadget_test<F: Field, H: CRH, CG: CRHGadget<H, F>>(hash_constra
     let output_gadget = <CG as CRHGadget<_, _>>::check_evaluation_gadget(
         &mut cs.ns(|| "gadget_evaluation"),
         &parameters_gadget,
-        &input_bytes,
+        input_bytes,
     )
     .unwrap();
     assert_eq!(cs.num_constraints(), hash_constraints);
@@ -152,9 +152,9 @@ fn masked_crh_gadget_test<F: PrimeField, H: CRH, CG: MaskedCRHGadget<H, F>>() {
     let masked_output_gadget = <CG as MaskedCRHGadget<_, _>>::check_evaluation_gadget_masked(
         &mut cs.ns(|| "masked_gadget_evaluation"),
         &parameters_gadget,
-        &input_bytes,
+        input_bytes,
         &mask_parameters_gadget,
-        &mask_bytes,
+        mask_bytes,
     )
     .unwrap();
     assert_eq!(cs.num_constraints(), 17932);

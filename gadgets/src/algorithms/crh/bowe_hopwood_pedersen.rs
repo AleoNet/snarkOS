@@ -53,10 +53,10 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<BoweH
     fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError> {
         // Pad the input bytes
-        let mut padded_input_bytes = input.to_vec();
+        let mut padded_input_bytes = input;
         padded_input_bytes.resize(S::WINDOW_SIZE * S::NUM_WINDOWS / 8, UInt8::constant(0u8));
         assert_eq!(padded_input_bytes.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
 
@@ -105,7 +105,7 @@ impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: P
     fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError> {
         let output = BoweHopwoodPedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(cs, parameters, input)?;
         Ok(output.to_x_coordinate())

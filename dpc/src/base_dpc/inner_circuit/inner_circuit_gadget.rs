@@ -763,7 +763,7 @@ where
             let candidate_sn_nonce = SerialNumberNonceCRHGadget::check_evaluation_gadget(
                 &mut sn_cs.ns(|| "Compute serial number nonce"),
                 &serial_number_nonce_crh_parameters,
-                &sn_nonce_input,
+                sn_nonce_input,
             )?;
             candidate_sn_nonce.enforce_equal(
                 &mut sn_cs.ns(|| "Check that computed nonce matches provided nonce"),
@@ -1206,7 +1206,7 @@ where
             let candidate_encrypted_record_hash = EncryptedRecordCRHGadget::check_evaluation_gadget(
                 &mut encryption_cs.ns(|| format!("Compute encrypted record hash {}", j)),
                 &encrypted_record_crh_parameters,
-                &encrypted_record_hash_input,
+                encrypted_record_hash_input,
             )?;
 
             encrypted_record_hash_gadget.enforce_equal(
@@ -1330,13 +1330,13 @@ where
         let inner1_commitment_hash = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment inner1 hash"),
             &local_data_crh_parameters,
-            &old_record_commitment_bytes,
+            old_record_commitment_bytes,
         )?;
 
         let inner2_commitment_hash = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment inner2 hash"),
             &local_data_crh_parameters,
-            &new_record_commitment_bytes,
+            new_record_commitment_bytes,
         )?;
 
         let mut inner_commitment_hash_bytes = Vec::new();
@@ -1348,7 +1348,7 @@ where
         let candidate_local_data_root = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment root"),
             &local_data_crh_parameters,
-            &inner_commitment_hash_bytes,
+            inner_commitment_hash_bytes,
         )?;
 
         let declared_local_data_root =

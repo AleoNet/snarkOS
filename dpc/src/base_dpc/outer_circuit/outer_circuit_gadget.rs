@@ -378,7 +378,7 @@ where
         let claimed_death_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death program vk hash"),
             &program_vk_crh_parameters,
-            &death_program_vk_bytes,
+            death_program_vk_bytes,
         )?;
 
         let claimed_death_program_id_bytes =
@@ -419,7 +419,7 @@ where
         let claimed_birth_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute birth program vk hash"),
             &program_vk_crh_parameters,
-            &birth_program_vk_bytes,
+            birth_program_vk_bytes,
         )?;
 
         let claimed_birth_program_id_bytes =
@@ -495,7 +495,7 @@ where
     let candidate_inner_snark_id = C::InnerSNARKVerificationKeyCRHGadget::check_evaluation_gadget(
         &mut cs.ns(|| "Compute inner snark vk hash"),
         &inner_snark_vk_crh_parameters,
-        &inner_snark_vk_bytes,
+        inner_snark_vk_bytes,
     )?;
 
     candidate_inner_snark_id.enforce_equal(
