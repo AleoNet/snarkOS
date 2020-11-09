@@ -981,19 +981,11 @@ mod projective_impl {
                 };
 
             // Compute ∏(h_i^{m_i}) for all i.
-            let mut coords1 = Vec::with_capacity(4);
-            let mut coords2 = Vec::with_capacity(4);
             let mut x_coeffs = Vec::with_capacity(4);
             let mut y_coeffs = Vec::with_capacity(4);
             for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.zip(bases.iter()).enumerate() {
                 for (i, (bits, base_power)) in segment_bits_chunks.zip(segment_powers.borrow().iter()).enumerate() {
                     let base_power = base_power.borrow();
-                    let mut acc_power = *base_power;
-                    coords1.clear();
-                    for _ in 0..4 {
-                        coords1.push(acc_power);
-                        acc_power += base_power;
-                    }
 
                     let bits = bits
                         .borrow()
@@ -1002,18 +994,16 @@ mod projective_impl {
                         return Err(SynthesisError::Unsatisfiable);
                     }
 
-                    coords2.clear();
-                    for p in &coords1 {
-                        coords2.push(
-                            MontgomeryAffineGadget::<P, F, FG>::from_edwards_to_coords(&p.into_affine()).unwrap(),
-                        );
-                    }
-
                     x_coeffs.clear();
                     y_coeffs.clear();
-                    for (x, y) in &coords2 {
-                        x_coeffs.push(*x);
-                        y_coeffs.push(*y);
+                    let mut acc_power = *base_power;
+                    for _ in 0..4 {
+                        let p = acc_power;
+                        let (x, y) =
+                            MontgomeryAffineGadget::<P, F, FG>::from_edwards_to_coords(&p.into_affine()).unwrap();
+                        x_coeffs.push(x);
+                        y_coeffs.push(y);
+                        acc_power += base_power;
                     }
 
                     let precomp = Boolean::and(
