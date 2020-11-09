@@ -38,7 +38,7 @@ use itertools::Itertools;
 
 fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
-    field_elements: &[C::InnerField],
+    field_elements: Vec<C::InnerField>,
     name: &str,
 ) -> Result<Vec<Vec<UInt8>>, SynthesisError> {
     if field_elements.len() <= 1 {
@@ -211,24 +211,24 @@ where
     // Allocate field element bytes
 
     let account_commitment_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &account_commitment_parameters_fe, "account commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, account_commitment_parameters_fe, "account commitment pp")?;
 
     let account_encryption_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &account_encryption_parameters_fe, "account encryption pp")?;
+        field_element_to_bytes::<C, _>(cs, account_encryption_parameters_fe, "account encryption pp")?;
 
-    let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, &account_signature_fe, "account signature pp")?;
+    let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, account_signature_fe, "account signature pp")?;
     let record_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &record_commitment_parameters_fe, "record commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, record_commitment_parameters_fe, "record commitment pp")?;
     let encrypted_record_crh_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &encrypted_record_crh_parameters_fe, "encrypted record crh pp")?;
+        field_element_to_bytes::<C, _>(cs, encrypted_record_crh_parameters_fe, "encrypted record crh pp")?;
     let program_vk_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &program_vk_commitment_parameters_fe, "program vk commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, program_vk_commitment_parameters_fe, "program vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_crh_parameters_fe, "local data commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, local_data_crh_parameters_fe, "local data commitment pp")?;
     let serial_number_nonce_crh_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
-    let ledger_parameters_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_parameters_fe, "ledger pp")?;
-    let ledger_digest_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_digest_fe, "ledger digest")?;
+        field_element_to_bytes::<C, _>(cs, serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
+    let ledger_parameters_fe_bytes = field_element_to_bytes::<C, _>(cs, ledger_parameters_fe, "ledger pp")?;
+    let ledger_digest_fe_bytes = field_element_to_bytes::<C, _>(cs, ledger_digest_fe, "ledger digest")?;
 
     let mut serial_number_fe_bytes = vec![];
     for (index, sn) in old_serial_numbers.iter().enumerate() {
@@ -266,11 +266,11 @@ where
         )?);
     }
 
-    let program_commitment_fe_bytes = field_element_to_bytes::<C, _>(cs, &program_commitment_fe, "program commitment")?;
-    let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, &memo_fe, "memo")?;
-    let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
-    let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, &local_data_root_fe, "local data root")?;
-    let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
+    let program_commitment_fe_bytes = field_element_to_bytes::<C, _>(cs, program_commitment_fe, "program commitment")?;
+    let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, memo_fe, "memo")?;
+    let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, network_id_fe, "network id")?;
+    let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, local_data_root_fe, "local data root")?;
+    let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, value_balance_fe, "value balance")?;
 
     // Construct inner snark input as bytes
 
