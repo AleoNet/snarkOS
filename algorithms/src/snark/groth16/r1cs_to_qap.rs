@@ -47,7 +47,7 @@ impl R1CStoQAP {
         assembly: &KeypairAssembly<E>,
         t: &E::Fr,
     ) -> SynthesisResult<(Vec<E::Fr>, Vec<E::Fr>, Vec<E::Fr>, E::Fr, usize, usize)> {
-        let domain_size = assembly.num_constraints + (assembly.num_inputs - 1) + 1;
+        let domain_size = assembly.num_constraints() + (assembly.num_inputs - 1) + 1;
         let domain = EvaluationDomain::<E::Fr>::new(domain_size).ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
         let domain_size = domain.size();
 
@@ -65,10 +65,10 @@ impl R1CStoQAP {
         let mut c = vec![E::Fr::zero(); qap_num_variables + 1];
 
         for i in 0..assembly.num_inputs {
-            a[i] = u[assembly.num_constraints + i];
+            a[i] = u[assembly.num_constraints() + i];
         }
 
-        for (i, x) in u.iter().enumerate().take(assembly.num_constraints) {
+        for (i, x) in u.iter().enumerate().take(assembly.num_constraints()) {
             for &(ref coeff, index) in assembly.at[i].iter() {
                 let index = match index {
                     Index::Input(i) => i,
