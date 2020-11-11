@@ -202,7 +202,7 @@ where
                 gamma_g2,
                 delta_g2,
                 gamma_abc_g1,
-            } = vk.borrow().clone();
+            } = vk.borrow();
             let alpha_g1 = P::G1Gadget::alloc(cs.ns(|| "alpha_g1"), || Ok(alpha_g1.into_projective()))?;
             let beta_g2 = P::G2Gadget::alloc(cs.ns(|| "beta_g2"), || Ok(beta_g2.into_projective()))?;
             let gamma_g2 = P::G2Gadget::alloc(cs.ns(|| "gamma_g2"), || Ok(gamma_g2.into_projective()))?;
@@ -216,9 +216,7 @@ where
                         Ok(gamma_abc_i.into_projective())
                     })
                 })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(Self {
                 alpha_g1,
                 beta_g2,
@@ -242,7 +240,7 @@ where
                 gamma_g2,
                 delta_g2,
                 gamma_abc_g1,
-            } = vk.borrow().clone();
+            } = vk.borrow();
             let alpha_g1 = P::G1Gadget::alloc_input(cs.ns(|| "alpha_g1"), || Ok(alpha_g1.into_projective()))?;
             let beta_g2 = P::G2Gadget::alloc_input(cs.ns(|| "beta_g2"), || Ok(beta_g2.into_projective()))?;
             let gamma_g2 = P::G2Gadget::alloc_input(cs.ns(|| "gamma_g2"), || Ok(gamma_g2.into_projective()))?;
@@ -256,7 +254,7 @@ where
                         Ok(gamma_abc_i.into_projective())
                     })
                 })
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?;
 
             Ok(Self {
                 alpha_g1,
@@ -282,7 +280,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|vk_bytes| {
-            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow().clone()[..])?;
+            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow()[..])?;
 
             Self::alloc(cs.ns(|| "alloc_bytes"), || Ok(vk))
         })
@@ -298,7 +296,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|vk_bytes| {
-            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow().clone()[..])?;
+            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow()[..])?;
 
             Self::alloc_input(cs.ns(|| "alloc_input_bytes"), || Ok(vk))
         })
@@ -318,7 +316,7 @@ where
         T: Borrow<Proof<PairingE>>,
     {
         value_gen().and_then(|proof| {
-            let Proof { a, b, c } = proof.borrow().clone();
+            let Proof { a, b, c } = proof.borrow();
             let a = P::G1Gadget::alloc_checked(cs.ns(|| "a"), || Ok(a.into_projective()))?;
             let b = P::G2Gadget::alloc_checked(cs.ns(|| "b"), || Ok(b.into_projective()))?;
             let c = P::G1Gadget::alloc_checked(cs.ns(|| "c"), || Ok(c.into_projective()))?;
@@ -333,7 +331,7 @@ where
         T: Borrow<Proof<PairingE>>,
     {
         value_gen().and_then(|proof| {
-            let Proof { a, b, c } = proof.borrow().clone();
+            let Proof { a, b, c } = proof.borrow();
             // We don't need to check here because the prime order check can be performed
             // in plain.
             let a = P::G1Gadget::alloc_input(cs.ns(|| "a"), || Ok(a.into_projective()))?;
@@ -357,7 +355,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|proof_bytes| {
-            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow().clone()[..])?;
+            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow()[..])?;
 
             Self::alloc(cs.ns(|| "alloc_bytes"), || Ok(proof))
         })
@@ -373,7 +371,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|proof_bytes| {
-            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow().clone()[..])?;
+            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow()[..])?;
 
             Self::alloc_input(cs.ns(|| "alloc_input_bytes"), || Ok(proof))
         })
