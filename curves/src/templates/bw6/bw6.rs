@@ -20,8 +20,8 @@ use crate::templates::bw6::{
 };
 use serde::{Deserialize, Serialize};
 use snarkos_models::curves::{
-    fp3::Fp3Parameters,
-    fp6_2over3::{Fp6, Fp6Parameters},
+    fp2::Fp2Parameters,
+    fp6_3over2::{Fp6, Fp6Parameters},
     Field,
     ModelParameters,
     One,
@@ -49,8 +49,8 @@ pub trait BW6Parameters: 'static {
     const ATE_LOOP_COUNT_2_IS_NEGATIVE: bool;
     const TWIST_TYPE: TwistType;
     type Fp: PrimeField + SquareRootField + Into<<Self::Fp as PrimeField>::BigInteger>;
-    type Fp3Params: Fp3Parameters<Fp = Self::Fp>;
-    type Fp6Params: Fp6Parameters<Fp3Params = Self::Fp3Params>;
+    type Fp2Params: Fp2Parameters<Fp = Self::Fp>;
+    type Fp6Params: Fp6Parameters<Fp2Params = Self::Fp2Params>;
     type G1Parameters: SWModelParameters<BaseField = Self::Fp>;
     type G2Parameters: SWModelParameters<
         BaseField = Self::Fp,
