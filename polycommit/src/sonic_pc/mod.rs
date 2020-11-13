@@ -169,7 +169,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
 
         let enforced_degree_bounds = enforced_degree_bounds.map(|bounds| {
             let mut v = bounds.to_vec();
-            v.sort();
+            v.sort_unstable();
             v.dedup();
             v
         });
