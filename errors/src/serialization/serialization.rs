@@ -35,3 +35,9 @@ pub enum SerializationError {
     #[error(transparent)]
     BincodeError(#[from] bincode::Error),
 }
+
+impl From<SerializationError> for std::io::Error {
+    fn from(error: SerializationError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("{}", error))
+    }
+}
