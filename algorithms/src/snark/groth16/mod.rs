@@ -20,12 +20,12 @@
 
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::{
-    curves::{AffineCurve, Field, PairingCurve, PairingEngine},
+    curves::{Field, PairingCurve, PairingEngine},
     gadgets::r1cs::{Index, LinearCombination},
 };
 use snarkos_utilities::{serialize::*, FromBytes, ToBytes};
 
-use std::io::{self, Read, Result as IoResult, Write};
+use std::io::{Read, Result as IoResult, Write};
 
 /// Reduce an R1CS instance to a *Quadratic Arithmetic Program* instance.
 mod r1cs_to_qap;
@@ -154,6 +154,8 @@ impl<E: PairingEngine> VerifyingKey<E> {
     /// Serialize the verification key into bytes, for storage on disk
     /// or transmission over the network.
     pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // TODO (raychu86): Use compressed serialization for verifying key.
+        //   This will require updating the corresponding verifying key gadget implementation.
         self.alpha_g1.write(&mut writer)?;
         self.beta_g2.write(&mut writer)?;
         self.gamma_g2.write(&mut writer)?;
@@ -211,121 +213,21 @@ impl<E: PairingEngine> ToBytes for Parameters<E> {
 impl<E: PairingEngine> FromBytes for Parameters<E> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        Self::read(&mut reader, false)
+        Self::read(&mut reader)
     }
 }
 
 impl<E: PairingEngine> Parameters<E> {
     /// Serialize the parameters to bytes.
     pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.vk.write(&mut writer)?;
-
-        self.beta_g1.write(&mut writer)?;
-
-        self.delta_g1.write(&mut writer)?;
-
-        (self.a_query.len() as u32).write(&mut writer)?;
-        for g in &self.a_query[..] {
-            g.write(&mut writer)?;
-        }
-
-        (self.b_g1_query.len() as u32).write(&mut writer)?;
-        for g in &self.b_g1_query[..] {
-            g.write(&mut writer)?;
-        }
-
-        (self.b_g2_query.len() as u32).write(&mut writer)?;
-        for g in &self.b_g2_query[..] {
-            g.write(&mut writer)?;
-        }
-
-        (self.h_query.len() as u32).write(&mut writer)?;
-        for g in &self.h_query[..] {
-            g.write(&mut writer)?;
-        }
-
-        (self.l_query.len() as u32).write(&mut writer)?;
-        for g in &self.l_query[..] {
-            g.write(&mut writer)?;
-        }
+        CanonicalSerialize::serialize(self, &mut writer)?;
 
         Ok(())
     }
 
     /// Deserialize the public parameters from bytes.
-    pub fn read<R: Read>(mut reader: R, checked: bool) -> IoResult<Self> {
-        let read_g1_affine = |mut reader: &mut R| -> IoResult<E::G1Affine> {
-            let g1_affine: E::G1Affine = FromBytes::read(&mut reader)?;
-
-            if checked && !g1_affine.is_in_correct_subgroup_assuming_on_curve() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "point is not in the correct subgroup",
-                ));
-            }
-
-            Ok(g1_affine)
-        };
-
-        let read_g2_affine = |mut reader: &mut R| -> IoResult<E::G2Affine> {
-            let g2_affine: E::G2Affine = FromBytes::read(&mut reader)?;
-
-            if checked && !g2_affine.is_in_correct_subgroup_assuming_on_curve() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "point is not in the correct subgroup",
-                ));
-            }
-
-            Ok(g2_affine)
-        };
-
-        let vk = VerifyingKey::<E>::read(&mut reader)?;
-
-        let beta_g1: E::G1Affine = FromBytes::read(&mut reader)?;
-
-        let delta_g1: E::G1Affine = FromBytes::read(&mut reader)?;
-
-        let a_query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut a_query = Vec::with_capacity(a_query_len as usize);
-        for _ in 0..a_query_len {
-            a_query.push(read_g1_affine(&mut reader)?);
-        }
-
-        let b_g1_query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut b_g1_query = Vec::with_capacity(b_g1_query_len as usize);
-        for _ in 0..b_g1_query_len {
-            b_g1_query.push(read_g1_affine(&mut reader)?);
-        }
-
-        let b_g2_query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut b_g2_query = Vec::with_capacity(b_g2_query_len as usize);
-        for _ in 0..b_g2_query_len {
-            b_g2_query.push(read_g2_affine(&mut reader)?);
-        }
-
-        let h_query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut h_query = Vec::with_capacity(h_query_len as usize);
-        for _ in 0..h_query_len {
-            h_query.push(read_g1_affine(&mut reader)?);
-        }
-
-        let l_query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut l_query = Vec::with_capacity(l_query_len as usize);
-        for _ in 0..l_query_len {
-            l_query.push(read_g1_affine(&mut reader)?);
-        }
-
-        Ok(Self {
-            vk,
-            beta_g1,
-            delta_g1,
-            a_query,
-            b_g1_query,
-            b_g2_query,
-            h_query,
-            l_query,
-        })
+    pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+        Ok(CanonicalDeserialize::deserialize(&mut reader)?)
     }
 }
 
