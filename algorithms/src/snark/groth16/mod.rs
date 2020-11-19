@@ -51,7 +51,7 @@ pub use prover::*;
 pub use verifier::*;
 
 /// A proof in the Groth16 SNARK.
-#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone, Debug, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<E: PairingEngine> {
     pub a: E::G1Affine,
     pub b: E::G2Affine,
@@ -92,20 +92,14 @@ impl<E: PairingEngine> Proof<E> {
     /// Serialize the proof into bytes, for storage on disk or transmission
     /// over the network.
     pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        CanonicalSerialize::serialize(&self.a, &mut writer)?;
-        CanonicalSerialize::serialize(&self.b, &mut writer)?;
-        CanonicalSerialize::serialize(&self.c, &mut writer)?;
+        CanonicalSerialize::serialize(self, &mut writer)?;
 
         Ok(())
     }
 
     /// Deserialize the proof from bytes.
     pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let a: E::G1Affine = CanonicalDeserialize::deserialize(&mut reader)?;
-        let b: E::G2Affine = CanonicalDeserialize::deserialize(&mut reader)?;
-        let c: E::G1Affine = CanonicalDeserialize::deserialize(&mut reader)?;
-
-        Ok(Self { a, b, c })
+        Ok(CanonicalDeserialize::deserialize(&mut reader)?)
     }
 }
 
