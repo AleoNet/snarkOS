@@ -23,7 +23,7 @@ use snarkos_models::{
     curves::{AffineCurve, Field, PairingCurve, PairingEngine},
     gadgets::r1cs::{Index, LinearCombination},
 };
-use snarkos_utilities::{error as error_fn, serialize::*, FromBytes, ToBytes};
+use snarkos_utilities::{serialize::*, FromBytes, ToBytes};
 
 use std::io::{self, Read, Result as IoResult, Write};
 

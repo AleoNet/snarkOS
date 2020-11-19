@@ -19,7 +19,7 @@
 
 use snarkos_errors::gadgets::SynthesisResult;
 use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkos_utilities::{serialize::*, FromBytes, ToBytes};
 
 use std::io::{self, Read, Result as IoResult, Write};
 
@@ -88,16 +88,18 @@ impl<E: PairingEngine> Proof<E> {
     /// Serialize the proof into bytes, for storage on disk or transmission
     /// over the network.
     pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.a.write(&mut writer)?;
-        self.b.write(&mut writer)?;
-        self.c.write(&mut writer)
+        CanonicalSerialize::serialize(&self.a, &mut writer)?;
+        CanonicalSerialize::serialize(&self.b, &mut writer)?;
+        CanonicalSerialize::serialize(&self.c, &mut writer)?;
+
+        Ok(())
     }
 
     /// Deserialize the proof from bytes.
     pub fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let a: E::G1Affine = FromBytes::read(&mut reader)?;
-        let b: E::G2Affine = FromBytes::read(&mut reader)?;
-        let c: E::G1Affine = FromBytes::read(&mut reader)?;
+        let a: E::G1Affine = CanonicalDeserialize::deserialize(&mut reader)?;
+        let b: E::G2Affine = CanonicalDeserialize::deserialize(&mut reader)?;
+        let c: E::G1Affine = CanonicalDeserialize::deserialize(&mut reader)?;
 
         Ok(Self { a, b, c })
     }
