@@ -38,4 +38,4 @@ serial_test = { version = "0.5.0" }
 tokio-test = { version = "0.2.0" }
 
 [build-dependencies]
-rustc_version = "0.2"
+rustc_version = "0.3"

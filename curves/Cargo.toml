@@ -26,7 +26,7 @@ default = ["snarkos-errors/default", "snarkos-models/default", "snarkos-utilitie
 sw6 = []
 
 [build-dependencies]
-rustc_version = "0.2"
+rustc_version = "0.3"
 
 [dev-dependencies]
 criterion = "0.3"
