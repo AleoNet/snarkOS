@@ -149,7 +149,7 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 }
 
-fn compute_path(ns: &[String], this: String) -> String {
+fn compute_path(ns: &[String], this: &str) -> String {
     if this.contains('/') {
         panic!("'/' is not allowed in names");
     }

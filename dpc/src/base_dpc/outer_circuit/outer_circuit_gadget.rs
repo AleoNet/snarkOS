@@ -237,7 +237,7 @@ where
 
         serial_number_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            &serial_number_fe,
+            serial_number_fe,
             &format!("Allocate serial number {:?}", index),
         )?);
     }
@@ -255,13 +255,13 @@ where
 
         commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            &commitment_fe,
+            commitment_fe,
             &format!("Allocate record commitment {:?}", index),
         )?);
 
         commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            &encrypted_record_hash_fe,
+            encrypted_record_hash_fe,
             &format!("Allocate encrypted record hash {:?}", index),
         )?);
     }
