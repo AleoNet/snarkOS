@@ -70,6 +70,9 @@ pub trait PCCommitment: CanonicalDeserialize + CanonicalSerialize + Clone + Debu
 
     /// Does this commitment have a degree bound?
     fn has_degree_bound(&self) -> bool;
+
+    /// Does this commitment's affine belong to the correct subgroup?
+    fn is_in_correct_subgroup_assuming_on_curve(&self) -> bool;
 }
 
 /// Defines the minimal interface of commitment randomness for any polynomial
