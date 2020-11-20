@@ -267,7 +267,7 @@ impl_params!(
     NoopProgramSNARKPKParameters,
     noop_program_snark_pk_test,
     "noop_program_snark_pk",
-    348514
+    172752
 );
 impl_params!(
     NoopProgramSNARKVKParameters,
@@ -277,9 +277,9 @@ impl_params!(
 );
 
 // Inner SNARK
-impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 250108401);
+impl_params_remote!(InnerSNARKPKParameters, "inner_snark_pk", 123968736);
 impl_params!(InnerSNARKVKParameters, inner_snark_vk_test, "inner_snark_vk", 2329);
 
 // Outer SNARK
-impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 502942005);
+impl_params_remote!(OuterSNARKPKParameters, "outer_snark_pk", 250168080);
 impl_params!(OuterSNARKVKParameters, outer_snark_vk_test, "outer_snark_vk", 4443);
