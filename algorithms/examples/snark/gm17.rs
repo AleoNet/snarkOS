@@ -105,7 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let pvk = prepare_verifying_key(&params.vk);
         total_setup += start.elapsed();
 
-        // proof_vec.truncate(0);
+        // proof_vec.clear();
         let start = Instant::now();
         let proof = {
             // Create an instance of our circuit (with the witness)

@@ -75,11 +75,11 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
 
     let outer_snark_parameters = C::OuterSNARK::setup(
         &OuterCircuit::blank(
-            &system_parameters,
-            &ledger_merkle_tree_parameters,
-            &inner_snark_vk,
-            &inner_snark_proof,
-            &private_program_input,
+            system_parameters,
+            ledger_merkle_tree_parameters,
+            inner_snark_vk,
+            inner_snark_proof,
+            private_program_input,
         ),
         rng,
     )?;

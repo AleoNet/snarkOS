@@ -369,7 +369,7 @@ impl ConsensusParameters {
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
-        program_vk_hash: &[u8],
+        program_vk_hash: Vec<u8>,
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
@@ -407,15 +407,15 @@ impl ConsensusParameters {
                 SerialNumberNonce::hash(&parameters.system_parameters.serial_number_nonce, &sn_nonce_input)?;
 
             let old_record = InstantiatedDPC::generate_record(
-                &parameters.system_parameters,
-                &old_sn_nonce,
-                &new_account.address,
+                parameters.system_parameters.clone(),
+                old_sn_nonce,
+                new_account.address.clone(),
                 true, // The input record is dummy
                 0,
-                &RecordPayload::default(),
+                RecordPayload::default(),
                 // Filler program input
-                &program_vk_hash,
-                &program_vk_hash,
+                program_vk_hash.clone(),
+                program_vk_hash.clone(),
                 rng,
             )?;
 
@@ -469,16 +469,16 @@ impl ConsensusParameters {
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Offline execution to generate a DPC transaction
         let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
-            &parameters.system_parameters,
-            &old_records,
-            &old_account_private_keys,
-            &new_record_owners,
+            parameters.system_parameters.clone(),
+            old_records,
+            old_account_private_keys,
+            new_record_owners,
             &new_is_dummy_flags,
             &new_values,
-            &new_payloads,
-            &new_birth_program_ids,
-            &new_death_program_ids,
-            &memo,
+            new_payloads,
+            new_birth_program_ids,
+            new_death_program_ids,
+            memo,
             self.network.id(),
             rng,
         )?;
@@ -525,8 +525,8 @@ impl ConsensusParameters {
         let (new_records, transaction) = InstantiatedDPC::execute_online(
             &parameters,
             execute_context,
-            &old_death_program_proofs,
-            &new_birth_program_proofs,
+            old_death_program_proofs,
+            new_birth_program_proofs,
             ledger,
             rng,
         )?;
