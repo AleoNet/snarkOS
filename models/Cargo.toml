@@ -25,3 +25,11 @@ smallvec = { version = "1.4" }
 
 [features]
 default = [ "snarkos-errors/default", "snarkos-utilities/default", ]
+
+[dev-dependencies.criterion]
+version = "0.3"
+
+[[bench]]
+name = "integer_arithmetic"
+path = "benches/integer_arithmetic.rs"
+harness = false

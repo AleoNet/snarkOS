@@ -124,6 +124,10 @@ impl<E: PairingEngine> PCCommitment for Commitment<E> {
     fn has_degree_bound(&self) -> bool {
         false
     }
+
+    fn is_in_correct_subgroup_assuming_on_curve(&self) -> bool {
+        self.0.is_in_correct_subgroup_assuming_on_curve()
+    }
 }
 
 impl<'a, E: PairingEngine> AddAssign<(E::Fr, &'a Commitment<E>)> for Commitment<E> {

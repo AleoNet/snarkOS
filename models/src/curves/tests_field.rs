@@ -436,21 +436,15 @@ pub fn field_serialization_test<F: Field>() {
         use snarkos_errors::serialization::SerializationError;
         {
             let mut serialized = vec![0; buf_size];
-            assert!(if let SerializationError::NotEnoughSpace = a
-                .serialize_with_flags(&mut &mut serialized[..], DummyFlags)
-                .unwrap_err()
-            {
-                true
-            } else {
-                false
-            });
-            assert!(if let SerializationError::NotEnoughSpace =
-                F::deserialize_with_flags::<_, DummyFlags>(&mut &serialized[..]).unwrap_err()
-            {
-                true
-            } else {
-                false
-            });
+            assert!(matches!(
+                a.serialize_with_flags(&mut &mut serialized[..], DummyFlags)
+                    .unwrap_err(),
+                SerializationError::NotEnoughSpace
+            ));
+            assert!(matches!(
+                F::deserialize_with_flags::<_, DummyFlags>(&mut &serialized[..]).unwrap_err(),
+                SerializationError::NotEnoughSpace
+            ));
         }
 
         {

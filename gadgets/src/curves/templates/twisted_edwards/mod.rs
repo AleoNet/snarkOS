@@ -945,15 +945,16 @@ mod projective_impl {
             Ok(())
         }
 
-        fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, B>(
+        fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, K, B>(
             mut cs: CS,
             bases: &[B],
-            scalars: &[J],
+            scalars: K,
         ) -> Result<Self, SynthesisError>
         where
             CS: ConstraintSystem<F>,
             I: Borrow<[Boolean]>,
-            J: Borrow<[I]>,
+            J: Iterator<Item = I>,
+            K: Iterator<Item = J>,
             B: Borrow<[TEProjective<P>]>,
         {
             const CHUNK_SIZE: usize = 3;
@@ -980,20 +981,11 @@ mod projective_impl {
                 };
 
             // Compute ∏(h_i^{m_i}) for all i.
-            for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.iter().zip(bases.iter()).enumerate() {
-                for (i, (bits, base_power)) in segment_bits_chunks
-                    .borrow()
-                    .iter()
-                    .zip(segment_powers.borrow().iter())
-                    .enumerate()
-                {
+            let mut x_coeffs = Vec::with_capacity(4);
+            let mut y_coeffs = Vec::with_capacity(4);
+            for (segment_i, (segment_bits_chunks, segment_powers)) in scalars.zip(bases.iter()).enumerate() {
+                for (i, (bits, base_power)) in segment_bits_chunks.zip(segment_powers.borrow().iter()).enumerate() {
                     let base_power = base_power.borrow();
-                    let mut acc_power = *base_power;
-                    let mut coords = Vec::with_capacity(4);
-                    for _ in 0..4 {
-                        coords.push(acc_power);
-                        acc_power += base_power;
-                    }
 
                     let bits = bits
                         .borrow()
@@ -1002,16 +994,17 @@ mod projective_impl {
                         return Err(SynthesisError::Unsatisfiable);
                     }
 
-                    let coords = coords
-                        .iter()
-                        .map(|p| {
-                            let p = p.into_affine();
-                            MontgomeryAffineGadget::<P, F, FG>::from_edwards_to_coords(&p).unwrap()
-                        })
-                        .collect::<Vec<_>>();
-
-                    let x_coeffs = coords.iter().map(|p| p.0).collect::<Vec<_>>();
-                    let y_coeffs = coords.iter().map(|p| p.1).collect::<Vec<_>>();
+                    x_coeffs.clear();
+                    y_coeffs.clear();
+                    let mut acc_power = *base_power;
+                    for _ in 0..4 {
+                        let p = acc_power;
+                        let (x, y) =
+                            MontgomeryAffineGadget::<P, F, FG>::from_edwards_to_coords(&p.into_affine()).unwrap();
+                        x_coeffs.push(x);
+                        y_coeffs.push(y);
+                        acc_power += base_power;
+                    }
 
                     let precomp = Boolean::and(
                         cs.ns(|| format!("precomp in window {}, {}", segment_i, i)),
