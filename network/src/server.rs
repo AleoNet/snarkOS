@@ -212,7 +212,7 @@ impl Server {
         mut channel: Arc<Channel>,
         mut message_handler_sender: mpsc::Sender<(oneshot::Sender<Arc<Channel>>, MessageName, Vec<u8>, Arc<Channel>)>,
     ) {
-        let peer_address = channel.address.clone();
+        let peer_address = channel.address;
         let future = async move {
             // Determines the criteria for disconnecting from a peer.
             fn should_disconnect(failure_count: &u8) -> bool {

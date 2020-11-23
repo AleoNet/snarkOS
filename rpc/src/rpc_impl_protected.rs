@@ -237,7 +237,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
-        assert!(transaction_input.old_records.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
         assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
@@ -287,14 +287,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters.system_parameters,
-                &old_sn_nonce,
-                &address,
+                self.parameters.system_parameters.clone(),
+                old_sn_nonce,
+                address,
                 true, // The input record is dummy
                 0,
-                &RecordPayload::default(),
-                &program_id,
-                &program_id,
+                RecordPayload::default(),
+                program_id.clone(),
+                program_id.clone(),
                 rng,
             )?;
 

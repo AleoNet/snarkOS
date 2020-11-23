@@ -117,8 +117,8 @@ impl<E: PairingEngine> MarlinKZG10<E> {
                 s_flags.push(false);
             }
         }
-        let comms = E::G1Projective::batch_normalization_into_affine(&comms);
-        let s_comms = E::G1Projective::batch_normalization_into_affine(&s_comms);
+        let comms = E::G1Projective::batch_normalization_into_affine(comms);
+        let s_comms = E::G1Projective::batch_normalization_into_affine(s_comms);
         comms.into_iter().zip(s_comms).zip(s_flags).map(|((c, s_c), flag)| {
             let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
             Commitment {
@@ -216,7 +216,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
 
         let enforced_degree_bounds = enforced_degree_bounds.map(|v| {
             let mut v = v.to_vec();
-            v.sort();
+            v.sort_unstable();
             v.dedup();
             v
         });

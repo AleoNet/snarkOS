@@ -25,7 +25,7 @@ pub mod inner {
     pub use colored::Colorize;
 
     pub static NUM_INDENT: AtomicUsize = AtomicUsize::new(0);
-    pub const PAD_CHAR: &'static str = "·";
+    pub const PAD_CHAR: &str = "·";
 
     pub struct TimerInfo {
         pub msg: String,

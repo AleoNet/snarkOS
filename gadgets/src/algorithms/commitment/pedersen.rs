@@ -33,7 +33,10 @@ use snarkos_models::{
 };
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
-use std::{borrow::Borrow, marker::PhantomData};
+use std::{
+    borrow::{Borrow, Cow},
+    marker::PhantomData,
+};
 
 #[derive(Clone)]
 pub struct PedersenCommitmentParametersGadget<G: Group, S: PedersenSize, F: Field> {
@@ -131,13 +134,12 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> Commitment
     ) -> Result<Self::OutputGadget, SynthesisError> {
         assert!((input.len() * 8) <= (S::WINDOW_SIZE * S::NUM_WINDOWS));
 
-        let mut padded_input = input.to_vec();
+        let mut padded_input = Cow::Borrowed(input);
         // Pad if input length is less than `S::WINDOW_SIZE * S::NUM_WINDOWS`.
         if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
-            let current_length = input.len();
-            for _ in current_length..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
-                padded_input.push(UInt8::constant(0u8));
-            }
+            padded_input
+                .to_mut()
+                .resize((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8, UInt8::constant(0u8))
         }
 
         assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);

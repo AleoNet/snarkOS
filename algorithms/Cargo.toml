@@ -14,7 +14,6 @@ edition = "2018"
 [[example]]
 name = "gm17"
 path = "examples/snark/gm17.rs"
-required-features = ["rand", "snarkos-curves/bls12_377", "snarkos-models/gadgets"]
 
 [dependencies]
 snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
