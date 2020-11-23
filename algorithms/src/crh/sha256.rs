@@ -16,12 +16,20 @@
 
 use sha2::{Digest, Sha256};
 
-pub fn sha256(data: &[u8]) -> Vec<u8> {
-    Sha256::digest(&data).to_vec()
+pub fn sha256(data: &[u8]) -> [u8; 32] {
+    let digest = Sha256::digest(&data);
+    let mut ret = [0u8; 32];
+    ret.copy_from_slice(&digest);
+
+    ret
 }
 
-pub fn double_sha256(data: &[u8]) -> Vec<u8> {
-    Sha256::digest(&Sha256::digest(&data)).to_vec()
+pub fn double_sha256(data: &[u8]) -> [u8; 32] {
+    let digest = Sha256::digest(&Sha256::digest(&data));
+    let mut ret = [0u8; 32];
+    ret.copy_from_slice(&digest);
+
+    ret
 }
 
 pub fn sha256d_to_u64(data: &[u8]) -> u64 {

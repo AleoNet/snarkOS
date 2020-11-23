@@ -26,6 +26,8 @@ pub(crate) mod pairing {
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
+    use std::iter;
+
     pub fn bench_pairing_miller_loop(c: &mut Criterion) {
         const SAMPLES: usize = 1000;
 
@@ -43,7 +45,7 @@ pub(crate) mod pairing {
         let mut count = 0;
         c.bench_function("bls12_377: pairing_miller_loop", |c| {
             c.iter(|| {
-                let tmp = Bls12_377::miller_loop(&[(&v[count].0, &v[count].1)]);
+                let tmp = Bls12_377::miller_loop(iter::once((&v[count].0, &v[count].1)));
                 count = (count + 1) % SAMPLES;
                 tmp
             })

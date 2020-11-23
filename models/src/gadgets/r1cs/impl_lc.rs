@@ -56,7 +56,7 @@ impl<F: Field> LinearCombination<F> {
     /// Replaces the contents of `self` with those of `other`.
     #[inline]
     pub fn replace_in_place(&mut self, other: Self) {
-        self.0.truncate(0);
+        self.0.clear();
         self.0.extend_from_slice(&other.0)
     }
 

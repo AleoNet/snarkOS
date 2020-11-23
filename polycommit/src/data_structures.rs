@@ -70,6 +70,9 @@ pub trait PCCommitment: CanonicalDeserialize + CanonicalSerialize + Clone + Debu
 
     /// Does this commitment have a degree bound?
     fn has_degree_bound(&self) -> bool;
+
+    /// Does this commitment's affine belong to the correct subgroup?
+    fn is_in_correct_subgroup_assuming_on_curve(&self) -> bool;
 }
 
 /// Defines the minimal interface of commitment randomness for any polynomial
@@ -228,7 +231,7 @@ impl LCTerm {
     /// Returns `true` if `self == LCTerm::One`
     #[inline]
     pub fn is_one(&self) -> bool {
-        if let LCTerm::One = self { true } else { false }
+        matches!(self, LCTerm::One)
     }
 }
 
@@ -329,6 +332,7 @@ impl<'a, F: Field> AddAssign<(F, &'a LinearCombination<F>)> for LinearCombinatio
 }
 
 impl<'a, F: Field> SubAssign<(F, &'a LinearCombination<F>)> for LinearCombination<F> {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, (coeff, other): (F, &'a LinearCombination<F>)) {
         self.terms
             .extend(other.terms.iter().map(|(c, t)| (-coeff * c, t.clone())));

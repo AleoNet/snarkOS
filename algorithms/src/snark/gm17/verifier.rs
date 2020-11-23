@@ -23,16 +23,22 @@ use std::{
     ops::{AddAssign, MulAssign, Neg},
 };
 
-pub fn prepare_verifying_key<E: PairingEngine>(vk: &VerifyingKey<E>) -> PreparedVerifyingKey<E> {
+pub fn prepare_verifying_key<E: PairingEngine>(vk: VerifyingKey<E>) -> PreparedVerifyingKey<E> {
+    let g_alpha = vk.g_alpha_g1;
+    let h_beta = vk.h_beta_g2;
+    let g_alpha_h_beta_ml = E::miller_loop(iter::once((&g_alpha.prepare(), &h_beta.prepare())));
+    let g_gamma_pc = vk.g_gamma_g1.prepare();
+    let h_gamma_pc = vk.h_gamma_g2.prepare();
+    let h_pc = vk.h_g2.prepare();
+
     PreparedVerifyingKey {
-        vk: vk.clone(),
-        g_alpha: vk.g_alpha_g1,
-        h_beta: vk.h_beta_g2,
-        g_alpha_h_beta_ml: E::miller_loop(iter::once((&vk.g_alpha_g1.prepare(), &vk.h_beta_g2.prepare()))),
-        g_gamma_pc: vk.g_gamma_g1.prepare(),
-        h_gamma_pc: vk.h_gamma_g2.prepare(),
-        h_pc: vk.h_g2.prepare(),
-        query: vk.query.clone(),
+        vk,
+        g_alpha,
+        h_beta,
+        g_alpha_h_beta_ml,
+        g_gamma_pc,
+        h_gamma_pc,
+        h_pc,
     }
 }
 
@@ -41,15 +47,15 @@ pub fn verify_proof<E: PairingEngine>(
     proof: &Proof<E>,
     public_inputs: &[E::Fr],
 ) -> Result<bool, SynthesisError> {
-    if (public_inputs.len() + 1) != pvk.query.len() {
+    if (public_inputs.len() + 1) != pvk.query().len() {
         return Err(SynthesisError::MalformedVerifyingKey);
     }
 
     // e(A*G^{alpha}, B*H^{beta}) = e(G^{alpha}, H^{beta}) * e(G^{psi}, H^{gamma}) *
     // e(C, H) where psi = \sum_{i=0}^l input_i pvk.query[i]
 
-    let mut g_psi = pvk.query[0].into_projective();
-    for (i, b) in public_inputs.iter().zip(pvk.query.iter().skip(1)) {
+    let mut g_psi = pvk.query()[0].into_projective();
+    for (i, b) in public_inputs.iter().zip(pvk.query().iter().skip(1)) {
         g_psi.add_assign(&b.mul(i.into_repr()));
     }
 

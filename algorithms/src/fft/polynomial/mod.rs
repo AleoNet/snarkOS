@@ -128,11 +128,11 @@ impl<F: Field> DenseOrSparsePolynomial<'_, F> {
 
                 if let SPolynomial(p) = divisor {
                     for (i, div_coeff) in &p.coeffs {
-                        remainder[cur_q_degree + i] -= &(cur_q_coeff * &div_coeff);
+                        remainder[cur_q_degree + i] -= &(cur_q_coeff * div_coeff);
                     }
                 } else if let DPolynomial(p) = divisor {
                     for (i, div_coeff) in p.iter().enumerate() {
-                        remainder[cur_q_degree + i] -= &(cur_q_coeff * &div_coeff);
+                        remainder[cur_q_degree + i] -= &(cur_q_coeff * div_coeff);
                     }
                 }
 

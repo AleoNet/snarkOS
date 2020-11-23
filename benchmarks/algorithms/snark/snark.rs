@@ -85,7 +85,7 @@ fn snark_setup(c: &mut Criterion) {
     c.bench_function("snark_setup", move |b| {
         b.iter(|| {
             GM17SNARK::setup(
-                Benchmark::<Fr> {
+                &Benchmark::<Fr> {
                     inputs: vec![None; num_inputs],
                     num_constraints,
                 },
@@ -106,7 +106,7 @@ fn snark_prove(c: &mut Criterion) {
     }
 
     let params = GM17SNARK::setup(
-        Benchmark::<Fr> {
+        &Benchmark::<Fr> {
             inputs: vec![None; num_inputs],
             num_constraints,
         },
@@ -118,7 +118,7 @@ fn snark_prove(c: &mut Criterion) {
         b.iter(|| {
             GM17SNARK::prove(
                 &params.0,
-                Benchmark {
+                &Benchmark {
                     inputs: inputs.clone(),
                     num_constraints,
                 },

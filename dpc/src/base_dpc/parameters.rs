@@ -56,7 +56,7 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             LocalDataCommitmentParameters::load_bytes()?.as_slice(),
         )?);
         let program_verification_key_commitment: C::ProgramVerificationKeyCommitment =
-            From::from(FromBytes::read(vec![].as_slice())?);
+            From::from(FromBytes::read(&[][..])?);
         let program_verification_key_crh: C::ProgramVerificationKeyCRH =
             From::from(FromBytes::read(ProgramVKCRHParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =

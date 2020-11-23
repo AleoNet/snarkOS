@@ -244,7 +244,7 @@ impl<E: PairingEngine> From<Parameters<E>> for VerifyingKey<E> {
 
 impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
     fn from(other: Parameters<E>) -> Self {
-        prepare_verifying_key(&other.vk)
+        prepare_verifying_key(other.vk)
     }
 }
 
@@ -380,7 +380,12 @@ pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub g_gamma_pc: <E::G1Affine as PairingCurve>::Prepared,
     pub h_gamma_pc: <E::G2Affine as PairingCurve>::Prepared,
     pub h_pc: <E::G2Affine as PairingCurve>::Prepared,
-    pub query: Vec<E::G1Affine>,
+}
+
+impl<E: PairingEngine> PreparedVerifyingKey<E> {
+    fn query(&self) -> &[E::G1Affine] {
+        &self.vk.query
+    }
 }
 
 impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
@@ -391,7 +396,7 @@ impl<E: PairingEngine> From<PreparedVerifyingKey<E>> for VerifyingKey<E> {
 
 impl<E: PairingEngine> From<VerifyingKey<E>> for PreparedVerifyingKey<E> {
     fn from(other: VerifyingKey<E>) -> Self {
-        prepare_verifying_key(&other)
+        prepare_verifying_key(other)
     }
 }
 
@@ -405,7 +410,6 @@ impl<E: PairingEngine> Default for PreparedVerifyingKey<E> {
             g_gamma_pc: <E::G1Affine as PairingCurve>::Prepared::default(),
             h_gamma_pc: <E::G2Affine as PairingCurve>::Prepared::default(),
             h_pc: <E::G2Affine as PairingCurve>::Prepared::default(),
-            query: Vec::new(),
         }
     }
 }
@@ -419,7 +423,7 @@ impl<E: PairingEngine> ToBytes for PreparedVerifyingKey<E> {
         self.g_gamma_pc.write(&mut writer)?;
         self.h_gamma_pc.write(&mut writer)?;
         self.h_pc.write(&mut writer)?;
-        for q in &self.query {
+        for q in self.query() {
             q.write(&mut writer)?;
         }
         Ok(())

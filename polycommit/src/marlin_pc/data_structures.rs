@@ -163,6 +163,15 @@ impl<E: PairingEngine> PCCommitment for Commitment<E> {
     fn has_degree_bound(&self) -> bool {
         self.shifted_comm.is_some()
     }
+
+    fn is_in_correct_subgroup_assuming_on_curve(&self) -> bool {
+        self.comm.is_in_correct_subgroup_assuming_on_curve()
+            && if let Some(ref comm) = self.shifted_comm {
+                comm.is_in_correct_subgroup_assuming_on_curve()
+            } else {
+                true
+            }
+    }
 }
 
 /// `Randomness` hides the polynomial inside a commitment. It is output by `KZG10::commit`.
