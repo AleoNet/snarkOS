@@ -38,7 +38,7 @@ use itertools::Itertools;
 
 fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
-    field_elements: &[C::InnerField],
+    field_elements: Vec<C::InnerField>,
     name: &str,
 ) -> Result<Vec<Vec<UInt8>>, SynthesisError> {
     if field_elements.len() <= 1 {
@@ -211,24 +211,24 @@ where
     // Allocate field element bytes
 
     let account_commitment_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &account_commitment_parameters_fe, "account commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, account_commitment_parameters_fe, "account commitment pp")?;
 
     let account_encryption_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &account_encryption_parameters_fe, "account encryption pp")?;
+        field_element_to_bytes::<C, _>(cs, account_encryption_parameters_fe, "account encryption pp")?;
 
-    let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, &account_signature_fe, "account signature pp")?;
+    let account_signature_fe_bytes = field_element_to_bytes::<C, _>(cs, account_signature_fe, "account signature pp")?;
     let record_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &record_commitment_parameters_fe, "record commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, record_commitment_parameters_fe, "record commitment pp")?;
     let encrypted_record_crh_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &encrypted_record_crh_parameters_fe, "encrypted record crh pp")?;
+        field_element_to_bytes::<C, _>(cs, encrypted_record_crh_parameters_fe, "encrypted record crh pp")?;
     let program_vk_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &program_vk_commitment_parameters_fe, "program vk commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, program_vk_commitment_parameters_fe, "program vk commitment pp")?;
     let local_data_commitment_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &local_data_crh_parameters_fe, "local data commitment pp")?;
+        field_element_to_bytes::<C, _>(cs, local_data_crh_parameters_fe, "local data commitment pp")?;
     let serial_number_nonce_crh_parameters_fe_bytes =
-        field_element_to_bytes::<C, _>(cs, &serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
-    let ledger_parameters_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_parameters_fe, "ledger pp")?;
-    let ledger_digest_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_digest_fe, "ledger digest")?;
+        field_element_to_bytes::<C, _>(cs, serial_number_nonce_crh_parameters_fe, "serial number nonce crh pp")?;
+    let ledger_parameters_fe_bytes = field_element_to_bytes::<C, _>(cs, ledger_parameters_fe, "ledger pp")?;
+    let ledger_digest_fe_bytes = field_element_to_bytes::<C, _>(cs, ledger_digest_fe, "ledger digest")?;
 
     let mut serial_number_fe_bytes = vec![];
     for (index, sn) in old_serial_numbers.iter().enumerate() {
@@ -237,7 +237,7 @@ where
 
         serial_number_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            &serial_number_fe,
+            serial_number_fe,
             &format!("Allocate serial number {:?}", index),
         )?);
     }
@@ -255,22 +255,22 @@ where
 
         commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            &commitment_fe,
+            commitment_fe,
             &format!("Allocate record commitment {:?}", index),
         )?);
 
         commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            &encrypted_record_hash_fe,
+            encrypted_record_hash_fe,
             &format!("Allocate encrypted record hash {:?}", index),
         )?);
     }
 
-    let program_commitment_fe_bytes = field_element_to_bytes::<C, _>(cs, &program_commitment_fe, "program commitment")?;
-    let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, &memo_fe, "memo")?;
-    let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, &network_id_fe, "network id")?;
-    let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, &local_data_root_fe, "local data root")?;
-    let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, &value_balance_fe, "value balance")?;
+    let program_commitment_fe_bytes = field_element_to_bytes::<C, _>(cs, program_commitment_fe, "program commitment")?;
+    let memo_fe_bytes = field_element_to_bytes::<C, _>(cs, memo_fe, "memo")?;
+    let network_id_fe_bytes = field_element_to_bytes::<C, _>(cs, network_id_fe, "network id")?;
+    let local_data_root_fe_bytes = field_element_to_bytes::<C, _>(cs, local_data_root_fe, "local data root")?;
+    let value_balance_fe_bytes = field_element_to_bytes::<C, _>(cs, value_balance_fe, "value balance")?;
 
     // Construct inner snark input as bytes
 
@@ -345,7 +345,9 @@ where
             .iter()
             .flat_map(|byte| byte.to_bits_le())
             .collect::<Vec<_>>();
-        program_input_bits.push(input_bits);
+        if !input_bits.is_empty() {
+            program_input_bits.push(input_bits);
+        }
     }
 
     // ************************************************************************
@@ -376,7 +378,7 @@ where
         let claimed_death_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute death program vk hash"),
             &program_vk_crh_parameters,
-            &death_program_vk_bytes,
+            death_program_vk_bytes,
         )?;
 
         let claimed_death_program_id_bytes =
@@ -389,9 +391,7 @@ where
         C::ProgramSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &death_program_vk,
-            ([position].iter())
-                .chain(program_input_bits.iter())
-                .filter(|inp| !inp.is_empty()),
+            ([position].iter()).chain(program_input_bits.iter()),
             &death_program_proof,
         )?;
     }
@@ -419,7 +419,7 @@ where
         let claimed_birth_program_id = C::ProgramVerificationKeyCRHGadget::check_evaluation_gadget(
             &mut cs.ns(|| "Compute birth program vk hash"),
             &program_vk_crh_parameters,
-            &birth_program_vk_bytes,
+            birth_program_vk_bytes,
         )?;
 
         let claimed_birth_program_id_bytes =
@@ -432,9 +432,7 @@ where
         C::ProgramSNARKGadget::check_verify(
             &mut cs.ns(|| "Check that proof is satisfied"),
             &birth_program_vk,
-            ([position].iter())
-                .chain(program_input_bits.iter())
-                .filter(|inp| !inp.is_empty()),
+            ([position].iter()).chain(program_input_bits.iter()),
             &birth_program_proof,
         )?;
     }
@@ -497,7 +495,7 @@ where
     let candidate_inner_snark_id = C::InnerSNARKVerificationKeyCRHGadget::check_evaluation_gadget(
         &mut cs.ns(|| "Compute inner snark vk hash"),
         &inner_snark_vk_crh_parameters,
-        &inner_snark_vk_bytes,
+        inner_snark_vk_bytes,
     )?;
 
     candidate_inner_snark_id.enforce_equal(

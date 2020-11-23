@@ -83,7 +83,7 @@ impl<C: CommitmentScheme, H: CRH, CG: CommitmentGadget<C, F>, HG: CRHGadget<H, F
         let mut leaf_bytes = left_leaf_bytes;
         leaf_bytes.extend_from_slice(&right_leaf_bytes);
 
-        let inner_hash = HG::check_evaluation_gadget(cs.ns(|| "inner_hash"), parameters, &leaf_bytes)?;
+        let inner_hash = HG::check_evaluation_gadget(cs.ns(|| "inner_hash"), parameters, leaf_bytes)?;
 
         let left_inner_hash = &self.inner_hashes.0;
         let right_inner_hash = &self.inner_hashes.1;
@@ -105,7 +105,7 @@ impl<C: CommitmentScheme, H: CRH, CG: CommitmentGadget<C, F>, HG: CRHGadget<H, F
         let mut inner_hash_bytes = left_inner_hash_bytes;
         inner_hash_bytes.extend_from_slice(&right_inner_hash_bytes);
 
-        let declared_root = HG::check_evaluation_gadget(cs.ns(|| "root_hash"), parameters, &inner_hash_bytes)?;
+        let declared_root = HG::check_evaluation_gadget(cs.ns(|| "root_hash"), parameters, inner_hash_bytes)?;
 
         root.conditional_enforce_equal(&mut cs.ns(|| "check_root_is_valid"), &declared_root, should_enforce)?;
 

@@ -361,11 +361,15 @@ impl<E: PairingEngine> From<VerifyingKey<E>> for PreparedVerifyingKey<E> {
     }
 }
 
-fn push_constraints<F: Field>(l: LinearCombination<F>, constraints: &mut [Vec<(F, Index)>], this_constraint: usize) {
-    for (var, coeff) in l.as_ref() {
+fn push_constraints<F: Field>(l: LinearCombination<F>, constraints: &mut Vec<Vec<(F, Index)>>) {
+    let vars_and_coeffs = l.as_ref();
+    let mut vec = Vec::with_capacity(vars_and_coeffs.len());
+
+    for (var, coeff) in vars_and_coeffs {
         match var.get_unchecked() {
-            Index::Input(i) => constraints[this_constraint].push((*coeff, Index::Input(i))),
-            Index::Aux(i) => constraints[this_constraint].push((*coeff, Index::Aux(i))),
+            Index::Input(i) => vec.push((*coeff, Index::Input(i))),
+            Index::Aux(i) => vec.push((*coeff, Index::Aux(i))),
         }
     }
+    constraints.push(vec);
 }
