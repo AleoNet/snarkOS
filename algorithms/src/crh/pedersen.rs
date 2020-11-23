@@ -22,7 +22,6 @@ use snarkos_models::{
 };
 use snarkos_utilities::bytes_to_bits;
 
-use itertools::Itertools;
 use rand::Rng;
 
 #[cfg(feature = "pedersen-parallel")]
@@ -94,6 +93,7 @@ impl<G: Group, S: PedersenSize> CRH for PedersenCRH<G, S> {
             #[cfg(not(feature = "pedersen-parallel"))]
             {
                 bytes_to_bits(input)
+                    .collect::<Vec<_>>()
                     .chunks(S::WINDOW_SIZE)
                     .zip(&self.parameters.bases)
                     .map(|(bits, powers)| {
