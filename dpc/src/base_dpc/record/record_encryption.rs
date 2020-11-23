@@ -34,6 +34,8 @@ use itertools::Itertools;
 use rand::Rng;
 use std::marker::PhantomData;
 
+type BaseField<T> = <<T as BaseDPCComponents>::EncryptionModelParameters as ModelParameters>::BaseField;
+
 #[derive(Derivative)]
 #[derivative(
     Clone(bound = "C: BaseDPCComponents"),
@@ -44,10 +46,7 @@ pub struct RecordEncryptionGadgetComponents<C: BaseDPCComponents> {
     /// Record field element representations
     pub record_field_elements: Vec<<C::EncryptionModelParameters as ModelParameters>::BaseField>,
     /// Record group element encodings - Represented in (x,y) affine coordinates
-    pub record_group_encoding: Vec<(
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-        <C::EncryptionModelParameters as ModelParameters>::BaseField,
-    )>,
+    pub record_group_encoding: Vec<(BaseField<C>, BaseField<C>)>,
     /// Record ciphertext selectors - Used for ciphertext compression/decompression
     pub ciphertext_selectors: Vec<bool>,
     /// Record fq high selectors - Used for plaintext serialization/deserialization
@@ -101,9 +100,9 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
     > {
         // Serialize the record into group elements and fq_high bits
         let (serialized_record, final_fq_high_selector) =
-            RecordSerializer::<C, C::EncryptionModelParameters, C::EncryptionGroup>::serialize(&record)?;
+            RecordSerializer::<C, C::EncryptionModelParameters, C::EncryptionGroup>::serialize(record)?;
 
-        let mut record_plaintexts = vec![];
+        let mut record_plaintexts = Vec::with_capacity(serialized_record.len());
         for element in serialized_record.iter() {
             // Construct the plaintext element from the serialized group elements
             // This value will be used in the inner circuit to validate the encryption
@@ -145,7 +144,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             &encrypted_record.encrypted_record,
         )?;
 
-        let mut plaintext = vec![];
+        let mut plaintext = Vec::with_capacity(plaintext_elements.len());
         for element in plaintext_elements {
             let plaintext_element = <C as BaseDPCComponents>::EncryptionGroup::read(&to_bytes![element]?[..])?;
 
@@ -220,8 +219,8 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         system_parameters: &SystemParameters<C>,
         encrypted_record: &EncryptedRecord<C>,
     ) -> Result<<<C as DPCComponents>::EncryptedRecordCRH as CRH>::Output, DPCError> {
-        let mut ciphertext_affine_x = vec![];
-        let mut selector_bits = vec![];
+        let mut ciphertext_affine_x = Vec::with_capacity(encrypted_record.encrypted_record.len());
+        let mut selector_bits = Vec::with_capacity(encrypted_record.encrypted_record.len() + 1);
         for ciphertext_element in &encrypted_record.encrypted_record {
             // Compress the ciphertext element to the affine x coordinate
             let ciphertext_element_affine =
@@ -231,7 +230,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             // Fetch the ciphertext selector bit
             let selector =
                 match <<C as BaseDPCComponents>::EncryptionGroup as ProjectiveCurve>::Affine::from_x_coordinate(
-                    ciphertext_x_coordinate.clone(),
+                    ciphertext_x_coordinate,
                     true,
                 ) {
                     Some(affine) => ciphertext_element_affine == affine,
@@ -276,15 +275,18 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
             )?;
             let final_element_bits = bytes_to_bits(&final_element_bytes);
             [
-                &final_element_bits[1..serialized_record.len()],
+                &final_element_bits
+                    .skip(1)
+                    .take(serialized_record.len().saturating_sub(1))
+                    .collect::<Vec<_>>(),
                 &[final_fq_high_selector][..],
             ]
             .concat()
         };
 
-        let mut record_field_elements = vec![];
-        let mut record_group_encoding = vec![];
-        let mut record_plaintexts = vec![];
+        let mut record_field_elements = Vec::with_capacity(serialized_record.len());
+        let mut record_group_encoding = Vec::with_capacity(serialized_record.len());
+        let mut record_plaintexts = Vec::with_capacity(serialized_record.len());
 
         for (i, (element, fq_high)) in serialized_record.iter().zip_eq(&fq_high_selectors).enumerate() {
             let element_affine = element.into_affine();
@@ -341,7 +343,7 @@ impl<C: BaseDPCComponents> RecordEncryption<C> {
         )?;
 
         // Compute the compressed ciphertext selector bits
-        let mut ciphertext_selectors = vec![];
+        let mut ciphertext_selectors = Vec::with_capacity(encrypted_record.len());
         for ciphertext_element in encrypted_record.iter() {
             // Compress the ciphertext element to the affine x coordinate
             let ciphertext_element_affine =

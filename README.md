@@ -132,7 +132,7 @@ FLAGS:
         --no-jsonrpc     Run the node without running the json rpc server
 
 OPTIONS:
-        --connect <ip>                           Specify a node ip address to connect to on startup
+        --connect <ip>                           Specify one or more node ip addresses to connect to on startup
     -i, --ip <ip>                                Specify the ip of your node
         --max-peers <max-peers>                  Specify the maximum number of peers the node can connect to
         --mempool-interval <mempool-interval>    Specify the frequency in seconds the node should fetch a sync node's mempool

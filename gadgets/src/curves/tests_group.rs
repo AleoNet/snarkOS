@@ -25,8 +25,6 @@ use snarkos_models::{
     },
 };
 
-use rand;
-
 pub fn group_test<F: Field, G: Group, GG: GroupGadget<G, F>, CS: ConstraintSystem<F>>(cs: &mut CS, a: GG, b: GG) {
     let zero = GG::zero(cs.ns(|| "Zero")).unwrap();
     assert_eq!(zero, zero);

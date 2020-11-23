@@ -118,7 +118,7 @@ where
         ps: &[Self::G1PreparedGadget],
         qs: &[Self::G2PreparedGadget],
     ) -> Result<Self::GTGadget, SynthesisError> {
-        let mut pairs = vec![];
+        let mut pairs = Vec::with_capacity(ps.len());
         for (p, q) in ps.iter().zip(qs.iter()) {
             pairs.push((p, q.ell_coeffs.iter()));
         }

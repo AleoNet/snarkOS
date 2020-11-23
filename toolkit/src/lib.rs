@@ -14,12 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![allow(clippy::module_inception)]
+
 #[macro_use]
 extern crate thiserror;
 
 pub mod account;
 pub mod dpc;
 pub mod errors;
+pub mod record;
 pub mod signature;
 
 #[cfg(target_arch = "wasm32")]

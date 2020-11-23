@@ -107,11 +107,12 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         }
     }
 
-    /// Get memo index
+    /// Build a new commitment merkle tree from the stored commitments
     pub fn build_merkle_tree(
         &self,
         additional_cms: Vec<(T::Commitment, usize)>,
     ) -> Result<MerkleTree<P>, StorageError> {
+        // TODO (raychu86) make this more efficient
         let mut cm_and_indices = additional_cms;
 
         for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {

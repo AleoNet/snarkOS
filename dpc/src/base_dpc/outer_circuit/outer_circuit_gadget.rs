@@ -38,7 +38,7 @@ use itertools::Itertools;
 
 fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
-    field_elements: &Vec<C::InnerField>,
+    field_elements: &[C::InnerField],
     name: &str,
 ) -> Result<Vec<Vec<UInt8>>, SynthesisError> {
     if field_elements.len() <= 1 {
@@ -47,7 +47,7 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
             &to_bytes![field_elements].map_err(|_| SynthesisError::AssignmentMissing)?,
         )?])
     } else {
-        let mut fe_bytes = vec![];
+        let mut fe_bytes = Vec::with_capacity(field_elements.len());
         for (index, field_element) in field_elements.iter().enumerate() {
             fe_bytes.push(UInt8::alloc_input_vec(
                 cs.ns(|| format!("Allocate {} - index {} ", name, index)),
@@ -58,6 +58,7 @@ fn field_element_to_bytes<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterFie
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::OuterField>>(
     cs: &mut CS,
     // Parameters
@@ -66,9 +67,9 @@ pub fn execute_outer_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     // Inner snark verifier public inputs
     ledger_parameters: &C::MerkleParameters,
     ledger_digest: &MerkleTreeDigest<C::MerkleParameters>,
-    old_serial_numbers: &Vec<<C::AccountSignature as SignatureScheme>::PublicKey>,
-    new_commitments: &Vec<<C::RecordCommitment as CommitmentScheme>::Output>,
-    new_encrypted_record_hashes: &Vec<<C::EncryptedRecordCRH as CRH>::Output>,
+    old_serial_numbers: &[<C::AccountSignature as SignatureScheme>::PublicKey],
+    new_commitments: &[<C::RecordCommitment as CommitmentScheme>::Output],
+    new_encrypted_record_hashes: &[<C::EncryptedRecordCRH as CRH>::Output],
     memo: &[u8; 32],
     value_balance: AleoAmount,
     network_id: u8,
@@ -192,30 +193,6 @@ where
     let ledger_digest_fe = ToConstraintField::<C::InnerField>::to_field_elements(ledger_digest)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-    let mut serial_numbers_fe = vec![];
-    for sn in old_serial_numbers {
-        let serial_number_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(sn).map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        serial_numbers_fe.push(serial_number_fe);
-    }
-
-    let mut commitments_fe = vec![];
-    for cm in new_commitments {
-        let commitment_fe =
-            ToConstraintField::<C::InnerField>::to_field_elements(cm).map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        commitments_fe.push(commitment_fe);
-    }
-
-    let mut encrypted_record_hashes_fe = vec![];
-    for encrypted_record_hash in new_encrypted_record_hashes {
-        let encrypted_record_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(encrypted_record_hash)
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
-
-        encrypted_record_hashes_fe.push(encrypted_record_hash_fe);
-    }
-
     let program_commitment_fe = ToConstraintField::<C::InnerField>::to_field_elements(program_commitment)
         .map_err(|_| SynthesisError::AssignmentMissing)?;
 
@@ -254,27 +231,37 @@ where
     let ledger_digest_fe_bytes = field_element_to_bytes::<C, _>(cs, &ledger_digest_fe, "ledger digest")?;
 
     let mut serial_number_fe_bytes = vec![];
-    for (index, sn_fe) in serial_numbers_fe.iter().enumerate() {
+    for (index, sn) in old_serial_numbers.iter().enumerate() {
+        let serial_number_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(sn).map_err(|_| SynthesisError::AssignmentMissing)?;
+
         serial_number_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            sn_fe,
+            &serial_number_fe,
             &format!("Allocate serial number {:?}", index),
         )?);
     }
 
     let mut commitment_and_encrypted_record_hash_fe_bytes = vec![];
-    for (index, (cm_fe, encrypted_record_hash_fe)) in
-        commitments_fe.iter().zip_eq(&encrypted_record_hashes_fe).enumerate()
+    for (index, (cm, encrypted_record_hash)) in new_commitments
+        .iter()
+        .zip_eq(new_encrypted_record_hashes.iter())
+        .enumerate()
     {
+        let commitment_fe =
+            ToConstraintField::<C::InnerField>::to_field_elements(cm).map_err(|_| SynthesisError::AssignmentMissing)?;
+        let encrypted_record_hash_fe = ToConstraintField::<C::InnerField>::to_field_elements(encrypted_record_hash)
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+
         commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            cm_fe,
+            &commitment_fe,
             &format!("Allocate record commitment {:?}", index),
         )?);
 
         commitment_and_encrypted_record_hash_fe_bytes.extend(field_element_to_bytes::<C, _>(
             cs,
-            encrypted_record_hash_fe,
+            &encrypted_record_hash_fe,
             &format!("Allocate encrypted record hash {:?}", index),
         )?);
     }
@@ -308,7 +295,7 @@ where
 
     // Convert inner snark input bytes to bits
 
-    let mut inner_snark_input_bits = vec![];
+    let mut inner_snark_input_bits = Vec::with_capacity(inner_snark_input_bytes.len());
     for input_bytes in inner_snark_input_bytes {
         let input_bits = input_bytes
             .iter()
@@ -338,6 +325,8 @@ where
         &inner_snark_proof,
     )?;
 
+    drop(inner_snark_input_bits);
+
     // ************************************************************************
     // Construct program input
     // ************************************************************************
@@ -349,7 +338,7 @@ where
     program_input_bytes.extend(local_data_commitment_parameters_fe_bytes);
     program_input_bytes.extend(local_data_root_fe_bytes);
 
-    let mut program_input_bits = vec![];
+    let mut program_input_bits = Vec::with_capacity(program_input_bytes.len());
 
     for input_bytes in program_input_bytes {
         let input_bits = input_bytes
@@ -362,20 +351,24 @@ where
     // ************************************************************************
     // ************************************************************************
 
-    let mut old_death_program_ids = Vec::new();
-    let mut new_birth_program_ids = Vec::new();
-    for i in 0..C::NUM_INPUT_RECORDS {
+    let mut old_death_program_ids = Vec::with_capacity(C::NUM_INPUT_RECORDS);
+    let mut new_birth_program_ids = Vec::with_capacity(C::NUM_OUTPUT_RECORDS);
+    for (i, input) in old_death_program_verification_inputs
+        .iter()
+        .enumerate()
+        .take(C::NUM_INPUT_RECORDS)
+    {
         let cs = &mut cs.ns(|| format!("Check death program for input record {}", i));
 
         let death_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc_bytes(
             &mut cs.ns(|| "Allocate proof"),
-            || Ok(&old_death_program_verification_inputs[i].proof),
+            || Ok(&input.proof),
         )?;
 
         let death_program_vk =
             <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc_bytes(
                 &mut cs.ns(|| "Allocate verification key"),
-                || Ok(&old_death_program_verification_inputs[i].verification_key),
+                || Ok(&input.verification_key),
             )?;
 
         let death_program_vk_bytes = death_program_vk.to_bytes(&mut cs.ns(|| "Convert death pred vk to bytes"))?;
@@ -403,18 +396,22 @@ where
         )?;
     }
 
-    for j in 0..C::NUM_OUTPUT_RECORDS {
+    for (j, input) in new_birth_program_verification_inputs
+        .iter()
+        .enumerate()
+        .take(C::NUM_OUTPUT_RECORDS)
+    {
         let cs = &mut cs.ns(|| format!("Check birth program for output record {}", j));
 
         let birth_program_proof = <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::ProofGadget::alloc_bytes(
             &mut cs.ns(|| "Allocate proof"),
-            || Ok(&new_birth_program_verification_inputs[j].proof),
+            || Ok(&input.proof),
         )?;
 
         let birth_program_vk =
             <C::ProgramSNARKGadget as SNARKVerifierGadget<_, _>>::VerificationKeyGadget::alloc_bytes(
                 &mut cs.ns(|| "Allocate verification key"),
-                || Ok(&new_birth_program_verification_inputs[j].verification_key),
+                || Ok(&input.verification_key),
             )?;
 
         let birth_program_vk_bytes = birth_program_vk.to_bytes(&mut cs.ns(|| "Convert birth pred vk to bytes"))?;
@@ -450,12 +447,12 @@ where
         let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
-        for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_program_ids[i]);
+        for id in old_death_program_ids.iter().take(C::NUM_INPUT_RECORDS) {
+            input.extend_from_slice(&id);
         }
 
-        for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_program_ids[j]);
+        for id in new_birth_program_ids.iter().take(C::NUM_OUTPUT_RECORDS) {
+            input.extend_from_slice(&id);
         }
 
         let given_commitment_randomness =

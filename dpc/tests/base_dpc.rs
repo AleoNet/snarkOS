@@ -99,14 +99,14 @@ fn base_dpc_integration_test() {
         )
         .unwrap();
         let old_record = DPC::generate_record(
-            &parameters.system_parameters,
-            &old_sn_nonce,
-            &genesis_account.address,
+            parameters.system_parameters.clone(),
+            old_sn_nonce,
+            genesis_account.address.clone(),
             true, // The input record is dummy
             0,
-            &RecordPayload::default(),
-            &noop_program_id,
-            &noop_program_id,
+            RecordPayload::default(),
+            noop_program_id.clone(),
+            noop_program_id.clone(),
             &mut rng,
         )
         .unwrap();
@@ -127,16 +127,16 @@ fn base_dpc_integration_test() {
 
     // Offline execution to generate a DPC transaction
     let execute_context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
-        &parameters.system_parameters,
-        &old_records,
-        &old_account_private_keys,
-        &new_record_owners,
+        parameters.system_parameters.clone(),
+        old_records,
+        old_account_private_keys,
+        new_record_owners,
         &new_is_dummy_flags,
         &new_values,
-        &new_payloads,
-        &new_birth_program_ids,
-        &new_death_program_ids,
-        &memo,
+        new_payloads,
+        new_birth_program_ids,
+        new_death_program_ids,
+        memo,
         network_id,
         &mut rng,
     )
@@ -181,8 +181,8 @@ fn base_dpc_integration_test() {
     let (new_records, transaction) = InstantiatedDPC::execute_online(
         &parameters,
         execute_context,
-        &old_death_program_proofs,
-        &new_birth_program_proofs,
+        old_death_program_proofs,
+        new_birth_program_proofs,
         &ledger,
         &mut rng,
     )
@@ -198,7 +198,7 @@ fn base_dpc_integration_test() {
         // Check that new_records can be decrypted from the transaction
 
         let encrypted_records = transaction.encrypted_records();
-        let new_account_private_keys = vec![recipient.private_key.clone(); NUM_OUTPUT_RECORDS];
+        let new_account_private_keys = vec![recipient.private_key; NUM_OUTPUT_RECORDS];
 
         for ((encrypted_record, private_key), new_record) in
             encrypted_records.iter().zip(new_account_private_keys).zip(new_records)

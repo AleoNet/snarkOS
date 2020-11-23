@@ -96,7 +96,7 @@ impl Miner {
             storage.get_latest_block_height() + 1,
             transactions,
             parameters,
-            &program_vk_hash,
+            program_vk_hash,
             new_birth_programs,
             new_death_programs,
             self.address.clone(),
@@ -109,6 +109,7 @@ impl Miner {
     }
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
+    #[allow(clippy::type_complexity)]
     pub fn establish_block(
         &self,
         parameters: &PublicParameters<Components>,
@@ -171,13 +172,13 @@ impl Miner {
         storage: &Arc<MerkleTreeLedger>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
     ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let mut candidate_transactions =
+        let candidate_transactions =
             Self::fetch_memory_pool_transactions(&storage.clone(), memory_pool, self.consensus.max_block_size).await?;
 
         println!("Miner creating block");
 
         let (previous_block_header, transactions, coinbase_records) =
-            self.establish_block(parameters, storage, &mut candidate_transactions)?;
+            self.establish_block(parameters, storage, &candidate_transactions)?;
 
         println!("Miner generated coinbase transaction");
 
@@ -197,7 +198,14 @@ impl Miner {
         self.consensus
             .receive_block(parameters, storage, &mut memory_pool, &block)?;
 
-        storage.store_records(&coinbase_records)?;
+        // Store the non-dummy coinbase records.
+        let mut records_to_store = vec![];
+        for record in &coinbase_records {
+            if !record.is_dummy() {
+                records_to_store.push(record.clone());
+            }
+        }
+        storage.store_records(&records_to_store)?;
 
         Ok((block.serialize()?, coinbase_records))
     }

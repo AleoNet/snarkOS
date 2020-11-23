@@ -281,9 +281,10 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
 
     let elems: Vec<_> = output_domain.elements().collect();
 
-    let mut row_vec = Vec::new();
-    let mut col_vec = Vec::new();
-    let mut val_vec = Vec::new();
+    let vec_len: usize = matrix.iter().map(|row| row.len()).sum();
+    let mut row_vec = Vec::with_capacity(vec_len);
+    let mut col_vec = Vec::with_capacity(vec_len);
+    let mut val_vec = Vec::with_capacity(vec_len);
 
     let eq_poly_vals_time = start_timer!(|| "Precomputing eq_poly_vals");
     let eq_poly_vals: BTreeMap<F, F> = output_domain
@@ -293,13 +294,13 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
     end_timer!(eq_poly_vals_time);
 
     let lde_evals_time = start_timer!(|| "Computing row, col and val evals");
-    let mut inverses = Vec::new();
+    let mut inverses = Vec::with_capacity(vec_len);
 
     let mut count = 0;
 
     // Recall that we are computing the arithmetization of M^*,
     // where `M^*(i, j) := M(j, i) * u_H(j, j)`.
-    for (r, row) in matrix.into_iter().enumerate() {
+    for (r, row) in matrix.iter_mut().enumerate() {
         if !is_in_ascending_order(&row, |(_, a), (_, b)| a < b) {
             row.sort_by(|(_, a), (_, b)| a.cmp(b));
         };
@@ -363,7 +364,7 @@ pub(crate) fn arithmetize_matrix<'a, F: PrimeField>(
         row: LabeledPolynomial::new_owned(m_name.clone() + "_row", row, None, None),
         col: LabeledPolynomial::new_owned(m_name.clone() + "_col", col, None, None),
         val: LabeledPolynomial::new_owned(m_name.clone() + "_val", val, None, None),
-        row_col: LabeledPolynomial::new_owned(m_name.clone() + "_row_col", row_col, None, None),
+        row_col: LabeledPolynomial::new_owned(m_name + "_row_col", row_col, None, None),
         evals_on_K,
         evals_on_B,
         row_col_evals_on_B: Cow::Owned(row_col_evals_on_B),

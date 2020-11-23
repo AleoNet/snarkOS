@@ -36,6 +36,7 @@ use core::marker::PhantomData;
 
 mod data_structures;
 pub use data_structures::*;
+use std::collections::BTreeMap;
 
 /// `KZG10` is an implementation of the polynomial commitment scheme of
 /// [Kate, Zaverucha and Goldbgerg][kzg10]
@@ -93,7 +94,10 @@ impl<E: PairingEngine> KZG10<E> {
         end_timer!(gamma_g_time);
 
         let powers_of_g = E::G1Projective::batch_normalization_into_affine(&powers_of_g);
-        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g);
+        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g)
+            .into_iter()
+            .enumerate()
+            .collect();
 
         let prepared_neg_powers_of_h_time = start_timer!(|| "Generating negative powers of h in G2");
         let prepared_neg_powers_of_h = if produce_g2_powers {
@@ -113,9 +117,17 @@ impl<E: PairingEngine> KZG10<E> {
             );
 
             let affines = E::G2Projective::batch_normalization_into_affine(&neg_powers_of_h);
-            Some(affines.into_iter().map(|a| a.prepare()).collect())
+            let mut affines_map = BTreeMap::new();
+            affines
+                .into_iter()
+                .enumerate()
+                .map(|(i, a)| (i, a.prepare()))
+                .for_each(|(i, a)| {
+                    affines_map.insert(i, a);
+                });
+            affines_map
         } else {
-            None
+            BTreeMap::new()
         };
 
         end_timer!(prepared_neg_powers_of_h_time);
@@ -187,6 +199,7 @@ impl<E: PairingEngine> KZG10<E> {
     /// The witness polynomial w(x) the quotient of the division (p(x) - p(z)) / (x - z)
     /// Observe that this quotient does not change with z because
     /// p(z) is the remainder term. We can therefore omit p(z) when computing the quotient.
+    #[allow(clippy::type_complexity)]
     pub fn compute_witness_polynomial(
         p: &Polynomial<E::Fr>,
         point: E::Fr,
@@ -212,7 +225,7 @@ impl<E: PairingEngine> KZG10<E> {
         Ok((witness_polynomial, random_witness_polynomial))
     }
 
-    pub(crate) fn open_with_witness_polynomial<'a>(
+    pub(crate) fn open_with_witness_polynomial(
         powers: &Powers<E>,
         point: E::Fr,
         randomness: &Randomness<E>,
@@ -248,7 +261,7 @@ impl<E: PairingEngine> KZG10<E> {
     }
 
     /// On input a polynomial `p` and a point `point`, outputs a proof for the same.
-    pub(crate) fn open<'a>(
+    pub(crate) fn open(
         powers: &Powers<E>,
         p: &Polynomial<E::Fr>,
         point: E::Fr,
@@ -295,7 +308,7 @@ impl<E: PairingEngine> KZG10<E> {
     /// `commitment_i` at `point_i`.
     pub fn batch_check<R: RngCore>(
         vk: &VerifierKey<E>,
-        commitments: &[Commitment<E>],
+        commitments: impl ExactSizeIterator<Item = Commitment<E>>,
         points: &[E::Fr],
         values: &[E::Fr],
         proofs: &[Proof<E>],
@@ -314,12 +327,12 @@ impl<E: PairingEngine> KZG10<E> {
         // their coefficients and perform a final multiplication at the end.
         let mut g_multiplier = E::Fr::zero();
         let mut gamma_g_multiplier = E::Fr::zero();
-        for (((c, z), v), proof) in commitments.iter().zip(points).zip(values).zip(proofs) {
+        for (((c, z), v), proof) in commitments.zip(points).zip(values).zip(proofs) {
             let w = proof.w;
             let mut temp = w.mul(*z);
             temp.add_assign_mixed(&c.0);
             let c = temp;
-            g_multiplier += &(randomizer * &v);
+            g_multiplier += &(randomizer * v);
             if let Some(random_v) = proof.random_v {
                 gamma_g_multiplier += &(randomizer * &random_v);
             }
@@ -339,10 +352,14 @@ impl<E: PairingEngine> KZG10<E> {
         end_timer!(to_affine_time);
 
         let pairing_time = start_timer!(|| "Performing product of pairings");
-        let result = E::product_of_pairings(&[
-            (&total_w.prepare(), &vk.prepared_beta_h),
-            (&total_c.prepare(), &vk.prepared_h),
-        ])
+        let result = E::product_of_pairings(
+            [
+                (&total_w.prepare(), &vk.prepared_beta_h),
+                (&total_c.prepare(), &vk.prepared_h),
+            ]
+            .iter()
+            .copied(),
+        )
         .is_one();
         end_timer!(pairing_time);
         end_timer!(check_time, || format!("Result: {}", result));
@@ -397,12 +414,12 @@ impl<E: PairingEngine> KZG10<E> {
             if enforced_degree_bounds.binary_search(&bound).is_err() {
                 Err(Error::UnsupportedDegreeBound(bound))
             } else if bound < p.degree() || bound > max_degree {
-                return Err(Error::IncorrectDegreeBound {
+                Err(Error::IncorrectDegreeBound {
                     poly_degree: p.degree(),
                     degree_bound: p.degree_bound().unwrap(),
                     supported_degree,
                     label: p.label().to_string(),
-                });
+                })
             } else {
                 Ok(())
             }
@@ -449,7 +466,7 @@ mod tests {
                 supported_degree += 1;
             }
             let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();
-            let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_degree].to_vec();
+            let powers_of_gamma_g = (0..=supported_degree).map(|i| pp.powers_of_gamma_g[&i]).collect();
 
             let powers = Powers {
                 powers_of_g: Cow::Owned(powers_of_g),
@@ -457,7 +474,7 @@ mod tests {
             };
             let vk = VerifierKey {
                 g: pp.powers_of_g[0],
-                gamma_g: pp.powers_of_gamma_g[0],
+                gamma_g: pp.powers_of_gamma_g[&0],
                 h: pp.h,
                 beta_h: pp.beta_h,
                 prepared_h: pp.prepared_h.clone(),
@@ -570,7 +587,14 @@ mod tests {
                 points.push(point);
                 proofs.push(proof);
             }
-            assert!(KZG10::<E>::batch_check(&vk, &comms, &points, &values, &proofs, rng)?);
+            assert!(KZG10::<E>::batch_check(
+                &vk,
+                comms.into_iter(),
+                &points,
+                &values,
+                &proofs,
+                rng
+            )?);
         }
         Ok(())
     }

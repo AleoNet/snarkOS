@@ -20,7 +20,10 @@ use crate::{
 };
 
 use smallvec::smallvec;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub};
+use std::{
+    cmp::Ordering,
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub},
+};
 
 impl<F: Field> AsRef<[(Variable, F)]> for LinearCombination<F> {
     #[inline]
@@ -53,7 +56,7 @@ impl<F: Field> LinearCombination<F> {
     /// Replaces the contents of `self` with those of `other`.
     #[inline]
     pub fn replace_in_place(&mut self, other: Self) {
-        self.0.truncate(0);
+        self.0.clear();
         self.0.extend_from_slice(&other.0)
     }
 
@@ -84,7 +87,7 @@ impl<F: Field> LinearCombination<F> {
                     found_index += 1;
                 }
             }
-            return Err(found_index);
+            Err(found_index)
         } else {
             self.0.binary_search_by_key(search_var, |&(cur_var, _)| cur_var)
         }
@@ -181,16 +184,20 @@ where
     while i < cur.0.len() && j < other.0.len() {
         let self_cur = &cur.0[i];
         let other_cur = &other.0[j];
-        if self_cur.0 > other_cur.0 {
-            new_vec.push((other.0[j].0, push_fn(other.0[j].1)));
-            j += 1;
-        } else if self_cur.0 < other_cur.0 {
-            new_vec.push(*self_cur);
-            i += 1;
-        } else {
-            new_vec.push((self_cur.0, combine_fn(self_cur.1, other_cur.1)));
-            i += 1;
-            j += 1;
+        match self_cur.0.cmp(&other_cur.0) {
+            Ordering::Greater => {
+                new_vec.push((other.0[j].0, push_fn(other.0[j].1)));
+                j += 1;
+            }
+            Ordering::Less => {
+                new_vec.push(*self_cur);
+                i += 1;
+            }
+            Ordering::Equal => {
+                new_vec.push((self_cur.0, combine_fn(self_cur.1, other_cur.1)));
+                i += 1;
+                j += 1;
+            }
         }
     }
     new_vec.extend_from_slice(&cur.0[i..]);
@@ -357,6 +364,7 @@ impl<F: Field> Sub<LinearCombination<F>> for LinearCombination<F> {
 impl<F: Field> Add<(F, &LinearCombination<F>)> for &LinearCombination<F> {
     type Output = LinearCombination<F>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, other): (F, &LinearCombination<F>)) -> LinearCombination<F> {
         if other.0.is_empty() {
             return self.clone();
@@ -377,6 +385,7 @@ impl<F: Field> Add<(F, &LinearCombination<F>)> for &LinearCombination<F> {
 impl<'a, F: Field> Add<(F, &'a LinearCombination<F>)> for LinearCombination<F> {
     type Output = LinearCombination<F>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, other): (F, &'a LinearCombination<F>)) -> LinearCombination<F> {
         if other.0.is_empty() {
             return self;
@@ -397,6 +406,7 @@ impl<'a, F: Field> Add<(F, &'a LinearCombination<F>)> for LinearCombination<F> {
 impl<F: Field> Add<(F, LinearCombination<F>)> for &LinearCombination<F> {
     type Output = LinearCombination<F>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, mut other): (F, LinearCombination<F>)) -> LinearCombination<F> {
         if other.0.is_empty() {
             return self.clone();
@@ -416,6 +426,7 @@ impl<F: Field> Add<(F, LinearCombination<F>)> for &LinearCombination<F> {
 impl<F: Field> Add<(F, Self)> for LinearCombination<F> {
     type Output = Self;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, (mul_coeff, other): (F, Self)) -> Self {
         if other.0.is_empty() {
             return self;

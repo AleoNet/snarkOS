@@ -21,16 +21,22 @@ use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkos_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
-    pub(crate) fn process_transaction(
+    /// Commit a transaction to the canon chain
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn commit_transaction(
         &self,
         sn_index: &mut usize,
         cm_index: &mut usize,
         memo_index: &mut usize,
         transaction: &T,
     ) -> Result<(Vec<Op>, Vec<(T::Commitment, usize)>), StorageError> {
-        let mut ops = vec![];
-        let mut cms = vec![];
-        for sn in transaction.old_serial_numbers() {
+        let old_serial_numbers = transaction.old_serial_numbers();
+        let new_commitments = transaction.new_commitments();
+
+        let mut ops = Vec::with_capacity(old_serial_numbers.len() + new_commitments.len());
+        let mut cms = Vec::with_capacity(new_commitments.len());
+
+        for sn in old_serial_numbers {
             let sn_bytes = to_bytes![sn]?;
             if self.get_sn_index(&sn_bytes)?.is_some() {
                 return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
@@ -39,12 +45,12 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             ops.push(Op::Insert {
                 col: COL_SERIAL_NUMBER,
                 key: sn_bytes,
-                value: (sn_index.clone() as u32).to_le_bytes().to_vec(),
+                value: (*sn_index as u32).to_le_bytes().to_vec(),
             });
             *sn_index += 1;
         }
 
-        for cm in transaction.new_commitments() {
+        for cm in new_commitments {
             let cm_bytes = to_bytes![cm]?;
             if self.get_cm_index(&cm_bytes)?.is_some() {
                 return Err(StorageError::ExistingCm(cm_bytes.to_vec()));
@@ -53,9 +59,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             ops.push(Op::Insert {
                 col: COL_COMMITMENT,
                 key: cm_bytes,
-                value: (cm_index.clone() as u32).to_le_bytes().to_vec(),
+                value: (*cm_index as u32).to_le_bytes().to_vec(),
             });
-            cms.push((cm.clone(), cm_index.clone()));
+            cms.push((cm.clone(), *cm_index));
 
             *cm_index += 1;
         }
@@ -67,7 +73,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             ops.push(Op::Insert {
                 col: COL_MEMO,
                 key: memo_bytes,
-                value: (memo_index.clone() as u32).to_le_bytes().to_vec(),
+                value: (*memo_index as u32).to_le_bytes().to_vec(),
             });
             *memo_index += 1;
         }
@@ -75,8 +81,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         Ok((ops, cms))
     }
 
+    /// Insert a block into storage without canonizing/committing it.
     pub fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
+
+        // Check that the block does not already exist.
         if self.block_hash_exists(&block_hash) {
             return Err(StorageError::BlockError(BlockError::BlockExists(
                 block_hash.to_string(),
@@ -85,9 +94,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         let mut database_transaction = DatabaseTransaction::new();
 
-        let mut transaction_serial_numbers = vec![];
-        let mut transaction_commitments = vec![];
-        let mut transaction_memos = vec![];
+        let mut transaction_serial_numbers = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
             transaction_serial_numbers.push(transaction.transaction_id()?);
@@ -126,7 +135,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_HEADER,
-            key: block.header.get_hash().0.to_vec(),
+            key: block_hash.0.to_vec(),
             value: to_bytes![block.header]?.to_vec(),
         });
         database_transaction.push(Op::Insert {
@@ -169,9 +178,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         let mut database_transaction = DatabaseTransaction::new();
 
-        let mut transaction_serial_numbers = vec![];
-        let mut transaction_commitments = vec![];
-        let mut transaction_memos = vec![];
+        let mut transaction_serial_numbers = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
+        let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
             transaction_serial_numbers.push(transaction.transaction_id()?);
@@ -205,7 +214,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         let mut transaction_cms = vec![];
 
         for transaction in block.transactions.0.iter() {
-            let (tx_ops, cms) = self.process_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
+            let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
         }
@@ -304,7 +313,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         self.block_hash_exists(block_hash) && self.get_block_number(block_hash).is_ok()
     }
 
-    /// Returns true if the block corresponding to this block's previous_block_h.is_canon(&block_haash is in the canon chain.
+    /// Returns true if the block corresponding to this block's previous_block_hash is in the canon chain.
     pub fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
         self.is_canon(&block_header.previous_block_hash)
     }
@@ -314,6 +323,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         let latest_block_height = self.get_latest_block_height();
 
         if side_chain_path.new_block_number > latest_block_height {
+            // Decommit all blocks on canon chain up to the shared block number with the side chain.
             for _ in (side_chain_path.shared_block_number)..latest_block_height {
                 self.decommit_latest_block()?;
             }

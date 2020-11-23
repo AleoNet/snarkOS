@@ -92,11 +92,8 @@ where
 
     /// Loads the PoSW runner from the locally stored parameters.
     pub fn load() -> Result<Self, PoswError> {
-        let params = PoswSNARKVKParameters::load_bytes()?;
-        let vk = S::VerificationParameters::read(&params[..])?;
-
-        let params = PoswSNARKPKParameters::load_bytes()?;
-        let pk = S::ProvingParameters::read(&params[..])?;
+        let vk = S::VerificationParameters::read(&PoswSNARKVKParameters::load_bytes()?[..])?;
+        let pk = S::ProvingParameters::read(&PoswSNARKPKParameters::load_bytes()?[..])?;
 
         Ok(Self {
             pk: Some(pk),
@@ -113,7 +110,7 @@ where
         let mask = commit(nonce, &root.into());
 
         // Convert the leaves to Options for the SNARK
-        let leaves = leaves.into_iter().map(|l| Some(l)).collect();
+        let leaves = leaves.into_iter().map(Some).collect();
 
         POSWCircuit {
             leaves,
@@ -145,7 +142,7 @@ where
         S: SNARK<Circuit = POSWCircuit<F, M, HG, CP>>,
     {
         let params = S::setup(
-            POSWCircuit {
+            &POSWCircuit {
                 // the circuit will be padded internally
                 leaves: vec![None; 0],
                 merkle_parameters: PARAMS.clone(),
@@ -172,7 +169,7 @@ where
         S: SNARK<Circuit = (POSWCircuit<F, M, HG, CP>, SRS<E>)>,
     {
         let params = S::setup(
-            (
+            &(
                 POSWCircuit {
                     // the circuit will be padded internally
                     leaves: vec![None; 0],
@@ -236,7 +233,7 @@ where
 
         // generate the proof
         let proof_timer = start_timer!(|| "POSW proof");
-        let proof = S::prove(pk, circuit, rng)?;
+        let proof = S::prove(pk, &circuit, rng)?;
         end_timer!(proof_timer);
 
         Ok(proof)

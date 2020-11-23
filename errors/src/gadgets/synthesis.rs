@@ -16,6 +16,8 @@
 
 use std::{error::Error, fmt, io};
 
+pub type SynthesisResult<T> = Result<T, SynthesisError>;
+
 /// This is an error that could occur during circuit synthesis contexts,
 /// such as CRS generation, proving or verification.
 #[derive(Debug)]
@@ -61,7 +63,7 @@ impl Error for SynthesisError {
 
 impl fmt::Display for SynthesisError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        if let &SynthesisError::IoError(ref e) = self {
+        if let SynthesisError::IoError(ref e) = *self {
             write!(f, "I/O error: ")?;
             e.fmt(f)
         } else {

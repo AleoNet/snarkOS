@@ -26,11 +26,11 @@ pub fn variable_length_integer(value: u64) -> Vec<u8> {
         // bounded by u8::max_value()
         0..=252 => vec![value as u8],
         // bounded by u16::max_value()
-        253..=65535 => [vec![0xfd], (value as u16).to_le_bytes().to_vec()].concat(),
+        253..=65535 => [&[0xfd], &(value as u16).to_le_bytes()[..]].concat(),
         // bounded by u32::max_value()
-        65536..=4_294_967_295 => [vec![0xfe], (value as u32).to_le_bytes().to_vec()].concat(),
+        65536..=4_294_967_295 => [&[0xfe], &(value as u32).to_le_bytes()[..]].concat(),
         // bounded by u64::max_value()
-        _ => [vec![0xff], value.to_le_bytes().to_vec()].concat(),
+        _ => [&[0xff], &value.to_le_bytes()[..]].concat(),
     }
 }
 
@@ -38,13 +38,13 @@ pub fn variable_length_integer(value: u64) -> Vec<u8> {
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
 pub fn read_variable_length_integer<R: Read>(mut reader: R) -> IoResult<usize> {
     let mut flag = [0u8; 1];
-    reader.read(&mut flag)?;
+    reader.read_exact(&mut flag)?;
 
     match flag[0] {
         0..=252 => Ok(flag[0] as usize),
         0xfd => {
             let mut size = [0u8; 2];
-            reader.read(&mut size)?;
+            reader.read_exact(&mut size)?;
             match u16::from_le_bytes(size) {
                 s if s < 253 => Err(error("Invalid variable size integer")),
                 s => Ok(s as usize),
@@ -52,7 +52,7 @@ pub fn read_variable_length_integer<R: Read>(mut reader: R) -> IoResult<usize> {
         }
         0xfe => {
             let mut size = [0u8; 4];
-            reader.read(&mut size)?;
+            reader.read_exact(&mut size)?;
             match u32::from_le_bytes(size) {
                 s if s < 65536 => Err(error("Invalid variable size integer")),
                 s => Ok(s as usize),
@@ -60,7 +60,7 @@ pub fn read_variable_length_integer<R: Read>(mut reader: R) -> IoResult<usize> {
         }
         _ => {
             let mut size = [0u8; 8];
-            reader.read(&mut size)?;
+            reader.read_exact(&mut size)?;
             match u64::from_le_bytes(size) {
                 s if s < 4_294_967_296 => Err(error("Invalid variable size integer")),
                 s => Ok(s as usize),

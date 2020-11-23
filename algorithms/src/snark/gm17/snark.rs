@@ -53,7 +53,7 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
     type VerifierInput = V;
 
     fn setup<R: Rng>(
-        circuit: Self::Circuit,
+        circuit: &Self::Circuit,
         rng: &mut R,
     ) -> Result<(Self::ProvingParameters, Self::PreparedVerificationParameters), SNARKError> {
         let setup_time = start_timer!(|| "{Groth-Maller 2017}::Setup");
@@ -65,7 +65,7 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
 
     fn prove<R: Rng>(
         pp: &Self::ProvingParameters,
-        input_and_witness: Self::AssignedCircuit,
+        input_and_witness: &Self::AssignedCircuit,
         rng: &mut R,
     ) -> Result<Self::Proof, SNARKError> {
         let proof_time = start_timer!(|| "{Groth-Maller 2017}::Prove");

@@ -104,6 +104,7 @@ fn test_montgomery_conversion() {
 }
 
 #[test]
+#[allow(clippy::many_single_char_names)]
 fn test_edwards_to_montgomery_point() {
     let a: EdwardsAffine = rand::random();
     let (x, y) = (a.x, a.y);
@@ -113,7 +114,7 @@ fn test_edwards_to_montgomery_point() {
         let numerator = Fq::one() + &y;
         let denominator = Fq::one() - &y;
 
-        let u = numerator.clone() * &(denominator.inverse().unwrap());
+        let u = numerator * &(denominator.inverse().unwrap());
         let v = numerator * &((denominator * &x).inverse().unwrap());
         (u, v)
     };
@@ -153,8 +154,8 @@ fn print_montgomery_to_weierstrass_parameters() {
 
     let two = Fq::one() + &Fq::one();
     let three = Fq::one() + &two;
-    let nine = three.clone() + &(three.clone() + &three);
-    let twenty_seven = nine.clone() + &(nine.clone() + &nine);
+    let nine = three + &(three + &three);
+    let twenty_seven = nine + &(nine + &nine);
 
     let a2 = A.square();
     let a3 = A * &a2;
@@ -162,7 +163,7 @@ fn print_montgomery_to_weierstrass_parameters() {
     let b3 = B * &b2;
 
     // Let a = (3 - A^2) / (3 * B^2).
-    let numerator = three.clone() - &a2;
+    let numerator = three - &a2;
     let denominator = three * &b2;
     let a = numerator * &denominator.inverse().unwrap();
 
@@ -175,6 +176,7 @@ fn print_montgomery_to_weierstrass_parameters() {
 }
 
 #[test]
+#[allow(clippy::many_single_char_names)]
 fn test_isomorphism() {
     let rng = &mut thread_rng();
 
@@ -236,14 +238,14 @@ fn test_isomorphism() {
         // Let e = legendre(v^3 + Av^2 + Bv).
         let v2 = v.square();
         let v3 = v2 * &v;
-        let av2 = a.clone() * &v2;
-        let bv = b.clone() * &v;
+        let av2 = a * &v2;
+        let bv = b * &v;
         let e = (v3 + &(av2 + &bv)).legendre();
 
         // Let x = ev - ((1 - e) * A/2).
         let two = Fq::one().double();
         let x = match e {
-            LegendreSymbol::Zero => -(a.clone() * &two.inverse().unwrap()),
+            LegendreSymbol::Zero => -(a * &two.inverse().unwrap()),
             LegendreSymbol::QuadraticResidue => v,
             LegendreSymbol::QuadraticNonResidue => (-v) - &a,
         };
@@ -251,8 +253,8 @@ fn test_isomorphism() {
         // Let y = -e * sqrt(x^3 + Ax^2 + Bx).
         let x2 = x.square();
         let x3 = x2 * &x;
-        let ax2 = a.clone() * &x2;
-        let bx = b.clone() * &x;
+        let ax2 = a * &x2;
+        let bx = b * &x;
         let value = (x3 + &(ax2 + &bx)).sqrt().unwrap();
         let y = match e {
             LegendreSymbol::Zero => Fq::zero(),
@@ -309,7 +311,7 @@ fn test_isomorphism() {
         let numerator = Fq::one() + &y;
         let denominator = Fq::one() - &y;
 
-        let u = numerator.clone() * &(denominator.inverse().unwrap());
+        let u = numerator * &(denominator.inverse().unwrap());
         let v = numerator * &((denominator * &x).inverse().unwrap());
 
         // Ensure (u, v) is a valid Montgomery element

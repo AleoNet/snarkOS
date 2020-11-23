@@ -143,7 +143,7 @@ where
             let mut input_len = 1;
             for (i, (input, b)) in public_inputs.by_ref().zip(pvk.gamma_abc_g1.iter().skip(1)).enumerate() {
                 let input_bits = input.to_bits(cs.ns(|| format!("Input {}", i)))?;
-                g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.iter())?;
+                g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.into_iter())?;
                 input_len += 1;
             }
             // Check that the input and the query in the verification are of the
@@ -444,12 +444,12 @@ mod test {
     }
 
     impl<F: Field> ConstraintSynthesizer<F> for Bench<F> {
-        fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
             assert!(self.inputs.len() >= 2);
             assert!(self.num_constraints >= self.inputs.len());
 
             let mut variables: Vec<_> = Vec::with_capacity(self.inputs.len());
-            for (i, input) in self.inputs.into_iter().enumerate() {
+            for (i, input) in self.inputs.iter().cloned().enumerate() {
                 let input_var = cs.alloc_input(
                     || format!("Input {}", i),
                     || input.ok_or(SynthesisError::AssignmentMissing),
@@ -495,7 +495,7 @@ mod test {
                 num_constraints,
             };
 
-            generate_random_parameters(c, rng).unwrap()
+            generate_random_parameters(&c, rng).unwrap()
         };
 
         {
@@ -507,18 +507,18 @@ mod test {
                     num_constraints,
                 };
                 // Create a groth16 proof with our parameters.
-                create_random_proof(c, &params, rng).unwrap()
+                create_random_proof(&c, &params, rng).unwrap()
             };
 
             // assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());
             let mut cs = TestConstraintSystem::<Fq>::new();
 
-            let inputs: Vec<_> = inputs.into_iter().map(|input| input.unwrap()).collect();
+            let inputs = inputs.into_iter().map(|input| input.unwrap());
             let mut input_gadgets = Vec::new();
 
             {
                 let mut cs = cs.ns(|| "Allocate Input");
-                for (i, input) in inputs.into_iter().enumerate() {
+                for (i, input) in inputs.enumerate() {
                     let mut input_bits = BitIterator::new(input.into_repr()).collect::<Vec<_>>();
                     // Input must be in little-endian, but BitIterator outputs in big-endian.
                     input_bits.reverse();
@@ -566,7 +566,7 @@ mod test {
                 num_constraints,
             };
 
-            generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap()
+            generate_random_parameters::<Bls12_377, _, _>(&c, rng).unwrap()
         };
 
         {
@@ -578,7 +578,7 @@ mod test {
                     num_constraints,
                 };
                 // Create a groth16 proof with our parameters.
-                create_random_proof(c, &params, rng).unwrap()
+                create_random_proof(&c, &params, rng).unwrap()
             };
 
             // assert!(!verify_proof(&pvk, &proof, &[a]).unwrap());

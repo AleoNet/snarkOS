@@ -26,7 +26,7 @@ snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
-thiserror = "1.0.20"
+thiserror = "1.0.21"
 
 [dev-dependencies]
 snarkos-utilities = { path = "../utilities", version = "1.1.4"}

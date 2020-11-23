@@ -57,10 +57,7 @@ impl<T: Transaction> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
     #[inline]
     pub fn new() -> Self {
-        Self {
-            total_size: 0,
-            transactions: HashMap::<Vec<u8>, Entry<T>>::new(),
-        }
+        Self::default()
     }
 
     /// Load the memory pool from previously stored state in storage
@@ -117,7 +114,7 @@ impl<T: Transaction> MemoryPool<T> {
 
         let mut holding_serial_numbers = vec![];
         let mut holding_commitments = vec![];
-        let mut holding_memos = vec![];
+        let mut holding_memos = Vec::with_capacity(self.transactions.len());
 
         for (_, tx) in self.transactions.iter() {
             holding_serial_numbers.extend(tx.transaction.old_serial_numbers());
@@ -182,7 +179,7 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Removes transaction from memory pool based on the transaction id.
     #[inline]
-    pub fn remove_by_hash(&mut self, transaction_id: &Vec<u8>) -> Result<Option<Entry<T>>, ConsensusError> {
+    pub fn remove_by_hash(&mut self, transaction_id: &[u8]) -> Result<Option<Entry<T>>, ConsensusError> {
         match self.transactions.clone().get(transaction_id) {
             Some(entry) => {
                 self.total_size -= entry.size;
@@ -228,6 +225,15 @@ impl<T: Transaction> MemoryPool<T> {
         }
 
         Ok(transactions)
+    }
+}
+
+impl<T: Transaction> Default for MemoryPool<T> {
+    fn default() -> Self {
+        Self {
+            total_size: 0,
+            transactions: HashMap::<Vec<u8>, Entry<T>>::new(),
+        }
     }
 }
 
@@ -278,10 +284,7 @@ mod tests {
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
-        let entry = Entry::<Tx> {
-            size,
-            transaction: transaction.clone(),
-        };
+        let entry = Entry::<Tx> { size, transaction };
 
         mem_pool.insert(&blockchain, entry.clone()).unwrap();
 
@@ -354,7 +357,7 @@ mod tests {
         mem_pool
             .insert(&blockchain, Entry {
                 size: TRANSACTION_2.len(),
-                transaction: transaction.clone(),
+                transaction,
             })
             .unwrap();
 
@@ -378,7 +381,7 @@ mod tests {
         mem_pool
             .insert(&blockchain, Entry {
                 size: TRANSACTION_2.len(),
-                transaction: transaction.clone(),
+                transaction,
             })
             .unwrap();
 

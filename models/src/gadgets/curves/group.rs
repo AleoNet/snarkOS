@@ -74,11 +74,11 @@ pub trait GroupGadget<G: Group, F: Field>:
     /// Inputs must be specified in *little-endian* form.
     /// If the addition law is incomplete for the identity element,
     /// `result` must not be the identity element.
-    fn mul_bits<'a, CS: ConstraintSystem<F>>(
+    fn mul_bits<CS: ConstraintSystem<F>>(
         &self,
         mut cs: CS,
         result: &Self,
-        bits: impl Iterator<Item = &'a Boolean>,
+        bits: impl Iterator<Item = Boolean>,
     ) -> Result<Self, SynthesisError> {
         let mut base = self.clone();
         let mut result = result.clone();
@@ -156,7 +156,7 @@ pub trait GroupGadget<G: Group, F: Field>:
         Err(SynthesisError::AssignmentMissing)
     }
 
-    fn precomputed_base_3_bit_signed_digit_scalar_mul<'a, CS, I, J, B>(
+    fn precomputed_base_3_bit_signed_digit_scalar_mul<CS, I, J, B>(
         _: CS,
         _: &[B],
         _: &[J],

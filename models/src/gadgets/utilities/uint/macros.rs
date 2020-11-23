@@ -73,7 +73,7 @@ macro_rules! uint_impl {
             }
 
             fn to_bits_le(&self) -> Vec<Boolean> {
-                self.bits.iter().cloned().collect()
+                self.bits.clone()
             }
 
             fn from_bits_le(bits: &[Boolean]) -> Self {
@@ -209,7 +209,7 @@ macro_rules! uint_impl {
                                     lc = lc - (coeff, bit.get_variable());
                                 } else {
                                     // Add coeff * bit_gadget
-                                    lc = lc + (coeff, bit.get_variable());
+                                    lc += (coeff, bit.get_variable());
                                 }
                             }
                             Boolean::Not(ref bit) => {
@@ -228,7 +228,7 @@ macro_rules! uint_impl {
                                     if op.negated {
                                         lc = lc - (coeff, CS::one());
                                     } else {
-                                        lc = lc + (coeff, CS::one());
+                                        lc += (coeff, CS::one());
                                     }
                                 }
                             }
@@ -318,7 +318,7 @@ macro_rules! uint_impl {
                                 let modular_value = result_value.map(|v| v as $_type);
 
                                 // Storage area for the resulting bits
-                                let mut result_bits = vec![];
+                                let mut result_bits = Vec::with_capacity($size);
 
                                 // This is a linear combination that we will enforce to be "zero"
                                 let mut lc = LinearCombination::zero();

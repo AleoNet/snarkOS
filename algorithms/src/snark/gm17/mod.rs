@@ -17,7 +17,7 @@
 //! An implementation of the [Groth-Maller][GM17] simulation extractable zkSNARK.
 //! [GM17]: https://eprint.iacr.org/2017/540
 
-use snarkos_errors::gadgets::SynthesisError;
+use snarkos_errors::gadgets::SynthesisResult;
 use snarkos_models::curves::pairing_engine::{AffineCurve, PairingCurve, PairingEngine};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
@@ -176,7 +176,7 @@ impl<E: PairingEngine> VerifyingKey<E> {
         let h_gamma_g2: E::G2Affine = FromBytes::read(&mut reader)?;
 
         let query_len: u32 = FromBytes::read(&mut reader)?;
-        let mut query: Vec<E::G1Affine> = vec![];
+        let mut query: Vec<E::G1Affine> = Vec::with_capacity(query_len as usize);
         for _ in 0..query_len {
             let query_element: E::G1Affine = FromBytes::read(&mut reader)?;
             query.push(query_element);
@@ -319,28 +319,26 @@ impl<E: PairingEngine> Parameters<E> {
 
         let vk = VerifyingKey::<E>::read(&mut reader)?;
 
-        let mut a_query: Vec<E::G1Affine> = vec![];
-        let mut b_query: Vec<E::G2Affine> = vec![];
-        let mut c_query_1: Vec<E::G1Affine> = vec![];
-        let mut c_query_2: Vec<E::G1Affine> = vec![];
-        let mut g_gamma2_z_t: Vec<E::G1Affine> = vec![];
-
         let a_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut a_query = Vec::with_capacity(a_query_len as usize);
         for _ in 0..a_query_len {
             a_query.push(read_g1_affine(&mut reader)?);
         }
 
         let b_query_len: u32 = FromBytes::read(&mut reader)?;
+        let mut b_query = Vec::with_capacity(b_query_len as usize);
         for _ in 0..b_query_len {
             b_query.push(read_g2_affine(&mut reader)?);
         }
 
         let c_query_1_len: u32 = FromBytes::read(&mut reader)?;
+        let mut c_query_1 = Vec::with_capacity(c_query_1_len as usize);
         for _ in 0..c_query_1_len {
             c_query_1.push(read_g1_affine(&mut reader)?);
         }
 
         let c_query_2_len: u32 = FromBytes::read(&mut reader)?;
+        let mut c_query_2 = Vec::with_capacity(c_query_2_len as usize);
         for _ in 0..c_query_2_len {
             c_query_2.push(read_g1_affine(&mut reader)?);
         }
@@ -351,6 +349,7 @@ impl<E: PairingEngine> Parameters<E> {
         let g_gamma2_z2: E::G1Affine = FromBytes::read(&mut reader)?;
 
         let g_gamma2_z_t_len: u32 = FromBytes::read(&mut reader)?;
+        let mut g_gamma2_z_t = Vec::with_capacity(g_gamma2_z_t_len as usize);
         for _ in 0..g_gamma2_z_t_len {
             g_gamma2_z_t.push(read_g1_affine(&mut reader)?);
         }
@@ -427,64 +426,66 @@ impl<E: PairingEngine> ToBytes for PreparedVerifyingKey<E> {
     }
 }
 
+type AffinePair<'a, T> = (&'a [T], &'a [T]);
+
 impl<E: PairingEngine> Parameters<E> {
-    pub fn get_vk(&self, _: usize) -> Result<VerifyingKey<E>, SynthesisError> {
+    pub fn get_vk(&self, _: usize) -> SynthesisResult<VerifyingKey<E>> {
         Ok(self.vk.clone())
     }
 
-    pub fn get_a_query(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_a_query(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.a_query[1..num_inputs], &self.a_query[num_inputs..]))
     }
 
-    pub fn get_b_query(&self, num_inputs: usize) -> Result<(&[E::G2Affine], &[E::G2Affine]), SynthesisError> {
+    pub fn get_b_query(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G2Affine>> {
         Ok((&self.b_query[1..num_inputs], &self.b_query[num_inputs..]))
     }
 
-    pub fn get_c_query_1(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_c_query_1(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.c_query_1[0..num_inputs], &self.c_query_1[num_inputs..]))
     }
 
-    pub fn get_c_query_2(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_c_query_2(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.c_query_2[1..num_inputs], &self.c_query_2[num_inputs..]))
     }
 
-    pub fn get_g_gamma_z(&self) -> Result<E::G1Affine, SynthesisError> {
+    pub fn get_g_gamma_z(&self) -> SynthesisResult<E::G1Affine> {
         Ok(self.g_gamma_z)
     }
 
-    pub fn get_h_gamma_z(&self) -> Result<E::G2Affine, SynthesisError> {
+    pub fn get_h_gamma_z(&self) -> SynthesisResult<E::G2Affine> {
         Ok(self.h_gamma_z)
     }
 
-    pub fn get_g_ab_gamma_z(&self) -> Result<E::G1Affine, SynthesisError> {
+    pub fn get_g_ab_gamma_z(&self) -> SynthesisResult<E::G1Affine> {
         Ok(self.g_ab_gamma_z)
     }
 
-    pub fn get_g_gamma2_z2(&self) -> Result<E::G1Affine, SynthesisError> {
+    pub fn get_g_gamma2_z2(&self) -> SynthesisResult<E::G1Affine> {
         Ok(self.g_gamma2_z2)
     }
 
-    pub fn get_g_gamma2_z_t(&self, num_inputs: usize) -> Result<(&[E::G1Affine], &[E::G1Affine]), SynthesisError> {
+    pub fn get_g_gamma2_z_t(&self, num_inputs: usize) -> SynthesisResult<AffinePair<E::G1Affine>> {
         Ok((&self.g_gamma2_z_t[0..num_inputs], &self.g_gamma2_z_t[num_inputs..]))
     }
 
-    pub fn get_a_query_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_a_query_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.a_query)
     }
 
-    pub fn get_b_query_full(&self) -> Result<&[E::G2Affine], SynthesisError> {
+    pub fn get_b_query_full(&self) -> SynthesisResult<&[E::G2Affine]> {
         Ok(&self.b_query)
     }
 
-    pub fn get_c_query_1_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_c_query_1_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.c_query_1)
     }
 
-    pub fn get_c_query_2_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_c_query_2_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.c_query_2)
     }
 
-    pub fn get_g_gamma2_z_t_full(&self) -> Result<&[E::G1Affine], SynthesisError> {
+    pub fn get_g_gamma2_z_t_full(&self) -> SynthesisResult<&[E::G1Affine]> {
         Ok(&self.g_gamma2_z_t)
     }
 }

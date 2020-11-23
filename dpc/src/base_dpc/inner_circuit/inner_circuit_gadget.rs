@@ -62,6 +62,7 @@ use snarkos_utilities::{
 use snarkos_models::gadgets::utilities::eq::NEqGadget;
 use std::ops::Mul;
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::InnerField>>(
     cs: &mut CS,
     // Parameters
@@ -146,6 +147,7 @@ pub fn execute_inner_proof_gadget<C: BaseDPCComponents, CS: ConstraintSystem<C::
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn base_dpc_execute_gadget_helper<
     C,
     CS: ConstraintSystem<C::InnerField>,
@@ -242,14 +244,6 @@ where
     SerialNumberNonceCRHGadget: CRHGadget<SerialNumberNonceCRH, C::InnerField>,
     PGadget: PRFGadget<P, C::InnerField>,
 {
-    let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
-    let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
-    let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
-
-    let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
-    let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
-
     // Order for allocation of input:
     // 1. account_commitment_parameters
     // 2. account_encryption_parameters
@@ -354,6 +348,11 @@ where
         || Ok(ledger_digest),
     )?;
 
+    let mut old_serial_numbers_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_serial_numbers_bytes_gadgets = Vec::with_capacity(old_records.len() * 32); // Serial numbers are 32 bytes
+    let mut old_record_commitments_gadgets = Vec::with_capacity(old_records.len());
+    let mut old_death_program_ids_gadgets = Vec::with_capacity(old_records.len());
+
     for (i, (((record, witness), account_private_key), given_serial_number)) in old_records
         .iter()
         .zip(old_witnesses)
@@ -389,7 +388,7 @@ where
 
             let given_commitment =
                 RecordCommitmentGadget::OutputGadget::alloc(&mut declare_cs.ns(|| "given_commitment"), || {
-                    Ok(record.commitment().clone())
+                    Ok(record.commitment())
                 })?;
             old_record_commitments_gadgets.push(given_commitment.clone());
 
@@ -587,14 +586,12 @@ where
                 &given_serial_number_gadget,
             )?;
 
-            old_serial_numbers_gadgets.push(candidate_serial_number_gadget.clone());
-
             // Convert input serial numbers to bytes
-            {
-                let bytes = candidate_serial_number_gadget
-                    .to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
-                old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
-            }
+            let bytes = candidate_serial_number_gadget
+                .to_bytes(&mut sn_cs.ns(|| format!("Convert {}-th serial number to bytes", i)))?;
+            old_serial_numbers_bytes_gadgets.extend_from_slice(&bytes);
+
+            old_serial_numbers_gadgets.push(candidate_serial_number_gadget);
 
             serial_number_nonce_bytes
         };
@@ -639,6 +636,9 @@ where
             )?;
         }
     }
+
+    let mut new_record_commitments_gadgets = Vec::with_capacity(new_records.len());
+    let mut new_birth_program_ids_gadgets = Vec::with_capacity(new_records.len());
 
     for (
         j,
@@ -843,7 +843,7 @@ where
                 given_death_program_id.to_bits(&mut encryption_cs.ns(|| "Convert given_death_program_id to bits"))?;
             let value_bits = given_value.to_bits(&mut encryption_cs.ns(|| "Convert given_value to bits"))?;
             let payload_bits = given_payload.to_bits(&mut encryption_cs.ns(|| "Convert given_payload to bits"))?;
-            let mut fq_high_bits = vec![];
+            let mut fq_high_bits = Vec::with_capacity(fq_high_selectors.len() - 1);
 
             for (i, fq_high_bit) in fq_high_selectors[0..(fq_high_selectors.len() - 1)].iter().enumerate() {
                 let boolean = Boolean::alloc(
@@ -941,7 +941,7 @@ where
             );
 
             let fq_high_and_payload_and_value_bits = [
-                &vec![Boolean::Constant(true)],
+                &[Boolean::Constant(true)],
                 &fq_high_bits[..],
                 &value_bits[..],
                 &payload_field_bits[..],
@@ -1224,12 +1224,12 @@ where
         let commitment_cs = &mut cs.ns(|| "Check that program commitment is well-formed");
 
         let mut input = Vec::new();
-        for i in 0..C::NUM_INPUT_RECORDS {
-            input.extend_from_slice(&old_death_program_ids_gadgets[i]);
+        for id_gadget in old_death_program_ids_gadgets.iter().take(C::NUM_INPUT_RECORDS) {
+            input.extend_from_slice(id_gadget);
         }
 
-        for j in 0..C::NUM_OUTPUT_RECORDS {
-            input.extend_from_slice(&new_birth_program_ids_gadgets[j]);
+        for id_gadget in new_birth_program_ids_gadgets.iter().take(C::NUM_OUTPUT_RECORDS) {
+            input.extend_from_slice(id_gadget);
         }
 
         let given_commitment_randomness =
@@ -1268,10 +1268,10 @@ where
         let network_id = UInt8::alloc_input_vec(cs.ns(|| "Allocate network id"), &[network_id])?;
 
         let mut old_record_commitment_bytes = vec![];
+        let mut input_bytes = vec![];
         for i in 0..C::NUM_INPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with input record {}", i));
 
-            let mut input_bytes = vec![];
             input_bytes.extend_from_slice(&old_serial_numbers_gadgets[i].to_bytes(&mut cs.ns(|| "old_serial_number"))?);
             input_bytes.extend_from_slice(
                 &old_record_commitments_gadgets[i].to_bytes(&mut cs.ns(|| "old_record_commitment"))?,
@@ -1293,13 +1293,16 @@ where
 
             old_record_commitment_bytes
                 .extend_from_slice(&commitment.to_bytes(&mut cs.ns(|| "old_record_local_data"))?);
+
+            input_bytes.clear();
         }
+        drop(input_bytes);
 
         let mut new_record_commitment_bytes = Vec::new();
+        let mut input_bytes = vec![];
         for j in 0..C::NUM_OUTPUT_RECORDS {
             let mut cs = cs.ns(|| format!("Construct local data with output record {}", j));
 
-            let mut input_bytes = vec![];
             input_bytes
                 .extend_from_slice(&new_record_commitments_gadgets[j].to_bytes(&mut cs.ns(|| "record_commitment"))?);
             input_bytes.extend_from_slice(&memo);
@@ -1319,7 +1322,10 @@ where
 
             new_record_commitment_bytes
                 .extend_from_slice(&commitment.to_bytes(&mut cs.ns(|| "new_record_local_data"))?);
+
+            input_bytes.clear();
         }
+        drop(input_bytes);
 
         let inner1_commitment_hash = LocalDataCRHGadget::check_evaluation_gadget(
             cs.ns(|| "Compute to local data commitment inner1 hash"),

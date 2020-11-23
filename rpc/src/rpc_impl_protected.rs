@@ -38,7 +38,6 @@ use snarkos_utilities::{
     to_bytes,
 };
 
-use base64;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::{thread_rng, Rng};
 use std::{str::FromStr, sync::Arc};
@@ -237,11 +236,11 @@ impl ProtectedRpcFunctions for RpcImpl {
     ) -> Result<CreateRawTransactionOuput, RpcError> {
         let rng = &mut thread_rng();
 
-        assert!(transaction_input.old_records.len() > 0);
+        assert!(!transaction_input.old_records.is_empty());
         assert!(transaction_input.old_records.len() <= Components::NUM_OUTPUT_RECORDS);
-        assert!(transaction_input.old_account_private_keys.len() > 0);
+        assert!(!transaction_input.old_account_private_keys.is_empty());
         assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
-        assert!(transaction_input.recipients.len() > 0);
+        assert!(!transaction_input.recipients.is_empty());
         assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
 
         // Fetch birth/death programs
@@ -259,13 +258,13 @@ impl ProtectedRpcFunctions for RpcImpl {
         let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode old records
-        let mut old_records = vec![];
+        let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
         for record_string in transaction_input.old_records {
             let record_bytes = hex::decode(record_string)?;
             old_records.push(DPCRecord::<Components>::read(&record_bytes[..])?);
         }
 
-        let mut old_account_private_keys = vec![];
+        let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
         for private_key_string in transaction_input.old_account_private_keys {
             old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
         }
@@ -288,14 +287,14 @@ impl ProtectedRpcFunctions for RpcImpl {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters.system_parameters,
-                &old_sn_nonce,
-                &address,
+                self.parameters.system_parameters.clone(),
+                old_sn_nonce,
+                address,
                 true, // The input record is dummy
                 0,
-                &RecordPayload::default(),
-                &program_id,
-                &program_id,
+                RecordPayload::default(),
+                program_id.clone(),
+                program_id.clone(),
                 rng,
             )?;
 
@@ -307,9 +306,9 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_record_owners = vec![];
-        let mut new_is_dummy_flags = vec![];
-        let mut new_values = vec![];
+        let mut new_record_owners = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_is_dummy_flags = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_values = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for recipient in transaction_input.recipients {
             new_record_owners.push(AccountAddress::<Components>::from_str(&recipient.address)?);
             new_is_dummy_flags.push(false);
@@ -343,6 +342,10 @@ impl ProtectedRpcFunctions for RpcImpl {
             memo = rng.gen();
         }
 
+        // Because this is a computationally heavy endpoint, we open a
+        // new secondary storage instance to prevent storage bottle-necking.
+        let storage = self.new_secondary_storage_instance()?;
+
         // Generate transaction
         let (records, transaction) = self.consensus.create_transaction(
             &self.parameters,
@@ -355,12 +358,12 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values,
             new_payloads,
             memo,
-            &self.storage,
+            &storage,
             rng,
         )?;
 
         let encoded_transaction = hex::encode(to_bytes![transaction]?);
-        let mut encoded_records = vec![];
+        let mut encoded_records = Vec::with_capacity(records.len());
         for record in records {
             encoded_records.push(hex::encode(to_bytes![record]?));
         }
@@ -373,6 +376,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
+        self.storage.catch_up_secondary(false)?;
         let record_commitments = self.storage.get_record_commitments(None)?;
 
         Ok(record_commitments.len())
@@ -380,8 +384,9 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
+        self.storage.catch_up_secondary(false)?;
         let record_commitments = self.storage.get_record_commitments(Some(100))?;
-        let record_commitment_strings: Vec<String> = record_commitments.iter().map(|cm| hex::encode(cm)).collect();
+        let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
 
         Ok(record_commitment_strings)
     }

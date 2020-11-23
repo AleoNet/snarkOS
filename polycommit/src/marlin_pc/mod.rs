@@ -101,7 +101,9 @@ impl<E: PairingEngine> MarlinKZG10<E> {
         (combined_comm, combined_shifted_comm)
     }
 
-    fn normalize_commitments<'a>(commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>) -> Vec<Commitment<E>> {
+    fn normalize_commitments(
+        commitments: Vec<(E::G1Projective, Option<E::G1Projective>)>,
+    ) -> impl Iterator<Item = Commitment<E>> {
         let mut comms = Vec::with_capacity(commitments.len());
         let mut s_comms = Vec::with_capacity(commitments.len());
         let mut s_flags = Vec::with_capacity(commitments.len());
@@ -116,19 +118,14 @@ impl<E: PairingEngine> MarlinKZG10<E> {
             }
         }
         let comms = E::G1Projective::batch_normalization_into_affine(&comms);
-        let s_comms = E::G1Projective::batch_normalization_into_affine(&mut s_comms);
-        comms
-            .into_iter()
-            .zip(s_comms)
-            .zip(s_flags)
-            .map(|((c, s_c), flag)| {
-                let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
-                Commitment {
-                    comm: kzg10::Commitment(c),
-                    shifted_comm,
-                }
-            })
-            .collect()
+        let s_comms = E::G1Projective::batch_normalization_into_affine(&s_comms);
+        comms.into_iter().zip(s_comms).zip(s_flags).map(|((c, s_c), flag)| {
+            let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
+            Commitment {
+                comm: kzg10::Commitment(c),
+                shifted_comm,
+            }
+        })
     }
 
     /// Accumulate `commitments` and `values` according to `opening_challenge`.
@@ -185,12 +182,10 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         kzg10::KZG10::setup(max_degree, false, rng).map_err(Into::into)
     }
 
-    // TODO: should trim also take in the hiding_bounds? That way we don't
-    // have to store many powers of gamma_g.
-    // TODO: add an optional hiding_bound.
     fn trim(
         pp: &Self::UniversalParams,
         supported_degree: usize,
+        supported_hiding_bound: usize,
         enforced_degree_bounds: Option<&[usize]>,
     ) -> Result<(Self::CommitterKey, Self::VerifierKey), Self::Error> {
         let max_degree = pp.max_degree();
@@ -202,15 +197,17 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let ck_time =
             start_timer!(|| format!("Constructing `powers` of size {} for unshifted polys", supported_degree));
         let powers = pp.powers_of_g[..=supported_degree].to_vec();
-        // We want to support making up to supported_degree queries to committed
+        // We want to support making up to `supported_hiding_bound` queries to committed
         // polynomials.
-        let powers_of_gamma_g = pp.powers_of_gamma_g[..=(supported_degree + 1)].to_vec();
+        let powers_of_gamma_g = (0..=supported_hiding_bound + 1)
+            .map(|i| pp.powers_of_gamma_g[&i])
+            .collect::<Vec<_>>();
         end_timer!(ck_time);
 
         // Construct the core KZG10 verifier key.
         let vk = kzg10::VerifierKey {
             g: pp.powers_of_g[0],
-            gamma_g: pp.powers_of_gamma_g[0],
+            gamma_g: pp.powers_of_gamma_g[&0],
             h: pp.h,
             beta_h: pp.beta_h,
             prepared_h: pp.prepared_h.clone(),
@@ -219,7 +216,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
 
         let enforced_degree_bounds = enforced_degree_bounds.map(|v| {
             let mut v = v.to_vec();
-            v.sort();
+            v.sort_unstable();
             v.dedup();
             v
         });
@@ -269,6 +266,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
     }
 
     /// Outputs a commitment to `polynomial`.
+    #[allow(clippy::type_complexity)]
     fn commit<'a>(
         ck: &Self::CommitterKey,
         polynomials: impl IntoIterator<Item = &'a LabeledPolynomial<'a, E::Fr>>,
@@ -286,8 +284,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
             let hiding_bound = p.hiding_bound();
             let polynomial = p.polynomial();
 
-            let enforced_degree_bounds: Option<&[usize]> =
-                ck.enforced_degree_bounds.as_ref().map(|bounds| bounds.as_slice());
+            let enforced_degree_bounds: Option<&[usize]> = ck.enforced_degree_bounds.as_deref();
             kzg10::KZG10::<E>::check_degrees_and_bounds(
                 ck.supported_degree(),
                 ck.max_degree,
@@ -349,8 +346,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         for (j, (polynomial, rand)) in labeled_polynomials.into_iter().zip(rands).enumerate() {
             let degree_bound = polynomial.degree_bound();
 
-            let enforced_degree_bounds: Option<&[usize]> =
-                ck.enforced_degree_bounds.as_ref().map(|bounds| bounds.as_slice());
+            let enforced_degree_bounds: Option<&[usize]> = ck.enforced_degree_bounds.as_deref();
             kzg10::KZG10::<E>::check_degrees_and_bounds(
                 ck.supported_degree(),
                 ck.max_degree,
@@ -436,7 +432,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
 
     fn batch_check<'a, R: RngCore>(
         vk: &Self::VerifierKey,
-        commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
+        commitments: impl Iterator<Item = LabeledCommitment<Self::Commitment>>,
         query_set: &QuerySet<E::Fr>,
         values: &Evaluations<E::Fr>,
         proof: &Self::BatchProof,
@@ -446,22 +442,22 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
     where
         Self::Commitment: 'a,
     {
-        let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label(), c)).collect();
+        let commitments: BTreeMap<_, _> = commitments.into_iter().map(|c| (c.label().to_owned(), c)).collect();
         let mut query_to_labels_map = BTreeMap::new();
 
         for (label, point) in query_set.iter() {
-            let labels = query_to_labels_map.entry(point).or_insert(BTreeSet::new());
+            let labels = query_to_labels_map.entry(point).or_insert_with(BTreeSet::new);
             labels.insert(label);
         }
         assert_eq!(proof.len(), query_to_labels_map.len());
 
-        let mut combined_comms = Vec::new();
-        let mut combined_queries = Vec::new();
-        let mut combined_evals = Vec::new();
+        let mut combined_comms = Vec::with_capacity(query_to_labels_map.len());
+        let mut combined_queries = Vec::with_capacity(query_to_labels_map.len());
+        let mut combined_evals = Vec::with_capacity(query_to_labels_map.len());
         for (query, labels) in query_to_labels_map.into_iter() {
             let lc_time = start_timer!(|| format!("Randomly combining {} commitments", labels.len()));
-            let mut comms_to_combine: Vec<&'_ LabeledCommitment<_>> = Vec::new();
-            let mut values_to_combine = Vec::new();
+            let mut comms_to_combine = Vec::with_capacity(labels.len());
+            let mut values_to_combine = Vec::with_capacity(labels.len());
             for label in labels.into_iter() {
                 let commitment = commitments.get(label).ok_or(Error::MissingPolynomial {
                     label: label.to_string(),
@@ -485,14 +481,11 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         }
         let norm_time = start_timer!(|| "Normalizaing combined commitments");
         E::G1Projective::batch_normalization(&mut combined_comms);
-        let combined_comms = combined_comms
-            .into_iter()
-            .map(|c| kzg10::Commitment(c.into()))
-            .collect::<Vec<_>>();
+        let combined_comms = combined_comms.into_iter().map(|c| kzg10::Commitment(c.into()));
         end_timer!(norm_time);
         let proof_time = start_timer!(|| "Checking KZG10::Proof");
         let result =
-            kzg10::KZG10::batch_check(&vk.vk, &combined_comms, &combined_queries, &combined_evals, &proof, rng)?;
+            kzg10::KZG10::batch_check(&vk.vk, combined_comms, &combined_queries, &combined_evals, &proof, rng)?;
         end_timer!(proof_time);
         Ok(result)
     }
@@ -592,7 +585,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
     fn check_combinations<'a, R: RngCore>(
         vk: &Self::VerifierKey,
         lc_s: impl IntoIterator<Item = &'a LinearCombination<E::Fr>>,
-        commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
+        commitments: impl Iterator<Item = LabeledCommitment<Self::Commitment>>,
         query_set: &QuerySet<E::Fr>,
         evaluations: &Evaluations<E::Fr>,
         proof: &BatchLCProof<E::Fr, Self>,
@@ -605,7 +598,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let BatchLCProof { proof, .. } = proof;
         let label_comm_map = commitments
             .into_iter()
-            .map(|c| (c.label(), c))
+            .map(|c| (c.label().to_owned(), c))
             .collect::<BTreeMap<_, _>>();
 
         let mut lc_commitments = Vec::new();
@@ -628,8 +621,8 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
                         }
                     }
                 } else {
-                    let label: &String = label.try_into().unwrap();
-                    let &cur_comm = label_comm_map.get(label).ok_or(Error::MissingPolynomial {
+                    let label: String = label.to_owned().try_into().unwrap();
+                    let cur_comm = label_comm_map.get(&label).ok_or(Error::MissingPolynomial {
                         label: label.to_string(),
                     })?;
 
@@ -653,13 +646,12 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
         let lc_commitments = lc_info
             .into_iter()
             .zip(comms)
-            .map(|((label, d), c)| LabeledCommitment::new(label, c, d))
-            .collect::<Vec<_>>();
+            .map(|((label, d), c)| LabeledCommitment::new(label, c, d));
         end_timer!(combined_comms_norm_time);
 
         Self::batch_check(
             vk,
-            &lc_commitments,
+            lc_commitments,
             &query_set,
             &evaluations,
             proof,

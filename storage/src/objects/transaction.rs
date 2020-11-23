@@ -29,10 +29,7 @@ use snarkos_utilities::{
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Returns a transaction location given the transaction ID if it exists. Returns `None` otherwise.
-    pub fn get_transaction_location(
-        &self,
-        transaction_id: &Vec<u8>,
-    ) -> Result<Option<TransactionLocation>, StorageError> {
+    pub fn get_transaction_location(&self, transaction_id: &[u8]) -> Result<Option<TransactionLocation>, StorageError> {
         match self.storage.get(COL_TRANSACTION_LOCATION, &transaction_id)? {
             Some(transaction_locator) => {
                 let transaction_location = TransactionLocation::read(&transaction_locator[..])?;
@@ -43,7 +40,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Returns a transaction given the transaction ID if it exists. Returns `None` otherwise.
-    pub fn get_transaction(&self, transaction_id: &Vec<u8>) -> Result<Option<T>, StorageError> {
+    pub fn get_transaction(&self, transaction_id: &[u8]) -> Result<Option<T>, StorageError> {
         match self.get_transaction_location(&transaction_id)? {
             Some(transaction_location) => {
                 let block_transactions =
@@ -55,8 +52,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Returns a transaction in bytes given a transaction ID.
-    pub fn get_transaction_bytes(&self, transaction_id: &Vec<u8>) -> Result<Vec<u8>, StorageError> {
-        match self.get_transaction(&transaction_id.clone())? {
+    pub fn get_transaction_bytes(&self, transaction_id: &[u8]) -> Result<Vec<u8>, StorageError> {
+        match self.get_transaction(transaction_id)? {
             Some(transaction) => Ok(to_bytes![transaction]?),
             None => Err(StorageError::InvalidTransactionId(hex::encode(&transaction_id))),
         }

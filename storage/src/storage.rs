@@ -58,6 +58,36 @@ impl Storage {
         Ok(Self { db: storage, cf_names })
     }
 
+    /// Opens a secondary storage instance from the given path with its given names.
+    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
+    pub fn open_secondary_cf<P: AsRef<Path> + Clone>(
+        primary_path: P,
+        secondary_path: P,
+        num_cfs: u32,
+    ) -> Result<Self, StorageError> {
+        let mut cf_names: Vec<String> = Vec::with_capacity(num_cfs as usize);
+
+        for column in 0..num_cfs {
+            let column_name = format!("col{}", column.to_string());
+
+            cf_names.push(column_name);
+        }
+
+        let mut storage_opts = Options::default();
+        storage_opts.increase_parallelism(2);
+
+        let storage = Arc::new(DB::open_cf_as_secondary(
+            &storage_opts,
+            primary_path,
+            secondary_path,
+            cf_names.clone(),
+        )?);
+
+        storage.try_catch_up_with_primary()?;
+
+        Ok(Self { db: storage, cf_names })
+    }
+
     /// Returns the column family reference from a given index.
     /// If the given index does not exist, returns [None](std::option::Option).
     pub(crate) fn get_cf_ref(&self, index: u32) -> &ColumnFamily {
@@ -75,7 +105,7 @@ impl Storage {
     /// Returns the iterator from a given col.
     /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
     pub(crate) fn get_iter(&self, col: u32) -> Result<DBIterator, StorageError> {
-        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start)?)
+        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start))
     }
 
     /// Returns `Ok(())` after executing a database transaction
@@ -87,11 +117,11 @@ impl Storage {
             match operation {
                 Op::Insert { col, key, value } => {
                     let cf = self.get_cf_ref(col);
-                    batch.put_cf(cf, &key, value)?;
+                    batch.put_cf(cf, &key, value);
                 }
                 Op::Delete { col, key } => {
                     let cf = self.get_cf_ref(col);
-                    batch.delete_cf(cf, &key)?;
+                    batch.delete_cf(cf, &key);
                 }
             };
         }
@@ -113,7 +143,7 @@ impl Storage {
     /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
     pub fn destroy(&self) -> Result<(), StorageError> {
         let path = self.db.path();
-        drop(&self.db);
+        // drop(&self.db); FIXME: this didn't actually drop self.db
         Self::destroy_storage(path.into())
     }
 

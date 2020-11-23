@@ -119,6 +119,16 @@ pub struct DecryptRecordInput {
     pub account_view_key: String,
 }
 
+/// Returned value for the `getnodeinfo` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeInfo {
+    /// Flag indicating if the node is operating as a miner
+    pub is_miner: bool,
+
+    /// Flag indicating if the node is currently syncing
+    pub is_syncing: bool,
+}
+
 /// Returned value for the `getpeerinfo` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerInfo {

@@ -46,13 +46,19 @@ mod rpc_tests {
         );
 
         let consensus = TEST_CONSENSUS.clone();
+
+        let storage = storage.clone();
+        let storage_path = storage.storage.db.path().to_path_buf();
+
         Rpc::new(
             RpcImpl::new(
-                storage.clone(),
+                storage,
+                storage_path,
                 parameters,
                 server.context.clone(),
                 consensus,
                 server.memory_pool_lock,
+                server.sync_handler_lock,
                 None,
             )
             .to_delegate(),
@@ -320,6 +326,24 @@ mod rpc_tests {
         let expected_peers: Vec<SocketAddr> = vec![];
 
         assert_eq!(peer_info.peers, expected_peers);
+
+        drop(rpc);
+        kill_storage_sync(storage);
+    }
+
+    #[test]
+    fn test_rpc_get_node_info() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let rpc = initialize_test_rpc(&storage);
+
+        let method = "getnodeinfo".to_string();
+
+        let result = make_request_no_params(&rpc, method);
+
+        let peer_info: NodeInfo = serde_json::from_value(result).unwrap();
+
+        assert_eq!(peer_info.is_miner, false);
+        assert_eq!(peer_info.is_syncing, false);
 
         drop(rpc);
         kill_storage_sync(storage);

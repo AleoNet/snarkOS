@@ -21,14 +21,14 @@ mod server_listen {
         parameters::PublicParameters,
     };
     use snarkos_network::{
-        context::Context,
-        message::{
-            types::{GetPeers, GetSync, Verack},
-            Message,
+        external::{
+            message::Message,
+            message_types::{GetPeers, GetSync, Verack},
+            protocol::SyncHandler,
+            Handshakes,
         },
-        protocol::SyncHandler,
+        internal::context::Context,
         server::Server,
-        Handshakes,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
 
@@ -59,9 +59,15 @@ mod server_listen {
         let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
         let server = Server::new(
-            Context::new(server_address, 5, 0, 10, is_bootnode, vec![
-                bootnode_address.to_string(),
-            ]),
+            Arc::new(Context::new(
+                server_address,
+                5,
+                0,
+                10,
+                is_bootnode,
+                vec![bootnode_address.to_string()],
+                false,
+            )),
             consensus,
             storage,
             parameters,
@@ -145,8 +151,8 @@ mod server_listen {
             // 4. Send handshake response from bootnode to server
 
             let mut bootnode_handshakes = Handshakes::new();
-            let (mut bootnode_hand, _) = bootnode_handshakes
-                .receive_any(1u64, 1u32, bootnode_address, server_address, reader)
+            let (mut bootnode_hand, _, _) = bootnode_handshakes
+                .receive_any(1u64, 1u32, server_address, reader)
                 .await
                 .unwrap();
 
@@ -215,11 +221,11 @@ mod server_listen {
             let (reader, _peer) = peer_listener.accept().await.unwrap();
             sleep(1000).await;
 
-            // 5. Send handshake response from peer to server
+            // 5. Send handshake response from remote node to local node
 
             let mut peer_handshakes = Handshakes::new();
             peer_handshakes
-                .receive_any(1u64, 1u32, peer_address, server_address, reader)
+                .receive_any(1u64, 1u32, server_address, reader)
                 .await
                 .unwrap();
         });

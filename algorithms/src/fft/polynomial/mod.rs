@@ -107,14 +107,6 @@ impl<F: Field> DenseOrSparsePolynomial<'_, F> {
         }
     }
 
-    #[inline]
-    fn iter_with_index<'a>(&'a self) -> Vec<(usize, F)> {
-        match self {
-            SPolynomial(p) => p.coeffs.iter().cloned().collect(),
-            DPolynomial(p) => p.iter().cloned().enumerate().collect(),
-        }
-    }
-
     /// Divide self by another (sparse or dense) polynomial, and returns the quotient and remainder.
     pub fn divide_with_q_and_r(&self, divisor: &Self) -> Option<(DensePolynomial<F>, DensePolynomial<F>)> {
         if self.is_zero() {
@@ -134,9 +126,16 @@ impl<F: Field> DenseOrSparsePolynomial<'_, F> {
                 let cur_q_degree = remainder.degree() - divisor.degree();
                 quotient[cur_q_degree] = cur_q_coeff;
 
-                for (i, div_coeff) in divisor.iter_with_index() {
-                    remainder[cur_q_degree + i] -= &(cur_q_coeff * &div_coeff);
+                if let SPolynomial(p) = divisor {
+                    for (i, div_coeff) in &p.coeffs {
+                        remainder[cur_q_degree + i] -= &(cur_q_coeff * div_coeff);
+                    }
+                } else if let DPolynomial(p) = divisor {
+                    for (i, div_coeff) in p.iter().enumerate() {
+                        remainder[cur_q_degree + i] -= &(cur_q_coeff * div_coeff);
+                    }
                 }
+
                 while let Some(true) = remainder.coeffs.last().map(|c| c.is_zero()) {
                     remainder.coeffs.pop();
                 }

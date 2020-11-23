@@ -56,9 +56,9 @@ pub struct POSWCircuit<
 impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP: POSWCircuitParameters>
     ConstraintSynthesizer<F> for POSWCircuit<F, M, HG, CP>
 {
-    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         // Compute the mask if it exists.
-        let mask = self.mask.clone().unwrap_or(vec![0; CP::MASK_LENGTH]);
+        let mask = self.mask.clone().unwrap_or_else(|| vec![0; CP::MASK_LENGTH]);
         if mask.len() != CP::MASK_LENGTH {
             return Err(SynthesisError::Unsatisfiable);
         }
@@ -105,7 +105,8 @@ impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP:
         )?;
 
         // Enforce the input root is the same as the computed root.
-        let public_computed_root = HG::OutputGadget::alloc_input(cs.ns(|| "public computed root"), || self.root.get())?;
+        let public_computed_root =
+            HG::OutputGadget::alloc_input(cs.ns(|| "public computed root"), || self.root.as_ref().get())?;
         computed_root.enforce_equal(cs.ns(|| "inputize computed root"), &public_computed_root)?;
 
         Ok(())
@@ -157,7 +158,7 @@ mod test {
 
         let parameters = EdwardsMaskedMerkleParameters::setup(&mut rng);
         let params = generate_random_parameters::<Bls12_377, _, _>(
-            POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
+            &POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
                 leaves: vec![None; 7],
                 merkle_parameters: parameters.clone(),
                 mask: None,
@@ -184,9 +185,9 @@ mod test {
 
         let snark_leaves = tree.hashed_leaves().into_iter().map(Some).collect();
         let proof = create_random_proof(
-            POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
+            &POSWCircuit::<_, EdwardsMaskedMerkleParameters, HashGadget, TestPOSWCircuitParameters> {
                 leaves: snark_leaves,
-                merkle_parameters: parameters.clone(),
+                merkle_parameters: parameters,
                 mask: Some(mask.clone()),
                 root: Some(root),
                 field_type: PhantomData,

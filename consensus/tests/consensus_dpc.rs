@@ -71,7 +71,7 @@ mod consensus_dpc {
 
         // OUTPUTS
 
-        let new_record_owners = vec![recipient.address.clone(); NUM_OUTPUT_RECORDS];
+        let new_record_owners = vec![recipient.address; NUM_OUTPUT_RECORDS];
         let new_death_program_ids = vec![program.into_compact_repr(); NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
         let new_values = vec![10; NUM_OUTPUT_RECORDS];

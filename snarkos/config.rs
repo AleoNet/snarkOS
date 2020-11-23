@@ -28,18 +28,21 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use toml;
 
-/// Hardcoded bootnodes maintained by Aleo.
+/// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
-pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &'static [&str] = &[
+pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
+pub const TESTNET_BOOTNODES: &[&str] = &[
+    "138.197.232.178:4131",
+    "64.225.91.42:4131",
+    "64.225.91.43:4131",
+    "46.101.144.133:4131",
+    "46.101.147.96:4131",
+    "167.71.79.152:4131",
+    "167.99.69.230:4131",
+    "206.189.80.245:4131",
+    "178.128.18.3:4131",
     "50.18.83.123:4131",
-    "34.220.189.127:4131",
-    "34.220.144.175:4131",
-    "52.89.166.172:4131",
-    "52.42.131.71:4131",
-    "54.245.170.92:4131",
 ]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
@@ -119,8 +122,8 @@ impl Default for Config {
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
                 mempool_interval: 5,
-                min_peers: 2,
-                max_peers: 20,
+                min_peers: 7,
+                max_peers: 25,
             },
         }
     }
@@ -129,7 +132,7 @@ impl Default for Config {
 impl Config {
     /// The directory that snarkOS system files will be stored
     fn snarkos_dir() -> PathBuf {
-        let mut path = home_dir().unwrap_or(std::env::current_dir().unwrap());
+        let mut path = home_dir().unwrap_or_else(|| std::env::current_dir().unwrap());
         path.push(".snarkOS/");
 
         path
@@ -252,15 +255,16 @@ impl Config {
     }
 
     fn path(&mut self, argument: Option<&str>) {
-        match argument {
-            Some(path) => self.node.db = path.into(),
-            _ => (),
-        };
+        if let Some(path) = argument {
+            self.node.db = path.into();
+        }
     }
 
     fn connect(&mut self, argument: Option<&str>) {
-        if let Some(bootnode) = argument {
-            self.p2p.bootnodes = vec![bootnode.to_string()];
+        if let Some(bootnodes) = argument {
+            let sanitize_bootnodes = bootnodes.replace(&['[', ']', ' '][..], "");
+            let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
+            self.p2p.bootnodes = bootnodes;
         }
     }
 
@@ -361,12 +365,9 @@ impl CLI for ConfigCli {
             "verbose",
         ]);
 
-        match arguments.subcommand() {
-            ("update", Some(arguments)) => {
-                UpdateCLI::parse(arguments)?;
-                std::process::exit(0x0100);
-            }
-            _ => {}
+        if let ("update", Some(arguments)) = arguments.subcommand() {
+            UpdateCLI::parse(arguments)?;
+            std::process::exit(0x0100);
         }
 
         Ok(config)

@@ -19,22 +19,29 @@ apt-get install -y \
     llvm \
     make \
     pkg-config \
+    tmux \
     xz-utils
 
 # Install Rust
 
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
 
-# Build snarkOS Release
+# Install snarkOS
+# cargo clean
+cargo install --path .
 
-cargo build --release
-
-# Start snarkOS
-
-echo "================================================"
+echo "=================================================="
 echo " Attention - Please ensure ports 4131 and 3030"
 echo "             are enabled on your local network."
-echo "================================================"
+echo ""
+echo " Cloud Providers - Enable ports 4131 and 3030"
+echo "                   in your network firewall"
+echo ""
+echo " Home Users - Enable port forwarding or NAT rules"
+echo "              for 4131 and 3030 on your router."
+echo "=================================================="
 
-./target/release/snarkos
+# Open ports on system
+ufw allow 4131/tcp
+ufw allow 3030/tcp

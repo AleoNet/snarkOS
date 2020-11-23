@@ -140,7 +140,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
 
         let birth_program_id_size: usize = read_variable_length_integer(&mut reader)?;
 
-        let mut birth_program_id = vec![];
+        let mut birth_program_id = Vec::with_capacity(birth_program_id_size);
         for _ in 0..birth_program_id_size {
             let byte: u8 = FromBytes::read(&mut reader)?;
             birth_program_id.push(byte);
@@ -148,7 +148,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
 
         let death_program_id_size: usize = read_variable_length_integer(&mut reader)?;
 
-        let mut death_program_id = vec![];
+        let mut death_program_id = Vec::with_capacity(death_program_id_size);
         for _ in 0..death_program_id_size {
             let byte: u8 = FromBytes::read(&mut reader)?;
             death_program_id.push(byte);
@@ -165,8 +165,8 @@ impl<C: BaseDPCComponents> FromBytes for DPCRecord<C> {
             is_dummy,
             value,
             payload,
-            birth_program_id: birth_program_id.to_vec(),
-            death_program_id: death_program_id.to_vec(),
+            birth_program_id,
+            death_program_id,
             serial_number_nonce,
             commitment,
             commitment_randomness,

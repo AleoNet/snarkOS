@@ -31,7 +31,7 @@ use rayon::prelude::*;
 
 /// Generates a random common reference string for
 /// a circuit.
-pub fn generate_random_parameters<E, C, R>(circuit: C, rng: &mut R) -> Result<Parameters<E>, SynthesisError>
+pub fn generate_random_parameters<E, C, R>(circuit: &C, rng: &mut R) -> Result<Parameters<E>, SynthesisError>
 where
     E: PairingEngine,
     C: ConstraintSynthesizer<E::Fr>,
@@ -133,8 +133,9 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for KeypairAssembly<E> {
 }
 
 /// Create parameters for a circuit, given some toxic waste.
+#[allow(clippy::many_single_char_names)]
 pub fn generate_parameters<E, C, R>(
-    circuit: C,
+    circuit: &C,
     alpha: E::Fr,
     beta: E::Fr,
     gamma: E::Fr,

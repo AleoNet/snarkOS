@@ -76,7 +76,7 @@ impl UInt for UInt128 {
         Self {
             bits: self.bits.clone(),
             negated: true,
-            value: self.value.clone(),
+            value: self.value,
         }
     }
 
@@ -110,24 +110,32 @@ impl UInt for UInt128 {
 
         let mut value = Some(0u128);
         for b in bits.iter().rev() {
-            value.as_mut().map(|v| *v <<= 1);
+            if let Some(v) = value.as_mut() {
+                *v <<= 1;
+            }
 
-            match b {
-                &Boolean::Constant(b) => {
+            match *b {
+                Boolean::Constant(b) => {
                     if b {
-                        value.as_mut().map(|v| *v |= 1);
+                        if let Some(v) = value.as_mut() {
+                            *v |= 1;
+                        }
                     }
                 }
-                &Boolean::Is(ref b) => match b.get_value() {
+                Boolean::Is(ref b) => match b.get_value() {
                     Some(true) => {
-                        value.as_mut().map(|v| *v |= 1);
+                        if let Some(v) = value.as_mut() {
+                            *v |= 1;
+                        }
                     }
                     Some(false) => {}
                     None => value = None,
                 },
-                &Boolean::Not(ref b) => match b.get_value() {
+                Boolean::Not(ref b) => match b.get_value() {
                     Some(false) => {
-                        value.as_mut().map(|v| *v |= 1);
+                        if let Some(v) = value.as_mut() {
+                            *v |= 1;
+                        }
                     }
                     Some(true) => {}
                     None => value = None,
@@ -241,7 +249,7 @@ impl UInt for UInt128 {
                             lc = lc - (coeff, bit.get_variable());
                         } else {
                             // Add coeff * bit_gadget
-                            lc = lc + (coeff, bit.get_variable());
+                            lc += (coeff, bit.get_variable());
                         }
                     }
                     Boolean::Not(ref bit) => {
@@ -260,7 +268,7 @@ impl UInt for UInt128 {
                             if op.negated {
                                 lc = lc - (coeff, CS::one());
                             } else {
-                                lc = lc + (coeff, CS::one());
+                                lc += (coeff, CS::one());
                             }
                         }
                     }
@@ -273,11 +281,13 @@ impl UInt for UInt128 {
         // The value of the actual result is modulo 2^128
         let modular_value = big_result_value.map(|v| v.to_u128());
 
-        if all_constants && modular_value.is_some() {
-            // We can just return a constant, rather than
-            // unpacking the result into allocated bits.
+        if all_constants {
+            if let Some(val) = modular_value {
+                // We can just return a constant, rather than
+                // unpacking the result into allocated bits.
 
-            return Ok(Self::constant(modular_value.unwrap()));
+                return Ok(Self::constant(val));
+            }
         }
 
         // Storage area for the resulting bits
@@ -347,7 +357,7 @@ impl UInt for UInt128 {
                         let modular_value = result_value.map(|v| v as u128);
 
                         // Storage area for the resulting bits
-                        let mut result_bits = vec![];
+                        let mut result_bits = Vec::with_capacity(128);
 
                         // This is a linear combination that we will enforce to be "zero"
                         let mut lc = LinearCombination::zero();
@@ -389,7 +399,7 @@ impl UInt for UInt128 {
             (_, _) => {
                 // If either of our operands have unknown value, we won't
                 // know the value of the result
-                return Err(SynthesisError::AssignmentMissing);
+                Err(SynthesisError::AssignmentMissing)
             }
         }
     }
@@ -443,7 +453,7 @@ impl UInt for UInt128 {
             })
             .collect::<Vec<Self>>();
 
-        Self::addmany(&mut cs.ns(|| format!("partial_products")), &partial_products)
+        Self::addmany(&mut cs.ns(|| "partial_products"), &partial_products)
     }
 
     /// Perform long division of two `UInt128` objects.
@@ -495,7 +505,7 @@ impl UInt for UInt128 {
 
         let self_is_zero = Boolean::Constant(self.eq(&Self::constant(0u128)));
         let mut quotient = zero.clone();
-        let mut remainder = zero.clone();
+        let mut remainder = zero;
 
         for (i, bit) in self.bits.iter().rev().enumerate() {
             // Left shift remainder by 1
@@ -546,7 +556,7 @@ impl UInt for UInt128 {
             let index = 127 - i as usize;
             let bit_value = 1u128 << (index as u128);
             let mut new_quotient = quotient.clone();
-            new_quotient.bits[index] = true_bit.clone();
+            new_quotient.bits[index] = true_bit;
             new_quotient.value = Some(new_quotient.value.unwrap() + bit_value);
 
             quotient = Self::conditionally_select(
@@ -625,7 +635,7 @@ impl UInt for UInt128 {
 
 impl PartialEq for UInt128 {
     fn eq(&self, other: &Self) -> bool {
-        !self.value.is_none() && !other.value.is_none() && self.value == other.value
+        self.value.is_some() && other.value.is_some() && self.value == other.value
     }
 }
 
@@ -696,7 +706,7 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt128 {
                 }
             });
 
-            let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get().map(|v| v))?;
+            let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get())?;
 
             result.negated = is_negated;
 
@@ -813,7 +823,7 @@ impl<F: Field> ToBytesGadget<F> for UInt128 {
             None => [None, None, None, None],
         };
         let mut bytes = Vec::new();
-        for (i, chunk8) in self.to_bits_le().chunks(8).into_iter().enumerate() {
+        for (i, chunk8) in self.to_bits_le().chunks(8).enumerate() {
             let byte = UInt8 {
                 bits: chunk8.to_vec(),
                 negated: false,

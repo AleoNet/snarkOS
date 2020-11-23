@@ -41,17 +41,18 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn create_account<R: Rng>(parameters: &Self::Parameters, rng: &mut R) -> Result<Self::Account, DPCError>;
 
     /// Returns the execution context required for program snark and DPC transaction generation.
+    #[allow(clippy::too_many_arguments)]
     fn execute_offline<R: Rng>(
-        parameters: &Self::SystemParameters,
-        old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
+        parameters: Self::SystemParameters,
+        old_records: Vec<Self::Record>,
+        old_account_private_keys: Vec<<Self::Account as AccountScheme>::AccountPrivateKey>,
+        new_record_owners: Vec<<Self::Account as AccountScheme>::AccountAddress>,
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
-        new_payloads: &[Self::Payload],
-        new_birth_program_ids: &[Vec<u8>],
-        new_death_program_ids: &[Vec<u8>],
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        new_payloads: Vec<Self::Payload>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
+        memorandum: <Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self::ExecuteContext, DPCError>;
@@ -61,8 +62,8 @@ pub trait DPCScheme<L: LedgerScheme> {
     fn execute_online<R: Rng>(
         parameters: &Self::Parameters,
         execute_context: Self::ExecuteContext,
-        old_death_program_proofs: &[Self::PrivateProgramInput],
-        new_birth_program_proofs: &[Self::PrivateProgramInput],
+        old_death_program_proofs: Vec<Self::PrivateProgramInput>,
+        new_birth_program_proofs: Vec<Self::PrivateProgramInput>,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError>;
@@ -73,7 +74,7 @@ pub trait DPCScheme<L: LedgerScheme> {
     /// Returns true iff all the transactions in the block are valid according to the ledger.
     fn verify_transactions(
         parameters: &Self::Parameters,
-        block: &Vec<Self::Transaction>,
+        block: &[Self::Transaction],
         ledger: &L,
     ) -> Result<bool, DPCError>;
 }

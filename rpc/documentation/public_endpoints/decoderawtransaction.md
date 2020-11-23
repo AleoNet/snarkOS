@@ -22,6 +22,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `local_data_root`       | string | The local data root                       |
 | `value balance`         | number | The transaction value balance             |
 | `signatures`            | array  | The list of transaction signatures        |
+| `encrypted_records`     | array  | The list of new encrypted records         |
 | `transaction_metadata`  | object | The transaction metadata                  |
 
 ### Example

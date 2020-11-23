@@ -45,7 +45,7 @@ use snarkos_utilities::{
     variable_length_integer::*,
 };
 
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 use rand::Rng;
 use std::{
     io::{Read, Result as IoResult, Write},
@@ -159,6 +159,7 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
 }
 
 impl<Components: BaseDPCComponents> ExecuteContext<Components> {
+    #[allow(clippy::wrong_self_convention)]
     pub fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
             system_parameters: self.system_parameters.clone(),
@@ -171,7 +172,7 @@ impl<Components: BaseDPCComponents> ExecuteContext<Components> {
             local_data_merkle_tree: self.local_data_merkle_tree.clone(),
             local_data_commitment_randomizers: self.local_data_commitment_randomizers.clone(),
 
-            memorandum: self.memorandum.clone(),
+            memorandum: self.memorandum,
             network_id: self.network_id,
         }
     }
@@ -462,7 +463,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         system_parameters: &SystemParameters<Components>,
         rng: &mut R,
     ) -> Result<NoopProgramSNARKParameters<Components>, DPCError> {
-        let (pk, pvk) = Components::NoopProgramSNARK::setup(NoopCircuit::blank(system_parameters), rng)?;
+        let (pk, pvk) = Components::NoopProgramSNARK::setup(&NoopCircuit::blank(system_parameters), rng)?;
 
         Ok(NoopProgramSNARKParameters {
             proving_key: pk,
@@ -492,15 +493,16 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         Ok((sn, sig_and_pk_randomizer))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_record<R: Rng>(
-        system_parameters: &SystemParameters<Components>,
-        sn_nonce: &<Components::SerialNumberNonceCRH as CRH>::Output,
-        owner: &AccountAddress<Components>,
+        system_parameters: SystemParameters<Components>,
+        sn_nonce: <Components::SerialNumberNonceCRH as CRH>::Output,
+        owner: AccountAddress<Components>,
         is_dummy: bool,
         value: u64,
-        payload: &RecordPayload,
-        birth_program_id: &Vec<u8>,
-        death_program_id: &Vec<u8>,
+        payload: RecordPayload,
+        birth_program_id: Vec<u8>,
+        death_program_id: Vec<u8>,
         rng: &mut R,
     ) -> Result<DPCRecord<Components>, DPCError> {
         let record_time = start_timer!(|| "Generate record");
@@ -525,13 +527,13 @@ impl<Components: BaseDPCComponents> DPC<Components> {
         )?;
 
         let record = DPCRecord {
-            owner: owner.clone(),
+            owner,
             is_dummy,
             value,
-            payload: payload.clone(),
-            birth_program_id: birth_program_id.to_vec(),
-            death_program_id: death_program_id.to_vec(),
-            serial_number_nonce: sn_nonce.clone(),
+            payload,
+            birth_program_id,
+            death_program_id,
+            serial_number_nonce: sn_nonce,
             commitment,
             commitment_randomness,
             _components: PhantomData,
@@ -574,7 +576,7 @@ where
         let noop_program_snark_parameters = Self::generate_noop_program_snark_parameters(&system_parameters, rng)?;
         let program_snark_proof = Components::NoopProgramSNARK::prove(
             &noop_program_snark_parameters.proving_key,
-            NoopCircuit::blank(&system_parameters),
+            &NoopCircuit::blank(&system_parameters),
             rng,
         )?;
         end_timer!(program_snark_setup_time);
@@ -585,26 +587,22 @@ where
         };
 
         let snark_setup_time = start_timer!(|| "Execute inner SNARK setup");
-        let inner_snark_parameters =
-            Components::InnerSNARK::setup(InnerCircuit::blank(&system_parameters, ledger_parameters), rng)?;
+        let inner_circuit = InnerCircuit::blank(&system_parameters, ledger_parameters);
+        let inner_snark_parameters = Components::InnerSNARK::setup(&inner_circuit, rng)?;
         end_timer!(snark_setup_time);
 
         let snark_setup_time = start_timer!(|| "Execute outer SNARK setup");
         let inner_snark_vk: <Components::InnerSNARK as SNARK>::VerificationParameters =
             inner_snark_parameters.1.clone().into();
-        let inner_snark_proof = Components::InnerSNARK::prove(
-            &inner_snark_parameters.0,
-            InnerCircuit::blank(&system_parameters, ledger_parameters),
-            rng,
-        )?;
+        let inner_snark_proof = Components::InnerSNARK::prove(&inner_snark_parameters.0, &inner_circuit, rng)?;
 
         let outer_snark_parameters = Components::OuterSNARK::setup(
-            OuterCircuit::blank(
-                &system_parameters,
-                ledger_parameters,
-                &inner_snark_vk,
-                &inner_snark_proof,
-                &program_snark_vk_and_proof,
+            &OuterCircuit::blank(
+                system_parameters.clone(),
+                ledger_parameters.clone(),
+                inner_snark_vk,
+                inner_snark_proof,
+                program_snark_vk_and_proof,
             ),
             rng,
         )?;
@@ -641,16 +639,16 @@ where
     }
 
     fn execute_offline<R: Rng>(
-        parameters: &Self::SystemParameters,
-        old_records: &[Self::Record],
-        old_account_private_keys: &[<Self::Account as AccountScheme>::AccountPrivateKey],
-        new_record_owners: &[<Self::Account as AccountScheme>::AccountAddress],
+        parameters: Self::SystemParameters,
+        old_records: Vec<Self::Record>,
+        old_account_private_keys: Vec<<Self::Account as AccountScheme>::AccountPrivateKey>,
+        new_record_owners: Vec<<Self::Account as AccountScheme>::AccountAddress>,
         new_is_dummy_flags: &[bool],
         new_values: &[u64],
-        new_payloads: &[Self::Payload],
-        new_birth_program_ids: &[Vec<u8>],
-        new_death_program_ids: &[Vec<u8>],
-        memorandum: &<Self::Transaction as Transaction>::Memorandum,
+        new_payloads: Vec<Self::Payload>,
+        new_birth_program_ids: Vec<Vec<u8>>,
+        new_death_program_ids: Vec<Vec<u8>>,
+        memorandum: <Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self::ExecuteContext, DPCError> {
@@ -666,7 +664,7 @@ where
         let mut old_serial_numbers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut old_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut joint_serial_numbers = Vec::new();
-        let mut old_death_program_ids = Vec::new();
+        let mut old_death_program_ids = Vec::with_capacity(old_records.len());
 
         let mut value_balance = AleoAmount::ZERO;
 
@@ -692,7 +690,13 @@ where
         let mut new_sn_nonce_randomness = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
 
         // Generate new records and commitments for them.
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
+        for (j, (new_record_owner, new_payload, new_death_program_id)) in
+            izip!(new_record_owners, new_payloads, new_death_program_ids).enumerate()
+        {
+            if j == Components::NUM_OUTPUT_RECORDS {
+                break;
+            }
+
             let output_record_time = start_timer!(|| format!("Process output record {}", j));
             let sn_nonce_time = start_timer!(|| "Generate serial number nonce");
 
@@ -705,14 +709,14 @@ where
             end_timer!(sn_nonce_time);
 
             let record = Self::generate_record(
-                parameters,
-                &sn_nonce,
-                &new_record_owners[j],
+                parameters.clone(),
+                sn_nonce,
+                new_record_owner,
                 new_is_dummy_flags[j],
                 new_values[j],
-                &new_payloads[j],
-                &new_birth_program_ids[j],
-                &new_death_program_ids[j],
+                new_payload,
+                new_birth_program_ids[j].clone(),
+                new_death_program_id,
                 rng,
             )?;
 
@@ -730,7 +734,7 @@ where
         // TODO (raychu86) Add index and program register inputs + outputs to local data commitment leaves
         let local_data_merkle_tree_timer = start_timer!(|| "Compute local data merkle tree");
 
-        let mut local_data_commitment_randomizers = vec![];
+        let mut local_data_commitment_randomizers = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
 
         let mut old_record_commitments = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for i in 0..Components::NUM_INPUT_RECORDS {
@@ -749,8 +753,7 @@ where
         }
 
         let mut new_record_commitments = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
-            let record = &new_records[j];
+        for record in new_records.iter().take(Components::NUM_OUTPUT_RECORDS) {
             let input_bytes = to_bytes![record.commitment(), memorandum, network_id]?;
 
             let commitment_randomness = <Components::LocalDataCommitment as CommitmentScheme>::Randomness::rand(rng);
@@ -818,10 +821,10 @@ where
         }
 
         let context = ExecuteContext {
-            system_parameters: parameters.clone(),
+            system_parameters: parameters,
 
-            old_records: old_records.to_vec(),
-            old_account_private_keys: old_account_private_keys.to_vec(),
+            old_records,
+            old_account_private_keys,
             old_serial_numbers,
             old_randomizers,
 
@@ -839,7 +842,7 @@ where
             local_data_commitment_randomizers,
 
             value_balance,
-            memorandum: memorandum.clone(),
+            memorandum,
             network_id,
         };
         Ok(context)
@@ -848,8 +851,8 @@ where
     fn execute_online<R: Rng>(
         parameters: &Self::Parameters,
         context: Self::ExecuteContext,
-        old_death_program_proofs: &[Self::PrivateProgramInput],
-        new_birth_program_proofs: &[Self::PrivateProgramInput],
+        old_death_program_proofs: Vec<Self::PrivateProgramInput>,
+        new_birth_program_proofs: Vec<Self::PrivateProgramInput>,
         ledger: &L,
         rng: &mut R,
     ) -> Result<(Vec<Self::Record>, Self::Transaction), DPCError> {
@@ -961,24 +964,24 @@ where
 
         let inner_proof = {
             let circuit = InnerCircuit::new(
-                &parameters.system_parameters,
-                ledger.parameters(),
-                &ledger_digest,
-                &old_records,
-                &old_witnesses,
-                &old_account_private_keys,
-                &old_serial_numbers,
-                &new_records,
-                &new_sn_nonce_randomness,
-                &new_commitments,
-                &new_records_encryption_randomness,
-                &new_records_encryption_gadget_components,
-                &new_encrypted_record_hashes,
-                &program_commitment,
-                &program_randomness,
-                &local_data_root,
-                &local_data_commitment_randomizers,
-                &memorandum,
+                parameters.system_parameters.clone(),
+                ledger.parameters().clone(),
+                ledger_digest.clone(),
+                old_records,
+                old_witnesses,
+                old_account_private_keys,
+                old_serial_numbers.clone(),
+                new_records.clone(),
+                new_sn_nonce_randomness,
+                new_commitments.clone(),
+                new_records_encryption_randomness,
+                new_records_encryption_gadget_components,
+                new_encrypted_record_hashes.clone(),
+                program_commitment.clone(),
+                program_randomness.clone(),
+                local_data_root.clone(),
+                local_data_commitment_randomizers,
+                memorandum,
                 value_balance,
                 network_id,
             );
@@ -988,7 +991,7 @@ where
                 None => return Err(DPCError::MissingInnerSnarkProvingParameters),
             };
 
-            Components::InnerSNARK::prove(&inner_snark_parameters, circuit, rng)?
+            Components::InnerSNARK::prove(&inner_snark_parameters, &circuit, rng)?
         };
 
         // Verify that the inner proof passes
@@ -1000,7 +1003,7 @@ where
                 old_serial_numbers: old_serial_numbers.clone(),
                 new_commitments: new_commitments.clone(),
                 new_encrypted_record_hashes: new_encrypted_record_hashes.clone(),
-                memo: memorandum.clone(),
+                memo: memorandum,
                 program_commitment: program_commitment.clone(),
                 local_data_root: local_data_root.clone(),
                 value_balance,
@@ -1021,26 +1024,24 @@ where
         )?;
 
         let transaction_proof = {
-            let ledger_parameters = ledger.parameters();
-
             let circuit = OuterCircuit::new(
-                &parameters.system_parameters,
-                ledger_parameters,
-                &ledger_digest,
-                &old_serial_numbers,
-                &new_commitments,
-                &new_encrypted_record_hashes,
-                &memorandum,
+                parameters.system_parameters.clone(),
+                ledger.parameters().clone(),
+                ledger_digest.clone(),
+                old_serial_numbers.clone(),
+                new_commitments.clone(),
+                new_encrypted_record_hashes,
+                memorandum,
                 value_balance,
                 network_id,
-                &inner_snark_vk,
-                &inner_proof,
-                &old_death_program_attributes,
-                &new_birth_program_attributes,
-                &program_commitment,
-                &program_randomness,
-                &local_data_root,
-                &inner_snark_id,
+                inner_snark_vk,
+                inner_proof,
+                old_death_program_attributes,
+                new_birth_program_attributes,
+                program_commitment.clone(),
+                program_randomness,
+                local_data_root.clone(),
+                inner_snark_id.clone(),
             );
 
             let outer_snark_parameters = match &parameters.outer_snark_parameters.0 {
@@ -1048,13 +1049,13 @@ where
                 None => return Err(DPCError::MissingOuterSnarkProvingParameters),
             };
 
-            Components::OuterSNARK::prove(&outer_snark_parameters, circuit, rng)?
+            Components::OuterSNARK::prove(&outer_snark_parameters, &circuit, rng)?
         };
 
         let transaction = Self::Transaction::new(
             old_serial_numbers,
             new_commitments,
-            memorandum.clone(),
+            memorandum,
             ledger_digest,
             inner_snark_id,
             transaction_proof,
@@ -1158,7 +1159,7 @@ where
             old_serial_numbers: transaction.old_serial_numbers().to_vec(),
             new_commitments: transaction.new_commitments().to_vec(),
             new_encrypted_record_hashes,
-            memo: transaction.memorandum().clone(),
+            memo: *transaction.memorandum(),
             program_commitment: transaction.program_commitment().clone(),
             local_data_root: transaction.local_data_root().clone(),
             value_balance: transaction.value_balance(),
@@ -1195,7 +1196,7 @@ where
     /// Returns true iff all the transactions in the block are valid according to the ledger.
     fn verify_transactions(
         parameters: &Self::Parameters,
-        transactions: &Vec<Self::Transaction>,
+        transactions: &[Self::Transaction],
         ledger: &L,
     ) -> Result<bool, DPCError> {
         for transaction in transactions {

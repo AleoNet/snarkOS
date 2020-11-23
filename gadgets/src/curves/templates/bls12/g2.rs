@@ -64,10 +64,11 @@ impl<P: Bls12Parameters> G2PreparedGadget<P> {
         let two_inv = P::Fp::one().double().inverse().unwrap();
         let zero = G2Gadget::<P>::zero(cs.ns(|| "zero"))?;
         q.enforce_not_equal(cs.ns(|| "enforce not zero"), &zero)?;
-        let mut ell_coeffs = vec![];
+        let bit_iterator = BitIterator::new(P::X);
+        let mut ell_coeffs = Vec::with_capacity(bit_iterator.len());
         let mut r = q.clone();
 
-        for (j, i) in BitIterator::new(P::X).skip(1).enumerate() {
+        for (j, i) in bit_iterator.skip(1).enumerate() {
             let mut cs = cs.ns(|| format!("Iteration {}", j));
             ell_coeffs.push(Self::double(cs.ns(|| "double"), &mut r, &two_inv)?);
 
@@ -79,6 +80,7 @@ impl<P: Bls12Parameters> G2PreparedGadget<P> {
         Ok(Self { ell_coeffs })
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn double<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         r: &mut G2Gadget<P>,
@@ -106,6 +108,7 @@ impl<P: Bls12Parameters> G2PreparedGadget<P> {
         }
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn add<CS: ConstraintSystem<P::Fp>>(
         mut cs: CS,
         r: &mut G2Gadget<P>,

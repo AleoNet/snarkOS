@@ -207,9 +207,9 @@ impl<F: PrimeField> EvaluationDomain<F> {
         if t_size.is_one() {
             let mut u = vec![F::zero(); size];
             let mut omega_i = one;
-            for i in 0..size {
+            for x in u.iter_mut().take(size) {
                 if omega_i == tau {
-                    u[i] = one;
+                    *x = one;
                     break;
                 }
                 omega_i *= &self.group_gen;
@@ -328,6 +328,7 @@ fn best_fft<F: PrimeField>(a: &mut [F], worker: &Worker, omega: F, log_n: u32) {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 pub(crate) fn serial_fft<F: PrimeField>(a: &mut [F], omega: F, log_n: u32) {
     #[inline]
     fn bitreverse(mut n: u32, l: u32) -> u32 {
@@ -391,12 +392,12 @@ pub(crate) fn parallel_fft<F: PrimeField>(a: &mut [F], worker: &Worker, omega: F
                 let omega_step = omega.pow(&[(j as u64) << log_new_n]);
 
                 let mut elt = F::one();
-                for i in 0..(1 << log_new_n) {
+                for (i, x) in tmp.iter_mut().enumerate().take(1 << log_new_n) {
                     for s in 0..num_cpus {
                         let idx = (i + (s << log_new_n)) % (1 << log_n);
                         let mut t = a[idx];
                         t *= &elt;
-                        tmp[i] += &t;
+                        *x += &t;
                         elt *= &omega_step;
                     }
                     elt *= &omega_j;
@@ -485,7 +486,7 @@ mod tests {
             let size = 1 << coeffs;
             let domain = EvaluationDomain::<Fr>::new(size).unwrap();
             let domain_size = domain.size();
-            assert_eq!(domain_size, domain.elements().collect::<Vec<_>>().len());
+            assert_eq!(domain_size, domain.elements().count());
         }
     }
 

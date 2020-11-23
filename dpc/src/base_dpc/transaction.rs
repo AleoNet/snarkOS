@@ -86,6 +86,7 @@ pub struct DPCTransaction<C: BaseDPCComponents> {
 }
 
 impl<C: BaseDPCComponents> DPCTransaction<C> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         old_serial_numbers: Vec<<Self as Transaction>::SerialNumber>,
         new_commitments: Vec<<Self as Transaction>::Commitment>,
@@ -235,7 +236,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the old serial numbers
         let num_old_serial_numbers = C::NUM_INPUT_RECORDS;
-        let mut old_serial_numbers = vec![];
+        let mut old_serial_numbers = Vec::with_capacity(num_old_serial_numbers);
         for _ in 0..num_old_serial_numbers {
             let old_serial_number: <C::AccountSignature as SignatureScheme>::PublicKey =
                 CanonicalDeserialize::deserialize(&mut reader).unwrap();
@@ -245,7 +246,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
 
         // Read the new commitments
         let num_new_commitments = C::NUM_OUTPUT_RECORDS;
-        let mut new_commitments = vec![];
+        let mut new_commitments = Vec::with_capacity(num_new_commitments);
         for _ in 0..num_new_commitments {
             let new_commitment: <C::RecordCommitment as CommitmentScheme>::Output = FromBytes::read(&mut reader)?;
             new_commitments.push(new_commitment);
@@ -265,7 +266,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
 
         // Read the signatures
         let num_signatures = C::NUM_INPUT_RECORDS;
-        let mut signatures = vec![];
+        let mut signatures = Vec::with_capacity(num_signatures);
         for _ in 0..num_signatures {
             let signature: <C::AccountSignature as SignatureScheme>::Output = FromBytes::read(&mut reader)?;
             signatures.push(signature);
@@ -273,7 +274,7 @@ impl<C: BaseDPCComponents> FromBytes for DPCTransaction<C> {
 
         // Read the encrypted records
         let num_encrypted_records = C::NUM_OUTPUT_RECORDS;
-        let mut encrypted_records = vec![];
+        let mut encrypted_records = Vec::with_capacity(num_encrypted_records);
         for _ in 0..num_encrypted_records {
             let encrypted_record: EncryptedRecord<C> = FromBytes::read(&mut reader)?;
 

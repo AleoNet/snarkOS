@@ -81,7 +81,7 @@ impl<'a, 'b, F: PrimeField, C> ProverState<'a, 'b, F, C> {
 
 /// Each prover message that is not a list of oracles is a list of field elements.
 #[repr(transparent)]
-#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone, Debug, Default, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ProverMsg<F: Field> {
     /// The field elements that make up the message
     pub field_elements: Vec<F>,
@@ -148,7 +148,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
     /// Initialize the AHP prover.
     pub fn prover_init<'a, 'b, C: ConstraintSynthesizer<F>>(
         index: &'a Index<F, C>,
-        c: C,
+        c: &C,
     ) -> Result<ProverState<'a, 'b, F, C>, Error> {
         let init_time = start_timer!(|| "AHP::Prover::Init");
 
@@ -175,11 +175,11 @@ impl<F: PrimeField> AHPForR1CS<F> {
         if index.index_info.num_constraints != num_constraints
             || num_input_variables + num_witness_variables != index.index_info.num_variables
         {
-            Err(Error::InstanceDoesNotMatchIndex)?;
+            return Err(Error::InstanceDoesNotMatchIndex);
         }
 
         if !Self::formatted_public_input_is_admissible(&formatted_input_assignment) {
-            Err(Error::InvalidPublicInputLength)?
+            return Err(Error::InvalidPublicInputLength);
         }
 
         // Perform matrix multiplications
@@ -235,6 +235,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
     }
 
     /// Output the first round message and the next state.
+    #[allow(clippy::type_complexity)]
     pub fn prover_first_round<'a, 'b, R: RngCore, C: ConstraintSynthesizer<F>>(
         mut state: ProverState<'a, 'b, F, C>,
         rng: &mut R,
@@ -296,17 +297,17 @@ impl<F: PrimeField> AHPForR1CS<F> {
         mask_poly[0] -= &scaled_sigma_1;
         end_timer!(mask_poly_time);
 
-        let msg = ProverMsg { field_elements: vec![] };
+        let msg = ProverMsg::default();
 
-        assert!(w_poly.degree() <= domain_h.size() - domain_x.size() + zk_bound - 1);
-        assert!(z_a_poly.degree() <= domain_h.size() + zk_bound - 1);
-        assert!(z_b_poly.degree() <= domain_h.size() + zk_bound - 1);
+        assert!(w_poly.degree() < domain_h.size() - domain_x.size() + zk_bound);
+        assert!(z_a_poly.degree() < domain_h.size() + zk_bound);
+        assert!(z_b_poly.degree() < domain_h.size() + zk_bound);
         assert!(mask_poly.degree() <= 3 * domain_h.size() + 2 * zk_bound - 3);
 
         let w = LabeledPolynomial::new_owned("w".to_string(), w_poly, None, Some(1));
         let z_a = LabeledPolynomial::new_owned("z_a".to_string(), z_a_poly, None, Some(1));
         let z_b = LabeledPolynomial::new_owned("z_b".to_string(), z_b_poly, None, Some(1));
-        let mask_poly = LabeledPolynomial::new_owned("mask_poly".to_string(), mask_poly.clone(), None, None);
+        let mask_poly = LabeledPolynomial::new_owned("mask_poly".to_string(), mask_poly, None, None);
 
         let oracles = ProverFirstOracles {
             w: w.clone(),
@@ -424,7 +425,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
         cfg_iter_mut!(z_poly.coeffs)
             .zip(&x_poly.coeffs)
             .for_each(|(z, x)| *z += x);
-        assert!(z_poly.degree() <= domain_h.size() + zk_bound - 1);
+        assert!(z_poly.degree() < domain_h.size() + zk_bound);
 
         end_timer!(z_poly_time);
 
@@ -451,7 +452,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
             .zip(&t_poly_m_evals.evals)
             .for_each(|(((a, b), &c), d)| {
                 *a *= &b;
-                *a -= &(c * &d);
+                *a -= &(c * d);
             });
         let rhs = r_alpha_evals.interpolate();
         let q_1 = mask_poly.polynomial() + &rhs;
@@ -564,19 +565,19 @@ impl<F: PrimeField> AHPForR1CS<F> {
         let a_denom: Vec<_> = cfg_iter!(a_star.evals_on_B.row.evals)
             .zip(&a_star.evals_on_B.col.evals)
             .zip(&a_star.row_col_evals_on_B.evals)
-            .map(|((&r, c), r_c)| beta * &alpha - &(r * &alpha) - &(beta * &c) + &r_c)
+            .map(|((&r, c), r_c)| beta * &alpha - &(r * &alpha) - &(beta * c) + r_c)
             .collect();
 
         let b_denom: Vec<_> = cfg_iter!(b_star.evals_on_B.row.evals)
             .zip(&b_star.evals_on_B.col.evals)
             .zip(&b_star.row_col_evals_on_B.evals)
-            .map(|((&r, c), r_c)| beta * &alpha - &(r * &alpha) - &(beta * &c) + &r_c)
+            .map(|((&r, c), r_c)| beta * &alpha - &(r * &alpha) - &(beta * c) + r_c)
             .collect();
 
         let c_denom: Vec<_> = cfg_iter!(c_star.evals_on_B.row.evals)
             .zip(&c_star.evals_on_B.col.evals)
             .zip(&c_star.row_col_evals_on_B.evals)
-            .map(|((&r, c), r_c)| beta * &alpha - &(r * &alpha) - &(beta * &c) + &r_c)
+            .map(|((&r, c), r_c)| beta * &alpha - &(r * &alpha) - &(beta * c) + r_c)
             .collect();
         end_timer!(denom_eval_time);
 
@@ -612,7 +613,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
             .0;
         end_timer!(h_2_poly_time);
 
-        let msg = ProverMsg { field_elements: vec![] };
+        let msg = ProverMsg::default();
 
         assert!(g_2.degree() <= domain_k.size() - 2);
         let oracles = ProverThirdOracles {

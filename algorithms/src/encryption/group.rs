@@ -98,11 +98,8 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         let keygen_time = start_timer!(|| "GroupEncryption::generate_public_key");
 
         let mut public_key = G::zero();
-        for (bit, base_power) in bytes_to_bits(&to_bytes![private_key]?)
-            .iter()
-            .zip_eq(&self.parameters.generator_powers)
-        {
-            if *bit {
+        for (bit, base_power) in bytes_to_bits(&to_bytes![private_key]?).zip_eq(&self.parameters.generator_powers) {
+            if bit {
                 public_key += &base_power;
             }
         }
@@ -165,16 +162,13 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         &self,
         public_key: &Self::PublicKey,
         randomness: &Self::Randomness,
-        message: &Vec<Self::Text>,
+        message: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
         let record_view_key = public_key.0.mul(&randomness);
 
         let mut c_0 = G::zero();
-        for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?)
-            .iter()
-            .zip_eq(&self.parameters.generator_powers)
-        {
-            if *bit {
+        for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?).zip_eq(&self.parameters.generator_powers) {
+            if bit {
                 c_0 += &base_power;
             }
         }
@@ -202,9 +196,9 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
     fn decrypt(
         &self,
         private_key: &Self::PrivateKey,
-        ciphertext: &Vec<Self::Text>,
+        ciphertext: &[Self::Text],
     ) -> Result<Vec<Self::Text>, EncryptionError> {
-        assert!(ciphertext.len() > 0);
+        assert!(!ciphertext.is_empty());
         let c_0 = &ciphertext[0];
 
         let record_view_key = c_0.mul(&private_key);
@@ -216,7 +210,7 @@ impl<G: Group + ProjectiveCurve> EncryptionScheme for GroupEncryption<G> {
         let z = Self::Randomness::read(&z_bytes[..])?;
 
         let one = Self::Randomness::one();
-        let mut plaintext = vec![];
+        let mut plaintext = Vec::with_capacity(ciphertext.len().saturating_sub(1));
         let mut i = Self::Randomness::one();
 
         for c_i in ciphertext.iter().skip(1) {

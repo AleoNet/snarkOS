@@ -56,7 +56,9 @@ where
     scalar.reverse();
     let input = Vec::<Boolean>::alloc(cs.ns(|| "Input"), || Ok(scalar)).unwrap();
     let zero = GG::zero(cs.ns(|| "zero")).unwrap();
-    let result = gadget_a.mul_bits(cs.ns(|| "mul_bits"), &zero, input.iter()).unwrap();
+    let result = gadget_a
+        .mul_bits(cs.ns(|| "mul_bits"), &zero, input.into_iter())
+        .unwrap();
     let gadget_value = result.get_value().expect("Gadget_result failed");
     assert_eq!(native_result, gadget_value);
 }

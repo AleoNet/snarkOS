@@ -17,7 +17,7 @@
 #[macro_use]
 extern crate criterion;
 
-use snarkos_algorithms::snark::GM17;
+use snarkos_algorithms::snark::gm17::GM17;
 use snarkos_curves::bls12_377::{Bls12_377, Fr};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -37,12 +37,12 @@ struct Benchmark<F: Field> {
 }
 
 impl<F: Field> ConstraintSynthesizer<F> for Benchmark<F> {
-    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         assert!(self.inputs.len() >= 2);
         assert!(self.num_constraints >= self.inputs.len());
 
         let mut variables: Vec<_> = Vec::with_capacity(self.inputs.len());
-        for (i, input) in self.inputs.into_iter().enumerate() {
+        for (i, input) in self.inputs.iter().cloned().enumerate() {
             let input_var = cs.alloc_input(
                 || format!("input_{}", i),
                 || input.ok_or(SynthesisError::AssignmentMissing),

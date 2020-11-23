@@ -26,8 +26,6 @@ use snarkos_models::curves::{
     ProjectiveCurve,
 };
 
-use rand;
-
 #[test]
 fn test_edwards_sw6_fr() {
     let a: Fr = rand::random();

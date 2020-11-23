@@ -60,6 +60,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `local_data_root`       | string | The local data root                       |
 | `value balance`         | number | The transaction value balance             |
 | `signatures`            | array  | The list of transaction signatures        |
+| `encrypted_records`     | array  | The list of new encrypted records         |
 | `transaction_metadata`  | object | The transaction metadata                  |
 
 ### Example
@@ -127,7 +128,7 @@ None
 
 | Parameter |  Type  |                  Description                 |
 |:---------:|:------:|:--------------------------------------------:|
-| `result`  | string | The number of blocks in the best valid chain |
+| `result`  | number | The number of blocks in the best valid chain |
 
 ### Example
 ```ignore
@@ -141,7 +142,7 @@ Returns the block hash of a block at the given block height in the best valid ch
 
 |    Parameter   |  Type  | Required |                  Description                 |
 |:-------------- |:------:|:--------:|:-------------------------------------------- |
-| `block_height` | string |    Yes   | The block height of the requested block hash |
+| `block_height` | number |    Yes   | The block height of the requested block hash |
 
 ### Response
 
@@ -193,6 +194,25 @@ None
 ### Example
 ```ignore
 curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectioncount", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+```
+
+## getnodeinfo
+Returns information about the node.
+
+### Arguments
+
+None 
+
+### Response
+
+|   Parameter  | Type |                  Description                  |
+|:------------:|:----:|:---------------------------------------------:|
+|  `is_miner`  | bool | Flag indicating if the node is a miner        |
+| `is_snycing` | bool | Flag indicating if the node currently syncing |
+
+### Example
+```ignore
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getnodeinfo", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ## getpeerinfo
@@ -251,12 +271,14 @@ Returns information about a transaction from a transaction id.
 | `old_serial_numbers`    | array  | The list of old record serial numbers    |
 | `new_commitments`       | array  | The list of new record commitments       |
 | `memo`                  | string | The transaction memo                     |
+| `network_id`            | number | The transaction network id               |
 | `digest`                | string | The merkle tree digest                   |
 | `transaction_proof`     | string | The transaction zero knowledge proof     |
 | `program_commitment`    | string | The program verification key commitment  |
 | `local_data_root`       | string | The local data root                      |
 | `value balance`         | number | The transaction value balance            |
 | `signatures`            | array  | The list of transaction signatures       |
+| `encrypted_records`     | array  | The list of new encrypted records        |
 | `transaction_metadata`  | object | The transaction metadata                 |
 
 ### Example

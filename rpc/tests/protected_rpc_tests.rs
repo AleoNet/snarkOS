@@ -23,7 +23,7 @@ mod protected_rpc_tests {
         record::DPCRecord,
     };
     use snarkos_models::dpc::Record;
-    use snarkos_network::Context;
+    use snarkos_network::{external::SyncHandler, internal::context::Context};
     use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
@@ -77,14 +77,22 @@ mod protected_rpc_tests {
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
 
-        let context = Context::new(server_address, 5, 1, 10, true, vec![]);
+        let sync_handler = SyncHandler::new(server_address);
+        let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
+
+        let context = Context::new(server_address, 5, 1, 10, true, vec![], false);
+
+        let storage = storage.clone();
+        let storage_path = storage.storage.db.path().to_path_buf();
 
         let rpc_impl = RpcImpl::new(
-            storage.clone(),
+            storage,
+            storage_path,
             parameters,
             Arc::new(context),
             consensus,
             memory_pool_lock,
+            sync_handler_lock,
             Some(credentials),
         );
         let mut io = jsonrpc_core::MetaIoHandler::default();
@@ -272,7 +280,7 @@ mod protected_rpc_tests {
 
             let extracted: Value = serde_json::from_str(&response).unwrap();
 
-            let expected_result = Value::String(format!("{}", hex::encode(to_bytes![record].unwrap())));
+            let expected_result = Value::String(hex::encode(to_bytes![record].unwrap()).to_string());
             assert_eq!(extracted["result"], expected_result);
         }
 

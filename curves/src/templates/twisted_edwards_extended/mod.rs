@@ -207,11 +207,11 @@ impl<P: Parameters> AffineCurve for GroupAffine<P> {
     }
 
     fn to_x_coordinate(&self) -> Self::BaseField {
-        self.x.clone()
+        self.x
     }
 
     fn to_y_coordinate(&self) -> Self::BaseField {
-        self.y.clone()
+        self.y
     }
 
     /// Checks that the current point is on the elliptic curve.
@@ -245,6 +245,7 @@ impl<'a, P: Parameters> Add<&'a Self> for GroupAffine<P> {
 }
 
 impl<'a, P: Parameters> AddAssign<&'a Self> for GroupAffine<P> {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, other: &'a Self) {
         let y1y2 = self.y * &other.y;
         let x1x2 = self.x * &other.x;
@@ -534,6 +535,7 @@ impl<P: Parameters> ProjectiveCurve for GroupProjective<P> {
         self
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn add_assign_mixed(&mut self, other: &Self::Affine) {
         // A = X1*X2
         let a = self.x * &other.x;
@@ -615,6 +617,8 @@ impl<'a, P: Parameters> Add<&'a Self> for GroupProjective<P> {
 }
 
 impl<'a, P: Parameters> AddAssign<&'a Self> for GroupProjective<P> {
+    #[allow(clippy::many_single_char_names)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, other: &'a Self) {
         // See "Twisted Edwards Curves Revisited"
         // Huseyin Hisil, Kenneth Koon-Ho Wong, Gary Carter, and Ed Dawson

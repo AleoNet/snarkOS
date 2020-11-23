@@ -17,13 +17,17 @@
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
-use snarkos_network::{Channel, Context, Server, SyncHandler};
+use snarkos_network::{
+    external::{Channel, SyncHandler},
+    internal::context::Context,
+    Server,
+};
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::Mutex};
 
-pub const LOCALHOST: &'static str = "0.0.0.0:";
+pub const LOCALHOST: &str = "0.0.0.0:";
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
 pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
@@ -56,7 +60,7 @@ pub fn initialize_test_server(
     let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
     Server::new(
-        Context::new(server_address, 5, 1, 10, true, vec![]),
+        Arc::new(Context::new(server_address, 5, 1, 10, true, vec![], false)),
         consensus,
         storage,
         parameters,

@@ -1,0 +1,40 @@
+{
+    "readme": [
+        {
+            "folderName": "concepts",
+            "config": {
+                "use_filenames_for_section_titles": false,
+                "add_section_titles_to_readme": false,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "network_messages",
+            "config": {
+                "use_filenames_for_section_titles": true,
+                "use_pascal_case_for_section_titles": true,
+                "add_section_titles_to_readme": true,
+                "are_filenames_numbered": false
+            }
+        }
+    ],
+    "documentation": [
+        {
+            "folderName": "concepts",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": false,
+                "are_filenames_numbered": false
+            }
+        },
+        {
+            "folderName": "network_messages",
+            "config": {
+                "include_title_in_markdown_metadata": true,
+                "use_ids_for_topic_titles": true,
+                "use_pascal_case_for_topic_titles": true,
+                "are_filenames_numbered": false
+            }
+        }
+    ]
+}

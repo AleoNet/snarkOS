@@ -57,7 +57,7 @@ impl_bytes!(CommitterKey);
 
 impl<E: PairingEngine> CommitterKey<E> {
     /// Obtain powers for the underlying KZG10 construction
-    pub fn powers<'a>(&'a self) -> kzg10::Powers<'a, E> {
+    pub fn powers(&self) -> kzg10::Powers<'_, E> {
         kzg10::Powers {
             powers_of_g: self.powers.as_slice().into(),
             powers_of_gamma_g: self.powers_of_gamma_g.as_slice().into(),
@@ -65,7 +65,7 @@ impl<E: PairingEngine> CommitterKey<E> {
     }
 
     /// Obtain powers for committing to shifted polynomials.
-    pub fn shifted_powers<'a>(&'a self, degree_bound: impl Into<Option<usize>>) -> Option<kzg10::Powers<'a, E>> {
+    pub fn shifted_powers(&self, degree_bound: impl Into<Option<usize>>) -> Option<kzg10::Powers<'_, E>> {
         self.shifted_powers.as_ref().map(|shifted_powers| {
             let powers_range = if let Some(degree_bound) = degree_bound.into() {
                 assert!(self.enforced_degree_bounds.as_ref().unwrap().contains(&degree_bound));
@@ -163,6 +163,15 @@ impl<E: PairingEngine> PCCommitment for Commitment<E> {
     fn has_degree_bound(&self) -> bool {
         self.shifted_comm.is_some()
     }
+
+    fn is_in_correct_subgroup_assuming_on_curve(&self) -> bool {
+        self.comm.is_in_correct_subgroup_assuming_on_curve()
+            && if let Some(ref comm) = self.shifted_comm {
+                comm.is_in_correct_subgroup_assuming_on_curve()
+            } else {
+                true
+            }
+    }
 }
 
 /// `Randomness` hides the polynomial inside a commitment. It is output by `KZG10::commit`.
@@ -198,7 +207,7 @@ impl<'a, E: PairingEngine> AddAssign<&'a Self> for Randomness<E> {
         if let Some(r1) = &mut self.shifted_rand {
             *r1 += other.shifted_rand.as_ref().unwrap_or(&kzg10::Randomness::empty());
         } else {
-            self.shifted_rand = other.shifted_rand.as_ref().map(|r| r.clone());
+            self.shifted_rand = other.shifted_rand.clone();
         }
     }
 }

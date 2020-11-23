@@ -65,9 +65,9 @@ pub struct BoweHopwoodPedersenCRH<G: Group, S: PedersenSize> {
 
 impl<G: Group, S: PedersenSize> BoweHopwoodPedersenCRH<G, S> {
     pub fn create_generators<R: Rng>(rng: &mut R) -> Vec<Vec<G>> {
-        let mut generators = Vec::new();
+        let mut generators = Vec::with_capacity(S::NUM_WINDOWS);
         for _ in 0..S::NUM_WINDOWS {
-            let mut generators_for_segment = Vec::new();
+            let mut generators_for_segment = Vec::with_capacity(S::WINDOW_SIZE);
             let mut base = G::rand(rng);
             for _ in 0..S::WINDOW_SIZE {
                 generators_for_segment.push(base);
@@ -138,21 +138,21 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         let mut padded_input_bytes = vec![];
         if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
             padded_input_bytes.extend_from_slice(input_bytes);
-            for _ in input.len()..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
-                padded_input_bytes.push(0u8);
-            }
+            padded_input_bytes.resize((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8, 0u8);
             input_bytes = padded_input_bytes.as_slice();
         }
 
         let mut padded_input = Vec::with_capacity(input_bytes.len());
         let input = bytes_to_bits(input_bytes);
+        let input_len = input_bytes.len() * 8;
         // Pad the input if it is not the current length.
-        padded_input.extend_from_slice(&input);
-        if input.len() % BOWE_HOPWOOD_CHUNK_SIZE != 0 {
-            let current_length = input.len();
-            for _ in 0..(BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE) {
-                padded_input.push(false);
-            }
+        padded_input.extend(input);
+        if input_len % BOWE_HOPWOOD_CHUNK_SIZE != 0 {
+            let current_length = input_len;
+            padded_input.resize(
+                current_length + BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE,
+                false,
+            );
         }
 
         assert_eq!(padded_input.len() % BOWE_HOPWOOD_CHUNK_SIZE, 0);
@@ -186,9 +186,9 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
                         cfg_chunks!(segment_bits, BOWE_HOPWOOD_CHUNK_SIZE)
                             .zip(segment_generators)
                             .map(|(chunk_bits, generator)| {
-                                let mut encoded = generator.clone();
+                                let mut encoded = *generator;
                                 if chunk_bits[0] {
-                                    encoded = encoded + generator;
+                                    encoded += generator;
                                 }
                                 if chunk_bits[1] {
                                     encoded += &generator.double();

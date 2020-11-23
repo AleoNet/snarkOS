@@ -142,11 +142,8 @@ where
         let keygen_time = start_timer!(|| "SchnorrSignature::generate_public_key");
 
         let mut public_key = G::zero();
-        for (bit, base_power) in bytes_to_bits(&to_bytes![private_key]?)
-            .iter()
-            .zip_eq(&self.parameters.generator_powers)
-        {
-            if *bit {
+        for (bit, base_power) in bytes_to_bits(&to_bytes![private_key]?).zip_eq(&self.parameters.generator_powers) {
+            if bit {
                 public_key += &base_power;
             }
         }
@@ -169,11 +166,9 @@ where
             // Commit to the random scalar via r := k · g.
             // This is the prover's first msg in the Sigma protocol.
             let mut prover_commitment = G::zero();
-            for (bit, base_power) in bytes_to_bits(&to_bytes![random_scalar]?)
-                .iter()
-                .zip_eq(&self.parameters.generator_powers)
+            for (bit, base_power) in bytes_to_bits(&to_bytes![random_scalar]?).zip_eq(&self.parameters.generator_powers)
             {
-                if *bit {
+                if bit {
                     prover_commitment += &base_power;
                 }
             }
@@ -191,7 +186,7 @@ where
         };
 
         // k - xe;
-        let prover_response = random_scalar - &(verifier_challenge * &private_key);
+        let prover_response = random_scalar - &(verifier_challenge * private_key);
         let signature = SchnorrOutput {
             prover_response,
             verifier_challenge,
@@ -215,11 +210,8 @@ where
         } = signature;
 
         let mut claimed_prover_commitment = G::zero();
-        for (bit, base_power) in bytes_to_bits(&to_bytes![prover_response]?)
-            .iter()
-            .zip_eq(&self.parameters.generator_powers)
-        {
-            if *bit {
+        for (bit, base_power) in bytes_to_bits(&to_bytes![prover_response]?).zip_eq(&self.parameters.generator_powers) {
+            if bit {
                 claimed_prover_commitment += &base_power;
             }
         }
@@ -250,14 +242,11 @@ where
     ) -> Result<Self::PublicKey, SignatureError> {
         let rand_pk_time = start_timer!(|| "SchnorrSignature::randomize_public_key");
 
-        let mut randomized_pk = public_key.0.clone();
+        let mut randomized_pk = public_key.0;
 
         let mut encoded = G::zero();
-        for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?)
-            .iter()
-            .zip_eq(&self.parameters.generator_powers)
-        {
-            if *bit {
+        for (bit, base_power) in bytes_to_bits(&to_bytes![randomness]?).zip_eq(&self.parameters.generator_powers) {
+            if bit {
                 encoded += &base_power;
             }
         }

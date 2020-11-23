@@ -104,6 +104,8 @@ const SIGMA: [[usize; 16]; 10] = [
 // END FUNCTION.
 //
 
+#[allow(clippy::many_single_char_names)]
+#[allow(clippy::too_many_arguments)]
 fn mixing_g<F: PrimeField, CS: ConstraintSystem<F>>(
     mut cs: CS,
     v: &mut [UInt32],
@@ -173,6 +175,7 @@ fn mixing_g<F: PrimeField, CS: ConstraintSystem<F>>(
 // END FUNCTION.
 //
 
+#[allow(clippy::many_single_char_names)]
 fn blake2s_compression<F: PrimeField, CS: ConstraintSystem<F>>(
     mut cs: CS,
     h: &mut [UInt32],
@@ -332,7 +335,7 @@ pub fn blake2s_gadget<F: PrimeField, CS: ConstraintSystem<F>>(
     h.push(UInt32::constant(0x1F83D9AB));
     h.push(UInt32::constant(0x5BE0CD19));
 
-    let mut blocks: Vec<Vec<UInt32>> = vec![];
+    let mut blocks: Vec<Vec<UInt32>> = Vec::with_capacity(input.len() / 512);
 
     for block in input.chunks(512) {
         let mut this_block = Vec::with_capacity(16);

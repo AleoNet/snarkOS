@@ -31,10 +31,10 @@ use rand_xorshift::XorShiftRng;
 
 fn check_all_constant_bits(mut expected: u32, actual: UInt32) {
     for b in actual.bits.iter() {
-        match b {
-            &Boolean::Is(_) => panic!(),
-            &Boolean::Not(_) => panic!(),
-            &Boolean::Constant(b) => {
+        match *b {
+            Boolean::Is(_) => panic!(),
+            Boolean::Not(_) => panic!(),
+            Boolean::Constant(b) => {
                 assert!(b == (expected & 1 == 1));
             }
         }
@@ -45,14 +45,14 @@ fn check_all_constant_bits(mut expected: u32, actual: UInt32) {
 
 fn check_all_allocated_bits(mut expected: u32, actual: UInt32) {
     for b in actual.bits.iter() {
-        match b {
-            &Boolean::Is(ref b) => {
+        match *b {
+            Boolean::Is(ref b) => {
                 assert!(b.get_value().unwrap() == (expected & 1 == 1));
             }
-            &Boolean::Not(ref b) => {
-                assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+            Boolean::Not(ref b) => {
+                assert!(b.get_value().unwrap() != (expected & 1 == 1));
             }
-            &Boolean::Constant(_) => unreachable!(),
+            Boolean::Constant(_) => unreachable!(),
         }
 
         expected >>= 1;
@@ -69,8 +69,8 @@ fn test_uint32_from_bits() {
         let b = UInt32::from_bits_le(&v);
 
         for (i, bit_gadget) in b.bits.iter().enumerate() {
-            match bit_gadget {
-                &Boolean::Constant(bit_gadget) => {
+            match *bit_gadget {
+                Boolean::Constant(bit_gadget) => {
                     assert!(bit_gadget == ((b.value.unwrap() >> i) & 1 == 1));
                 }
                 _ => unreachable!(),
@@ -104,8 +104,8 @@ fn test_uint32_rotr() {
 
         let mut tmp = num;
         for b in &b.bits {
-            match b {
-                &Boolean::Constant(b) => {
+            match *b {
+                Boolean::Constant(b) => {
                     assert_eq!(b, tmp & 1 == 1);
                 }
                 _ => unreachable!(),
@@ -143,14 +143,14 @@ fn test_uint32_xor() {
         assert!(r.value == Some(expected));
 
         for b in r.bits.iter() {
-            match b {
-                &Boolean::Is(ref b) => {
+            match *b {
+                Boolean::Is(ref b) => {
                     assert!(b.get_value().unwrap() == (expected & 1 == 1));
                 }
-                &Boolean::Not(ref b) => {
-                    assert!(!b.get_value().unwrap() == (expected & 1 == 1));
+                Boolean::Not(ref b) => {
+                    assert!(b.get_value().unwrap() != (expected & 1 == 1));
                 }
-                &Boolean::Constant(b) => {
+                Boolean::Constant(b) => {
                     assert!(b == (expected & 1 == 1));
                 }
             }
@@ -186,6 +186,7 @@ fn test_uint32_addmany_constants() {
 }
 
 #[test]
+#[allow(clippy::many_single_char_names)]
 fn test_uint32_addmany() {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 

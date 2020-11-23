@@ -17,10 +17,10 @@
 #![deny(unused_import_braces, unused_qualifications, trivial_casts, trivial_numeric_casts)]
 #![deny(unused_qualifications, variant_size_differences, stable_features)]
 #![deny(
-non_shorthand_field_patterns,
-unused_attributes,
-unused_imports,
-unused_extern_crates
+    non_shorthand_field_patterns,
+    unused_attributes,
+    unused_imports,
+    unused_extern_crates
 )]
 #![deny(renamed_and_removed_lints, stable_features, unused_allocation, unused_comparisons)]
 #![deny(unused_must_use, unused_mut, unused_unsafe, private_in_public, unsafe_code)]
@@ -59,9 +59,9 @@ const MIMC_ROUNDS: usize = 322;
 fn mimc<F: Field>(mut xl: F, mut xr: F, constants: &[F]) -> F {
     assert_eq!(constants.len(), MIMC_ROUNDS);
 
-    for i in 0..MIMC_ROUNDS {
+    for c in constants.iter().take(MIMC_ROUNDS) {
         let mut tmp1 = xl;
-        tmp1.add_assign(&constants[i]);
+        tmp1.add_assign(&c);
         let mut tmp2 = tmp1;
         tmp2.square_in_place();
         tmp2.mul_assign(&tmp1);
@@ -85,7 +85,7 @@ struct MiMCDemo<'a, F: Field> {
 /// is used during paramgen and proving in order to
 /// synthesize the constraint system.
 impl<'a, F: Field> ConstraintSynthesizer<F> for MiMCDemo<'a, F> {
-    fn generate_constraints<CS: ConstraintSystem<F>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn generate_constraints<CS: ConstraintSystem<F>>(&self, cs: &mut CS) -> Result<(), SynthesisError> {
         assert_eq!(self.constants.len(), MIMC_ROUNDS);
 
         // Allocate the first component of the preimage.
@@ -180,7 +180,7 @@ fn test_mimc_groth_16() {
             constants: &constants,
         };
 
-        generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap()
+        generate_random_parameters::<Bls12_377, _, _>(&c, rng).unwrap()
     };
 
     // Prepare the verification key (for proof verification)
@@ -203,7 +203,7 @@ fn test_mimc_groth_16() {
         let xr = rng.gen();
         let image = mimc(xl, xr, &constants);
 
-        // proof_vec.truncate(0);
+        // proof_vec.clear();
 
         let start = Instant::now();
         {
@@ -216,7 +216,7 @@ fn test_mimc_groth_16() {
             };
 
             // Create a groth16 proof with our parameters.
-            let proof = create_random_proof(c, &params, rng).unwrap();
+            let proof = create_random_proof(&c, &params, rng).unwrap();
             assert!(verify_proof(&pvk, &proof, &[image]).unwrap());
 
             // proof.write(&mut proof_vec).unwrap();
@@ -267,7 +267,7 @@ fn test_mimc_groth_maller_17() {
             constants: &constants,
         };
 
-        generate_random_parameters::<Bls12_377, _, _>(c, rng).unwrap()
+        generate_random_parameters::<Bls12_377, _, _>(&c, rng).unwrap()
     };
 
     // Prepare the verification key (for proof verification)
@@ -290,7 +290,7 @@ fn test_mimc_groth_maller_17() {
         let xr = rng.gen();
         let image = mimc(xl, xr, &constants);
 
-        // proof_vec.truncate(0);
+        // proof_vec.clear();
 
         let start = Instant::now();
         {
@@ -303,7 +303,7 @@ fn test_mimc_groth_maller_17() {
             };
 
             // Create a groth16 proof with our parameters.
-            let proof = create_random_proof(c, &params, rng).unwrap();
+            let proof = create_random_proof(&c, &params, rng).unwrap();
             assert!(verify_proof(&pvk, &proof, &[image]).unwrap());
 
             // proof.write(&mut proof_vec).unwrap();

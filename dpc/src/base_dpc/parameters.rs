@@ -56,7 +56,7 @@ impl<C: BaseDPCComponents> SystemParameters<C> {
             LocalDataCommitmentParameters::load_bytes()?.as_slice(),
         )?);
         let program_verification_key_commitment: C::ProgramVerificationKeyCommitment =
-            From::from(FromBytes::read(vec![].as_slice())?);
+            From::from(FromBytes::read(&[][..])?);
         let program_verification_key_crh: C::ProgramVerificationKeyCRH =
             From::from(FromBytes::read(ProgramVKCRHParameters::load_bytes()?.as_slice())?);
         let record_commitment: C::RecordCommitment =
@@ -92,10 +92,10 @@ impl<C: BaseDPCComponents> NoopProgramSNARKParameters<C> {
     // TODO (howardwu): Why are we not preparing the VK here?
     pub fn load() -> IoResult<Self> {
         let proving_key: <C::NoopProgramSNARK as SNARK>::ProvingParameters =
-            From::from(FromBytes::read(NoopProgramSNARKPKParameters::load_bytes()?.as_slice())?);
-        let verification_key = From::from(<C::NoopProgramSNARK as SNARK>::VerificationParameters::read(
+            FromBytes::read(NoopProgramSNARKPKParameters::load_bytes()?.as_slice())?;
+        let verification_key = <C::NoopProgramSNARK as SNARK>::VerificationParameters::read(
             NoopProgramSNARKVKParameters::load_bytes()?.as_slice(),
-        )?);
+        )?;
 
         Ok(Self {
             proving_key,
@@ -189,15 +189,15 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         let inner_snark_parameters = {
             let inner_snark_pk = match verify_only {
                 true => None,
-                false => Some(From::from(<C::InnerSNARK as SNARK>::ProvingParameters::read(
+                false => Some(<C::InnerSNARK as SNARK>::ProvingParameters::read(
                     InnerSNARKPKParameters::load_bytes()?.as_slice(),
-                )?)),
+                )?),
             };
 
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
-                From::from(<C::InnerSNARK as SNARK>::VerificationParameters::read(
+                <C::InnerSNARK as SNARK>::VerificationParameters::read(
                     InnerSNARKVKParameters::load_bytes()?.as_slice(),
-                )?);
+                )?;
 
             (inner_snark_pk, inner_snark_vk.into())
         };
@@ -205,15 +205,15 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         let outer_snark_parameters = {
             let outer_snark_pk = match verify_only {
                 true => None,
-                false => Some(From::from(<C::OuterSNARK as SNARK>::ProvingParameters::read(
+                false => Some(<C::OuterSNARK as SNARK>::ProvingParameters::read(
                     OuterSNARKPKParameters::load_bytes()?.as_slice(),
-                )?)),
+                )?),
             };
 
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
-                From::from(<C::OuterSNARK as SNARK>::VerificationParameters::read(
+                <C::OuterSNARK as SNARK>::VerificationParameters::read(
                     OuterSNARKVKParameters::load_bytes()?.as_slice(),
-                )?);
+                )?;
 
             (outer_snark_pk, outer_snark_vk.into())
         };
@@ -233,18 +233,18 @@ impl<C: BaseDPCComponents> PublicParameters<C> {
         let inner_snark_parameters = {
             let inner_snark_pk = None;
             let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
-                From::from(<C::InnerSNARK as SNARK>::VerificationParameters::read(
+                <C::InnerSNARK as SNARK>::VerificationParameters::read(
                     InnerSNARKVKParameters::load_bytes()?.as_slice(),
-                )?);
+                )?;
             (inner_snark_pk, inner_snark_vk.into())
         };
 
         let outer_snark_parameters = {
             let outer_snark_pk = None;
             let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
-                From::from(<C::OuterSNARK as SNARK>::VerificationParameters::read(
+                <C::OuterSNARK as SNARK>::VerificationParameters::read(
                     OuterSNARKVKParameters::load_bytes()?.as_slice(),
-                )?);
+                )?;
             (outer_snark_pk, outer_snark_vk.into())
         };
 

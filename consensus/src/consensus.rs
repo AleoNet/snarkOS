@@ -183,7 +183,7 @@ impl ConsensusParameters {
     pub fn verify_transactions(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
-        transactions: &Vec<Tx>,
+        transactions: &[Tx],
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
         for tx in transactions {
@@ -265,7 +265,7 @@ impl ConsensusParameters {
             return Ok(());
         }
 
-        // 1. verify that the block valid
+        // 1. Verify that the block valid
         if !self.verify_block(parameters, block, storage)? {
             return Err(ConsensusError::InvalidBlock(block.header.get_hash().0.to_vec()));
         }
@@ -281,7 +281,7 @@ impl ConsensusParameters {
         Ok(())
     }
 
-    /// Receive a block from an external source and process it based on ledger state
+    /// Receive a block from an external source and process it based on ledger state.
     pub fn receive_block(
         &self,
         parameters: &PublicParameters<Components>,
@@ -296,18 +296,27 @@ impl ConsensusParameters {
 
         // Block is an unknown orphan
         if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
+            debug!("Processing a block that is an unknown orphan");
+
+            // There are two possible cases for an unknown orphan.
+            // 1) The block is a genesis block, or
+            // 2) The block is unknown and does not correspond with the canon chain.
             if Self::is_genesis(&block.header) && storage.is_empty() {
                 self.process_block(parameters, &storage, memory_pool, &block)?;
             } else {
                 storage.insert_only(block)?;
             }
         } else {
-            // Find the origin of the block
+            // If the block is not an unknown orphan, find the origin of the block
             match storage.get_block_path(&block.header)? {
                 BlockPath::ExistingBlock => {}
-                BlockPath::CanonChain(_) => {
+                BlockPath::CanonChain(block_height) => {
+                    debug!("Processing a block that is on canon chain. Height {}", block_height);
+
                     self.process_block(parameters, &storage, memory_pool, block)?;
 
+                    // Attempt to fast forward the block state if the node already stores
+                    // the children of the new canon block.
                     let (_, child_path) = storage.longest_child_path(block.header.get_hash())?;
                     for child_block_hash in child_path {
                         let new_block = storage.get_block(&child_block_hash)?;
@@ -315,8 +324,21 @@ impl ConsensusParameters {
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
+                    debug!(
+                        "Processing a block that is on side chain. Height {}",
+                        side_chain_path.new_block_number
+                    );
+
+                    // If the side chain is now longer than the canon chain,
+                    // perform a fork to the side chain.
                     if side_chain_path.new_block_number > storage.get_latest_block_height() {
-                        // Fork to superior chain
+                        debug!(
+                            "Determined side chain is longer than canon chain by {} blocks",
+                            side_chain_path.new_block_number - storage.get_latest_block_height()
+                        );
+                        warn!("A valid fork has been detected. Performing a fork to the side chain.");
+
+                        // Fork to superior side chain
                         storage.revert_for_fork(&side_chain_path)?;
 
                         if !side_chain_path.path.is_empty() {
@@ -330,6 +352,7 @@ impl ConsensusParameters {
                             }
                         }
                     } else {
+                        // If the sidechain is not longer than the main canon chain, simply store the block
                         storage.insert_only(block)?;
                     }
                 }
@@ -340,12 +363,13 @@ impl ConsensusParameters {
     }
 
     /// Generate a coinbase transaction given candidate block transactions
+    #[allow(clippy::too_many_arguments)]
     pub fn create_coinbase_transaction<R: Rng>(
         &self,
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
         parameters: &PublicParameters<Components>,
-        program_vk_hash: &Vec<u8>,
+        program_vk_hash: Vec<u8>,
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
@@ -375,7 +399,7 @@ impl ConsensusParameters {
 
         // Generate dummy input records having as address the genesis address.
         let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
-        let mut old_records = vec![];
+        let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
@@ -383,22 +407,22 @@ impl ConsensusParameters {
                 SerialNumberNonce::hash(&parameters.system_parameters.serial_number_nonce, &sn_nonce_input)?;
 
             let old_record = InstantiatedDPC::generate_record(
-                &parameters.system_parameters,
-                &old_sn_nonce,
-                &new_account.address,
+                parameters.system_parameters.clone(),
+                old_sn_nonce,
+                new_account.address.clone(),
                 true, // The input record is dummy
                 0,
-                &RecordPayload::default(),
+                RecordPayload::default(),
                 // Filler program input
-                &program_vk_hash,
-                &program_vk_hash,
+                program_vk_hash.clone(),
+                program_vk_hash.clone(),
                 rng,
             )?;
 
             old_records.push(old_record);
         }
 
-        let new_record_owners = vec![recipient.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_values = [vec![total_value_balance.0 as u64], vec![
             0;
@@ -427,6 +451,7 @@ impl ConsensusParameters {
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes
+    #[allow(clippy::too_many_arguments)]
     pub fn create_transaction<R: Rng>(
         &self,
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
@@ -444,16 +469,16 @@ impl ConsensusParameters {
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Offline execution to generate a DPC transaction
         let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
-            &parameters.system_parameters,
-            &old_records,
-            &old_account_private_keys,
-            &new_record_owners,
+            parameters.system_parameters.clone(),
+            old_records,
+            old_account_private_keys,
+            new_record_owners,
             &new_is_dummy_flags,
             &new_values,
-            &new_payloads,
-            &new_birth_program_ids,
-            &new_death_program_ids,
-            &memo,
+            new_payloads,
+            new_birth_program_ids,
+            new_death_program_ids,
+            memo,
             self.network.id(),
             rng,
         )?;
@@ -470,7 +495,7 @@ impl ConsensusParameters {
         let dpc_program =
             NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
 
-        let mut old_death_program_proofs = vec![];
+        let mut old_death_program_proofs = Vec::with_capacity(NUM_INPUT_RECORDS);
         for i in 0..NUM_INPUT_RECORDS {
             let private_input = dpc_program.execute(
                 &parameters.noop_program_snark_parameters.proving_key,
@@ -483,7 +508,7 @@ impl ConsensusParameters {
             old_death_program_proofs.push(private_input);
         }
 
-        let mut new_birth_program_proofs = vec![];
+        let mut new_birth_program_proofs = Vec::with_capacity(NUM_OUTPUT_RECORDS);
         for j in 0..NUM_OUTPUT_RECORDS {
             let private_input = dpc_program.execute(
                 &parameters.noop_program_snark_parameters.proving_key,
@@ -500,8 +525,8 @@ impl ConsensusParameters {
         let (new_records, transaction) = InstantiatedDPC::execute_online(
             &parameters,
             execute_context,
-            &old_death_program_proofs,
-            &new_birth_program_proofs,
+            old_death_program_proofs,
+            new_birth_program_proofs,
             ledger,
             rng,
         )?;
@@ -573,10 +598,10 @@ mod tests {
         };
 
         let b1 = DATA.block_1.clone();
-        let h1 = b1.header.clone();
+        let h1 = b1.header;
 
         let b2 = DATA.block_2.clone();
-        let h2 = b2.header.clone();
+        let h2 = b2.header;
         let merkle_root_hash = h2.merkle_root_hash.clone();
         let pedersen_merkle_root = h2.pedersen_merkle_root_hash.clone();
 
@@ -635,7 +660,7 @@ mod tests {
             .unwrap_err();
 
         // expected difficulty did not match the difficulty target
-        let mut h2_err = h2.clone();
+        let mut h2_err = h2;
         h2_err.difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp()) + 1;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)

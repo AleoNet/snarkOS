@@ -118,21 +118,21 @@ fn test_execute_base_dpc_constraints() {
 
     let sn_nonce = SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
     let old_record = DPC::generate_record(
-        &system_parameters,
-        &sn_nonce,
-        &dummy_account.address,
+        system_parameters.clone(),
+        sn_nonce,
+        dummy_account.address,
         true,
         0,
-        &RecordPayload::default(),
-        &alternate_noop_program_id,
-        &alternate_noop_program_id,
+        RecordPayload::default(),
+        alternate_noop_program_id.clone(),
+        alternate_noop_program_id.clone(),
         &mut rng,
     )
     .unwrap();
 
     // Set the input records for our transaction to be the initial dummy records.
-    let old_records = vec![old_record.clone(); NUM_INPUT_RECORDS];
-    let old_account_private_keys = vec![dummy_account.private_key.clone(); NUM_INPUT_RECORDS];
+    let old_records = vec![old_record; NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![dummy_account.private_key; NUM_INPUT_RECORDS];
 
     // Construct new records.
 
@@ -148,7 +148,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Set the new record's program to be the "always-accept" program.
 
-    let new_record_owners = vec![new_account.address.clone(); NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![new_account.address; NUM_OUTPUT_RECORDS];
     let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
     let new_values = vec![10; NUM_OUTPUT_RECORDS];
     let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
@@ -157,16 +157,16 @@ fn test_execute_base_dpc_constraints() {
     let memo = [0u8; 32];
 
     let context = <InstantiatedDPC as DPCScheme<L>>::execute_offline(
-        &system_parameters,
-        &old_records,
-        &old_account_private_keys,
-        &new_record_owners,
+        system_parameters.clone(),
+        old_records,
+        old_account_private_keys,
+        new_record_owners,
         &new_is_dummy_flags,
         &new_values,
-        &new_payloads,
-        &new_birth_program_ids,
-        &new_death_program_ids,
-        &memo,
+        new_payloads,
+        new_birth_program_ids,
+        new_death_program_ids,
+        memo,
         network_id,
         &mut rng,
     )
@@ -313,7 +313,7 @@ fn test_execute_base_dpc_constraints() {
 
     // Generate inner snark parameters and proof for verification in the outer snark
     let inner_snark_parameters = <Components as BaseDPCComponents>::InnerSNARK::setup(
-        InnerCircuit::blank(&system_parameters, ledger.parameters()),
+        &InnerCircuit::blank(&system_parameters, ledger.parameters()),
         &mut rng,
     )
     .unwrap();
@@ -329,25 +329,25 @@ fn test_execute_base_dpc_constraints() {
 
     let inner_snark_proof = <Components as BaseDPCComponents>::InnerSNARK::prove(
         &inner_snark_parameters.0,
-        InnerCircuit::new(
-            &system_parameters,
-            ledger.parameters(),
-            &ledger_digest,
-            &old_records,
-            &old_witnesses,
-            &old_account_private_keys,
-            &old_serial_numbers,
-            &new_records,
-            &new_sn_nonce_randomness,
-            &new_commitments,
-            &new_records_encryption_randomness,
-            &new_records_encryption_gadget_components,
-            &new_encrypted_record_hashes,
-            &program_commitment,
-            &program_randomness,
-            &local_data_root,
-            &local_data_commitment_randomizers,
-            &memo,
+        &InnerCircuit::new(
+            system_parameters.clone(),
+            ledger.parameters().clone(),
+            ledger_digest,
+            old_records,
+            old_witnesses,
+            old_account_private_keys,
+            old_serial_numbers.clone(),
+            new_records,
+            new_sn_nonce_randomness,
+            new_commitments.clone(),
+            new_records_encryption_randomness,
+            new_records_encryption_gadget_components,
+            new_encrypted_record_hashes.clone(),
+            program_commitment,
+            program_randomness,
+            local_data_root,
+            local_data_commitment_randomizers,
+            memo,
             value_balance,
             network_id,
         ),

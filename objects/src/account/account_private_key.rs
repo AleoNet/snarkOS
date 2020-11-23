@@ -191,7 +191,7 @@ impl<C: DPCComponents> AccountPrivateKey<C> {
         // to the scalar field in the `inner_snark`, we additionally enforce
         // that the MSB bit of the scalar field is also set to 0.
         if !self.is_dummy {
-            let account_decryption_key_bits = bytes_to_bits(&decryption_key_bytes[..]);
+            let account_decryption_key_bits = bytes_to_bits(&decryption_key_bytes[..]).collect::<Vec<_>>();
             let account_decryption_key_length = account_decryption_key_bits.len();
 
             let decryption_private_key_length = C::AccountEncryption::private_key_size_in_bits();
@@ -248,7 +248,7 @@ impl<C: DPCComponents> FromStr for AccountPrivateKey<C> {
             return Err(AccountError::InvalidByteLength(data.len()));
         }
 
-        if &data[0..9] != account_format::PRIVATE_KEY_PREFIX {
+        if data[0..9] != account_format::PRIVATE_KEY_PREFIX {
             return Err(AccountError::InvalidPrefixBytes(data[0..9].to_vec()));
         }
 

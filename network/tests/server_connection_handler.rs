@@ -16,10 +16,7 @@
 
 mod server_connection_handler {
     use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
-    use snarkos_network::{
-        message::{types::GetMemoryPool, Message},
-        Channel,
-    };
+    use snarkos_network::external::{message::Message, message_types::GetMemoryPool, Channel};
     use snarkos_testing::{consensus::FIXTURE_VK, dpc::load_verifying_parameters, network::*, storage::*};
 
     use chrono::{Duration, Utc};
@@ -37,13 +34,13 @@ mod server_connection_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -54,7 +51,7 @@ mod server_connection_handler {
             // 1. Add peer to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_connected(peer_address, Utc::now());
+            peer_book.update_connected(remote_address, Utc::now());
             drop(peer_book);
 
             // 2. Start server
@@ -63,15 +60,15 @@ mod server_connection_handler {
 
             // 3. Check that peer received server connect
 
-            accept_all_messages(peer_listener);
+            accept_all_messages(remote_listener);
 
             // 4. Check that the server did not move the peer
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(peer_book.connected_contains(&peer_address));
-            assert!(!peer_book.gossiped_contains(&peer_address));
-            assert!(!peer_book.disconnected_contains(&peer_address));
+            assert!(peer_book.connected_contains(&remote_address));
+            assert!(!peer_book.gossiped_contains(&remote_address));
+            assert!(!peer_book.disconnected_contains(&remote_address));
         });
 
         drop(rt);
@@ -88,11 +85,11 @@ mod server_connection_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -103,7 +100,7 @@ mod server_connection_handler {
             // 1. Add peer with old date to connected in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_connected(peer_address, Utc::now() - Duration::minutes(1));
+            peer_book.update_connected(remote_address, Utc::now() - Duration::minutes(1));
             drop(peer_book);
 
             // 2. Start server
@@ -118,9 +115,9 @@ mod server_connection_handler {
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(!peer_book.connected_contains(&peer_address));
-            assert!(!peer_book.gossiped_contains(&peer_address));
-            assert!(peer_book.disconnected_contains(&peer_address));
+            assert!(!peer_book.connected_contains(&remote_address));
+            assert!(!peer_book.gossiped_contains(&remote_address));
+            assert!(peer_book.disconnected_contains(&remote_address));
         });
 
         drop(rt);
@@ -137,13 +134,13 @@ mod server_connection_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -154,7 +151,7 @@ mod server_connection_handler {
             // 1. Add peer to gossiped in peer_book
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_gossiped(peer_address, Utc::now());
+            peer_book.update_gossiped(remote_address, Utc::now());
             drop(peer_book);
 
             // 2. Start server
@@ -163,15 +160,15 @@ mod server_connection_handler {
 
             // 3. Check that peer received server connect
 
-            accept_all_messages(peer_listener);
+            accept_all_messages(remote_listener);
 
             // 4. Check that the server did not move the peer from gossiped
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(!peer_book.connected_contains(&peer_address));
-            assert!(peer_book.gossiped_contains(&peer_address));
-            assert!(!peer_book.disconnected_contains(&peer_address));
+            assert!(!peer_book.connected_contains(&remote_address));
+            assert!(peer_book.gossiped_contains(&remote_address));
+            assert!(!peer_book.disconnected_contains(&remote_address));
         });
 
         drop(rt);
@@ -188,11 +185,11 @@ mod server_connection_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -202,7 +199,7 @@ mod server_connection_handler {
 
             let mut peer_book = context.peer_book.write().await;
 
-            // 1. Add the maximum number of connected to the server peer book
+            // 1. Add the maximum number of connected to the local node peer book
 
             for _x in 0..10 {
                 peer_book.update_connected(random_socket_address(), Utc::now());
@@ -210,7 +207,7 @@ mod server_connection_handler {
 
             // 2. Add peer with old date to gossiped in peer_book
 
-            peer_book.update_gossiped(peer_address, Utc::now() - Duration::minutes(1));
+            peer_book.update_gossiped(remote_address, Utc::now() - Duration::minutes(1));
             drop(peer_book);
 
             // 3. Start server
@@ -225,9 +222,9 @@ mod server_connection_handler {
 
             let peer_book = context.peer_book.read().await;
 
-            assert!(!peer_book.connected_contains(&peer_address));
-            assert!(peer_book.gossiped_contains(&peer_address));
-            assert!(!peer_book.disconnected_contains(&peer_address));
+            assert!(!peer_book.connected_contains(&remote_address));
+            assert!(peer_book.gossiped_contains(&remote_address));
+            assert!(!peer_book.disconnected_contains(&remote_address));
         });
 
         drop(rt);
@@ -244,13 +241,13 @@ mod server_connection_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
-            let peer_address = random_socket_address();
+            let local_address = random_socket_address();
+            let remote_address = random_socket_address();
 
-            let peer_listener = TcpListener::bind(peer_address).await.unwrap();
+            let remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -262,12 +259,12 @@ mod server_connection_handler {
             // 1. Add peer to peers
 
             let mut peer_book = context.peer_book.write().await;
-            peer_book.update_connected(peer_address, Utc::now());
+            peer_book.update_connected(remote_address, Utc::now());
             drop(peer_book);
 
-            // 2. Start peer_listener
+            // 2. Start remote_listener
 
-            accept_all_messages(peer_listener);
+            accept_all_messages(remote_listener);
 
             // 2. Start server
 
@@ -285,7 +282,7 @@ mod server_connection_handler {
 
             // 6. Check that the server set sync_node to peer
 
-            assert_eq!(sync_handler_lock.lock().await.sync_node, peer_address);
+            assert_eq!(sync_handler_lock.lock().await.sync_node, remote_address);
         });
 
         drop(rt);
@@ -302,12 +299,12 @@ mod server_connection_handler {
 
         rt.block_on(async move {
             let bootnode_address = random_socket_address();
-            let server_address = random_socket_address();
+            let local_address = random_socket_address();
 
             let mut sync_node_listener = TcpListener::bind(bootnode_address).await.unwrap();
 
             let server = initialize_test_server(
-                server_address,
+                local_address,
                 bootnode_address,
                 storage,
                 parameters,
@@ -322,13 +319,11 @@ mod server_connection_handler {
 
             // 2. Add sync handler to connections
 
-            context
-                .connections
-                .write()
-                .await
-                .store_channel(&Arc::new(Channel::new_write_only(bootnode_address).await.unwrap()));
+            let bootnode_channel = Arc::new(Channel::new_write_only(bootnode_address).await.unwrap());
 
-            let channel_sync_side = accept_channel(&mut sync_node_listener, server_address).await;
+            context.connections.write().await.store_channel(&bootnode_channel);
+
+            let channel_sync_side = accept_channel(&mut sync_node_listener, local_address).await;
 
             // 3. Wait for memory pool interval
 

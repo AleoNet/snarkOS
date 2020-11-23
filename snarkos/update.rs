@@ -65,11 +65,9 @@ impl UpdateCLI {
                 println!("Could not get snarkOS versions");
                 println!("Error: {}", e);
             }
-        } else {
-            if let Err(e) = Self::update_to_latest_release() {
-                println!("Could not update snarkOS");
-                println!("Error: {}", e);
-            }
+        } else if let Err(e) = Self::update_to_latest_release() {
+            println!("Could not update snarkOS");
+            println!("Error: {}", e);
         }
 
         Ok(())
