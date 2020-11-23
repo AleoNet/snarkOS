@@ -357,8 +357,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, D: Digest> Marlin<F, PC, D> {
             .into_iter()
             .chain(AHPForR1CS::prover_first_round_degree_bounds(&index_info))
             .chain(AHPForR1CS::prover_second_round_degree_bounds(&index_info))
-            .chain(AHPForR1CS::prover_third_round_degree_bounds(&index_info))
-            .collect::<Vec<_>>();
+            .chain(AHPForR1CS::prover_third_round_degree_bounds(&index_info));
 
         // Gather commitments in one vector.
         let commitments = index_vk

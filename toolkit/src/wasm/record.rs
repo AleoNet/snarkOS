@@ -18,6 +18,8 @@ use crate::{
     account::{PrivateKey, ViewKey},
     record::Record as RecordNative,
 };
+use snarkos_models::dpc::Record as RecordTrait;
+use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -47,6 +49,51 @@ impl Record {
         let private_key = PrivateKey::from_str(private_key).unwrap();
         let serial_number = self.record.to_serial_number(&private_key).unwrap();
         hex::encode(serial_number)
+    }
+
+    #[wasm_bindgen]
+    pub fn owner(&self) -> String {
+        self.record.record.owner().to_string()
+    }
+
+    #[wasm_bindgen]
+    pub fn is_dummy(&self) -> bool {
+        self.record.record.is_dummy()
+    }
+
+    #[wasm_bindgen]
+    pub fn payload(&self) -> String {
+        hex::encode(to_bytes![self.record.record.payload()].unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub fn birth_program_id(&self) -> String {
+        hex::encode(to_bytes![self.record.record.birth_program_id()].unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub fn death_program_id(&self) -> String {
+        hex::encode(to_bytes![self.record.record.death_program_id()].unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub fn serial_number_nonce(&self) -> String {
+        hex::encode(to_bytes![self.record.record.serial_number_nonce()].unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub fn commitment(&self) -> String {
+        hex::encode(to_bytes![self.record.record.commitment()].unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub fn commitment_randomness(&self) -> String {
+        hex::encode(to_bytes![self.record.record.commitment_randomness()].unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub fn value(&self) -> u64 {
+        self.record.record.value()
     }
 
     #[wasm_bindgen]

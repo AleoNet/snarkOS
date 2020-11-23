@@ -60,7 +60,7 @@ mod bls12_377 {
 
         let params = generate_random_parameters::<Bls12_377, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
-        let pvk = prepare_verifying_key::<Bls12_377>(&params.vk);
+        let pvk = prepare_verifying_key::<Bls12_377>(params.vk.clone());
 
         for _ in 0..10 {
             let a = Fr::rand(rng);
@@ -88,13 +88,12 @@ mod bw6 {
 
         let params = generate_random_parameters::<BW6_761, _, _>(&MySillyCircuit { a: None, b: None }, rng).unwrap();
 
-        let pvk = prepare_verifying_key::<BW6_761>(&params.vk);
-
         let a = BW6Fr::rand(rng);
         let b = BW6Fr::rand(rng);
         let c = a * &b;
 
         let proof = create_random_proof(&MySillyCircuit { a: Some(a), b: Some(b) }, &params, rng).unwrap();
+        let pvk = prepare_verifying_key::<BW6_761>(params.vk);
 
         assert!(verify_proof(&pvk, &proof, &[c]).unwrap());
         assert!(!verify_proof(&pvk, &proof, &[BW6Fr::zero()]).unwrap());

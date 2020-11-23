@@ -43,8 +43,8 @@ impl<P: Bls12Parameters> G1PreparedGadget<P> {
         Some(G1Prepared::from_affine(self.0.get_value().unwrap().into_affine()))
     }
 
-    pub fn from_affine<CS: ConstraintSystem<P::Fp>>(_cs: CS, q: &G1Gadget<P>) -> Result<Self, SynthesisError> {
-        Ok(G1PreparedGadget(q.clone()))
+    pub fn from_affine<CS: ConstraintSystem<P::Fp>>(_cs: CS, q: G1Gadget<P>) -> Result<Self, SynthesisError> {
+        Ok(G1PreparedGadget(q))
     }
 }
 
