@@ -74,14 +74,14 @@ impl OfflineTransaction {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &parameters,
-                &old_sn_nonce,
-                &address,
+                parameters,
+                old_sn_nonce,
+                address,
                 true, // The input record is dummy
                 0,
-                &RecordPayload::default(),
-                &noop_program_id,
-                &noop_program_id,
+                RecordPayload::default(),
+                noop_program_id,
+                noop_program_id,
                 rng,
             )?;
 
@@ -138,16 +138,16 @@ impl OfflineTransaction {
 
         // Offline execution to generate a DPC transaction
         let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
-            &parameters,
-            &old_records,
-            &old_account_private_keys,
-            &new_record_owners,
+            parameters,
+            old_records,
+            old_account_private_keys,
+            new_record_owners,
             &new_is_dummy_flags,
             &new_values,
-            &new_payloads,
-            &new_birth_program_ids,
-            &new_death_program_ids,
-            &memo,
+            new_payloads,
+            new_birth_program_ids,
+            new_death_program_ids,
+            memo,
             network_id,
             rng,
         )?;
