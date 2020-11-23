@@ -341,18 +341,23 @@ pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub alpha_g1_beta_g2: E::Fqk,
     pub gamma_g2_neg_pc: <E::G2Affine as PairingCurve>::Prepared,
     pub delta_g2_neg_pc: <E::G2Affine as PairingCurve>::Prepared,
-    pub gamma_abc_g1: Vec<E::G1Affine>,
+}
+
+impl<E: PairingEngine> PreparedVerifyingKey<E> {
+    fn gamma_abc_g1(&self) -> &[E::G1Affine] {
+        &self.vk.gamma_abc_g1
+    }
 }
 
 impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
     fn from(other: Parameters<E>) -> Self {
-        prepare_verifying_key(&other.vk)
+        prepare_verifying_key(other.vk)
     }
 }
 
 impl<E: PairingEngine> From<VerifyingKey<E>> for PreparedVerifyingKey<E> {
     fn from(other: VerifyingKey<E>) -> Self {
-        prepare_verifying_key(&other)
+        prepare_verifying_key(other)
     }
 }
 

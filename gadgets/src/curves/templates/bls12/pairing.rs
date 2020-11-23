@@ -209,14 +209,14 @@ where
 
     fn prepare_g1<CS: ConstraintSystem<P::Fp>>(
         cs: CS,
-        p: &Self::G1Gadget,
+        p: Self::G1Gadget,
     ) -> Result<Self::G1PreparedGadget, SynthesisError> {
         Self::G1PreparedGadget::from_affine(cs, p)
     }
 
     fn prepare_g2<CS: ConstraintSystem<P::Fp>>(
         cs: CS,
-        q: &Self::G2Gadget,
+        q: Self::G2Gadget,
     ) -> Result<Self::G2PreparedGadget, SynthesisError> {
         Self::G2PreparedGadget::from_affine(cs, q)
     }

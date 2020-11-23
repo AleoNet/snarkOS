@@ -117,8 +117,8 @@ impl<E: PairingEngine> MarlinKZG10<E> {
                 s_flags.push(false);
             }
         }
-        let comms = E::G1Projective::batch_normalization_into_affine(&comms);
-        let s_comms = E::G1Projective::batch_normalization_into_affine(&s_comms);
+        let comms = E::G1Projective::batch_normalization_into_affine(comms);
+        let s_comms = E::G1Projective::batch_normalization_into_affine(s_comms);
         comms.into_iter().zip(s_comms).zip(s_flags).map(|((c, s_c), flag)| {
             let shifted_comm = if flag { Some(kzg10::Commitment(s_c)) } else { None };
             Commitment {

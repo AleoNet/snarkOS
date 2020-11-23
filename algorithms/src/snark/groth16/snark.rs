@@ -60,7 +60,7 @@ impl<E: PairingEngine, C: ConstraintSynthesizer<E::Fr>, V: ToConstraintField<E::
     ) -> Result<(Self::ProvingParameters, Self::PreparedVerificationParameters), SNARKError> {
         let setup_time = start_timer!(|| "{Groth 2016}::Setup");
         let pp = generate_random_parameters::<E, Self::Circuit, R>(circuit, rng)?;
-        let vk = prepare_verifying_key(&pp.vk);
+        let vk = prepare_verifying_key(pp.vk.clone());
         end_timer!(setup_time);
         Ok((pp, vk))
     }

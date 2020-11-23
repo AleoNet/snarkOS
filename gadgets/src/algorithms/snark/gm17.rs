@@ -61,11 +61,11 @@ impl<Pairing: PairingEngine, F: Field, P: PairingGadget<Pairing, F>> GM17Verifyi
         mut cs: CS,
     ) -> Result<GM17PreparedVerifyingKeyGadget<Pairing, F, P>, SynthesisError> {
         let mut cs = cs.ns(|| "Preparing verifying key");
-        let g_alpha_pc = P::prepare_g1(&mut cs.ns(|| "Prepare g_alpha_g1"), &self.g_alpha_g1)?;
-        let h_beta_pc = P::prepare_g2(&mut cs.ns(|| "Prepare h_beta_g2"), &self.h_beta_g2)?;
-        let g_gamma_pc = P::prepare_g1(&mut cs.ns(|| "Prepare g_gamma_pc"), &self.g_gamma_g1)?;
-        let h_gamma_pc = P::prepare_g2(&mut cs.ns(|| "Prepare h_gamma_pc"), &self.h_gamma_g2)?;
-        let h_pc = P::prepare_g2(&mut cs.ns(|| "Prepare h_pc"), &self.h_g2)?;
+        let g_alpha_pc = P::prepare_g1(&mut cs.ns(|| "Prepare g_alpha_g1"), self.g_alpha_g1.clone())?;
+        let h_beta_pc = P::prepare_g2(&mut cs.ns(|| "Prepare h_beta_g2"), self.h_beta_g2.clone())?;
+        let g_gamma_pc = P::prepare_g1(&mut cs.ns(|| "Prepare g_gamma_pc"), self.g_gamma_g1.clone())?;
+        let h_gamma_pc = P::prepare_g2(&mut cs.ns(|| "Prepare h_gamma_pc"), self.h_gamma_g2.clone())?;
+        let h_pc = P::prepare_g2(&mut cs.ns(|| "Prepare h_pc"), self.h_g2.clone())?;
         Ok(GM17PreparedVerifyingKeyGadget {
             g_alpha: self.g_alpha_g1.clone(),
             h_beta: self.h_beta_g2.clone(),
@@ -140,12 +140,12 @@ impl<
 
         let test1_exp = {
             test1_a_g_alpha = test1_a_g_alpha.negate(cs.ns(|| "neg 1"))?;
-            let test1_a_g_alpha_prep = P::prepare_g1(cs.ns(|| "First prep"), &test1_a_g_alpha)?;
-            let test1_b_h_beta_prep = P::prepare_g2(cs.ns(|| "Second prep"), &test1_b_h_beta)?;
+            let test1_a_g_alpha_prep = P::prepare_g1(cs.ns(|| "First prep"), test1_a_g_alpha)?;
+            let test1_b_h_beta_prep = P::prepare_g2(cs.ns(|| "Second prep"), test1_b_h_beta)?;
 
-            let g_psi_prep = P::prepare_g1(cs.ns(|| "Third prep"), &g_psi)?;
+            let g_psi_prep = P::prepare_g1(cs.ns(|| "Third prep"), g_psi)?;
 
-            let c_prep = P::prepare_g1(cs.ns(|| "Fourth prep"), &proof.c)?;
+            let c_prep = P::prepare_g1(cs.ns(|| "Fourth prep"), proof.c.clone())?;
 
             P::miller_loop(
                 cs.ns(|| "Miller loop 1"),
@@ -163,11 +163,11 @@ impl<
 
         // e(A, H^{gamma}) = e(G^{gamma}, B)
         let test2_exp = {
-            let a_prep = P::prepare_g1(cs.ns(|| "Fifth prep"), &proof.a)?;
+            let a_prep = P::prepare_g1(cs.ns(|| "Fifth prep"), proof.a.clone())?;
             // pvk.h_gamma_pc
             //&pvk.g_gamma_pc
             let proof_b = proof.b.negate(cs.ns(|| "Negate b"))?;
-            let b_prep = P::prepare_g2(cs.ns(|| "Sixth prep"), &proof_b)?;
+            let b_prep = P::prepare_g2(cs.ns(|| "Sixth prep"), proof_b)?;
             P::miller_loop(cs.ns(|| "Miller loop 4"), &[a_prep, pvk.g_gamma_pc.clone()], &[
                 pvk.h_gamma_pc,
                 b_prep,

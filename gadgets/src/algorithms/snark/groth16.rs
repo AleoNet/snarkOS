@@ -62,8 +62,8 @@ impl<PairingE: PairingEngine, ConstraintF: Field, P: PairingGadget<PairingE, Con
         mut cs: CS,
     ) -> Result<PreparedVerifyingKeyGadget<PairingE, ConstraintF, P>, SynthesisError> {
         let mut cs = cs.ns(|| "Preparing verifying key");
-        let alpha_g1_pc = P::prepare_g1(&mut cs.ns(|| "Prepare alpha_g1"), &self.alpha_g1)?;
-        let beta_g2_pc = P::prepare_g2(&mut cs.ns(|| "Prepare beta_g2"), &self.beta_g2)?;
+        let alpha_g1_pc = P::prepare_g1(&mut cs.ns(|| "Prepare alpha_g1"), self.alpha_g1.clone())?;
+        let beta_g2_pc = P::prepare_g2(&mut cs.ns(|| "Prepare beta_g2"), self.beta_g2.clone())?;
 
         let alpha_g1_beta_g2 = P::pairing(
             &mut cs.ns(|| "Precompute e(alpha_g1, beta_g2)"),
@@ -72,10 +72,10 @@ impl<PairingE: PairingEngine, ConstraintF: Field, P: PairingGadget<PairingE, Con
         )?;
 
         let gamma_g2_neg = self.gamma_g2.negate(&mut cs.ns(|| "Negate gamma_g2"))?;
-        let gamma_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare gamma_g2_neg"), &gamma_g2_neg)?;
+        let gamma_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare gamma_g2_neg"), gamma_g2_neg)?;
 
         let delta_g2_neg = self.delta_g2.negate(&mut cs.ns(|| "Negate delta_g2"))?;
-        let delta_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare delta_g2_neg"), &delta_g2_neg)?;
+        let delta_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare delta_g2_neg"), delta_g2_neg)?;
 
         Ok(PreparedVerifyingKeyGadget {
             alpha_g1_beta_g2,
@@ -153,11 +153,11 @@ where
         };
 
         let test_exp = {
-            let proof_a_prep = P::prepare_g1(cs.ns(|| "Prepare proof a"), &proof.a)?;
-            let proof_b_prep = P::prepare_g2(cs.ns(|| "Prepare proof b"), &proof.b)?;
-            let proof_c_prep = P::prepare_g1(cs.ns(|| "Prepare proof c"), &proof.c)?;
+            let proof_a_prep = P::prepare_g1(cs.ns(|| "Prepare proof a"), proof.a.clone())?;
+            let proof_b_prep = P::prepare_g2(cs.ns(|| "Prepare proof b"), proof.b.clone())?;
+            let proof_c_prep = P::prepare_g1(cs.ns(|| "Prepare proof c"), proof.c.clone())?;
 
-            let g_ic_prep = P::prepare_g1(cs.ns(|| "Prepare g_ic"), &g_ic)?;
+            let g_ic_prep = P::prepare_g1(cs.ns(|| "Prepare g_ic"), g_ic)?;
 
             P::miller_loop(cs.ns(|| "Miller loop 1"), &[proof_a_prep, g_ic_prep, proof_c_prep], &[
                 proof_b_prep,
