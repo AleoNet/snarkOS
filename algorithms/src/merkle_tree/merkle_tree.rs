@@ -53,11 +53,8 @@ impl<P: MerkleParameters> MerkleTree<P> {
         }
 
         // Initialize the Merkle tree.
-        let mut tree = Vec::with_capacity(tree_size);
         let empty_hash = parameters.hash_empty()?;
-        for _ in 0..tree_size {
-            tree.push(empty_hash.clone());
-        }
+        let mut tree = vec![empty_hash.clone(); tree_size];
 
         // Compute the starting index (on the left) for each level of the tree.
         let mut index = 0;

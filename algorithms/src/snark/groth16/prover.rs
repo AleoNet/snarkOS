@@ -76,17 +76,9 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for ProvingAssignment<E> {
         LB: FnOnce(LinearCombination<E::Fr>) -> LinearCombination<E::Fr>,
         LC: FnOnce(LinearCombination<E::Fr>) -> LinearCombination<E::Fr>,
     {
-        let num_constraints = self.num_constraints();
-
-        self.at.push(Vec::new());
-        self.bt.push(Vec::new());
-        self.ct.push(Vec::new());
-
-        push_constraints(a(LinearCombination::zero()), &mut self.at, num_constraints);
-
-        push_constraints(b(LinearCombination::zero()), &mut self.bt, num_constraints);
-
-        push_constraints(c(LinearCombination::zero()), &mut self.ct, num_constraints);
+        push_constraints(a(LinearCombination::zero()), &mut self.at);
+        push_constraints(b(LinearCombination::zero()), &mut self.bt);
+        push_constraints(c(LinearCombination::zero()), &mut self.ct);
     }
 
     fn push_namespace<NR, N>(&mut self, _: N)

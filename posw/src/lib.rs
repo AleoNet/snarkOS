@@ -58,7 +58,7 @@ mod params {
 }
 
 /// Subtree calculation
-pub fn txids_to_roots(transaction_ids: &[Vec<u8>]) -> (MerkleRootHash, PedersenMerkleRootHash, Vec<Vec<u8>>) {
+pub fn txids_to_roots(transaction_ids: &[[u8; 32]]) -> (MerkleRootHash, PedersenMerkleRootHash, Vec<[u8; 32]>) {
     let (root, subroots) = merkle_root_with_subroots(transaction_ids, MASKED_TREE_DEPTH);
     let mut merkle_root_bytes = [0u8; 32];
     merkle_root_bytes[..].copy_from_slice(&root);
@@ -97,7 +97,7 @@ mod tests {
         // super low difficulty so we find a solution immediately
         let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
 
-        let transaction_ids = vec![vec![1u8; 32]; 8];
+        let transaction_ids = vec![[1u8; 32]; 8];
         let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
 
         // generate the proof
@@ -124,7 +124,7 @@ mod tests {
         // super low difficulty so we find a solution immediately
         let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
 
-        let transaction_ids = vec![vec![1u8; 32]; 8];
+        let transaction_ids = vec![[1u8; 32]; 8];
         let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
 
         // generate the proof
