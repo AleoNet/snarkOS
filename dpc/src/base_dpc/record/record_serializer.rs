@@ -169,22 +169,25 @@ impl<C: BaseDPCComponents, P: MontgomeryModelParameters + TEModelParameters, G: 
             birth_program_id_remainder_bits.push(birth_program_id_biginteger.get_bit(i));
             death_program_id_remainder_bits.push(death_program_id_biginteger.get_bit(i));
         }
-        birth_program_id_remainder_bits.extend_from_slice(&death_program_id_remainder_bits);
+        birth_program_id_remainder_bits.append(&mut death_program_id_remainder_bits);
 
         // (Assumption 3 applies)
 
         let (encoded_birth_program_id, sign_high) =
             encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_program_id_bits)[..])?;
+        drop(birth_program_id_bits);
         data_elements.push(encoded_birth_program_id);
         data_high_bits.push(sign_high);
 
         let (encoded_death_program_id, sign_high) =
             encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&death_program_id_bits)[..])?;
+        drop(death_program_id_bits);
         data_elements.push(encoded_death_program_id);
         data_high_bits.push(sign_high);
 
         let (encoded_birth_program_id_remainder, sign_high) =
             encode_to_group::<Self::Parameters, Self::Group>(&bits_to_bytes(&birth_program_id_remainder_bits)[..])?;
+        drop(birth_program_id_remainder_bits);
         data_elements.push(encoded_birth_program_id_remainder);
         data_high_bits.push(sign_high);
 

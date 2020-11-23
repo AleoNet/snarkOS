@@ -93,8 +93,8 @@ impl<E: PairingEngine> KZG10<E> {
         powers_of_gamma_g.push(powers_of_gamma_g.last().unwrap().mul(&beta));
         end_timer!(gamma_g_time);
 
-        let powers_of_g = E::G1Projective::batch_normalization_into_affine(&powers_of_g);
-        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g)
+        let powers_of_g = E::G1Projective::batch_normalization_into_affine(powers_of_g);
+        let powers_of_gamma_g = E::G1Projective::batch_normalization_into_affine(powers_of_gamma_g)
             .into_iter()
             .enumerate()
             .collect();
@@ -116,7 +116,7 @@ impl<E: PairingEngine> KZG10<E> {
                 &neg_powers_of_beta,
             );
 
-            let affines = E::G2Projective::batch_normalization_into_affine(&neg_powers_of_h);
+            let affines = E::G2Projective::batch_normalization_into_affine(neg_powers_of_h);
             let mut affines_map = BTreeMap::new();
             affines
                 .into_iter()
@@ -347,7 +347,7 @@ impl<E: PairingEngine> KZG10<E> {
         end_timer!(combination_time);
 
         let to_affine_time = start_timer!(|| "Converting results to affine for pairing");
-        let affine_points = E::G1Projective::batch_normalization_into_affine(&[-total_w, total_c]);
+        let affine_points = E::G1Projective::batch_normalization_into_affine(vec![-total_w, total_c]);
         let (total_w, total_c) = (affine_points[0], affine_points[1]);
         end_timer!(to_affine_time);
 

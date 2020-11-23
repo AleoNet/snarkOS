@@ -62,8 +62,8 @@ impl<PairingE: PairingEngine, ConstraintF: Field, P: PairingGadget<PairingE, Con
         mut cs: CS,
     ) -> Result<PreparedVerifyingKeyGadget<PairingE, ConstraintF, P>, SynthesisError> {
         let mut cs = cs.ns(|| "Preparing verifying key");
-        let alpha_g1_pc = P::prepare_g1(&mut cs.ns(|| "Prepare alpha_g1"), &self.alpha_g1)?;
-        let beta_g2_pc = P::prepare_g2(&mut cs.ns(|| "Prepare beta_g2"), &self.beta_g2)?;
+        let alpha_g1_pc = P::prepare_g1(&mut cs.ns(|| "Prepare alpha_g1"), self.alpha_g1.clone())?;
+        let beta_g2_pc = P::prepare_g2(&mut cs.ns(|| "Prepare beta_g2"), self.beta_g2.clone())?;
 
         let alpha_g1_beta_g2 = P::pairing(
             &mut cs.ns(|| "Precompute e(alpha_g1, beta_g2)"),
@@ -72,10 +72,10 @@ impl<PairingE: PairingEngine, ConstraintF: Field, P: PairingGadget<PairingE, Con
         )?;
 
         let gamma_g2_neg = self.gamma_g2.negate(&mut cs.ns(|| "Negate gamma_g2"))?;
-        let gamma_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare gamma_g2_neg"), &gamma_g2_neg)?;
+        let gamma_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare gamma_g2_neg"), gamma_g2_neg)?;
 
         let delta_g2_neg = self.delta_g2.negate(&mut cs.ns(|| "Negate delta_g2"))?;
-        let delta_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare delta_g2_neg"), &delta_g2_neg)?;
+        let delta_g2_neg_pc = P::prepare_g2(&mut cs.ns(|| "Prepare delta_g2_neg"), delta_g2_neg)?;
 
         Ok(PreparedVerifyingKeyGadget {
             alpha_g1_beta_g2,
@@ -137,38 +137,47 @@ where
     {
         let pvk = vk.prepare(&mut cs.ns(|| "Prepare vk"))?;
 
+        let PreparedVerifyingKeyGadget {
+            alpha_g1_beta_g2,
+            gamma_g2_neg_pc,
+            delta_g2_neg_pc,
+            mut gamma_abc_g1,
+        } = pvk;
+
+        let mut gamma_abc_g1_iter = gamma_abc_g1.iter_mut();
+
         let g_ic = {
             let mut cs = cs.ns(|| "Process input");
-            let mut g_ic = pvk.gamma_abc_g1[0].clone();
+            let mut g_ic = gamma_abc_g1_iter.next().cloned().unwrap();
             let mut input_len = 1;
-            for (i, (input, b)) in public_inputs.by_ref().zip(pvk.gamma_abc_g1.iter().skip(1)).enumerate() {
+            for (i, (input, b)) in public_inputs.by_ref().zip(gamma_abc_g1_iter).enumerate() {
                 let input_bits = input.to_bits(cs.ns(|| format!("Input {}", i)))?;
                 g_ic = b.mul_bits(cs.ns(|| format!("Mul {}", i)), &g_ic, input_bits.into_iter())?;
                 input_len += 1;
             }
             // Check that the input and the query in the verification are of the
             // same length.
-            assert!(input_len == pvk.gamma_abc_g1.len() && public_inputs.next().is_none());
+            assert!(input_len == gamma_abc_g1.len() && public_inputs.next().is_none());
             g_ic
         };
 
         let test_exp = {
-            let proof_a_prep = P::prepare_g1(cs.ns(|| "Prepare proof a"), &proof.a)?;
-            let proof_b_prep = P::prepare_g2(cs.ns(|| "Prepare proof b"), &proof.b)?;
-            let proof_c_prep = P::prepare_g1(cs.ns(|| "Prepare proof c"), &proof.c)?;
+            let proof_a_prep = P::prepare_g1(cs.ns(|| "Prepare proof a"), proof.a.clone())?;
+            let proof_b_prep = P::prepare_g2(cs.ns(|| "Prepare proof b"), proof.b.clone())?;
+            let proof_c_prep = P::prepare_g1(cs.ns(|| "Prepare proof c"), proof.c.clone())?;
 
-            let g_ic_prep = P::prepare_g1(cs.ns(|| "Prepare g_ic"), &g_ic)?;
+            let g_ic_prep = P::prepare_g1(cs.ns(|| "Prepare g_ic"), g_ic)?;
 
             P::miller_loop(cs.ns(|| "Miller loop 1"), &[proof_a_prep, g_ic_prep, proof_c_prep], &[
                 proof_b_prep,
-                pvk.gamma_g2_neg_pc.clone(),
-                pvk.delta_g2_neg_pc.clone(),
+                gamma_g2_neg_pc,
+                delta_g2_neg_pc,
             ])?
         };
 
         let test = P::final_exponentiation(cs.ns(|| "Final Exp"), &test_exp).unwrap();
 
-        test.enforce_equal(cs.ns(|| "Test 1"), &pvk.alpha_g1_beta_g2)?;
+        test.enforce_equal(cs.ns(|| "Test 1"), &alpha_g1_beta_g2)?;
         Ok(())
     }
 }
@@ -193,7 +202,7 @@ where
                 gamma_g2,
                 delta_g2,
                 gamma_abc_g1,
-            } = vk.borrow().clone();
+            } = vk.borrow();
             let alpha_g1 = P::G1Gadget::alloc(cs.ns(|| "alpha_g1"), || Ok(alpha_g1.into_projective()))?;
             let beta_g2 = P::G2Gadget::alloc(cs.ns(|| "beta_g2"), || Ok(beta_g2.into_projective()))?;
             let gamma_g2 = P::G2Gadget::alloc(cs.ns(|| "gamma_g2"), || Ok(gamma_g2.into_projective()))?;
@@ -207,9 +216,7 @@ where
                         Ok(gamma_abc_i.into_projective())
                     })
                 })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(Self {
                 alpha_g1,
                 beta_g2,
@@ -233,7 +240,7 @@ where
                 gamma_g2,
                 delta_g2,
                 gamma_abc_g1,
-            } = vk.borrow().clone();
+            } = vk.borrow();
             let alpha_g1 = P::G1Gadget::alloc_input(cs.ns(|| "alpha_g1"), || Ok(alpha_g1.into_projective()))?;
             let beta_g2 = P::G2Gadget::alloc_input(cs.ns(|| "beta_g2"), || Ok(beta_g2.into_projective()))?;
             let gamma_g2 = P::G2Gadget::alloc_input(cs.ns(|| "gamma_g2"), || Ok(gamma_g2.into_projective()))?;
@@ -247,9 +254,7 @@ where
                         Ok(gamma_abc_i.into_projective())
                     })
                 })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?;
 
             Ok(Self {
                 alpha_g1,
@@ -275,7 +280,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|vk_bytes| {
-            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow().clone()[..])?;
+            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow()[..])?;
 
             Self::alloc(cs.ns(|| "alloc_bytes"), || Ok(vk))
         })
@@ -291,7 +296,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|vk_bytes| {
-            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow().clone()[..])?;
+            let vk: VerifyingKey<PairingE> = FromBytes::read(&vk_bytes.borrow()[..])?;
 
             Self::alloc_input(cs.ns(|| "alloc_input_bytes"), || Ok(vk))
         })
@@ -311,7 +316,7 @@ where
         T: Borrow<Proof<PairingE>>,
     {
         value_gen().and_then(|proof| {
-            let Proof { a, b, c } = proof.borrow().clone();
+            let Proof { a, b, c } = proof.borrow();
             let a = P::G1Gadget::alloc_checked(cs.ns(|| "a"), || Ok(a.into_projective()))?;
             let b = P::G2Gadget::alloc_checked(cs.ns(|| "b"), || Ok(b.into_projective()))?;
             let c = P::G1Gadget::alloc_checked(cs.ns(|| "c"), || Ok(c.into_projective()))?;
@@ -326,7 +331,7 @@ where
         T: Borrow<Proof<PairingE>>,
     {
         value_gen().and_then(|proof| {
-            let Proof { a, b, c } = proof.borrow().clone();
+            let Proof { a, b, c } = proof.borrow();
             // We don't need to check here because the prime order check can be performed
             // in plain.
             let a = P::G1Gadget::alloc_input(cs.ns(|| "a"), || Ok(a.into_projective()))?;
@@ -350,7 +355,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|proof_bytes| {
-            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow().clone()[..])?;
+            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow()[..])?;
 
             Self::alloc(cs.ns(|| "alloc_bytes"), || Ok(proof))
         })
@@ -366,7 +371,7 @@ where
         T: Borrow<Vec<u8>>,
     {
         value_gen().and_then(|proof_bytes| {
-            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow().clone()[..])?;
+            let proof: Proof<PairingE> = FromBytes::read(&proof_bytes.borrow()[..])?;
 
             Self::alloc_input(cs.ns(|| "alloc_input_bytes"), || Ok(proof))
         })

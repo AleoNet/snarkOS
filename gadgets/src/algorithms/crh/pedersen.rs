@@ -89,7 +89,7 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError> {
         assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
         // Pad the input if it is not the correct length.
@@ -103,8 +103,8 @@ impl<F: Field, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> CRHGadget<Peder
     }
 }
 
-fn pad_input_and_bitify<S: PedersenSize>(input: &[UInt8]) -> Vec<Boolean> {
-    let mut padded_input = input.to_vec();
+fn pad_input_and_bitify<S: PedersenSize>(input: Vec<UInt8>) -> Vec<Boolean> {
+    let mut padded_input = input;
     padded_input.resize(S::WINDOW_SIZE * S::NUM_WINDOWS / 8, UInt8::constant(0u8));
     assert_eq!(padded_input.len() * 8, S::WINDOW_SIZE * S::NUM_WINDOWS);
     padded_input.into_iter().flat_map(|byte| byte.to_bits_le()).collect()
@@ -125,21 +125,21 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
     fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
         mut cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
         mask_parameters: &Self::ParametersGadget,
-        mask: &[UInt8],
+        mask: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError> {
         // The mask will be extended to ensure constant hardness. This condition
         // ensures the input and the mask sizes match.
         if input.len() != mask.len() * 2 {
             return Err(SynthesisError::Unsatisfiable);
         }
-        let mask = <Self as MaskedCRHGadget<PedersenCRH<G, S>, F>>::extend_mask(cs.ns(|| "extend mask"), mask)?;
+        let mask = <Self as MaskedCRHGadget<PedersenCRH<G, S>, F>>::extend_mask(cs.ns(|| "extend mask"), &mask)?;
         // H(p) = sum of g_i^{p_i} for all i.
-        let mask_hash = Self::check_evaluation_gadget(cs.ns(|| "evaluate mask"), parameters, &mask)?;
+        let mask_hash = Self::check_evaluation_gadget(cs.ns(|| "evaluate mask"), parameters, mask.clone())?;
 
         // H_2(p) = sum of h_i^{1-2*p_i} for all i.
-        let mask_input_in_bits = pad_input_and_bitify::<S>(&mask);
+        let mask_input_in_bits = pad_input_and_bitify::<S>(mask.clone());
         let mask_symmetric_hash = GG::precomputed_base_symmetric_multiscalar_mul(
             cs.ns(|| "evaluate mask with mask bases"),
             &mask_parameters.parameters.bases,
@@ -149,7 +149,7 @@ impl<F: PrimeField, G: Group, GG: GroupGadget<G, F>, S: PedersenSize> MaskedCRHG
         assert_eq!(parameters.parameters.bases.len(), S::NUM_WINDOWS);
         // Pad the input if it is not the correct length.
         let input_in_bits = pad_input_and_bitify::<S>(input);
-        let mask_in_bits = pad_input_and_bitify::<S>(&mask);
+        let mask_in_bits = pad_input_and_bitify::<S>(mask);
 
         let masked_output = GG::precomputed_base_multiscalar_mul_masked(
             cs.ns(|| "multiscalar multiplication"),
@@ -180,7 +180,7 @@ impl<F: Field, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>, S: P
     fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError> {
         let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget(cs, parameters, input)?;
         Ok(output.to_x_coordinate())
@@ -193,9 +193,9 @@ impl<F: PrimeField, G: Group + ProjectiveCurve, GG: CompressedGroupGadget<G, F>,
     fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
         mask_parameters: &Self::ParametersGadget,
-        mask: &[UInt8],
+        mask: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError> {
         let output = PedersenCRHGadget::<G, F, GG>::check_evaluation_gadget_masked(
             cs,

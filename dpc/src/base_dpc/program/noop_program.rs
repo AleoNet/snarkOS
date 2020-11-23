@@ -67,10 +67,14 @@ where
         position: u8,
         rng: &mut R,
     ) -> Result<Self::PrivateWitness, DPCError> {
-        let records = [&local_data.old_records[..], &local_data.new_records[..]].concat();
-        assert!((position as usize) < records.len());
+        let num_records = local_data.old_records.len() + local_data.new_records.len();
+        assert!((position as usize) < num_records);
 
-        let record = &records[position as usize];
+        let record = if (position as usize) < local_data.old_records.len() {
+            &local_data.old_records[position as usize]
+        } else {
+            &local_data.new_records[position as usize - local_data.old_records.len()]
+        };
 
         if (position as usize) < C::NUM_INPUT_RECORDS {
             assert_eq!(self.identity, record.death_program_id());

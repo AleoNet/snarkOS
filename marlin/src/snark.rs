@@ -18,7 +18,7 @@
 use snarkos_errors::{algorithms::SNARKError, serialization::SerializationError};
 use snarkos_models::{
     algorithms::SNARK,
-    curves::{to_field_vec::ToConstraintField, PairingEngine},
+    curves::{to_field_vec::ToConstraintField, AffineCurve, PairingEngine},
     gadgets::r1cs::ConstraintSynthesizer,
 };
 use snarkos_profiler::{end_timer, start_timer};
@@ -29,11 +29,12 @@ use snarkos_utilities::{
     serialize::*,
 };
 
-pub use snarkos_polycommit::marlin_pc::MarlinKZG10 as MultiPC;
+pub use snarkos_polycommit::{marlin_pc::MarlinKZG10 as MultiPC, PCCommitment};
 
 use blake2::Blake2s;
 use derivative::Derivative;
 use rand_core::RngCore;
+use rayon::prelude::*;
 use std::{
     io::{Read, Write},
     marker::PhantomData,
@@ -84,7 +85,103 @@ where
 
 impl<'a, E: PairingEngine, C: ConstraintSynthesizer<E::Fr>> FromBytes for Parameters<'a, E, C> {
     fn read<R: Read>(mut r: R) -> io::Result<Self> {
-        CanonicalDeserialize::deserialize(&mut r).map_err(|_| error("could not deserialize parameters"))
+        use snarkos_utilities::{PROCESSING_SNARK_PARAMS, SNARK_PARAMS_AFFINE_COUNT};
+        use std::sync::atomic::{self, AtomicU64};
+
+        // signal that the SNARK params are being processed in order for the validation of affine values to be
+        // deferred, while ensuring that this method is not called recursively; the expected number of entries is
+        // counted with a thread-local SNARK_PARAMS_AFFINE_COUNT, which does not support recursion in its current form
+        let only_entry = PROCESSING_SNARK_PARAMS
+            .with(|p| p.compare_exchange(false, true, atomic::Ordering::Relaxed, atomic::Ordering::Relaxed));
+        debug_assert_eq!(only_entry, Ok(false), "recursive deserialization of Parameters");
+
+        // perform the deserialization which will initially omit the validation of affine values
+        let ret: Self =
+            CanonicalDeserialize::deserialize(&mut r).map_err(|_| error("could not deserialize parameters"))?;
+
+        // signal that all the other affine validation should be performed eagerly back again
+        PROCESSING_SNARK_PARAMS.with(|p| p.store(false, atomic::Ordering::Relaxed));
+
+        // retrieve the thread-local SNARK_PARAMS_AFFINE_COUNT and make it rayon-friendly
+        let num_affines_to_verify =
+            AtomicU64::new(SNARK_PARAMS_AFFINE_COUNT.with(|p| p.load(atomic::Ordering::Relaxed)));
+
+        // check the affine values for the CommitterKey
+        let ck = &ret.prover_key.committer_key;
+
+        ck.powers.par_iter().try_for_each(|p| {
+            num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+            if !p.is_in_correct_subgroup_assuming_on_curve() {
+                Err(error("invalid parameter data"))
+            } else {
+                Ok(())
+            }
+        })?;
+
+        if let Some(shifted_powers) = &ck.shifted_powers {
+            shifted_powers.par_iter().try_for_each(|p| {
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+                if !p.is_in_correct_subgroup_assuming_on_curve() {
+                    Err(error("invalid parameter data"))
+                } else {
+                    Ok(())
+                }
+            })?;
+        }
+
+        ck.powers_of_gamma_g.par_iter().try_for_each(|p| {
+            num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+            if !p.is_in_correct_subgroup_assuming_on_curve() {
+                Err(error("invalid parameter data"))
+            } else {
+                Ok(())
+            }
+        })?;
+
+        // there are 2 IndexVerifierKeys in the Parameters
+        for vk in &[&ret.prover_key.index_vk, &ret.verifier_key] {
+            // check the affine values for marlin::IndexVerifierKey
+            for comm in &vk.index_comms {
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+                if !comm.is_in_correct_subgroup_assuming_on_curve() {
+                    return Err(error("invalid parameter data"));
+                }
+
+                if comm.has_degree_bound() {
+                    num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+                }
+            }
+
+            // check the affine values for marlin_pc::VerifierKey
+            if let Some(dbasp) = &vk.verifier_key.degree_bounds_and_shift_powers {
+                for (_, p) in dbasp {
+                    num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+                    if !p.is_in_correct_subgroup_assuming_on_curve() {
+                        return Err(error("invalid parameter data"));
+                    }
+                }
+            }
+
+            // check the affine values for kzg10::VerifierKey
+            for g in &[vk.verifier_key.vk.g, vk.verifier_key.vk.gamma_g] {
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+                if !g.is_in_correct_subgroup_assuming_on_curve() {
+                    return Err(error("invalid parameter data"));
+                }
+            }
+            for h in &[vk.verifier_key.vk.h, vk.verifier_key.vk.beta_h] {
+                num_affines_to_verify.fetch_sub(1, atomic::Ordering::Relaxed);
+                if !h.is_in_correct_subgroup_assuming_on_curve() {
+                    return Err(error("invalid parameter data"));
+                }
+            }
+        }
+
+        // this check ensures that all the deferred validation has been accounted for, i.e. that
+        // there were no affine values belonging to the Parameters object that were not validated
+        debug_assert_eq!(num_affines_to_verify.load(atomic::Ordering::Relaxed), 0);
+
+        Ok(ret)
     }
 }
 

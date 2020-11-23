@@ -138,9 +138,7 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         let mut padded_input_bytes = vec![];
         if (input.len() * 8) < S::WINDOW_SIZE * S::NUM_WINDOWS {
             padded_input_bytes.extend_from_slice(input_bytes);
-            for _ in input.len()..((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8) {
-                padded_input_bytes.push(0u8);
-            }
+            padded_input_bytes.resize((S::WINDOW_SIZE * S::NUM_WINDOWS) / 8, 0u8);
             input_bytes = padded_input_bytes.as_slice();
         }
 
@@ -151,9 +149,10 @@ impl<G: Group, S: PedersenSize> CRH for BoweHopwoodPedersenCRH<G, S> {
         padded_input.extend(input);
         if input_len % BOWE_HOPWOOD_CHUNK_SIZE != 0 {
             let current_length = input_len;
-            for _ in 0..(BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE) {
-                padded_input.push(false);
-            }
+            padded_input.resize(
+                current_length + BOWE_HOPWOOD_CHUNK_SIZE - current_length % BOWE_HOPWOOD_CHUNK_SIZE,
+                false,
+            );
         }
 
         assert_eq!(padded_input.len() % BOWE_HOPWOOD_CHUNK_SIZE, 0);

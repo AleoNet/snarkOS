@@ -341,26 +341,35 @@ pub struct PreparedVerifyingKey<E: PairingEngine> {
     pub alpha_g1_beta_g2: E::Fqk,
     pub gamma_g2_neg_pc: <E::G2Affine as PairingCurve>::Prepared,
     pub delta_g2_neg_pc: <E::G2Affine as PairingCurve>::Prepared,
-    pub gamma_abc_g1: Vec<E::G1Affine>,
+}
+
+impl<E: PairingEngine> PreparedVerifyingKey<E> {
+    fn gamma_abc_g1(&self) -> &[E::G1Affine] {
+        &self.vk.gamma_abc_g1
+    }
 }
 
 impl<E: PairingEngine> From<Parameters<E>> for PreparedVerifyingKey<E> {
     fn from(other: Parameters<E>) -> Self {
-        prepare_verifying_key(&other.vk)
+        prepare_verifying_key(other.vk)
     }
 }
 
 impl<E: PairingEngine> From<VerifyingKey<E>> for PreparedVerifyingKey<E> {
     fn from(other: VerifyingKey<E>) -> Self {
-        prepare_verifying_key(&other)
+        prepare_verifying_key(other)
     }
 }
 
-fn push_constraints<F: Field>(l: LinearCombination<F>, constraints: &mut [Vec<(F, Index)>], this_constraint: usize) {
-    for (var, coeff) in l.as_ref() {
+fn push_constraints<F: Field>(l: LinearCombination<F>, constraints: &mut Vec<Vec<(F, Index)>>) {
+    let vars_and_coeffs = l.as_ref();
+    let mut vec = Vec::with_capacity(vars_and_coeffs.len());
+
+    for (var, coeff) in vars_and_coeffs {
         match var.get_unchecked() {
-            Index::Input(i) => constraints[this_constraint].push((*coeff, Index::Input(i))),
-            Index::Aux(i) => constraints[this_constraint].push((*coeff, Index::Aux(i))),
+            Index::Input(i) => vec.push((*coeff, Index::Input(i))),
+            Index::Aux(i) => vec.push((*coeff, Index::Aux(i))),
         }
     }
+    constraints.push(vec);
 }

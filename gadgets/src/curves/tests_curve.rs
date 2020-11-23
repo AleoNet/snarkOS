@@ -51,11 +51,11 @@ fn bls12_377_gadget_bilinearity_test() {
     let sa_g = G1Gadget::alloc(&mut cs.ns(|| "sa"), || Ok(sa)).unwrap();
     let sb_g = G2Gadget::alloc(&mut cs.ns(|| "sb"), || Ok(sb)).unwrap();
 
-    let a_prep_g = G1PreparedGadget::from_affine(&mut cs.ns(|| "a_prep"), &a_g).unwrap();
-    let b_prep_g = G2PreparedGadget::from_affine(&mut cs.ns(|| "b_prep"), &b_g).unwrap();
+    let a_prep_g = G1PreparedGadget::from_affine(&mut cs.ns(|| "a_prep"), a_g).unwrap();
+    let b_prep_g = G2PreparedGadget::from_affine(&mut cs.ns(|| "b_prep"), b_g).unwrap();
 
-    let sa_prep_g = G1PreparedGadget::from_affine(&mut cs.ns(|| "sa_prep"), &sa_g).unwrap();
-    let sb_prep_g = G2PreparedGadget::from_affine(&mut cs.ns(|| "sb_prep"), &sb_g).unwrap();
+    let sa_prep_g = G1PreparedGadget::from_affine(&mut cs.ns(|| "sa_prep"), sa_g).unwrap();
+    let sb_prep_g = G2PreparedGadget::from_affine(&mut cs.ns(|| "sb_prep"), sb_g).unwrap();
 
     let (ans1_g, ans1_n) = {
         let ans_g = Bls12PairingGadget::pairing(cs.ns(|| "pair(sa, b)"), sa_prep_g, b_prep_g.clone()).unwrap();

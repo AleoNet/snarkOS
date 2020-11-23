@@ -596,7 +596,7 @@ impl Boolean {
                     current_run.push(last_run);
                     last_run = Self::kary_and(cs.ns(|| format!("run {}", run_i)), &current_run)?;
                     run_i += 1;
-                    current_run.truncate(0);
+                    current_run.clear();
                 }
 
                 // If `last_run` is true, `a` must be false, or it would
