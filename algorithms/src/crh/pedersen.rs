@@ -22,6 +22,7 @@ use snarkos_models::{
 };
 use snarkos_utilities::bytes_to_bits;
 
+use itertools::Itertools;
 use rand::Rng;
 
 #[cfg(feature = "pedersen-parallel")]
