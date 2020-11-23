@@ -225,12 +225,7 @@ fn base_dpc_integration_test() {
     let mut transactions = DPCTransactions::new();
     transactions.push(transaction);
 
-    let transaction_ids: Vec<Vec<u8>> = transactions
-        .to_transaction_ids()
-        .unwrap()
-        .iter()
-        .map(|id| id.to_vec())
-        .collect();
+    let transaction_ids = transactions.to_transaction_ids().unwrap();
 
     let mut merkle_root_bytes = [0u8; 32];
     merkle_root_bytes[..].copy_from_slice(&merkle_root(&transaction_ids));

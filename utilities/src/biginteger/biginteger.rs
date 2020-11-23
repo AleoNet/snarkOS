@@ -94,7 +94,7 @@ pub trait BigInteger:
 
     /// Returns the big integer representation of a given big endian boolean
     /// array.
-    fn from_bits(bits: &[bool]) -> Self;
+    fn from_bits(bits: Vec<bool>) -> Self;
 
     /// Returns the bit representation in a big endian boolean array, without
     /// leading zeros.
