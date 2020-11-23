@@ -34,7 +34,7 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use tokio::{runtime::Runtime, sync::Mutex};
+use tokio::{runtime::Builder, sync::Mutex};
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
@@ -194,7 +194,12 @@ fn main() -> Result<(), NodeError> {
     // create a tracing span dedicated to the entire node
     let node_span = debug_span!("node");
 
-    Runtime::new()?.block_on(start_server(config).instrument(node_span))?;
+    Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .thread_stack_size(4 * 1024 * 1024)
+        .build()?
+        .block_on(start_server(config).instrument(node_span))?;
 
     Ok(())
 }

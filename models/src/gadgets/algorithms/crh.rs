@@ -46,7 +46,7 @@ pub trait CRHGadget<H: CRH, F: Field>: Sized + Clone {
     fn check_evaluation_gadget<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError>;
 }
 
@@ -72,8 +72,8 @@ pub trait MaskedCRHGadget<H: CRH, F: PrimeField>: CRHGadget<H, F> {
     fn check_evaluation_gadget_masked<CS: ConstraintSystem<F>>(
         cs: CS,
         parameters: &Self::ParametersGadget,
-        input: &[UInt8],
+        input: Vec<UInt8>,
         mask_parameters: &Self::ParametersGadget,
-        mask: &[UInt8],
+        mask: Vec<UInt8>,
     ) -> Result<Self::OutputGadget, SynthesisError>;
 }

@@ -34,7 +34,7 @@ fn gm17_bench(c: &mut Criterion) {
     let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
 
     // Can we test for different tx id sizes?
-    let transaction_ids = vec![vec![1u8; 32]; 8];
+    let transaction_ids = vec![[1u8; 32]; 8];
     let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
 
     // Proof Generation Bench
@@ -64,7 +64,7 @@ fn marlin_bench(c: &mut Criterion) {
 
     let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;
 
-    let transaction_ids = vec![vec![1u8; 32]; 8];
+    let transaction_ids = vec![[1u8; 32]; 8];
     let (_, pedersen_merkle_root, subroots) = txids_to_roots(&transaction_ids);
 
     // Proof Generation Bench

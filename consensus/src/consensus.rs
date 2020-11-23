@@ -203,7 +203,7 @@ impl ConsensusParameters {
         block: &Block<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
-        let transaction_ids: Vec<Vec<u8>> = block.transactions.to_transaction_ids()?;
+        let transaction_ids: Vec<_> = block.transactions.to_transaction_ids()?;
         let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
 
         // Verify the block header

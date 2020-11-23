@@ -54,7 +54,7 @@ pub fn compute_root<H: CRH, HG: MaskedCRHGadget<H, F>, F: PrimeField, TB: ToByte
                     &left_right[0],
                     &left_right[1],
                     mask_parameters,
-                    &mask_bytes,
+                    mask_bytes.clone(),
                 );
                 inner_hash
             })
@@ -73,7 +73,7 @@ pub(crate) fn hash_inner_node_gadget<H, HG, F, TB, CS>(
     left_child: &TB,
     right_child: &TB,
     mask_parameters: &HG::ParametersGadget,
-    mask: &[UInt8],
+    mask: Vec<UInt8>,
 ) -> Result<HG::OutputGadget, SynthesisError>
 where
     F: PrimeField,
@@ -86,5 +86,5 @@ where
     let right_bytes = right_child.to_bytes(&mut cs.ns(|| "right_to_bytes"))?;
     let bytes = [left_bytes, right_bytes].concat();
 
-    HG::check_evaluation_gadget_masked(cs, parameters, &bytes, mask_parameters, &mask)
+    HG::check_evaluation_gadget_masked(cs, parameters, bytes, mask_parameters, mask)
 }
