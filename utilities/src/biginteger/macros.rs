@@ -165,11 +165,10 @@ macro_rules! bigint_impl {
             /// Constructs a `BigInteger` by parsing a vector of bits in big endian format
             /// and transforms it into a vector of little endian u64 elements.
             #[inline]
-            fn from_bits(bits: &[bool]) -> Self {
+            fn from_bits(mut bits: Vec<bool>) -> Self {
                 let mut res = Self::default();
                 let mut acc: u64 = 0;
 
-                let mut bits = bits.to_vec();
                 bits.reverse();
                 for (i, bits64) in bits.chunks(64).enumerate() {
                     for bit in bits64.iter().rev() {
