@@ -107,19 +107,19 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
     let old_account_private_keys = vec![dummy_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
     let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
     for i in 0..Components::NUM_INPUT_RECORDS {
-        let old_sn_nonce = &parameters
+        let old_sn_nonce = parameters
             .system_parameters
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
-            &parameters.system_parameters,
-            &old_sn_nonce,
-            &dummy_account.address,
+            parameters.system_parameters.clone(),
+            old_sn_nonce.clone(),
+            dummy_account.address.clone(),
             true, // The input record is dummy
             0,
-            &RecordPayload::default(),
-            &noop_program_id,
-            &noop_program_id,
+            RecordPayload::default(),
+            noop_program_id.clone(),
+            noop_program_id.clone(),
             rng,
         )?;
         old_records.push(old_record);

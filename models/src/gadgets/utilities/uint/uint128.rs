@@ -706,7 +706,7 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt128 {
                 }
             });
 
-            let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get().map(|v| v))?;
+            let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get())?;
 
             result.negated = is_negated;
 

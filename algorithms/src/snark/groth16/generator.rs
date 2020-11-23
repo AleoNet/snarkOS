@@ -51,7 +51,6 @@ where
 pub struct KeypairAssembly<E: PairingEngine> {
     pub num_inputs: usize,
     pub num_aux: usize,
-    pub num_constraints: usize,
     pub at: Vec<Vec<(E::Fr, Index)>>,
     pub bt: Vec<Vec<(E::Fr, Index)>>,
     pub ct: Vec<Vec<(E::Fr, Index)>>,
@@ -92,6 +91,7 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for KeypairAssembly<E> {
         Ok(Variable::new_unchecked(Index::Input(index)))
     }
 
+    #[inline]
     fn enforce<A, AR, LA, LB, LC>(&mut self, _: A, a: LA, b: LB, c: LC)
     where
         A: FnOnce() -> AR,
@@ -100,15 +100,9 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for KeypairAssembly<E> {
         LB: FnOnce(LinearCombination<E::Fr>) -> LinearCombination<E::Fr>,
         LC: FnOnce(LinearCombination<E::Fr>) -> LinearCombination<E::Fr>,
     {
-        self.at.push(vec![]);
-        self.bt.push(vec![]);
-        self.ct.push(vec![]);
-
-        push_constraints(a(LinearCombination::zero()), &mut self.at, self.num_constraints);
-        push_constraints(b(LinearCombination::zero()), &mut self.bt, self.num_constraints);
-        push_constraints(c(LinearCombination::zero()), &mut self.ct, self.num_constraints);
-
-        self.num_constraints += 1;
+        push_constraints(a(LinearCombination::zero()), &mut self.at);
+        push_constraints(b(LinearCombination::zero()), &mut self.bt);
+        push_constraints(c(LinearCombination::zero()), &mut self.ct);
     }
 
     fn push_namespace<NR, N>(&mut self, _: N)
@@ -128,7 +122,7 @@ impl<E: PairingEngine> ConstraintSystem<E::Fr> for KeypairAssembly<E> {
     }
 
     fn num_constraints(&self) -> usize {
-        self.num_constraints
+        self.at.len()
     }
 }
 
@@ -150,7 +144,6 @@ where
     let mut assembly = KeypairAssembly {
         num_inputs: 0,
         num_aux: 0,
-        num_constraints: 0,
         at: vec![],
         bt: vec![],
         ct: vec![],
@@ -167,7 +160,7 @@ where
     ///////////////////////////////////////////////////////////////////////////
     let domain_time = start_timer!(|| "Constructing evaluation domain");
 
-    let domain_size = assembly.num_constraints + (assembly.num_inputs - 1) + 1;
+    let domain_size = assembly.num_constraints() + (assembly.num_inputs - 1) + 1;
     let domain = EvaluationDomain::<E::Fr>::new(domain_size).ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
     let t = domain.sample_element_outside_domain(rng);
 

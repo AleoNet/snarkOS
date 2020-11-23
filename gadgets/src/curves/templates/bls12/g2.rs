@@ -60,7 +60,7 @@ impl<P: Bls12Parameters> ToBytesGadget<P::Fp> for G2PreparedGadget<P> {
 }
 
 impl<P: Bls12Parameters> G2PreparedGadget<P> {
-    pub fn from_affine<CS: ConstraintSystem<P::Fp>>(mut cs: CS, q: &G2Gadget<P>) -> Result<Self, SynthesisError> {
+    pub fn from_affine<CS: ConstraintSystem<P::Fp>>(mut cs: CS, q: G2Gadget<P>) -> Result<Self, SynthesisError> {
         let two_inv = P::Fp::one().double().inverse().unwrap();
         let zero = G2Gadget::<P>::zero(cs.ns(|| "zero"))?;
         q.enforce_not_equal(cs.ns(|| "enforce not zero"), &zero)?;

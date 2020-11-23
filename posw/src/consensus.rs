@@ -103,7 +103,7 @@ where
     }
 
     /// Creates a POSW circuit from the provided transaction ids and nonce.
-    fn circuit_from(nonce: u32, leaves: &[Vec<u8>]) -> POSWCircuit<F, M, HG, CP> {
+    fn circuit_from(nonce: u32, leaves: &[[u8; 32]]) -> POSWCircuit<F, M, HG, CP> {
         let (root, leaves) = pedersen_merkle_root_hash_with_leaves(leaves);
 
         // Generate the mask by committing to the nonce and the root
@@ -197,7 +197,7 @@ where
     /// under the difficulty target. These can then be used in the block header's field.
     pub fn mine<R: Rng>(
         &self,
-        subroots: &[Vec<u8>],
+        subroots: &[[u8; 32]],
         difficulty_target: u64, // TODO: Change to Bignum?
         rng: &mut R,
         max_nonce: u32,
@@ -225,7 +225,7 @@ where
     fn prove<R: Rng>(
         pk: &S::ProvingParameters,
         nonce: u32,
-        subroots: &[Vec<u8>],
+        subroots: &[[u8; 32]],
         rng: &mut R,
     ) -> Result<S::Proof, PoswError> {
         // instantiate the circuit with the nonce
