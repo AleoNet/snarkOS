@@ -20,6 +20,8 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
+use indexmap::IndexSet;
+
 use std::collections::{btree_map::Entry, BTreeMap};
 
 #[derive(Debug)]
@@ -29,19 +31,26 @@ enum NamedObject {
     Namespace,
 }
 
-type TestConstraint<T> = (LinearCombination<T>, LinearCombination<T>, LinearCombination<T>, String);
+type PathIdx = usize;
+type TestConstraint<T> = (
+    LinearCombination<T>,
+    LinearCombination<T>,
+    LinearCombination<T>,
+    PathIdx,
+);
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
-    named_objects: BTreeMap<String, NamedObject>,
+    paths: IndexSet<String>,
+    named_objects: BTreeMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
     pub constraints: Vec<TestConstraint<F>>,
-    inputs: Vec<(F, String)>,
-    aux: Vec<(F, String)>,
+    inputs: Vec<(F, PathIdx)>,
+    aux: Vec<(F, PathIdx)>,
 }
 
 impl<F: Field> TestConstraintSystem<F> {
-    fn eval_lc(terms: &[(Variable, F)], inputs: &[(F, String)], aux: &[(F, String)]) -> F {
+    fn eval_lc(terms: &[(Variable, F)], inputs: &[(F, PathIdx)], aux: &[(F, PathIdx)]) -> F {
         let mut acc = F::zero();
 
         for &(var, ref coeff) in terms {
@@ -60,14 +69,17 @@ impl<F: Field> TestConstraintSystem<F> {
 
 impl<F: Field> Default for TestConstraintSystem<F> {
     fn default() -> Self {
+        let mut paths = IndexSet::new();
+        let path_idx = paths.insert_full("ONE".into()).0;
         let mut map = BTreeMap::new();
-        map.insert("ONE".into(), NamedObject::Var(TestConstraintSystem::<F>::one()));
+        map.insert(path_idx, NamedObject::Var(TestConstraintSystem::<F>::one()));
 
         TestConstraintSystem {
+            paths,
             named_objects: map,
             current_namespace: vec![],
             constraints: vec![],
-            inputs: vec![(F::one(), "ONE".into())],
+            inputs: vec![(F::one(), path_idx)],
             aux: vec![],
         }
     }
@@ -79,13 +91,13 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn print_named_objects(&self) {
-        for &(_, _, _, ref name) in &self.constraints {
-            println!("{}", name);
+        for &(_, _, _, path_idx) in &self.constraints {
+            println!("{}", self.paths.get_index(path_idx).unwrap());
         }
     }
 
     pub fn which_is_unsatisfied(&self) -> Option<&str> {
-        for &(ref a, ref b, ref c, ref path) in &self.constraints {
+        for &(ref a, ref b, ref c, path_idx) in &self.constraints {
             let mut a = Self::eval_lc(a.as_ref(), &self.inputs, &self.aux);
             let b = Self::eval_lc(b.as_ref(), &self.inputs, &self.aux);
             let c = Self::eval_lc(c.as_ref(), &self.inputs, &self.aux);
@@ -93,7 +105,7 @@ impl<F: Field> TestConstraintSystem<F> {
             a.mul_assign(&b);
 
             if a != c {
-                return Some(&*path);
+                return self.paths.get_index(path_idx).map(|p| p.as_str());
             }
         }
 
@@ -109,7 +121,12 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn set(&mut self, path: &str, to: F) {
-        match self.named_objects.get(path) {
+        let path_idx = self
+            .paths
+            .get_index_of(path)
+            .unwrap_or_else(|| panic!("no variable exists at path: {}", path));
+
+        match self.named_objects.get(&path_idx) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
                 Index::Input(index) => self.inputs[index].0 = to,
                 Index::Aux(index) => self.aux[index].0 = to,
@@ -123,7 +140,12 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn get(&mut self, path: &str) -> F {
-        match self.named_objects.get(path) {
+        let path_idx = self
+            .paths
+            .get_index_of(path)
+            .unwrap_or_else(|| panic!("no variable exists at path: {}", path));
+
+        match self.named_objects.get(&path_idx) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
                 Index::Input(index) => self.inputs[index].0,
                 Index::Aux(index) => self.aux[index].0,
@@ -136,8 +158,8 @@ impl<F: Field> TestConstraintSystem<F> {
         }
     }
 
-    fn set_named_obj(&mut self, path: String, to: NamedObject) {
-        match self.named_objects.entry(path) {
+    fn set_named_obj(&mut self, path_idx: PathIdx, to: NamedObject) {
+        match self.named_objects.entry(path_idx) {
             Entry::Vacant(e) => {
                 e.insert(to);
             }
@@ -179,9 +201,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     {
         let index = self.aux.len();
         let path = compute_path(&self.current_namespace, &annotation().into());
-        self.aux.push((f()?, path.clone()));
+        let path_idx = self.paths.insert_full(path).0;
+        self.aux.push((f()?, path_idx));
         let var = Variable::new_unchecked(Index::Aux(index));
-        self.set_named_obj(path, NamedObject::Var(var));
+        self.set_named_obj(path_idx, NamedObject::Var(var));
 
         Ok(var)
     }
@@ -194,9 +217,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     {
         let index = self.inputs.len();
         let path = compute_path(&self.current_namespace, &annotation().into());
-        self.inputs.push((f()?, path.clone()));
+        let path_idx = self.paths.insert_full(path).0;
+        self.inputs.push((f()?, path_idx));
         let var = Variable::new_unchecked(Index::Input(index));
-        self.set_named_obj(path, NamedObject::Var(var));
+        self.set_named_obj(path_idx, NamedObject::Var(var));
 
         Ok(var)
     }
@@ -210,8 +234,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
     {
         let path = compute_path(&self.current_namespace, &annotation().into());
+        let path_idx = self.paths.insert_full(path).0;
         let index = self.constraints.len();
-        self.set_named_obj(path.clone(), NamedObject::Constraint(index));
+        self.set_named_obj(path_idx, NamedObject::Constraint(index));
 
         let mut a = a(LinearCombination::zero());
         let mut b = b(LinearCombination::zero());
@@ -220,13 +245,14 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         b.0.shrink_to_fit();
         c.0.shrink_to_fit();
 
-        self.constraints.push((a, b, c, path));
+        self.constraints.push((a, b, c, path_idx));
     }
 
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn().into();
         let path = compute_path(&self.current_namespace, &name);
-        self.set_named_obj(path, NamedObject::Namespace);
+        let path_idx = self.paths.insert_full(path).0;
+        self.set_named_obj(path_idx, NamedObject::Namespace);
         self.current_namespace.push(name);
     }
 
