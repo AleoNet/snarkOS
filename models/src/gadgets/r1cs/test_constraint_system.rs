@@ -21,8 +21,9 @@ use crate::{
 use snarkos_errors::gadgets::SynthesisError;
 
 use indexmap::IndexSet;
+use nohash_hasher::IntMap;
 
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::hash_map::Entry;
 
 #[derive(Debug)]
 enum NamedObject {
@@ -42,7 +43,7 @@ type TestConstraint<T> = (
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     paths: IndexSet<String>,
-    named_objects: BTreeMap<PathIdx, NamedObject>,
+    named_objects: IntMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
     pub constraints: Vec<TestConstraint<F>>,
     inputs: Vec<(F, PathIdx)>,
@@ -71,7 +72,7 @@ impl<F: Field> Default for TestConstraintSystem<F> {
     fn default() -> Self {
         let mut paths = IndexSet::new();
         let path_idx = paths.insert_full("ONE".into()).0;
-        let mut map = BTreeMap::new();
+        let mut map = IntMap::default();
         map.insert(path_idx, NamedObject::Var(TestConstraintSystem::<F>::one()));
 
         TestConstraintSystem {
