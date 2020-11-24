@@ -20,6 +20,7 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
+use fxhash::FxBuildHasher;
 use indexmap::IndexSet;
 use nohash_hasher::IntMap;
 
@@ -42,7 +43,7 @@ type TestConstraint<T> = (
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
-    paths: IndexSet<String>,
+    paths: IndexSet<String, FxBuildHasher>,
     named_objects: IntMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
     pub constraints: Vec<TestConstraint<F>>,
@@ -70,7 +71,7 @@ impl<F: Field> TestConstraintSystem<F> {
 
 impl<F: Field> Default for TestConstraintSystem<F> {
     fn default() -> Self {
-        let mut paths = IndexSet::new();
+        let mut paths = IndexSet::with_hasher(FxBuildHasher::default());
         let path_idx = paths.insert_full("ONE".into()).0;
         let mut map = IntMap::default();
         map.insert(path_idx, NamedObject::Var(TestConstraintSystem::<F>::one()));
