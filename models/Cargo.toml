@@ -17,6 +17,7 @@ snarkos-utilities = { path = "../utilities", version = "1.1.4", default-features
 
 bincode = { version = "1.3.1" }
 derivative = { version = "2" }
+fxhash = { version = "0.2.1" }
 indexmap = { version = "1.6.0" }
 itertools = { version = "0.9.0" }
 nohash-hasher = { version = "0.2.0" }
