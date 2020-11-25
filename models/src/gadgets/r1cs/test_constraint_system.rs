@@ -49,7 +49,7 @@ pub struct TestConstraintSystem<F: Field> {
     interned_constraints: IndexSet<LinearCombination<F>, FxBuildHasher>,
     named_objects: IntMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: IntMap<ConstraintIdx, TestConstraint>,
+    pub constraints: IntMap<PathIdx, TestConstraint>,
     inputs: Vec<(F, PathIdx)>,
     aux: Vec<(F, PathIdx)>,
 }
