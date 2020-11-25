@@ -34,12 +34,13 @@ enum NamedObject {
 }
 
 type PathIdx = usize;
-type TestConstraint<T> = (
-    LinearCombination<T>,
-    LinearCombination<T>,
-    LinearCombination<T>,
-    PathIdx,
-);
+
+pub struct TestConstraint<F: Field> {
+    a: LinearCombination<F>,
+    b: LinearCombination<F>,
+    c: LinearCombination<F>,
+    path_idx: PathIdx,
+}
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
@@ -93,13 +94,19 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn print_named_objects(&self) {
-        for &(_, _, _, path_idx) in &self.constraints {
-            println!("{}", self.paths.get_index(path_idx).unwrap());
+        for constraint in &self.constraints {
+            println!("{}", self.paths.get_index(constraint.path_idx).unwrap());
         }
     }
 
     pub fn which_is_unsatisfied(&self) -> Option<&str> {
-        for &(ref a, ref b, ref c, path_idx) in &self.constraints {
+        for &TestConstraint {
+            ref a,
+            ref b,
+            ref c,
+            path_idx,
+        } in &self.constraints
+        {
             let mut a = Self::eval_lc(a.as_ref(), &self.inputs, &self.aux);
             let b = Self::eval_lc(b.as_ref(), &self.inputs, &self.aux);
             let c = Self::eval_lc(c.as_ref(), &self.inputs, &self.aux);
@@ -246,7 +253,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         b.0.shrink_to_fit();
         c.0.shrink_to_fit();
 
-        self.constraints.push((a, b, c, path_idx));
+        self.constraints.push(TestConstraint { a, b, c, path_idx });
     }
 
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
