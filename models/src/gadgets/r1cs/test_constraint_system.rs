@@ -37,15 +37,16 @@ enum NamedObject {
 }
 
 type PathIdx = usize;
+type ConstraintIdx = usize;
 
-pub struct TestConstraint<F: Field> {
-    a: LinearCombination<F>,
-    b: LinearCombination<F>,
-    c: LinearCombination<F>,
+pub struct TestConstraint {
+    a: ConstraintIdx,
+    b: ConstraintIdx,
+    c: ConstraintIdx,
     path_idx: PathIdx,
 }
 
-impl<F: Field> Hash for TestConstraint<F> {
+impl Hash for TestConstraint {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.a.hash(state);
         self.b.hash(state);
@@ -53,20 +54,21 @@ impl<F: Field> Hash for TestConstraint<F> {
     }
 }
 
-impl<F: Field> PartialEq for TestConstraint<F> {
+impl PartialEq for TestConstraint {
     fn eq(&self, other: &Self) -> bool {
         self.a == other.a && self.b == other.b && self.c == other.c
     }
 }
 
-impl<F: Field> Eq for TestConstraint<F> {}
+impl Eq for TestConstraint {}
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     paths: IndexSet<String, FxBuildHasher>,
+    interned_constraints: IndexSet<LinearCombination<F>, FxBuildHasher>,
     named_objects: IntMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: FxHashSet<TestConstraint<F>>,
+    pub constraints: FxHashSet<TestConstraint>,
     inputs: Vec<(F, PathIdx)>,
     aux: Vec<(F, PathIdx)>,
 }
@@ -91,12 +93,14 @@ impl<F: Field> TestConstraintSystem<F> {
 
 impl<F: Field> Default for TestConstraintSystem<F> {
     fn default() -> Self {
+        let interned_constraints = IndexSet::with_hasher(FxBuildHasher::default());
         let mut paths = IndexSet::with_hasher(FxBuildHasher::default());
         let path_idx = paths.insert_full("ONE".into()).0;
         let mut map = IntMap::default();
         map.insert(path_idx, NamedObject::Var(TestConstraintSystem::<F>::one()));
 
         TestConstraintSystem {
+            interned_constraints,
             paths,
             named_objects: map,
             current_namespace: vec![],
@@ -126,6 +130,10 @@ impl<F: Field> TestConstraintSystem<F> {
             path_idx,
         } in &self.constraints
         {
+            let a = self.interned_constraints.get_index(*a).unwrap();
+            let b = self.interned_constraints.get_index(*b).unwrap();
+            let c = self.interned_constraints.get_index(*c).unwrap();
+
             let mut a = Self::eval_lc(a.as_ref(), &self.inputs, &self.aux);
             let b = Self::eval_lc(b.as_ref(), &self.inputs, &self.aux);
             let c = Self::eval_lc(c.as_ref(), &self.inputs, &self.aux);
@@ -271,6 +279,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         a.0.shrink_to_fit();
         b.0.shrink_to_fit();
         c.0.shrink_to_fit();
+
+        let a = self.interned_constraints.insert_full(a).0;
+        let b = self.interned_constraints.insert_full(b).0;
+        let c = self.interned_constraints.insert_full(c).0;
 
         self.constraints.insert(TestConstraint { a, b, c, path_idx });
     }
