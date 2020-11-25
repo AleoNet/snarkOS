@@ -20,11 +20,14 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
-use fxhash::FxBuildHasher;
+use fxhash::{FxBuildHasher, FxHashSet};
 use indexmap::IndexSet;
 use nohash_hasher::IntMap;
 
-use std::collections::hash_map::Entry;
+use std::{
+    collections::hash_map::Entry,
+    hash::{Hash, Hasher},
+};
 
 #[derive(Debug)]
 enum NamedObject {
@@ -42,12 +45,28 @@ pub struct TestConstraint<F: Field> {
     path_idx: PathIdx,
 }
 
+impl<F: Field> Hash for TestConstraint<F> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.a.hash(state);
+        self.b.hash(state);
+        self.c.hash(state);
+    }
+}
+
+impl<F: Field> PartialEq for TestConstraint<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.a == other.a && self.b == other.b && self.c == other.c
+    }
+}
+
+impl<F: Field> Eq for TestConstraint<F> {}
+
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     paths: IndexSet<String, FxBuildHasher>,
     named_objects: IntMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: Vec<TestConstraint<F>>,
+    pub constraints: FxHashSet<TestConstraint<F>>,
     inputs: Vec<(F, PathIdx)>,
     aux: Vec<(F, PathIdx)>,
 }
@@ -81,7 +100,7 @@ impl<F: Field> Default for TestConstraintSystem<F> {
             paths,
             named_objects: map,
             current_namespace: vec![],
-            constraints: vec![],
+            constraints: Default::default(),
             inputs: vec![(F::one(), path_idx)],
             aux: vec![],
         }
@@ -253,7 +272,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         b.0.shrink_to_fit();
         c.0.shrink_to_fit();
 
-        self.constraints.push(TestConstraint { a, b, c, path_idx });
+        self.constraints.insert(TestConstraint { a, b, c, path_idx });
     }
 
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {

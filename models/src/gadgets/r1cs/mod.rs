@@ -39,7 +39,7 @@ use std::cmp::Ordering;
 type SmallVec<F> = StackVec<[(Variable, F); 16]>;
 
 /// Represents a variable in a constraint system.
-#[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Debug, Hash)]
 pub struct Variable(Index);
 
 impl Variable {
@@ -57,7 +57,7 @@ impl Variable {
 }
 
 /// Represents the index of either an input variable or auxiliary variable.
-#[derive(Copy, Clone, PartialEq, Debug, Eq)]
+#[derive(Copy, Clone, PartialEq, Debug, Eq, Hash)]
 pub enum Index {
     /// Index of an input variable.
     Input(usize),
@@ -128,7 +128,7 @@ impl CanonicalDeserialize for Index {
 /// in the field `F`.
 /// The `(coeff, var)` pairs in a `LinearCombination` are kept sorted according
 /// to the index of the variable in its constraint system.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LinearCombination<F: Field>(pub SmallVec<F>);
 
 /// Either a `Variable` or a `LinearCombination`.
