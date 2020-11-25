@@ -254,6 +254,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         b.0.shrink_to_fit();
         c.0.shrink_to_fit();
 
+        self.interned_constraints.reserve(3);
         let a = self.interned_constraints.insert_full(a).0;
         let b = self.interned_constraints.insert_full(b).0;
         let c = self.interned_constraints.insert_full(c).0;
