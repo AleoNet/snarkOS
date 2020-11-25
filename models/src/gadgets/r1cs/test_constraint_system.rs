@@ -20,14 +20,11 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
-use fxhash::{FxBuildHasher, FxHashSet};
+use fxhash::FxBuildHasher;
 use indexmap::IndexSet;
 use nohash_hasher::IntMap;
 
-use std::{
-    collections::hash_map::Entry,
-    hash::{Hash, Hasher},
-};
+use std::collections::hash_map::Entry;
 
 #[derive(Debug)]
 enum NamedObject {
@@ -39,26 +36,12 @@ enum NamedObject {
 type PathIdx = usize;
 type ConstraintIdx = usize;
 
+#[derive(PartialEq, Eq, Hash)]
 pub struct TestConstraint {
     a: ConstraintIdx,
     b: ConstraintIdx,
     c: ConstraintIdx,
-    path_idx: PathIdx,
 }
-
-impl Hash for TestConstraint {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.path_idx.hash(state); // TODO: double-check
-    }
-}
-
-impl PartialEq for TestConstraint {
-    fn eq(&self, other: &Self) -> bool {
-        self.path_idx == other.path_idx
-    }
-}
-
-impl Eq for TestConstraint {}
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
@@ -66,7 +49,7 @@ pub struct TestConstraintSystem<F: Field> {
     interned_constraints: IndexSet<LinearCombination<F>, FxBuildHasher>,
     named_objects: IntMap<PathIdx, NamedObject>,
     current_namespace: Vec<String>,
-    pub constraints: FxHashSet<TestConstraint>,
+    pub constraints: IntMap<ConstraintIdx, TestConstraint>,
     inputs: Vec<(F, PathIdx)>,
     aux: Vec<(F, PathIdx)>,
 }
@@ -115,19 +98,13 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn print_named_objects(&self) {
-        for constraint in &self.constraints {
-            println!("{}", self.paths.get_index(constraint.path_idx).unwrap());
+        for (path_idx, _constraint) in &self.constraints {
+            println!("{}", self.paths.get_index(*path_idx).unwrap());
         }
     }
 
     pub fn which_is_unsatisfied(&self) -> Option<&str> {
-        for &TestConstraint {
-            ref a,
-            ref b,
-            ref c,
-            path_idx,
-        } in &self.constraints
-        {
+        for (path_idx, TestConstraint { a, b, c }) in &self.constraints {
             let a = self.interned_constraints.get_index(*a).unwrap();
             let b = self.interned_constraints.get_index(*b).unwrap();
             let c = self.interned_constraints.get_index(*c).unwrap();
@@ -139,7 +116,7 @@ impl<F: Field> TestConstraintSystem<F> {
             a.mul_assign(&b);
 
             if a != c {
-                return self.paths.get_index(path_idx).map(|p| p.as_str());
+                return self.paths.get_index(*path_idx).map(|p| p.as_str());
             }
         }
 
@@ -282,7 +259,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let b = self.interned_constraints.insert_full(b).0;
         let c = self.interned_constraints.insert_full(c).0;
 
-        self.constraints.insert(TestConstraint { a, b, c, path_idx });
+        self.constraints.insert(path_idx, TestConstraint { a, b, c });
     }
 
     fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
