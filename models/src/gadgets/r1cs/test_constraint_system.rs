@@ -160,23 +160,22 @@ impl<F: Field> TestConstraintSystem<F> {
         }
     }
 
+    #[inline]
     fn set_named_obj(&mut self, path_idx: PathIdx, to: NamedObject) {
         match self.named_objects.entry(path_idx) {
             Entry::Vacant(e) => {
                 e.insert(to);
             }
             Entry::Occupied(e) => {
-                let (path, _) = e.remove_entry();
-                panic!("tried to create object at existing path: {}", path);
+                panic!("tried to create object at existing path: {}", e.key());
             }
         }
     }
 }
 
+#[inline]
 fn compute_path(ns: &[String], this: &str) -> String {
-    if this.contains('/') {
-        panic!("'/' is not allowed in names");
-    }
+    assert!(!this.contains('/'), "'/' is not allowed in names");
 
     // preallocate the target path size, including the separators
     let len = ns.iter().map(|s| s.len()).sum::<usize>() + ns.len() + this.len();
