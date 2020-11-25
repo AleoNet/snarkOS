@@ -48,15 +48,13 @@ pub struct TestConstraint {
 
 impl Hash for TestConstraint {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.a.hash(state);
-        self.b.hash(state);
-        self.c.hash(state);
+        self.path_idx.hash(state); // TODO: double-check
     }
 }
 
 impl PartialEq for TestConstraint {
     fn eq(&self, other: &Self) -> bool {
-        self.a == other.a && self.b == other.b && self.c == other.c
+        self.path_idx == other.path_idx
     }
 }
 
