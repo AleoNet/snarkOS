@@ -41,6 +41,7 @@ enum NamedObject {
 type InternedConstraint = usize;
 type InternedField = usize;
 type InternedLC = SmallVec<[(Variable, InternedField); 16]>;
+type InternedPathSegment = usize;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct InternedPath(Rc<RefCell<Vec<usize>>>);
@@ -70,7 +71,7 @@ pub struct TestConstraintSystem<F: Field> {
     interned_fields: IndexSet<F, FxBuildHasher>,
     interned_constraints: IndexSet<InternedLC, FxBuildHasher>,
     named_objects: FxHashMap<InternedPath, NamedObject>,
-    current_namespace: InternedPath,
+    current_namespace: Vec<InternedPathSegment>,
     constraints: FxHashMap<InternedPath, TestConstraint>,
     inputs: Vec<InternedField>,
     aux: Vec<InternedField>,
@@ -239,8 +240,8 @@ impl<F: Field> TestConstraintSystem<F> {
     fn compute_path(&mut self, new_segment: &str) -> InternedPath {
         assert!(!new_segment.contains('/'), "'/' is not allowed in names");
 
-        let mut vec = Vec::with_capacity(self.current_namespace.0.borrow().len() + 1);
-        vec.extend_from_slice(&self.current_namespace.0.borrow());
+        let mut vec = Vec::with_capacity(self.current_namespace.len() + 1);
+        vec.extend_from_slice(&self.current_namespace);
         let interned_segment = self.interned_path_segments.insert_full(new_segment.to_owned()).0;
         vec.push(interned_segment);
 
@@ -334,11 +335,11 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let interned_path = self.compute_path(name.as_ref());
         let new_segment = *interned_path.0.borrow().last().unwrap();
         self.set_named_obj(interned_path, NamedObject::Namespace);
-        self.current_namespace.0.borrow_mut().push(new_segment);
+        self.current_namespace.push(new_segment);
     }
 
     fn pop_namespace(&mut self) {
-        assert!(self.current_namespace.0.borrow_mut().pop().is_some());
+        assert!(self.current_namespace.pop().is_some());
     }
 
     fn get_root(&mut self) -> &mut Self::Root {
