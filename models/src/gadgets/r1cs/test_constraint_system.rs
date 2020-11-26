@@ -22,6 +22,7 @@ use snarkos_errors::gadgets::SynthesisError;
 
 use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::IndexSet;
+use smallvec::SmallVec;
 
 use std::{
     cell::RefCell,
@@ -38,6 +39,8 @@ enum NamedObject {
 }
 
 type ConstraintIdx = usize;
+type InternedField = usize;
+type InternedLC = SmallVec<[(Variable, InternedField); 16]>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct InternedPath(Rc<RefCell<Vec<usize>>>);
@@ -64,30 +67,13 @@ pub struct TestConstraint {
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     interned_path_segments: IndexSet<String, FxBuildHasher>,
-    interned_constraints: IndexSet<LinearCombination<F>, FxBuildHasher>,
+    interned_fields: IndexSet<F, FxBuildHasher>,
+    interned_constraints: IndexSet<InternedLC, FxBuildHasher>,
     named_objects: FxHashMap<InternedPath, NamedObject>,
     current_namespace: InternedPath,
     pub constraints: FxHashMap<InternedPath, TestConstraint>,
     inputs: Vec<F>,
     aux: Vec<F>,
-}
-
-impl<F: Field> TestConstraintSystem<F> {
-    fn eval_lc(terms: &[(Variable, F)], inputs: &[F], aux: &[F]) -> F {
-        let mut acc = F::zero();
-
-        for &(var, ref coeff) in terms {
-            let mut tmp = match var.get_unchecked() {
-                Index::Input(index) => inputs[index],
-                Index::Aux(index) => aux[index],
-            };
-
-            tmp.mul_assign(&coeff);
-            acc.add_assign(&tmp);
-        }
-
-        acc
-    }
 }
 
 impl<F: Field> Default for TestConstraintSystem<F> {
@@ -103,6 +89,7 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         );
 
         TestConstraintSystem {
+            interned_fields: IndexSet::with_hasher(FxBuildHasher::default()),
             interned_constraints: IndexSet::with_hasher(FxBuildHasher::default()),
             interned_path_segments,
             named_objects,
@@ -151,15 +138,33 @@ impl<F: Field> TestConstraintSystem<F> {
         }
     }
 
+    fn eval_lc(&self, terms: &[(Variable, InternedField)]) -> F {
+        let mut acc = F::zero();
+
+        for &(var, interned_coeff) in terms {
+            let coeff = self.interned_fields.get_index(interned_coeff).unwrap();
+
+            let mut tmp = match var.get_unchecked() {
+                Index::Input(index) => self.inputs[index],
+                Index::Aux(index) => self.aux[index],
+            };
+
+            tmp.mul_assign(&coeff);
+            acc.add_assign(&tmp);
+        }
+
+        acc
+    }
+
     pub fn which_is_unsatisfied(&self) -> Option<String> {
         for (interned_path, TestConstraint { a, b, c }) in &self.constraints {
             let a = self.interned_constraints.get_index(*a).unwrap();
             let b = self.interned_constraints.get_index(*b).unwrap();
             let c = self.interned_constraints.get_index(*c).unwrap();
 
-            let mut a = Self::eval_lc(a.as_ref(), &self.inputs, &self.aux);
-            let b = Self::eval_lc(b.as_ref(), &self.inputs, &self.aux);
-            let c = Self::eval_lc(c.as_ref(), &self.inputs, &self.aux);
+            let mut a = self.eval_lc(a.as_ref());
+            let b = self.eval_lc(b.as_ref());
+            let c = self.eval_lc(c.as_ref());
 
             a.mul_assign(&b);
 
@@ -286,12 +291,31 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let index = self.constraints.len();
         self.set_named_obj(interned_path.clone(), NamedObject::Constraint(index));
 
-        let mut a = a(LinearCombination::zero());
-        let mut b = b(LinearCombination::zero());
-        let mut c = c(LinearCombination::zero());
-        a.0.shrink_to_fit();
-        b.0.shrink_to_fit();
-        c.0.shrink_to_fit();
+        let a = a(LinearCombination::zero());
+        let b = b(LinearCombination::zero());
+        let c = c(LinearCombination::zero());
+
+        let a =
+            a.0.into_iter()
+                .map(|(var, field)| {
+                    let interned_field = self.interned_fields.insert_full(field).0;
+                    (var, interned_field)
+                })
+                .collect();
+        let b =
+            b.0.into_iter()
+                .map(|(var, field)| {
+                    let interned_field = self.interned_fields.insert_full(field).0;
+                    (var, interned_field)
+                })
+                .collect();
+        let c =
+            c.0.into_iter()
+                .map(|(var, field)| {
+                    let interned_field = self.interned_fields.insert_full(field).0;
+                    (var, interned_field)
+                })
+                .collect();
 
         self.interned_constraints.reserve(3);
         let a = self.interned_constraints.insert_full(a).0;
