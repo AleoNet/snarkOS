@@ -68,18 +68,18 @@ pub struct TestConstraintSystem<F: Field> {
     named_objects: FxHashMap<InternedPath, NamedObject>,
     current_namespace: InternedPath,
     pub constraints: FxHashMap<InternedPath, TestConstraint>,
-    inputs: Vec<(F, InternedPath)>,
-    aux: Vec<(F, InternedPath)>,
+    inputs: Vec<F>,
+    aux: Vec<F>,
 }
 
 impl<F: Field> TestConstraintSystem<F> {
-    fn eval_lc(terms: &[(Variable, F)], inputs: &[(F, InternedPath)], aux: &[(F, InternedPath)]) -> F {
+    fn eval_lc(terms: &[(Variable, F)], inputs: &[F], aux: &[F]) -> F {
         let mut acc = F::zero();
 
         for &(var, ref coeff) in terms {
             let mut tmp = match var.get_unchecked() {
-                Index::Input(index) => inputs[index].0,
-                Index::Aux(index) => aux[index].0,
+                Index::Input(index) => inputs[index],
+                Index::Aux(index) => aux[index],
             };
 
             tmp.mul_assign(&coeff);
@@ -108,7 +108,7 @@ impl<F: Field> Default for TestConstraintSystem<F> {
             named_objects,
             current_namespace: vec![].into(),
             constraints: Default::default(),
-            inputs: vec![(F::one(), interned_path)],
+            inputs: vec![F::one()],
             aux: vec![],
         }
     }
@@ -184,8 +184,8 @@ impl<F: Field> TestConstraintSystem<F> {
 
         match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
-                Index::Input(index) => self.inputs[index].0 = to,
-                Index::Aux(index) => self.aux[index].0 = to,
+                Index::Input(index) => self.inputs[index] = to,
+                Index::Aux(index) => self.aux[index] = to,
             },
             Some(e) => panic!(
                 "tried to set path `{}` to value, but `{:?}` already exists there.",
@@ -200,8 +200,8 @@ impl<F: Field> TestConstraintSystem<F> {
 
         match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
-                Index::Input(index) => self.inputs[index].0,
-                Index::Aux(index) => self.aux[index].0,
+                Index::Input(index) => self.inputs[index],
+                Index::Aux(index) => self.aux[index],
             },
             Some(e) => panic!(
                 "tried to get value of path `{}`, but `{:?}` exists there (not a variable)",
@@ -252,7 +252,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     {
         let index = self.aux.len();
         let interned_path = self.compute_path(annotation().as_ref());
-        self.aux.push((f()?, interned_path.clone()));
+        self.aux.push(f()?);
         let var = Variable::new_unchecked(Index::Aux(index));
         self.set_named_obj(interned_path, NamedObject::Var(var));
 
@@ -267,7 +267,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     {
         let index = self.inputs.len();
         let interned_path = self.compute_path(annotation().as_ref());
-        self.inputs.push((f()?, interned_path.clone()));
+        self.inputs.push(f()?);
         let var = Variable::new_unchecked(Index::Input(index));
         self.set_named_obj(interned_path, NamedObject::Var(var));
 
