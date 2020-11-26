@@ -38,7 +38,7 @@ enum NamedObject {
     Namespace,
 }
 
-type ConstraintIdx = usize;
+type InternedConstraint = usize;
 type InternedField = usize;
 type InternedLC = SmallVec<[(Variable, InternedField); 16]>;
 
@@ -59,9 +59,9 @@ impl From<Vec<usize>> for InternedPath {
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct TestConstraint {
-    a: ConstraintIdx,
-    b: ConstraintIdx,
-    c: ConstraintIdx,
+    a: InternedConstraint,
+    b: InternedConstraint,
+    c: InternedConstraint,
 }
 
 /// Constraint system for testing purposes.
@@ -80,8 +80,8 @@ impl<F: Field> Default for TestConstraintSystem<F> {
     fn default() -> Self {
         let mut interned_path_segments = IndexSet::with_hasher(FxBuildHasher::default());
         let path_segment = "ONE".to_owned();
-        let path_idx = interned_path_segments.insert_full(path_segment).0;
-        let interned_path: InternedPath = vec![path_idx].into();
+        let interned_path_segment = interned_path_segments.insert_full(path_segment).0;
+        let interned_path: InternedPath = vec![interned_path_segment].into();
         let mut named_objects = FxHashMap::default();
         named_objects.insert(interned_path, NamedObject::Var(TestConstraintSystem::<F>::one()));
         let mut interned_fields = IndexSet::with_hasher(FxBuildHasher::default());
