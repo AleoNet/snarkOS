@@ -127,7 +127,7 @@ impl<F: Field> TestConstraintSystem<F> {
 
     pub fn print_named_objects(&self) {
         let mut path = String::new();
-        for (interned_path, _constraint) in &self.constraints {
+        for interned_path in self.constraints.keys() {
             for interned_segment in interned_path.0.borrow().iter() {
                 path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
             }
@@ -332,7 +332,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
-        let new_segment = interned_path.0.borrow().last().unwrap().clone();
+        let new_segment = *interned_path.0.borrow().last().unwrap();
         self.set_named_obj(interned_path, NamedObject::Namespace);
         self.current_namespace.0.borrow_mut().push(new_segment);
     }
