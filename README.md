@@ -71,6 +71,17 @@ snarkos
 
 ### Option 2 - Install from Crates.io
 
+#### Prerequisite
+
+Before installing rust, you need to install below dependencies. 
+- ubuntu-18.04: bionic
+   - clang
+   - pkg-config
+   - libssl-dev
+```
+$sudo apt-get install -y pkg-config clang libssl-dev
+```
+
 #### Step 1. Install Rust
 
 We recommend installing Rust using [rustup](https://www.rustup.rs/). You can install `rustup` as follows:
