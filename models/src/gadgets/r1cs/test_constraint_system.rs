@@ -185,7 +185,7 @@ impl<F: Field> TestConstraintSystem<F> {
 
     pub fn set(&mut self, path: &str, to: F) {
         let interned_path = self.intern_path(path);
-        let interned_field = self.interned_fields.get_index_of(&to).unwrap();
+        let interned_field = self.interned_fields.insert_full(to).0;
 
         match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
