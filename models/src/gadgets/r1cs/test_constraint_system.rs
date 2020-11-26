@@ -72,8 +72,8 @@ pub struct TestConstraintSystem<F: Field> {
     named_objects: FxHashMap<InternedPath, NamedObject>,
     current_namespace: InternedPath,
     pub constraints: FxHashMap<InternedPath, TestConstraint>,
-    inputs: Vec<F>,
-    aux: Vec<F>,
+    inputs: Vec<InternedField>,
+    aux: Vec<InternedField>,
 }
 
 impl<F: Field> Default for TestConstraintSystem<F> {
@@ -83,19 +83,18 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         let path_idx = interned_path_segments.insert_full(path_segment).0;
         let interned_path: InternedPath = vec![path_idx].into();
         let mut named_objects = FxHashMap::default();
-        named_objects.insert(
-            interned_path.clone(),
-            NamedObject::Var(TestConstraintSystem::<F>::one()),
-        );
+        named_objects.insert(interned_path, NamedObject::Var(TestConstraintSystem::<F>::one()));
+        let mut interned_fields = IndexSet::with_hasher(FxBuildHasher::default());
+        let interned_field = interned_fields.insert_full(F::one()).0;
 
         TestConstraintSystem {
-            interned_fields: IndexSet::with_hasher(FxBuildHasher::default()),
+            interned_fields,
             interned_constraints: IndexSet::with_hasher(FxBuildHasher::default()),
             interned_path_segments,
             named_objects,
             current_namespace: vec![].into(),
             constraints: Default::default(),
-            inputs: vec![F::one()],
+            inputs: vec![interned_field],
             aux: vec![],
         }
     }
@@ -142,14 +141,14 @@ impl<F: Field> TestConstraintSystem<F> {
         let mut acc = F::zero();
 
         for &(var, interned_coeff) in terms {
-            let coeff = self.interned_fields.get_index(interned_coeff).unwrap();
-
-            let mut tmp = match var.get_unchecked() {
+            let interned_tmp = match var.get_unchecked() {
                 Index::Input(index) => self.inputs[index],
                 Index::Aux(index) => self.aux[index],
             };
+            let mut tmp = *self.interned_fields.get_index(interned_tmp).unwrap();
+            let coeff = self.interned_fields.get_index(interned_coeff).unwrap();
 
-            tmp.mul_assign(&coeff);
+            tmp.mul_assign(coeff);
             acc.add_assign(&tmp);
         }
 
@@ -186,11 +185,12 @@ impl<F: Field> TestConstraintSystem<F> {
 
     pub fn set(&mut self, path: &str, to: F) {
         let interned_path = self.intern_path(path);
+        let interned_field = self.interned_fields.get_index_of(&to).unwrap();
 
         match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
-                Index::Input(index) => self.inputs[index] = to,
-                Index::Aux(index) => self.aux[index] = to,
+                Index::Input(index) => self.inputs[index] = interned_field,
+                Index::Aux(index) => self.aux[index] = interned_field,
             },
             Some(e) => panic!(
                 "tried to set path `{}` to value, but `{:?}` already exists there.",
@@ -203,7 +203,7 @@ impl<F: Field> TestConstraintSystem<F> {
     pub fn get(&mut self, path: &str) -> F {
         let interned_path = self.intern_path(path);
 
-        match self.named_objects.get(&interned_path) {
+        let interned_field = match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
                 Index::Input(index) => self.inputs[index],
                 Index::Aux(index) => self.aux[index],
@@ -213,7 +213,9 @@ impl<F: Field> TestConstraintSystem<F> {
                 path, e
             ),
             _ => panic!("no variable exists at path: {}", path),
-        }
+        };
+
+        *self.interned_fields.get_index(interned_field).unwrap()
     }
 
     #[inline]
@@ -257,7 +259,8 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     {
         let index = self.aux.len();
         let interned_path = self.compute_path(annotation().as_ref());
-        self.aux.push(f()?);
+        let interned_field = self.interned_fields.insert_full(f()?).0;
+        self.aux.push(interned_field);
         let var = Variable::new_unchecked(Index::Aux(index));
         self.set_named_obj(interned_path, NamedObject::Var(var));
 
@@ -272,7 +275,8 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     {
         let index = self.inputs.len();
         let interned_path = self.compute_path(annotation().as_ref());
-        self.inputs.push(f()?);
+        let interned_field = self.interned_fields.insert_full(f()?).0;
+        self.inputs.push(interned_field);
         let var = Variable::new_unchecked(Index::Input(index));
         self.set_named_obj(interned_path, NamedObject::Var(var));
 
