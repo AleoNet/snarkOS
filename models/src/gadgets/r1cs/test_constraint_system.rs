@@ -20,9 +20,8 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
-use fxhash::FxBuildHasher;
+use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::IndexSet;
-use nohash_hasher::IntMap;
 
 use std::collections::hash_map::Entry;
 
@@ -33,8 +32,22 @@ enum NamedObject {
     Namespace,
 }
 
-type PathIdx = usize;
 type ConstraintIdx = usize;
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct InternedPath(Vec<usize>);
+
+impl From<Vec<usize>> for InternedPath {
+    fn from(v: Vec<usize>) -> Self {
+        Self(v)
+    }
+}
+
+impl AsRef<[usize]> for InternedPath {
+    fn as_ref(&self) -> &[usize] {
+        &self.0
+    }
+}
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct TestConstraint {
@@ -45,17 +58,17 @@ pub struct TestConstraint {
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
-    interned_paths: IndexSet<String, FxBuildHasher>,
+    interned_path_segments: IndexSet<String, FxBuildHasher>,
     interned_constraints: IndexSet<LinearCombination<F>, FxBuildHasher>,
-    named_objects: IntMap<PathIdx, NamedObject>,
-    current_namespace: Vec<String>,
-    pub constraints: IntMap<PathIdx, TestConstraint>,
-    inputs: Vec<(F, PathIdx)>,
-    aux: Vec<(F, PathIdx)>,
+    named_objects: FxHashMap<InternedPath, NamedObject>,
+    current_namespace: InternedPath,
+    pub constraints: FxHashMap<InternedPath, TestConstraint>,
+    inputs: Vec<(F, InternedPath)>,
+    aux: Vec<(F, InternedPath)>,
 }
 
 impl<F: Field> TestConstraintSystem<F> {
-    fn eval_lc(terms: &[(Variable, F)], inputs: &[(F, PathIdx)], aux: &[(F, PathIdx)]) -> F {
+    fn eval_lc(terms: &[(Variable, F)], inputs: &[(F, InternedPath)], aux: &[(F, InternedPath)]) -> F {
         let mut acc = F::zero();
 
         for &(var, ref coeff) in terms {
@@ -74,18 +87,23 @@ impl<F: Field> TestConstraintSystem<F> {
 
 impl<F: Field> Default for TestConstraintSystem<F> {
     fn default() -> Self {
-        let mut interned_paths = IndexSet::with_hasher(FxBuildHasher::default());
-        let path_idx = interned_paths.insert_full("ONE".into()).0;
-        let mut named_objects = IntMap::default();
-        named_objects.insert(path_idx, NamedObject::Var(TestConstraintSystem::<F>::one()));
+        let mut interned_path_segments = IndexSet::with_hasher(FxBuildHasher::default());
+        let path_segment = "ONE".to_owned();
+        let path_idx = interned_path_segments.insert_full(path_segment).0;
+        let interned_path: InternedPath = vec![path_idx].into();
+        let mut named_objects = FxHashMap::default();
+        named_objects.insert(
+            interned_path.clone(),
+            NamedObject::Var(TestConstraintSystem::<F>::one()),
+        );
 
         TestConstraintSystem {
             interned_constraints: IndexSet::with_hasher(FxBuildHasher::default()),
-            interned_paths,
+            interned_path_segments,
             named_objects,
-            current_namespace: vec![],
+            current_namespace: vec![].into(),
             constraints: Default::default(),
-            inputs: vec![(F::one(), path_idx)],
+            inputs: vec![(F::one(), interned_path)],
             aux: vec![],
         }
     }
@@ -96,14 +114,40 @@ impl<F: Field> TestConstraintSystem<F> {
         Self::default()
     }
 
+    fn intern_path(&self, path: &str) -> InternedPath {
+        let mut vec = vec![];
+
+        for segment in path.split('/') {
+            vec.push(self.interned_path_segments.get_index_of(segment).unwrap());
+        }
+
+        vec.into()
+    }
+
+    fn unintern_path(&self, interned_path: &InternedPath) -> String {
+        let mut ret = String::new();
+
+        for interned_segment in interned_path.as_ref() {
+            ret.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
+        }
+
+        ret
+    }
+
     pub fn print_named_objects(&self) {
-        for (path_idx, _constraint) in &self.constraints {
-            println!("{}", self.interned_paths.get_index(*path_idx).unwrap());
+        let mut path = String::new();
+        for (interned_path, _constraint) in &self.constraints {
+            for interned_segment in interned_path.as_ref() {
+                path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
+            }
+
+            println!("{}", path);
+            path.clear();
         }
     }
 
-    pub fn which_is_unsatisfied(&self) -> Option<&str> {
-        for (path_idx, TestConstraint { a, b, c }) in &self.constraints {
+    pub fn which_is_unsatisfied(&self) -> Option<String> {
+        for (interned_path, TestConstraint { a, b, c }) in &self.constraints {
             let a = self.interned_constraints.get_index(*a).unwrap();
             let b = self.interned_constraints.get_index(*b).unwrap();
             let c = self.interned_constraints.get_index(*c).unwrap();
@@ -115,7 +159,7 @@ impl<F: Field> TestConstraintSystem<F> {
             a.mul_assign(&b);
 
             if a != c {
-                return self.interned_paths.get_index(*path_idx).map(|p| p.as_str());
+                return Some(self.unintern_path(interned_path));
             }
         }
 
@@ -131,12 +175,9 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn set(&mut self, path: &str, to: F) {
-        let path_idx = self
-            .interned_paths
-            .get_index_of(path)
-            .unwrap_or_else(|| panic!("no variable exists at path: {}", path));
+        let interned_path = self.intern_path(path);
 
-        match self.named_objects.get(&path_idx) {
+        match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
                 Index::Input(index) => self.inputs[index].0 = to,
                 Index::Aux(index) => self.aux[index].0 = to,
@@ -150,12 +191,9 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn get(&mut self, path: &str) -> F {
-        let path_idx = self
-            .interned_paths
-            .get_index_of(path)
-            .unwrap_or_else(|| panic!("no variable exists at path: {}", path));
+        let interned_path = self.intern_path(path);
 
-        match self.named_objects.get(&path_idx) {
+        match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
                 Index::Input(index) => self.inputs[index].0,
                 Index::Aux(index) => self.aux[index].0,
@@ -169,34 +207,34 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     #[inline]
-    fn set_named_obj(&mut self, path_idx: PathIdx, to: NamedObject) {
-        match self.named_objects.entry(path_idx) {
+    fn set_named_obj(&mut self, interned_path: InternedPath, to: NamedObject) {
+        match self.named_objects.entry(interned_path) {
             Entry::Vacant(e) => {
                 e.insert(to);
             }
             Entry::Occupied(e) => {
-                panic!("tried to create object at existing path: {}", e.key());
+                let mut path = String::new();
+
+                for interned_segment in e.remove_entry().0.0 {
+                    path.push_str(self.interned_path_segments.get_index(interned_segment).unwrap());
+                }
+
+                panic!("tried to create object at existing path: {}", path);
             }
         }
     }
-}
 
-#[inline]
-fn compute_path(ns: &[String], this: &str) -> String {
-    assert!(!this.contains('/'), "'/' is not allowed in names");
+    #[inline]
+    fn compute_path(&mut self, new_segment: &str) -> InternedPath {
+        assert!(!new_segment.contains('/'), "'/' is not allowed in names");
 
-    // preallocate the target path size, including the separators
-    let len = ns.iter().map(|s| s.len()).sum::<usize>() + ns.len() + this.len();
-    let mut name = String::with_capacity(len);
+        let mut vec = Vec::with_capacity(self.current_namespace.as_ref().len() + 1);
+        vec.extend_from_slice(self.current_namespace.as_ref());
+        let interned_segment = self.interned_path_segments.insert_full(new_segment.to_owned()).0;
+        vec.push(interned_segment);
 
-    for (i, ns) in ns.iter().map(|s| s.as_str()).chain(Some(this)).enumerate() {
-        if i != 0 {
-            name.push('/');
-        }
-        name.push_str(ns);
+        vec.into()
     }
-
-    name
 }
 
 impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
@@ -209,11 +247,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         AR: AsRef<str>,
     {
         let index = self.aux.len();
-        let path = compute_path(&self.current_namespace, annotation().as_ref());
-        let path_idx = self.interned_paths.insert_full(path).0;
-        self.aux.push((f()?, path_idx));
+        let interned_path = self.compute_path(annotation().as_ref());
+        self.aux.push((f()?, interned_path.clone()));
         let var = Variable::new_unchecked(Index::Aux(index));
-        self.set_named_obj(path_idx, NamedObject::Var(var));
+        self.set_named_obj(interned_path, NamedObject::Var(var));
 
         Ok(var)
     }
@@ -225,11 +262,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         AR: AsRef<str>,
     {
         let index = self.inputs.len();
-        let path = compute_path(&self.current_namespace, annotation().as_ref());
-        let path_idx = self.interned_paths.insert_full(path).0;
-        self.inputs.push((f()?, path_idx));
+        let interned_path = self.compute_path(annotation().as_ref());
+        self.inputs.push((f()?, interned_path.clone()));
         let var = Variable::new_unchecked(Index::Input(index));
-        self.set_named_obj(path_idx, NamedObject::Var(var));
+        self.set_named_obj(interned_path, NamedObject::Var(var));
 
         Ok(var)
     }
@@ -242,10 +278,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         LB: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
     {
-        let path = compute_path(&self.current_namespace, annotation().as_ref());
-        let path_idx = self.interned_paths.insert_full(path).0;
+        let interned_path = self.compute_path(annotation().as_ref());
         let index = self.constraints.len();
-        self.set_named_obj(path_idx, NamedObject::Constraint(index));
+        self.set_named_obj(interned_path.clone(), NamedObject::Constraint(index));
 
         let mut a = a(LinearCombination::zero());
         let mut b = b(LinearCombination::zero());
@@ -259,19 +294,19 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let b = self.interned_constraints.insert_full(b).0;
         let c = self.interned_constraints.insert_full(c).0;
 
-        self.constraints.insert(path_idx, TestConstraint { a, b, c });
+        self.constraints.insert(interned_path, TestConstraint { a, b, c });
     }
 
     fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn();
-        let path = compute_path(&self.current_namespace, name.as_ref());
-        let path_idx = self.interned_paths.insert_full(path).0;
-        self.set_named_obj(path_idx, NamedObject::Namespace);
-        self.current_namespace.push(name.as_ref().to_owned());
+        let interned_path = self.compute_path(name.as_ref());
+        let new_segment = interned_path.as_ref().last().unwrap().clone();
+        self.set_named_obj(interned_path, NamedObject::Namespace);
+        self.current_namespace.0.push(new_segment);
     }
 
     fn pop_namespace(&mut self) {
-        assert!(self.current_namespace.pop().is_some());
+        assert!(self.current_namespace.0.pop().is_some());
     }
 
     fn get_root(&mut self) -> &mut Self::Root {

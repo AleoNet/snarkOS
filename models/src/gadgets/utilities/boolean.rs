@@ -809,7 +809,7 @@ mod test {
         assert!(cs.is_satisfied());
         cs.set("boolean", Fr::from_str("2").unwrap());
         assert!(!cs.is_satisfied());
-        assert!(cs.which_is_unsatisfied() == Some("boolean constraint"));
+        assert!(cs.which_is_unsatisfied().as_deref() == Some("boolean constraint"));
     }
 
     #[test]
