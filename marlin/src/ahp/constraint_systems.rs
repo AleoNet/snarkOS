@@ -20,7 +20,6 @@ use crate::{
     ahp::{indexer::Matrix, *},
     BTreeMap,
     Cow,
-    String,
     ToString,
 };
 use derivative::Derivative;
@@ -140,7 +139,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for IndexerConstraintSyst
     where
         F: FnOnce() -> Result<ConstraintF, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         // There is no assignment, so we don't invoke the
         // function for obtaining one.
@@ -156,7 +155,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for IndexerConstraintSyst
     where
         F: FnOnce() -> Result<ConstraintF, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         // There is no assignment, so we don't invoke the
         // function for obtaining one.
@@ -170,7 +169,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for IndexerConstraintSyst
     fn enforce<A, AR, LA, LB, LC>(&mut self, _: A, a: LA, b: LB, c: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
         LB: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
         LC: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
@@ -184,7 +183,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for IndexerConstraintSyst
 
     fn push_namespace<NR, N>(&mut self, _: N)
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR,
     {
         // Do nothing; we don't care about namespaces in this context.
@@ -442,7 +441,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ProverConstraintSyste
     where
         F: FnOnce() -> Result<ConstraintF, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         let index = self.num_witness_variables;
         self.num_witness_variables += 1;
@@ -456,7 +455,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ProverConstraintSyste
     where
         F: FnOnce() -> Result<ConstraintF, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         let index = self.num_input_variables;
         self.num_input_variables += 1;
@@ -469,7 +468,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ProverConstraintSyste
     fn enforce<A, AR, LA, LB, LC>(&mut self, _: A, _: LA, _: LB, _: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
         LB: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
         LC: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
@@ -479,7 +478,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ProverConstraintSyste
 
     fn push_namespace<NR, N>(&mut self, _: N)
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR,
     {
         // Do nothing; we don't care about namespaces in this context.

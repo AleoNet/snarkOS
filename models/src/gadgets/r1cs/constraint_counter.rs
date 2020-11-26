@@ -41,7 +41,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ConstraintCounter {
     where
         F: FnOnce() -> Result<ConstraintF, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         let var = Variable::new_unchecked(Index::Aux(self.num_aux));
         self.num_aux += 1;
@@ -52,7 +52,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ConstraintCounter {
     where
         F: FnOnce() -> Result<ConstraintF, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         let var = Variable::new_unchecked(Index::Input(self.num_inputs));
         self.num_inputs += 1;
@@ -63,7 +63,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ConstraintCounter {
     fn enforce<A, AR, LA, LB, LC>(&mut self, _: A, _: LA, _: LB, _: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
         LB: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
         LC: FnOnce(LinearCombination<ConstraintF>) -> LinearCombination<ConstraintF>,
@@ -73,7 +73,7 @@ impl<ConstraintF: Field> ConstraintSystem<ConstraintF> for ConstraintCounter {
 
     fn push_namespace<NR, N>(&mut self, _: N)
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR,
     {
     }
