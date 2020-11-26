@@ -71,7 +71,7 @@ pub struct TestConstraintSystem<F: Field> {
     interned_constraints: IndexSet<InternedLC, FxBuildHasher>,
     named_objects: FxHashMap<InternedPath, NamedObject>,
     current_namespace: InternedPath,
-    pub constraints: FxHashMap<InternedPath, TestConstraint>,
+    constraints: FxHashMap<InternedPath, TestConstraint>,
     inputs: Vec<InternedField>,
     aux: Vec<InternedField>,
 }
