@@ -226,7 +226,7 @@ impl<F: Field> TestConstraintSystem<F> {
             }
             Entry::Occupied(e) => {
                 let mut path = String::new();
-                for interned_segment in e.remove_entry().0.0.borrow().iter() {
+                for interned_segment in (e.remove_entry().0).0.borrow().iter() {
                     path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
                 }
 
