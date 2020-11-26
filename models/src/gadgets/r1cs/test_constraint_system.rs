@@ -23,7 +23,12 @@ use snarkos_errors::gadgets::SynthesisError;
 use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::IndexSet;
 
-use std::collections::hash_map::Entry;
+use std::{
+    cell::RefCell,
+    collections::hash_map::Entry,
+    hash::{Hash, Hasher},
+    rc::Rc,
+};
 
 #[derive(Debug)]
 enum NamedObject {
@@ -34,18 +39,18 @@ enum NamedObject {
 
 type ConstraintIdx = usize;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct InternedPath(Vec<usize>);
+#[derive(Clone, PartialEq, Eq)]
+pub struct InternedPath(Rc<RefCell<Vec<usize>>>);
 
-impl From<Vec<usize>> for InternedPath {
-    fn from(v: Vec<usize>) -> Self {
-        Self(v)
+impl Hash for InternedPath {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.borrow().hash(state);
     }
 }
 
-impl AsRef<[usize]> for InternedPath {
-    fn as_ref(&self) -> &[usize] {
-        &self.0
+impl From<Vec<usize>> for InternedPath {
+    fn from(v: Vec<usize>) -> Self {
+        Self(Rc::new(RefCell::new(v)))
     }
 }
 
@@ -127,7 +132,7 @@ impl<F: Field> TestConstraintSystem<F> {
     fn unintern_path(&self, interned_path: &InternedPath) -> String {
         let mut ret = String::new();
 
-        for interned_segment in interned_path.as_ref() {
+        for interned_segment in interned_path.0.borrow().iter() {
             ret.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
         }
 
@@ -137,7 +142,7 @@ impl<F: Field> TestConstraintSystem<F> {
     pub fn print_named_objects(&self) {
         let mut path = String::new();
         for (interned_path, _constraint) in &self.constraints {
-            for interned_segment in interned_path.as_ref() {
+            for interned_segment in interned_path.0.borrow().iter() {
                 path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
             }
 
@@ -214,9 +219,8 @@ impl<F: Field> TestConstraintSystem<F> {
             }
             Entry::Occupied(e) => {
                 let mut path = String::new();
-
-                for interned_segment in e.remove_entry().0.0 {
-                    path.push_str(self.interned_path_segments.get_index(interned_segment).unwrap());
+                for interned_segment in e.remove_entry().0.0.borrow().iter() {
+                    path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
                 }
 
                 panic!("tried to create object at existing path: {}", path);
@@ -228,8 +232,8 @@ impl<F: Field> TestConstraintSystem<F> {
     fn compute_path(&mut self, new_segment: &str) -> InternedPath {
         assert!(!new_segment.contains('/'), "'/' is not allowed in names");
 
-        let mut vec = Vec::with_capacity(self.current_namespace.as_ref().len() + 1);
-        vec.extend_from_slice(self.current_namespace.as_ref());
+        let mut vec = Vec::with_capacity(self.current_namespace.0.borrow().len() + 1);
+        vec.extend_from_slice(&self.current_namespace.0.borrow());
         let interned_segment = self.interned_path_segments.insert_full(new_segment.to_owned()).0;
         vec.push(interned_segment);
 
@@ -300,13 +304,13 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
-        let new_segment = interned_path.as_ref().last().unwrap().clone();
+        let new_segment = interned_path.0.borrow().last().unwrap().clone();
         self.set_named_obj(interned_path, NamedObject::Namespace);
-        self.current_namespace.0.push(new_segment);
+        self.current_namespace.0.borrow_mut().push(new_segment);
     }
 
     fn pop_namespace(&mut self) {
-        assert!(self.current_namespace.0.pop().is_some());
+        assert!(self.current_namespace.0.borrow_mut().pop().is_some());
     }
 
     fn get_root(&mut self) -> &mut Self::Root {
