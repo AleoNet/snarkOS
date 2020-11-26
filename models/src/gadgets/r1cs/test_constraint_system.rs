@@ -206,10 +206,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     where
         Fn: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         let index = self.aux.len();
-        let path = compute_path(&self.current_namespace, &annotation().into());
+        let path = compute_path(&self.current_namespace, annotation().as_ref());
         let path_idx = self.interned_paths.insert_full(path).0;
         self.aux.push((f()?, path_idx));
         let var = Variable::new_unchecked(Index::Aux(index));
@@ -222,10 +222,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     where
         Fn: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         let index = self.inputs.len();
-        let path = compute_path(&self.current_namespace, &annotation().into());
+        let path = compute_path(&self.current_namespace, annotation().as_ref());
         let path_idx = self.interned_paths.insert_full(path).0;
         self.inputs.push((f()?, path_idx));
         let var = Variable::new_unchecked(Index::Input(index));
@@ -237,12 +237,12 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn enforce<A, AR, LA, LB, LC>(&mut self, annotation: A, a: LA, b: LB, c: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LB: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
     {
-        let path = compute_path(&self.current_namespace, &annotation().into());
+        let path = compute_path(&self.current_namespace, annotation().as_ref());
         let path_idx = self.interned_paths.insert_full(path).0;
         let index = self.constraints.len();
         self.set_named_obj(path_idx, NamedObject::Constraint(index));
@@ -262,12 +262,12 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.constraints.insert(path_idx, TestConstraint { a, b, c });
     }
 
-    fn push_namespace<NR: Into<String>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
-        let name = name_fn().into();
-        let path = compute_path(&self.current_namespace, &name);
+    fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
+        let name = name_fn();
+        let path = compute_path(&self.current_namespace, name.as_ref());
         let path_idx = self.interned_paths.insert_full(path).0;
         self.set_named_obj(path_idx, NamedObject::Namespace);
-        self.current_namespace.push(name);
+        self.current_namespace.push(name.as_ref().to_owned());
     }
 
     fn pop_namespace(&mut self) {
