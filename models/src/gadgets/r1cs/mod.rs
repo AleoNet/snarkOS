@@ -51,6 +51,12 @@ impl Variable {
     pub fn get_unchecked(&self) -> Index {
         self.0
     }
+
+    /// Mutably borrows the index underlying the variable.
+    /// Circuit implementations are not recommended to use this.
+    pub fn mut_unchecked(&mut self) -> &mut Index {
+        &mut self.0
+    }
 }
 
 /// Represents the index of either an input variable or auxiliary variable.

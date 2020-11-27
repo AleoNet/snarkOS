@@ -339,6 +339,47 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     }
 
     fn pop_namespace(&mut self) {
+        let current_ns = self.current_namespace.clone().into(); // TODO: avoid into() here
+
+        let named_object = self.named_objects.remove(&current_ns).unwrap();
+
+        match named_object {
+            NamedObject::Constraint(_) => {
+                self.constraints.remove(&current_ns);
+            }
+            NamedObject::Var(var) => match var.get_unchecked() {
+                Index::Aux(idx) => {
+                    self.aux.remove(idx);
+                    for no in self.named_objects.values_mut() {
+                        // think of better indexing
+                        if let NamedObject::Var(ref mut var) = no {
+                            if let Index::Aux(ref mut i) = var.mut_unchecked() {
+                                if *i >= idx {
+                                    *i -= 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                Index::Input(idx) => {
+                    // almost the same as Aux, dedup
+                    self.inputs.remove(idx);
+                    for no in self.named_objects.values_mut() {
+                        if let NamedObject::Var(ref mut var) = no {
+                            if let Index::Input(ref mut i) = var.mut_unchecked() {
+                                if *i >= idx {
+                                    *i -= 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            NamedObject::Namespace => {
+                // already removed; nothing else to do here
+            }
+        }
+
         assert!(self.current_namespace.pop().is_some());
     }
 
