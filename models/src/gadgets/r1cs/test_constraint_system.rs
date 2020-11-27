@@ -298,9 +298,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.set_named_obj(interned_path.clone(), NamedObject::Constraint(index));
 
         let a = a(LinearCombination::zero());
-        let b = b(LinearCombination::zero());
-        let c = c(LinearCombination::zero());
-
         let a =
             a.0.into_iter()
                 .map(|(var, field)| {
@@ -308,6 +305,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     (var, interned_field)
                 })
                 .collect();
+        let a = self.interned_constraints.insert_full(a).0;
+
+        let b = b(LinearCombination::zero());
         let b =
             b.0.into_iter()
                 .map(|(var, field)| {
@@ -315,6 +315,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     (var, interned_field)
                 })
                 .collect();
+        let b = self.interned_constraints.insert_full(b).0;
+
+        let c = c(LinearCombination::zero());
         let c =
             c.0.into_iter()
                 .map(|(var, field)| {
@@ -322,9 +325,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     (var, interned_field)
                 })
                 .collect();
-
-        let a = self.interned_constraints.insert_full(a).0;
-        let b = self.interned_constraints.insert_full(b).0;
         let c = self.interned_constraints.insert_full(c).0;
 
         self.constraints.insert(interned_path, TestConstraint { a, b, c });
