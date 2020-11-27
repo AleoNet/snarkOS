@@ -322,7 +322,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                 })
                 .collect();
 
-        self.interned_constraints.reserve(3);
         let a = self.interned_constraints.insert_full(a).0;
         let b = self.interned_constraints.insert_full(b).0;
         let c = self.interned_constraints.insert_full(c).0;
