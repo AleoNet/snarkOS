@@ -1877,7 +1877,7 @@ dependencies = [
  "cloudabi 0.0.3",
  "libc",
  "redox_syscall",
- "smallvec 1.4.2",
+ "smallvec 1.5.0",
  "winapi 0.3.9",
 ]
 
@@ -1892,7 +1892,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall",
- "smallvec 1.4.2",
+ "smallvec 1.5.0",
  "winapi 0.3.9",
 ]
 
@@ -2475,9 +2475,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.4.2"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
+checksum = "7acad6f34eb9e8a259d3283d1e8c1d34d7415943d4895f65cc73813c7396fc85"
 
 [[package]]
 name = "snarkos"
@@ -2524,7 +2524,7 @@ dependencies = [
  "rand_xorshift",
  "rayon",
  "sha2",
- "smallvec 1.4.2",
+ "smallvec 1.5.0",
  "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
@@ -2544,7 +2544,7 @@ dependencies = [
  "rand_xorshift",
  "rayon",
  "sha2",
- "smallvec 1.4.2",
+ "smallvec 1.5.0",
  "snarkos-algorithms",
  "snarkos-curves",
  "snarkos-errors",
@@ -2692,7 +2692,7 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "serde",
- "smallvec 1.4.2",
+ "smallvec 1.5.0",
  "snarkos-errors",
  "snarkos-utilities",
 ]
@@ -3420,7 +3420,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sharded-slab",
- "smallvec 1.4.2",
+ "smallvec 1.5.0",
  "thread_local",
  "tracing-core",
  "tracing-log",
