@@ -238,11 +238,13 @@ impl<F: Field> TestConstraintSystem<F> {
 
     #[inline]
     fn compute_path(&mut self, new_segment: &str) -> InternedPath {
-        assert!(!new_segment.contains('/'), "'/' is not allowed in names");
-
         let mut vec = Vec::with_capacity(self.current_namespace.len() + 1);
         vec.extend_from_slice(&self.current_namespace);
-        let interned_segment = self.interned_path_segments.insert_full(new_segment.to_owned()).0;
+        let (interned_segment, new) = self.interned_path_segments.insert_full(new_segment.to_owned());
+
+        // only perform the check for segments not seen before
+        assert!(!new || !new_segment.contains('/'), "'/' is not allowed in names");
+
         vec.push(interned_segment);
 
         vec.into()
