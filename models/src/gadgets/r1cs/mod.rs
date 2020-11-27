@@ -31,12 +31,9 @@ pub use test_fr::*;
 
 use crate::curves::Field;
 
-use smallvec::SmallVec as StackVec;
 use snarkos_errors::serialization::SerializationError;
 use snarkos_utilities::serialize::*;
 use std::cmp::Ordering;
-
-type SmallVec<F> = StackVec<[(Variable, F); 16]>;
 
 /// Represents a variable in a constraint system.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Debug, Hash)]
@@ -129,7 +126,7 @@ impl CanonicalDeserialize for Index {
 /// The `(coeff, var)` pairs in a `LinearCombination` are kept sorted according
 /// to the index of the variable in its constraint system.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LinearCombination<F: Field>(pub SmallVec<F>);
+pub struct LinearCombination<F: Field>(pub Vec<(Variable, F)>);
 
 /// Either a `Variable` or a `LinearCombination`.
 #[derive(Clone, Debug)]

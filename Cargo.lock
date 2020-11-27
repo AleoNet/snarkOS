@@ -2710,7 +2710,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "serde",
- "smallvec 1.4.2",
  "snarkos-errors",
  "snarkos-utilities",
 ]
