@@ -22,7 +22,6 @@ use snarkos_errors::gadgets::SynthesisError;
 
 use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::IndexSet;
-use smallvec::SmallVec;
 
 use std::{
     cell::RefCell,
@@ -40,7 +39,7 @@ enum NamedObject {
 
 type InternedConstraint = usize;
 type InternedField = usize;
-type InternedLC = SmallVec<[(Variable, InternedField); 16]>;
+type InternedLC = Vec<(Variable, InternedField)>;
 type InternedPathSegment = usize;
 
 #[derive(Clone, PartialEq, Eq)]

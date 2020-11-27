@@ -16,10 +16,9 @@
 
 use crate::{
     curves::Field,
-    gadgets::r1cs::{LinearCombination, SmallVec, Variable},
+    gadgets::r1cs::{LinearCombination, Variable},
 };
 
-use smallvec::smallvec;
 use std::{
     cmp::Ordering,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub},
@@ -35,14 +34,14 @@ impl<F: Field> AsRef<[(Variable, F)]> for LinearCombination<F> {
 impl<F: Field> From<(F, Variable)> for LinearCombination<F> {
     #[inline]
     fn from((coeff, var): (F, Variable)) -> Self {
-        LinearCombination(smallvec![(var, coeff)])
+        LinearCombination(vec![(var, coeff)])
     }
 }
 
 impl<F: Field> From<Variable> for LinearCombination<F> {
     #[inline]
     fn from(var: Variable) -> Self {
-        LinearCombination(smallvec![(var, F::one())])
+        LinearCombination(vec![(var, F::one())])
     }
 }
 
@@ -50,7 +49,7 @@ impl<F: Field> LinearCombination<F> {
     /// Outputs an empty linear combination.
     #[inline]
     pub fn zero() -> LinearCombination<F> {
-        LinearCombination(SmallVec::<F>::new())
+        LinearCombination(Vec::new())
     }
 
     /// Replaces the contents of `self` with those of `other`.
@@ -178,7 +177,7 @@ where
     F1: Fn(F) -> F,
     F2: Fn(F, F) -> F,
 {
-    let mut new_vec = SmallVec::<F>::new(); // with_capacity($self.0.len() + $other.0.len());
+    let mut new_vec = Vec::with_capacity(cur.0.len() + other.0.len());
     let mut i = 0;
     let mut j = 0;
     while i < cur.0.len() && j < other.0.len() {
