@@ -21,11 +21,10 @@ use crate::{
 use snarkos_errors::gadgets::SynthesisError;
 
 use fxhash::{FxBuildHasher, FxHashMap};
-use indexmap::IndexSet;
+use indexmap::{map::Entry, IndexMap, IndexSet};
 
 use std::{
     cell::RefCell,
-    collections::hash_map::Entry,
     hash::{Hash, Hasher},
     rc::Rc,
 };
@@ -69,7 +68,7 @@ pub struct TestConstraintSystem<F: Field> {
     interned_path_segments: IndexSet<String, FxBuildHasher>,
     interned_fields: IndexSet<F, FxBuildHasher>,
     interned_constraints: IndexSet<InternedLC, FxBuildHasher>,
-    named_objects: FxHashMap<InternedPath, NamedObject>,
+    named_objects: IndexMap<InternedPath, NamedObject, FxBuildHasher>,
     current_namespace: Vec<InternedPathSegment>,
     constraints: FxHashMap<InternedPath, TestConstraint>,
     inputs: Vec<InternedField>,
@@ -82,7 +81,7 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         let path_segment = "ONE".to_owned();
         let interned_path_segment = interned_path_segments.insert_full(path_segment).0;
         let interned_path: InternedPath = vec![interned_path_segment].into();
-        let mut named_objects = FxHashMap::default();
+        let mut named_objects = IndexMap::with_hasher(FxBuildHasher::default());
         named_objects.insert(interned_path, NamedObject::Var(TestConstraintSystem::<F>::one()));
         let mut interned_fields = IndexSet::with_hasher(FxBuildHasher::default());
         let interned_field = interned_fields.insert_full(F::one()).0;
@@ -350,9 +349,11 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             NamedObject::Var(var) => match var.get_unchecked() {
                 Index::Aux(idx) => {
                     self.aux.remove(idx);
-                    for no in self.named_objects.values_mut() {
-                        // think of better indexing
-                        if let NamedObject::Var(ref mut var) = no {
+                    for (path, obj) in self.named_objects.iter_mut().rev() {
+                        if path.0.borrow().len() < current_ns.0.borrow().len() {
+                            break;
+                        }
+                        if let NamedObject::Var(ref mut var) = obj {
                             if let Index::Aux(ref mut i) = var.mut_unchecked() {
                                 if *i >= idx {
                                     *i -= 1;
@@ -364,8 +365,11 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                 Index::Input(idx) => {
                     // almost the same as Aux, dedup
                     self.inputs.remove(idx);
-                    for no in self.named_objects.values_mut() {
-                        if let NamedObject::Var(ref mut var) = no {
+                    for (path, obj) in self.named_objects.iter_mut().rev() {
+                        if path.0.borrow().len() < current_ns.0.borrow().len() {
+                            break;
+                        }
+                        if let NamedObject::Var(ref mut var) = obj {
                             if let Index::Input(ref mut i) = var.mut_unchecked() {
                                 if *i >= idx {
                                     *i -= 1;
