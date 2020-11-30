@@ -23,11 +23,7 @@ use snarkos_errors::gadgets::SynthesisError;
 use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::{map::Entry, IndexMap, IndexSet};
 
-use std::{
-    cell::RefCell,
-    hash::{Hash, Hasher},
-    rc::Rc,
-};
+use std::{borrow::Borrow, ops::Deref, rc::Rc};
 
 #[derive(Debug)]
 enum NamedObject {
@@ -41,18 +37,26 @@ type InternedField = usize;
 type InternedLC = Vec<(Variable, InternedField)>;
 type InternedPathSegment = usize;
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct InternedPath(Rc<RefCell<Vec<usize>>>);
-
-impl Hash for InternedPath {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.borrow().hash(state);
-    }
-}
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct InternedPath(Rc<Vec<usize>>);
 
 impl From<Vec<usize>> for InternedPath {
     fn from(v: Vec<usize>) -> Self {
-        Self(Rc::new(RefCell::new(v)))
+        Self(Rc::new(v))
+    }
+}
+
+impl Deref for InternedPath {
+    type Target = [usize];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Borrow<Vec<usize>> for InternedPath {
+    fn borrow(&self) -> &Vec<usize> {
+        &self.0
     }
 }
 
@@ -117,7 +121,7 @@ impl<F: Field> TestConstraintSystem<F> {
     fn unintern_path(&self, interned_path: &InternedPath) -> String {
         let mut ret = String::new();
 
-        for interned_segment in interned_path.0.borrow().iter() {
+        for interned_segment in interned_path.iter() {
             ret.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
         }
 
@@ -127,7 +131,7 @@ impl<F: Field> TestConstraintSystem<F> {
     pub fn print_named_objects(&self) {
         let mut path = String::new();
         for interned_path in self.constraints.keys() {
-            for interned_segment in interned_path.0.borrow().iter() {
+            for interned_segment in interned_path.iter() {
                 path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
             }
 
@@ -225,7 +229,7 @@ impl<F: Field> TestConstraintSystem<F> {
             }
             Entry::Occupied(e) => {
                 let mut path = String::new();
-                for interned_segment in (e.remove_entry().0).0.borrow().iter() {
+                for interned_segment in (e.remove_entry().0).iter() {
                     path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
                 }
 
@@ -332,25 +336,25 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
-        let new_segment = *interned_path.0.borrow().last().unwrap();
+        let new_segment = *interned_path.0.last().unwrap();
         self.set_named_obj(interned_path, NamedObject::Namespace);
         self.current_namespace.push(new_segment);
     }
 
     fn pop_namespace(&mut self) {
-        let current_ns = self.current_namespace.clone().into(); // TODO: avoid into() here
+        let current_ns = &self.current_namespace;
 
-        let named_object = self.named_objects.remove(&current_ns).unwrap();
+        let named_object = self.named_objects.shift_remove(current_ns).unwrap();
 
         match named_object {
             NamedObject::Constraint(_) => {
-                self.constraints.remove(&current_ns);
+                self.constraints.remove(current_ns);
             }
             NamedObject::Var(var) => match var.get_unchecked() {
                 Index::Aux(idx) => {
                     self.aux.remove(idx);
                     for (path, obj) in self.named_objects.iter_mut().rev() {
-                        if path.0.borrow().len() < current_ns.0.borrow().len() {
+                        if path.len() < current_ns.len() {
                             break;
                         }
                         if let NamedObject::Var(ref mut var) = obj {
@@ -366,7 +370,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     // almost the same as Aux, dedup
                     self.inputs.remove(idx);
                     for (path, obj) in self.named_objects.iter_mut().rev() {
-                        if path.0.borrow().len() < current_ns.0.borrow().len() {
+                        if path.len() < current_ns.len() {
                             break;
                         }
                         if let NamedObject::Var(ref mut var) = obj {
