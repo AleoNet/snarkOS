@@ -120,9 +120,13 @@ impl<F: Field> TestConstraintSystem<F> {
 
     fn unintern_path(&self, interned_path: &InternedPath) -> String {
         let mut ret = String::new();
+        let mut iter = interned_path.iter().peekable();
 
-        for interned_segment in interned_path.iter() {
+        while let Some(interned_segment) = iter.next() {
             ret.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
+            if iter.peek().is_some() {
+                ret.push('/');
+            }
         }
 
         ret
