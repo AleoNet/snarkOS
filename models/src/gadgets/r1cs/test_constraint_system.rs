@@ -32,10 +32,56 @@ enum NamedObject {
     Namespace(Vec<NamedObject>),
 }
 
-type Holes = VecDeque<usize>;
 type InternedField = usize;
 type InternedPathSegment = usize;
 type NamespaceIndex = usize;
+
+#[derive(Default)]
+pub struct OptionalVec<T> {
+    values: Vec<Option<T>>,
+    holes: VecDeque<usize>,
+}
+
+impl<T> OptionalVec<T> {
+    pub fn insert(&mut self, elem: T) -> usize {
+        let idx = self.holes.pop_front().unwrap_or_else(|| self.values.len());
+        if idx < self.values.len() {
+            self.values[idx] = Some(elem);
+        } else {
+            self.values.push(Some(elem));
+        }
+        idx
+    }
+
+    pub fn next_idx(&self) -> usize {
+        self.holes.front().copied().unwrap_or_else(|| self.values.len())
+    }
+
+    #[allow(dead_code)]
+    pub fn remove(&mut self, idx: usize) -> T {
+        let val = self.values[idx].take();
+        self.holes.push_back(idx);
+        val.unwrap()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.values.iter().filter(|v| v.is_some()).map(|v| v.as_ref().unwrap())
+    }
+}
+
+impl<T> std::ops::Index<usize> for OptionalVec<T> {
+    type Output = T;
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        self.values[idx].as_ref().unwrap()
+    }
+}
+
+impl<T> std::ops::IndexMut<usize> for OptionalVec<T> {
+    fn index_mut(&mut self, idx: usize) -> &mut Self::Output {
+        self.values[idx].as_mut().unwrap()
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct InternedPath(Rc<Vec<usize>>);
@@ -62,6 +108,7 @@ impl Borrow<Vec<usize>> for InternedPath {
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct TestConstraint {
+    interned_path: InternedPath,
     a: Vec<(Variable, InternedField)>,
     b: Vec<(Variable, InternedField)>,
     c: Vec<(Variable, InternedField)>,
@@ -73,9 +120,9 @@ pub struct TestConstraintSystem<F: Field> {
     interned_fields: IndexSet<F, FxBuildHasher>,
     named_objects: IndexMap<InternedPath, NamedObject, FxBuildHasher>,
     current_namespace: (Vec<InternedPathSegment>, NamespaceIndex),
-    constraints: (Vec<Option<(InternedPath, TestConstraint)>>, Holes),
-    inputs: (Vec<Option<InternedField>>, Holes),
-    aux: (Vec<Option<InternedField>>, Holes),
+    constraints: OptionalVec<TestConstraint>,
+    inputs: OptionalVec<InternedField>,
+    aux: OptionalVec<InternedField>,
 }
 
 impl<F: Field> Default for TestConstraintSystem<F> {
@@ -84,20 +131,28 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         let path_segment = "ONE".to_owned();
         let interned_path_segment = interned_path_segments.insert_full(path_segment).0;
         let interned_path: InternedPath = vec![interned_path_segment].into();
+
         let mut named_objects = IndexMap::with_hasher(FxBuildHasher::default());
         named_objects
             .insert_full(interned_path, NamedObject::Var(TestConstraintSystem::<F>::one()))
             .0;
+
         let mut interned_fields = IndexSet::with_hasher(FxBuildHasher::default());
         let interned_field = interned_fields.insert_full(F::one()).0;
+
+        let mut inputs: OptionalVec<InternedField> = Default::default();
+        inputs.insert(interned_field);
 
         TestConstraintSystem {
             interned_fields,
             interned_path_segments,
             named_objects,
             current_namespace: (vec![], 0),
-            constraints: Default::default(),
-            inputs: (vec![Some(interned_field)], Default::default()),
+            constraints: OptionalVec {
+                values: vec![],
+                holes: Default::default(),
+            },
+            inputs,
             aux: Default::default(),
         }
     }
@@ -134,13 +189,7 @@ impl<F: Field> TestConstraintSystem<F> {
 
     pub fn print_named_objects(&self) {
         let mut path = String::new();
-        for (interned_path, _) in self
-            .constraints
-            .0
-            .iter()
-            .filter(|c| c.is_some())
-            .map(|c| c.as_ref().unwrap())
-        {
+        for TestConstraint { interned_path, .. } in self.constraints.iter() {
             for interned_segment in interned_path.iter() {
                 path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
             }
@@ -155,8 +204,8 @@ impl<F: Field> TestConstraintSystem<F> {
 
         for &(var, interned_coeff) in terms {
             let interned_tmp = match var.get_unchecked() {
-                Index::Input(index) => self.inputs.0[index].unwrap(),
-                Index::Aux(index) => self.aux.0[index].unwrap(),
+                Index::Input(index) => self.inputs[index],
+                Index::Aux(index) => self.aux[index],
             };
             let mut tmp = *self.interned_fields.get_index(interned_tmp).unwrap();
             let coeff = self.interned_fields.get_index(interned_coeff).unwrap();
@@ -169,13 +218,7 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn which_is_unsatisfied(&self) -> Option<String> {
-        for (interned_path, TestConstraint { a, b, c }) in self
-            .constraints
-            .0
-            .iter()
-            .filter(|c| c.is_some())
-            .map(|c| c.as_ref().unwrap())
-        {
+        for TestConstraint { interned_path, a, b, c } in self.constraints.iter() {
             let mut a = self.eval_lc(a.as_ref());
             let b = self.eval_lc(b.as_ref());
             let c = self.eval_lc(c.as_ref());
@@ -195,7 +238,7 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     pub fn num_constraints(&self) -> usize {
-        self.constraints.0.iter().filter(|c| c.is_some()).count()
+        self.constraints.iter().count()
     }
 
     pub fn set(&mut self, path: &str, to: F) {
@@ -204,8 +247,8 @@ impl<F: Field> TestConstraintSystem<F> {
 
         match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
-                Index::Input(index) => self.inputs.0[index] = Some(interned_field),
-                Index::Aux(index) => self.aux.0[index] = Some(interned_field),
+                Index::Input(index) => self.inputs[index] = interned_field,
+                Index::Aux(index) => self.aux[index] = interned_field,
             },
             Some(e) => panic!(
                 "tried to set path `{}` to value, but `{:?}` already exists there.",
@@ -220,8 +263,8 @@ impl<F: Field> TestConstraintSystem<F> {
 
         let interned_field = match self.named_objects.get(&interned_path) {
             Some(&NamedObject::Var(ref v)) => match v.get_unchecked() {
-                Index::Input(index) => self.inputs.0[index].unwrap(),
-                Index::Aux(index) => self.aux.0[index].unwrap(),
+                Index::Input(index) => self.inputs[index],
+                Index::Aux(index) => self.aux[index],
             },
             Some(e) => panic!(
                 "tried to get value of path `{}`, but `{:?}` exists there (not a variable)",
@@ -277,14 +320,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         A: FnOnce() -> AR,
         AR: AsRef<str>,
     {
-        let index = self.aux.1.pop_front().unwrap_or_else(|| self.aux.0.len());
         let interned_path = self.compute_path(annotation().as_ref());
         let interned_field = self.interned_fields.insert_full(f()?).0;
-        if index < self.aux.0.len() {
-            self.aux.0[index] = Some(interned_field);
-        } else {
-            self.aux.0.push(Some(interned_field));
-        }
+        let index = self.aux.insert(interned_field);
         let var = Variable::new_unchecked(Index::Aux(index));
         let named_obj = NamedObject::Var(var);
         if let NamedObject::Namespace(ref mut ns) =
@@ -303,14 +341,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         A: FnOnce() -> AR,
         AR: AsRef<str>,
     {
-        let index = self.inputs.1.pop_front().unwrap_or_else(|| self.inputs.0.len());
         let interned_path = self.compute_path(annotation().as_ref());
         let interned_field = self.interned_fields.insert_full(f()?).0;
-        if index < self.inputs.0.len() {
-            self.inputs.0[index] = Some(interned_field);
-        } else {
-            self.inputs.0.push(Some(interned_field));
-        }
+        let index = self.inputs.insert(interned_field);
         let var = Variable::new_unchecked(Index::Input(index));
         let named_obj = NamedObject::Var(var);
         if let NamedObject::Namespace(ref mut ns) =
@@ -332,11 +365,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
     {
         let interned_path = self.compute_path(annotation().as_ref());
-        let index = self
-            .constraints
-            .1
-            .pop_front()
-            .unwrap_or_else(|| self.constraints.0.len());
+        let index = self.constraints.next_idx();
         let named_obj = NamedObject::Constraint(index);
         if let NamedObject::Namespace(ref mut ns) =
             self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
@@ -372,13 +401,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                 })
                 .collect();
 
-        if index < self.constraints.0.len() {
-            self.constraints.0[index] = Some((interned_path, TestConstraint { a, b, c }));
-        } else {
-            self.constraints
-                .0
-                .push(Some((interned_path, TestConstraint { a, b, c })));
-        }
+        self.constraints.insert(TestConstraint { interned_path, a, b, c });
     }
 
     fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
@@ -394,10 +417,14 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     }
 
     fn pop_namespace(&mut self) {
-        let (current_ns, ns_idx) = &self.current_namespace;
         //println!("popping ns {} : {}", ns_idx, self.unintern_path(&current_ns.to_owned().into()));
 
-        let named_object = if let NamedObject::Namespace(no) = self.named_objects.swap_remove_index(*ns_idx).unwrap().1
+        #[cfg(not(test))]
+        let named_object = if let NamedObject::Namespace(no) = self
+            .named_objects
+            .swap_remove_index(self.current_namespace.1)
+            .unwrap()
+            .1
         {
             no
         } else {
@@ -409,19 +436,16 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             match child_obj {
                 NamedObject::Var(var) => match var.get_unchecked() {
                     Index::Aux(idx) => {
-                        self.aux.0[idx] = None;
-                        self.aux.1.push_back(idx);
+                        self.aux.remove(idx);
                         //println!("  removing Aux({})", idx);
                     }
                     Index::Input(idx) => {
-                        self.inputs.0[idx] = None;
-                        self.inputs.1.push_back(idx);
+                        self.inputs.remove(idx);
                         //println!("  removing Input({})", idx);
                     }
                 },
                 NamedObject::Constraint(idx) => {
-                    self.constraints.0[idx] = None;
-                    self.constraints.1.push_back(idx);
+                    self.constraints.remove(idx);
                     //println!("  removing Constraint({})", idx);
                 }
                 _ => {}
