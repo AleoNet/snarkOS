@@ -413,8 +413,8 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.current_namespace.1 = namespace_idx;
     }
 
+    #[cfg(not(debug_assertions))]
     fn pop_namespace(&mut self) {
-        #[cfg(not(test))]
         let named_object = if let NamedObject::Namespace(no) = self
             .named_objects
             .swap_remove_index(self.current_namespace.1)
@@ -426,7 +426,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             unreachable!()
         };
 
-        #[cfg(not(test))]
         for child_obj in named_object {
             match child_obj {
                 NamedObject::Var(var) => match var.get_unchecked() {
@@ -444,6 +443,18 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             }
         }
 
+        assert!(self.current_namespace.0.pop().is_some());
+        if let Some(new_ns_idx) = self.named_objects.get_index_of(&self.current_namespace.0) {
+            self.current_namespace.1 = new_ns_idx;
+        } else {
+            // we must be at the "bottom" namespace
+            self.current_namespace.1 = 0;
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    fn pop_namespace(&mut self) {
+        self.named_objects.swap_remove_index(self.current_namespace.1);
         assert!(self.current_namespace.0.pop().is_some());
         if let Some(new_ns_idx) = self.named_objects.get_index_of(&self.current_namespace.0) {
             self.current_namespace.1 = new_ns_idx;
