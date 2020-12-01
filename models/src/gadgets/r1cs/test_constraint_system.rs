@@ -404,6 +404,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             unreachable!()
         };
 
+        #[cfg(not(test))]
         for child_obj in named_object {
             match child_obj {
                 NamedObject::Var(var) => match var.get_unchecked() {
