@@ -63,6 +63,7 @@ pub struct OptionalVec<T> {
 impl<T> OptionalVec<T> {
     // inserts a new value either into the first existing hole or extending the vector
     // of values, i.e. pushing it to its end
+    #[inline]
     pub fn insert(&mut self, elem: T) -> usize {
         let idx = self.holes.pop_front().unwrap_or_else(|| self.values.len());
         if idx < self.values.len() {
@@ -74,6 +75,7 @@ impl<T> OptionalVec<T> {
     }
 
     // returns the index of the next value inserted into the OptionalVec
+    #[inline]
     pub fn next_idx(&self) -> usize {
         self.holes.front().copied().unwrap_or_else(|| self.values.len())
     }
@@ -87,6 +89,7 @@ impl<T> OptionalVec<T> {
         val.unwrap()
     }
 
+    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.values.iter().filter(|v| v.is_some()).map(|v| v.as_ref().unwrap())
     }
@@ -195,6 +198,7 @@ impl<F: Field> TestConstraintSystem<F> {
         Self::default()
     }
 
+    #[inline]
     fn intern_path(&self, path: &str) -> InternedPath {
         let mut vec = vec![];
 
@@ -265,6 +269,7 @@ impl<F: Field> TestConstraintSystem<F> {
         None
     }
 
+    #[inline]
     pub fn is_satisfied(&self) -> bool {
         self.which_is_unsatisfied().is_none()
     }
@@ -365,11 +370,13 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     #[cfg(debug_assertions)]
+    #[inline]
     fn purge_namespace(&mut self, _namespace: Namespace) {
         // don't perform a full cleanup in test conditions, so that all the variables and
         // constraints remain available throughout the tests
     }
 
+    #[inline]
     fn register_object_in_namespace(&mut self, named_obj: NamedObject) {
         if let NamedObject::Namespace(ref mut ns) =
             self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
