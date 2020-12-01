@@ -281,7 +281,6 @@ impl<F: Field> TestConstraintSystem<F> {
         match self.named_objects.entry(interned_path) {
             Entry::Vacant(e) => {
                 let ns_idx = e.index();
-                //println!("  set_named_obj {:?} : {}", &to, ns_idx);
                 e.insert(to);
                 ns_idx
             }
@@ -408,17 +407,13 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
         let new_segment = *interned_path.0.last().unwrap();
-        let namespace_idx = self.set_named_obj(interned_path.clone(), NamedObject::Namespace(vec![])); // FIXME: remove this clone() after debugging
+        let namespace_idx = self.set_named_obj(interned_path, NamedObject::Namespace(vec![]));
 
-        //println!("pushed ns {} : {}", namespace_idx, self.unintern_path(&interned_path));
         self.current_namespace.0.push(new_segment);
         self.current_namespace.1 = namespace_idx;
-        //println!("  curr ns idx: {}", namespace_idx);
     }
 
     fn pop_namespace(&mut self) {
-        //println!("popping ns {} : {}", ns_idx, self.unintern_path(&current_ns.to_owned().into()));
-
         #[cfg(not(test))]
         let named_object = if let NamedObject::Namespace(no) = self
             .named_objects
@@ -437,16 +432,13 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                 NamedObject::Var(var) => match var.get_unchecked() {
                     Index::Aux(idx) => {
                         self.aux.remove(idx);
-                        //println!("  removing Aux({})", idx);
                     }
                     Index::Input(idx) => {
                         self.inputs.remove(idx);
-                        //println!("  removing Input({})", idx);
                     }
                 },
                 NamedObject::Constraint(idx) => {
                     self.constraints.remove(idx);
-                    //println!("  removing Constraint({})", idx);
                 }
                 _ => {}
             }
@@ -455,11 +447,9 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         assert!(self.current_namespace.0.pop().is_some());
         if let Some(new_ns_idx) = self.named_objects.get_index_of(&self.current_namespace.0) {
             self.current_namespace.1 = new_ns_idx;
-            //println!("  curr ns idx: {}", new_ns_idx);
         } else {
             // we must be at the "bottom" namespace
             self.current_namespace.1 = 0;
-            //println!("  curr ns idx: 0");
         }
     }
 
