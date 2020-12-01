@@ -430,32 +430,19 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.register_object_in_namespace(named_obj.clone());
         self.set_named_obj(interned_path.clone(), named_obj);
 
-        let a = a(LinearCombination::zero());
-        let a =
-            a.0.into_iter()
+        let mut intern_fields = |uninterned: Vec<(Variable, F)>| -> Vec<(Variable, InternedField)> {
+            uninterned
+                .into_iter()
                 .map(|(var, field)| {
                     let interned_field = self.interned_fields.insert_full(field).0;
                     (var, interned_field)
                 })
-                .collect();
+                .collect()
+        };
 
-        let b = b(LinearCombination::zero());
-        let b =
-            b.0.into_iter()
-                .map(|(var, field)| {
-                    let interned_field = self.interned_fields.insert_full(field).0;
-                    (var, interned_field)
-                })
-                .collect();
-
-        let c = c(LinearCombination::zero());
-        let c =
-            c.0.into_iter()
-                .map(|(var, field)| {
-                    let interned_field = self.interned_fields.insert_full(field).0;
-                    (var, interned_field)
-                })
-                .collect();
+        let a = intern_fields(a(LinearCombination::zero()).0);
+        let b = intern_fields(b(LinearCombination::zero()).0);
+        let c = intern_fields(c(LinearCombination::zero()).0);
 
         self.constraints.insert(TestConstraint { interned_path, a, b, c });
     }
