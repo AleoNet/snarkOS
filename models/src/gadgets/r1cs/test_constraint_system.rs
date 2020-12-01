@@ -328,6 +328,28 @@ impl<F: Field> TestConstraintSystem<F> {
 
         vec.into()
     }
+
+    #[cfg(not(debug_assertions))]
+    fn purge_namespace(&mut self, namespace_objects: Vec<NamedObject>) {
+        for child_obj in namespace_objects {
+            match child_obj {
+                NamedObject::Var(var) => match var.get_unchecked() {
+                    Index::Aux(idx) => {
+                        self.aux.remove(idx);
+                    }
+                    Index::Input(idx) => {
+                        self.inputs.remove(idx);
+                    }
+                },
+                NamedObject::Constraint(idx) => {
+                    self.constraints.remove(idx);
+                }
+                NamedObject::Namespace(children) => {
+                    self.purge_namespace(children);
+                }
+            }
+        }
+    }
 }
 
 impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
@@ -427,7 +449,13 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
         let new_segment = *interned_path.0.last().unwrap();
-        let namespace_idx = self.set_named_obj(interned_path, NamedObject::Namespace(vec![]));
+        let named_obj = NamedObject::Namespace(vec![]);
+        if let NamedObject::Namespace(ref mut ns) =
+            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
+        {
+            ns.push(named_obj.clone());
+        }
+        let namespace_idx = self.set_named_obj(interned_path, named_obj);
 
         self.current_namespace.0.push(new_segment);
         self.current_namespace.1 = namespace_idx;
@@ -435,7 +463,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
 
     #[cfg(not(debug_assertions))]
     fn pop_namespace(&mut self) {
-        let named_object = if let NamedObject::Namespace(no) = self
+        let namespace_objects = if let NamedObject::Namespace(no) = self
             .named_objects
             .swap_remove_index(self.current_namespace.1)
             .unwrap()
@@ -446,22 +474,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             unreachable!()
         };
 
-        for child_obj in named_object {
-            match child_obj {
-                NamedObject::Var(var) => match var.get_unchecked() {
-                    Index::Aux(idx) => {
-                        self.aux.remove(idx);
-                    }
-                    Index::Input(idx) => {
-                        self.inputs.remove(idx);
-                    }
-                },
-                NamedObject::Constraint(idx) => {
-                    self.constraints.remove(idx);
-                }
-                _ => {}
-            }
-        }
+        self.purge_namespace(namespace_objects);
 
         assert!(self.current_namespace.0.pop().is_some());
         if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
