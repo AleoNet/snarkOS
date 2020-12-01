@@ -369,6 +369,14 @@ impl<F: Field> TestConstraintSystem<F> {
         // don't perform a full cleanup in test conditions, so that all the variables and
         // constraints remain available throughout the tests
     }
+
+    fn register_object_in_namespace(&mut self, named_obj: NamedObject) {
+        if let NamedObject::Namespace(ref mut ns) =
+            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
+        {
+            ns.push(named_obj);
+        }
+    }
 }
 
 impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
@@ -385,11 +393,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let index = self.aux.insert(interned_field);
         let var = Variable::new_unchecked(Index::Aux(index));
         let named_obj = NamedObject::Var(var);
-        if let NamedObject::Namespace(ref mut ns) =
-            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
-        {
-            ns.push(named_obj.clone());
-        }
+        self.register_object_in_namespace(named_obj.clone());
         self.set_named_obj(interned_path, named_obj);
 
         Ok(var)
@@ -406,11 +410,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let index = self.inputs.insert(interned_field);
         let var = Variable::new_unchecked(Index::Input(index));
         let named_obj = NamedObject::Var(var);
-        if let NamedObject::Namespace(ref mut ns) =
-            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
-        {
-            ns.push(named_obj.clone());
-        }
+        self.register_object_in_namespace(named_obj.clone());
         self.set_named_obj(interned_path, named_obj);
 
         Ok(var)
@@ -427,11 +427,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let interned_path = self.compute_path(annotation().as_ref());
         let index = self.constraints.next_idx();
         let named_obj = NamedObject::Constraint(index);
-        if let NamedObject::Namespace(ref mut ns) =
-            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
-        {
-            ns.push(named_obj.clone());
-        }
+        self.register_object_in_namespace(named_obj.clone());
         self.set_named_obj(interned_path.clone(), named_obj);
 
         let a = a(LinearCombination::zero());
