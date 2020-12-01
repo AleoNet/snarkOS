@@ -89,9 +89,16 @@ impl<T> OptionalVec<T> {
         val.unwrap()
     }
 
+    // iterates over all the Some values in the list
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.values.iter().filter(|v| v.is_some()).map(|v| v.as_ref().unwrap())
+    }
+
+    // returns the number of the Some values
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.values.len() - self.holes.len()
     }
 }
 
@@ -178,15 +185,17 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         let mut inputs: OptionalVec<InternedField> = Default::default();
         inputs.insert(interned_field);
 
+        let constraints = OptionalVec {
+            values: Default::default(),
+            holes: Default::default(),
+        };
+
         TestConstraintSystem {
             interned_fields,
             interned_path_segments,
             named_objects,
-            current_namespace: (vec![], 0),
-            constraints: OptionalVec {
-                values: vec![],
-                holes: Default::default(),
-            },
+            current_namespace: Default::default(),
+            constraints,
             inputs,
             aux: Default::default(),
         }
@@ -274,8 +283,9 @@ impl<F: Field> TestConstraintSystem<F> {
         self.which_is_unsatisfied().is_none()
     }
 
+    #[inline]
     pub fn num_constraints(&self) -> usize {
-        self.constraints.iter().count()
+        self.constraints.len()
     }
 
     pub fn set(&mut self, path: &str, to: F) {
@@ -322,12 +332,11 @@ impl<F: Field> TestConstraintSystem<F> {
                 ns_idx
             }
             Entry::Occupied(e) => {
-                let mut path = String::new();
-                for interned_segment in (e.remove_entry().0).iter() {
-                    path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
-                }
-
-                panic!("tried to create object at existing path: {}", path);
+                let interned_segments = e.remove_entry().0;
+                panic!(
+                    "tried to create object at existing path: {}",
+                    self.unintern_path(&interned_segments)
+                );
             }
         }
     }
@@ -459,11 +468,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let interned_path = self.compute_path(name.as_ref());
         let new_segment = *interned_path.0.last().unwrap();
         let named_obj = NamedObject::Namespace(Default::default());
-        if let NamedObject::Namespace(ref mut ns) =
-            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
-        {
-            ns.push(named_obj.clone());
-        }
+        self.register_object_in_namespace(named_obj.clone());
         let namespace_idx = self.set_named_obj(interned_path, named_obj);
         if let NamedObject::Namespace(ref mut ns) = self.named_objects[namespace_idx] {
             ns.idx = namespace_idx;
@@ -485,8 +490,10 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             unreachable!()
         };
 
+        // remove object belonging to the popped namespace
         self.purge_namespace(namespace);
 
+        // update the current namespace
         assert!(self.current_namespace.0.pop().is_some());
         if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
             self.current_namespace.1 = new_ns_idx;
@@ -496,10 +503,12 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         }
     }
 
+    #[inline]
     fn get_root(&mut self) -> &mut Self::Root {
         self
     }
 
+    #[inline]
     fn num_constraints(&self) -> usize {
         self.num_constraints()
     }
