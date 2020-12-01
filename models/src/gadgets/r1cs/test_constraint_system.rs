@@ -84,11 +84,11 @@ impl<T> std::ops::IndexMut<usize> for OptionalVec<T> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct InternedPath(Rc<Vec<usize>>);
+pub struct InternedPath(Rc<[usize]>);
 
 impl From<Vec<usize>> for InternedPath {
     fn from(v: Vec<usize>) -> Self {
-        Self(Rc::new(v))
+        Self(Rc::from(v))
     }
 }
 
@@ -100,8 +100,8 @@ impl Deref for InternedPath {
     }
 }
 
-impl Borrow<Vec<usize>> for InternedPath {
-    fn borrow(&self) -> &Vec<usize> {
+impl Borrow<[usize]> for InternedPath {
+    fn borrow(&self) -> &[usize] {
         &self.0
     }
 }
@@ -444,7 +444,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         }
 
         assert!(self.current_namespace.0.pop().is_some());
-        if let Some(new_ns_idx) = self.named_objects.get_index_of(&self.current_namespace.0) {
+        if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
             self.current_namespace.1 = new_ns_idx;
         } else {
             // we must be at the "bottom" namespace
@@ -456,7 +456,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn pop_namespace(&mut self) {
         self.named_objects.swap_remove_index(self.current_namespace.1);
         assert!(self.current_namespace.0.pop().is_some());
-        if let Some(new_ns_idx) = self.named_objects.get_index_of(&self.current_namespace.0) {
+        if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
             self.current_namespace.1 = new_ns_idx;
         } else {
             // we must be at the "bottom" namespace
