@@ -29,6 +29,7 @@ use std::{borrow::Borrow, collections::VecDeque, ops::Deref, rc::Rc};
 enum NamedObject {
     Constraint(usize),
     Var(Variable),
+    // contains the list of named objects that belong to it
     Namespace(Vec<NamedObject>),
 }
 
@@ -36,13 +37,20 @@ type InternedField = usize;
 type InternedPathSegment = usize;
 type NamespaceIndex = usize;
 
+// a helper object containing a list of values that, when removed, leave a "hole" in their
+// place; this allows all the following indices to remain unperturbed; the holes take priority
+// when inserting new objects
 #[derive(Default)]
 pub struct OptionalVec<T> {
+    // a list of optional values
     values: Vec<Option<T>>,
+    // a double-ended list of indices of the Nones in the values vector
     holes: VecDeque<usize>,
 }
 
 impl<T> OptionalVec<T> {
+    // inserts a new value either into the first existing hole or extending the vector
+    // of values, i.e. pushing it to its end
     pub fn insert(&mut self, elem: T) -> usize {
         let idx = self.holes.pop_front().unwrap_or_else(|| self.values.len());
         if idx < self.values.len() {
@@ -53,10 +61,13 @@ impl<T> OptionalVec<T> {
         idx
     }
 
+    // returns the index of the next value inserted into the OptionalVec
     pub fn next_idx(&self) -> usize {
         self.holes.front().copied().unwrap_or_else(|| self.values.len())
     }
 
+    // removes a value at the specified index; assumes that the index points to
+    // an existing value that is a Some (i.e. not a hole)
     #[allow(dead_code)]
     pub fn remove(&mut self, idx: usize) -> T {
         let val = self.values[idx].take();
@@ -84,24 +95,24 @@ impl<T> std::ops::IndexMut<usize> for OptionalVec<T> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct InternedPath(Rc<[usize]>);
+pub struct InternedPath(Rc<[InternedPathSegment]>);
 
-impl From<Vec<usize>> for InternedPath {
-    fn from(v: Vec<usize>) -> Self {
+impl From<Vec<InternedPathSegment>> for InternedPath {
+    fn from(v: Vec<InternedPathSegment>) -> Self {
         Self(Rc::from(v))
     }
 }
 
 impl Deref for InternedPath {
-    type Target = [usize];
+    type Target = [InternedPathSegment];
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl Borrow<[usize]> for InternedPath {
-    fn borrow(&self) -> &[usize] {
+impl Borrow<[InternedPathSegment]> for InternedPath {
+    fn borrow(&self) -> &[InternedPathSegment] {
         &self.0
     }
 }
@@ -116,12 +127,21 @@ pub struct TestConstraint {
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
+    // used to intern namespace segments
     interned_path_segments: IndexSet<String, FxBuildHasher>,
+    // used to intern fields belonging to F
     interned_fields: IndexSet<F, FxBuildHasher>,
+    // contains named objects bound to their (interned) paths; the indices are
+    // used for NamespaceIndex lookups
     named_objects: IndexMap<InternedPath, NamedObject, FxBuildHasher>,
+    // a stack of current path's segments and the index of the current path's
+    // index in the named_objects map
     current_namespace: (Vec<InternedPathSegment>, NamespaceIndex),
+    // the list of currently applicable constraints
     constraints: OptionalVec<TestConstraint>,
+    // the list of currently applicable input variables
     inputs: OptionalVec<InternedField>,
+    // the list of currently applicable auxiliary variables
     aux: OptionalVec<InternedField>,
 }
 
