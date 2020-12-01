@@ -33,9 +33,7 @@ enum NamedObject {
 }
 
 type Holes = VecDeque<usize>;
-type InternedConstraint = usize;
 type InternedField = usize;
-type InternedLC = Vec<(Variable, InternedField)>;
 type InternedPathSegment = usize;
 type NamespaceIndex = usize;
 
@@ -64,16 +62,15 @@ impl Borrow<Vec<usize>> for InternedPath {
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct TestConstraint {
-    a: InternedConstraint,
-    b: InternedConstraint,
-    c: InternedConstraint,
+    a: Vec<(Variable, InternedField)>,
+    b: Vec<(Variable, InternedField)>,
+    c: Vec<(Variable, InternedField)>,
 }
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     interned_path_segments: IndexSet<String, FxBuildHasher>,
     interned_fields: IndexSet<F, FxBuildHasher>,
-    interned_constraints: IndexSet<InternedLC, FxBuildHasher>,
     named_objects: IndexMap<InternedPath, NamedObject, FxBuildHasher>,
     current_namespace: (Vec<InternedPathSegment>, NamespaceIndex),
     constraints: (Vec<Option<(InternedPath, TestConstraint)>>, Holes),
@@ -96,7 +93,6 @@ impl<F: Field> Default for TestConstraintSystem<F> {
 
         TestConstraintSystem {
             interned_fields,
-            interned_constraints: IndexSet::with_hasher(FxBuildHasher::default()),
             interned_path_segments,
             named_objects,
             current_namespace: (vec![], 0),
@@ -180,10 +176,6 @@ impl<F: Field> TestConstraintSystem<F> {
             .filter(|c| c.is_some())
             .map(|c| c.as_ref().unwrap())
         {
-            let a = self.interned_constraints.get_index(*a).unwrap();
-            let b = self.interned_constraints.get_index(*b).unwrap();
-            let c = self.interned_constraints.get_index(*c).unwrap();
-
             let mut a = self.eval_lc(a.as_ref());
             let b = self.eval_lc(b.as_ref());
             let c = self.eval_lc(c.as_ref());
@@ -361,7 +353,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     (var, interned_field)
                 })
                 .collect();
-        let a = self.interned_constraints.insert_full(a).0;
 
         let b = b(LinearCombination::zero());
         let b =
@@ -371,7 +362,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     (var, interned_field)
                 })
                 .collect();
-        let b = self.interned_constraints.insert_full(b).0;
 
         let c = c(LinearCombination::zero());
         let c =
@@ -381,7 +371,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
                     (var, interned_field)
                 })
                 .collect();
-        let c = self.interned_constraints.insert_full(c).0;
 
         if index < self.constraints.0.len() {
             self.constraints.0[index] = Some((interned_path, TestConstraint { a, b, c }));
@@ -409,7 +398,6 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         //println!("popping ns {} : {}", ns_idx, self.unintern_path(&current_ns.to_owned().into()));
 
         let named_object = if let NamedObject::Namespace(no) = self.named_objects.swap_remove_index(*ns_idx).unwrap().1
-        // FIXME: should be ok to change to swap_remove_index
         {
             no
         } else {
