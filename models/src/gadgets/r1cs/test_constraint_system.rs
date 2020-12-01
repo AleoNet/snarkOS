@@ -25,12 +25,24 @@ use indexmap::{map::Entry, IndexMap, IndexSet};
 
 use std::{borrow::Borrow, collections::VecDeque, ops::Deref, rc::Rc};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 enum NamedObject {
     Constraint(usize),
     Var(Variable),
     // contains the list of named objects that belong to it
-    Namespace(Vec<NamedObject>),
+    Namespace(Namespace),
+}
+
+#[derive(Debug, Clone, Default)]
+struct Namespace {
+    children: Vec<NamedObject>,
+    idx: usize,
+}
+
+impl Namespace {
+    fn push(&mut self, child: NamedObject) {
+        self.children.push(child);
+    }
 }
 
 type InternedField = usize;
@@ -330,8 +342,8 @@ impl<F: Field> TestConstraintSystem<F> {
     }
 
     #[cfg(not(debug_assertions))]
-    fn purge_namespace(&mut self, namespace_objects: Vec<NamedObject>) {
-        for child_obj in namespace_objects {
+    fn purge_namespace(&mut self, namespace: Namespace) {
+        for child_obj in namespace.children {
             match child_obj {
                 NamedObject::Var(var) => match var.get_unchecked() {
                     Index::Aux(idx) => {
@@ -348,7 +360,14 @@ impl<F: Field> TestConstraintSystem<F> {
                     self.purge_namespace(children);
                 }
             }
+            self.named_objects.swap_remove_index(namespace.idx);
         }
+    }
+
+    #[cfg(debug_assertions)]
+    fn purge_namespace(&mut self, _namespace: Namespace) {
+        // don't perform a full cleanup in test conditions, so that all the variables and
+        // constraints remain available throughout the tests
     }
 }
 
@@ -449,21 +468,23 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
         let new_segment = *interned_path.0.last().unwrap();
-        let named_obj = NamedObject::Namespace(vec![]);
+        let named_obj = NamedObject::Namespace(Default::default());
         if let NamedObject::Namespace(ref mut ns) =
             self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
         {
             ns.push(named_obj.clone());
         }
         let namespace_idx = self.set_named_obj(interned_path, named_obj);
+        if let NamedObject::Namespace(ref mut ns) = self.named_objects[namespace_idx] {
+            ns.idx = namespace_idx;
+        };
 
         self.current_namespace.0.push(new_segment);
         self.current_namespace.1 = namespace_idx;
     }
 
-    #[cfg(not(debug_assertions))]
     fn pop_namespace(&mut self) {
-        let namespace_objects = if let NamedObject::Namespace(no) = self
+        let namespace = if let NamedObject::Namespace(no) = self
             .named_objects
             .swap_remove_index(self.current_namespace.1)
             .unwrap()
@@ -474,20 +495,8 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             unreachable!()
         };
 
-        self.purge_namespace(namespace_objects);
+        self.purge_namespace(namespace);
 
-        assert!(self.current_namespace.0.pop().is_some());
-        if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
-            self.current_namespace.1 = new_ns_idx;
-        } else {
-            // we must be at the "bottom" namespace
-            self.current_namespace.1 = 0;
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    fn pop_namespace(&mut self) {
-        self.named_objects.swap_remove_index(self.current_namespace.1);
         assert!(self.current_namespace.0.pop().is_some());
         if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
             self.current_namespace.1 = new_ns_idx;
