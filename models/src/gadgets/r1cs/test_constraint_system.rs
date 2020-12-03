@@ -25,8 +25,6 @@ use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use itertools::Itertools;
 
-use std::collections::VecDeque;
-
 #[derive(Debug, Clone)]
 enum NamedObject {
     Constraint(usize),
@@ -58,8 +56,8 @@ type NamespaceIndex = usize;
 pub struct OptionalVec<T> {
     // a list of optional values
     values: Vec<Option<T>>,
-    // a double-ended list of indices of the Nones in the values vector
-    holes: VecDeque<usize>,
+    // a list of indices of the Nones in the values vector
+    holes: Vec<usize>,
 }
 
 impl<T> OptionalVec<T> {
@@ -67,7 +65,7 @@ impl<T> OptionalVec<T> {
     // of values, i.e. pushing it to its end
     #[inline]
     pub fn insert(&mut self, elem: T) -> usize {
-        let idx = self.holes.pop_front().unwrap_or_else(|| self.values.len());
+        let idx = self.holes.pop().unwrap_or_else(|| self.values.len());
         if idx < self.values.len() {
             self.values[idx] = Some(elem);
         } else {
@@ -79,7 +77,7 @@ impl<T> OptionalVec<T> {
     // returns the index of the next value inserted into the OptionalVec
     #[inline]
     pub fn next_idx(&self) -> usize {
-        self.holes.front().copied().unwrap_or_else(|| self.values.len())
+        self.holes.last().copied().unwrap_or_else(|| self.values.len())
     }
 
     // removes a value at the specified index; assumes that the index points to
@@ -87,7 +85,7 @@ impl<T> OptionalVec<T> {
     #[allow(dead_code)]
     pub fn remove(&mut self, idx: usize) -> T {
         let val = self.values[idx].take();
-        self.holes.push_back(idx);
+        self.holes.push(idx);
         val.unwrap()
     }
 
