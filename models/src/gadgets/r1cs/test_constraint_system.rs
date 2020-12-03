@@ -345,7 +345,11 @@ impl<F: Field> TestConstraintSystem<F> {
     fn compute_path(&mut self, new_segment: &str) -> InternedPath {
         let mut vec = Vec::with_capacity(self.current_namespace.0.len() + 1);
         vec.extend_from_slice(&self.current_namespace.0);
-        let (interned_segment, new) = self.interned_path_segments.insert_full(new_segment.to_owned());
+        let (interned_segment, new) = if let Some(index) = self.interned_path_segments.get_index_of(new_segment) {
+            (index, false)
+        } else {
+            self.interned_path_segments.insert_full(new_segment.to_owned())
+        };
 
         // only perform the check for segments not seen before
         assert!(!new || !new_segment.contains('/'), "'/' is not allowed in names");
