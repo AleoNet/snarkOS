@@ -20,10 +20,12 @@ use crate::{
 };
 use snarkos_errors::gadgets::SynthesisError;
 
-use fxhash::FxBuildHasher;
+use cfg_if::cfg_if;
+use fxhash::{FxBuildHasher, FxHashMap};
 use indexmap::{map::Entry, IndexMap, IndexSet};
+use itertools::Itertools;
 
-use std::{borrow::Borrow, collections::VecDeque, ops::Deref, rc::Rc};
+use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
 enum NamedObject {
@@ -36,7 +38,7 @@ enum NamedObject {
 #[derive(Debug, Clone, Default)]
 struct Namespace {
     children: Vec<NamedObject>,
-    idx: usize,
+    idx: NamespaceIndex,
 }
 
 impl Namespace {
@@ -116,27 +118,10 @@ impl<T> std::ops::IndexMut<usize> for OptionalVec<T> {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct InternedPath(Rc<[InternedPathSegment]>);
-
-impl From<Vec<InternedPathSegment>> for InternedPath {
-    fn from(v: Vec<InternedPathSegment>) -> Self {
-        Self(Rc::from(v))
-    }
-}
-
-impl Deref for InternedPath {
-    type Target = [InternedPathSegment];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Borrow<[InternedPathSegment]> for InternedPath {
-    fn borrow(&self) -> &[InternedPathSegment] {
-        &self.0
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct InternedPath {
+    parent_namespace: NamespaceIndex,
+    last_segment: InternedPathSegment,
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -147,17 +132,13 @@ pub struct TestConstraint {
     c: Vec<(Variable, InternedField)>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct CurrentNamespace {
     segments: Vec<InternedPathSegment>,
     indices: Vec<NamespaceIndex>,
 }
 
 impl CurrentNamespace {
-    fn depth(&self) -> usize {
-        self.segments.len()
-    }
-
     fn idx(&self) -> usize {
         self.indices.last().copied().unwrap_or(0)
     }
@@ -170,6 +151,8 @@ impl CurrentNamespace {
 
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
+    // used to intern full paths in test scenarios, for get and set purposes
+    interned_full_paths: FxHashMap<Vec<InternedPathSegment>, InternedPath>,
     // used to intern namespace segments
     interned_path_segments: IndexSet<String, FxBuildHasher>,
     // used to intern fields belonging to F
@@ -193,7 +176,17 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         let mut interned_path_segments = IndexSet::with_hasher(FxBuildHasher::default());
         let path_segment = "ONE".to_owned();
         let interned_path_segment = interned_path_segments.insert_full(path_segment).0;
-        let interned_path: InternedPath = vec![interned_path_segment].into();
+        let interned_path = InternedPath {
+            parent_namespace: 0,
+            last_segment: interned_path_segment,
+        };
+
+        let mut interned_full_paths = FxHashMap::default();
+        cfg_if! {
+            if #[cfg(debug_assertions)] {
+                interned_full_paths.insert(vec![interned_path_segment], interned_path);
+            }
+        }
 
         let mut named_objects = IndexMap::with_hasher(FxBuildHasher::default());
         named_objects
@@ -212,6 +205,7 @@ impl<F: Field> Default for TestConstraintSystem<F> {
         };
 
         TestConstraintSystem {
+            interned_full_paths,
             interned_fields,
             interned_path_segments,
             named_objects,
@@ -236,32 +230,38 @@ impl<F: Field> TestConstraintSystem<F> {
             vec.push(self.interned_path_segments.get_index_of(segment).unwrap());
         }
 
-        vec.into()
+        *self.interned_full_paths.get(&vec).unwrap()
     }
 
-    fn unintern_path(&self, interned_path: &InternedPath) -> String {
-        let mut ret = String::new();
-        let mut iter = interned_path.iter().peekable();
+    fn unintern_path(&self, interned_path: InternedPath) -> String {
+        let last_segment = self
+            .interned_path_segments
+            .get_index(interned_path.last_segment)
+            .unwrap();
+        let mut reversed_uninterned_segments = vec![last_segment];
 
-        while let Some(interned_segment) = iter.next() {
-            ret.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
-            if iter.peek().is_some() {
-                ret.push('/');
-            }
+        let mut parent_ns = interned_path.parent_namespace;
+        while parent_ns != 0 {
+            let interned_parent_ns = self.named_objects.get_index(parent_ns).unwrap().0;
+            let parent_segment = self
+                .interned_path_segments
+                .get_index(interned_parent_ns.last_segment)
+                .unwrap();
+            reversed_uninterned_segments.push(parent_segment);
+            parent_ns = interned_parent_ns.parent_namespace;
         }
 
-        ret
+        reversed_uninterned_segments
+            .into_iter()
+            .map(|s| s.as_str())
+            .rev()
+            .intersperse("/")
+            .collect()
     }
 
     pub fn print_named_objects(&self) {
-        let mut path = String::new();
         for TestConstraint { interned_path, .. } in self.constraints.iter() {
-            for interned_segment in interned_path.iter() {
-                path.push_str(self.interned_path_segments.get_index(*interned_segment).unwrap());
-            }
-
-            println!("{}", path);
-            path.clear();
+            println!("{}", self.unintern_path(*interned_path));
         }
     }
 
@@ -292,7 +292,7 @@ impl<F: Field> TestConstraintSystem<F> {
             a.mul_assign(&b);
 
             if a != c {
-                return Some(self.unintern_path(&interned_path));
+                return Some(self.unintern_path(*interned_path));
             }
         }
 
@@ -356,7 +356,7 @@ impl<F: Field> TestConstraintSystem<F> {
                 let interned_segments = e.remove_entry().0;
                 panic!(
                     "tried to create object at existing path: {}",
-                    self.unintern_path(&interned_segments)
+                    self.unintern_path(interned_segments)
                 );
             }
         }
@@ -364,8 +364,6 @@ impl<F: Field> TestConstraintSystem<F> {
 
     #[inline]
     fn compute_path(&mut self, new_segment: &str) -> InternedPath {
-        let mut vec = Vec::with_capacity(self.current_namespace.depth() + 1);
-        vec.extend_from_slice(&self.current_namespace.segments);
         let (interned_segment, new) = if let Some(index) = self.interned_path_segments.get_index_of(new_segment) {
             (index, false)
         } else {
@@ -375,9 +373,20 @@ impl<F: Field> TestConstraintSystem<F> {
         // only perform the check for segments not seen before
         assert!(!new || !new_segment.contains('/'), "'/' is not allowed in names");
 
-        vec.push(interned_segment);
+        let interned_path = InternedPath {
+            parent_namespace: self.current_namespace.idx(),
+            last_segment: interned_segment,
+        };
 
-        vec.into()
+        cfg_if! {
+            if #[cfg(debug_assertions)] {
+                let mut full_path = self.current_namespace.segments.clone();
+                full_path.push(interned_segment);
+                self.interned_full_paths.insert(full_path, interned_path);
+            }
+        }
+
+        interned_path
     }
 
     #[cfg(not(debug_assertions))]
@@ -401,13 +410,6 @@ impl<F: Field> TestConstraintSystem<F> {
             }
             self.named_objects.swap_remove_index(namespace.idx);
         }
-    }
-
-    #[cfg(debug_assertions)]
-    #[inline]
-    fn purge_namespace(&mut self, _namespace: Namespace) {
-        // don't perform a full cleanup in test conditions, so that all the variables and
-        // constraints remain available throughout the tests
     }
 
     #[inline]
@@ -472,7 +474,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         let index = self.constraints.next_idx();
         let named_obj = NamedObject::Constraint(index);
         self.register_object_in_namespace(named_obj.clone());
-        self.set_named_obj(interned_path.clone(), named_obj);
+        self.set_named_obj(interned_path, named_obj);
 
         let mut intern_fields = |uninterned: Vec<(Variable, F)>| -> Vec<(Variable, InternedField)> {
             uninterned
@@ -494,7 +496,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
     fn push_namespace<NR: AsRef<str>, N: FnOnce() -> NR>(&mut self, name_fn: N) {
         let name = name_fn();
         let interned_path = self.compute_path(name.as_ref());
-        let new_segment = *interned_path.0.last().unwrap();
+        let new_segment = interned_path.last_segment;
         let named_obj = NamedObject::Namespace(Default::default());
         self.register_object_in_namespace(named_obj.clone());
         let namespace_idx = self.set_named_obj(interned_path, named_obj);
@@ -506,6 +508,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.current_namespace.indices.push(namespace_idx);
     }
 
+    #[cfg(not(debug_assertions))]
     fn pop_namespace(&mut self) {
         let namespace = if let NamedObject::Namespace(no) = self
             .named_objects
@@ -522,6 +525,14 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.purge_namespace(namespace);
 
         // update the current namespace
+        self.current_namespace.pop();
+    }
+
+    #[cfg(debug_assertions)]
+    fn pop_namespace(&mut self) {
+        // don't perform a full cleanup in test conditions, so that all the variables,
+        // constraints and namespace indices remain available throughout the tests
+
         self.current_namespace.pop();
     }
 
