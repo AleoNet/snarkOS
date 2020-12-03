@@ -147,6 +147,27 @@ pub struct TestConstraint {
     c: Vec<(Variable, InternedField)>,
 }
 
+#[derive(Default)]
+pub struct CurrentNamespace {
+    segments: Vec<InternedPathSegment>,
+    indices: Vec<NamespaceIndex>,
+}
+
+impl CurrentNamespace {
+    fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    fn idx(&self) -> usize {
+        self.indices.last().copied().unwrap_or(0)
+    }
+
+    fn pop(&mut self) {
+        assert!(self.segments.pop().is_some());
+        assert!(self.indices.pop().is_some());
+    }
+}
+
 /// Constraint system for testing purposes.
 pub struct TestConstraintSystem<F: Field> {
     // used to intern namespace segments
@@ -158,7 +179,7 @@ pub struct TestConstraintSystem<F: Field> {
     named_objects: IndexMap<InternedPath, NamedObject, FxBuildHasher>,
     // a stack of current path's segments and the index of the current path's
     // index in the named_objects map
-    current_namespace: (Vec<InternedPathSegment>, NamespaceIndex),
+    current_namespace: CurrentNamespace,
     // the list of currently applicable constraints
     constraints: OptionalVec<TestConstraint>,
     // the list of currently applicable input variables
@@ -343,8 +364,8 @@ impl<F: Field> TestConstraintSystem<F> {
 
     #[inline]
     fn compute_path(&mut self, new_segment: &str) -> InternedPath {
-        let mut vec = Vec::with_capacity(self.current_namespace.0.len() + 1);
-        vec.extend_from_slice(&self.current_namespace.0);
+        let mut vec = Vec::with_capacity(self.current_namespace.depth() + 1);
+        vec.extend_from_slice(&self.current_namespace.segments);
         let (interned_segment, new) = if let Some(index) = self.interned_path_segments.get_index_of(new_segment) {
             (index, false)
         } else {
@@ -391,8 +412,11 @@ impl<F: Field> TestConstraintSystem<F> {
 
     #[inline]
     fn register_object_in_namespace(&mut self, named_obj: NamedObject) {
-        if let NamedObject::Namespace(ref mut ns) =
-            self.named_objects.get_index_mut(self.current_namespace.1).unwrap().1
+        if let NamedObject::Namespace(ref mut ns) = self
+            .named_objects
+            .get_index_mut(self.current_namespace.idx())
+            .unwrap()
+            .1
         {
             ns.push(named_obj);
         }
@@ -478,14 +502,14 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
             ns.idx = namespace_idx;
         };
 
-        self.current_namespace.0.push(new_segment);
-        self.current_namespace.1 = namespace_idx;
+        self.current_namespace.segments.push(new_segment);
+        self.current_namespace.indices.push(namespace_idx);
     }
 
     fn pop_namespace(&mut self) {
         let namespace = if let NamedObject::Namespace(no) = self
             .named_objects
-            .swap_remove_index(self.current_namespace.1)
+            .swap_remove_index(self.current_namespace.idx())
             .unwrap()
             .1
         {
@@ -498,13 +522,7 @@ impl<F: Field> ConstraintSystem<F> for TestConstraintSystem<F> {
         self.purge_namespace(namespace);
 
         // update the current namespace
-        assert!(self.current_namespace.0.pop().is_some());
-        if let Some(new_ns_idx) = self.named_objects.get_index_of(self.current_namespace.0.as_slice()) {
-            self.current_namespace.1 = new_ns_idx;
-        } else {
-            // we must be at the "bottom" namespace
-            self.current_namespace.1 = 0;
-        }
+        self.current_namespace.pop();
     }
 
     #[inline]
