@@ -179,10 +179,12 @@ impl<F: Field> Default for TestConstraintSystem<F> {
             last_segment: interned_path_segment,
         };
 
-        let mut interned_full_paths = FxHashMap::default();
         cfg_if! {
             if #[cfg(debug_assertions)] {
+                let mut interned_full_paths = FxHashMap::default();
                 interned_full_paths.insert(vec![interned_path_segment], interned_path);
+            } else {
+                let interned_full_paths = FxHashMap::default();
             }
         }
 
