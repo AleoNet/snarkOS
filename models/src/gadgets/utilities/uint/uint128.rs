@@ -28,6 +28,7 @@ use crate::{
             ToBytesGadget,
         },
     },
+    to_bytes_int_impl,
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::{
@@ -735,33 +736,4 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt128 {
 }
 
 alloc_int_impl!(UInt128, u128, 128);
-
-impl<F: Field> ToBytesGadget<F> for UInt128 {
-    #[inline]
-    fn to_bytes<CS: ConstraintSystem<F>>(&self, _cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
-        let value_chunks = match self.value.map(|val| {
-            let mut bytes = [0u8; 16];
-            val.write(bytes.as_mut()).unwrap();
-            bytes
-        }) {
-            Some(chunks) => [Some(chunks[0]), Some(chunks[1]), Some(chunks[2]), Some(chunks[3])],
-            None => [None, None, None, None],
-        };
-        let bits = self.to_bits_le();
-        let mut bytes = Vec::with_capacity(bits.len() / 8);
-        for (chunk8, value) in bits.chunks(8).into_iter().zip(value_chunks.iter()) {
-            let byte = UInt8 {
-                bits: chunk8.to_vec(),
-                negated: false,
-                value: *value,
-            };
-            bytes.push(byte);
-        }
-
-        Ok(bytes)
-    }
-
-    fn to_bytes_strict<CS: ConstraintSystem<F>>(&self, cs: CS) -> Result<Vec<UInt8>, SynthesisError> {
-        self.to_bytes(cs)
-    }
-}
+to_bytes_int_impl!(UInt128, u128, 128);
