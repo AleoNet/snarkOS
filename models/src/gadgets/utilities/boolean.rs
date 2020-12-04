@@ -256,7 +256,7 @@ impl AllocatedBit {
 
 impl PartialEq for AllocatedBit {
     fn eq(&self, other: &Self) -> bool {
-        self.value.is_some() && other.value.is_some() && self.value == other.value
+        self.value.is_some() && self.value == other.value
     }
 }
 

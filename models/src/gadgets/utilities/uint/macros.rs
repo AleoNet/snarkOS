@@ -587,7 +587,7 @@ macro_rules! uint_impl {
 
         impl PartialEq for $name {
             fn eq(&self, other: &Self) -> bool {
-                !self.value.is_none() && !other.value.is_none() && self.value == other.value
+                self.value.is_some() && self.value == other.value
             }
         }
 
