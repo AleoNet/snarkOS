@@ -186,7 +186,7 @@ where
         let other_cur = &other.0[j];
         match self_cur.0.cmp(&other_cur.0) {
             Ordering::Greater => {
-                new_vec.push((other.0[j].0, push_fn(other.0[j].1)));
+                new_vec.push((other_cur.0, push_fn(other_cur.1)));
                 j += 1;
             }
             Ordering::Less => {
