@@ -264,7 +264,10 @@ macro_rules! uint_impl {
                     // balance out
                     lc = lc - (coeff, b.get_variable());
 
-                    result_bits.push(b.into());
+                    // Discard carry bits that we don't care about
+                    if result_bits.len() < $size {
+                        result_bits.push(b.into());
+                    }
 
                     max_value >>= 1;
                     i += 1;
@@ -273,9 +276,6 @@ macro_rules! uint_impl {
 
                 // Enforce that the linear combination equals zero
                 cs.enforce(|| "modular addition", |lc| lc, |lc| lc, |_| lc);
-
-                // Discard carry bits that we don't care about
-                result_bits.truncate($size);
 
                 Ok(Self {
                     bits: result_bits,
@@ -342,9 +342,6 @@ macro_rules! uint_impl {
 
                                 // Enforce that the linear combination equals zero
                                 cs.enforce(|| "unsafe subtraction", |lc| lc, |lc| lc, |_| lc);
-
-                                // Discard carry bits that we don't care about
-                                result_bits.truncate($size);
 
                                 Ok(Self {
                                     bits: result_bits,

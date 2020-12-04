@@ -306,7 +306,10 @@ impl UInt for UInt128 {
             // balance out
             lc = lc - (coeff, b.get_variable());
 
-            result_bits.push(b.into());
+            // Discard carry bits that we don't care about
+            if result_bits.len() < 128 {
+                result_bits.push(b.into());
+            }
 
             max_value.div2();
             i += 1;
@@ -315,9 +318,6 @@ impl UInt for UInt128 {
 
         // Enforce that the linear combination equals zero
         cs.enforce(|| "modular addition", |lc| lc, |lc| lc, |_| lc);
-
-        // Discard carry bits that we don't care about
-        result_bits.truncate(128);
 
         Ok(Self {
             bits: result_bits,
@@ -381,9 +381,6 @@ impl UInt for UInt128 {
 
                         // Enforce that the linear combination equals zero
                         cs.enforce(|| "unsafe subtraction", |lc| lc, |lc| lc, |_| lc);
-
-                        // Discard carry bits that we don't care about
-                        result_bits.truncate(128);
 
                         Ok(Self {
                             bits: result_bits,

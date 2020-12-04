@@ -134,9 +134,6 @@ macro_rules! add_int_impl {
                 // Enforce that the linear combination equals zero
                 cs.enforce(|| "modular addition", |lc| lc, |lc| lc, |_| lc);
 
-                // Discard carry bits we don't care about
-                result_bits.truncate(<$gadget as Int>::SIZE);
-
                 Ok(Self {
                     bits: result_bits,
                     value: modular_value,
