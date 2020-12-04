@@ -708,19 +708,21 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt128 {
 
             result.negated = is_negated;
 
-            let expected_bits = first
-                .bits
+            for (i, (actual, (bit1, bit2))) in result
+                .to_bits_le()
                 .iter()
-                .zip(&second.bits)
+                .zip(first.bits.iter().zip(&second.bits))
                 .enumerate()
-                .map(|(i, (a, b))| {
-                    Boolean::conditionally_select(&mut cs.ns(|| format!("uint128_cond_select_{}", i)), cond, a, b)
-                        .unwrap()
-                })
-                .collect::<Vec<Boolean>>();
+            {
+                let expected_bit = Boolean::conditionally_select(
+                    &mut cs.ns(|| format!("uint128_cond_select_{}", i)),
+                    cond,
+                    bit1,
+                    bit2,
+                )
+                .unwrap();
 
-            for (i, (actual, expected)) in result.to_bits_le().iter().zip(expected_bits.iter()).enumerate() {
-                actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), expected)?;
+                actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), &expected_bit)?;
             }
 
             Ok(result)

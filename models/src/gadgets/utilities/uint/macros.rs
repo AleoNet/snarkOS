@@ -727,24 +727,20 @@ macro_rules! uint_impl {
 
                     result.negated = is_negated;
 
-                    let expected_bits = first
-                        .bits
+                    for (i, (actual, (bit1, bit2))) in result
+                        .to_bits_le()
                         .iter()
-                        .zip(&second.bits)
+                        .zip(first.bits.iter().zip(&second.bits))
                         .enumerate()
-                        .map(|(i, (a, b))| {
-                            Boolean::conditionally_select(
-                                &mut cs.ns(|| format!("{}_cond_select_{}", $size, i)),
-                                cond,
-                                a,
-                                b,
-                            )
-                            .unwrap()
-                        })
-                        .collect::<Vec<Boolean>>();
-
-                    for (i, (actual, expected)) in result.to_bits_le().iter().zip(expected_bits.iter()).enumerate() {
-                        actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), expected)?;
+                    {
+                        let expected_bit = Boolean::conditionally_select(
+                            &mut cs.ns(|| format!("{}_cond_select_{}", $size, i)),
+                            cond,
+                            bit1,
+                            bit2,
+                        )
+                        .unwrap();
+                        actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), &expected_bit)?;
                     }
 
                     Ok(result)
