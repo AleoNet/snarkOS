@@ -81,10 +81,11 @@ pub struct Server {
 impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
-        // Create the inbound and outbound service.
+        // Create the inbound and outbound handlers.
         let inbound = Arc::new(RwLock::new(Inbound::new()));
         let outbound = Arc::new(RwLock::new(Outbound::new()));
 
+        // Initialize the peer and block services.
         let peers = Peers::new(&mut environment.clone(), outbound.clone())?;
         let blocks = Blocks::new(&mut environment.clone(), outbound.clone())?;
 
@@ -119,7 +120,7 @@ impl Server {
         }
     }
 
-    pub async fn receiver(&self) -> Result<(), NetworkError> {
+    async fn receiver(&self) -> Result<(), NetworkError> {
         warn!("START NEXT RECEIVER INBOUND");
         let response = self
             .inbound

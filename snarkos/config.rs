@@ -35,7 +35,6 @@ use toml;
 pub const MAINNET_BOOTNODES: &'static [&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &'static [&str] = &[
         "0.0.0.0:4141"
-        // "50.18.246.201:4131"
     // "138.197.232.178:4131",
     // "64.225.91.42:4131",
     // "64.225.91.43:4131",
