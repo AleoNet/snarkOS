@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    alloc_int_impl,
     curves::{Field, FpParameters, PrimeField},
     gadgets::{
         r1cs::{Assignment, ConstraintSystem, LinearCombination},
@@ -731,82 +732,7 @@ impl<F: PrimeField> CondSelectGadget<F> for UInt128 {
     }
 }
 
-impl<F: Field> AllocGadget<u128, F> for UInt128 {
-    fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<u128>, CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        value_gen: Fn,
-    ) -> Result<Self, SynthesisError> {
-        let value = value_gen().map(|val| *val.borrow());
-        let values = match value {
-            Ok(mut val) => {
-                let mut v = Vec::with_capacity(128);
-
-                for _ in 0..128 {
-                    v.push(Some(val & 1 == 1));
-                    val >>= 1;
-                }
-
-                v
-            }
-            _ => vec![None; 128],
-        };
-
-        let bits = values
-            .into_iter()
-            .enumerate()
-            .map(|(i, v)| {
-                Ok(Boolean::from(AllocatedBit::alloc(
-                    &mut cs.ns(|| format!("allocated bit_gadget {}", i)),
-                    || v.ok_or(SynthesisError::AssignmentMissing),
-                )?))
-            })
-            .collect::<Result<Vec<_>, SynthesisError>>()?;
-
-        Ok(Self {
-            bits,
-            negated: false,
-            value: value.ok(),
-        })
-    }
-
-    fn alloc_input<Fn, T, CS: ConstraintSystem<F>>(mut cs: CS, value_gen: Fn) -> Result<Self, SynthesisError>
-    where
-        Fn: FnOnce() -> Result<T, SynthesisError>,
-        T: Borrow<u128>,
-    {
-        let value = value_gen().map(|val| *val.borrow());
-        let values = match value {
-            Ok(mut val) => {
-                let mut v = Vec::with_capacity(128);
-
-                for _ in 0..128 {
-                    v.push(Some(val & 1 == 1));
-                    val >>= 1;
-                }
-
-                v
-            }
-            _ => vec![None; 128],
-        };
-
-        let bits = values
-            .into_iter()
-            .enumerate()
-            .map(|(i, v)| {
-                Ok(Boolean::from(AllocatedBit::alloc_input(
-                    &mut cs.ns(|| format!("allocated bit_gadget {}", i)),
-                    || v.ok_or(SynthesisError::AssignmentMissing),
-                )?))
-            })
-            .collect::<Result<Vec<_>, SynthesisError>>()?;
-
-        Ok(Self {
-            bits,
-            negated: false,
-            value: value.ok(),
-        })
-    }
-}
+alloc_int_impl!(UInt128, u128, 128);
 
 impl<F: Field> ToBytesGadget<F> for UInt128 {
     #[inline]

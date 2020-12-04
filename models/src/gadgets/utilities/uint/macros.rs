@@ -14,6 +14,57 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+macro_rules! alloc_int_fn_impl {
+    ($name: ident, $_type: ty, $size: expr, $fn_name: ident) => {
+        fn $fn_name<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<$_type>, CS: ConstraintSystem<F>>(
+            mut cs: CS,
+            value_gen: Fn,
+        ) -> Result<Self, SynthesisError> {
+            let value = value_gen().map(|val| *val.borrow());
+            let values = match value {
+                Ok(mut val) => {
+                    let mut v = Vec::with_capacity($size);
+                    for _ in 0..$size {
+                        v.push(Some(val & 1 == 1));
+                        val >>= 1;
+                    }
+
+                    v
+                }
+                _ => vec![None; $size],
+            };
+
+            let bits = values
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    Ok(Boolean::from(AllocatedBit::$fn_name(
+                        &mut cs.ns(|| format!("allocated bit_gadget {}", i)),
+                        || v.ok_or(SynthesisError::AssignmentMissing),
+                    )?))
+                })
+                .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+            Ok(Self {
+                bits,
+                negated: false,
+                value: value.ok(),
+            })
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! alloc_int_impl {
+    ($name: ident, $_type: ty, $size: expr) => {
+        impl<F: Field> AllocGadget<$_type, F> for $name {
+            alloc_int_fn_impl!($name, $_type, $size, alloc);
+
+            alloc_int_fn_impl!($name, $_type, $size, alloc_input);
+        }
+    };
+}
+
 macro_rules! uint_impl {
     ($name: ident, $_type: ty, $size: expr) => {
         #[derive(Clone, Debug)]
@@ -644,80 +695,7 @@ macro_rules! uint_impl {
             }
         }
 
-        impl<F: Field> AllocGadget<$_type, F> for $name {
-            fn alloc<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<$_type>, CS: ConstraintSystem<F>>(
-                mut cs: CS,
-                value_gen: Fn,
-            ) -> Result<Self, SynthesisError> {
-                let value = value_gen().map(|val| *val.borrow());
-                let values = match value {
-                    Ok(mut val) => {
-                        let mut v = Vec::with_capacity($size);
-
-                        for _ in 0..$size {
-                            v.push(Some(val & 1 == 1));
-                            val >>= 1;
-                        }
-
-                        v
-                    }
-                    _ => vec![None; $size],
-                };
-
-                let bits = values
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, v)| {
-                        Ok(Boolean::from(AllocatedBit::alloc(
-                            &mut cs.ns(|| format!("allocated bit_gadget {}", i)),
-                            || v.ok_or(SynthesisError::AssignmentMissing),
-                        )?))
-                    })
-                    .collect::<Result<Vec<_>, SynthesisError>>()?;
-
-                Ok(Self {
-                    bits,
-                    negated: false,
-                    value: value.ok(),
-                })
-            }
-
-            fn alloc_input<Fn: FnOnce() -> Result<T, SynthesisError>, T: Borrow<$_type>, CS: ConstraintSystem<F>>(
-                mut cs: CS,
-                value_gen: Fn,
-            ) -> Result<Self, SynthesisError> {
-                let value = value_gen().map(|val| *val.borrow());
-                let values = match value {
-                    Ok(mut val) => {
-                        let mut v = Vec::with_capacity($size);
-                        for _ in 0..$size {
-                            v.push(Some(val & 1 == 1));
-                            val >>= 1;
-                        }
-
-                        v
-                    }
-                    _ => vec![None; $size],
-                };
-
-                let bits = values
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, v)| {
-                        Ok(Boolean::from(AllocatedBit::alloc_input(
-                            &mut cs.ns(|| format!("allocated bit_gadget {}", i)),
-                            || v.ok_or(SynthesisError::AssignmentMissing),
-                        )?))
-                    })
-                    .collect::<Result<Vec<_>, SynthesisError>>()?;
-
-                Ok(Self {
-                    bits,
-                    negated: false,
-                    value: value.ok(),
-                })
-            }
-        }
+        alloc_int_impl!($name, $_type, $size);
 
         impl<F: PrimeField> CondSelectGadget<F> for $name {
             fn conditionally_select<CS: ConstraintSystem<F>>(
