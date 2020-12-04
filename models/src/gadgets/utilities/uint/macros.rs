@@ -102,6 +102,66 @@ macro_rules! to_bytes_int_impl {
     };
 }
 
+#[macro_export]
+macro_rules! cond_select_int_impl {
+    ($name: ident, $_type: ty, $size: expr) => {
+        impl<F: PrimeField> CondSelectGadget<F> for $name {
+            fn conditionally_select<CS: ConstraintSystem<F>>(
+                mut cs: CS,
+                cond: &Boolean,
+                first: &Self,
+                second: &Self,
+            ) -> Result<Self, SynthesisError> {
+                if let Boolean::Constant(cond) = *cond {
+                    if cond {
+                        Ok(first.clone())
+                    } else {
+                        Ok(second.clone())
+                    }
+                } else {
+                    let mut is_negated = false;
+
+                    let result_val = cond.get_value().and_then(|c| {
+                        if c {
+                            is_negated = first.negated;
+                            first.value
+                        } else {
+                            is_negated = second.negated;
+                            second.value
+                        }
+                    });
+
+                    let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get().map(|v| v))?;
+
+                    result.negated = is_negated;
+
+                    for (i, (actual, (bit1, bit2))) in result
+                        .to_bits_le()
+                        .iter()
+                        .zip(first.bits.iter().zip(&second.bits))
+                        .enumerate()
+                    {
+                        let expected_bit = Boolean::conditionally_select(
+                            &mut cs.ns(|| format!("{}_cond_select_{}", $size, i)),
+                            cond,
+                            bit1,
+                            bit2,
+                        )
+                        .unwrap();
+                        actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), &expected_bit)?;
+                    }
+
+                    Ok(result)
+                }
+            }
+
+            fn cost() -> usize {
+                $size * (<Boolean as ConditionalEqGadget<F>>::cost() + <Boolean as CondSelectGadget<F>>::cost())
+            }
+        }
+    };
+}
+
 macro_rules! uint_impl {
     ($name: ident, $_type: ty, $size: expr) => {
         #[derive(Clone, Debug)]
@@ -733,62 +793,7 @@ macro_rules! uint_impl {
         }
 
         alloc_int_impl!($name, $_type, $size);
-
-        impl<F: PrimeField> CondSelectGadget<F> for $name {
-            fn conditionally_select<CS: ConstraintSystem<F>>(
-                mut cs: CS,
-                cond: &Boolean,
-                first: &Self,
-                second: &Self,
-            ) -> Result<Self, SynthesisError> {
-                if let Boolean::Constant(cond) = *cond {
-                    if cond {
-                        Ok(first.clone())
-                    } else {
-                        Ok(second.clone())
-                    }
-                } else {
-                    let mut is_negated = false;
-
-                    let result_val = cond.get_value().and_then(|c| {
-                        if c {
-                            is_negated = first.negated;
-                            first.value
-                        } else {
-                            is_negated = second.negated;
-                            second.value
-                        }
-                    });
-
-                    let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get().map(|v| v))?;
-
-                    result.negated = is_negated;
-
-                    for (i, (actual, (bit1, bit2))) in result
-                        .to_bits_le()
-                        .iter()
-                        .zip(first.bits.iter().zip(&second.bits))
-                        .enumerate()
-                    {
-                        let expected_bit = Boolean::conditionally_select(
-                            &mut cs.ns(|| format!("{}_cond_select_{}", $size, i)),
-                            cond,
-                            bit1,
-                            bit2,
-                        )
-                        .unwrap();
-                        actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), &expected_bit)?;
-                    }
-
-                    Ok(result)
-                }
-            }
-
-            fn cost() -> usize {
-                $size * (<Boolean as ConditionalEqGadget<F>>::cost() + <Boolean as CondSelectGadget<F>>::cost())
-            }
-        }
-
+        cond_select_int_impl!($name, $_type, $size);
         to_bytes_int_impl!($name, $_type, $size);
     };
 }

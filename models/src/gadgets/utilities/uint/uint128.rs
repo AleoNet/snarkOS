@@ -16,6 +16,7 @@
 
 use crate::{
     alloc_int_impl,
+    cond_select_int_impl,
     curves::{Field, FpParameters, PrimeField},
     gadgets::{
         r1cs::{Assignment, ConstraintSystem, LinearCombination},
@@ -683,57 +684,6 @@ impl<F: Field> ConditionalEqGadget<F> for UInt128 {
     }
 }
 
-impl<F: PrimeField> CondSelectGadget<F> for UInt128 {
-    fn conditionally_select<CS: ConstraintSystem<F>>(
-        mut cs: CS,
-        cond: &Boolean,
-        first: &Self,
-        second: &Self,
-    ) -> Result<Self, SynthesisError> {
-        if let Boolean::Constant(cond) = *cond {
-            if cond { Ok(first.clone()) } else { Ok(second.clone()) }
-        } else {
-            let mut is_negated = false;
-
-            let result_val = cond.get_value().and_then(|c| {
-                if c {
-                    is_negated = first.negated;
-                    first.value
-                } else {
-                    is_negated = second.negated;
-                    second.value
-                }
-            });
-
-            let mut result = Self::alloc(cs.ns(|| "cond_select_result"), || result_val.get())?;
-
-            result.negated = is_negated;
-
-            for (i, (actual, (bit1, bit2))) in result
-                .to_bits_le()
-                .iter()
-                .zip(first.bits.iter().zip(&second.bits))
-                .enumerate()
-            {
-                let expected_bit = Boolean::conditionally_select(
-                    &mut cs.ns(|| format!("uint128_cond_select_{}", i)),
-                    cond,
-                    bit1,
-                    bit2,
-                )
-                .unwrap();
-
-                actual.enforce_equal(&mut cs.ns(|| format!("selected_result_bit_{}", i)), &expected_bit)?;
-            }
-
-            Ok(result)
-        }
-    }
-
-    fn cost() -> usize {
-        128 * (<Boolean as ConditionalEqGadget<F>>::cost() + <Boolean as CondSelectGadget<F>>::cost())
-    }
-}
-
 alloc_int_impl!(UInt128, u128, 128);
+cond_select_int_impl!(UInt128, u128, 128);
 to_bytes_int_impl!(UInt128, u128, 128);
