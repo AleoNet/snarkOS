@@ -521,7 +521,7 @@ macro_rules! uint_impl {
                     let index = $size - 1 - i as usize;
                     let bit_value = (1 as $_type) << (index as $_type);
                     let mut new_quotient = quotient.clone();
-                    new_quotient.bits[index] = true_bit.clone();
+                    new_quotient.bits[index] = true_bit;
                     new_quotient.value = Some(new_quotient.value.unwrap() + bit_value);
 
                     quotient = Self::conditionally_select(
