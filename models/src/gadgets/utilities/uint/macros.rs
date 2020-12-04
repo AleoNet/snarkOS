@@ -763,12 +763,13 @@ macro_rules! uint_impl {
                     Some(chunks) => [Some(chunks[0]), Some(chunks[1]), Some(chunks[2]), Some(chunks[3])],
                     None => [None, None, None, None],
                 };
-                let mut bytes = Vec::new();
-                for (i, chunk8) in self.to_bits_le().chunks(8).into_iter().enumerate() {
+                let bits = self.to_bits_le();
+                let mut bytes = Vec::with_capacity(bits.len() / 8);
+                for (chunk8, value) in bits.chunks(8).into_iter().zip(value_chunks.iter()) {
                     let byte = UInt8 {
                         bits: chunk8.to_vec(),
                         negated: false,
-                        value: value_chunks[i],
+                        value: *value,
                     };
                     bytes.push(byte);
                 }
