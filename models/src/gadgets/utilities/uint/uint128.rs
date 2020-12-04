@@ -15,8 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    alloc_int_impl,
-    cond_select_int_impl,
     curves::{Field, FpParameters, PrimeField},
     gadgets::{
         r1cs::{Assignment, ConstraintSystem, LinearCombination},
@@ -29,7 +27,7 @@ use crate::{
             ToBytesGadget,
         },
     },
-    to_bytes_int_impl,
+    uint_impl_common,
 };
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_utilities::{
@@ -39,39 +37,7 @@ use snarkos_utilities::{
 
 use std::{borrow::Borrow, cmp::Ordering};
 
-/// Represents an interpretation of 128 `Boolean` objects as an
-/// unsigned integer.
-#[derive(Clone, Debug)]
-pub struct UInt128 {
-    // Least significant bit_gadget first
-    pub bits: Vec<Boolean>,
-    pub negated: bool,
-    pub value: Option<u128>,
-}
-
-impl UInt128 {
-    /// Construct a constant `UInt128` from a `u128`
-    pub fn constant(value: u128) -> Self {
-        let mut bits = Vec::with_capacity(128);
-
-        let mut tmp = value;
-        for _ in 0..128 {
-            if tmp & 1 == 1 {
-                bits.push(Boolean::constant(true))
-            } else {
-                bits.push(Boolean::constant(false))
-            }
-
-            tmp >>= 1;
-        }
-
-        Self {
-            bits,
-            negated: false,
-            value: Some(value),
-        }
-    }
-}
+uint_impl_common!(UInt128, u128, 128);
 
 impl UInt for UInt128 {
     /// Returns the inverse UInt128
@@ -421,7 +387,7 @@ impl UInt for UInt128 {
 
         let is_constant = Boolean::constant(Self::result_is_constant(&self, &other));
         let constant_result = Self::constant(0u128);
-        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_1u128"), || Ok(0u128))?;
+        let allocated_result = Self::alloc(&mut cs.ns(|| "allocated_0u128"), || Ok(0u128))?;
         let zero_result = Self::conditionally_select(
             &mut cs.ns(|| "constant_or_allocated"),
             &is_constant,
@@ -632,58 +598,3 @@ impl UInt for UInt128 {
         Ok(result)
     }
 }
-
-impl PartialEq for UInt128 {
-    fn eq(&self, other: &Self) -> bool {
-        self.value.is_some() && self.value == other.value
-    }
-}
-
-impl Eq for UInt128 {}
-
-impl PartialOrd for UInt128 {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Option::from(self.value.cmp(&other.value))
-    }
-}
-
-impl<F: PrimeField> EvaluateEqGadget<F> for UInt128 {
-    fn evaluate_equal<CS: ConstraintSystem<F>>(&self, mut cs: CS, other: &Self) -> Result<Boolean, SynthesisError> {
-        let mut result = Boolean::constant(true);
-        for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-            let equal = a.evaluate_equal(&mut cs.ns(|| format!("u128 evaluate equality for {}-th bit", i)), b)?;
-
-            result = Boolean::and(
-                &mut cs.ns(|| format!("u128 and result for {}-th bit", i)),
-                &equal,
-                &result,
-            )?;
-        }
-
-        Ok(result)
-    }
-}
-
-impl<F: Field> EqGadget<F> for UInt128 {}
-
-impl<F: Field> ConditionalEqGadget<F> for UInt128 {
-    fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
-        &self,
-        mut cs: CS,
-        other: &Self,
-        condition: &Boolean,
-    ) -> Result<(), SynthesisError> {
-        for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-            a.conditional_enforce_equal(&mut cs.ns(|| format!("uint128_equal_{}", i)), b, condition)?;
-        }
-        Ok(())
-    }
-
-    fn cost() -> usize {
-        128 * <Boolean as ConditionalEqGadget<F>>::cost()
-    }
-}
-
-alloc_int_impl!(UInt128, u128, 128);
-cond_select_int_impl!(UInt128, u128, 128);
-to_bytes_int_impl!(UInt128, u128, 128);

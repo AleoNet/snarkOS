@@ -54,7 +54,6 @@ macro_rules! alloc_int_fn_impl {
     };
 }
 
-#[macro_export]
 macro_rules! alloc_int_impl {
     ($name: ident, $_type: ty, $size: expr) => {
         impl<F: Field> AllocGadget<$_type, F> for $name {
@@ -65,7 +64,6 @@ macro_rules! alloc_int_impl {
     };
 }
 
-#[macro_export]
 macro_rules! to_bytes_int_impl {
     ($name: ident, $_type: ty, $size: expr) => {
         impl<F: Field> ToBytesGadget<F> for $name {
@@ -102,7 +100,6 @@ macro_rules! to_bytes_int_impl {
     };
 }
 
-#[macro_export]
 macro_rules! cond_select_int_impl {
     ($name: ident, $_type: ty, $size: expr) => {
         impl<F: PrimeField> CondSelectGadget<F> for $name {
@@ -162,7 +159,80 @@ macro_rules! cond_select_int_impl {
     };
 }
 
-macro_rules! uint_impl {
+macro_rules! uint_impl_eq_ord {
+    ($name: ident, $_type: ty, $size: expr) => {
+        impl PartialEq for $name {
+            fn eq(&self, other: &Self) -> bool {
+                self.value.is_some() && self.value == other.value
+            }
+        }
+
+        impl Eq for $name {}
+
+        impl PartialOrd for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Option::from(self.value.cmp(&other.value))
+            }
+        }
+    };
+}
+
+macro_rules! uint_impl_eq_gadget {
+    ($name: ident, $_type: ty, $size: expr) => {
+        impl<F: PrimeField> EvaluateEqGadget<F> for $name {
+            fn evaluate_equal<CS: ConstraintSystem<F>>(
+                &self,
+                mut cs: CS,
+                other: &Self,
+            ) -> Result<Boolean, SynthesisError> {
+                let mut result = Boolean::constant(true);
+                for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
+                    let equal = a.evaluate_equal(
+                        &mut cs.ns(|| format!("{} evaluate equality for {}-th bit", $size, i)),
+                        b,
+                    )?;
+
+                    result = Boolean::and(
+                        &mut cs.ns(|| format!("{} and result for {}-th bit", $size, i)),
+                        &equal,
+                        &result,
+                    )?;
+                }
+
+                Ok(result)
+            }
+        }
+
+        impl<F: Field> EqGadget<F> for $name {}
+
+        impl<F: Field> ConditionalEqGadget<F> for $name {
+            fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
+                &self,
+                mut cs: CS,
+                other: &Self,
+                condition: &Boolean,
+            ) -> Result<(), SynthesisError> {
+                for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
+                    a.conditional_enforce_equal(
+                        &mut cs.ns(|| format!("{} equality check for {}-th bit", $size, i)),
+                        b,
+                        condition,
+                    )?;
+                }
+                Ok(())
+            }
+
+            fn cost() -> usize {
+                const MULTIPLIER: usize = if $size == 128 { 128 } else { 8 };
+
+                MULTIPLIER * <Boolean as ConditionalEqGadget<F>>::cost()
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! uint_impl_common {
     ($name: ident, $_type: ty, $size: expr) => {
         #[derive(Clone, Debug)]
         pub struct $name {
@@ -196,12 +266,24 @@ macro_rules! uint_impl {
             }
         }
 
+        alloc_int_impl!($name, $_type, $size);
+        cond_select_int_impl!($name, $_type, $size);
+        to_bytes_int_impl!($name, $_type, $size);
+        uint_impl_eq_ord!($name, $_type, $size);
+        uint_impl_eq_gadget!($name, $_type, $size);
+    };
+}
+
+macro_rules! uint_impl {
+    ($name: ident, $_type: ty, $size: expr) => {
+        uint_impl_common!($name, $_type, $size);
+
         impl UInt for $name {
             fn negate(&self) -> Self {
                 Self {
                     bits: self.bits.clone(),
                     negated: true,
-                    value: self.value.clone(),
+                    value: self.value,
                 }
             }
 
@@ -729,71 +811,5 @@ macro_rules! uint_impl {
                 Ok(result)
             }
         }
-
-        impl PartialEq for $name {
-            fn eq(&self, other: &Self) -> bool {
-                self.value.is_some() && self.value == other.value
-            }
-        }
-
-        impl Eq for $name {}
-
-        impl PartialOrd for $name {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Option::from(self.value.cmp(&other.value))
-            }
-        }
-
-        impl<F: PrimeField> EvaluateEqGadget<F> for $name {
-            fn evaluate_equal<CS: ConstraintSystem<F>>(
-                &self,
-                mut cs: CS,
-                other: &Self,
-            ) -> Result<Boolean, SynthesisError> {
-                let mut result = Boolean::constant(true);
-                for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-                    let equal = a.evaluate_equal(
-                        &mut cs.ns(|| format!("{} evaluate equality for {}-th bit", $size, i)),
-                        b,
-                    )?;
-
-                    result = Boolean::and(
-                        &mut cs.ns(|| format!("{} and result for {}-th bit", $size, i)),
-                        &equal,
-                        &result,
-                    )?;
-                }
-
-                Ok(result)
-            }
-        }
-
-        impl<F: Field> EqGadget<F> for $name {}
-
-        impl<F: Field> ConditionalEqGadget<F> for $name {
-            fn conditional_enforce_equal<CS: ConstraintSystem<F>>(
-                &self,
-                mut cs: CS,
-                other: &Self,
-                condition: &Boolean,
-            ) -> Result<(), SynthesisError> {
-                for (i, (a, b)) in self.bits.iter().zip(&other.bits).enumerate() {
-                    a.conditional_enforce_equal(
-                        &mut cs.ns(|| format!("{} equality check for {}-th bit", $size, i)),
-                        b,
-                        condition,
-                    )?;
-                }
-                Ok(())
-            }
-
-            fn cost() -> usize {
-                8 * <Boolean as ConditionalEqGadget<F>>::cost()
-            }
-        }
-
-        alloc_int_impl!($name, $_type, $size);
-        cond_select_int_impl!($name, $_type, $size);
-        to_bytes_int_impl!($name, $_type, $size);
     };
 }
