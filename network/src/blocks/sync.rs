@@ -98,7 +98,7 @@ impl SyncManager {
 
     /// Remove the blocks that are now included in the chain.
     pub async fn clear_pending(&mut self) {
-        for block_hash in &self.pending_blocks.clone().keys() {
+        for block_hash in self.pending_blocks.clone().keys() {
             if !self.environment.storage_read().await.block_hash_exists(block_hash) {
                 self.pending_blocks.remove(block_hash);
             }

@@ -213,8 +213,7 @@ fn main() -> Result<(), NodeError> {
     let config: Config = ConfigCli::parse(&arguments)?;
     let node_span = debug_span!("node");
 
-    Builder::new()
-        .threaded_scheduler()
+    Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?

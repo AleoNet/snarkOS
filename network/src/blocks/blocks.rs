@@ -286,7 +286,10 @@ impl Blocks {
 
             if let Ok(inserted) = memory_pool.insert(&*self.environment.storage_read().await, entry) {
                 if let Some(txid) = inserted {
-                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(txid));
+                    debug!(
+                        "Transaction added to memory pool with txid: {:?}",
+                        hex::encode(txid.clone())
+                    );
                 }
             }
         }
