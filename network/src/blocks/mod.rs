@@ -17,5 +17,5 @@
 pub mod blocks;
 pub use blocks::*;
 
-pub(crate) mod sync;
-pub(crate) use sync::*;
+pub mod sync;
+pub use sync::*;

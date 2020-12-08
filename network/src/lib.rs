@@ -47,15 +47,7 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
-use crate::{
-    blocks::Blocks,
-    environment::Environment,
-    inbound::Response,
-    peers::peers::Peers,
-    Inbound,
-    NetworkError,
-    Outbound,
-};
+use crate::peers::peers::Peers;
 
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::RwLock, task, time::sleep};

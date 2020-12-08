@@ -36,7 +36,10 @@ use snarkos_utilities::{
 
 use chrono::Utc;
 use std::{path::PathBuf, sync::Arc};
-use tokio::{runtime::Runtime, sync::RwLock};
+use tokio::{
+    runtime::Runtime,
+    sync::{Mutex, RwLock},
+};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
