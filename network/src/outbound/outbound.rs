@@ -39,7 +39,7 @@ pub(super) type Channel = Arc<Mutex<TcpStream>>;
 type Channels = HashMap<SocketAddr, Channel>;
 
 /// The set of requests for a single remote address.
-type Requests = Arc<RwLock<HashSet<Request>>>;
+type Requests = HashSet<Request>;
 
 /// The map of remote addresses to their pending requests.
 type Pending = HashMap<SocketAddr, Requests>;
@@ -80,7 +80,7 @@ impl Outbound {
         // Fetch the pending requests of the given receiver.
         match pending.get(&request.receiver()) {
             // Check if the set of pending requests contains the given request.
-            Some(requests) => requests.read().await.contains(&request),
+            Some(requests) => requests.contains(&request),
             // Return `false` as the receiver does not exist in this map.
             None => false,
         }
@@ -96,7 +96,7 @@ impl Outbound {
         // Fetch the successful requests of the given receiver.
         match success.get(&request.receiver()) {
             // Check if the set of successful requests contains the given request.
-            Some(requests) => requests.read().await.contains(&request),
+            Some(requests) => requests.contains(&request),
             // Return `false` as the receiver does not exist in this map.
             None => false,
         }
@@ -112,7 +112,7 @@ impl Outbound {
         // Fetch the failed requests of the given receiver.
         match failure.get(&request.receiver()) {
             // Check if the set of failed requests contains the given request.
-            Some(requests) => requests.read().await.contains(&request),
+            Some(requests) => requests.contains(&request),
             // Return `false` as the receiver does not exist in this map.
             None => false,
         }
@@ -201,7 +201,7 @@ impl Outbound {
         // Store the request to the pending requests.
         match pending.get_mut(&request.receiver()) {
             Some(requests) => {
-                requests.write().await.insert(request.clone());
+                requests.insert(request.clone());
 
                 // Increment the request counter.
                 self.send_pending_count.fetch_add(1, Ordering::SeqCst);
@@ -253,7 +253,7 @@ impl Outbound {
 
         // Remove the request from the pending requests.
         if let Some(requests) = pending.get_mut(&request.receiver()) {
-            requests.write().await.remove(&request);
+            requests.remove(&request);
         };
 
         // Acquire the success requests write lock.
@@ -261,7 +261,7 @@ impl Outbound {
 
         // Store the request in the successful requests.
         if let Some(requests) = success.get_mut(&request.receiver()) {
-            requests.write().await.insert(request.clone());
+            requests.insert(request.clone());
 
             // Increment the success counter.
             self.send_success_count.fetch_add(1, Ordering::SeqCst);
@@ -277,7 +277,7 @@ impl Outbound {
 
         // Remove the request from the pending requests.
         if let Some(requests) = pending.get_mut(&request.receiver()) {
-            requests.write().await.remove(&request);
+            requests.remove(&request);
         };
 
         // Acquire the failed requests write lock.
@@ -285,7 +285,7 @@ impl Outbound {
 
         // Store the request in the failed requests.
         if let Some(requests) = failure.get_mut(&request.receiver()) {
-            requests.write().await.insert(request.clone());
+            requests.insert(request.clone());
 
             // Increment the failure counter.
             self.send_failure_count.fetch_add(1, Ordering::SeqCst);
