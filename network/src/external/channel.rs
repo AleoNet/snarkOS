@@ -23,7 +23,14 @@ use crate::external::message::{
 use snarkos_errors::network::ConnectError;
 
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
+use tokio::{
+    io::AsyncWriteExt,
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpStream,
+    },
+    sync::Mutex,
+};
 
 /// A channel for reading and writing messages to a peer.
 /// The channel manages two streams to allow for simultaneous reading and writing.
@@ -31,70 +38,46 @@ use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 #[derive(Clone, Debug)]
 pub struct Channel {
     pub remote_address: SocketAddr,
-    pub reader: Arc<Mutex<TcpStream>>,
-    pub writer: Arc<Mutex<TcpStream>>,
+    pub reader: Arc<Mutex<OwnedReadHalf>>,
+    pub writer: Arc<Mutex<OwnedWriteHalf>>,
 }
 
 impl Channel {
-    pub async fn new(
-        remote_address: SocketAddr,
-        reader: Arc<Mutex<TcpStream>>,
-        writer: Arc<Mutex<TcpStream>>,
-    ) -> Result<Self, ConnectError> {
-        Ok(Self {
-            remote_address,
-            reader,
-            writer,
-        })
-    }
-
-    /// Returns a new channel with a writer only stream.
-    pub async fn new_writer(remote_address: SocketAddr) -> Result<Self, ConnectError> {
-        let stream = Arc::new(Mutex::new(TcpStream::connect(remote_address).await?));
+    pub fn new(remote_address: SocketAddr, stream: TcpStream) -> Result<Self, ConnectError> {
+        let (reader, writer) = stream.into_split();
 
         Ok(Self {
             remote_address,
-            reader: stream.clone(),
-            writer: stream,
+            reader: Arc::new(Mutex::new(reader)),
+            writer: Arc::new(Mutex::new(writer)),
         })
     }
 
-    /// Returns a new channel with a reader only stream.
-    pub fn new_reader(reader: TcpStream) -> Result<Self, ConnectError> {
-        let remote_address = reader.peer_addr()?;
-        let stream = Arc::new(Mutex::new(reader));
+    pub async fn from_addr(remote_address: SocketAddr) -> Result<Self, ConnectError> {
+        let stream = TcpStream::connect(remote_address).await?;
 
-        Ok(Self {
-            remote_address,
-            reader: stream.clone(),
-            writer: stream,
-        })
-    }
-
-    /// Returns a new channel with the specified address.
-    pub fn update_address(&self, remote_address: SocketAddr) -> Self {
-        Self {
-            remote_address,
-            reader: self.reader.clone(),
-            writer: self.writer.clone(),
-        }
-    }
-
-    /// Returns a new channel with the specified reader stream.
-    pub fn update_reader(&self, reader: Arc<Mutex<TcpStream>>) -> Self {
-        Self {
-            remote_address: self.remote_address,
-            reader,
-            writer: self.writer.clone(),
-        }
+        Channel::new(remote_address, stream)
     }
 
     /// Returns a new channel with the specified address and new writer stream.
-    pub async fn update_writer(&self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
+    pub async fn update_writer(self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
+        let stream = TcpStream::connect(remote_address).await?;
+        let writer = stream.into_split().1;
+
         Ok(Self {
             remote_address,
-            reader: self.reader.clone(),
-            writer: Arc::new(Mutex::new(TcpStream::connect(remote_address).await?)),
+            reader: self.reader,
+            writer: Arc::new(Mutex::new(writer)),
+        })
+    }
+
+    pub async fn update_reader(self, stream: TcpStream) -> Result<Self, ConnectError> {
+        let reader = stream.into_split().0;
+
+        Ok(Self {
+            remote_address: self.remote_address,
+            reader: Arc::new(Mutex::new(reader)),
+            writer: self.writer,
         })
     }
 
@@ -136,13 +119,13 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_write() {
+    async fn channel_write() {
         // 1. Start remote node
         let remote_address = random_socket_address();
         simulate_active_node(remote_address).await;
 
         // 2. Server connect to peer
-        let server_channel = Channel::new_writer(remote_address).await.unwrap();
+        let server_channel = Channel::from_addr(remote_address).await.unwrap();
 
         // 3. Server write message to peer
         server_channel.write(&GetPeers).await.unwrap();
@@ -150,21 +133,21 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_read() {
+    async fn channel_read() {
         let remote_address = random_socket_address();
         let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         tokio::spawn(async move {
             // 1. Server connects to peer.
-            let server_channel = Channel::new_writer(remote_address).await.unwrap();
+            let server_channel = Channel::from_addr(remote_address).await.unwrap();
 
             // 2. Server writes GetPeers message.
             server_channel.write(&GetPeers).await.unwrap();
         });
 
         // 2. Peer accepts server connection.
-        let (reader, _address) = remote_listener.accept().await.unwrap();
-        let peer_channel = Channel::new_reader(reader).unwrap();
+        let (stream, address) = remote_listener.accept().await.unwrap();
+        let peer_channel = Channel::new(address, stream).unwrap();
 
         // 4. Peer reads GetPeers message.
         let (name, buffer) = peer_channel.read().await.unwrap();
@@ -175,26 +158,28 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_channel_update() {
+    async fn channel_update() {
         let local_address = random_socket_address();
         let remote_address = random_socket_address();
 
+        // start a listener for the "remote" node
         let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         let (ty, ry) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
+            // start a listener for the "local" node
             let mut server_listener = TcpListener::bind(local_address).await.unwrap();
 
             tx.send(()).unwrap();
 
             // 1. Local node connects to Remote node
-            let mut channel = Channel::new_writer(remote_address).await.unwrap();
+            let mut channel = Channel::from_addr(remote_address).await.unwrap();
 
             // 4. Local node accepts Remote node connection
-            let (reader, _socket) = server_listener.accept().await.unwrap();
-            channel = channel.update_reader(Arc::new(Mutex::new(reader)));
+            let (stream, address) = server_listener.accept().await.unwrap();
+            channel = channel.update_reader(stream).await.unwrap();
 
             // 5. Local node writes GetPeers message
             channel.write(&GetPeers).await.unwrap();
@@ -210,8 +195,8 @@ mod tests {
         rx.await.unwrap();
 
         // 2. Remote node accepts Local node connection.
-        let (reader, _address) = remote_listener.accept().await.unwrap();
-        let mut channel = Channel::new_reader(reader).unwrap();
+        let (stream, _) = remote_listener.accept().await.unwrap();
+        let mut channel = Channel::new(local_address, stream).unwrap();
 
         // 3. Remote node connects to Local node.
         channel = channel.update_writer(local_address).await.unwrap();

@@ -102,20 +102,10 @@ pub fn start_test_server(server: Server) {
     tokio::spawn(async move { server.start().await.unwrap() });
 }
 
-/// Returns a tcp channel connected to the address
-pub async fn connect_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
-    let channel = Channel::new_writer(address).await.unwrap();
-    let (reader, _socket) = listener.accept().await.unwrap();
-
-    channel.update_reader(Arc::new(Mutex::new(reader)))
-}
-
 /// Returns the next tcp channel connected to the listener
 pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
-    let (reader, _peer) = listener.accept().await.unwrap();
-    let channel = Channel::new_reader(reader).unwrap();
-
-    channel.update_writer(address).await.unwrap()
+    let (stream, address) = listener.accept().await.unwrap();
+    Channel::new(address, stream).unwrap()
 }
 
 /// Starts a fake node that accepts all tcp connections at the given socket address

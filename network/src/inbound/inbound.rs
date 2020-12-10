@@ -362,7 +362,7 @@ impl Inbound {
         reader: TcpStream,
     ) -> Result<Option<(Channel, SocketAddr)>, NetworkError> {
         // Parse the inbound message into the message name and message bytes.
-        let (channel, (message_name, message_bytes)) = match Channel::new_reader(reader) {
+        let (channel, (message_name, message_bytes)) = match Channel::new(remote_address, reader) {
             // Read the next message from the channel.
             // Note this is a blocking operation.
             Ok(channel) => match channel.read().await {
