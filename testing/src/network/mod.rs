@@ -85,7 +85,7 @@ pub async fn initialize_test_server(
     // let sync_handler = SyncManager::new(bootnode_address);
     // let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
 
-    Server::new(&mut environment
+    Server::new(environment
         // consensus,
         // storage,
         // parameters,

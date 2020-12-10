@@ -51,7 +51,7 @@ type Success = HashMap<SocketAddr, Requests>;
 type Failure = HashMap<SocketAddr, Requests>;
 
 /// A core data structure for handling outbound network traffic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Outbound {
     /// The map of remote addresses to their active write channels.
     channels: Arc<RwLock<Channels>>,
@@ -70,20 +70,6 @@ pub struct Outbound {
 }
 
 impl Outbound {
-    /// Creates a new instance of a `Outbound`.
-    #[inline]
-    pub fn new() -> Self {
-        Self {
-            channels: Arc::new(RwLock::new(HashMap::new())),
-            pending: Arc::new(RwLock::new(Pending::new())),
-            success: Arc::new(RwLock::new(Success::new())),
-            failure: Arc::new(RwLock::new(Failure::new())),
-            send_pending_count: Arc::new(AtomicU64::new(0)),
-            send_success_count: Arc::new(AtomicU64::new(0)),
-            send_failure_count: Arc::new(AtomicU64::new(0)),
-        }
-    }
-
     ///
     /// Returns `true` if the given request is a pending request.
     ///
@@ -162,28 +148,19 @@ impl Outbound {
         let pending_exists = self.pending.read().await.contains_key(remote_address);
         if !pending_exists {
             trace!("Adding a pending requests map for {}", remote_address);
-            self.pending
-                .write()
-                .await
-                .insert(*remote_address, Arc::new(RwLock::new(HashSet::new())));
+            self.pending.write().await.insert(*remote_address, Default::default());
         }
 
         let success_exists = self.success.read().await.contains_key(remote_address);
         if !success_exists {
             trace!("Adding a success requests map for {}", remote_address);
-            self.success
-                .write()
-                .await
-                .insert(*remote_address, Arc::new(RwLock::new(HashSet::new())));
+            self.success.write().await.insert(*remote_address, Default::default());
         }
 
         let failure_exists = self.failure.read().await.contains_key(remote_address);
         if !failure_exists {
             trace!("Adding a failure requests map for {}", remote_address);
-            self.failure
-                .write()
-                .await
-                .insert(*remote_address, Arc::new(RwLock::new(HashSet::new())));
+            self.failure.write().await.insert(*remote_address, Default::default());
         }
     }
 
@@ -380,7 +357,7 @@ mod tests {
         let request = request(remote_address);
 
         // Create a new instance.
-        let outbound = Outbound::new();
+        let outbound = Outbound::default();
         assert!(!outbound.is_pending(&request).await);
         assert!(!outbound.is_success(&request).await);
         assert!(!outbound.is_failure(&request).await);
@@ -410,7 +387,7 @@ mod tests {
         let request = request(remote_address);
 
         // Create a new instance.
-        let outbound = Outbound::new();
+        let outbound = Outbound::default();
         assert!(!outbound.is_pending(&request).await);
         assert!(!outbound.is_success(&request).await);
         assert!(!outbound.is_failure(&request).await);
@@ -434,7 +411,7 @@ mod tests {
         let request = request(remote_address);
 
         // Create a new instance.
-        let outbound = Outbound::new();
+        let outbound = Outbound::default();
         assert!(!outbound.is_pending(&request).await);
         assert!(!outbound.is_success(&request).await);
         assert!(!outbound.is_failure(&request).await);

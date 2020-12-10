@@ -153,7 +153,7 @@ mod server_listen {
 
             // 1. Simulate server.
             tokio::spawn(async move {
-                let server = Server::new(&mut environment).await.unwrap();
+                let server = Server::new(environment).await.unwrap();
                 tx.send(()).unwrap();
                 server.start().await.unwrap();
                 sleep(5000).await;

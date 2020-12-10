@@ -44,9 +44,9 @@ impl PeerBook {
     #[inline]
     pub fn new(local_address: SocketAddr) -> Self {
         Self {
-            connecting_peers: HashMap::default(),
-            connected_peers: HashMap::default(),
-            disconnected_peers: HashMap::default(),
+            connecting_peers: Default::default(),
+            connected_peers: Default::default(),
+            disconnected_peers: Default::default(),
             local_address,
         }
     }

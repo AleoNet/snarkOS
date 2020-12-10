@@ -75,8 +75,8 @@ impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: &mut Environment) -> Result<Self, NetworkError> {
         // Create the inbound and outbound handlers.
-        let inbound = Arc::new(RwLock::new(Inbound::new()));
-        let outbound = Arc::new(RwLock::new(Outbound::new()));
+        let inbound = Arc::new(RwLock::new(Inbound::default()));
+        let outbound = Arc::new(RwLock::new(Outbound::default()));
 
         // Initialize the peer and block services.
         let peers = Peers::new(&mut environment.clone(), outbound.clone())?;

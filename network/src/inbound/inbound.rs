@@ -55,23 +55,23 @@ pub struct Inbound {
     receive_failure_count: Arc<AtomicU64>,
 }
 
-impl Inbound {
-    /// Creates a new instance of a `Inbound`.
-    #[inline]
-    pub fn new() -> Self {
+impl Default for Inbound {
+    fn default() -> Self {
         // Initialize the sender and receiver.
         let (sender, receiver) = tokio::sync::mpsc::channel(1024);
 
         Self {
             sender,
             receiver: Arc::new(Mutex::new(receiver)),
-            channels: Arc::new(RwLock::new(HashMap::new())),
-            receive_response_count: Arc::new(AtomicU64::new(0)),
-            receive_success_count: Arc::new(AtomicU64::new(0)),
-            receive_failure_count: Arc::new(AtomicU64::new(0)),
+            channels: Default::default(),
+            receive_response_count: Default::default(),
+            receive_success_count: Default::default(),
+            receive_failure_count: Default::default(),
         }
     }
+}
 
+impl Inbound {
     #[inline]
     pub async fn listen(&self, environment: &Environment) -> Result<(), NetworkError> {
         // TODO (howardwu): Find the actual address of this node.
@@ -589,10 +589,10 @@ mod tests {
         let remote_address = random_socket_address();
         let remote_environment = environment(remote_address);
 
-        let inbound = Inbound::new();
+        let inbound = Inbound::default();
         inbound.listen(&remote_environment).await.unwrap();
 
-        let outbound = Outbound::new();
+        let outbound = Outbound::default();
         outbound
             .broadcast(&Request::Version(Version::new_with_rng(
                 1u64,
