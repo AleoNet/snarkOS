@@ -42,7 +42,7 @@ pub type Channels = HashMap<SocketAddr, Arc<Channel>>;
 #[derive(Debug, Clone)]
 pub struct Inbound {
     /// The producer for sending inbound messages to the server.
-    sender: Arc<Sender>,
+    sender: Sender,
     /// The consumer for receiving inbound messages to the server.
     receiver: Arc<Mutex<Receiver>>,
     /// The map of remote addresses to their active read channels.
@@ -63,7 +63,7 @@ impl Inbound {
         let (sender, receiver) = tokio::sync::mpsc::channel(1024);
 
         Self {
-            sender: Arc::new(sender),
+            sender,
             receiver: Arc::new(Mutex::new(receiver)),
             channels: Arc::new(RwLock::new(HashMap::new())),
             receive_response_count: Arc::new(AtomicU64::new(0)),
