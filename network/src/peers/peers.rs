@@ -78,13 +78,9 @@ impl Peers {
     ///
     #[inline]
     pub async fn update(&self) -> Result<(), NetworkError> {
-        // Broadcast a `Version` request to each connected peer.
-        trace!("Broadcasting version requests to all connected peers");
-        self.broadcast_version_requests().await?;
-
         // Fetch the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers().await;
-        trace!("Connected with {} peers", number_of_connected_peers);
+        trace!("Connected to {} peers", number_of_connected_peers);
 
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
@@ -120,8 +116,14 @@ impl Peers {
             // }
         }
 
-        // Store the peer book to storage.
-        self.save_peer_book_to_storage().await?;
+        if number_of_connected_peers != 0 {
+            // Broadcast a `Version` request to each connected peer.
+            self.broadcast_version_requests().await?;
+
+            // Store the peer book to storage.
+            self.save_peer_book_to_storage().await?;
+        }
+
         Ok(())
     }
 
