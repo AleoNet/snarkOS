@@ -36,7 +36,7 @@ use tokio::{
 };
 
 /// The map of remote addresses to their active read channels.
-pub type Channels = HashMap<SocketAddr, Arc<Channel>>;
+pub type Channels = HashMap<SocketAddr, Channel>;
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug, Clone)]
@@ -124,7 +124,7 @@ impl Inbound {
         Ok(())
     }
 
-    async fn inbound(&self, local_address: SocketAddr, channel: Arc<Channel>) -> Result<(), NetworkError> {
+    async fn inbound(&self, local_address: SocketAddr, channel: Channel) -> Result<(), NetworkError> {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut channel = channel;
@@ -289,8 +289,8 @@ impl Inbound {
         &self,
         local_address: SocketAddr,
         version: Version,
-        channel: Arc<Channel>,
-    ) -> Result<Arc<Channel>, NetworkError> {
+        channel: Channel,
+    ) -> Result<Channel, NetworkError> {
         let remote_address = SocketAddr::new(channel.remote_address.ip(), version.sender.port());
 
         if local_address != remote_address {
@@ -360,7 +360,7 @@ impl Inbound {
         block_height: u32,
         remote_address: SocketAddr,
         reader: TcpStream,
-    ) -> Result<Option<(Arc<Channel>, SocketAddr)>, NetworkError> {
+    ) -> Result<Option<(Channel, SocketAddr)>, NetworkError> {
         // Parse the inbound message into the message name and message bytes.
         let (channel, (message_name, message_bytes)) = match Channel::new_reader(reader) {
             // Read the next message from the channel.
@@ -438,7 +438,6 @@ impl Inbound {
                 // Acquire the channels write lock.
                 let mut channels = self.channels.write().await;
                 // Store the new channel.
-                let channel = Arc::new(channel.clone());
                 channels.insert(local_address, channel.clone());
             }
 
@@ -469,7 +468,6 @@ impl Inbound {
                 // Acquire the channels write lock.
                 let mut channels = self.channels.write().await;
                 // Store the new channel.
-                let channel = Arc::new(channel);
                 channels.insert(remote_address, channel.clone());
 
                 self.sender
@@ -503,7 +501,6 @@ impl Inbound {
             // Acquire the channels write lock.
             let mut channels = self.channels.write().await;
             // Store the new channel.
-            let channel = Arc::new(channel);
             channels.insert(remote_address, channel.clone());
 
             self.sender
