@@ -46,7 +46,7 @@ impl Peers {
     /// Creates a new instance of `Peers`.
     ///
     #[inline]
-    pub fn new(environment: &mut Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
+    pub fn new(environment: Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
 
         // Load the peer book from storage, or create a new peer book.
@@ -61,7 +61,7 @@ impl Peers {
 
         // Instantiate the peer manager.
         let peers = Self {
-            environment: environment.clone(),
+            environment,
             outbound,
             peer_book: Arc::new(RwLock::new(peer_book)),
         };

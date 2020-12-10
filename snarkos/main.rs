@@ -175,7 +175,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // }
 
     // Construct the server instance. Note this does not start the server.
-    let server = Server::new(&mut environment).await?;
+    let server = Server::new(environment).await?;
 
     // // Start RPC thread, if the RPC configuration is enabled.
     // if config.rpc.json_rpc {

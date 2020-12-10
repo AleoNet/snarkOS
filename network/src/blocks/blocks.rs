@@ -48,12 +48,9 @@ impl Blocks {
     /// Creates a new instance of `Blocks`.
     ///
     #[inline]
-    pub fn new(environment: &mut Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
+    pub fn new(environment: Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
         trace!("Instantiating block service");
-        Ok(Self {
-            environment: environment.clone(),
-            outbound,
-        })
+        Ok(Self { environment, outbound })
     }
 
     ///
