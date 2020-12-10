@@ -150,20 +150,19 @@ impl<F: Field> TestConstraintSystem<F> {
 }
 
 fn compute_path(ns: &[String], this: &str) -> String {
-    if this.chars().any(|a| a == '/') {
+    if this.contains('/') {
         panic!("'/' is not allowed in names");
     }
 
-    let mut name = String::new();
+    // preallocate the target path size, including the separators
+    let len = ns.iter().map(|s| s.len()).sum::<usize>() + ns.len() + this.len();
+    let mut name = String::with_capacity(len);
 
-    let mut needs_separation = false;
-    for ns in ns.iter().map(|s| s.as_str()).chain(Some(this)) {
-        if needs_separation {
-            name += "/";
+    for (i, ns) in ns.iter().map(|s| s.as_str()).chain(Some(this)).enumerate() {
+        if i != 0 {
+            name.push('/');
         }
-
-        name += ns;
-        needs_separation = true;
+        name.push_str(ns);
     }
 
     name

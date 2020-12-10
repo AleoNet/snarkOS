@@ -60,7 +60,7 @@ impl<P: MerkleParameters, HG: CRHGadget<P::H, F>, F: Field> MerklePathGadget<P, 
         // Check that the hash of the given leaf matches the leaf hash in the membership
         // proof.
         let leaf_bits = leaf.to_bytes(&mut cs.ns(|| "leaf_to_bytes"))?;
-        let leaf_hash = HG::check_evaluation_gadget(cs.ns(|| "check_evaluation_gadget"), parameters, &leaf_bits)?;
+        let leaf_hash = HG::check_evaluation_gadget(cs.ns(|| "check_evaluation_gadget"), parameters, leaf_bits)?;
 
         // Check if leaf is one of the bottom-most siblings.
         let leaf_is_left =
@@ -121,7 +121,7 @@ where
     let mut bytes = left_bytes;
     bytes.extend_from_slice(&right_bytes);
 
-    HG::check_evaluation_gadget(cs, parameters, &bytes)
+    HG::check_evaluation_gadget(cs, parameters, bytes)
 }
 
 impl<P, HGadget, F> AllocGadget<MerklePath<P>, F> for MerklePathGadget<P, HGadget, F>

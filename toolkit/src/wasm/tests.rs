@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    record::tests::{TEST_ENCRYPTED_RECORD, TEST_PRIVATE_KEY, TEST_RECORD, TEST_SERIAL_NUMBER},
+    record::tests::*,
     wasm::{Account, OfflineTransaction, Record, SignatureScheme, SignatureSchemePublicKey, ViewKey},
 };
 
@@ -51,6 +51,14 @@ pub fn view_key_from_private_key_test() {
 // Record Tests
 
 #[wasm_bindgen_test]
+pub fn record_to_string_test() {
+    let record = Record::from_string(TEST_RECORD);
+
+    println!("{} == {}", TEST_RECORD, record.record.to_string());
+    assert_eq!(TEST_RECORD, record.record.to_string());
+}
+
+#[wasm_bindgen_test]
 pub fn record_decrpyption_test() {
     let view_key = ViewKey::from_private_key(TEST_PRIVATE_KEY).view_key.to_string();
 
@@ -70,6 +78,87 @@ pub fn serial_number_derivation_test() {
 
     println!("{} == {}", TEST_SERIAL_NUMBER, serial_number);
     assert_eq!(TEST_SERIAL_NUMBER, serial_number);
+}
+
+#[wasm_bindgen_test]
+pub fn record_owner_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let owner = record.owner();
+
+    println!("{} == {}", TEST_RECORD_OWNER, owner);
+    assert_eq!(TEST_RECORD_OWNER, owner);
+}
+
+#[wasm_bindgen_test]
+pub fn record_is_dummy_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let is_dummy = record.is_dummy();
+
+    println!("{} == {}", TEST_RECORD_IS_DUMMY, is_dummy);
+    assert_eq!(TEST_RECORD_IS_DUMMY, is_dummy);
+}
+
+#[wasm_bindgen_test]
+pub fn record_payload_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let payload = record.payload();
+
+    println!("{} == {}", TEST_RECORD_PAYLOAD, payload);
+    assert_eq!(TEST_RECORD_PAYLOAD, payload);
+}
+
+#[wasm_bindgen_test]
+pub fn record_birth_program_id_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let birth_program_id = record.birth_program_id();
+
+    println!("{} == {}", TEST_RECORD_BIRTH_PROGRAM_ID, birth_program_id);
+    assert_eq!(TEST_RECORD_BIRTH_PROGRAM_ID, birth_program_id);
+}
+
+#[wasm_bindgen_test]
+pub fn record_death_program_id_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let death_program_id = record.death_program_id();
+
+    println!("{} == {}", TEST_RECORD_DEATH_PROGRAM_ID, death_program_id);
+    assert_eq!(TEST_RECORD_DEATH_PROGRAM_ID, death_program_id);
+}
+
+#[wasm_bindgen_test]
+pub fn record_serial_number_nonce_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let serial_number_nonce = record.serial_number_nonce();
+
+    println!("{} == {}", TEST_RECORD_SERIAL_NUMBER_NONCE, serial_number_nonce);
+    assert_eq!(TEST_RECORD_SERIAL_NUMBER_NONCE, serial_number_nonce);
+}
+
+#[wasm_bindgen_test]
+pub fn record_commitment_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let commitment = record.commitment();
+
+    println!("{} == {}", TEST_RECORD_COMMITMENT, commitment);
+    assert_eq!(TEST_RECORD_COMMITMENT, commitment);
+}
+
+#[wasm_bindgen_test]
+pub fn record_commitment_randomness_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let commitment_randomness = record.commitment_randomness();
+
+    println!("{} == {}", TEST_RECORD_COMMITMENT_RANDOMNESS, commitment_randomness);
+    assert_eq!(TEST_RECORD_COMMITMENT_RANDOMNESS, commitment_randomness);
+}
+
+#[wasm_bindgen_test]
+pub fn record_value_test() {
+    let record = Record::from_string(TEST_RECORD);
+    let value = record.value();
+
+    println!("{} == {}", TEST_RECORD_VALUE, value);
+    assert_eq!(TEST_RECORD_VALUE, value);
 }
 
 // Signature Tests

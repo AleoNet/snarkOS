@@ -25,7 +25,7 @@ snarkos-posw = { path = "../posw", version = "1.1.4"}
 snarkos-storage = { path = "../storage", version = "1.1.4"}
 snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
-once_cell = { version = "1.4.1" }
+once_cell = { version = "1.5.2" }
 rand = { version = "0.7.0" }
 rand_xorshift = { version = "0.2.0" }
 tokio = { version = "0.2.22", features = ["full"] }
