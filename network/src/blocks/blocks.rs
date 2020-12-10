@@ -216,17 +216,16 @@ impl Blocks {
                         .await?;
                 }
             } else {
-                if let Ok(mut sync_manager) = self.environment.sync_manager().await.try_lock() {
-                    // TODO (howardwu): Implement this.
-                    {
-                        sync_manager.clear_pending().await;
+                /* TODO (howardwu): Implement this.
+                {
+                    sync_manager.clear_pending().await;
 
-                        if sync_manager.sync_state != SyncState::Idle {
-                            // We are currently syncing with a node, ask for the next block.
-                            sync_manager.increment().await?;
-                        }
+                    if sync_manager.sync_state != SyncState::Idle {
+                        // We are currently syncing with a node, ask for the next block.
+                        sync_manager.increment().await?;
                     }
                 }
+                */
             }
         }
 
@@ -353,16 +352,15 @@ impl Blocks {
     /// A peer has sent us their chain state.
     pub(crate) async fn received_sync(&self, message: Sync) -> Result<(), NetworkError> {
         let height = self.environment.storage_read().await.get_current_block_height();
-        let mut sync_handler = self.environment.sync_manager().await.lock().await;
 
+        /* TODO: implement
         sync_handler.receive_hashes(message.block_hashes, height);
 
-        // TODO (howardwu): Implement this using the sync manager and outbound handler.
         {
             // Received block headers
             sync_handler.increment().await?;
         }
-
+        */
         Ok(())
     }
 }

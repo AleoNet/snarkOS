@@ -82,8 +82,6 @@ impl Server {
         let peers = Peers::new(&mut environment.clone(), outbound.clone())?;
         let blocks = Blocks::new(&mut environment.clone(), outbound.clone())?;
 
-        environment.set_managers(outbound.clone());
-
         Ok(Self {
             environment: environment.clone(),
             inbound,

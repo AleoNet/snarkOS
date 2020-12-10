@@ -41,9 +41,6 @@ pub struct Environment {
     /// The network ID of this node.
     network_id: Network,
 
-    /// TODO (howardwu): Remove this.
-    sync_manager: Option<Arc<Mutex<SyncManager>>>,
-
     /// The local address of this node.
     local_address: SocketAddr,
 
@@ -118,8 +115,6 @@ impl Environment {
             dpc_parameters,
             network_id,
 
-            sync_manager: None, // TODO (howardwu): Remove this
-
             local_address,
 
             minimum_number_of_connected_peers,
@@ -131,25 +126,6 @@ impl Environment {
             is_bootnode,
             is_miner,
         })
-    }
-
-    /// TODO (howardwu): Remove this.
-    pub fn set_managers(&mut self, outbound: Arc<RwLock<Outbound>>) {
-        // Check if this node is configured as a bootnode.
-        // Skips instantiating the sync manager if this is a bootnode.
-        if let Some(bootnode_address) = self.bootnodes.first() {
-            self.sync_manager = Some(Arc::new(Mutex::new(SyncManager::new(
-                self.clone(),
-                *bootnode_address,
-                outbound,
-            ))));
-        }
-    }
-
-    /// TODO (howardwu): Remove this.
-    #[inline]
-    pub async fn sync_manager(&self) -> &Arc<Mutex<SyncManager>> {
-        self.sync_manager.as_ref().unwrap()
     }
 
     /// Returns a reference to the storage system of this node.
