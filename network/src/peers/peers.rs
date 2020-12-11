@@ -80,7 +80,11 @@ impl Peers {
     pub async fn update(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers().await;
-        trace!("Connected to {} peers", number_of_connected_peers);
+        trace!(
+            "Connected to {} peer{}",
+            number_of_connected_peers,
+            if number_of_connected_peers == 1 { "" } else { "s" }
+        );
 
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
