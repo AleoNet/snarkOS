@@ -376,8 +376,6 @@ impl Peers {
     ///
     #[inline]
     async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-        trace!("Saving peer book to storage");
-
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
         // Acquire the storage write lock.
@@ -389,7 +387,6 @@ impl Peers {
         // Save the serialized peer book to storage.
         storage.save_peer_book_to_storage(serialized_peer_book)?;
 
-        trace!("Saved peer book to storage");
         Ok(())
     }
 }

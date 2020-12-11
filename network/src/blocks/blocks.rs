@@ -58,12 +58,9 @@ impl Blocks {
     ///
     #[inline]
     pub async fn update(&self) -> Result<(), NetworkError> {
-        debug!("Updating block service");
-
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {}
 
-        debug!("Updated block service");
         Ok(())
     }
 

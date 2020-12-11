@@ -205,7 +205,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the main server thread.
     server.start().instrument(debug_span!("server")).await?;
 
-    stream::pending::<bool>().next().await;
+    stream::pending::<()>().next().await;
 
     Ok(())
 }

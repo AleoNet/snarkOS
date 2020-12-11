@@ -99,7 +99,6 @@ impl Inbound {
                             .await
                             .unwrap()
                         {
-                            error!("FINISHED CONNECTION REQUEST");
                             // TODO (howardwu): Enable this peer address discovery again.
                             // // Bootstrap discovery of local node IP via VERACK responses
                             //     let local_address = peers.local_address();
@@ -118,7 +117,6 @@ impl Inbound {
                                 // inbound.inbound(&discovered_local_address, channel).await?;
                             });
                         }
-                        warn!("RECEIVE HANDLER: END LISTEN");
                     }
                     Err(error) => error!("Failed to accept connection request\n{}", error),
                 }
@@ -299,7 +297,6 @@ impl Inbound {
 
         if local_address != remote_address {
             // Route version message to peer manager.
-            warn!("RECEIVEVERSIONCOMPARE {} {}", channel.remote_address, remote_address);
             self.route(Response::VersionToVerack(remote_address, version.clone()))
                 .await;
 

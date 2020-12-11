@@ -99,7 +99,7 @@ impl Server {
         let blocks = self.blocks.clone();
         task::spawn(async move {
             loop {
-                info!("Hello b?");
+                info!("Updating peers and blocks");
                 peers.update().await.unwrap();
                 blocks.update().await.unwrap();
                 sleep(Duration::from_secs(10)).await;
@@ -109,7 +109,9 @@ impl Server {
         let server_clone = self.clone();
         task::spawn(async move {
             loop {
-                server_clone.receiver().await.unwrap();
+                if let Err(e) = server_clone.receive_response().await {
+                    error!("Server error: {}", e);
+                }
             }
         });
 
@@ -122,8 +124,7 @@ impl Server {
         self.environment.local_address()
     }
 
-    async fn receiver(&self) -> Result<(), NetworkError> {
-        warn!("START NEXT RECEIVER INBOUND");
+    async fn receive_response(&self) -> Result<(), NetworkError> {
         let response = self
             .inbound
             .write()
@@ -141,7 +142,6 @@ impl Server {
                 debug!("Connecting to {}", remote_address);
             }
             Response::ConnectedTo(remote_address, nonce) => {
-                trace!("RESOLVING CONNECTED TO FROM {}", remote_address);
                 self.peers.connected_to_peer(&remote_address, nonce).await?;
                 debug!("Connected to {}", remote_address);
             }
@@ -208,7 +208,7 @@ impl Server {
                 self.peers.inbound_peers(remote_address, peers).await?;
             }
         }
-        warn!("END RECEIVER INBOUND");
+
         Ok(())
     }
 }
