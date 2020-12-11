@@ -118,7 +118,6 @@ mod tests {
     use tokio::net::TcpListener;
 
     #[tokio::test]
-    #[serial]
     async fn channel_write() {
         // 1. Start remote node
         let remote_address = simulate_active_node().await;
@@ -131,7 +130,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn channel_read() {
         let (remote_address, remote_listener) = random_bound_address().await;
 
@@ -155,7 +153,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn channel_update() {
         // start a listener for the "remote" node
         let (remote_address, remote_listener) = random_bound_address().await;

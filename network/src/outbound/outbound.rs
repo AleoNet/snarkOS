@@ -338,7 +338,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_is_pending() {
         let (remote_address, _listener) = random_bound_address().await;
         let request = request(remote_address);
@@ -365,7 +364,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_is_success() {
         // Create a test server.
         let server = test_server().await.unwrap();
@@ -389,7 +387,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_is_failure() {
         // Create a test server that refuses connections.
         let server = test_server_that_rejects().await.unwrap();

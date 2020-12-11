@@ -113,7 +113,6 @@ mod server_listen {
     //  }
 
     #[test]
-    #[serial]
     fn bind_to_port() {
         let storage = FIXTURE_VK.ledger();
         let storage_path = storage.storage.db.path().to_owned();

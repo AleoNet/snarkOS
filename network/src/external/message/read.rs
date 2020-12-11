@@ -56,7 +56,6 @@ mod tests {
     use tokio::net::{TcpListener, TcpStream};
 
     #[tokio::test]
-    #[serial]
     async fn read_multiple_headers() {
         let (address, listener) = random_bound_address().await;
 
@@ -87,7 +86,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_read_header() {
         let (address, listener) = random_bound_address().await;
 
@@ -106,7 +104,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_read_message() {
         let (address, listener) = random_bound_address().await;
 
