@@ -34,7 +34,7 @@ use tokio::sync::RwLock;
 #[derive(Clone)]
 pub struct Peers {
     /// The parameters and settings of this node server.
-    environment: Environment,
+    pub(crate) environment: Environment,
     /// The outbound service of this node server.
     outbound: Arc<RwLock<Outbound>>,
     /// The list of connected and disconnected peers of this node server.

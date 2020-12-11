@@ -38,7 +38,7 @@ use tokio::sync::RwLock;
 #[derive(Clone)]
 pub struct Blocks {
     /// The parameters and settings of this node server.
-    environment: Environment,
+    pub(crate) environment: Environment,
     /// The outbound handler of this node server.
     outbound: Arc<RwLock<Outbound>>,
 }

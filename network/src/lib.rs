@@ -95,6 +95,15 @@ impl Server {
     pub async fn start(&mut self) -> Result<(), NetworkError> {
         debug!("Initializing server");
         self.inbound.write().await.listen(&mut self.environment).await?;
+
+        // update the local address for Blocks and Peers
+        self.peers
+            .environment
+            .set_local_address(self.environment.local_address().unwrap());
+        self.blocks
+            .environment
+            .set_local_address(self.environment.local_address().unwrap());
+
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
         task::spawn(async move {
