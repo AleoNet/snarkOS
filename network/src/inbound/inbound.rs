@@ -72,18 +72,17 @@ impl Default for Inbound {
 }
 
 impl Inbound {
-    #[inline]
     pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
-        let (local_address, listener) = if let Some(addr) = environment.local_address() {
+        let (listener_address, listener) = if let Some(addr) = environment.local_address() {
             let listener = TcpListener::bind(&addr).await?;
             (addr, listener)
         } else {
             let listener = TcpListener::bind("127.0.0.1:0").await?;
-            let local_address = listener.local_addr()?;
-            environment.set_local_address(local_address);
-            (local_address, listener)
+            let listener_address = listener.local_addr()?;
+            environment.set_local_address(listener_address);
+            (listener_address, listener)
         };
-        info!("Listening at {}", local_address);
+        info!("Listening at {}", listener_address);
 
         let inbound = self.clone();
         let environment = environment.clone();
@@ -91,7 +90,7 @@ impl Inbound {
             loop {
                 match listener.accept().await {
                     Ok((channel, remote_address)) => {
-                        info!("Connection request from {}", remote_address);
+                        info!("Got a connection request from {}", remote_address);
 
                         let height = environment.current_block_height().await;
                         if let Some((channel, discovered_local_address)) = inbound
@@ -107,13 +106,11 @@ impl Inbound {
                             //         info!("Discovered local address: {:?}", local_address);
                             //     }
 
-                            // TODO (howardwu): Consider adding a `task::spawn`.
                             let inbound = inbound.clone();
                             let channel = channel.clone();
-
                             tokio::spawn(async move {
-                                debug!("Starting thread for handling connection requests");
-                                inbound.inbound(local_address, channel).await.unwrap();
+                                debug!("Spawning a task for requests from {}", remote_address);
+                                inbound.inbound(listener_address, channel).await.unwrap();
                                 // inbound.inbound(&discovered_local_address, channel).await?;
                             });
                         }
@@ -373,8 +370,6 @@ impl Inbound {
             _ => return Ok(None),
         };
 
-        trace!("Received a {} message from {}", message_name, remote_address);
-
         // Handles a version message request.
         // Create and store a new handshake in the manager.
         match message_name {
@@ -384,12 +379,18 @@ impl Inbound {
                     Ok(remote_version) => remote_version,
                     _ => return Ok(None),
                 };
+
                 let local_address = remote_version.receiver;
+
                 // Create the remote address from the given peer address, and specified port from the version message.
                 let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
+
                 // Create the local version message.
                 // TODO (raychu86): Establish a formal node version.
                 let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
+
+                debug_assert_eq!(local_address, local_version.sender);
+                debug_assert_eq!(remote_address, local_version.receiver);
 
                 // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
                 // if let Some(version) = version_message {
@@ -418,11 +419,9 @@ impl Inbound {
                 // }
 
                 // Connect to the remote address.
-                let remote_address = local_version.receiver;
                 let channel = channel.update_writer(remote_address).await?;
-                // Write a verack response to the remote peer.
-                let local_address = local_version.sender;
 
+                // Write a verack response to the remote peer.
                 channel
                     .write(&Verack::new(remote_version.nonce, local_address, remote_address))
                     .await?;
@@ -432,12 +431,9 @@ impl Inbound {
                     .send(Response::ConnectingTo(local_version.receiver, local_version.nonce))
                     .await?;
 
-                // Store the new channel. TODO(ljedrz): we store the channel under both the local_address and remote_address?
-                self.channels.write().await.insert(local_address, channel.clone());
-
                 // Parse the inbound message into the message name and message bytes.
-                let (channel, (message_name, message_bytes)) = match channel.read().await {
-                    Ok(inbound_message) => (channel, inbound_message),
+                let (message_name, message_bytes) = match channel.read().await {
+                    Ok(inbound_message) => inbound_message,
                     _ => return Ok(None),
                 };
 
