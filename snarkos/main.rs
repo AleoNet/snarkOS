@@ -60,8 +60,6 @@ fn initialize_logger(config: &Config) {
                 .with_env_filter(filter)
                 .with_target(false)
                 .init();
-
-            println!("{}", render_welcome(&config));
         }
     }
 }
