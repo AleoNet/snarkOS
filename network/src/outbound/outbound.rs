@@ -229,10 +229,8 @@ impl Outbound {
             }
         };
 
-        trace!("Broadcasting `{}` request to {}", request.name(), request.receiver());
-
-        // Broadcast the request on the outbound channel.
-        match request.broadcast(&channel).await {
+        // Write the request to the outbound channel.
+        match request.write_to_channel(&channel).await {
             Ok(_) => self.success(&request).await,
             Err(error) => self.failure(&request, error).await,
         };

@@ -74,9 +74,9 @@ impl Request {
         }
     }
 
-    /// Locks the given channel and broadcasts the request.
+    /// Locks the given channel and writes the request to it.
     #[inline]
-    pub async fn broadcast(&self, channel: &Channel) -> anyhow::Result<()> {
+    pub async fn write_to_channel(&self, channel: &Channel) -> anyhow::Result<()> {
         Ok(channel.lock().await.write_all(&self.serialize()?).await?)
     }
 
