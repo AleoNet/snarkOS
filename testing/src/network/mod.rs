@@ -39,7 +39,7 @@ pub async fn sleep(time: u64) {
 
 /// Returns an `Environment` struct with given arguments
 pub fn initialize_test_environment(
-    server_address: SocketAddr,
+    server_address: Option<SocketAddr>,
     bootnode_address: SocketAddr,
     storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
@@ -67,7 +67,7 @@ pub fn initialize_test_environment(
 
 /// Returns a server struct with given arguments
 pub async fn initialize_test_server(
-    server_address: SocketAddr,
+    server_address: Option<SocketAddr>,
     bootnode_address: SocketAddr,
     storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
@@ -98,7 +98,7 @@ pub async fn initialize_test_server(
 }
 
 /// Starts a server on a new thread. Takes full ownership of server.
-pub fn start_test_server(server: Server) {
+pub fn start_test_server(mut server: Server) {
     tokio::spawn(async move { server.start().await.unwrap() });
 }
 
@@ -109,8 +109,11 @@ pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> 
 }
 
 /// Starts a fake node that accepts all tcp connections at the given socket address
-pub async fn simulate_active_node(address: SocketAddr) {
-    accept_all_messages(TcpListener::bind(address).await.unwrap());
+pub async fn simulate_active_node() -> SocketAddr {
+    let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    accept_all_messages(listener);
+    addr
 }
 
 /// Starts a fake node that accepts all tcp connections received by the given peer listener

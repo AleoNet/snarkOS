@@ -35,6 +35,7 @@ use snarkos_utilities::{to_bytes, ToBytes};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     runtime::Builder,
+    stream::{self, StreamExt},
     sync::{Mutex, RwLock},
 };
 use tracing_futures::Instrument;
@@ -125,12 +126,12 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         authorized_inner_snark_ids,
     };
 
-    let mut environment = Environment::new(
+    let environment = Environment::new(
         Arc::new(RwLock::new(storage)),
         memory_pool_lock.clone(),
         Arc::new(consensus.clone()),
         Arc::new(parameters.clone()),
-        socket_address,
+        Some(socket_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
         100,
@@ -175,7 +176,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // }
 
     // Construct the server instance. Note this does not start the server.
-    let server = Server::new(environment).await?;
+    let mut server = Server::new(environment).await?;
 
     // // Start RPC thread, if the RPC configuration is enabled.
     // if config.rpc.json_rpc {
@@ -202,8 +203,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // }
 
     // Start the main server thread.
-    info!("Hello?");
     server.start().instrument(debug_span!("server")).await?;
+
+    stream::pending::<bool>().next().await;
 
     Ok(())
 }

@@ -50,7 +50,7 @@ impl Peers {
         trace!("Instantiating peer manager");
 
         // Load the peer book from storage, or create a new peer book.
-        let peer_book = PeerBook::new(*environment.local_address());
+        let peer_book = PeerBook::default();
         // let peer_book = match PeerBook::load(&*environment.storage_read().await) {
         //     // Case 1 - The peer book was found in storage.
         //     Ok(peer_book) => peer_book,
@@ -205,28 +205,17 @@ impl Peers {
     }
 
     ///
-    /// Returns the local address of this node.
+    /// Returns the local address of the node.
     ///
     #[inline]
-    pub fn local_address(&self) -> SocketAddr {
+    pub fn local_address(&self) -> Option<SocketAddr> {
         // TODO (howardwu): Check that env addr and peer book addr match.
         // // Acquire the peer book reader.
         // let peer_book = self.peer_book.read().await;
         // // Fetch the local address of this node.
         // peer_book.local_address()
 
-        *self.environment.local_address()
-    }
-
-    ///
-    /// Updates the local address stored in the `PeerBook`.
-    ///
-    #[inline]
-    async fn set_local_address(&mut self, local_address: SocketAddr) {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
-        // Update the local address stored in the peer book.
-        peer_book.set_local_address(local_address);
+        self.environment.local_address()
     }
 
     ///
@@ -254,7 +243,7 @@ impl Peers {
         trace!("Connecting to bootnodes");
 
         // Fetch the local address of this node.
-        let local_address = self.local_address();
+        let local_address = self.local_address().unwrap(); // must be known by now
         // Fetch the current connected peers of this node.
         let connected_peers = self.connected_peers().await;
         // Fetch the current block height of this node.
@@ -288,7 +277,7 @@ impl Peers {
     #[inline]
     async fn connect_to_disconnected_peers(&self) -> Result<(), NetworkError> {
         // Fetch the local address of this node.
-        let local_address = self.local_address();
+        let local_address = self.local_address().unwrap(); // must be known by now
         // Fetch the current block height of this node.
         let block_height = self.environment.current_block_height().await;
 
@@ -313,7 +302,7 @@ impl Peers {
     #[inline]
     async fn broadcast_version_requests(&self) -> Result<(), NetworkError> {
         // Get the local address of this node.
-        let local_address = self.local_address();
+        let local_address = self.local_address().unwrap(); // must be known by now
         // Fetch the current block height of this node.
         let block_height = self.environment.current_block_height().await;
 
@@ -396,9 +385,6 @@ impl Peers {
 
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&*peer_book)?;
-
-        // Check that the node does not maintain a connection to itself.
-        peer_book.remove_peer(&self.local_address());
 
         // Save the serialized peer book to storage.
         storage.save_peer_book_to_storage(serialized_peer_book)?;
@@ -517,7 +503,7 @@ impl Peers {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
-        let local_address = *self.environment.local_address();
+        let local_address = self.environment.local_address().unwrap(); // the address must be known by now
 
         for (peer_address, _) in peers.addresses.iter() {
             // Skip if the peer address is this node's local address.

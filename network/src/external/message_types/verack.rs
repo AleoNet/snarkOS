@@ -70,11 +70,14 @@ impl Message for Verack {
 mod tests {
     use super::*;
     use crate::external::message_types::Version;
-    use snarkos_testing::network::random_socket_address;
+    use snarkos_testing::network::random_bound_address;
 
     #[test]
     fn test_verack() {
-        let version = Version::new_with_rng(1u64, 1u32, random_socket_address(), random_socket_address());
+        let addr1: SocketAddr = "127.0.0.1:3333".parse().unwrap();
+        let addr2: SocketAddr = "127.0.0.1:4444".parse().unwrap();
+
+        let version = Version::new_with_rng(1u64, 1u32, addr1, addr2);
 
         let message = Verack::new(version.nonce, version.receiver, version.sender);
 

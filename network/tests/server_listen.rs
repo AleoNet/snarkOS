@@ -121,12 +121,12 @@ mod server_listen {
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
         let consensus = TEST_CONSENSUS.clone();
         let parameters = load_verifying_parameters();
-        let socket_address = random_socket_address();
+        let socket_address = None;
         let min_peers = 1;
         let max_peers = 10;
         let sync_interval = 100;
         let mempool_interval = 5;
-        let bootnodes = vec![random_socket_address().to_string()];
+        let bootnodes = vec![];
         let is_bootnode = true;
         let is_miner = false;
 
@@ -153,15 +153,16 @@ mod server_listen {
 
             // 1. Simulate server.
             tokio::spawn(async move {
-                let server = Server::new(environment).await.unwrap();
-                tx.send(()).unwrap();
+                let mut server = Server::new(environment).await.unwrap();
                 server.start().await.unwrap();
-                sleep(5000).await;
+                let server_addr = server.local_address().unwrap();
+                tx.send(server_addr);
             });
-            rx.await.unwrap();
+
+            let server_addr = rx.await.unwrap();
 
             // 2. Try to bind to server listener port.
-            assert_err!(TcpListener::bind(socket_address).await);
+            assert_err!(TcpListener::bind(server_addr).await);
         });
 
         drop(rt);

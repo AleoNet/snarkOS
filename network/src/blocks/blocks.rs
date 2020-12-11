@@ -78,7 +78,7 @@ impl Blocks {
         // // Fetch the local address of this node.
         // peer_book.local_address()
 
-        *self.environment.local_address()
+        self.environment.local_address().unwrap() // the address must be known by now
     }
 
     /// Broadcast block to connected peers

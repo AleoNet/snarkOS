@@ -49,7 +49,7 @@ pub use peers::*;
 
 use crate::peers::peers::Peers;
 
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, task, time::sleep};
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Response>;
@@ -92,9 +92,9 @@ impl Server {
     }
 
     #[inline]
-    pub async fn start(self) -> Result<(), NetworkError> {
+    pub async fn start(&mut self) -> Result<(), NetworkError> {
         debug!("Initializing server");
-        self.inbound.write().await.listen(&self.environment).await?;
+        self.inbound.write().await.listen(&mut self.environment).await?;
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
         task::spawn(async move {
@@ -105,10 +105,21 @@ impl Server {
                 sleep(Duration::from_secs(10)).await;
             }
         });
+
+        let server_clone = self.clone();
+        task::spawn(async move {
+            loop {
+                server_clone.receiver().await.unwrap();
+            }
+        });
+
         debug!("Initialized server");
-        loop {
-            self.receiver().await?;
-        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn local_address(&self) -> Option<SocketAddr> {
+        self.environment.local_address()
     }
 
     async fn receiver(&self) -> Result<(), NetworkError> {

@@ -73,13 +73,17 @@ impl Default for Inbound {
 
 impl Inbound {
     #[inline]
-    pub async fn listen(&self, environment: &Environment) -> Result<(), NetworkError> {
-        // TODO (howardwu): Find the actual address of this node.
-        let local_address = environment.local_address();
-        debug!("Starting listener at {:?}...", local_address);
-
-        let listener = TcpListener::bind(&local_address).await?;
-        info!("Listening at {:?}", local_address);
+    pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
+        let (local_address, listener) = if let Some(addr) = environment.local_address() {
+            let listener = TcpListener::bind(&addr).await?;
+            (addr, listener)
+        } else {
+            let listener = TcpListener::bind("0.0.0.0:0").await?;
+            let local_address = listener.local_addr()?;
+            environment.set_local_address(local_address);
+            (local_address, listener)
+        };
+        info!("Listening at {}", local_address);
 
         let inbound = self.clone();
         let environment = environment.clone();
@@ -107,10 +111,10 @@ impl Inbound {
                             // TODO (howardwu): Consider adding a `task::spawn`.
                             let inbound = inbound.clone();
                             let channel = channel.clone();
-                            let environment = environment.clone();
+
                             tokio::spawn(async move {
                                 debug!("Starting thread for handling connection requests");
-                                inbound.inbound(*environment.local_address(), channel).await.unwrap();
+                                inbound.inbound(local_address, channel).await.unwrap();
                                 // inbound.inbound(&discovered_local_address, channel).await?;
                             });
                         }
@@ -496,90 +500,5 @@ impl Inbound {
         }
 
         Ok(None)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        environment::Environment,
-        external::message_types::{Verack, Version},
-        inbound::Inbound,
-        outbound::{Outbound, Request},
-    };
-    use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
-    use snarkos_testing::{
-        consensus::*,
-        dpc::load_verifying_parameters,
-        network::{initialize_test_environment, *},
-        storage::*,
-    };
-
-    use serial_test::serial;
-    use std::{net::SocketAddr, sync::Arc};
-    use tokio::sync::{Mutex, RwLock};
-    use tracing::*;
-
-    #[inline]
-    fn test_logger() {
-        use tracing_subscriber::{fmt::format::Format, FmtSubscriber};
-
-        let subscriber = FmtSubscriber::builder()
-            .with_max_level(tracing::Level::TRACE)
-            .with_target(false)
-            .event_format(Format::default())
-            .finish();
-
-        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    }
-
-    #[inline]
-    fn environment(local_address: SocketAddr) -> Environment {
-        let bootnode_address = random_socket_address();
-        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
-        let consensus = Arc::new(TEST_CONSENSUS.clone());
-        let memory_pool = MemoryPool::new();
-        let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
-
-        Environment::new(
-            storage,
-            memory_pool_lock,
-            consensus,
-            Arc::new(parameters),
-            local_address,
-            1,
-            5,
-            100,
-            10,
-            vec![bootnode_address.to_string()],
-            true,
-            false,
-        )
-        .unwrap()
-    }
-
-    #[tokio::test]
-    #[serial]
-    #[ignore]
-    async fn test_inbound_basic() {
-        test_logger();
-
-        let local_address = random_socket_address();
-        let remote_address = random_socket_address();
-        let remote_environment = environment(remote_address);
-
-        let inbound = Inbound::default();
-        inbound.listen(&remote_environment).await.unwrap();
-
-        let outbound = Outbound::default();
-        outbound
-            .broadcast(&Request::Version(Version::new_with_rng(
-                1u64,
-                1,
-                local_address,
-                remote_address,
-            )))
-            .await;
     }
 }

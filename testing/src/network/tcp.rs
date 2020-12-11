@@ -21,39 +21,40 @@ use tracing::*;
 
 pub const LOCALHOST: &'static str = "0.0.0.0";
 
-/// Returns a random tcp socket address
-pub fn random_socket_address() -> SocketAddr {
-    let mut rng = rand::thread_rng();
-    let string = format!("{}:{}", LOCALHOST, rng.gen_range(3333, 9999));
-    string.parse::<SocketAddr>().unwrap()
+/// Returns a random tcp socket address and binds it to a listener
+pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
+    let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    (addr, listener)
 }
 
 pub struct TcpServer {
-    address: SocketAddr,
+    pub address: SocketAddr,
+    listener: Option<TcpListener>,
 }
 
 impl TcpServer {
-    pub fn new(address: SocketAddr) -> Self {
-        Self { address }
-    }
+    pub async fn new() -> Self {
+        let (address, listener) = random_bound_address().await;
 
-    pub fn new_random() -> Self {
         Self {
-            address: random_socket_address(),
+            address,
+            listener: Some(listener),
         }
     }
 
-    pub async fn listen(&self, should_reject: bool) -> anyhow::Result<()> {
-        debug!("Starting listener at {:?}...", self.address);
-        let listener = TcpListener::bind(&self.address).await?;
-        info!("Listening at {:?}", self.address);
+    pub async fn listen(&mut self, should_reject: bool) -> anyhow::Result<()> {
+        let listener = self.listener.take().unwrap();
 
         if !should_reject {
-            loop {
-                let inbound = listener.accept().await;
-                info!("{:?}", inbound);
-            }
+            tokio::spawn(async move {
+                loop {
+                    let inbound = listener.accept().await;
+                    println!("{:?}", inbound);
+                }
+            });
         }
+        // gets dropped otherwise
 
         Ok(())
     }
@@ -67,7 +68,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_listen() {
-        let remote_address = random_socket_address();
+        let remote_address = random_bound_address();
 
         // Start a TcpServer.
         tokio::task::spawn(async move {

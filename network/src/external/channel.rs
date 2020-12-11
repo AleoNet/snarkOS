@@ -112,7 +112,7 @@ impl Channel {
 mod tests {
     use super::*;
     use crate::external::message_types::{GetPeers, Peers};
-    use snarkos_testing::network::{random_socket_address, simulate_active_node};
+    use snarkos_testing::network::{random_bound_address, simulate_active_node};
 
     use serial_test::serial;
     use tokio::net::TcpListener;
@@ -121,8 +121,7 @@ mod tests {
     #[serial]
     async fn channel_write() {
         // 1. Start remote node
-        let remote_address = random_socket_address();
-        simulate_active_node(remote_address).await;
+        let remote_address = simulate_active_node().await;
 
         // 2. Server connect to peer
         let server_channel = Channel::from_addr(remote_address).await.unwrap();
@@ -134,8 +133,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn channel_read() {
-        let remote_address = random_socket_address();
-        let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
+        let (remote_address, remote_listener) = random_bound_address().await;
 
         tokio::spawn(async move {
             // 1. Server connects to peer.
@@ -159,20 +157,17 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn channel_update() {
-        let local_address = random_socket_address();
-        let remote_address = random_socket_address();
-
         // start a listener for the "remote" node
-        let mut remote_listener = TcpListener::bind(remote_address).await.unwrap();
+        let (remote_address, remote_listener) = random_bound_address().await;
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         let (ty, ry) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
             // start a listener for the "local" node
-            let mut server_listener = TcpListener::bind(local_address).await.unwrap();
+            let (local_address, server_listener) = random_bound_address().await;
 
-            tx.send(()).unwrap();
+            tx.send(local_address).unwrap();
 
             // 1. Local node connects to Remote node
             let mut channel = Channel::from_addr(remote_address).await.unwrap();
@@ -192,7 +187,7 @@ mod tests {
             ty.send(()).unwrap();
         });
 
-        rx.await.unwrap();
+        let local_address = rx.await.unwrap();
 
         // 2. Remote node accepts Local node connection.
         let (stream, _) = remote_listener.accept().await.unwrap();

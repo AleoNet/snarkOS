@@ -296,7 +296,7 @@ impl Outbound {
 #[cfg(test)]
 mod tests {
     use crate::{external::GetPeers, outbound::*};
-    use snarkos_testing::network::{random_socket_address, TcpServer};
+    use snarkos_testing::network::{random_bound_address, TcpServer};
 
     use serial_test::serial;
     use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -314,44 +314,33 @@ mod tests {
     /// Creates a new `TcpServer` and rejects requests if the given reject boolean is set to `true`.
     ///
     #[inline]
-    async fn test_server_with_behavior(remote_address: SocketAddr, should_reject: bool) -> anyhow::Result<()> {
-        // Start a TcpServer.
-        tokio::task::spawn(async move {
-            let server = TcpServer::new(remote_address);
-            server.listen(should_reject).await.unwrap();
-        });
-        sleep(Duration::from_secs(2)).await;
+    async fn test_server_with_behavior(should_reject: bool) -> anyhow::Result<TcpServer> {
+        let mut server = TcpServer::new().await;
+        server.listen(should_reject).await.unwrap();
 
-        if !should_reject {
-            // Check that the TcpServer is working.
-            let mut channel = TcpStream::connect(remote_address).await?;
-            let result = channel.write_all(b"hello").await;
-            assert!(result.is_ok());
-        }
-
-        Ok(())
+        Ok(server)
     }
 
     ///
     /// Creates a new `TcpServer`.
     ///
     #[inline]
-    pub async fn test_server(remote_address: SocketAddr) -> anyhow::Result<()> {
-        test_server_with_behavior(remote_address, false).await
+    pub async fn test_server() -> anyhow::Result<TcpServer> {
+        test_server_with_behavior(false).await
     }
 
     ///
     /// Creates a new `TcpServer` that rejects all requests.
     ///
     #[inline]
-    pub async fn test_server_that_rejects(remote_address: SocketAddr) -> anyhow::Result<()> {
-        test_server_with_behavior(remote_address, true).await
+    pub async fn test_server_that_rejects() -> anyhow::Result<TcpServer> {
+        test_server_with_behavior(true).await
     }
 
     #[tokio::test]
     #[serial]
     async fn test_is_pending() {
-        let remote_address = random_socket_address();
+        let (remote_address, _listener) = random_bound_address().await;
         let request = request(remote_address);
 
         // Create a new instance.
@@ -379,8 +368,8 @@ mod tests {
     #[serial]
     async fn test_is_success() {
         // Create a test server.
-        let remote_address = random_socket_address();
-        test_server(remote_address).await.unwrap();
+        let server = test_server().await.unwrap();
+        let remote_address = server.address;
 
         let request = request(remote_address);
 
@@ -403,8 +392,8 @@ mod tests {
     #[serial]
     async fn test_is_failure() {
         // Create a test server that refuses connections.
-        let remote_address = random_socket_address();
-        test_server_that_rejects(remote_address).await.unwrap();
+        let server = test_server_that_rejects().await.unwrap();
+        let remote_address = server.address;
 
         let request = request(remote_address);
 

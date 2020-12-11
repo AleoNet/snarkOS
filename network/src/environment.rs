@@ -42,7 +42,7 @@ pub struct Environment {
     network_id: Network,
 
     /// The local address of this node.
-    local_address: SocketAddr,
+    local_address: Option<SocketAddr>,
 
     /// The minimum number of peers required to maintain connections with.
     minimum_number_of_connected_peers: u16,
@@ -74,7 +74,7 @@ impl Environment {
         consensus_parameters: Arc<ConsensusParameters>,
         dpc_parameters: Arc<PublicParameters<Components>>,
 
-        local_address: SocketAddr,
+        local_address: Option<SocketAddr>,
 
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
@@ -152,10 +152,16 @@ impl Environment {
         &self.dpc_parameters
     }
 
-    /// Returns a reference to the default bootnodes of the network.
+    /// Returns the local address of the node.
     #[inline]
-    pub fn local_address(&self) -> &SocketAddr {
-        &self.local_address
+    pub fn local_address(&self) -> Option<SocketAddr> {
+        self.local_address
+    }
+
+    /// Sets the local address of the node to the given value.
+    #[inline]
+    pub fn set_local_address(&mut self, addr: SocketAddr) {
+        self.local_address = Some(addr);
     }
 
     /// Returns a reference to the default bootnodes of the network.

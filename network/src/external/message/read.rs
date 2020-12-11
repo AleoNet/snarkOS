@@ -50,7 +50,7 @@ mod tests {
         message::{message::Message, MessageHeader},
         message_types::Version,
     };
-    use snarkos_testing::network::random_socket_address;
+    use snarkos_testing::network::random_bound_address;
 
     use serial_test::serial;
     use tokio::net::{TcpListener, TcpStream};
@@ -58,8 +58,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn read_multiple_headers() {
-        let address = random_socket_address();
-        let listener = TcpListener::bind(address).await.unwrap();
+        let (address, listener) = random_bound_address().await;
 
         tokio::spawn(async move {
             let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
@@ -90,8 +89,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_read_header() {
-        let address = random_socket_address();
-        let mut listener = TcpListener::bind(address).await.unwrap();
+        let (address, listener) = random_bound_address().await;
 
         tokio::spawn(async move {
             let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
@@ -110,8 +108,8 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_read_message() {
-        let address = random_socket_address();
-        let listener = TcpListener::bind(address).await.unwrap();
+        let (address, listener) = random_bound_address().await;
+
         let expected = Version::new(
             1u64,
             0u32,
