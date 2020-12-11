@@ -206,3 +206,68 @@ impl Server {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::external::{message::message::Message, Version};
+
+    use snarkos_consensus::MemoryPool;
+    use snarkos_testing::{
+        consensus::{FIXTURE_VK, TEST_CONSENSUS},
+        dpc::load_verifying_parameters,
+    };
+
+    use std::{
+        sync::{atomic::AtomicBool, Arc},
+        time::Duration,
+    };
+
+    use tokio::{
+        io::AsyncWriteExt,
+        net::TcpStream,
+        sync::{Mutex, RwLock},
+    };
+
+    fn environment() -> Environment {
+        let storage = FIXTURE_VK.ledger();
+        let storage_path = storage.storage.db.path().to_owned();
+        let memory_pool = MemoryPool::new();
+        let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
+        let consensus = TEST_CONSENSUS.clone();
+        let parameters = load_verifying_parameters();
+        let socket_address = None;
+        let min_peers = 1;
+        let max_peers = 10;
+        let sync_interval = 100;
+        let mempool_interval = 5;
+        let bootnodes = vec![];
+        let is_bootnode = false;
+        let is_miner = false;
+
+        Environment::new(
+            Arc::new(RwLock::new(storage)),
+            memory_pool_lock,
+            Arc::new(consensus),
+            Arc::new(parameters),
+            socket_address,
+            min_peers,
+            max_peers,
+            sync_interval,
+            mempool_interval,
+            bootnodes,
+            is_bootnode,
+            is_miner,
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn starts_server() {
+        let environment = environment();
+        let mut server = Server::new(environment).await.unwrap();
+
+        assert!(server.start().await.is_ok());
+        assert_eq!(server.peers.number_of_connected_peers().await, 0);
+    }
+}
