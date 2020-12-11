@@ -177,13 +177,6 @@ impl PeerBook {
     ///
     #[inline]
     pub fn set_connecting(&mut self, address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        /* TODO(ljedrz): move this check higher up
-        if self.local_address() == *address {
-            error!("Attempting to open a connection to the local address - {}", address);
-            return Err(NetworkError::PeerAddressIsLocalAddress);
-        }
-        */
-
         // Remove the address from the disconnected peers, if it exists.
         let mut peer_info = match self.disconnected_peers.remove(address) {
             // Case 1 - A previously known peer.

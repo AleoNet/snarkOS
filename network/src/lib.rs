@@ -138,7 +138,7 @@ impl Server {
 
         match response {
             Response::ConnectingTo(remote_address, nonce) => {
-                self.peers.connecting_to_peer(&remote_address, nonce).await?;
+                self.peers.connecting_to_peer(remote_address, nonce).await?;
                 debug!("Connecting to {}", remote_address);
             }
             Response::ConnectedTo(remote_address, nonce) => {

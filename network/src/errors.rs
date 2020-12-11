@@ -48,6 +48,7 @@ pub enum NetworkError {
     PeerNonceMismatch,
     PeerUnauthorized,
     PeerWasNotSetToConnecting,
+    SelfConnectAttempt,
     SendError(SendError),
     SenderError(tokio::sync::mpsc::error::SendError<crate::inbound::Response>),
     OutboundChannelMissing,
