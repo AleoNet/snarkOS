@@ -33,7 +33,7 @@ use std::{
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &[&str] = &[
-        "0.0.0.0:4141"
+        "127.0.0.1:4141"
     // "138.197.232.178:4131",
     // "64.225.91.42:4131",
     // "64.225.91.43:4131",
@@ -102,7 +102,7 @@ impl Default for Config {
                 dir: Self::snarkos_dir(),
                 db: "snarkos_testnet1".into(),
                 is_bootnode: false,
-                ip: "0.0.0.0".into(),
+                ip: "127.0.0.1".into(),
                 port: 4131,
                 verbose: 3,
             },

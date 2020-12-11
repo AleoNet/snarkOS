@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let peer_info = PeerInfo::new(format!("0.0.0.0:4130").parse()?);
+        let peer_info = PeerInfo::new(format!("127.0.0.1:4130").parse()?);
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
         assert_eq!(&None, peer_info.nonce());
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_set_connecting_from_never_connected() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
         assert_eq!(address, peer_info.address());
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_set_connected_from_connecting() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
         peer_info.set_connecting(&address, 0).unwrap();
@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_set_disconnected_from_connecting() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
         peer_info.set_connecting(&address, 0).unwrap();
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_set_disconnected_from_connected() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
         peer_info.set_connecting(&address, 0).unwrap();
@@ -392,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_set_connected_from_never_connected() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
 
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_set_disconnected_from_never_connected() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
 
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_set_connected_from_disconnected() {
-        let address: SocketAddr = format!("0.0.0.0:4130").parse()?;
+        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
 
         let mut peer_info = PeerInfo::new(address);
         peer_info.set_connecting(&address, 0).unwrap();

@@ -19,11 +19,9 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tracing::*;
 
-pub const LOCALHOST: &'static str = "0.0.0.0";
-
 /// Returns a random tcp socket address and binds it to a listener
 pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
-    let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     (addr, listener)
 }

@@ -111,8 +111,8 @@ mod tests {
             1u64,
             0u32,
             1u64,
-            "0.0.0.0:4131".parse().unwrap(),
-            "0.0.0.0:4141".parse().unwrap(),
+            "127.0.0.1:4131".parse().unwrap(),
+            "127.0.0.1:4141".parse().unwrap(),
         );
         let version = expected.clone();
 

@@ -110,8 +110,7 @@ pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> 
 
 /// Starts a fake node that accepts all tcp connections at the given socket address
 pub async fn simulate_active_node() -> SocketAddr {
-    let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+    let (addr, listener) = random_bound_address().await;
     accept_all_messages(listener);
     addr
 }

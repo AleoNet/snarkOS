@@ -25,7 +25,7 @@ use crate::{
 
 use std::{
     collections::HashMap,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
 };
 use tokio::sync::RwLock;
@@ -504,10 +504,7 @@ impl Peers {
 
         for (peer_address, _) in peers.addresses.iter() {
             // Skip if the peer address is this node's local address.
-            let is_zero_address = match "0.0.0.0".to_string().parse::<IpAddr>() {
-                Ok(zero_ip) => (*peer_address).ip() == zero_ip,
-                _ => false,
-            };
+            let is_zero_address = (*peer_address).ip() == IpAddr::V4(Ipv4Addr::LOCALHOST);
             if *peer_address == local_address || is_zero_address {
                 continue;
             }

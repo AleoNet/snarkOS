@@ -78,7 +78,7 @@ impl Inbound {
             let listener = TcpListener::bind(&addr).await?;
             (addr, listener)
         } else {
-            let listener = TcpListener::bind("0.0.0.0:0").await?;
+            let listener = TcpListener::bind("127.0.0.1:0").await?;
             let local_address = listener.local_addr()?;
             environment.set_local_address(local_address);
             (local_address, listener)
