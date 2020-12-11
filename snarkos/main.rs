@@ -95,11 +95,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let memory_pool = MemoryPool::from_storage(&storage)?;
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
 
-    let bootnode = match config.p2p.bootnodes.len() {
-        0 => socket_address,
-        _ => config.p2p.bootnodes[0].parse::<SocketAddr>()?,
-    };
-
     info!("Loading Aleo parameters...");
     let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
     info!("Loading complete.");
